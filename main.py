@@ -11,7 +11,7 @@ import threading
 from datetime import datetime
 
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 
 def load_config():
@@ -754,6 +754,98 @@ class StockNumberComparator:
             print(f'保存重复日志失败: {e}')
             return False
 
+    def get_latest_json_file(self):
+        try:
+            file_dir = 'file'
+            if not os.path.exists(file_dir):
+                print(f'目录 {file_dir} 不存在')
+                return None
+            
+            json_files = []
+            for file in os.listdir(file_dir):
+                if file.endswith('.json') and '微购相册' in file:
+                    file_path = os.path.join(file_dir, file)
+                    json_files.append((file_path, os.path.getmtime(file_path)))
+            
+            if not json_files:
+                print('未找到微购相册JSON文件')
+                return None
+            
+            json_files.sort(key=lambda x: x[1], reverse=True)
+            latest_file = json_files[0][0]
+            print(f'找到最新的JSON文件: {latest_file}')
+            return latest_file
+        except Exception as e:
+            print(f'获取最新JSON文件失败: {e}')
+            return None
+
+    def compare_excel_with_json(self):
+        try:
+            print('='*60)
+            print('Excel与JSON数据对比工具')
+            print('='*60)
+            
+            latest_json_file = self.get_latest_json_file()
+            if not latest_json_file:
+                print('无法获取最新的JSON文件')
+                return False
+            
+            with open(latest_json_file, 'r', encoding='utf-8') as f:
+                json_data = json.load(f)
+            
+            json_stock_numbers = self.extract_stock_numbers(json_data)
+            print(f'从JSON文件中读取到 {len(json_stock_numbers)} 个货号\n')
+            
+            excel_stock_numbers = self.load_excel_data()
+            if not excel_stock_numbers:
+                print('无法从Excel文件读取货号')
+                return False
+            
+            result = self.compare_stock_numbers(json_stock_numbers, excel_stock_numbers)
+            
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            date_str = datetime.now().strftime('%Y%m%d')
+            
+            diff_data = {
+                'timestamp': timestamp,
+                'date': date_str,
+                'json_file': os.path.basename(latest_json_file),
+                'excel_file': os.path.basename(self.excel_file),
+                'comparison': result
+            }
+            
+            diff_log_file = f'file/diff_log_{date_str}.json'
+            
+            if os.path.exists(diff_log_file):
+                try:
+                    with open(diff_log_file, 'r', encoding='utf-8') as f:
+                        existing_data = json.load(f)
+                    if isinstance(existing_data, list):
+                        existing_data.append(diff_data)
+                    elif isinstance(existing_data, dict) and 'logs' in existing_data:
+                        existing_data['logs'].append(diff_data)
+                    else:
+                        existing_data = {'logs': [existing_data, diff_data]}
+                except Exception as e:
+                    print(f'读取现有日志文件失败: {e}')
+                    existing_data = {'logs': [diff_data]}
+            else:
+                existing_data = {'logs': [diff_data]}
+            
+            with open(diff_log_file, 'w', encoding='utf-8') as f:
+                json.dump(existing_data, f, ensure_ascii=False, indent=2)
+            
+            print(f'\n差异日志已保存到 {diff_log_file}')
+            
+            self.print_comparison_result(result, [])
+            
+            return True
+        except Exception as e:
+            print(f'对比失败: {e}')
+            import traceback
+            traceback.print_exc()
+            return False
+
     def print_comparison_result(self, result, duplicates):
         print('\n' + '='*60)
         print('货号对比结果')
@@ -971,12 +1063,13 @@ def main():
     print('1. 运行爬虫')
     print('2. 货号对比（交互式）')
     print('3. 货号对比（简化版）')
-    print('4. 更新Cookie')
+    print('4. Excel与JSON对比（自动保存差异日志）')
+    print('5. 更新Cookie')
     print('0. 退出')
     print('='*60)
     
     try:
-        choice = input('请输入选项 (0-4): ').strip()
+        choice = input('请输入选项 (0-5): ').strip()
     except (EOFError, KeyboardInterrupt):
         print('\n程序已退出')
         return
@@ -991,6 +1084,9 @@ def main():
         comparator = StockNumberComparator()
         comparator.run_simple()
     elif choice == '4':
+        comparator = StockNumberComparator()
+        comparator.compare_excel_with_json()
+    elif choice == '5':
         update_cookie()
     elif choice == '0':
         print('程序已退出')
