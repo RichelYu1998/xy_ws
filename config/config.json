@@ -5,6 +5,14 @@
     "login_type": "phone"
   },
   "target_url": "https://www.szwego.com/static/index.html?link_type=pc_home&shop_id=_dmJmJEsu5AD3WiJ2MxfM3CmGtKrxJ3cFCPnT3zA&shop_name=%E5%A8%83%E5%A4%A7%E7%93%9C%E6%93%A6#/shop_detail/_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ",
+  "scroll_config": {
+    "max_attempts": 20,
+    "same_height_limit": 5,
+    "scroll_wait_time": 1.5,
+    "popup_close_interval": 5,
+    "popup_close_limit": 3,
+    "popup_close_wait": 0.3
+  },
   "headers": {
     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
     "accept-encoding": "gzip, deflate, br, zstd",
