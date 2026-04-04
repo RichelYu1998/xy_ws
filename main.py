@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "1.6.2"
+VERSION = "1.7.0"
 
 
 try:
@@ -186,7 +186,7 @@ class WegoScraper:
         text = re.sub(r'\s+', ' ', text).strip()
         return text if text else None
 
-    async def close_popups(self, page):
+    async def close_popups(self, page, close_limit=3, wait_time=0.3):
         popup_selectors = [
             '[class*="close"]', '[class*="modal-close"]', '[class*="dialog-close"]',
             'button:has-text("关闭")', 'button:has-text("×")', 'button:has-text("✕")',
@@ -200,9 +200,9 @@ class WegoScraper:
                 if close_button:
                     await close_button.click()
                     print(f'关闭了弹窗: {selector}')
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(wait_time)
                     closed_count += 1
-                    if closed_count >= 3:
+                    if closed_count >= close_limit:
                         break
             except Exception as e:
                 pass
@@ -210,11 +210,19 @@ class WegoScraper:
     async def scroll_to_load_all(self, page):
         print('开始滚动加载所有商品...')
         
+        scroll_config = self.config_manager.get('scroll_config', {})
+        max_attempts = scroll_config.get('max_attempts', 20)
+        same_height_limit = scroll_config.get('same_height_limit', 5)
+        scroll_wait_time = scroll_config.get('scroll_wait_time', 1.5)
+        popup_close_interval = scroll_config.get('popup_close_interval', 5)
+        popup_close_limit = scroll_config.get('popup_close_limit', 3)
+        popup_close_wait = scroll_config.get('popup_close_wait', 0.3)
+        
+        print(f'滚动配置: 最大尝试{max_attempts}次, 高度不变限制{same_height_limit}次, 等待时间{scroll_wait_time}秒')
+        
         last_height = 0
         scroll_attempts = 0
-        max_attempts = 20
         no_change_count = 0
-        same_height_limit = 5
         
         while scroll_attempts < max_attempts:
             try:
@@ -230,13 +238,13 @@ class WegoScraper:
                     last_height = current_height
                 
                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                await asyncio.sleep(1.5)
+                await asyncio.sleep(scroll_wait_time)
                 scroll_attempts += 1
                 print(f'滚动 {scroll_attempts}/{max_attempts}，当前高度: {current_height}')
                 
-                # 只在滚动5次后关闭一次弹窗，避免频繁操作
-                if scroll_attempts % 5 == 0:
-                    await self.close_popups(page)
+                # 只在滚动指定次数后关闭一次弹窗，避免频繁操作
+                if scroll_attempts % popup_close_interval == 0:
+                    await self.close_popups(page, popup_close_limit, popup_close_wait)
             except Exception as e:
                 print(f'滚动时出错: {e}')
                 break

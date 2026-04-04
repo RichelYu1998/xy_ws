@@ -407,6 +407,19 @@ pip install openpyxl
 
 ## 更新日志
 
+### v1.7.0 (2026-04-04)
+- **滚动参数可配置化**：将滚动相关参数移至config.json，支持根据不同网站调整
+- **新增scroll_config配置项**：
+  - max_attempts：最大滚动次数（默认20次）
+  - same_height_limit：高度不变限制（默认5次）
+  - scroll_wait_time：滚动等待时间（默认1.5秒）
+  - popup_close_interval：弹窗关闭间隔（默认5次）
+  - popup_close_limit：弹窗关闭限制（默认3个）
+  - popup_close_wait：弹窗关闭等待时间（默认0.3秒）
+- **优化close_popups函数**：支持自定义关闭限制和等待时间
+- **显示滚动配置信息**：启动时显示当前滚动配置参数
+- **提升灵活性**：用户可根据目标网站特点调整滚动策略
+
 ### v1.6.2 (2026-04-04)
 - **修复页面加载死机问题**：将wait_until从networkidle改为domcontentloaded，避免无限等待
 - **优化页面加载超时**：从120秒减少到60秒，更快失败并提示用户
