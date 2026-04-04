@@ -1,8 +1,14 @@
 @echo off
+setlocal enabledelayedexpansion
 chcp 65001 > nul
 echo ========================================
-echo Szwego商品爬虫和货号对比工具 - v1.5.0
+echo Szwego商品爬虫和货号对比工具 - v1.8.0
 echo ========================================
+echo.
+
+REM 获取开始时间
+set START_TIME=%time%
+echo 开始时间: %START_TIME%
 echo.
 
 REM 检查虚拟环境
@@ -32,5 +38,13 @@ if not exist "config\config.json" (
     exit /b 1
 )
 
+REM 运行程序
 .venv\Scripts\python.exe main.py
+
+REM 获取结束时间
+set END_TIME=%time%
+echo.
+echo ========================================
+echo 结束时间: %END_TIME%
+echo ========================================
 pause
