@@ -5,18 +5,11 @@ import os
 import re
 import platform
 import sys
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-import threading
 from datetime import datetime
 
 
-VERSION = "1.3.0"
-
-
-def load_config():
-    with open('config/config.json', 'r', encoding='utf-8') as f:
-        return json.load(f)
+VERSION = "1.3.1"
 
 
 try:
@@ -33,86 +26,182 @@ except ImportError:
     sys.exit(1)
 
 
-class WegoScraper:
+class ConfigManager:
     def __init__(self, config_path='config/config.json'):
         self.config_path = config_path
-        self.config = self.load_config()
+        self._config = None
 
-    def load_config(self):
-        with open(self.config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+    @property
+    def config(self):
+        if self._config is None:
+            self._config = self._load_config()
+        return self._config
+
+    def _load_config(self):
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f'加载配置文件失败: {e}')
+            return {}
 
     def save_config(self):
-        with open(self.config_path, 'w', encoding='utf-8') as f:
-            json.dump(self.config, f, ensure_ascii=False, indent=2)
+        if self._config:
+            try:
+                with open(self.config_path, 'w', encoding='utf-8') as f:
+                    json.dump(self._config, f, ensure_ascii=False, indent=2)
+                return True
+            except Exception as e:
+                print(f'保存配置文件失败: {e}')
+        return False
 
-    def save_cookies(self, cookies):
-        cookie_file = self.config.get('cookie_file', 'config/cookies.json')
-        with open(cookie_file, 'w', encoding='utf-8') as f:
-            json.dump(cookies, f, ensure_ascii=False, indent=2)
-        print(f'Cookie已保存到 {cookie_file}')
+    def get(self, key, default=None):
+        return self.config.get(key, default)
 
-    def load_cookies(self):
-        cookie_file = self.config.get('cookie_file', 'config/cookies.json')
-        if os.path.exists(cookie_file):
-            with open(cookie_file, 'r', encoding='utf-8') as f:
+    def set(self, key, value):
+        if self._config is not None:
+            self._config[key] = value
+            self.save_config()
+
+    def get_cookie_file(self):
+        return self.config.get('cookie_file', 'config/cookies.json')
+
+    def get_output_file(self):
+        return self.config.get('output_file', 'file/output.json')
+
+    def get_excel_file(self):
+        return self.config.get('excel_file', '')
+
+    def get_target_url(self):
+        return self.config.get('target_url', '')
+
+    def get_user_agent(self):
+        return self.config.get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+
+
+class FileManager:
+    @staticmethod
+    def read_json(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        return []
+        except Exception as e:
+            print(f'读取JSON文件失败 {file_path}: {e}')
+            return None
 
-    def get_system_info(self):
+    @staticmethod
+    def write_json(file_path, data, indent=2):
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=indent)
+            return True
+        except Exception as e:
+            print(f'写入JSON文件失败 {file_path}: {e}')
+            return False
+
+    @staticmethod
+    def read_text(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            print(f'读取文本文件失败 {file_path}: {e}')
+            return None
+
+    @staticmethod
+    def write_text(file_path, content):
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            return True
+        except Exception as e:
+            print(f'写入文本文件失败 {file_path}: {e}')
+            return False
+
+    @staticmethod
+    def file_exists(file_path):
+        return os.path.exists(file_path)
+
+    @staticmethod
+    def get_latest_json_file(directory='file', pattern='微购相册'):
+        try:
+            if not os.path.exists(directory):
+                print(f'目录 {directory} 不存在')
+                return None
+            
+            json_files = []
+            for file in os.listdir(directory):
+                if file.endswith('.json') and pattern in file:
+                    file_path = os.path.join(directory, file)
+                    json_files.append((file_path, os.path.getmtime(file_path)))
+            
+            if not json_files:
+                print(f'未找到包含"{pattern}"的JSON文件')
+                return None
+            
+            json_files.sort(key=lambda x: x[1], reverse=True)
+            latest_file = json_files[0][0]
+            print(f'找到最新的JSON文件: {latest_file}')
+            return latest_file
+        except Exception as e:
+            print(f'获取最新JSON文件失败: {e}')
+            return None
+
+    @staticmethod
+    def list_files(directory, pattern=None):
+        try:
+            if not os.path.exists(directory):
+                return []
+            
+            files = os.listdir(directory)
+            if pattern:
+                files = [f for f in files if pattern in f]
+            return files
+        except Exception as e:
+            print(f'列出文件失败: {e}')
+            return []
+
+
+class WegoScraper:
+    def __init__(self, config_path='config/config.json'):
+        self.config_manager = ConfigManager(config_path)
+
+    @staticmethod
+    def get_system_info():
         system = platform.system()
-        if system == 'Windows':
-            return 'Windows'
-        elif system == 'Darwin':
-            return 'Mac'
-        elif system == 'Linux':
-            return 'Linux'
-        return 'Unknown'
+        return {'Windows': 'Windows', 'Darwin': 'Mac', 'Linux': 'Linux'}.get(system, 'Unknown')
 
-    def clean_product_name(self, text):
+    @staticmethod
+    def clean_product_name(text):
         if not text:
             return None
         
         text = re.sub(r'¥\d+', '', text)
         
-        useless_patterns = [
-            r'删除下载刷新编辑分享商品属性标签',
-            r'售价：',
-            r'昨天分享',
-        ]
+        for pattern in [r'删除下载刷新编辑分享商品属性标签', r'售价：', r'昨天分享']:
+            text = re.sub(pattern, '', text)
         
-        cleaned_text = text
-        for pattern in useless_patterns:
-            cleaned_text = re.sub(pattern, '', cleaned_text)
-        
-        cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
-        
-        return cleaned_text if cleaned_text else None
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text if text else None
 
     async def close_popups(self, page):
-        try:
-            popup_selectors = [
-                '[class*="close"]',
-                '[class*="modal-close"]',
-                '[class*="dialog-close"]',
-                'button:has-text("关闭")',
-                'button:has-text("×")',
-                'button:has-text("✕")',
-                '.ant-modal-close',
-                '.el-dialog__close',
-            ]
-            
-            for selector in popup_selectors:
-                try:
-                    close_button = await page.query_selector(selector)
-                    if close_button:
-                        await close_button.click()
-                        print(f'关闭了弹窗: {selector}')
-                        await asyncio.sleep(0.5)
-                except:
-                    pass
-        except Exception as e:
-            print(f'关闭弹窗时出错: {e}')
+        popup_selectors = [
+            '[class*="close"]', '[class*="modal-close"]', '[class*="dialog-close"]',
+            'button:has-text("关闭")', 'button:has-text("×")', 'button:has-text("✕")',
+            '.ant-modal-close', '.el-dialog__close',
+        ]
+        
+        for selector in popup_selectors:
+            try:
+                close_button = await page.query_selector(selector)
+                if close_button:
+                    await close_button.click()
+                    print(f'关闭了弹窗: {selector}')
+                    await asyncio.sleep(0.5)
+            except:
+                pass
 
     async def scroll_to_load_all(self, page):
         print('开始滚动加载所有商品...')
@@ -138,94 +227,65 @@ class WegoScraper:
                 
                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
                 await asyncio.sleep(1)
-                
                 scroll_attempts += 1
                 print(f'滚动 {scroll_attempts}/{max_attempts}，当前高度: {current_height}')
-                
                 await self.close_popups(page)
-                    
             except Exception as e:
                 print(f'滚动时出错: {e}')
                 break
         
         print('滚动完成')
 
-    def extract_product_info_sync(self, element_text, html_content):
+    @staticmethod
+    def extract_product_info(element_text, html_content):
         try:
-            stock_number = None
             stock_match = re.search(r'货号[：:]\s*(\d+)', element_text)
-            if stock_match:
-                stock_number = stock_match.group(1)
-            
-            if not stock_number:
+            if not stock_match:
                 return None
             
+            stock_number = stock_match.group(1)
+            
+            price_patterns = [
+                r'售价[：:]\s*¥?\s*(\d{3,6})',
+                r'¥(\d{4,6})',
+                r'(\d{4,6})\s*$',
+                r'货号[：:]\s*\d+\s*(\d{4,6})'
+            ]
+            
             price = None
+            for pattern in price_patterns:
+                match = re.search(pattern, element_text)
+                if match:
+                    price = '¥' + match.group(1)
+                    break
             
-            price_match = re.search(r'售价[：:]\s*¥?\s*(\d{3,6})', element_text)
-            if price_match:
-                price = '¥' + price_match.group(1)
-            
-            if not price:
-                price_match = re.search(r'¥(\d{4,6})', element_text)
-                if price_match:
-                    price = '¥' + price_match.group(1)
-            
-            if not price:
-                price_match = re.search(r'(\d{4,6})\s*$', element_text)
-                if price_match:
-                    price = '¥' + price_match.group(1)
-            
-            if not price:
-                price_match = re.search(r'货号[：:]\s*\d+\s*(\d{4,6})', element_text)
-                if price_match:
-                    price = '¥' + price_match.group(1)
-            
-            remark = None
             remark_match = re.search(r'备注[：:]\s*(.+?)(?:\s*员工[：:]|$)', element_text, re.DOTALL)
-            if remark_match:
-                remark = remark_match.group(1).strip()
-                remark = re.sub(r'\s+', ' ', remark)
+            remark = re.sub(r'\s+', ' ', remark_match.group(1).strip()) if remark_match else None
             
-            employee = None
             employee_match = re.search(r'员工[：:]\s*(.+)', element_text)
-            if employee_match:
-                employee = employee_match.group(1).strip()
+            employee = employee_match.group(1).strip() if employee_match else None
             
-            name = None
-            
-            price_pos = element_text.find('¥')
-            delete_pos = element_text.find('删除')
-            stock_pos = element_text.find('货号')
-            
-            cut_pos = len(element_text)
-            if price_pos > 0:
-                cut_pos = min(cut_pos, price_pos)
-            if delete_pos > 0:
-                cut_pos = min(cut_pos, delete_pos)
-            if stock_pos > 0:
-                cut_pos = min(cut_pos, stock_pos)
+            cut_pos = min(
+                len(element_text),
+                *(pos for pos in [element_text.find('¥'), element_text.find('删除'), element_text.find('货号')] if pos > 0)
+            )
             
             if cut_pos < len(element_text) and cut_pos > 10:
-                name_part = element_text[:cut_pos].strip()
-                if name_part:
-                    name_part = re.sub(r'\s+', ' ', name_part)
-                    name = name_part
-            
-            if not name:
-                name = self.clean_product_name(element_text)
+                name_part = re.sub(r'\s+', ' ', element_text[:cut_pos].strip())
+                name = WegoScraper.clean_product_name(name_part) if name_part else None
+            else:
+                name = WegoScraper.clean_product_name(element_text)
             
             if name:
-                cleaned_name = self.clean_product_name(name)
+                cleaned_name = WegoScraper.clean_product_name(name)
                 if cleaned_name:
                     return {
                         'name': cleaned_name,
                         'price': price if price else 'N/A',
-                        'stock_number': stock_number if stock_number else 'N/A',
+                        'stock_number': stock_number,
                         'remark': remark if remark else 'N/A',
                         'employee': employee if employee else 'N/A'
                     }
-            
             return None
         except Exception as e:
             print(f'提取商品信息时出错: {e}')
@@ -242,18 +302,14 @@ class WegoScraper:
                 
                 if not element_text or not element_text.strip():
                     continue
-                
                 if '试试批量' in element_text or '暂无搭配' in element_text:
                     continue
-                
                 if re.match(r'^\d{2}月 \d{4}$', element_text.strip()):
                     continue
-                
                 if len(element_text.strip()) < 30:
                     continue
                 
                 elements_data.append((element_text, html_content))
-                
             except Exception as e:
                 print(f'收集元素 {i} 数据时出错: {e}')
                 continue
@@ -264,25 +320,19 @@ class WegoScraper:
         seen_products = set()
         
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = []
-            for i, (element_text, html_content) in enumerate(elements_data):
-                future = executor.submit(self.extract_product_info_sync, element_text, html_content)
-                futures.append((future, i))
+            futures = [executor.submit(self.extract_product_info, text, html) for text, html in elements_data]
             
-            for future, i in futures:
+            for i, future in enumerate(futures):
                 try:
                     result = future.result(timeout=5)
-                    if result:
-                        stock_number = result.get('stock_number')
-                        if stock_number and stock_number not in seen_products:
-                            seen_products.add(stock_number)
-                            products.append(result)
-                            
-                            if len(products) <= 10:
-                                print(f'商品 {len(products)}: {result["name"][:50]}...')
-                                print(f'  售价: {result["price"]}')
-                                print(f'  货号: {result["stock_number"]}')
-                                print()
+                    if result and result['stock_number'] not in seen_products:
+                        seen_products.add(result['stock_number'])
+                        products.append(result)
+                        
+                        if len(products) <= 10:
+                            print(f'商品 {len(products)}: {result["name"][:50]}...')
+                            print(f'  售价: {result["price"]}')
+                            print(f'  货号: {result["stock_number"]}\n')
                 except Exception as e:
                     print(f'处理商品 {i} 时出错: {e}')
                     continue
@@ -291,7 +341,7 @@ class WegoScraper:
 
     async def get_data_with_playwright(self, page):
         try:
-            target_url = self.config['target_url']
+            target_url = self.config_manager.get_target_url()
             print(f'正在访问目标页面: {target_url}')
             print(f'当前系统: {self.get_system_info()}')
             
@@ -316,57 +366,46 @@ class WegoScraper:
             try:
                 input('按回车键继续...')
             except:
-                import time
                 time.sleep(60)
             
             await page.reload()
             await asyncio.sleep(5)
             
-            page_content = await page.content()
-            
             await self.close_popups(page)
-            
             print('滚动加载所有商品...')
             await self.scroll_to_load_all(page)
             
             print('等待页面完全加载...')
             await asyncio.sleep(10)
             
-            print('开始获取数据...')
-            
-            if 'page_content' not in locals():
-                page_text = await page.content()
-            else:
-                page_text = page_content
+            page_text = await page.content()
             
             total_count = None
             new_count = None
             
-            try:
-                total_patterns = [
-                    r'总数\s*[：:]\s*(\d+)',
-                    r'上新\s*(\d+)\s*\|\s*总数\s*(\d+)',
-                    r'总\s*数\s*[：:]\s*(\d+)',
-                ]
-                
-                for pattern in total_patterns:
-                    match = re.search(pattern, page_text)
-                    if match:
-                        if len(match.groups()) == 2:
-                            new_count = int(match.group(1))
-                            total_count = int(match.group(2))
+            total_patterns = [
+                (r'上新\s*(\d+)\s*\|\s*总数\s*(\d+)', lambda m: (int(m.group(1)), int(m.group(2)))),
+                (r'总数\s*[：:]\s*(\d+)', lambda m: (None, int(m.group(1)))),
+                (r'总\s*数\s*[：:]\s*(\d+)', lambda m: (None, int(m.group(1)))),
+            ]
+            
+            for pattern, extractor in total_patterns:
+                match = re.search(pattern, page_text)
+                if match:
+                    result = extractor(match)
+                    if len(result) == 2:
+                        new_count, total_count = result
+                        if new_count:
                             print(f'网页显示上新: {new_count}, 总数: {total_count}')
                         else:
-                            total_count = int(match.group(1))
                             print(f'网页显示总数: {total_count}')
                         break
-                
+            
+            if not new_count:
                 new_match = re.search(r'上新\s*[：:]\s*(\d+)', page_text)
-                if new_match and not new_count:
+                if new_match:
                     new_count = int(new_match.group(1))
                     print(f'网页显示上新: {new_count}')
-            except Exception as e:
-                print(f'获取总数信息时出错: {e}')
             
             print('查找所有商品项...')
             item_selectors = [
@@ -380,13 +419,12 @@ class WegoScraper:
                     elements = await page.query_selector_all(selector)
                     if elements:
                         print(f'使用选择器 {selector} 找到 {len(elements)} 个元素')
-                        for element in elements:
-                            if element not in item_elements:
-                                item_elements.append(element)
+                        item_elements.extend(elements)
                 except Exception as e:
                     print(f'使用选择器 {selector} 时出错: {e}')
                     continue
             
+            item_elements = list(dict.fromkeys(item_elements))
             print(f'总共找到 {len(item_elements)} 个商品项')
             
             products = await self.process_elements_concurrently(page, item_elements)
@@ -395,8 +433,8 @@ class WegoScraper:
             print(f'网页显示总数: {total_count}')
             print(f'网页显示上新: {new_count}')
             print(f'实际获取商品数量: {len(products)}')
-            
             print(f'\n成功获取 {len(products)} 个商品')
+            
             return products
         except Exception as e:
             print(f'获取数据失败: {e}')
@@ -405,64 +443,45 @@ class WegoScraper:
             return []
 
     def save_data(self, data, filename=None):
-        if not filename:
-            filename = self.config.get('output_file', 'file/output.json')
-        
         today = datetime.now().strftime('%Y%m%d')
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
         new_filename = f"file/{today}微购相册(小旭数码).json"
         
         total_count = len(data)
-        
         change_summary = ""
         
-        existing_files = sorted([f for f in os.listdir('file') if f.endswith('.json') and '微购相册' in f])
+        existing_files = sorted(FileManager.list_files('file', '微购相册'))
         
-        if len(existing_files) >= 1:
+        if existing_files:
             latest_file = existing_files[-1]
             old_filename = f'file/{latest_file}'
             try:
-                with open(old_filename, 'r', encoding='utf-8') as f:
-                    old_data = json.load(f)
-                
-                old_items = old_data.get('商品列表', [])
-                old_stock_numbers = {item.get('stock_number', '') for item in old_items if item.get('stock_number')}
-                
-                current_stock_numbers = {item.get('stock_number', '') for item in data if item.get('stock_number')}
-                
-                added = current_stock_numbers - old_stock_numbers
-                removed = old_stock_numbers - current_stock_numbers
-                
-                added_details = []
-                for item in data:
-                    if item.get('stock_number') in added:
-                        name = item.get('name', 'N/A')[:30]
-                        price = item.get('price', 'N/A')
-                        added_details.append(f"• {item.get('stock_number')} - {name} ({price})")
-                
-                removed_details = []
-                for item in old_items:
-                    if item.get('stock_number') in removed:
-                        name = item.get('name', 'N/A')[:30]
-                        price = item.get('price', 'N/A')
-                        removed_details.append(f"• {item.get('stock_number')} - {name} ({price})")
-                
-                if added or removed:
-                    change_summary = f"对比 {old_data.get('生成日期', 'N/A')} 新增 {len(added)} 个，删除 {len(removed)} 个"
+                old_data = FileManager.read_json(old_filename)
+                if old_data:
+                    old_items = old_data.get('商品列表', [])
+                    old_stock_numbers = {item.get('stock_number', '') for item in old_items if item.get('stock_number')}
+                    current_stock_numbers = {item.get('stock_number', '') for item in data if item.get('stock_number')}
                     
-                    if added_details:
-                        change_summary += f"\n【新增商品】({len(added)}个):\n" + '\n'.join(added_details[:10])
-                        if len(added_details) > 10:
-                            change_summary += f"\n... 还有 {len(added_details)-10} 个"
+                    added = current_stock_numbers - old_stock_numbers
+                    removed = old_stock_numbers - current_stock_numbers
                     
-                    if removed_details:
-                        change_summary += f"\n【删除商品】({len(removed)}个):\n" + '\n'.join(removed_details[:10])
-                        if len(removed_details) > 10:
-                            change_summary += f"\n... 还有 {len(removed_details)-10} 个"
-                else:
-                    change_summary = "数据无变化"
+                    added_details = [f"• {item.get('stock_number')} - {item.get('name', 'N/A')[:30]} ({item.get('price', 'N/A')})" 
+                                    for item in data if item.get('stock_number') in added]
+                    removed_details = [f"• {item.get('stock_number')} - {item.get('name', 'N/A')[:30]} ({item.get('price', 'N/A')})" 
+                                      for item in old_items if item.get('stock_number') in removed]
                     
+                    if added or removed:
+                        change_summary = f"对比 {old_data.get('生成日期', 'N/A')} 新增 {len(added)} 个，删除 {len(removed)} 个"
+                        if added_details:
+                            change_summary += f"\n【新增商品】({len(added)}个):\n" + '\n'.join(added_details[:10])
+                            if len(added_details) > 10:
+                                change_summary += f"\n... 还有 {len(added_details)-10} 个"
+                        if removed_details:
+                            change_summary += f"\n【删除商品】({len(removed)}个):\n" + '\n'.join(removed_details[:10])
+                            if len(removed_details) > 10:
+                                change_summary += f"\n... 还有 {len(removed_details)-10} 个"
+                    else:
+                        change_summary = "数据无变化"
             except Exception as e:
                 change_summary = f"对比分析失败: {str(e)}"
         
@@ -477,9 +496,7 @@ class WegoScraper:
         if change_summary:
             output_data["小计"] = change_summary
         
-        with open(new_filename, 'w', encoding='utf-8') as f:
-            json.dump(output_data, f, ensure_ascii=False, indent=2)
-        
+        FileManager.write_json(new_filename, output_data)
         print(f'数据已保存到 {new_filename}')
         print(f'成功获取 {total_count} 个商品')
         if change_summary:
@@ -498,141 +515,80 @@ class WegoScraper:
                 print('正在启动浏览器...')
                 
                 system = self.get_system_info()
-                
-                browser_args = [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-blink-features=AutomationControlled',
-                    '--disable-dev-shm-usage',
-                ]
+                browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--disable-dev-shm-usage']
                 
                 if system == 'Windows':
-                    browser_args.extend([
-                        '--disable-gpu',
-                    ])
+                    browser_args.append('--disable-gpu')
                 elif system == 'Linux':
-                    browser_args.extend([
-                        '--disable-gpu',
-                        '--disable-dev-shm-usage',
-                    ])
+                    browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
                 
-                browser = await p.chromium.launch(
-                    headless=False,
-                    args=browser_args,
-                    channel='chrome'
-                )
-                
+                browser = await p.chromium.launch(headless=False, args=browser_args, channel='chrome')
                 context = await browser.new_context(
                     viewport={'width': 1920, 'height': 1080},
-                    user_agent=self.config.get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+                    user_agent=self.config_manager.get_user_agent()
                 )
                 
-                cookies = self.load_cookies()
-                if cookies:
-                    print(f'找到 {len(cookies)} 个Cookie，正在添加到浏览器...')
-                    await context.add_cookies(cookies)
-                    print('Cookie已添加')
-                else:
-                    print('未找到Cookie，需要手动登录')
+                cookie_file = self.config_manager.get_cookie_file()
+                if FileManager.file_exists(cookie_file):
+                    cookies = FileManager.read_json(cookie_file)
+                    if cookies:
+                        print(f'已加载 {len(cookies)} 个Cookie')
+                        await context.add_cookies(cookies)
                 
                 page = await context.new_page()
+                products = await self.get_data_with_playwright(page)
                 
-                data = await self.get_data_with_playwright(page)
+                if products:
+                    self.save_data(products)
                 
                 cookies = await context.cookies()
-                if cookies:
-                    self.save_cookies(cookies)
-                    print(f'Cookie已更新，共 {len(cookies)} 个')
+                FileManager.write_json(cookie_file, cookies)
+                print(f'Cookie已保存到 {cookie_file}')
                 
-                self.save_data(data)
-                
-                if data:
-                    print(f'成功获取 {len(data)} 个商品')
-                else:
-                    print('未获取到商品数据')
-                
-                try:
-                    input('\n按回车键关闭浏览器...')
-                except:
-                    pass
                 await browser.close()
+                
         except Exception as e:
-            print(f'发生错误: {e}')
+            print(f'运行失败: {e}')
             import traceback
             traceback.print_exc()
-            try:
-                input('\n按回车键退出...')
-            except:
-                pass
 
 
 class StockNumberComparator:
     def __init__(self, output_file='file/output.json', input_file='config/input_stock_numbers.txt', config_path='config/config.json'):
         self.output_file = output_file
         self.input_file = input_file
-        self.config_path = config_path
-        self.config = self.load_config()
-        self.excel_file = self.config.get('excel_file', 'C:\\Users\\Administrator\\Desktop\\小旭二手机.xlsx')
-
-    def load_config(self):
-        try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f'加载配置文件失败: {e}')
-            return {}
+        self.config_manager = ConfigManager(config_path)
+        self.excel_file = self.config_manager.get_excel_file()
 
     def load_json_data(self):
-        try:
-            with open(self.output_file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            return data
-        except Exception as e:
-            print(f'加载JSON文件失败: {e}')
-            return []
+        return FileManager.read_json(self.output_file) or []
 
-    def extract_stock_numbers(self, data):
-        stock_numbers = set()
-        for item in data:
-            if 'stock_number' in item and item['stock_number'] != 'N/A':
-                stock_numbers.add(item['stock_number'])
-        return stock_numbers
+    @staticmethod
+    def extract_stock_numbers(data):
+        return {item.get('stock_number') for item in data if item.get('stock_number') and item['stock_number'] != 'N/A'}
 
-    def parse_input_string(self, input_str):
+    @staticmethod
+    def parse_input_string(input_str):
         if not input_str:
             return []
         
         cleaned = re.sub(r'序列号', '', input_str)
-        
-        separators = r'[,，\s;；\n\t]+'
-        numbers = re.split(separators, cleaned)
-        
-        result = []
-        for num in numbers:
-            if num.strip():
-                result.append(num.strip())
-        
-        return result
+        numbers = re.split(r'[,，\s;；\n\t]+', cleaned)
+        return [num.strip() for num in numbers if num.strip()]
+
     def load_excel_data(self, excel_file=None):
-        """从Excel文件读取货号数据"""
         if excel_file is None:
             excel_file = self.excel_file
         
         try:
-            if not os.path.exists(excel_file):
+            if not FileManager.file_exists(excel_file):
                 print(f'Excel文件 {excel_file} 不存在')
                 return None
             
             print(f'正在读取Excel文件: {excel_file}')
             workbook = openpyxl.load_workbook(excel_file)
             
-            # 查找"闲鱼"工作表
-            sheet = None
-            for sheet_name in workbook.sheetnames:
-                if '闲鱼' in sheet_name:
-                    sheet = workbook[sheet_name]
-                    print(f'找到工作表: {sheet_name}')
-                    break
+            sheet = next((workbook[sheet_name] for sheet_name in workbook.sheetnames if '闲鱼' in sheet_name), None)
             
             if sheet is None:
                 print('未找到"闲鱼"工作表，使用第一个工作表')
@@ -640,28 +596,17 @@ class StockNumberComparator:
             else:
                 print(f'使用工作表: {sheet.title}')
             
-            # 读取E列（第5列）的数据
             stock_numbers = []
             for row in sheet.iter_rows(min_col=5, max_col=5, values_only=True):
                 cell_value = row[0]
                 if cell_value:
-                    # 将单元格值转换为字符串，保留前导0
                     cell_str = str(cell_value).strip()
-                    
-                    # 提取数字（货号），保留前导0
-                    # 使用更宽松的正则表达式，匹配包含数字的内容
                     number_match = re.search(r'(\d{3,6})', cell_str)
                     if number_match:
-                        # 如果原始字符串以0开头，保留前导0
-                        if cell_str.startswith('0'):
-                            stock_numbers.append(cell_str)
-                        else:
-                            stock_numbers.append(number_match.group(1))
+                        stock_numbers.append(cell_str if cell_str.startswith('0') else number_match.group(1))
             
-            # 去重
             stock_numbers = list(set(stock_numbers))
             print(f'从Excel文件的E列中读取到 {len(stock_numbers)} 个货号')
-            
             return stock_numbers
         except Exception as e:
             print(f'读取Excel文件失败: {e}')
@@ -670,64 +615,38 @@ class StockNumberComparator:
             return None
 
     def save_input_to_file(self, input_str):
-        try:
-            with open(self.input_file, 'w', encoding='utf-8') as f:
-                f.write(input_str)
+        if FileManager.write_text(self.input_file, input_str):
             print(f'输入已保存到 {self.input_file}')
             return True
-        except Exception as e:
-            print(f'保存输入文件失败: {e}')
-            return False
+        return False
 
     def load_input_from_file(self):
-        try:
-            if os.path.exists(self.input_file):
-                with open(self.input_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                print(f'已从 {self.input_file} 读取输入')
-                return content
-            else:
-                print(f'文件 {self.input_file} 不存在')
-                return None
-        except Exception as e:
-            print(f'读取输入文件失败: {e}')
-            return None
+        return FileManager.read_text(self.input_file)
 
-    def compare_stock_numbers(self, json_stock_numbers, input_stock_numbers):
+    @staticmethod
+    def compare_stock_numbers(json_stock_numbers, input_stock_numbers):
         json_set = set(json_stock_numbers)
         input_set = set(input_stock_numbers)
         
-        missing = input_set - json_set
-        existing = input_set & json_set
-        
         return {
-            'missing': sorted(list(missing)),
-            'existing': sorted(list(existing)),
+            'missing': sorted(list(input_set - json_set)),
+            'existing': sorted(list(input_set & json_set)),
+            'extra_in_json': sorted(list(json_set - input_set)),
             'total_input': len(input_set),
             'total_json': len(json_set),
-            'missing_count': len(missing),
-            'existing_count': len(existing)
+            'missing_count': len(input_set - json_set),
+            'existing_count': len(input_set & json_set),
+            'extra_in_json_count': len(json_set - input_set)
         }
 
-    def find_duplicate_stock_numbers(self, input_stock_numbers):
+    @staticmethod
+    def find_duplicate_stock_numbers(input_stock_numbers):
         seen = {}
-        duplicates = []
-        
         for num in input_stock_numbers:
-            if num in seen:
-                seen[num] += 1
-            else:
-                seen[num] = 1
+            seen[num] = seen.get(num, 0) + 1
         
-        for num, count in seen.items():
-            if count > 1:
-                duplicates.append({
-                    'stock_number': num,
-                    'count': count,
-                    'positions': count
-                })
-        
-        return duplicates
+        return [{'stock_number': num, 'count': count, 'positions': count} 
+                for num, count in seen.items() if count > 1]
 
     def save_duplicate_log(self, duplicates, log_file='file/duplicate_log.json'):
         try:
@@ -737,47 +656,19 @@ class StockNumberComparator:
                 'duplicates': duplicates
             }
             
-            if os.path.exists(log_file):
-                with open(log_file, 'r', encoding='utf-8') as f:
-                    existing_data = json.load(f)
+            if FileManager.file_exists(log_file):
+                existing_data = FileManager.read_json(log_file)
                 if isinstance(existing_data, list):
                     log_data['history'] = existing_data
                 elif isinstance(existing_data, dict) and 'history' in existing_data:
                     log_data['history'] = existing_data['history']
             
-            with open(log_file, 'w', encoding='utf-8') as f:
-                json.dump(log_data, f, ensure_ascii=False, indent=2)
-            
+            FileManager.write_json(log_file, log_data)
             print(f'重复序列号日志已保存到 {log_file}')
             return True
         except Exception as e:
             print(f'保存重复日志失败: {e}')
             return False
-
-    def get_latest_json_file(self):
-        try:
-            file_dir = 'file'
-            if not os.path.exists(file_dir):
-                print(f'目录 {file_dir} 不存在')
-                return None
-            
-            json_files = []
-            for file in os.listdir(file_dir):
-                if file.endswith('.json') and '微购相册' in file:
-                    file_path = os.path.join(file_dir, file)
-                    json_files.append((file_path, os.path.getmtime(file_path)))
-            
-            if not json_files:
-                print('未找到微购相册JSON文件')
-                return None
-            
-            json_files.sort(key=lambda x: x[1], reverse=True)
-            latest_file = json_files[0][0]
-            print(f'找到最新的JSON文件: {latest_file}')
-            return latest_file
-        except Exception as e:
-            print(f'获取最新JSON文件失败: {e}')
-            return None
 
     def compare_excel_with_json(self):
         try:
@@ -785,13 +676,15 @@ class StockNumberComparator:
             print('Excel与JSON数据对比工具')
             print('='*60)
             
-            latest_json_file = self.get_latest_json_file()
+            latest_json_file = FileManager.get_latest_json_file()
             if not latest_json_file:
                 print('无法获取最新的JSON文件')
                 return False
             
-            with open(latest_json_file, 'r', encoding='utf-8') as f:
-                json_data = json.load(f)
+            json_data = FileManager.read_json(latest_json_file)
+            if not json_data:
+                print('无法读取JSON文件')
+                return False
             
             json_stock_numbers = self.extract_stock_numbers(json_data)
             print(f'从JSON文件中读取到 {len(json_stock_numbers)} 个货号\n')
@@ -816,29 +709,21 @@ class StockNumberComparator:
             
             diff_log_file = f'file/diff_log_{date_str}.json'
             
-            if os.path.exists(diff_log_file):
-                try:
-                    with open(diff_log_file, 'r', encoding='utf-8') as f:
-                        existing_data = json.load(f)
-                    if isinstance(existing_data, list):
-                        existing_data.append(diff_data)
-                    elif isinstance(existing_data, dict) and 'logs' in existing_data:
-                        existing_data['logs'].append(diff_data)
-                    else:
-                        existing_data = {'logs': [existing_data, diff_data]}
-                except Exception as e:
-                    print(f'读取现有日志文件失败: {e}')
-                    existing_data = {'logs': [diff_data]}
+            if FileManager.file_exists(diff_log_file):
+                existing_data = FileManager.read_json(diff_log_file)
+                if isinstance(existing_data, list):
+                    existing_data.append(diff_data)
+                elif isinstance(existing_data, dict) and 'logs' in existing_data:
+                    existing_data['logs'].append(diff_data)
+                else:
+                    existing_data = {'logs': [existing_data, diff_data]}
             else:
                 existing_data = {'logs': [diff_data]}
             
-            with open(diff_log_file, 'w', encoding='utf-8') as f:
-                json.dump(existing_data, f, ensure_ascii=False, indent=2)
-            
+            FileManager.write_json(diff_log_file, existing_data)
             print(f'\n差异日志已保存到 {diff_log_file}')
             
             self.print_comparison_result(result, [])
-            
             return True
         except Exception as e:
             print(f'对比失败: {e}')
@@ -846,7 +731,8 @@ class StockNumberComparator:
             traceback.print_exc()
             return False
 
-    def print_comparison_result(self, result, duplicates):
+    @staticmethod
+    def print_comparison_result(result, duplicates):
         print('\n' + '='*60)
         print('货号对比结果')
         print('='*60)
@@ -854,6 +740,7 @@ class StockNumberComparator:
         print(f'JSON中货号总数: {result["total_json"]}')
         print(f'已存在货号数: {result["existing_count"]}')
         print(f'缺失货号数: {result["missing_count"]}')
+        print(f'JSON中多余货号数: {result.get("extra_in_json_count", 0)}')
         print(f'重复序列号数: {len(duplicates)}')
         print('='*60)
         
@@ -867,7 +754,12 @@ class StockNumberComparator:
             for i, num in enumerate(result['missing'], 1):
                 print(f'  {i}. {num}')
         else:
-            print('\n所有货号都已存在！')
+            print('\n所有输入货号都已存在！')
+        
+        if result.get('extra_in_json'):
+            print('\nJSON中多余的货号:')
+            for i, num in enumerate(result['extra_in_json'], 1):
+                print(f'  {i}. {num}')
         
         if duplicates:
             print('\n重复的序列号:')
@@ -943,8 +835,7 @@ class StockNumberComparator:
                 continue
             
             if user_input.lower() in ['load', '读取']:
-                # 优先尝试读取Excel文件
-                if os.path.exists(self.excel_file):
+                if FileManager.file_exists(self.excel_file):
                     print(f'检测到Excel文件: {self.excel_file}')
                     input_stock_numbers = self.load_excel_data()
                     
@@ -960,7 +851,6 @@ class StockNumberComparator:
                     else:
                         print('Excel文件中未找到有效的货号\n')
                 
-                # 如果没有Excel文件，尝试读取文本文件
                 file_content = self.load_input_from_file()
                 if file_content:
                     current_input = file_content
@@ -990,7 +880,6 @@ class StockNumberComparator:
                 continue
             
             current_input = user_input
-            
             input_stock_numbers = self.parse_input_string(user_input)
             
             if not input_stock_numbers:
@@ -1002,7 +891,6 @@ class StockNumberComparator:
                 self.save_duplicate_log(duplicates)
             
             result = self.compare_stock_numbers(json_stock_numbers, input_stock_numbers)
-            
             self.print_comparison_result(result, duplicates)
 
     def run_simple(self):
@@ -1014,8 +902,7 @@ class StockNumberComparator:
         json_stock_numbers = self.extract_stock_numbers(data)
         print(f'已加载 {len(json_stock_numbers)} 个货号\n')
         
-        # 优先尝试读取Excel文件
-        if os.path.exists(self.excel_file):
+        if FileManager.file_exists(self.excel_file):
             print(f'检测到Excel文件: {self.excel_file}')
             input_stock_numbers = self.load_excel_data()
             
@@ -1031,25 +918,24 @@ class StockNumberComparator:
             else:
                 print('Excel文件中未找到有效的货号\n')
         
-        # 如果没有Excel文件，尝试读取文本文件
-        input_file = self.input_file
-        if os.path.exists(input_file):
-            print(f'从文件 {input_file} 读取输入...')
-            with open(input_file, 'r', encoding='utf-8') as f:
-                input_str = f.read()
+        if FileManager.file_exists(self.input_file):
+            print(f'从文件 {self.input_file} 读取输入...')
+            input_str = FileManager.read_text(self.input_file)
             
-            input_stock_numbers = self.parse_input_string(input_str)
-            
-            if input_stock_numbers:
-                print(f'解析出 {len(input_stock_numbers)} 个货号\n')
-                duplicates = self.find_duplicate_stock_numbers(input_stock_numbers)
-                if duplicates:
-                    self.save_duplicate_log(duplicates)
-                
-                result = self.compare_stock_numbers(json_stock_numbers, input_stock_numbers)
-                self.print_comparison_result(result, duplicates)
+            if input_str:
+                input_stock_numbers = self.parse_input_string(input_str)
+                if input_stock_numbers:
+                    print(f'解析出 {len(input_stock_numbers)} 个货号\n')
+                    duplicates = self.find_duplicate_stock_numbers(input_stock_numbers)
+                    if duplicates:
+                        self.save_duplicate_log(duplicates)
+                    
+                    result = self.compare_stock_numbers(json_stock_numbers, input_stock_numbers)
+                    self.print_comparison_result(result, duplicates)
+                else:
+                    print('文件中未找到有效的货号\n')
             else:
-                print('文件中未找到有效的货号\n')
+                print('文件读取失败\n')
         else:
             print(f'文件 {self.excel_file} 和 {self.input_file} 都不存在')
             print('请创建 config/input_stock_numbers.txt 文件或确保Excel文件存在\n')
@@ -1078,14 +964,11 @@ def main():
         scraper = WegoScraper()
         asyncio.run(scraper.run())
     elif choice == '2':
-        comparator = StockNumberComparator()
-        comparator.run_interactive()
+        StockNumberComparator().run_interactive()
     elif choice == '3':
-        comparator = StockNumberComparator()
-        comparator.run_simple()
+        StockNumberComparator().run_simple()
     elif choice == '4':
-        comparator = StockNumberComparator()
-        comparator.compare_excel_with_json()
+        StockNumberComparator().compare_excel_with_json()
     elif choice == '5':
         update_cookie()
     elif choice == '0':
@@ -1130,23 +1013,17 @@ def auto_get_cookie():
     async def get_cookie():
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=False,
-                    channel='chrome'
-                )
+                browser = await p.chromium.launch(headless=False, channel='chrome')
                 context = await browser.new_context()
                 
-                existing_cookies = []
                 cookie_file = 'config/cookies.json'
-                if os.path.exists(cookie_file):
-                    with open(cookie_file, 'r', encoding='utf-8') as f:
-                        existing_cookies = json.load(f)
+                if FileManager.file_exists(cookie_file):
+                    existing_cookies = FileManager.read_json(cookie_file)
                     if existing_cookies:
                         print(f'已加载 {len(existing_cookies)} 个现有Cookie')
                         await context.add_cookies(existing_cookies)
                 
                 page = await context.new_page()
-                
                 await page.goto('https://www.szwego.com/')
                 
                 print('='*60)
@@ -1166,10 +1043,7 @@ def auto_get_cookie():
                 
                 if browser.is_connected():
                     cookies = await context.cookies()
-                    
-                    with open(cookie_file, 'w', encoding='utf-8') as f:
-                        json.dump(cookies, f, ensure_ascii=False, indent=2)
-                    
+                    FileManager.write_json(cookie_file, cookies)
                     print(f'✓ Cookie已保存到 {cookie_file}')
                     print(f'✓ 共保存 {len(cookies)} 个Cookie')
                     
@@ -1212,12 +1086,10 @@ def manual_update_cookie():
         cookies = parse_cookie_string(cookie_str)
         
         if cookies:
-            config = load_config()
-            cookie_file = config.get('cookie_file', 'config/cookies.json')
+            config_manager = ConfigManager()
+            cookie_file = config_manager.get_cookie_file()
             
-            with open(cookie_file, 'w', encoding='utf-8') as f:
-                json.dump(cookies, f, ensure_ascii=False, indent=2)
-            
+            FileManager.write_json(cookie_file, cookies)
             print(f'✓ Cookie已保存到 {cookie_file}')
             print(f'✓ 共保存 {len(cookies)} 个Cookie')
         else:
