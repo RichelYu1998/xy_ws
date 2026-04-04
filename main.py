@@ -702,12 +702,15 @@ class StockNumberComparator:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             date_str = datetime.now().strftime('%Y%m%d')
             
+            result_message = self.get_result_message(result, [])
+            
             diff_data = {
                 'timestamp': timestamp,
                 'date': date_str,
                 'json_file': os.path.basename(latest_json_file),
                 'excel_file': os.path.basename(self.excel_file),
-                'comparison': result
+                'comparison': result,
+                'result_message': result_message
             }
             
             diff_log_file = f'file/diff_log_{date_str}.json'
@@ -733,6 +736,17 @@ class StockNumberComparator:
             import traceback
             traceback.print_exc()
             return False
+
+    @staticmethod
+    def get_result_message(result, duplicates):
+        if result['missing_count'] == 0 and len(duplicates) == 0:
+            return '对比结果: 成功 - 所有货号都存在且无重复'
+        elif result['missing_count'] > 0 and len(duplicates) == 0:
+            return f'对比结果: 部分成功 - 缺失 {result["missing_count"]} 个货号'
+        elif result['missing_count'] == 0 and len(duplicates) > 0:
+            return f'对比结果: 部分成功 - 发现 {len(duplicates)} 个重复序列号'
+        else:
+            return f'对比结果: 失败 - 缺失 {result["missing_count"]} 个货号，发现 {len(duplicates)} 个重复序列号'
 
     @staticmethod
     def print_comparison_result(result, duplicates):
@@ -772,14 +786,7 @@ class StockNumberComparator:
         print('='*60)
         
         print('\n' + '='*60)
-        if result['missing_count'] == 0 and len(duplicates) == 0:
-            print('对比结果: 成功 - 所有货号都存在且无重复')
-        elif result['missing_count'] > 0 and len(duplicates) == 0:
-            print(f'对比结果: 部分成功 - 缺失 {result["missing_count"]} 个货号')
-        elif result['missing_count'] == 0 and len(duplicates) > 0:
-            print(f'对比结果: 部分成功 - 发现 {len(duplicates)} 个重复序列号')
-        else:
-            print(f'对比结果: 失败 - 缺失 {result["missing_count"]} 个货号，发现 {len(duplicates)} 个重复序列号')
+        print(StockNumberComparator.get_result_message(result, duplicates))
         print('='*60 + '\n')
 
     def run_interactive(self):
