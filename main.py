@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "1.4.3"
+VERSION = "1.5.0"
 
 
 try:
@@ -277,27 +277,11 @@ class WegoScraper:
                 cleaned_name = WegoScraper.clean_product_name(name)
                 if cleaned_name:
                     return {
-                        '商品图片': '',
-                        '商品名称/描述': cleaned_name,
+                        '商品名称': cleaned_name,
                         '售价': price if price else '',
                         '货号': stock_number,
-                        '商品Id': '',
-                        '标签': '',
-                        '来源(仅自己可见)': '',
-                        '商品简称': '',
-                        '商品规格': '',
-                        '颜色': '',
-                        '规格编码': '',
-                        '批发价': '',
-                        '打包价': '',
-                        '代发价': '',
-                        '拿货价(仅自己可见)': '',
-                        '活动类型': '',
-                        '活动价': '',
-                        '库存': '',
-                        '重量': '',
-                        '备注(公开)': remark if remark else '',
-                        '搜索码': ''
+                        '备注': remark if remark else '',
+                        '员工': employee if employee else ''
                     }
             return None
         except Exception as e:
@@ -339,13 +323,13 @@ class WegoScraper:
                 try:
                     result = future.result(timeout=5)
                     if result:
-                        product_key = result['货号'] if result['货号'] else result['商品名称/描述']
+                        product_key = result['货号'] if result['货号'] else result['商品名称']
                         if product_key not in seen_products:
                             seen_products.add(product_key)
                             products.append(result)
                             
                             if len(products) <= 10:
-                                print(f'商品 {len(products)}: {result["商品名称/描述"][:50]}...')
+                                print(f'商品 {len(products)}: {result["商品名称"][:50]}...')
                                 print(f'  售价: {result["售价"]}')
                                 print(f'  货号: {result["货号"]}\n')
                 except Exception as e:
@@ -463,9 +447,9 @@ class WegoScraper:
                     added = current_stock_numbers - old_stock_numbers
                     removed = old_stock_numbers - current_stock_numbers
                     
-                    added_details = [f"• {item.get('货号')} - {item.get('商品名称/描述', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
+                    added_details = [f"• {item.get('货号')} - {item.get('商品名称', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
                                     for item in data if item.get('货号') in added]
-                    removed_details = [f"• {item.get('货号')} - {item.get('商品名称/描述', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
+                    removed_details = [f"• {item.get('货号')} - {item.get('商品名称', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
                                       for item in old_items if item.get('货号') in removed]
                     
                     if added or removed:
