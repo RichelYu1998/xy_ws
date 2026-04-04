@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "1.9.0"
+VERSION = "2.0.0"
 
 
 try:
@@ -683,11 +683,11 @@ class StockNumberComparator:
         return FileManager.read_text(self.input_file)
 
     @staticmethod
-    def compare_stock_numbers(json_stock_numbers, input_stock_numbers):
+    def compare_stock_numbers(json_stock_numbers, input_stock_numbers, high_price_stock_numbers=None):
         json_set = set(json_stock_numbers)
         input_set = set(input_stock_numbers)
         
-        return {
+        result = {
             'missing': sorted(list(input_set - json_set)),
             'existing': sorted(list(input_set & json_set)),
             'extra_in_json': sorted(list(json_set - input_set)),
@@ -697,6 +697,12 @@ class StockNumberComparator:
             'existing_count': len(input_set & json_set),
             'extra_in_json_count': len(json_set - input_set)
         }
+        
+        if high_price_stock_numbers:
+            result['high_price_stock_numbers'] = sorted(list(set(high_price_stock_numbers)))
+            result['high_price_count'] = len(result['high_price_stock_numbers'])
+        
+        return result
 
     @staticmethod
     def find_duplicate_stock_numbers(input_stock_numbers):
@@ -751,12 +757,28 @@ class StockNumberComparator:
             json_stock_numbers = self.extract_stock_numbers(json_data)
             print(f'从JSON文件中读取到 {len(json_stock_numbers)} 个货号\n')
             
+            # 找出售价>=599的商品货号
+            high_price_stock_numbers = []
+            if isinstance(json_data, list):
+                for product in json_data:
+                    price_str = product.get('售价', '')
+                    if not price_str:
+                        continue
+                    price_clean = price_str.replace('¥', '').replace(',', '').strip()
+                    if not price_clean.isdigit():
+                        continue
+                    price = int(price_clean)
+                    if price >= 599:
+                        stock_num = product.get('货号', '')
+                        if stock_num:
+                            high_price_stock_numbers.append(stock_num)
+            
             excel_stock_numbers = self.load_excel_data()
             if not excel_stock_numbers:
                 print('无法从Excel文件读取货号')
                 return False
             
-            result = self.compare_stock_numbers(json_stock_numbers, excel_stock_numbers)
+            result = self.compare_stock_numbers(json_stock_numbers, excel_stock_numbers, high_price_stock_numbers)
             
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             date_str = datetime.now().strftime('%Y%m%d')
@@ -831,6 +853,8 @@ class StockNumberComparator:
         print(f'缺失货号数: {result["missing_count"]}')
         print(f'JSON中多余货号数: {result.get("extra_in_json_count", 0)}')
         print(f'重复序列号数: {len(duplicates)}')
+        if result.get('high_price_count'):
+            print(f'售价>=599货号数: {result["high_price_count"]}')
         print('='*60)
         
         if result['existing']:
@@ -848,6 +872,11 @@ class StockNumberComparator:
         if result.get('extra_in_json'):
             print('\nJSON中多余的货号:')
             for i, num in enumerate(result['extra_in_json'], 1):
+                print(f'  {i}. {num}')
+        
+        if result.get('high_price_stock_numbers'):
+            print(f'\n售价>=599的货号:')
+            for i, num in enumerate(result['high_price_stock_numbers'], 1):
                 print(f'  {i}. {num}')
         
         if duplicates:
