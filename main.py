@@ -240,10 +240,7 @@ class WegoScraper:
     def extract_product_info(element_text, html_content):
         try:
             stock_match = re.search(r'货号[：:]\s*(\d+)', element_text)
-            if not stock_match:
-                return None
-            
-            stock_number = stock_match.group(1)
+            stock_number = stock_match.group(1) if stock_match else ''
             
             price_patterns = [
                 r'售价[：:]\s*¥?\s*(\d{3,6})',
@@ -280,11 +277,27 @@ class WegoScraper:
                 cleaned_name = WegoScraper.clean_product_name(name)
                 if cleaned_name:
                     return {
-                        'name': cleaned_name,
-                        'price': price if price else 'N/A',
-                        'stock_number': stock_number,
-                        'remark': remark if remark else 'N/A',
-                        'employee': employee if employee else 'N/A'
+                        '商品图片': '',
+                        '商品名称/描述': cleaned_name,
+                        '售价': price if price else '',
+                        '货号': stock_number,
+                        '商品Id': '',
+                        '标签': '',
+                        '来源(仅自己可见)': '',
+                        '商品简称': '',
+                        '商品规格': '',
+                        '颜色': '',
+                        '规格编码': '',
+                        '批发价': '',
+                        '打包价': '',
+                        '代发价': '',
+                        '拿货价(仅自己可见)': '',
+                        '活动类型': '',
+                        '活动价': '',
+                        '库存': '',
+                        '重量': '',
+                        '备注(公开)': remark if remark else '',
+                        '搜索码': ''
                     }
             return None
         except Exception as e:
@@ -325,14 +338,14 @@ class WegoScraper:
             for i, future in enumerate(futures):
                 try:
                     result = future.result(timeout=5)
-                    if result and result['stock_number'] not in seen_products:
-                        seen_products.add(result['stock_number'])
+                    if result and result['货号'] not in seen_products:
+                        seen_products.add(result['货号'])
                         products.append(result)
                         
                         if len(products) <= 10:
-                            print(f'商品 {len(products)}: {result["name"][:50]}...')
-                            print(f'  售价: {result["price"]}')
-                            print(f'  货号: {result["stock_number"]}\n')
+                            print(f'商品 {len(products)}: {result["商品名称/描述"][:50]}...')
+                            print(f'  售价: {result["售价"]}')
+                            print(f'  货号: {result["货号"]}\n')
                 except Exception as e:
                     print(f'处理商品 {i} 时出错: {e}')
                     continue
@@ -459,16 +472,16 @@ class WegoScraper:
                 old_data = FileManager.read_json(old_filename)
                 if old_data:
                     old_items = old_data.get('商品列表', [])
-                    old_stock_numbers = {item.get('stock_number', '') for item in old_items if item.get('stock_number')}
-                    current_stock_numbers = {item.get('stock_number', '') for item in data if item.get('stock_number')}
+                    old_stock_numbers = {item.get('货号', '') for item in old_items if item.get('货号')}
+                    current_stock_numbers = {item.get('货号', '') for item in data if item.get('货号')}
                     
                     added = current_stock_numbers - old_stock_numbers
                     removed = old_stock_numbers - current_stock_numbers
                     
-                    added_details = [f"• {item.get('stock_number')} - {item.get('name', 'N/A')[:30]} ({item.get('price', 'N/A')})" 
-                                    for item in data if item.get('stock_number') in added]
-                    removed_details = [f"• {item.get('stock_number')} - {item.get('name', 'N/A')[:30]} ({item.get('price', 'N/A')})" 
-                                      for item in old_items if item.get('stock_number') in removed]
+                    added_details = [f"• {item.get('货号')} - {item.get('商品名称/描述', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
+                                    for item in data if item.get('货号') in added]
+                    removed_details = [f"• {item.get('货号')} - {item.get('商品名称/描述', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
+                                      for item in old_items if item.get('货号') in removed]
                     
                     if added or removed:
                         change_summary = f"对比 {old_data.get('生成日期', 'N/A')} 新增 {len(added)} 个，删除 {len(removed)} 个"
@@ -565,7 +578,7 @@ class StockNumberComparator:
 
     @staticmethod
     def extract_stock_numbers(data):
-        return {item.get('stock_number') for item in data if item.get('stock_number') and item['stock_number'] != 'N/A'}
+        return {item.get('货号') for item in data if item.get('货号') and item['货号'] != 'N/A'}
 
     @staticmethod
     def parse_input_string(input_str):
@@ -645,7 +658,7 @@ class StockNumberComparator:
         for num in input_stock_numbers:
             seen[num] = seen.get(num, 0) + 1
         
-        return [{'stock_number': num, 'count': count, 'positions': count} 
+        return [{'货号': num, 'count': count, 'positions': count} 
                 for num, count in seen.items() if count > 1]
 
     def save_duplicate_log(self, duplicates, log_file='file/duplicate_log.json'):
@@ -794,7 +807,7 @@ class StockNumberComparator:
         if duplicates:
             print('\n重复的序列号:')
             for i, dup in enumerate(duplicates, 1):
-                print(f'  {i}. 序列号: {dup["stock_number"]} (重复次数: {dup["count"]})')
+                print(f'  {i}. 序列号: {dup["货号"]} (重复次数: {dup["count"]})')
         
         print('='*60)
         
