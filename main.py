@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.0.2"
+VERSION = "2.0.3"
 
 
 try:
@@ -465,63 +465,76 @@ class WegoScraper:
             traceback.print_exc()
             return []
 
+    @staticmethod
+    def parse_price(price_str):
+        """解析价格字符串，返回整数价格或None"""
+        if not price_str:
+            return None
+        price_clean = price_str.replace('¥', '').replace(',', '').strip()
+        if not price_clean.isdigit():
+            return None
+        return int(price_clean)
+
+    def filter_high_price_products(self, data, min_price=599):
+        """筛选高价商品"""
+        high_price_products = []
+        for product in data:
+            price = self.parse_price(product.get('售价', ''))
+            if price and price >= min_price:
+                high_price_products.append(product)
+        return high_price_products
+
+    def analyze_data_changes(self, data, existing_files):
+        """分析数据变化"""
+        change_summary = ""
+        if not existing_files:
+            return change_summary
+        
+        latest_file = existing_files[-1]
+        old_filename = f'file/{latest_file}'
+        try:
+            old_data = FileManager.read_json(old_filename)
+            if old_data:
+                old_items = old_data.get('商品列表', [])
+                old_stock_numbers = {item.get('货号', '') for item in old_items if item.get('货号')}
+                current_stock_numbers = {item.get('货号', '') for item in data if item.get('货号')}
+                
+                added = current_stock_numbers - old_stock_numbers
+                removed = old_stock_numbers - current_stock_numbers
+                
+                added_details = [f"• {item.get('货号')} - {item.get('商品名称', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
+                                for item in data if item.get('货号') in added]
+                removed_details = [f"• {item.get('货号')} - {item.get('商品名称', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
+                                  for item in old_items if item.get('货号') in removed]
+                
+                if added or removed:
+                    change_summary = f"对比 {old_data.get('生成日期', 'N/A')} 新增 {len(added)} 个，删除 {len(removed)} 个"
+                    if added_details:
+                        change_summary += f"\n【新增商品】({len(added)}个):\n" + '\n'.join(added_details[:10])
+                        if len(added_details) > 10:
+                            change_summary += f"\n... 还有 {len(added_details)-10} 个"
+                    if removed_details:
+                        change_summary += f"\n【删除商品】({len(removed)}个):\n" + '\n'.join(removed_details[:10])
+                        if len(removed_details) > 10:
+                            change_summary += f"\n... 还有 {len(removed_details)-10} 个"
+                else:
+                    change_summary = "数据无变化"
+        except Exception as e:
+            change_summary = f"对比分析失败: {str(e)}"
+        
+        return change_summary
+
     def save_data(self, data, filename=None):
         today = datetime.now().strftime('%Y%m%d')
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         new_filename = f"file/{today}微购相册(小旭数码).json"
         
         total_count = len(data)
-        change_summary = ""
-        
-        # 找出售价>=599的商品
-        high_price_products = []
-        for product in data:
-            price_str = product.get('售价', '')
-            if not price_str:
-                continue
-            price_clean = price_str.replace('¥', '').replace(',', '').strip()
-            if not price_clean.isdigit():
-                continue
-            price = int(price_clean)
-            if price >= 599:
-                high_price_products.append(product)
-        
+        high_price_products = self.filter_high_price_products(data)
         high_price_count = len(high_price_products)
         
         existing_files = sorted(FileManager.list_files('file', '微购相册'))
-        
-        if existing_files:
-            latest_file = existing_files[-1]
-            old_filename = f'file/{latest_file}'
-            try:
-                old_data = FileManager.read_json(old_filename)
-                if old_data:
-                    old_items = old_data.get('商品列表', [])
-                    old_stock_numbers = {item.get('货号', '') for item in old_items if item.get('货号')}
-                    current_stock_numbers = {item.get('货号', '') for item in data if item.get('货号')}
-                    
-                    added = current_stock_numbers - old_stock_numbers
-                    removed = old_stock_numbers - current_stock_numbers
-                    
-                    added_details = [f"• {item.get('货号')} - {item.get('商品名称', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
-                                    for item in data if item.get('货号') in added]
-                    removed_details = [f"• {item.get('货号')} - {item.get('商品名称', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
-                                      for item in old_items if item.get('货号') in removed]
-                    
-                    if added or removed:
-                        change_summary = f"对比 {old_data.get('生成日期', 'N/A')} 新增 {len(added)} 个，删除 {len(removed)} 个"
-                        if added_details:
-                            change_summary += f"\n【新增商品】({len(added)}个):\n" + '\n'.join(added_details[:10])
-                            if len(added_details) > 10:
-                                change_summary += f"\n... 还有 {len(added_details)-10} 个"
-                        if removed_details:
-                            change_summary += f"\n【删除商品】({len(removed)}个):\n" + '\n'.join(removed_details[:10])
-                            if len(removed_details) > 10:
-                                change_summary += f"\n... 还有 {len(removed_details)-10} 个"
-                    else:
-                        change_summary = "数据无变化"
-            except Exception as e:
-                change_summary = f"对比分析失败: {str(e)}"
+        change_summary = self.analyze_data_changes(data, existing_files)
         
         output_data = {
             "生成日期": today,
@@ -534,7 +547,6 @@ class WegoScraper:
         if change_summary:
             output_data["小计"] = change_summary
         
-        # 添加高价商品统计
         output_data["高价商品统计"] = {
             "筛选条件": "售价 >= 599",
             "数量": high_price_count,
@@ -761,14 +773,8 @@ class StockNumberComparator:
             high_price_stock_numbers = []
             if isinstance(json_data, list):
                 for product in json_data:
-                    price_str = product.get('售价', '')
-                    if not price_str:
-                        continue
-                    price_clean = price_str.replace('¥', '').replace(',', '').strip()
-                    if not price_clean.isdigit():
-                        continue
-                    price = int(price_clean)
-                    if price >= 599:
+                    price = WegoScraper.parse_price(product.get('售价', ''))
+                    if price and price >= 599:
                         stock_num = product.get('货号', '')
                         if stock_num:
                             high_price_stock_numbers.append(stock_num)
