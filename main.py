@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-，弄VERSION = "1.9.0"
+VERSION = "1.9.0"
 
 
 try:
