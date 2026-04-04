@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 
 
 try:
@@ -366,18 +366,15 @@ class WegoScraper:
                 print(f'页面导航出错: {e}')
                 await asyncio.sleep(5)
             
-            print('等待页面初始加载...')
-            await asyncio.sleep(5)
-            
-            await page.reload()
-            await asyncio.sleep(5)
+            print('等待页面完全加载...')
+            await asyncio.sleep(3)
             
             await self.close_popups(page)
             print('滚动加载所有商品...')
             await self.scroll_to_load_all(page)
             
             print('等待页面完全加载...')
-            await asyncio.sleep(10)
+            await asyncio.sleep(5)
             
             page_text = await page.content()
             
