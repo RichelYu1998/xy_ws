@@ -338,14 +338,16 @@ class WegoScraper:
             for i, future in enumerate(futures):
                 try:
                     result = future.result(timeout=5)
-                    if result and result['货号'] not in seen_products:
-                        seen_products.add(result['货号'])
-                        products.append(result)
-                        
-                        if len(products) <= 10:
-                            print(f'商品 {len(products)}: {result["商品名称/描述"][:50]}...')
-                            print(f'  售价: {result["售价"]}')
-                            print(f'  货号: {result["货号"]}\n')
+                    if result:
+                        product_key = result['货号'] if result['货号'] else result['商品名称/描述']
+                        if product_key not in seen_products:
+                            seen_products.add(product_key)
+                            products.append(result)
+                            
+                            if len(products) <= 10:
+                                print(f'商品 {len(products)}: {result["商品名称/描述"][:50]}...')
+                                print(f'  售价: {result["售价"]}')
+                                print(f'  货号: {result["货号"]}\n')
                 except Exception as e:
                     print(f'处理商品 {i} 时出错: {e}')
                     continue
