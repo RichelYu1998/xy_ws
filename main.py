@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 
 try:
@@ -200,7 +200,7 @@ class WegoScraper:
                     await close_button.click()
                     print(f'关闭了弹窗: {selector}')
                     await asyncio.sleep(0.5)
-            except:
+            except Exception as e:
                 pass
 
     async def scroll_to_load_all(self, page):
@@ -947,65 +947,93 @@ class StockNumberComparator:
 
 
 def main():
-    print('='*60)
-    print(f'Szwego商品爬虫和货号对比工具 - v{VERSION}')
-    print('='*60)
-    print('请选择功能：')
-    print('1. 运行爬虫')
-    print('2. 货号对比（交互式）')
-    print('3. 货号对比（简化版）')
-    print('4. Excel与JSON对比（自动保存差异日志）')
-    print('5. 更新Cookie')
-    print('0. 退出')
-    print('='*60)
-    
+    while True:
+        print('='*60)
+        print(f'Szwego商品爬虫和货号对比工具 - v{VERSION}')
+        print('='*60)
+        
+        if not FileManager.file_exists('config/config.json'):
+            print('⚠️  警告: 配置文件不存在 (config/config.json)')
+            print('请先配置 config/config.json 文件')
+            print('='*60)
+            input('按回车键退出...')
+            return
+        
+        if not FileManager.file_exists('config/cookies.json'):
+            print('⚠️  警告: Cookie文件不存在 (config/cookies.json)')
+            print('建议先运行"更新Cookie"功能')
+            print('='*60)
+        
+        print('请选择功能：')
+        print('1. 运行爬虫')
+        print('2. 货号对比（交互式）')
+        print('3. 货号对比（简化版）')
+        print('4. Excel与JSON对比（自动保存差异日志）')
+        print('5. 更新Cookie')
+        print('0. 退出')
+        print('='*60)
+        
+        try:
+            choice = input('请输入选项 (0-5): ').strip()
+        except (EOFError, KeyboardInterrupt):
+            print('\n程序已退出')
+            return
+        
+        if choice == '1':
+            run_scraper()
+        elif choice == '2':
+            StockNumberComparator().run_interactive()
+        elif choice == '3':
+            StockNumberComparator().run_simple()
+        elif choice == '4':
+            StockNumberComparator().compare_excel_with_json()
+        elif choice == '5':
+            update_cookie()
+        elif choice == '0':
+            print('程序已退出')
+            break
+        else:
+            print('无效的选项')
+            input('按回车键继续...')
+
+
+def run_scraper():
     try:
-        choice = input('请输入选项 (0-5): ').strip()
-    except (EOFError, KeyboardInterrupt):
-        print('\n程序已退出')
-        return
-    
-    if choice == '1':
         scraper = WegoScraper()
         asyncio.run(scraper.run())
-    elif choice == '2':
-        StockNumberComparator().run_interactive()
-    elif choice == '3':
-        StockNumberComparator().run_simple()
-    elif choice == '4':
-        StockNumberComparator().compare_excel_with_json()
-    elif choice == '5':
-        update_cookie()
-    elif choice == '0':
-        print('程序已退出')
-    else:
-        print('无效的选项')
+    except Exception as e:
+        print(f'运行爬虫时出错: {e}')
+        import traceback
+        traceback.print_exc()
+        input('按回车键继续...')
 
 
 def update_cookie():
-    print('='*60)
-    print('Cookie更新工具')
-    print('='*60)
-    print('请选择方式：')
-    print('1. 自动获取（推荐）- 程序启动浏览器，登录后自动保存')
-    print('2. 手动粘贴 - 从浏览器复制Cookie字符串')
-    print('0. 返回')
-    print('='*60)
-    
-    try:
-        choice = input('请输入选项 (0-2): ').strip()
-    except (EOFError, KeyboardInterrupt):
-        print('\n已取消')
-        return
-    
-    if choice == '1':
-        auto_get_cookie()
-    elif choice == '2':
-        manual_update_cookie()
-    elif choice == '0':
-        return
-    else:
-        print('无效的选项')
+    while True:
+        print('='*60)
+        print('Cookie更新工具')
+        print('='*60)
+        print('请选择方式：')
+        print('1. 自动获取（推荐）- 程序启动浏览器，登录后自动保存')
+        print('2. 手动粘贴 - 从浏览器复制Cookie字符串')
+        print('0. 返回')
+        print('='*60)
+        
+        try:
+            choice = input('请输入选项 (0-2): ').strip()
+        except (EOFError, KeyboardInterrupt):
+            print('\n已取消')
+            return
+        
+        if choice == '1':
+            auto_get_cookie()
+        elif choice == '2':
+            manual_update_cookie()
+        elif choice == '0':
+            return
+        else:
+            print('无效的选项')
+            input('按回车键继续...')
 
 
 def auto_get_cookie():
@@ -1043,7 +1071,7 @@ def auto_get_cookie():
                 
                 try:
                     await page.wait_for_event('close', timeout=120000)
-                except:
+                except Exception as e:
                     pass
                 
                 if browser.is_connected():
@@ -1054,7 +1082,7 @@ def auto_get_cookie():
                     
                     try:
                         await browser.close()
-                    except:
+                    except Exception as e:
                         pass
                 else:
                     print('浏览器已关闭')
