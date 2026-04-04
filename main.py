@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 
 
 try:
@@ -223,10 +223,18 @@ class WegoScraper:
         last_height = 0
         scroll_attempts = 0
         no_change_count = 0
+        height_history = []
+        dynamic_adjust = scroll_config.get('dynamic_adjust', True)
         
         while scroll_attempts < max_attempts:
             try:
+                start_time = time.time()
                 current_height = await page.evaluate('document.body.scrollHeight')
+                load_time = time.time() - start_time
+                
+                height_history.append(current_height)
+                if len(height_history) > 10:
+                    height_history.pop(0)
                 
                 if current_height == last_height:
                     no_change_count += 1
@@ -240,9 +248,21 @@ class WegoScraper:
                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
                 await asyncio.sleep(scroll_wait_time)
                 scroll_attempts += 1
-                print(f'滚动 {scroll_attempts}/{max_attempts}，当前高度: {current_height}')
                 
-                # 只在滚动指定次数后关闭一次弹窗，避免频繁操作
+                progress_percent = min(100, int((scroll_attempts / max_attempts) * 100))
+                print(f'滚动 {scroll_attempts}/{max_attempts} ({progress_percent}%) - 当前高度: {current_height} - 加载耗时: {load_time:.2f}秒')
+                
+                if dynamic_adjust and len(height_history) >= 5:
+                    height_changes = [abs(height_history[i] - height_history[i-1]) for i in range(1, len(height_history))]
+                    avg_change = sum(height_changes) / len(height_changes)
+                    
+                    if avg_change < 100 and scroll_wait_time < 3.0:
+                        scroll_wait_time = min(3.0, scroll_wait_time + 0.2)
+                        print(f'  ⚠️  页面加载较慢，增加等待时间至 {scroll_wait_time:.1f}秒')
+                    elif avg_change > 500 and scroll_wait_time > 0.5:
+                        scroll_wait_time = max(0.5, scroll_wait_time - 0.2)
+                        print(f'  ✅ 页面加载较快，减少等待时间至 {scroll_wait_time:.1f}秒')
+                
                 if scroll_attempts % popup_close_interval == 0:
                     await self.close_popups(page, popup_close_limit, popup_close_wait)
             except Exception as e:
@@ -506,11 +526,15 @@ class WegoScraper:
             print(f'{change_summary}')
 
     async def run(self):
+        start_time = time.time()
+        start_datetime = datetime.now()
+        
         try:
             print('='*50)
             print(f'Szwego商品爬虫 - v{VERSION}')
             print(f'当前系统: {self.get_system_info()}')
             print(f'Python版本: {platform.python_version()}')
+            print(f'开始时间: {start_datetime.strftime("%Y-%m-%d %H:%M:%S")}')
             print('='*50)
             print('开始运行...')
             
@@ -554,6 +578,15 @@ class WegoScraper:
             print(f'运行失败: {e}')
             import traceback
             traceback.print_exc()
+        finally:
+            end_time = time.time()
+            end_datetime = datetime.now()
+            total_time = end_time - start_time
+            
+            print('='*50)
+            print(f'结束时间: {end_datetime.strftime("%Y-%m-%d %H:%M:%S")}')
+            print(f'总运行时间: {total_time:.2f} 秒 ({total_time/60:.2f} 分钟)')
+            print('='*50)
 
 
 class StockNumberComparator:
