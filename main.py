@@ -704,13 +704,26 @@ class StockNumberComparator:
             
             result_message = self.get_result_message(result, [])
             
+            if result['missing_count'] == 0 and result.get('extra_in_json_count', 0) == 0:
+                data_change = "数据无变化"
+            else:
+                data_change = f"数据有变化：缺失 {result['missing_count']} 个货号，多余 {result.get('extra_in_json_count', 0)} 个货号"
+            
+            comparison_with_descriptions = {
+                'missing_description': '微购相册比本地表格多出的序列号仅供参考',
+                'existing_description': '本地表格比微购相册上多的序列号，请仔细核对后删除多出的地方',
+                'extra_in_json_description': '微购相册比本地表格多出的序列号',
+                **result
+            }
+            
             diff_data = {
                 'timestamp': timestamp,
                 'date': date_str,
                 'json_file': os.path.basename(latest_json_file),
                 'excel_file': os.path.basename(self.excel_file),
-                'comparison': result,
-                'result_message': result_message
+                'comparison': comparison_with_descriptions,
+                'result_message': result_message,
+                'data_change': data_change
             }
             
             diff_log_file = f'file/diff_log_{date_str}.json'
