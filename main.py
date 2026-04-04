@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 
 
 try:
@@ -193,13 +193,17 @@ class WegoScraper:
             '.ant-modal-close', '.el-dialog__close',
         ]
         
+        closed_count = 0
         for selector in popup_selectors:
             try:
                 close_button = await page.query_selector(selector)
                 if close_button:
                     await close_button.click()
                     print(f'关闭了弹窗: {selector}')
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.3)
+                    closed_count += 1
+                    if closed_count >= 3:
+                        break
             except Exception as e:
                 pass
 
@@ -208,9 +212,9 @@ class WegoScraper:
         
         last_height = 0
         scroll_attempts = 0
-        max_attempts = 30
+        max_attempts = 20
         no_change_count = 0
-        same_height_limit = 3
+        same_height_limit = 5
         
         while scroll_attempts < max_attempts:
             try:
@@ -226,10 +230,13 @@ class WegoScraper:
                     last_height = current_height
                 
                 await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                await asyncio.sleep(1)
+                await asyncio.sleep(1.5)
                 scroll_attempts += 1
                 print(f'滚动 {scroll_attempts}/{max_attempts}，当前高度: {current_height}')
-                await self.close_popups(page)
+                
+                # 只在滚动5次后关闭一次弹窗，避免频繁操作
+                if scroll_attempts % 5 == 0:
+                    await self.close_popups(page)
             except Exception as e:
                 print(f'滚动时出错: {e}')
                 break
@@ -358,7 +365,7 @@ class WegoScraper:
             await self.scroll_to_load_all(page)
             
             print('等待页面完全加载...')
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
             
             page_text = await page.content()
             
@@ -408,6 +415,10 @@ class WegoScraper:
             
             item_elements = list(dict.fromkeys(item_elements))
             print(f'总共找到 {len(item_elements)} 个商品项')
+            
+            if not item_elements:
+                print('警告: 未找到任何商品项，可能页面加载失败或选择器不正确')
+                print('建议检查页面URL和Cookie是否有效')
             
             products = await self.process_elements_concurrently(page, item_elements)
             
