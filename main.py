@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 
 
 try:
@@ -805,6 +805,9 @@ class StockNumberComparator:
                 'missing_description': '微购相册比本地表格多出的序列号仅供参考',
                 'existing_description': '本地表格比微购相册上多的序列号，请仔细核对后删除多出的地方',
                 'extra_in_json_description': '微购相册比本地表格多出的序列号',
+                'high_price_extra_in_json': high_price_extra_in_json,
+                'high_price_extra_in_json_count': len(high_price_extra_in_json),
+                'high_price_extra_in_json_description': '只在JSON中存在但不在Excel中的售价>=599的货号',
                 **result
             }
             
@@ -815,7 +818,10 @@ class StockNumberComparator:
                 'excel_file': os.path.basename(self.excel_file),
                 'comparison': comparison_with_descriptions,
                 'result_message': result_message,
-                'data_change': data_change
+                'data_change': data_change,
+                'high_price_extra_in_json': high_price_extra_in_json,
+                'high_price_extra_in_json_count': len(high_price_extra_in_json),
+                'high_price_extra_in_json_description': '只在JSON中存在但不在Excel中的售价>=599的货号'
             }
             
             diff_log_file = f'file/diff_log_{date_str}.json'
@@ -833,6 +839,9 @@ class StockNumberComparator:
             
             FileManager.write_json(diff_log_file, existing_data)
             print(f'\n差异日志已保存到 {diff_log_file}')
+            
+            # 将高价商品信息写入原始JSON文件
+            self.add_high_price_info_to_json(latest_json_file, high_price_extra_in_json)
             
             self.print_comparison_result(result, [])
             return True
@@ -900,6 +909,47 @@ class StockNumberComparator:
         print('\n' + '='*60)
         print(StockNumberComparator.get_result_message(result, duplicates))
         print('='*60 + '\n')
+
+    def add_high_price_info_to_json(self, json_file_path, high_price_stock_numbers):
+        """
+        将高价商品信息写入原始JSON文件
+        """
+        try:
+            # 读取原始JSON数据
+            json_data = FileManager.read_json(json_file_path)
+            if not json_data:
+                print(f'无法读取JSON文件: {json_file_path}')
+                return
+            
+            # 获取商品列表
+            products = json_data.get('商品列表', [])
+            if not products:
+                print(f'JSON文件中没有商品列表')
+                return
+            
+            # 为高价商品添加备注
+            high_price_count = 0
+            for product in products:
+                stock_num = product.get('货号', '')
+                if stock_num in high_price_stock_numbers:
+                    # 添加高价商品备注
+                    product['备注'] = f'高价商品(≥599) - 只在JSON中存在但不在Excel中'
+                    high_price_count += 1
+            
+            # 更新统计信息
+            if '统计信息' not in json_data:
+                json_data['统计信息'] = {}
+            
+            json_data['统计信息']['高价商品数量'] = high_price_count
+            json_data['统计信息']['高价商品货号'] = high_price_stock_numbers
+            json_data['统计信息']['高价商品描述'] = '只在JSON中存在但不在Excel中的售价>=599的货号'
+            
+            # 保存更新后的JSON文件
+            FileManager.write_json(json_file_path, json_data)
+            print(f'已为 {high_price_count} 个高价商品添加备注，并更新统计信息到 {json_file_path}')
+            
+        except Exception as e:
+            print(f'添加高价商品信息失败: {e}')
 
     def run_interactive(self):
         print('\n' + '='*60)
