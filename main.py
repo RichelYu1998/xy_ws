@@ -367,20 +367,6 @@ class WegoScraper:
             print('等待页面初始加载...')
             await asyncio.sleep(5)
             
-            print('='*60)
-            print('请在浏览器中确认登录状态')
-            print('如果需要登录，请在浏览器中完成登录')
-            print('确认可以查看商品后，在此窗口按回车键继续')
-            print('='*60)
-            print('等待 60 秒，请在此期间完成登录...')
-            print('(也可以直接按回车键提前继续)')
-            print('='*60)
-            
-            try:
-                input('按回车键继续...')
-            except:
-                time.sleep(60)
-            
             await page.reload()
             await asyncio.sleep(5)
             
