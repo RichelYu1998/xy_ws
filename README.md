@@ -216,10 +216,12 @@ Szwego商品爬虫和货号对比工具 - 跨系统版本
       "comparison": {
         "missing": ["12345", "67890"],
         "existing": ["11111", "22222"],
+        "extra_in_json": ["33333", "44444"],
         "total_input": 4,
         "total_json": 100,
         "missing_count": 2,
-        "existing_count": 2
+        "existing_count": 2,
+        "extra_in_json_count": 2
       }
     },
     {
@@ -230,15 +232,27 @@ Szwego商品爬虫和货号对比工具 - 跨系统版本
       "comparison": {
         "missing": ["12345", "67890"],
         "existing": ["11111", "22222"],
+        "extra_in_json": ["33333", "44444"],
         "total_input": 4,
         "total_json": 100,
         "missing_count": 2,
-        "existing_count": 2
+        "existing_count": 2,
+        "extra_in_json_count": 2
       }
     }
   ]
 }
 ```
+
+**对比结果说明：**
+- `missing`: 在Excel中有但在JSON中没有的货号（Excel缺失）
+- `existing`: 在Excel和JSON中都存在的货号
+- `extra_in_json`: 在JSON中有但在Excel中没有的货号（JSON多余）
+- `total_input`: Excel中的货号总数
+- `total_json`: JSON中的货号总数
+- `missing_count`: 缺失货号数量
+- `existing_count`: 已存在货号数量
+- `extra_in_json_count`: JSON中多余货号数量
 
 **使用场景：**
 - 定期对比Excel和JSON数据，跟踪库存变化
@@ -392,6 +406,12 @@ pip install openpyxl
 - **错误处理**：完善的异常处理机制
 
 ## 更新日志
+
+### v1.3.1 (2026-04-04)
+- **新增JSON多余货号显示**：对比结果新增"在JSON中有但在Excel中没有"的货号列表
+- **优化对比结果展示**：在控制台和日志文件中显示JSON中多余的货号
+- **完善对比统计**：新增`extra_in_json_count`字段，统计JSON中多余货号数量
+- **改进显示逻辑**：优化"所有货号都已存在"的提示信息，改为"所有输入货号都已存在"
 
 ### v1.3.0 (2026-04-04)
 - **新增Excel与JSON自动对比功能**：自动对比Excel和最新JSON文件的数据
