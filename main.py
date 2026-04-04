@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 
 try:
@@ -774,11 +774,22 @@ class StockNumberComparator:
                             high_price_stock_numbers.append(stock_num)
             
             excel_stock_numbers = self.load_excel_data()
+            
+            # 筛选只在JSON中存在但不在Excel中的售价>=599的商品货号
+            high_price_extra_in_json = []
+            if high_price_stock_numbers and excel_stock_numbers:
+                json_set = set(json_stock_numbers)
+                excel_set = set(excel_stock_numbers)
+                extra_in_json_set = json_set - excel_set
+                for stock_num in high_price_stock_numbers:
+                    if stock_num in extra_in_json_set:
+                        high_price_extra_in_json.append(stock_num)
+            
             if not excel_stock_numbers:
                 print('无法从Excel文件读取货号')
                 return False
             
-            result = self.compare_stock_numbers(json_stock_numbers, excel_stock_numbers, high_price_stock_numbers)
+            result = self.compare_stock_numbers(json_stock_numbers, excel_stock_numbers, high_price_extra_in_json)
             
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             date_str = datetime.now().strftime('%Y%m%d')
@@ -854,7 +865,7 @@ class StockNumberComparator:
         print(f'JSON中多余货号数: {result.get("extra_in_json_count", 0)}')
         print(f'重复序列号数: {len(duplicates)}')
         if result.get('high_price_count'):
-            print(f'售价>=599货号数: {result["high_price_count"]}')
+            print(f'只在JSON中存在但不在Excel中的售价>=599货号数: {result["high_price_count"]}')
         print('='*60)
         
         if result['existing']:
@@ -875,7 +886,7 @@ class StockNumberComparator:
                 print(f'  {i}. {num}')
         
         if result.get('high_price_stock_numbers'):
-            print(f'\n售价>=599的货号:')
+            print(f'\n只在JSON中存在但不在Excel中的售价>=599的货号:')
             for i, num in enumerate(result['high_price_stock_numbers'], 1):
                 print(f'  {i}. {num}')
         
