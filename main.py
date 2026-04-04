@@ -686,6 +686,9 @@ class StockNumberComparator:
                 print('无法读取JSON文件')
                 return False
             
+            if isinstance(json_data, dict) and '商品列表' in json_data:
+                json_data = json_data['商品列表']
+            
             json_stock_numbers = self.extract_stock_numbers(json_data)
             print(f'从JSON文件中读取到 {len(json_stock_numbers)} 个货号\n')
             
