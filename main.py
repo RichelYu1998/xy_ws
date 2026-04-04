@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "1.8.0"
+，弄VERSION = "1.9.0"
 
 
 try:
@@ -473,6 +473,21 @@ class WegoScraper:
         total_count = len(data)
         change_summary = ""
         
+        # 找出售价>=599的商品
+        high_price_products = []
+        for product in data:
+            price_str = product.get('售价', '')
+            if not price_str:
+                continue
+            price_clean = price_str.replace('¥', '').replace(',', '').strip()
+            if not price_clean.isdigit():
+                continue
+            price = int(price_clean)
+            if price >= 599:
+                high_price_products.append(product)
+        
+        high_price_count = len(high_price_products)
+        
         existing_files = sorted(FileManager.list_files('file', '微购相册'))
         
         if existing_files:
@@ -519,9 +534,17 @@ class WegoScraper:
         if change_summary:
             output_data["小计"] = change_summary
         
+        # 添加高价商品统计
+        output_data["高价商品统计"] = {
+            "筛选条件": "售价 >= 599",
+            "数量": high_price_count,
+            "商品列表": high_price_products
+        }
+        
         FileManager.write_json(new_filename, output_data)
         print(f'数据已保存到 {new_filename}')
         print(f'成功获取 {total_count} 个商品')
+        print(f'售价 >= 599 的商品: {high_price_count} 个')
         if change_summary:
             print(f'{change_summary}')
 
