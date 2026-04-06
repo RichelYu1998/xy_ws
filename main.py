@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.0.3"
+VERSION = "2.0.4"
 
 
 try:
@@ -629,7 +629,13 @@ class StockNumberComparator:
         self.output_file = output_file
         self.input_file = input_file
         self.config_manager = ConfigManager(config_path)
-        self.excel_file = self.config_manager.get_excel_file()
+        self.excel_file = self._get_excel_file()
+
+    def _get_excel_file(self):
+        excel_file = self.config_manager.get_excel_file()
+        if excel_file and FileManager.file_exists(excel_file):
+            return excel_file
+        return None
 
     def load_json_data(self):
         return FileManager.read_json(self.output_file) or []
@@ -651,9 +657,11 @@ class StockNumberComparator:
         if excel_file is None:
             excel_file = self.excel_file
         
+        if not excel_file:
+            return None
+        
         try:
             if not FileManager.file_exists(excel_file):
-                print(f'Excel文件 {excel_file} 不存在')
                 return None
             
             print(f'正在读取Excel文件: {excel_file}')
@@ -1152,19 +1160,19 @@ def main():
             print('\n程序已退出')
             return
         
-        if choice == '1':
-            run_scraper()
-        elif choice == '2':
-            StockNumberComparator().run_interactive()
-        elif choice == '3':
-            StockNumberComparator().run_simple()
-        elif choice == '4':
-            StockNumberComparator().compare_excel_with_json()
-        elif choice == '5':
-            update_cookie()
-        elif choice == '0':
+        actions = {
+            '1': lambda: run_scraper() or True,
+            '2': lambda: StockNumberComparator().run_interactive() or True,
+            '3': lambda: StockNumberComparator().run_simple() or True,
+            '4': lambda: StockNumberComparator().compare_excel_with_json() or True,
+            '5': lambda: update_cookie() or True,
+        }
+        
+        if choice == '0':
             print('程序已退出')
             break
+        elif choice in actions:
+            actions[choice]()
         else:
             print('无效的选项')
             input('按回车键继续...')
