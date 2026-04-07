@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.0.6"
+VERSION = "2.0.7"
 
 
 try:
@@ -477,12 +477,7 @@ class WegoScraper:
 
     def filter_high_price_products(self, data, min_price=599):
         """筛选高价商品"""
-        high_price_products = []
-        for product in data:
-            price = self.parse_price(product.get('售价', ''))
-            if price and price >= min_price:
-                high_price_products.append(product)
-        return high_price_products
+        return [p for p in data if self.parse_price(p.get('售价', '')) and self.parse_price(p.get('售价', '')) >= min_price]
 
     def analyze_data_changes(self, data, previous_file):
         """分析数据变化"""
@@ -599,7 +594,7 @@ class WegoScraper:
                 elif system == 'Linux':
                     browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
                 
-                browser = await p.chromium.launch(headless=False, args=browser_args, channel='chrome')
+                browser = await p.chromium.launch(headless=False, args=browser_args, executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
                 context = await browser.new_context(
                     viewport={'width': 1920, 'height': 1080},
                     user_agent=self.config_manager.get_user_agent()
@@ -1265,7 +1260,7 @@ def auto_get_cookie():
     async def get_cookie():
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=False, channel='chrome')
+                browser = await p.chromium.launch(headless=False, executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
                 context = await browser.new_context()
                 
                 cookie_file = 'config/cookies.json'
