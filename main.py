@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.0.4"
+VERSION = "2.0.6"
 
 
 try:
@@ -484,45 +484,53 @@ class WegoScraper:
                 high_price_products.append(product)
         return high_price_products
 
-    def analyze_data_changes(self, data, existing_files):
+    def analyze_data_changes(self, data, previous_file):
         """分析数据变化"""
-        change_summary = ""
-        if not existing_files:
-            return change_summary
+        if not previous_file:
+            return ""
         
-        latest_file = existing_files[-1]
-        old_filename = f'file/{latest_file}'
         try:
-            old_data = FileManager.read_json(old_filename)
-            if old_data:
-                old_items = old_data.get('商品列表', [])
-                old_stock_numbers = {item.get('货号', '') for item in old_items if item.get('货号')}
-                current_stock_numbers = {item.get('货号', '') for item in data if item.get('货号')}
-                
-                added = current_stock_numbers - old_stock_numbers
-                removed = old_stock_numbers - current_stock_numbers
-                
-                added_details = [f"• {item.get('货号')} - {item.get('商品名称', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
-                                for item in data if item.get('货号') in added]
-                removed_details = [f"• {item.get('货号')} - {item.get('商品名称', 'N/A')[:30]} ({item.get('售价', 'N/A')})" 
-                                  for item in old_items if item.get('货号') in removed]
-                
-                if added or removed:
-                    change_summary = f"对比 {old_data.get('生成日期', 'N/A')} 新增 {len(added)} 个，删除 {len(removed)} 个"
-                    if added_details:
-                        change_summary += f"\n【新增商品】({len(added)}个):\n" + '\n'.join(added_details[:10])
-                        if len(added_details) > 10:
-                            change_summary += f"\n... 还有 {len(added_details)-10} 个"
-                    if removed_details:
-                        change_summary += f"\n【删除商品】({len(removed)}个):\n" + '\n'.join(removed_details[:10])
-                        if len(removed_details) > 10:
-                            change_summary += f"\n... 还有 {len(removed_details)-10} 个"
-                else:
-                    change_summary = "数据无变化"
+            old_data = FileManager.read_json(f'file/{previous_file}')
+            if not old_data:
+                return ""
+            
+            old_items = old_data.get('商品列表', [])
+            old_nums = {item.get('货号', '') for item in old_items if item.get('货号')}
+            current_nums = {item.get('货号', '') for item in data if item.get('货号')}
+            
+            added = current_nums - old_nums
+            removed = old_nums - current_nums
+            
+            if not added and not removed:
+                return "数据无变化"
+            
+            def get_product_detail(item):
+                return {
+                    "商品名称": item.get('商品名称', ''),
+                    "售价": item.get('售价', ''),
+                    "货号": item.get('货号', ''),
+                    "备注": item.get('备注', ''),
+                    "员工": item.get('员工', '')
+                }
+            
+            def format_json_array(items):
+                if not items:
+                    return "[]"
+                lines = ["["]
+                for i, item in enumerate(items):
+                    lines.append('  {')
+                    for j, (k, v) in enumerate(item.items()):
+                        lines.append(f'    "{k}": "{v}"' + (',' if j < len(item) - 1 else ''))
+                    lines.append('  }' + (',' if i < len(items) - 1 else ''))
+                lines.append("]")
+                return '\n'.join(lines)
+            
+            added_details = [get_product_detail(item) for item in data if item.get('货号') in added]
+            removed_details = [get_product_detail(item) for item in old_items if item.get('货号') in removed]
+            
+            return f"对比 {old_data.get('生成日期', 'N/A')} 新增 {len(added)} 个，删除 {len(removed)} 个\n【新增商品】({len(added)}个):\n{format_json_array(added_details)}\n【删除商品】({len(removed)}个):\n{format_json_array(removed_details)}"
         except Exception as e:
-            change_summary = f"对比分析失败: {str(e)}"
-        
-        return change_summary
+            return f"对比分析失败: {str(e)}"
 
     def save_data(self, data, filename=None):
         today = datetime.now().strftime('%Y%m%d')
@@ -533,8 +541,15 @@ class WegoScraper:
         high_price_products = self.filter_high_price_products(data)
         high_price_count = len(high_price_products)
         
-        existing_files = sorted(FileManager.list_files('file', '微购相册'))
-        change_summary = self.analyze_data_changes(data, existing_files)
+        existing_files = sorted(FileManager.list_files('file', '微购相册'), reverse=True)
+        
+        previous_file = None
+        for f in existing_files:
+            if f != f"{today}微购相册(小旭数码).json":
+                previous_file = f
+                break
+        
+        change_summary = self.analyze_data_changes(data, previous_file)
         
         output_data = {
             "生成日期": today,
@@ -825,6 +840,25 @@ class StockNumberComparator:
                 **result
             }
             
+            def get_product_detail(item, stock_num=None):
+                return {
+                    "商品名称": item.get('商品名称', ''),
+                    "售价": item.get('售价', ''),
+                    "货号": stock_num or item.get('货号', ''),
+                    "备注": item.get('备注', ''),
+                    "员工": item.get('员工', '')
+                }
+            
+            added_products = [get_product_detail(p, p.get('货号')) for p in json_data if p.get('货号') and p.get('货号') not in set(excel_stock_numbers)] if isinstance(json_data, list) and excel_stock_numbers else []
+            
+            prev_file = FileManager.get_latest_json_file('微购相册')
+            removed_products = []
+            if prev_file and prev_file != latest_json_file:
+                old_data = FileManager.read_json(prev_file)
+                if old_data and isinstance(old_data, dict):
+                    old_items = old_data.get('商品列表', [])
+                    removed_products = [get_product_detail(item) for item in old_items if item.get('货号') and item.get('货号') not in set(json_stock_numbers)]
+            
             diff_data = {
                 'timestamp': timestamp,
                 'date': date_str,
@@ -835,7 +869,11 @@ class StockNumberComparator:
                 'data_change': data_change,
                 'high_price_extra_in_json': high_price_extra_in_json,
                 'high_price_extra_in_json_count': len(high_price_extra_in_json),
-                'high_price_extra_in_json_description': '只在JSON中存在但不在Excel中的售价>=599的货号'
+                'high_price_extra_in_json_description': '只在JSON中存在但不在Excel中的售价>=599的货号',
+                '新增商品': added_products,
+                '新增商品数量': len(added_products),
+                '删除商品': removed_products,
+                '删除商品数量': len(removed_products)
             }
             
             diff_log_file = f'file/diff_log_{date_str}.json'
