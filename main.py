@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.0.8"
+VERSION = "2.0.9"
 
 
 try:
@@ -148,6 +148,37 @@ class FileManager:
         except Exception as e:
             print(f'获取最新JSON文件失败: {e}')
             return None
+
+    @staticmethod
+    def get_today_json_files(directory='file', pattern='微购相册'):
+        """
+        获取当天最新的两个JSON文件
+        """
+        try:
+            if not os.path.exists(directory):
+                print(f'目录 {directory} 不存在')
+                return None, None
+            
+            today = datetime.now().strftime('%Y%m%d')
+            json_files = []
+            for file in os.listdir(directory):
+                if file.endswith('.json') and pattern in file and today in file:
+                    file_path = os.path.join(directory, file)
+                    json_files.append((file_path, os.path.getmtime(file_path)))
+            
+            if len(json_files) < 2:
+                print(f'当天未找到至少2个包含"{pattern}"的JSON文件')
+                return None, None
+            
+            json_files.sort(key=lambda x: x[1], reverse=True)
+            latest_file = json_files[0][0]
+            second_latest_file = json_files[1][0]
+            print(f'找到当天最新的JSON文件: {latest_file}')
+            print(f'找到当天次新的JSON文件: {second_latest_file}')
+            return latest_file, second_latest_file
+        except Exception as e:
+            print(f'获取当天JSON文件失败: {e}')
+            return None, None
 
     @staticmethod
     def list_files(directory, pattern=None):
@@ -770,6 +801,124 @@ class StockNumberComparator:
             print(f'保存重复日志失败: {e}')
             return False
 
+    def compare_json_files(self):
+        """
+        对比当天最新的两个JSON文件，将差异写进最新的JSON文件中
+        """
+        try:
+            print('='*60)
+            print('当天JSON文件对比工具')
+            print('='*60)
+            
+            # 获取当天最新的两个JSON文件
+            latest_json_file, second_latest_json_file = FileManager.get_today_json_files()
+            if not latest_json_file or not second_latest_json_file:
+                print('无法获取当天的JSON文件')
+                return False
+            
+            # 读取最新的JSON文件
+            latest_json_data = FileManager.read_json(latest_json_file)
+            if not latest_json_data:
+                print('无法读取最新的JSON文件')
+                return False
+            
+            # 读取次新的JSON文件
+            second_json_data = FileManager.read_json(second_latest_json_file)
+            if not second_json_data:
+                print('无法读取次新的JSON文件')
+                return False
+            
+            # 提取商品列表
+            latest_products = latest_json_data.get('商品列表', [])
+            second_products = second_json_data.get('商品列表', [])
+            
+            if not latest_products or not second_products:
+                print('JSON文件中没有商品列表')
+                return False
+            
+            # 提取货号
+            latest_stock_numbers = {item.get('货号', '') for item in latest_products if item.get('货号')}
+            second_stock_numbers = {item.get('货号', '') for item in second_products if item.get('货号')}
+            
+            print(f'从最新JSON文件中读取到 {len(latest_stock_numbers)} 个货号')
+            print(f'从次新JSON文件中读取到 {len(second_stock_numbers)} 个货号\n')
+            
+            # 计算差异
+            added = latest_stock_numbers - second_stock_numbers
+            removed = second_stock_numbers - latest_stock_numbers
+            
+            # 找出售价>=599的商品货号
+            high_price_stock_numbers = []
+            for product in latest_products:
+                price = WegoScraper.parse_price(product.get('售价', ''))
+                if price and price >= 599:
+                    stock_num = product.get('货号', '')
+                    if stock_num:
+                        high_price_stock_numbers.append(stock_num)
+            
+            # 筛选新增的高价商品
+            high_price_added = []
+            if high_price_stock_numbers and added:
+                for stock_num in high_price_stock_numbers:
+                    if stock_num in added:
+                        high_price_added.append(stock_num)
+            
+            # 生成差异报告
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            date_str = datetime.now().strftime('%Y%m%d')
+            
+            diff_data = {
+                'timestamp': timestamp,
+                'date': date_str,
+                'latest_file': os.path.basename(latest_json_file),
+                'second_file': os.path.basename(second_latest_json_file),
+                'added_count': len(added),
+                'removed_count': len(removed),
+                'added': sorted(list(added)),
+                'removed': sorted(list(removed)),
+                'high_price_added': sorted(list(high_price_added)),
+                'high_price_added_count': len(high_price_added),
+                'high_price_description': '新增的售价>=599的商品'
+            }
+            
+            # 将差异信息写入最新的JSON文件
+            latest_json_data['对比差异'] = diff_data
+            FileManager.write_json(latest_json_file, latest_json_data)
+            print(f'\n对比差异已写入 {latest_json_file}')
+            
+            # 打印对比结果
+            print('\n' + '='*60)
+            print('对比结果')
+            print('='*60)
+            print(f'对比文件: {os.path.basename(second_latest_json_file)} -> {os.path.basename(latest_json_file)}')
+            print(f'新增商品数: {len(added)}')
+            print(f'删除商品数: {len(removed)}')
+            print(f'新增高价商品数: {len(high_price_added)}')
+            print('='*60)
+            
+            if added:
+                print('\n新增的商品:')
+                for i, num in enumerate(added, 1):
+                    print(f'  {i}. {num}')
+            
+            if removed:
+                print('\n删除的商品:')
+                for i, num in enumerate(removed, 1):
+                    print(f'  {i}. {num}')
+            
+            if high_price_added:
+                print(f'\n新增的售价>=599的商品:')
+                for i, num in enumerate(high_price_added, 1):
+                    print(f'  {i}. {num}')
+            
+            print('='*60 + '\n')
+            return True
+        except Exception as e:
+            print(f'对比失败: {e}')
+            import traceback
+            traceback.print_exc()
+            return False
+
     def compare_excel_with_json(self):
         try:
             print('='*60)
@@ -1188,12 +1337,13 @@ def main():
         print('2. 货号对比（交互式）')
         print('3. 货号对比（简化版）')
         print('4. Excel与JSON对比（自动保存差异日志）')
-        print('5. 更新Cookie')
+        print('5. 当天JSON文件对比（对比当天最新两个文件）')
+        print('6. 更新Cookie')
         print('0. 退出')
         print('='*60)
         
         try:
-            choice = input('请输入选项 (0-5): ').strip()
+            choice = input('请输入选项 (0-6): ').strip()
         except (EOFError, KeyboardInterrupt):
             print('\n程序已退出')
             return
@@ -1203,7 +1353,8 @@ def main():
             '2': lambda: StockNumberComparator().run_interactive() or True,
             '3': lambda: StockNumberComparator().run_simple() or True,
             '4': lambda: StockNumberComparator().compare_excel_with_json() or True,
-            '5': lambda: update_cookie() or True,
+            '5': lambda: StockNumberComparator().compare_json_files() or True,
+            '6': lambda: update_cookie() or True,
         }
         
         if choice == '0':
