@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.0.7"
+VERSION = "2.0.8"
 
 
 try:
@@ -589,12 +589,17 @@ class WegoScraper:
                 system = self.get_system_info()
                 browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--disable-dev-shm-usage']
                 
+                chrome_path = None
                 if system == 'Windows':
                     browser_args.append('--disable-gpu')
+                    chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
                 elif system == 'Linux':
                     browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
+                    chrome_path = '/usr/bin/google-chrome'
+                elif system == 'Mac':
+                    chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
                 
-                browser = await p.chromium.launch(headless=False, args=browser_args, executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+                browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
                 context = await browser.new_context(
                     viewport={'width': 1920, 'height': 1080},
                     user_agent=self.config_manager.get_user_agent()

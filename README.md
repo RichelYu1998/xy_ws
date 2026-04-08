@@ -407,6 +407,14 @@ pip install openpyxl
 
 ## 更新日志
 
+### v2.0.8 (2026-04-08)
+- **修复跨平台浏览器启动问题**：为不同操作系统分别设置Chrome浏览器路径
+- **新增Windows系统支持**：添加Windows系统Chrome路径配置（C:\Program Files\Google\Chrome\Application\chrome.exe）
+- **新增Linux系统支持**：添加Linux系统Chrome路径配置（/usr/bin/google-chrome）
+- **保留Mac系统支持**：保持Mac系统Chrome路径配置（/Applications/Google Chrome.app/Contents/MacOS/Google Chrome）
+- **优化浏览器启动逻辑**：根据操作系统自动选择合适的Chrome浏览器路径
+- **提升跨平台兼容性**：确保在Windows、Mac、Linux系统上都能正常启动浏览器
+
 ### v2.0.3 (2026-04-04)
 - **代码重构和优化**：提取价格解析逻辑为独立方法parse_price，提高代码复用性
 - **新增筛选方法**：创建filter_high_price_products方法，专门用于筛选高价商品
