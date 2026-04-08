@@ -5,11 +5,12 @@ import os
 import re
 import platform
 import sys
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.1.0"
+VERSION = "2.1.2"
 
 
 try:
@@ -152,7 +153,11 @@ class FileManager:
     @staticmethod
     def get_today_json_files(directory='file', pattern='微购相册'):
         """
-        获取当天最新的两个JSON文件
+        获取用于对比的两个JSON文件
+        优先级：
+        1. 当天的缓存文件和最新文件
+        2. 当天的最新文件和前一天的文件
+        3. 最新的两个文件
         """
         try:
             if not os.path.exists(directory):
@@ -160,24 +165,54 @@ class FileManager:
                 return None, None
             
             today = datetime.now().strftime('%Y%m%d')
-            json_files = []
-            for file in os.listdir(directory):
-                if file.endswith('.json') and pattern in file and today in file:
-                    file_path = os.path.join(directory, file)
-                    json_files.append((file_path, os.path.getmtime(file_path)))
             
-            if len(json_files) < 2:
-                print(f'当天未找到至少2个包含"{pattern}"的JSON文件')
+            # 获取所有符合条件的JSON文件
+            all_json_files = []
+            for file in os.listdir(directory):
+                if file.endswith('.json') and pattern in file and '_cache' not in file:
+                    file_path = os.path.join(directory, file)
+                    all_json_files.append((file_path, os.path.getmtime(file_path)))
+            
+            if len(all_json_files) < 1:
+                print(f'未找到包含"{pattern}"的JSON文件')
                 return None, None
             
-            json_files.sort(key=lambda x: x[1], reverse=True)
-            latest_file = json_files[0][0]
-            second_latest_file = json_files[1][0]
-            print(f'找到当天最新的JSON文件: {latest_file}')
-            print(f'找到当天次新的JSON文件: {second_latest_file}')
-            return latest_file, second_latest_file
+            # 按修改时间排序（最新的在前）
+            all_json_files.sort(key=lambda x: x[1], reverse=True)
+            latest_file = all_json_files[0][0]
+            
+            # 检查是否存在当天的缓存文件
+            cache_file = os.path.join(directory, f"{today}微购相册(小旭数码)_cache.json")
+            if os.path.exists(cache_file):
+                print(f'找到当天缓存文件: {cache_file}')
+                print(f'找到当天最新文件: {latest_file}')
+                return latest_file, cache_file
+            
+            # 如果没有缓存文件，检查当天是否有多个文件
+            today_files = []
+            for file in os.listdir(directory):
+                if file.endswith('.json') and pattern in file and today in file and '_cache' not in file:
+                    file_path = os.path.join(directory, file)
+                    today_files.append((file_path, os.path.getmtime(file_path)))
+            
+            if len(today_files) >= 2:
+                today_files.sort(key=lambda x: x[1], reverse=True)
+                print(f'找到当天最新文件: {today_files[0][0]}')
+                print(f'找到当天次新文件: {today_files[1][0]}')
+                return today_files[0][0], today_files[1][0]
+            
+            # 如果当天只有一个文件，尝试找前一天的文件
+            if len(all_json_files) >= 2:
+                print(f'当天只有一个文件，使用最新文件和次新文件对比')
+                print(f'最新文件: {latest_file}')
+                print(f'次新文件: {all_json_files[1][0]}')
+                return latest_file, all_json_files[1][0]
+            
+            print(f'只找到一个文件: {latest_file}')
+            return latest_file, None
+            
         except Exception as e:
-            print(f'获取当天JSON文件失败: {e}')
+            print(f'获取JSON文件失败: {e}')
             return None, None
 
     @staticmethod
@@ -571,6 +606,16 @@ class WegoScraper:
         today = datetime.now().strftime('%Y%m%d')
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         new_filename = f"file/{today}微购相册(小旭数码).json"
+        cache_filename = f"file/{today}微购相册(小旭数码)_cache.json"
+        
+        # 如果当天的JSON文件已存在，先保存为缓存文件
+        if os.path.exists(new_filename):
+            try:
+                import shutil
+                shutil.copy2(new_filename, cache_filename)
+                print(f'已将旧数据保存为缓存文件: {cache_filename}')
+            except Exception as e:
+                print(f'创建缓存文件失败: {e}')
         
         total_count = len(data)
         high_price_products = self.filter_high_price_products(data)
@@ -822,17 +867,27 @@ class StockNumberComparator:
     def compare_json_files(self):
         """
         对比当天最新的两个JSON文件，将差异写进最新的JSON文件中
+        如果使用缓存文件，对比完成后会删除缓存文件
         """
         try:
             print('='*60)
             print('当天JSON文件对比工具')
             print('='*60)
             
-            # 获取当天最新的两个JSON文件
+            # 获取用于对比的两个JSON文件
             latest_json_file, second_latest_json_file = FileManager.get_today_json_files()
-            if not latest_json_file or not second_latest_json_file:
-                print('无法获取当天的JSON文件')
+            if not latest_json_file:
+                print('无法获取最新的JSON文件')
                 return False
+            
+            if not second_latest_json_file:
+                print('只找到一个JSON文件，无法进行对比')
+                print(f'当前文件: {latest_json_file}')
+                print('提示：运行爬虫后再次运行此功能即可进行对比')
+                return True
+            
+            # 检查是否使用缓存文件
+            is_cache_used = '_cache' in second_latest_json_file
             
             # 读取最新的JSON文件
             latest_json_data = FileManager.read_json(latest_json_file)
@@ -930,6 +985,15 @@ class StockNumberComparator:
                     print(f'  {i}. {num}')
             
             print('='*60 + '\n')
+            
+            # 如果使用了缓存文件，删除它
+            if is_cache_used:
+                try:
+                    os.remove(second_latest_json_file)
+                    print(f'已删除缓存文件: {second_latest_json_file}')
+                except Exception as e:
+                    print(f'删除缓存文件失败: {e}')
+            
             return True
         except Exception as e:
             print(f'对比失败: {e}')
