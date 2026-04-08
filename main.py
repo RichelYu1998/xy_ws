@@ -426,19 +426,18 @@ class WegoScraper:
             await self.scroll_to_load_all(page)
             
             print('等待页面完全加载...')
-            await asyncio.sleep(2)
+            await asyncio.sleep(5)
             
-            # 调试：获取页面信息
-            page_title = await page.title()
-            page_url = page.url
-            print(f'页面标题: {page_title}')
-            print(f'当前URL: {page_url}')
+            # 等待商品元素加载
+            print('等待商品元素加载...')
+            try:
+                await page.wait_for_selector('.normal_item-module_normalItemContent_mrLg3', timeout=30000)
+                print('商品元素已加载')
+            except Exception as e:
+                print(f'等待商品元素超时: {e}')
+                print('尝试继续执行...')
             
-            # 调试：保存页面内容到文件
             page_text = await page.content()
-            debug_file = f'file/debug_page_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html'
-            FileManager.write_text(debug_file, page_text)
-            print(f'页面内容已保存到 {debug_file} 用于调试')
             
             total_count = None
             new_count = None
@@ -633,12 +632,21 @@ class WegoScraper:
                 chrome_path = None
                 if system == 'Windows':
                     browser_args.append('--disable-gpu')
-                    chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
+                    if os.path.exists(r'C:\Program Files\Google\Chrome\Application\chrome.exe'):
+                        chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
                 elif system == 'Linux':
                     browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
-                    chrome_path = '/usr/bin/google-chrome'
+                    if os.path.exists('/usr/bin/google-chrome'):
+                        chrome_path = '/usr/bin/google-chrome'
                 elif system == 'Mac':
-                    chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                    if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
+                        chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                
+                print(f'检测到系统: {system}')
+                if chrome_path:
+                    print(f'使用系统Chrome: {chrome_path}')
+                else:
+                    print(f'使用Playwright内置Chromium')
                 
                 browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
                 context = await browser.new_context(
@@ -1426,7 +1434,29 @@ def auto_get_cookie():
     async def get_cookie():
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=False, executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
+                system = WegoScraper.get_system_info()
+                browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--disable-dev-shm-usage']
+                
+                chrome_path = None
+                if system == 'Windows':
+                    browser_args.append('--disable-gpu')
+                    if os.path.exists(r'C:\Program Files\Google\Chrome\Application\chrome.exe'):
+                        chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
+                elif system == 'Linux':
+                    browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
+                    if os.path.exists('/usr/bin/google-chrome'):
+                        chrome_path = '/usr/bin/google-chrome'
+                elif system == 'Mac':
+                    if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
+                        chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                
+                print(f'检测到系统: {system}')
+                if chrome_path:
+                    print(f'使用系统Chrome: {chrome_path}')
+                else:
+                    print(f'使用Playwright内置Chromium')
+                
+                browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
                 context = await browser.new_context()
                 
                 cookie_file = 'config/cookies.json'
