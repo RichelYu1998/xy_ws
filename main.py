@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.0.9"
+VERSION = "2.1.0"
 
 
 try:
@@ -428,7 +428,17 @@ class WegoScraper:
             print('等待页面完全加载...')
             await asyncio.sleep(2)
             
+            # 调试：获取页面信息
+            page_title = await page.title()
+            page_url = page.url
+            print(f'页面标题: {page_title}')
+            print(f'当前URL: {page_url}')
+            
+            # 调试：保存页面内容到文件
             page_text = await page.content()
+            debug_file = f'file/debug_page_{datetime.now().strftime("%Y%m%d_%H%M%S")}.html'
+            FileManager.write_text(debug_file, page_text)
+            print(f'页面内容已保存到 {debug_file} 用于调试')
             
             total_count = None
             new_count = None
