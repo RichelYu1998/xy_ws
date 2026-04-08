@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.1.2"
+VERSION = "2.1.3"
 
 
 try:
@@ -609,11 +609,18 @@ class WegoScraper:
         cache_filename = f"file/{today}微购相册(小旭数码)_cache.json"
         
         # 如果当天的JSON文件已存在，先保存为缓存文件
+        existing_summary = None
         if os.path.exists(new_filename):
             try:
                 import shutil
                 shutil.copy2(new_filename, cache_filename)
                 print(f'已将旧数据保存为缓存文件: {cache_filename}')
+                
+                # 读取现有的"小计"字段
+                existing_data = FileManager.read_json(new_filename)
+                if existing_data and '小计' in existing_data:
+                    existing_summary = existing_data['小计']
+                    print(f'已保留 {len(existing_summary) if isinstance(existing_summary, list) else 1} 条对比记录')
             except Exception as e:
                 print(f'创建缓存文件失败: {e}')
         
@@ -639,8 +646,11 @@ class WegoScraper:
             "统计": f"共计获取到 {total_count} 个商品",
         }
         
-        if change_summary:
-            output_data["小计"] = change_summary
+        # 保留现有的"小计"字段（如果有）
+        if existing_summary:
+            output_data["小计"] = existing_summary
+        
+        # "小计"字段将由compare_json_files方法管理，用于存储多次对比的差异记录
         
         output_data["高价商品统计"] = {
             "筛选条件": "售价 >= 599",
@@ -954,10 +964,40 @@ class StockNumberComparator:
                 'high_price_description': '新增的售价>=599的商品'
             }
             
-            # 将差异信息写入最新的JSON文件
-            latest_json_data['对比差异'] = diff_data
+            # 将差异信息追加到"小计"字段中
+            if '小计' not in latest_json_data:
+                latest_json_data['小计'] = []
+            
+            # 处理"小计"字段的不同格式
+            if isinstance(latest_json_data['小计'], str):
+                # 如果是字符串，先保存为字典
+                old_summary = latest_json_data['小计']
+                latest_json_data['小计'] = []
+                # 尝试解析字符串中的信息（如果有）
+                if old_summary and old_summary != "数据无变化":
+                    # 创建一个基础记录
+                    base_record = {
+                        'timestamp': current_time,
+                        'date': date_str,
+                        'description': old_summary
+                    }
+                    latest_json_data['小计'].append(base_record)
+            elif isinstance(latest_json_data['小计'], dict):
+                # 如果是字典，转换为列表
+                latest_json_data['小计'] = [latest_json_data['小计']]
+            elif not isinstance(latest_json_data['小计'], list):
+                # 其他类型，初始化为列表
+                latest_json_data['小计'] = []
+            
+            # 追加新的差异记录
+            latest_json_data['小计'].append(diff_data)
+            
+            # 按时间戳排序
+            latest_json_data['小计'].sort(key=lambda x: x['timestamp'])
+            
             FileManager.write_json(latest_json_file, latest_json_data)
-            print(f'\n对比差异已写入 {latest_json_file}')
+            print(f'\n对比差异已追加到 {latest_json_file}')
+            print(f'当前共有 {len(latest_json_data["小计"])} 条对比记录')
             
             # 打印对比结果
             print('\n' + '='*60)
@@ -986,13 +1026,11 @@ class StockNumberComparator:
             
             print('='*60 + '\n')
             
-            # 如果使用了缓存文件，删除它
+            # 不删除缓存文件，保留用于后续对比
+            # 缓存文件会在下一次运行爬虫时被覆盖
             if is_cache_used:
-                try:
-                    os.remove(second_latest_json_file)
-                    print(f'已删除缓存文件: {second_latest_json_file}')
-                except Exception as e:
-                    print(f'删除缓存文件失败: {e}')
+                print(f'注意：缓存文件 {second_latest_json_file} 已保留，用于后续对比')
+                print(f'提示：下次运行爬虫时会自动更新缓存文件')
             
             return True
         except Exception as e:
