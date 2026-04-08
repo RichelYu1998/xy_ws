@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.1.3"
+VERSION = "2.1.5"
 
 
 try:
@@ -799,9 +799,9 @@ class StockNumberComparator:
                 cell_value = row[0]
                 if cell_value:
                     cell_str = str(cell_value).strip()
-                    number_match = re.search(r'(\d{3,6})', cell_str)
+                    number_match = re.match(r'^(\d{3,6})$', cell_str)
                     if number_match:
-                        stock_numbers.append(cell_str if cell_str.startswith('0') else number_match.group(1))
+                        stock_numbers.append(cell_str)
             
             stock_numbers = list(set(stock_numbers))
             print(f'从Excel文件的E列中读取到 {len(stock_numbers)} 个货号')
@@ -1068,7 +1068,8 @@ class StockNumberComparator:
                     price = WegoScraper.parse_price(product.get('售价', ''))
                     if price and price >= 599:
                         stock_num = product.get('货号', '')
-                        if stock_num:
+                        # 只添加符合3-6位数字格式的货号
+                        if stock_num and re.match(r'^\d{3,6}$', stock_num):
                             high_price_stock_numbers.append(stock_num)
             
             excel_stock_numbers = self.load_excel_data()
@@ -1079,6 +1080,7 @@ class StockNumberComparator:
                 json_set = set(json_stock_numbers)
                 excel_set = set(excel_stock_numbers)
                 extra_in_json_set = json_set - excel_set
+                
                 for stock_num in high_price_stock_numbers:
                     if stock_num in extra_in_json_set:
                         high_price_extra_in_json.append(stock_num)
@@ -1094,10 +1096,10 @@ class StockNumberComparator:
             
             result_message = self.get_result_message(result, [])
             
-            if result['missing_count'] == 0 and result.get('extra_in_json_count', 0) == 0:
+            if result['missing_count'] == 0 and result['extra_in_json_count'] == 0:
                 data_change = "数据无变化"
             else:
-                data_change = f"数据有变化：缺失 {result['missing_count']} 个货号，多余 {result.get('extra_in_json_count', 0)} 个货号"
+                data_change = f"数据有变化：缺失 {result['missing_count']} 个货号，多余 {result['extra_in_json_count']} 个货号"
             
             comparison_with_descriptions = {
                 'missing_description': '微购相册比本地表格多出的序列号仅供参考',
