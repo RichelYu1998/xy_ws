@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.1.9"
+VERSION = "2.2.0"
 
 
 try:
@@ -294,7 +294,7 @@ class WegoScraper:
                 current_height = await asyncio.wait_for(
                     page.evaluate('document.body.scrollHeight'),
                     timeout=5.0
-                ) if last_height else 0
+                ) if scroll_attempts > 0 else 0
                 
                 load_time = time.time() - start_time
                 
@@ -418,7 +418,7 @@ class WegoScraper:
                 
                 elements_data.append((element_text, html_content))
             except asyncio.TimeoutError:
-                print(f'元素 {i} 获取内容超时，跳过')
+                continue
             except Exception as e:
                 print(f'收集元素 {i} 数据时出错: {e}')
         
@@ -427,12 +427,12 @@ class WegoScraper:
         products = []
         seen_products = set()
         
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=15) as executor:
             futures = [executor.submit(self.extract_product_info, text, html) for text, html in elements_data]
             
             for i, future in enumerate(futures):
                 try:
-                    result = future.result(timeout=3)
+                    result = future.result(timeout=2)
                     if result:
                         product_key = result['货号'] or result['商品名称']
                         if product_key not in seen_products:
@@ -443,8 +443,8 @@ class WegoScraper:
                                 print(f'商品 {len(products)}: {result["商品名称"][:50]}...')
                                 print(f'  售价: {result["售价"]}')
                                 print(f'  货号: {result["货号"]}\n')
-                except Exception as e:
-                    print(f'处理商品 {i} 时出错: {e}')
+                except Exception:
+                    pass
         
         return products
 
@@ -553,17 +553,21 @@ class WegoScraper:
             ]
             
             item_elements = []
+            seen_elements = set()
             for selector in item_selectors:
                 try:
                     elements = await page.query_selector_all(selector)
                     if elements:
                         print(f'使用选择器 {selector} 找到 {len(elements)} 个元素')
-                        item_elements.extend(elements)
+                        for element in elements:
+                            element_id = await element.get_attribute('data-id') or await element.text_content()
+                            if element_id not in seen_elements:
+                                seen_elements.add(element_id)
+                                item_elements.append(element)
                 except Exception as e:
                     print(f'使用选择器 {selector} 时出错: {e}')
                     continue
             
-            item_elements = list(dict.fromkeys(item_elements))
             print(f'总共找到 {len(item_elements)} 个商品项')
             
             if not item_elements:
