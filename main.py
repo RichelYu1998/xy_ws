@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.1.6"
+VERSION = "2.1.7"
 
 
 try:
@@ -295,7 +295,17 @@ class WegoScraper:
         while scroll_attempts < max_attempts:
             try:
                 start_time = time.time()
-                current_height = await page.evaluate('document.body.scrollHeight')
+                
+                # 添加超时保护
+                try:
+                    current_height = await asyncio.wait_for(
+                        page.evaluate('document.body.scrollHeight'),
+                        timeout=5.0
+                    )
+                except asyncio.TimeoutError:
+                    print('获取页面高度超时，尝试继续...')
+                    current_height = last_height
+                
                 load_time = time.time() - start_time
                 
                 height_history.append(current_height)
@@ -311,7 +321,15 @@ class WegoScraper:
                     no_change_count = 0
                     last_height = current_height
                 
-                await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                # 添加滚动超时保护
+                try:
+                    await asyncio.wait_for(
+                        page.evaluate('window.scrollTo(0, document.body.scrollHeight)'),
+                        timeout=3.0
+                    )
+                except asyncio.TimeoutError:
+                    print('滚动操作超时，尝试继续...')
+                
                 await asyncio.sleep(scroll_wait_time)
                 scroll_attempts += 1
                 
@@ -333,6 +351,8 @@ class WegoScraper:
                     await self.close_popups(page, popup_close_limit, popup_close_wait)
             except Exception as e:
                 print(f'滚动时出错: {e}')
+                import traceback
+                traceback.print_exc()
                 break
         
         print('滚动完成')
@@ -395,8 +415,18 @@ class WegoScraper:
         elements_data = []
         for i, element in enumerate(elements):
             try:
-                element_text = await element.text_content()
-                html_content = await element.inner_html()
+                # 添加超时保护
+                try:
+                    element_text = await asyncio.wait_for(element.text_content(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    print(f'元素 {i} 获取文本内容超时，跳过')
+                    continue
+                
+                try:
+                    html_content = await asyncio.wait_for(element.inner_html(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    print(f'元素 {i} 获取HTML内容超时，跳过')
+                    continue
                 
                 if not element_text or not element_text.strip():
                     continue
@@ -422,7 +452,7 @@ class WegoScraper:
             
             for i, future in enumerate(futures):
                 try:
-                    result = future.result(timeout=5)
+                    result = future.result(timeout=3)
                     if result:
                         product_key = result['货号'] if result['货号'] else result['商品名称']
                         if product_key not in seen_products:
@@ -445,15 +475,30 @@ class WegoScraper:
             print(f'正在访问目标页面: {target_url}')
             print(f'当前系统: {self.get_system_info()}')
             
-            goto_start = time.time()
-            try:
-                await page.goto(target_url, timeout=60000, wait_until='domcontentloaded')
-                print('页面DOM已加载')
-            except Exception as e:
-                print(f'页面导航出错: {e}')
-                print('尝试继续执行...')
-                await asyncio.sleep(2)
-            print(f'页面导航耗时: {time.time() - goto_start:.2f}秒')
+            # 页面导航重试机制
+            max_retries = 3
+            page_loaded = False
+            
+            for retry in range(max_retries):
+                goto_start = time.time()
+                try:
+                    print(f'尝试加载页面 (第{retry + 1}/{max_retries}次)...')
+                    await page.goto(target_url, timeout=30000, wait_until='domcontentloaded')
+                    print('页面DOM已加载')
+                    page_loaded = True
+                    break
+                except Exception as e:
+                    print(f'页面导航出错: {e}')
+                    if retry < max_retries - 1:
+                        print(f'等待3秒后重试...')
+                        await asyncio.sleep(3)
+                    else:
+                        print('所有重试都失败，尝试继续执行...')
+                        await asyncio.sleep(2)
+                print(f'页面导航耗时: {time.time() - goto_start:.2f}秒')
+            
+            if not page_loaded:
+                print('警告: 页面可能未完全加载，继续执行...')
             
             print('等待页面完全加载...')
             await asyncio.sleep(2)
@@ -468,17 +513,31 @@ class WegoScraper:
             print(f'滚动加载耗时: {time.time() - scroll_start:.2f}秒')
             
             print('等待页面完全加载...')
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
             
-            # 等待商品元素加载
+            # 等待商品元素加载（带超时和重试）
             print('等待商品元素加载...')
             wait_start = time.time()
-            try:
-                await page.wait_for_selector('.normal_item-module_normalItemContent_mrLg3', timeout=30000)
-                print('商品元素已加载')
-            except Exception as e:
-                print(f'等待商品元素超时: {e}')
-                print('尝试继续执行...')
+            elements_found = False
+            
+            for retry in range(2):
+                try:
+                    await page.wait_for_selector('.normal_item-module_normalItemContent_mrLg3', timeout=15000)
+                    print('商品元素已加载')
+                    elements_found = True
+                    break
+                except Exception as e:
+                    print(f'等待商品元素超时: {e}')
+                    if retry == 0:
+                        print('尝试滚动页面后重试...')
+                        await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+                        await asyncio.sleep(2)
+                    else:
+                        print('尝试继续执行...')
+            
+            if not elements_found:
+                print('警告: 未找到商品元素，可能页面加载失败')
+            
             print(f'等待商品元素耗时: {time.time() - wait_start:.2f}秒')
             
             page_text = await page.content()
