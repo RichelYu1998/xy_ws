@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.1.7"
+VERSION = "2.1.8"
 
 
 try:
@@ -277,20 +277,23 @@ class WegoScraper:
         print('开始滚动加载所有商品...')
         
         scroll_config = self.config_manager.get('scroll_config', {})
-        max_attempts = scroll_config.get('max_attempts', 20)
-        same_height_limit = scroll_config.get('same_height_limit', 5)
-        scroll_wait_time = scroll_config.get('scroll_wait_time', 1.5)
+        max_attempts = scroll_config.get('max_attempts', 30)
+        same_height_limit = scroll_config.get('same_height_limit', 8)
+        scroll_wait_time = scroll_config.get('scroll_wait_time', 0.8)
         popup_close_interval = scroll_config.get('popup_close_interval', 5)
         popup_close_limit = scroll_config.get('popup_close_limit', 3)
         popup_close_wait = scroll_config.get('popup_close_wait', 0.3)
         
-        print(f'滚动配置: 最大尝试{max_attempts}次, 高度不变限制{same_height_limit}次, 等待时间{scroll_wait_time}秒')
+        print(f'滚动配置: 最大尝试{max_attempts}次, 高度不变限制{same_height_limit}次, 初始等待时间{scroll_wait_time}秒')
         
         last_height = 0
         scroll_attempts = 0
         no_change_count = 0
         height_history = []
         dynamic_adjust = scroll_config.get('dynamic_adjust', True)
+        
+        # 激进滚动模式：每次滚动更大的距离
+        aggressive_mode = True
         
         while scroll_attempts < max_attempts:
             try:
@@ -321,14 +324,26 @@ class WegoScraper:
                     no_change_count = 0
                     last_height = current_height
                 
-                # 添加滚动超时保护
-                try:
-                    await asyncio.wait_for(
-                        page.evaluate('window.scrollTo(0, document.body.scrollHeight)'),
-                        timeout=3.0
-                    )
-                except asyncio.TimeoutError:
-                    print('滚动操作超时，尝试继续...')
+                # 激进滚动策略
+                if aggressive_mode and scroll_attempts < 10:
+                    # 前10次使用更激进的滚动
+                    scroll_distance = current_height * 0.3  # 每次滚动30%的页面高度
+                    try:
+                        await asyncio.wait_for(
+                            page.evaluate(f'window.scrollBy(0, {scroll_distance})'),
+                            timeout=3.0
+                        )
+                    except asyncio.TimeoutError:
+                        print('滚动操作超时，尝试继续...')
+                else:
+                    # 正常滚动到底部
+                    try:
+                        await asyncio.wait_for(
+                            page.evaluate('window.scrollTo(0, document.body.scrollHeight)'),
+                            timeout=3.0
+                        )
+                    except asyncio.TimeoutError:
+                        print('滚动操作超时，尝试继续...')
                 
                 await asyncio.sleep(scroll_wait_time)
                 scroll_attempts += 1
@@ -336,15 +351,17 @@ class WegoScraper:
                 progress_percent = min(100, int((scroll_attempts / max_attempts) * 100))
                 print(f'滚动 {scroll_attempts}/{max_attempts} ({progress_percent}%) - 当前高度: {current_height} - 加载耗时: {load_time:.2f}秒')
                 
+                # 优化动态调整逻辑
                 if dynamic_adjust and len(height_history) >= 5:
                     height_changes = [abs(height_history[i] - height_history[i-1]) for i in range(1, len(height_history))]
                     avg_change = sum(height_changes) / len(height_changes)
                     
-                    if avg_change < 100 and scroll_wait_time < 3.0:
-                        scroll_wait_time = min(3.0, scroll_wait_time + 0.2)
+                    # 降低敏感度，避免频繁调整
+                    if avg_change < 50 and scroll_wait_time < 2.0:
+                        scroll_wait_time = min(2.0, scroll_wait_time + 0.1)
                         print(f'  ⚠️  页面加载较慢，增加等待时间至 {scroll_wait_time:.1f}秒')
-                    elif avg_change > 500 and scroll_wait_time > 0.5:
-                        scroll_wait_time = max(0.5, scroll_wait_time - 0.2)
+                    elif avg_change > 300 and scroll_wait_time > 0.5:
+                        scroll_wait_time = max(0.5, scroll_wait_time - 0.1)
                         print(f'  ✅ 页面加载较快，减少等待时间至 {scroll_wait_time:.1f}秒')
                 
                 if scroll_attempts % popup_close_interval == 0:
