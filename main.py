@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.1.5"
+VERSION = "2.1.6"
 
 
 try:
@@ -262,9 +262,9 @@ class WegoScraper:
         closed_count = 0
         for selector in popup_selectors:
             try:
-                close_button = await page.query_selector(selector)
+                close_button = await page.query_selector(selector, timeout=1000)
                 if close_button:
-                    await close_button.click()
+                    await close_button.click(timeout=1000)
                     print(f'关闭了弹窗: {selector}')
                     await asyncio.sleep(wait_time)
                     closed_count += 1
@@ -445,6 +445,7 @@ class WegoScraper:
             print(f'正在访问目标页面: {target_url}')
             print(f'当前系统: {self.get_system_info()}')
             
+            goto_start = time.time()
             try:
                 await page.goto(target_url, timeout=60000, wait_until='domcontentloaded')
                 print('页面DOM已加载')
@@ -452,25 +453,33 @@ class WegoScraper:
                 print(f'页面导航出错: {e}')
                 print('尝试继续执行...')
                 await asyncio.sleep(2)
+            print(f'页面导航耗时: {time.time() - goto_start:.2f}秒')
             
             print('等待页面完全加载...')
             await asyncio.sleep(2)
             
+            popup_start = time.time()
             await self.close_popups(page)
+            print(f'弹窗关闭耗时: {time.time() - popup_start:.2f}秒')
+            
             print('滚动加载所有商品...')
+            scroll_start = time.time()
             await self.scroll_to_load_all(page)
+            print(f'滚动加载耗时: {time.time() - scroll_start:.2f}秒')
             
             print('等待页面完全加载...')
             await asyncio.sleep(5)
             
             # 等待商品元素加载
             print('等待商品元素加载...')
+            wait_start = time.time()
             try:
                 await page.wait_for_selector('.normal_item-module_normalItemContent_mrLg3', timeout=30000)
                 print('商品元素已加载')
             except Exception as e:
                 print(f'等待商品元素超时: {e}')
                 print('尝试继续执行...')
+            print(f'等待商品元素耗时: {time.time() - wait_start:.2f}秒')
             
             page_text = await page.content()
             
@@ -525,7 +534,9 @@ class WegoScraper:
                 print('警告: 未找到任何商品项，可能页面加载失败或选择器不正确')
                 print('建议检查页面URL和Cookie是否有效')
             
+            process_start = time.time()
             products = await self.process_elements_concurrently(page, item_elements)
+            print(f'商品处理耗时: {time.time() - process_start:.2f}秒')
             
             print(f'\n数量统计：')
             print(f'网页显示总数: {total_count}')
@@ -678,6 +689,7 @@ class WegoScraper:
             print('='*50)
             print('开始运行...')
             
+            browser_start = time.time()
             async with async_playwright() as p:
                 print('正在启动浏览器...')
                 
@@ -704,29 +716,46 @@ class WegoScraper:
                     print(f'使用Playwright内置Chromium')
                 
                 browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
+                print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
+                
+                context_start = time.time()
                 context = await browser.new_context(
                     viewport={'width': 1920, 'height': 1080},
                     user_agent=self.config_manager.get_user_agent()
                 )
+                print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
                 
+                cookie_start = time.time()
                 cookie_file = self.config_manager.get_cookie_file()
                 if FileManager.file_exists(cookie_file):
                     cookies = FileManager.read_json(cookie_file)
                     if cookies:
                         print(f'已加载 {len(cookies)} 个Cookie')
                         await context.add_cookies(cookies)
+                print(f'Cookie加载耗时: {time.time() - cookie_start:.2f}秒')
                 
+                page_start = time.time()
                 page = await context.new_page()
+                print(f'页面创建耗时: {time.time() - page_start:.2f}秒')
+                
+                data_start = time.time()
                 products = await self.get_data_with_playwright(page)
+                print(f'数据获取耗时: {time.time() - data_start:.2f}秒')
                 
                 if products:
+                    save_start = time.time()
                     self.save_data(products)
+                    print(f'数据保存耗时: {time.time() - save_start:.2f}秒')
                 
+                save_cookie_start = time.time()
                 cookies = await context.cookies()
                 FileManager.write_json(cookie_file, cookies)
                 print(f'Cookie已保存到 {cookie_file}')
+                print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
                 
+                close_start = time.time()
                 await browser.close()
+                print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
                 
         except Exception as e:
             print(f'运行失败: {e}')
