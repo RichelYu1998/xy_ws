@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.1.8"
+VERSION = "2.1.9"
 
 
 try:
@@ -259,55 +259,42 @@ class WegoScraper:
             '.ant-modal-close', '.el-dialog__close',
         ]
         
-        closed_count = 0
-        for selector in popup_selectors:
+        for selector in popup_selectors[:close_limit]:
             try:
                 close_button = await page.query_selector(selector, timeout=1000)
                 if close_button:
                     await close_button.click(timeout=1000)
                     print(f'关闭了弹窗: {selector}')
                     await asyncio.sleep(wait_time)
-                    closed_count += 1
-                    if closed_count >= close_limit:
-                        break
-            except Exception as e:
+            except Exception:
                 pass
 
     async def scroll_to_load_all(self, page):
         print('开始滚动加载所有商品...')
         
-        scroll_config = self.config_manager.get('scroll_config', {})
-        max_attempts = scroll_config.get('max_attempts', 30)
-        same_height_limit = scroll_config.get('same_height_limit', 8)
-        scroll_wait_time = scroll_config.get('scroll_wait_time', 0.8)
-        popup_close_interval = scroll_config.get('popup_close_interval', 5)
-        popup_close_limit = scroll_config.get('popup_close_limit', 3)
-        popup_close_wait = scroll_config.get('popup_close_wait', 0.3)
+        config = self.config_manager.get('scroll_config', {})
+        max_attempts = config.get('max_attempts', 30)
+        same_height_limit = config.get('same_height_limit', 8)
+        scroll_wait_time = config.get('scroll_wait_time', 0.8)
+        popup_close_interval = config.get('popup_close_interval', 5)
+        popup_close_limit = config.get('popup_close_limit', 3)
+        popup_close_wait = config.get('popup_close_wait', 0.3)
         
         print(f'滚动配置: 最大尝试{max_attempts}次, 高度不变限制{same_height_limit}次, 初始等待时间{scroll_wait_time}秒')
         
         last_height = 0
-        scroll_attempts = 0
         no_change_count = 0
         height_history = []
-        dynamic_adjust = scroll_config.get('dynamic_adjust', True)
+        dynamic_adjust = config.get('dynamic_adjust', True)
         
-        # 激进滚动模式：每次滚动更大的距离
-        aggressive_mode = True
-        
-        while scroll_attempts < max_attempts:
+        for scroll_attempts in range(max_attempts):
             try:
                 start_time = time.time()
                 
-                # 添加超时保护
-                try:
-                    current_height = await asyncio.wait_for(
-                        page.evaluate('document.body.scrollHeight'),
-                        timeout=5.0
-                    )
-                except asyncio.TimeoutError:
-                    print('获取页面高度超时，尝试继续...')
-                    current_height = last_height
+                current_height = await asyncio.wait_for(
+                    page.evaluate('document.body.scrollHeight'),
+                    timeout=5.0
+                ) if last_height else 0
                 
                 load_time = time.time() - start_time
                 
@@ -324,39 +311,24 @@ class WegoScraper:
                     no_change_count = 0
                     last_height = current_height
                 
-                # 激进滚动策略
-                if aggressive_mode and scroll_attempts < 10:
-                    # 前10次使用更激进的滚动
-                    scroll_distance = current_height * 0.3  # 每次滚动30%的页面高度
-                    try:
-                        await asyncio.wait_for(
-                            page.evaluate(f'window.scrollBy(0, {scroll_distance})'),
-                            timeout=3.0
-                        )
-                    except asyncio.TimeoutError:
-                        print('滚动操作超时，尝试继续...')
-                else:
-                    # 正常滚动到底部
-                    try:
-                        await asyncio.wait_for(
-                            page.evaluate('window.scrollTo(0, document.body.scrollHeight)'),
-                            timeout=3.0
-                        )
-                    except asyncio.TimeoutError:
-                        print('滚动操作超时，尝试继续...')
+                scroll_distance = current_height * 0.3 if scroll_attempts < 10 else current_height
+                try:
+                    await asyncio.wait_for(
+                        page.evaluate(f'window.scrollBy(0, {scroll_distance})' if scroll_attempts < 10 else 'window.scrollTo(0, document.body.scrollHeight)'),
+                        timeout=3.0
+                    )
+                except asyncio.TimeoutError:
+                    print('滚动操作超时，尝试继续...')
                 
                 await asyncio.sleep(scroll_wait_time)
-                scroll_attempts += 1
                 
-                progress_percent = min(100, int((scroll_attempts / max_attempts) * 100))
-                print(f'滚动 {scroll_attempts}/{max_attempts} ({progress_percent}%) - 当前高度: {current_height} - 加载耗时: {load_time:.2f}秒')
+                progress_percent = min(100, int((scroll_attempts + 1) / max_attempts * 100))
+                print(f'滚动 {scroll_attempts + 1}/{max_attempts} ({progress_percent}%) - 当前高度: {current_height} - 加载耗时: {load_time:.2f}秒')
                 
-                # 优化动态调整逻辑
                 if dynamic_adjust and len(height_history) >= 5:
                     height_changes = [abs(height_history[i] - height_history[i-1]) for i in range(1, len(height_history))]
                     avg_change = sum(height_changes) / len(height_changes)
                     
-                    # 降低敏感度，避免频繁调整
                     if avg_change < 50 and scroll_wait_time < 2.0:
                         scroll_wait_time = min(2.0, scroll_wait_time + 0.1)
                         print(f'  ⚠️  页面加载较慢，增加等待时间至 {scroll_wait_time:.1f}秒')
@@ -364,7 +336,7 @@ class WegoScraper:
                         scroll_wait_time = max(0.5, scroll_wait_time - 0.1)
                         print(f'  ✅ 页面加载较快，减少等待时间至 {scroll_wait_time:.1f}秒')
                 
-                if scroll_attempts % popup_close_interval == 0:
+                if (scroll_attempts + 1) % popup_close_interval == 0:
                     await self.close_popups(page, popup_close_limit, popup_close_wait)
             except Exception as e:
                 print(f'滚动时出错: {e}')
@@ -432,18 +404,8 @@ class WegoScraper:
         elements_data = []
         for i, element in enumerate(elements):
             try:
-                # 添加超时保护
-                try:
-                    element_text = await asyncio.wait_for(element.text_content(), timeout=2.0)
-                except asyncio.TimeoutError:
-                    print(f'元素 {i} 获取文本内容超时，跳过')
-                    continue
-                
-                try:
-                    html_content = await asyncio.wait_for(element.inner_html(), timeout=2.0)
-                except asyncio.TimeoutError:
-                    print(f'元素 {i} 获取HTML内容超时，跳过')
-                    continue
+                element_text = await asyncio.wait_for(element.text_content(), timeout=2.0)
+                html_content = await asyncio.wait_for(element.inner_html(), timeout=2.0)
                 
                 if not element_text or not element_text.strip():
                     continue
@@ -455,9 +417,10 @@ class WegoScraper:
                     continue
                 
                 elements_data.append((element_text, html_content))
+            except asyncio.TimeoutError:
+                print(f'元素 {i} 获取内容超时，跳过')
             except Exception as e:
                 print(f'收集元素 {i} 数据时出错: {e}')
-                continue
         
         print(f'收集了 {len(elements_data)} 个有效商品数据')
         
@@ -471,7 +434,7 @@ class WegoScraper:
                 try:
                     result = future.result(timeout=3)
                     if result:
-                        product_key = result['货号'] if result['货号'] else result['商品名称']
+                        product_key = result['货号'] or result['商品名称']
                         if product_key not in seen_products:
                             seen_products.add(product_key)
                             products.append(result)
@@ -482,7 +445,6 @@ class WegoScraper:
                                 print(f'  货号: {result["货号"]}\n')
                 except Exception as e:
                     print(f'处理商品 {i} 时出错: {e}')
-                    continue
         
         return products
 
@@ -517,7 +479,6 @@ class WegoScraper:
             if not page_loaded:
                 print('警告: 页面可能未完全加载，继续执行...')
             
-            print('等待页面完全加载...')
             await asyncio.sleep(2)
             
             popup_start = time.time()
@@ -529,7 +490,6 @@ class WegoScraper:
             await self.scroll_to_load_all(page)
             print(f'滚动加载耗时: {time.time() - scroll_start:.2f}秒')
             
-            print('等待页面完全加载...')
             await asyncio.sleep(3)
             
             # 等待商品元素加载（带超时和重试）
