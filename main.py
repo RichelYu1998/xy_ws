@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.3.1"
+VERSION = "2.3.2"
 
 
 try:
@@ -679,6 +679,28 @@ class WegoScraper:
         high_price_products = self.filter_high_price_products(data)
         high_price_count = len(high_price_products)
         
+        # 计算累计值
+        total_sell_price = 0.0
+        total_cost_price = 0.0
+        
+        for product in data:
+            if '售价' in product:
+                try:
+                    sell_price = float(str(product['售价']).replace('¥', '').replace(',', '').strip())
+                    total_sell_price += sell_price
+                except (ValueError, TypeError):
+                    pass
+            
+            if '拿货价' in product:
+                try:
+                    cost_price = float(str(product['拿货价']).replace('¥', '').replace(',', '').strip())
+                    total_cost_price += cost_price
+                except (ValueError, TypeError):
+                    pass
+        
+        # 计算闲鱼平台手续费（售价累计 * 1.6%）
+        total_platform_fee = total_sell_price * 0.016
+        
         existing_files = sorted(FileManager.list_files('file', '微购相册'), reverse=True)
         
         previous_file = None
@@ -695,6 +717,9 @@ class WegoScraper:
             "成功获取": f"{total_count} 个商品",
             "商品列表": data,
             "统计": f"共计获取到 {total_count} 个商品",
+            "预计售出价格累计": round(total_sell_price, 2),
+            "设备成本累计": round(total_cost_price, 2),
+            "闲鱼平台手续费累计": round(total_platform_fee, 2)
         }
         
         # 保留现有的"小计"字段（如果有）
@@ -713,6 +738,9 @@ class WegoScraper:
         print(f'数据已保存到 {new_filename}')
         print(f'成功获取 {total_count} 个商品')
         print(f'售价 >= 599 的商品: {high_price_count} 个')
+        print(f'预计售出价格累计: ¥{total_sell_price:.2f}')
+        print(f'设备成本累计: ¥{total_cost_price:.2f}')
+        print(f'闲鱼平台手续费累计: ¥{total_platform_fee:.2f}')
         if change_summary:
             print(f'{change_summary}')
 
