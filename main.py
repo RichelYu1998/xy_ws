@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.4.4"
+VERSION = "2.4.5"
 
 
 try:
@@ -367,8 +367,14 @@ class WegoScraper:
                     if 100 <= price_value <= 50000:
                         price = '¥' + price_match.group(1)
             
+            remark = None
             remark_match = re.search(r'备注[：:]\s*(.+?)(?:\s*员工[：:]|$)', element_text, re.DOTALL)
-            remark = re.sub(r'\s+', ' ', remark_match.group(1).strip()) if remark_match else None
+            if remark_match:
+                remark = re.sub(r'\s+', ' ', remark_match.group(1).strip())
+            else:
+                remark_match = re.search(r'售价[：:]\s*¥[^修]+修(.+?)\s*员工[：:]', element_text)
+                if remark_match:
+                    remark = '修' + remark_match.group(1).strip()
             
             employee_match = re.search(r'员工[：:]\s*(.+)', element_text)
             employee = employee_match.group(1).strip() if employee_match else None
