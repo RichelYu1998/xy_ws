@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.4.5"
+VERSION = "2.4.6"
 
 
 try:
@@ -368,16 +368,27 @@ class WegoScraper:
                         price = '¥' + price_match.group(1)
             
             remark = None
-            remark_match = re.search(r'备注[：:]\s*(.+?)(?:\s*员工[：:]|$)', element_text, re.DOTALL)
-            if remark_match:
-                remark = re.sub(r'\s+', ' ', remark_match.group(1).strip())
-            else:
-                remark_match = re.search(r'售价[：:]\s*¥[^修]+修(.+?)\s*员工[：:]', element_text)
-                if remark_match:
-                    remark = '修' + remark_match.group(1).strip()
             
             employee_match = re.search(r'员工[：:]\s*(.+)', element_text)
             employee = employee_match.group(1).strip() if employee_match else None
+            
+            if employee_match:
+                employee_pos = element_text.find('员工')
+                price_match = re.search(r'售价[：:]', element_text)
+                if price_match:
+                    price_pos = price_match.start()
+                    between_text = element_text[price_pos:employee_pos]
+                    if between_text and len(between_text.strip()) > 0:
+                        between_text = between_text.replace('售价：', '').replace('售价:', '')
+                        between_text = re.sub(r'¥\s*[\d,]+', '', between_text)
+                        between_text = re.sub(r'\s+', ' ', between_text).strip()
+                        if between_text and len(between_text) > 0:
+                            remark = between_text
+            
+            if not remark:
+                remark_match = re.search(r'备注[：:]\s*(.+?)(?:\s*员工[：:]|$)', element_text, re.DOTALL)
+                if remark_match:
+                    remark = re.sub(r'\s+', ' ', remark_match.group(1).strip())
             
             cut_pos = min(
                 len(element_text),
