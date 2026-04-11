@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.3.2"
+VERSION = "2.3.3"
 
 
 try:
@@ -682,8 +682,12 @@ class WegoScraper:
         # 计算累计值
         total_sell_price = 0.0
         total_cost_price = 0.0
+        total_platform_fee = 0.0
         
         for product in data:
+            sell_price = 0.0
+            cost_price = 0.0
+            
             if '售价' in product:
                 try:
                     sell_price = float(str(product['售价']).replace('¥', '').replace(',', '').strip())
@@ -697,9 +701,16 @@ class WegoScraper:
                     total_cost_price += cost_price
                 except (ValueError, TypeError):
                     pass
+            
+            # 计算闲鱼平台手续费（售价 * 1.6%，单机最高60封顶）
+            if sell_price > 0:
+                platform_fee = sell_price * 0.016
+                if platform_fee > 60:
+                    platform_fee = 60
+                total_platform_fee += platform_fee
         
-        # 计算闲鱼平台手续费（售价累计 * 1.6%）
-        total_platform_fee = total_sell_price * 0.016
+        # 计算设备均价
+        avg_cost_price = total_cost_price / total_count if total_count > 0 else 0.0
         
         existing_files = sorted(FileManager.list_files('file', '微购相册'), reverse=True)
         
@@ -719,6 +730,7 @@ class WegoScraper:
             "统计": f"共计获取到 {total_count} 个商品",
             "预计售出价格累计": round(total_sell_price, 2),
             "设备成本累计": round(total_cost_price, 2),
+            "设备均价": round(avg_cost_price, 2),
             "闲鱼平台手续费累计": round(total_platform_fee, 2)
         }
         
@@ -740,6 +752,7 @@ class WegoScraper:
         print(f'售价 >= 599 的商品: {high_price_count} 个')
         print(f'预计售出价格累计: ¥{total_sell_price:.2f}')
         print(f'设备成本累计: ¥{total_cost_price:.2f}')
+        print(f'设备均价: ¥{avg_cost_price:.2f}')
         print(f'闲鱼平台手续费累计: ¥{total_platform_fee:.2f}')
         if change_summary:
             print(f'{change_summary}')
