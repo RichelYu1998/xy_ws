@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.5.2"
+VERSION = "2.5.3"
 
 
 try:
@@ -1594,9 +1594,9 @@ def update_cookie():
                 print('请在浏览器中完成以下操作：')
                 print('1. 如果需要登录，请完成登录')
                 print('2. 登录后刷新一下页面')
-                print('3. 确认登录成功后，关闭浏览器窗口')
+                print('3. 确认登录成功后，程序会自动关闭浏览器并更新Cookie')
                 print('='*60)
-                print('等待关闭浏览器...')
+                print('自动关闭浏览器并更新Cookie...')
                 print('='*60)
                 
                 try:
