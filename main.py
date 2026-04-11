@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.4.0"
+VERSION = "2.4.1"
 
 
 try:
@@ -700,6 +700,9 @@ class WegoScraper:
                     platform_fee = 60
                 total_platform_fee += platform_fee
         
+        # 计算平均每个设备售出均价
+        avg_sell_price = total_sell_price / total_count if total_count > 0 else 0.0
+        
         existing_files = sorted(FileManager.list_files('file', '微购相册'), reverse=True)
         
         previous_file = None
@@ -717,6 +720,7 @@ class WegoScraper:
             "商品列表": data,
             "统计": f"共计获取到 {total_count} 个商品",
             "预计售出价格累计": round(total_sell_price, 2),
+            "平均每个设备售出均价": round(avg_sell_price, 2),
             "闲鱼平台手续费累计": round(total_platform_fee, 2)
         }
         
@@ -737,6 +741,7 @@ class WegoScraper:
         print(f'成功获取 {total_count} 个商品')
         print(f'售价 >= 599 的商品: {high_price_count} 个')
         print(f'预计售出价格累计: ¥{total_sell_price:,.2f}')
+        print(f'平均每个设备售出均价: ¥{avg_sell_price:,.2f}')
         print(f'闲鱼平台手续费累计: ¥{total_platform_fee:,.2f}')
         if change_summary:
             print(f'{change_summary}')
