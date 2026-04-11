@@ -407,6 +407,11 @@ pip install openpyxl
 
 ## 更新日志
 
+### v2.5.8 (2026-04-11)
+- **修复excel_file为None的错误**：解决os.path.exists()的TypeError
+- **增强空值检查**：在使用excel_file前先检查是否为None
+- **提升代码健壮性**：避免空值导致的程序崩溃
+
 ### v2.5.7 (2026-04-11)
 - **修复价格比较错误**：解决parse_price返回None时的TypeError
 - **增强价格验证**：确保价格有效后才进行比较
