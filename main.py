@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.4.1"
+VERSION = "2.4.4"
 
 
 try:
@@ -352,19 +352,20 @@ class WegoScraper:
             stock_match = re.search(r'货号[：:]\s*(\d+)', element_text)
             stock_number = stock_match.group(1) if stock_match else ''
             
-            price_patterns = [
-                r'售价[：:]\s*¥?\s*(\d{3,6})',
-                r'¥(\d{4,6})',
-                r'(\d{4,6})\s*$',
-                r'货号[：:]\s*\d+\s*(\d{4,6})'
-            ]
-            
             price = None
-            for pattern in price_patterns:
-                match = re.search(pattern, element_text)
-                if match:
-                    price = '¥' + match.group(1)
-                    break
+            
+            price_match = re.search(r'售价[：:]\s*¥?\s*([\d,]+)', element_text)
+            if price_match:
+                price_value = int(price_match.group(1).replace(',', ''))
+                if 100 <= price_value <= 50000:
+                    price = '¥' + price_match.group(1)
+            
+            if not price:
+                price_match = re.search(r'¥\s*([\d,]+)(?![0-9])', element_text)
+                if price_match:
+                    price_value = int(price_match.group(1).replace(',', ''))
+                    if 100 <= price_value <= 50000:
+                        price = '¥' + price_match.group(1)
             
             remark_match = re.search(r'备注[：:]\s*(.+?)(?:\s*员工[：:]|$)', element_text, re.DOTALL)
             remark = re.sub(r'\s+', ' ', remark_match.group(1).strip()) if remark_match else None
@@ -719,9 +720,9 @@ class WegoScraper:
             "成功获取": f"{total_count} 个商品",
             "商品列表": data,
             "统计": f"共计获取到 {total_count} 个商品",
-            "预计售出价格累计": round(total_sell_price, 2),
-            "平均每个设备售出均价": round(avg_sell_price, 2),
-            "闲鱼平台手续费累计": round(total_platform_fee, 2)
+            "预计售出价格累计": f"{total_sell_price:,.2f}",
+            "平均每个设备售出均价": f"{avg_sell_price:,.2f}",
+            "闲鱼平台手续费累计": f"{total_platform_fee:,.2f}"
         }
         
         # 保留现有的"小计"字段（如果有）
