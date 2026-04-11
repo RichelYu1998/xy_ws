@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.2.2"
+VERSION = "2.3.0"
 
 
 try:
@@ -1339,166 +1339,102 @@ class StockNumberComparator:
         print(StockNumberComparator.get_result_message(result, duplicates))
         print('='*60 + '\n')
 
-    def run_interactive(self):
-        print('\n' + '='*60)
+    def run_comparison(self):
+        print('='*60)
         print('货号对比工具')
         print('='*60)
-        print('功能说明：')
-        print('  1. 直接输入货号字符串')
-        print('  2. 输入 "load" 从本地文件读取 (config/input_stock_numbers.txt)')
-        print('  3. 输入 "save" 保存当前输入到本地文件')
-        print('  4. 输入 "quit" 或 "exit" 退出程序')
-        print('\n输入格式支持：')
-        print('  - 逗号分隔: 12345, 67890, 11111')
-        print('  - 空格分隔: 12345 67890 11111')
-        print('  - 混合分隔: 12345, 67890 11111; 22222')
-        print('  - 多行输入: 12345\\n67890\\n11111')
-        print('  - 包含"序列号"文字: 序列号 12345 67890')
-        print('  - 大量空白字符: 12345,    67890,    11111')
-        print('='*60 + '\n')
         
         data = self.load_json_data()
         json_stock_numbers = self.extract_stock_numbers(data)
         print(f'已加载 {len(json_stock_numbers)} 个货号\n')
         
-        current_input = ''
+        input_stock_numbers = None
+        input_source = None
         
-        while True:
-            try:
-                user_input = input('请输入货号字符串 (输入 "help" 查看帮助): ').strip()
-            except (EOFError, KeyboardInterrupt):
-                print('\n\n程序已退出')
-                break
+        if FileManager.file_exists(self.excel_file):
+            print(f'检测到Excel文件: {self.excel_file}')
+            input_stock_numbers = self.load_excel_data()
+            if input_stock_numbers:
+                input_source = 'Excel'
+                print(f'从Excel文件读取到 {len(input_stock_numbers)} 个货号\n')
+        
+        if not input_stock_numbers and FileManager.file_exists(self.input_file):
+            print(f'从文件 {self.input_file} 读取输入...')
+            input_str = FileManager.read_text(self.input_file)
+            if input_str:
+                input_stock_numbers = self.parse_input_string(input_str)
+                if input_stock_numbers:
+                    input_source = 'TXT'
+                    print(f'解析出 {len(input_stock_numbers)} 个货号\n')
+        
+        if not input_stock_numbers:
+            print('未找到自动输入源，进入交互模式')
+            print('功能说明：')
+            print('  1. 直接输入货号字符串')
+            print('  2. 输入 "load" 从本地文件读取')
+            print('  3. 输入 "quit" 或 "exit" 退出程序')
+            print('\n输入格式支持：')
+            print('  - 逗号分隔: 12345, 67890, 11111')
+            print('  - 空格分隔: 12345 67890 11111')
+            print('  - 混合分隔: 12345, 67890 11111; 22222')
+            print('='*60 + '\n')
             
-            if user_input.lower() in ['quit', 'exit', 'q', '退出']:
-                print('\n程序已退出')
-                break
-            
-            if user_input.lower() in ['help', 'h', '帮助']:
-                print('\n' + '='*60)
-                print('帮助信息')
-                print('='*60)
-                print('可用命令：')
-                print('  load    - 从本地文件读取（优先Excel，其次TXT）')
-                print('  save    - 保存当前输入到本地文件')
-                print('  quit    - 退出程序')
-                print('  help    - 显示此帮助信息')
-                print('\n输入格式：')
-                print('  - 直接输入货号字符串')
-                print('  - 支持包含"序列号"文字')
-                print('  - 支持大量空白字符')
-                print('  - 支持多种分隔符')
-                print('  - 自动检测重复序列号')
-                print(f'  - 支持Excel文件（{self.excel_file}）')
-                print('  - 支持文本文件（config/input_stock_numbers.txt）')
-                print('='*60 + '\n')
-                continue
-            
-            if user_input.lower() in ['load', '读取']:
-                if FileManager.file_exists(self.excel_file):
-                    print(f'检测到Excel文件: {self.excel_file}')
-                    input_stock_numbers = self.load_excel_data()
-                    
-                    if input_stock_numbers:
-                        print(f'从Excel文件读取到 {len(input_stock_numbers)} 个货号\n')
-                        duplicates = self.find_duplicate_stock_numbers(input_stock_numbers)
-                        if duplicates:
-                            self.save_duplicate_log(duplicates)
-                        
-                        result = self.compare_stock_numbers(json_stock_numbers, input_stock_numbers)
-                        self.print_comparison_result(result, duplicates)
-                        continue
-                    else:
-                        print('Excel文件中未找到有效的货号\n')
+            while True:
+                try:
+                    user_input = input('请输入货号字符串 (输入 "help" 查看帮助): ').strip()
+                except (EOFError, KeyboardInterrupt):
+                    print('\n程序已退出')
+                    return
                 
-                file_content = self.load_input_from_file()
-                if file_content:
-                    current_input = file_content
-                    input_stock_numbers = self.parse_input_string(current_input)
+                if user_input.lower() in ['quit', 'exit', 'q', '退出']:
+                    print('\n程序已退出')
+                    return
+                
+                if user_input.lower() in ['help', 'h', '帮助']:
+                    print('\n帮助信息：')
+                    print('  load    - 从本地文件读取')
+                    print('  quit    - 退出程序')
+                    print('  help    - 显示此帮助信息')
+                    print('\n输入格式：')
+                    print('  - 直接输入货号字符串')
+                    print('  - 支持多种分隔符')
+                    print('  - 自动检测重复序列号')
+                    print('='*60 + '\n')
+                    continue
+                
+                if user_input.lower() in ['load', '读取']:
+                    if FileManager.file_exists(self.excel_file):
+                        input_stock_numbers = self.load_excel_data()
+                        if input_stock_numbers:
+                            input_source = 'Excel'
+                            print(f'从Excel文件读取到 {len(input_stock_numbers)} 个货号\n')
+                            break
+                    
+                    file_content = self.load_input_from_file()
+                    if file_content:
+                        input_stock_numbers = self.parse_input_string(file_content)
+                        if input_stock_numbers:
+                            input_source = 'TXT'
+                            print(f'从文件读取到 {len(input_stock_numbers)} 个货号\n')
+                            break
+                
+                if user_input:
+                    input_stock_numbers = self.parse_input_string(user_input)
                     if input_stock_numbers:
-                        duplicates = self.find_duplicate_stock_numbers(input_stock_numbers)
-                        if duplicates:
-                            self.save_duplicate_log(duplicates)
-                        
-                        result = self.compare_stock_numbers(json_stock_numbers, input_stock_numbers)
-                        self.print_comparison_result(result, duplicates)
-                    else:
-                        print('文件中未找到有效的货号\n')
-                else:
-                    print(f'文件 {self.excel_file} 和 {self.input_file} 都不存在\n')
-                continue
-            
-            if user_input.lower() in ['save', '保存']:
-                if current_input:
-                    self.save_input_to_file(current_input)
-                else:
-                    print('没有可保存的输入内容\n')
-                continue
-            
-            if not user_input:
-                print('输入不能为空，请重新输入或输入 "quit" 退出\n')
-                continue
-            
-            current_input = user_input
-            input_stock_numbers = self.parse_input_string(user_input)
-            
-            if not input_stock_numbers:
-                print('未能解析出货号，请检查输入格式\n')
-                continue
-            
+                        input_source = '手动输入'
+                        print(f'解析出 {len(input_stock_numbers)} 个货号\n')
+                        break
+        
+        if input_stock_numbers:
             duplicates = self.find_duplicate_stock_numbers(input_stock_numbers)
             if duplicates:
                 self.save_duplicate_log(duplicates)
             
             result = self.compare_stock_numbers(json_stock_numbers, input_stock_numbers)
+            print(f'\n对比来源: {input_source}')
             self.print_comparison_result(result, duplicates)
-
-    def run_simple(self):
-        print('='*60)
-        print('货号对比工具（简化版）')
-        print('='*60)
-        
-        data = self.load_json_data()
-        json_stock_numbers = self.extract_stock_numbers(data)
-        print(f'已加载 {len(json_stock_numbers)} 个货号\n')
-        
-        if FileManager.file_exists(self.excel_file):
-            print(f'检测到Excel文件: {self.excel_file}')
-            input_stock_numbers = self.load_excel_data()
-            
-            if input_stock_numbers:
-                print(f'从Excel文件读取到 {len(input_stock_numbers)} 个货号\n')
-                duplicates = self.find_duplicate_stock_numbers(input_stock_numbers)
-                if duplicates:
-                    self.save_duplicate_log(duplicates)
-                
-                result = self.compare_stock_numbers(json_stock_numbers, input_stock_numbers)
-                self.print_comparison_result(result, duplicates)
-                return
-            else:
-                print('Excel文件中未找到有效的货号\n')
-        
-        if FileManager.file_exists(self.input_file):
-            print(f'从文件 {self.input_file} 读取输入...')
-            input_str = FileManager.read_text(self.input_file)
-            
-            if input_str:
-                input_stock_numbers = self.parse_input_string(input_str)
-                if input_stock_numbers:
-                    print(f'解析出 {len(input_stock_numbers)} 个货号\n')
-                    duplicates = self.find_duplicate_stock_numbers(input_stock_numbers)
-                    if duplicates:
-                        self.save_duplicate_log(duplicates)
-                    
-                    result = self.compare_stock_numbers(json_stock_numbers, input_stock_numbers)
-                    self.print_comparison_result(result, duplicates)
-                else:
-                    print('文件中未找到有效的货号\n')
-            else:
-                print('文件读取失败\n')
         else:
-            print(f'文件 {self.excel_file} 和 {self.input_file} 都不存在')
-            print('请创建 config/input_stock_numbers.txt 文件或确保Excel文件存在\n')
+            print('未找到有效的货号输入')
 
 
 def main():
@@ -1520,28 +1456,22 @@ def main():
             print('='*60)
         
         print('请选择功能：')
-        print('1. 运行爬虫')
-        print('2. 货号对比（交互式）')
-        print('3. 货号对比（简化版）')
-        print('4. Excel与JSON对比（自动保存差异日志）')
-        print('5. 当天JSON文件对比（对比当天最新两个文件）')
-        print('6. 更新Cookie')
+        print('1. 运行爬虫（自动对比当天JSON文件）')
+        print('2. 货号对比')
+        print('3. Excel与JSON对比（自动保存差异日志）')
         print('0. 退出')
         print('='*60)
         
         try:
-            choice = input('请输入选项 (0-6): ').strip()
+            choice = input('请输入选项 (0-3): ').strip()
         except (EOFError, KeyboardInterrupt):
             print('\n程序已退出')
             return
         
         actions = {
             '1': lambda: run_scraper() or True,
-            '2': lambda: StockNumberComparator().run_interactive() or True,
-            '3': lambda: StockNumberComparator().run_simple() or True,
-            '4': lambda: StockNumberComparator().compare_excel_with_json() or True,
-            '5': lambda: StockNumberComparator().compare_json_files() or True,
-            '6': lambda: update_cookie() or True,
+            '2': lambda: StockNumberComparator().run_comparison() or True,
+            '3': lambda: StockNumberComparator().compare_excel_with_json() or True,
         }
         
         if choice == '0':
@@ -1563,171 +1493,6 @@ def run_scraper():
         import traceback
         traceback.print_exc()
         input('按回车键继续...')
-
-
-def update_cookie():
-    while True:
-        print('='*60)
-        print('Cookie更新工具')
-        print('='*60)
-        print('请选择方式：')
-        print('1. 自动获取（推荐）- 程序启动浏览器，登录后自动保存')
-        print('2. 手动粘贴 - 从浏览器复制Cookie字符串')
-        print('0. 返回')
-        print('='*60)
-        
-        try:
-            choice = input('请输入选项 (0-2): ').strip()
-        except (EOFError, KeyboardInterrupt):
-            print('\n已取消')
-            return
-        
-        if choice == '1':
-            auto_get_cookie()
-        elif choice == '2':
-            manual_update_cookie()
-        elif choice == '0':
-            return
-        else:
-            print('无效的选项')
-            input('按回车键继续...')
-
-
-def auto_get_cookie():
-    print('='*60)
-    print('自动获取Cookie')
-    print('='*60)
-    print('请稍候，浏览器即将打开...')
-    print('='*60)
-    
-    async def get_cookie():
-        try:
-            async with async_playwright() as p:
-                system = WegoScraper.get_system_info()
-                browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--disable-dev-shm-usage']
-                
-                chrome_path = None
-                if system == 'Windows':
-                    browser_args.append('--disable-gpu')
-                    if os.path.exists(r'C:\Program Files\Google\Chrome\Application\chrome.exe'):
-                        chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
-                elif system == 'Linux':
-                    browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
-                    if os.path.exists('/usr/bin/google-chrome'):
-                        chrome_path = '/usr/bin/google-chrome'
-                elif system == 'Mac':
-                    if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
-                        chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-                
-                print(f'检测到系统: {system}')
-                if chrome_path:
-                    print(f'使用系统Chrome: {chrome_path}')
-                else:
-                    print(f'使用Playwright内置Chromium')
-                
-                browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
-                context = await browser.new_context()
-                
-                cookie_file = 'config/cookies.json'
-                if FileManager.file_exists(cookie_file):
-                    existing_cookies = FileManager.read_json(cookie_file)
-                    if existing_cookies:
-                        print(f'已加载 {len(existing_cookies)} 个现有Cookie')
-                        await context.add_cookies(existing_cookies)
-                
-                page = await context.new_page()
-                await page.goto('https://www.szwego.com/')
-                
-                print('='*60)
-                print('浏览器已打开')
-                print('请在浏览器中完成以下操作：')
-                print('1. 如果需要登录，请完成登录')
-                print('2. 登录后刷新一下页面')
-                print('3. 确认登录成功后，关闭浏览器窗口')
-                print('='*60)
-                print('等待关闭浏览器...')
-                print('='*60)
-                
-                try:
-                    await page.wait_for_event('close', timeout=120000)
-                except Exception as e:
-                    pass
-                
-                if browser.is_connected():
-                    cookies = await context.cookies()
-                    FileManager.write_json(cookie_file, cookies)
-                    print(f'✓ Cookie已保存到 {cookie_file}')
-                    print(f'✓ 共保存 {len(cookies)} 个Cookie')
-                    
-                    try:
-                        await browser.close()
-                    except Exception as e:
-                        pass
-                else:
-                    print('浏览器已关闭')
-                    
-        except Exception as e:
-            print(f'✗ 获取失败: {e}')
-            import traceback
-            traceback.print_exc()
-    
-    asyncio.run(get_cookie())
-
-
-def manual_update_cookie():
-    print('='*60)
-    print('手动更新Cookie')
-    print('='*60)
-    print('步骤：')
-    print('1. 打开浏览器，访问 Szwego 网站并登录')
-    print('2. 按 F12 打开开发者工具')
-    print('3. 切换到 Application（应用）标签')
-    print('4. 展开左侧 Cookies > https://www.szwego.com')
-    print('5. 复制 cookie 的 name 和 value 值')
-    print('')
-    print('请在下方粘贴完整的 cookie 字符串（格式：key1=value1; key2=value2）')
-    print('或者直接按回车退出')
-    print('='*60)
-    
-    try:
-        cookie_str = input('请输入Cookie: ').strip()
-        if not cookie_str:
-            print('已取消')
-            return
-        
-        cookies = parse_cookie_string(cookie_str)
-        
-        if cookies:
-            config_manager = ConfigManager()
-            cookie_file = config_manager.get_cookie_file()
-            
-            FileManager.write_json(cookie_file, cookies)
-            print(f'✓ Cookie已保存到 {cookie_file}')
-            print(f'✓ 共保存 {len(cookies)} 个Cookie')
-        else:
-            print('✗ Cookie解析失败，请检查格式')
-            
-    except Exception as e:
-        print(f'✗ 更新失败: {e}')
-
-
-def parse_cookie_string(cookie_str):
-    import urllib.parse
-    
-    cookies = []
-    
-    for item in cookie_str.split(';'):
-        item = item.strip()
-        if '=' in item:
-            key, value = item.split('=', 1)
-            cookies.append({
-                'name': key.strip(),
-                'value': value.strip(),
-                'domain': '.szwego.com',
-                'path': '/'
-            })
-    
-    return cookies
 
 
 if __name__ == '__main__':
