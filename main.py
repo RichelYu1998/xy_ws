@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.3.4"
+VERSION = "2.3.5"
 
 
 try:
@@ -369,7 +369,9 @@ class WegoScraper:
             cost_price_patterns = [
                 r'拿货价[：:]\s*¥?\s*(\d{3,6})',
                 r'成本价[：:]\s*¥?\s*(\d{3,6})',
-                r'进货价[：:]\s*¥?\s*(\d{3,6})'
+                r'进货价[：:]\s*¥?\s*(\d{3,6})',
+                r'原价[：:]\s*¥?\s*(\d{3,6})',
+                r'采购价[：:]\s*¥?\s*(\d{3,6})'
             ]
             
             cost_price = None
@@ -384,6 +386,11 @@ class WegoScraper:
             
             employee_match = re.search(r'员工[：:]\s*(.+)', element_text)
             employee = employee_match.group(1).strip() if employee_match else None
+            
+            if not cost_price and '¥' in element_text:
+                prices = re.findall(r'¥(\d{3,6})', element_text)
+                if len(prices) >= 2:
+                    cost_price = '¥' + prices[1]
             
             cut_pos = min(
                 len(element_text),
@@ -430,8 +437,7 @@ class WegoScraper:
                 if len(element_text.strip()) < 30:
                     continue
                 
-                elements_data.append((element_text, html_content))
-            except asyncio.TimeoutError:
+                elements_data.append((element_text, html_content))            except asyncio.TimeoutError:
                 continue
             except Exception as e:
                 print(f'收集元素 {i} 数据时出错: {e}')
