@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.5.5"
+VERSION = "2.5.6"
 
 
 try:
@@ -1654,15 +1654,19 @@ def update_cookie():
                     FileManager.write_json(config_file, config_data)
                     print('✓ config.json中的Cookie已更新')
                 
-                # 自动关闭浏览器
-                await browser.close()
+                # 快速关闭浏览器，避免延迟
+                try:
+                    await browser.close()
+                except:
+                    pass
                 print('✓ 浏览器已自动关闭')
                 
                 return True
         
         # 运行异步函数
-        asyncio.run(get_cookie())
-        print('\n✓ Cookie更新完成')
+        result = asyncio.run(get_cookie())
+        if result:
+            print('\n✓ Cookie更新完成')
         
     except Exception as e:
         print(f'✗ Cookie更新失败: {e}')
