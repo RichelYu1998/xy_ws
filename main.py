@@ -9,8 +9,9 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
+import current_time
 
-VERSION = "2.5.8"
+VERSION = "2.5.9"
 
 
 try:
@@ -167,11 +168,11 @@ class FileManager:
             today = datetime.now().strftime('%Y%m%d')
             
             # 获取所有符合条件的JSON文件
-            all_json_files = []
-            for file in os.listdir(directory):
-                if file.endswith('.json') and pattern in file and '_cache' not in file:
-                    file_path = os.path.join(directory, file)
-                    all_json_files.append((file_path, os.path.getmtime(file_path)))
+            all_json_files = [
+                (os.path.join(directory, file), os.path.getmtime(file_path))
+                for file in os.listdir(directory)
+                if file.endswith('.json') and pattern in file and '_cache' not in file
+            ]
             
             if len(all_json_files) < 1:
                 print(f'未找到包含"{pattern}"的JSON文件')
@@ -189,11 +190,11 @@ class FileManager:
                 return latest_file, cache_file
             
             # 如果没有缓存文件，检查当天是否有多个文件
-            today_files = []
-            for file in os.listdir(directory):
-                if file.endswith('.json') and pattern in file and today in file and '_cache' not in file:
-                    file_path = os.path.join(directory, file)
-                    today_files.append((file_path, os.path.getmtime(file_path)))
+            today_files = [
+                (os.path.join(directory, file), os.path.getmtime(file_path))
+                for file in os.listdir(directory)
+                if file.endswith('.json') and pattern in file and today in file and '_cache' not in file
+            ]
             
             if len(today_files) >= 2:
                 today_files.sort(key=lambda x: x[1], reverse=True)
