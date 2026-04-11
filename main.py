@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.5.0"
+VERSION = "2.5.2"
 
 
 try:
@@ -1590,59 +1590,55 @@ def update_cookie():
                     print(f'页面加载超时，继续获取Cookie: {e}')
                 
                 print('='*60)
-                print('请手动完成以下操作：')
-                print('1. 在浏览器中输入账号密码登录')
-                print('2. 登录成功后，刷新一下页面确认登录状态')
-                print('3. 检测到登录成功后，程序会自动关闭浏览器')
+                print('浏览器已打开')
+                print('请在浏览器中完成以下操作：')
+                print('1. 如果需要登录，请完成登录')
+                print('2. 登录后刷新一下页面')
+                print('3. 确认登录成功后，关闭浏览器窗口')
                 print('='*60)
-                print('等待登录...')
+                print('等待关闭浏览器...')
                 print('='*60)
                 
-                # 自动检测登录状态并关闭浏览器
-                start_time = time.time()
-                timeout = 300  # 5分钟超时
-                login_detected = False
+                try:
+                    await page.wait_for_event('close', timeout=120000)
+                except Exception as e:
+                    pass
                 
-                while time.time() - start_time < timeout:
-                    # 检查是否已登录（通过检查用户信息元素）
+                if browser.is_connected():
+                    cookies = await context.cookies()
+                    
+                    szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+                    
+                    FileManager.write_json(cookie_file, szwego_cookies)
+                    
+                    print(f'✓ Cookie已保存到 {cookie_file}')
+                    print(f'✓ 共保存 {len(szwego_cookies)} 个Cookie')
+                    
+                    config_file = 'config/config.json'
+                    if FileManager.file_exists(config_file):
+                        config_data = FileManager.read_json(config_file)
+                        
+                        cookie_strings = []
+                        for cookie in szwego_cookies:
+                            cookie_strings.append(f'{cookie["name"]}={cookie["value"]}')
+                        
+                        cookie_header = '; '.join(cookie_strings)
+                        
+                        if 'headers' not in config_data:
+                            config_data['headers'] = {}
+                        config_data['headers']['cookie'] = cookie_header
+                        
+                        config_data['cookies'] = szwego_cookies
+                        
+                        FileManager.write_json(config_file, config_data)
+                        print('✓ config.json中的Cookie已更新')
+                    
                     try:
-                        await page.wait_for_selector('.user-info, .user-name, .logout, [class*="user"], [class*="login"]', timeout=5000)
-                        print('✓ 检测到登录成功，开始获取Cookie...')
-                        login_detected = True
-                        break
+                        await browser.close()
                     except:
-                        # 如果未检测到登录状态，继续等待
-                        await asyncio.sleep(5)
-                        elapsed = int(time.time() - start_time)
-                        print(f'等待登录中... ({elapsed}秒)')
-                        continue
-                
-                if not login_detected:
-                    print('⚠️ 登录超时，尝试获取当前Cookie')
-                
-                # 获取当前所有Cookie
-                cookies = await context.cookies()
-                
-                # 过滤出szwego.com相关的Cookie
-                szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
-                
-                # 检查是否获取到有效的认证Cookie
-                auth_cookies = [c for c in szwego_cookies if 'token' in c['name'].lower() or 'session' in c['name'].lower()]
-                
-                if not auth_cookies:
-                    print('⚠️ 警告：未获取到认证Cookie，可能登录未成功')
-                
-                # 保存Cookie
-                FileManager.write_json(cookie_file, szwego_cookies)
-                
-                print(f'✓ 成功获取 {len(szwego_cookies)} 个Cookie')
-                if auth_cookies:
-                    print(f'✓ 包含 {len(auth_cookies)} 个认证Cookie: {[c["name"] for c in auth_cookies]}')
-                print('✓ Cookie已保存到 config/cookies.json')
-                
-                # 自动关闭浏览器
-                await browser.close()
-                print('✓ 浏览器已自动关闭')
+                        pass
+                else:
+                    print('浏览器已关闭')
                 
                 return True
         
