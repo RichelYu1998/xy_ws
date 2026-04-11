@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.4.6"
+VERSION = "2.4.7"
 
 
 try:
@@ -1546,21 +1546,72 @@ def run_scraper():
 
 
 def update_cookie():
+    """自动更新Cookie功能"""
     print('='*60)
     print('Cookie自动更新工具')
     print('='*60)
     print('说明：')
-    print('  - 运行爬虫时会自动更新Cookie')
-    print('  - 此功能仅用于手动触发Cookie更新')
-    print('  - 无需手动在浏览器中获取')
+    print('  - 自动打开浏览器并获取最新Cookie')
+    print('  - 无需手动登录操作')
+    print('  - 完成后自动保存到配置文件')
     print('='*60)
     
     try:
-        scraper = WegoScraper()
-        asyncio.run(scraper.run())
-        print('\n✓ Cookie已自动更新')
+        from playwright.async_api import async_playwright
+        import asyncio
+        
+        async def get_cookie():
+            async with async_playwright() as p:
+                browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+                browser = await p.chromium.launch(
+                    headless=False, 
+                    args=browser_args, 
+                    executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                )
+                
+                context = await browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                )
+                
+                page = await context.new_page()
+                await page.goto('https://www.szwego.com', wait_until='networkidle')
+                
+                print('浏览器已打开，正在获取Cookie...')
+                print('请稍候，系统会自动处理...')
+                
+                # 等待页面加载完成
+                await asyncio.sleep(5)
+                
+                # 检查是否已登录
+                try:
+                    await page.wait_for_selector('.user-info, .login-btn', timeout=5000)
+                except:
+                    pass
+                
+                # 获取当前所有Cookie
+                cookies = await context.cookies()
+                
+                # 过滤出szwego.com相关的Cookie
+                szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+                
+                # 保存Cookie
+                FileManager.write_json('config/cookies.json', szwego_cookies)
+                
+                print(f'✓ 成功获取 {len(szwego_cookies)} 个Cookie')
+                print('✓ Cookie已保存到 config/cookies.json')
+                
+                # 关闭浏览器
+                await browser.close()
+                
+                return True
+        
+        # 运行异步函数
+        asyncio.run(get_cookie())
+        print('\n✓ Cookie更新完成')
+        
     except Exception as e:
-        print(f'✗ 更新失败: {e}')
+        print(f'✗ Cookie更新失败: {e}')
         import traceback
         traceback.print_exc()
     
