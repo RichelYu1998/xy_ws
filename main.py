@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.5.6"
+VERSION = "2.5.7"
 
 
 try:
@@ -1181,7 +1181,8 @@ class StockNumberComparator:
             
             high_price_stock_numbers = [
                 p.get('货号', '') for p in products 
-                if WegoScraper.parse_price(p.get('售价', '')) >= 599 
+                if WegoScraper.parse_price(p.get('售价', '')) is not None
+                and WegoScraper.parse_price(p.get('售价', '')) >= 599 
                 and re.match(r'^\d{3,6}$', p.get('货号', ''))
             ]
             
