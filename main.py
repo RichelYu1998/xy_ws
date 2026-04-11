@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.3.0"
+VERSION = "2.3.1"
 
 
 try:
@@ -1459,11 +1459,12 @@ def main():
         print('1. 运行爬虫（自动对比当天JSON文件）')
         print('2. 货号对比')
         print('3. Excel与JSON对比（自动保存差异日志）')
+        print('4. 更新Cookie（自动更新）')
         print('0. 退出')
         print('='*60)
         
         try:
-            choice = input('请输入选项 (0-3): ').strip()
+            choice = input('请输入选项 (0-4): ').strip()
         except (EOFError, KeyboardInterrupt):
             print('\n程序已退出')
             return
@@ -1472,6 +1473,7 @@ def main():
             '1': lambda: run_scraper() or True,
             '2': lambda: StockNumberComparator().run_comparison() or True,
             '3': lambda: StockNumberComparator().compare_excel_with_json() or True,
+            '4': lambda: update_cookie() or True,
         }
         
         if choice == '0':
@@ -1493,6 +1495,28 @@ def run_scraper():
         import traceback
         traceback.print_exc()
         input('按回车键继续...')
+
+
+def update_cookie():
+    print('='*60)
+    print('Cookie自动更新工具')
+    print('='*60)
+    print('说明：')
+    print('  - 运行爬虫时会自动更新Cookie')
+    print('  - 此功能仅用于手动触发Cookie更新')
+    print('  - 无需手动在浏览器中获取')
+    print('='*60)
+    
+    try:
+        scraper = WegoScraper()
+        asyncio.run(scraper.run())
+        print('\n✓ Cookie已自动更新')
+    except Exception as e:
+        print(f'✗ 更新失败: {e}')
+        import traceback
+        traceback.print_exc()
+    
+    input('按回车键继续...')
 
 
 if __name__ == '__main__':
