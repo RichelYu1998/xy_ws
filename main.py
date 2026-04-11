@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.4.7"
+VERSION = "2.5.0"
 
 
 try:
@@ -352,65 +352,58 @@ class WegoScraper:
             stock_match = re.search(r'货号[：:]\s*(\d+)', element_text)
             stock_number = stock_match.group(1) if stock_match else ''
             
-            price = None
-            
-            price_match = re.search(r'售价[：:]\s*¥?\s*([\d,]+)', element_text)
-            if price_match:
-                price_value = int(price_match.group(1).replace(',', ''))
-                if 100 <= price_value <= 50000:
-                    price = '¥' + price_match.group(1)
-            
-            if not price:
-                price_match = re.search(r'¥\s*([\d,]+)(?![0-9])', element_text)
+            def extract_price(text):
+                price_match = re.search(r'售价[：:]\s*¥?\s*([\d,]+)', text)
+                if not price_match:
+                    price_match = re.search(r'¥\s*([\d,]+)(?![0-9])', text)
                 if price_match:
                     price_value = int(price_match.group(1).replace(',', ''))
                     if 100 <= price_value <= 50000:
-                        price = '¥' + price_match.group(1)
+                        return '¥' + price_match.group(1)
+                return None
             
-            remark = None
+            price = extract_price(element_text)
             
             employee_match = re.search(r'员工[：:]\s*(.+)', element_text)
             employee = employee_match.group(1).strip() if employee_match else None
             
-            if employee_match:
-                employee_pos = element_text.find('员工')
-                price_match = re.search(r'售价[：:]', element_text)
-                if price_match:
-                    price_pos = price_match.start()
-                    between_text = element_text[price_pos:employee_pos]
-                    if between_text and len(between_text.strip()) > 0:
-                        between_text = between_text.replace('售价：', '').replace('售价:', '')
-                        between_text = re.sub(r'¥\s*[\d,]+', '', between_text)
-                        between_text = re.sub(r'\s+', ' ', between_text).strip()
-                        if between_text and len(between_text) > 0:
-                            remark = between_text
-            
-            if not remark:
-                remark_match = re.search(r'备注[：:]\s*(.+?)(?:\s*员工[：:]|$)', element_text, re.DOTALL)
+            def extract_remark(text, emp_match):
+                if emp_match:
+                    emp_pos = text.find('员工')
+                    price_match = re.search(r'售价[：:]', text)
+                    if price_match:
+                        price_pos = price_match.start()
+                        between_text = text[price_pos:emp_pos]
+                        if between_text and len(between_text.strip()) > 0:
+                            between_text = between_text.replace('售价：', '').replace('售价:', '')
+                            between_text = re.sub(r'¥\s*[\d,]+', '', between_text)
+                            between_text = re.sub(r'\s+', ' ', between_text).strip()
+                            if between_text and len(between_text) > 0:
+                                return between_text
+                
+                remark_match = re.search(r'备注[：:]\s*(.+?)(?:\s*员工[：:]|$)', text, re.DOTALL)
                 if remark_match:
-                    remark = re.sub(r'\s+', ' ', remark_match.group(1).strip())
+                    return re.sub(r'\s+', ' ', remark_match.group(1).strip())
+                return None
+            
+            remark = extract_remark(element_text, employee_match)
             
             cut_pos = min(
                 len(element_text),
                 *(pos for pos in [element_text.find('¥'), element_text.find('删除'), element_text.find('货号')] if pos > 0)
             )
             
-            if cut_pos < len(element_text) and cut_pos > 10:
-                name_part = re.sub(r'\s+', ' ', element_text[:cut_pos].strip())
-                name = WegoScraper.clean_product_name(name_part) if name_part else None
-            else:
-                name = WegoScraper.clean_product_name(element_text)
+            name_part = element_text[:cut_pos] if cut_pos < len(element_text) and cut_pos > 10 else element_text
+            name = WegoScraper.clean_product_name(re.sub(r'\s+', ' ', name_part.strip()))
             
             if name:
-                cleaned_name = WegoScraper.clean_product_name(name)
-                if cleaned_name:
-                    return {
-                        '商品名称': cleaned_name,
-                        '售价': price if price else '',
-                        '货号': stock_number,
-                        '备注': remark if remark else '',
-                        '员工': employee if employee else ''
-                    }
+                return {
+                    '商品名称': name,
+                    '售价': price if price else '',
+                    '货号': stock_number,
+                    '备注': remark if remark else '',
+                    '员工': employee if employee else ''
+                }
             return None
         except Exception as e:
             print(f'提取商品信息时出错: {e}')
@@ -1552,7 +1545,7 @@ def update_cookie():
     print('='*60)
     print('说明：')
     print('  - 自动打开浏览器并获取最新Cookie')
-    print('  - 无需手动登录操作')
+    print('  - 用户手动登录后关闭浏览器')
     print('  - 完成后自动保存到配置文件')
     print('='*60)
     
@@ -1574,6 +1567,15 @@ def update_cookie():
                     user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                 )
                 
+                # 加载现有Cookie
+                existing_cookies = []
+                cookie_file = 'config/cookies.json'
+                if FileManager.file_exists(cookie_file):
+                    existing_cookies = FileManager.read_json(cookie_file)
+                    if existing_cookies:
+                        print(f'已加载 {len(existing_cookies)} 个现有Cookie')
+                        await context.add_cookies(existing_cookies)
+                
                 page = await context.new_page()
                 await page.goto('https://www.szwego.com', wait_until='networkidle')
                 
@@ -1581,13 +1583,42 @@ def update_cookie():
                 print('请稍候，系统会自动处理...')
                 
                 # 等待页面加载完成
-                await asyncio.sleep(5)
-                
-                # 检查是否已登录
                 try:
-                    await page.wait_for_selector('.user-info, .login-btn', timeout=5000)
-                except:
-                    pass
+                    await page.wait_for_load_state('networkidle', timeout=10000)
+                    print('页面加载完成')
+                except Exception as e:
+                    print(f'页面加载超时，继续获取Cookie: {e}')
+                
+                print('='*60)
+                print('请手动完成以下操作：')
+                print('1. 在浏览器中输入账号密码登录')
+                print('2. 登录成功后，刷新一下页面确认登录状态')
+                print('3. 检测到登录成功后，程序会自动关闭浏览器')
+                print('='*60)
+                print('等待登录...')
+                print('='*60)
+                
+                # 自动检测登录状态并关闭浏览器
+                start_time = time.time()
+                timeout = 300  # 5分钟超时
+                login_detected = False
+                
+                while time.time() - start_time < timeout:
+                    # 检查是否已登录（通过检查用户信息元素）
+                    try:
+                        await page.wait_for_selector('.user-info, .user-name, .logout, [class*="user"], [class*="login"]', timeout=5000)
+                        print('✓ 检测到登录成功，开始获取Cookie...')
+                        login_detected = True
+                        break
+                    except:
+                        # 如果未检测到登录状态，继续等待
+                        await asyncio.sleep(5)
+                        elapsed = int(time.time() - start_time)
+                        print(f'等待登录中... ({elapsed}秒)')
+                        continue
+                
+                if not login_detected:
+                    print('⚠️ 登录超时，尝试获取当前Cookie')
                 
                 # 获取当前所有Cookie
                 cookies = await context.cookies()
@@ -1595,14 +1626,23 @@ def update_cookie():
                 # 过滤出szwego.com相关的Cookie
                 szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
                 
+                # 检查是否获取到有效的认证Cookie
+                auth_cookies = [c for c in szwego_cookies if 'token' in c['name'].lower() or 'session' in c['name'].lower()]
+                
+                if not auth_cookies:
+                    print('⚠️ 警告：未获取到认证Cookie，可能登录未成功')
+                
                 # 保存Cookie
-                FileManager.write_json('config/cookies.json', szwego_cookies)
+                FileManager.write_json(cookie_file, szwego_cookies)
                 
                 print(f'✓ 成功获取 {len(szwego_cookies)} 个Cookie')
+                if auth_cookies:
+                    print(f'✓ 包含 {len(auth_cookies)} 个认证Cookie: {[c["name"] for c in auth_cookies]}')
                 print('✓ Cookie已保存到 config/cookies.json')
                 
-                # 关闭浏览器
+                # 自动关闭浏览器
                 await browser.close()
+                print('✓ 浏览器已自动关闭')
                 
                 return True
         
