@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.3.6"
+VERSION = "2.4.0"
 
 
 try:
@@ -366,36 +366,11 @@ class WegoScraper:
                     price = '¥' + match.group(1)
                     break
             
-            cost_price_patterns = [
-                r'拿货价[：:]\s*¥?\s*(\d{3,6})',
-                r'成本价[：:]\s*¥?\s*(\d{3,6})',
-                r'进货价[：:]\s*¥?\s*(\d{3,6})',
-                r'原价[：:]\s*¥?\s*(\d{3,6})',
-                r'采购价[：:]\s*¥?\s*(\d{3,6})'
-            ]
-            
-            cost_price = None
-            for pattern in cost_price_patterns:
-                match = re.search(pattern, element_text)
-                if match:
-                    cost_price = '¥' + match.group(1)
-                    break
-            
             remark_match = re.search(r'备注[：:]\s*(.+?)(?:\s*员工[：:]|$)', element_text, re.DOTALL)
             remark = re.sub(r'\s+', ' ', remark_match.group(1).strip()) if remark_match else None
             
             employee_match = re.search(r'员工[：:]\s*(.+)', element_text)
             employee = employee_match.group(1).strip() if employee_match else None
-            
-            if not cost_price and '¥' in element_text:
-                prices = re.findall(r'¥(\d{3,6})', element_text)
-                if len(prices) >= 2:
-                    cost_price = '¥' + prices[1]
-            
-            if not cost_price and '拿货价' in html_content:
-                cost_match = re.search(r'拿货价[：:]\s*¥?\s*(\d{3,6})', html_content)
-                if cost_match:
-                    cost_price = '¥' + cost_match.group(1)
             
             cut_pos = min(
                 len(element_text),
@@ -414,7 +389,6 @@ class WegoScraper:
                     return {
                         '商品名称': cleaned_name,
                         '售价': price if price else '',
-                        '拿货价': cost_price if cost_price else '',
                         '货号': stock_number,
                         '备注': remark if remark else '',
                         '员工': employee if employee else ''
@@ -707,24 +681,15 @@ class WegoScraper:
         
         # 计算累计值
         total_sell_price = 0.0
-        total_cost_price = 0.0
         total_platform_fee = 0.0
         
         for product in data:
             sell_price = 0.0
-            cost_price = 0.0
             
             if '售价' in product:
                 try:
                     sell_price = float(str(product['售价']).replace('¥', '').replace(',', '').strip())
                     total_sell_price += sell_price
-                except (ValueError, TypeError):
-                    pass
-            
-            if '拿货价' in product:
-                try:
-                    cost_price = float(str(product['拿货价']).replace('¥', '').replace(',', '').strip())
-                    total_cost_price += cost_price
                 except (ValueError, TypeError):
                     pass
             
@@ -734,9 +699,6 @@ class WegoScraper:
                 if platform_fee > 60:
                     platform_fee = 60
                 total_platform_fee += platform_fee
-        
-        # 计算设备均价
-        avg_cost_price = total_cost_price / total_count if total_count > 0 else 0.0
         
         existing_files = sorted(FileManager.list_files('file', '微购相册'), reverse=True)
         
@@ -755,8 +717,6 @@ class WegoScraper:
             "商品列表": data,
             "统计": f"共计获取到 {total_count} 个商品",
             "预计售出价格累计": round(total_sell_price, 2),
-            "设备成本累计": round(total_cost_price, 2),
-            "设备均价": round(avg_cost_price, 2),
             "闲鱼平台手续费累计": round(total_platform_fee, 2)
         }
         
@@ -776,10 +736,8 @@ class WegoScraper:
         print(f'数据已保存到 {new_filename}')
         print(f'成功获取 {total_count} 个商品')
         print(f'售价 >= 599 的商品: {high_price_count} 个')
-        print(f'预计售出价格累计: ¥{total_sell_price:.2f}')
-        print(f'设备成本累计: ¥{total_cost_price:.2f}')
-        print(f'设备均价: ¥{avg_cost_price:.2f}')
-        print(f'闲鱼平台手续费累计: ¥{total_platform_fee:.2f}')
+        print(f'预计售出价格累计: ¥{total_sell_price:,.2f}')
+        print(f'闲鱼平台手续费累计: ¥{total_platform_fee:,.2f}')
         if change_summary:
             print(f'{change_summary}')
 
