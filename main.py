@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.5.7"
+VERSION = "2.5.8"
 
 
 try:
@@ -1214,7 +1214,7 @@ class StockNumberComparator:
                 'timestamp': timestamp,
                 'date': date_str,
                 'json_file': os.path.basename(latest_json_file),
-                'excel_file': os.path.basename(self.excel_file),
+                'excel_file': os.path.basename(self.excel_file) if self.excel_file else 'None',
                 'comparison': {
                     'missing_description': '微购相册比本地表格多出的序列号仅供参考',
                     'existing_description': '本地表格比微购相册上多的序列号，请仔细核对后删除多出的地方',
@@ -1393,7 +1393,7 @@ class StockNumberComparator:
         input_stock_numbers = None
         input_source = None
         
-        if FileManager.file_exists(self.excel_file):
+        if self.excel_file and FileManager.file_exists(self.excel_file):
             print(f'检测到Excel文件: {self.excel_file}')
             input_stock_numbers = self.load_excel_data()
             if input_stock_numbers:
@@ -1445,7 +1445,7 @@ class StockNumberComparator:
                     continue
                 
                 if user_input.lower() in ['load', '读取']:
-                    if FileManager.file_exists(self.excel_file):
+                    if self.excel_file and FileManager.file_exists(self.excel_file):
                         input_stock_numbers = self.load_excel_data()
                         if input_stock_numbers:
                             input_source = 'Excel'
