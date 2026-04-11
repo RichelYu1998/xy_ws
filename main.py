@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.2.1"
+VERSION = "2.2.2"
 
 
 try:
@@ -1131,115 +1131,68 @@ class StockNumberComparator:
                 return False
             
             if isinstance(json_data, dict) and '商品列表' in json_data:
-                json_data = json_data['商品列表']
+                products = json_data['商品列表']
+            else:
+                products = json_data if isinstance(json_data, list) else []
             
-            json_stock_numbers = self.extract_stock_numbers(json_data)
+            json_stock_numbers = self.extract_stock_numbers(products)
             print(f'从JSON文件中读取到 {len(json_stock_numbers)} 个货号\n')
             
-            # 找出售价>=599的商品货号
-            high_price_stock_numbers = []
-            if isinstance(json_data, list):
-                for product in json_data:
-                    price = WegoScraper.parse_price(product.get('售价', ''))
-                    if price and price >= 599:
-                        stock_num = product.get('货号', '')
-                        # 只添加符合3-6位数字格式的货号
-                        if stock_num and re.match(r'^\d{3,6}$', stock_num):
-                            high_price_stock_numbers.append(stock_num)
+            high_price_stock_numbers = [
+                p.get('货号', '') for p in products 
+                if WegoScraper.parse_price(p.get('售价', '')) >= 599 
+                and re.match(r'^\d{3,6}$', p.get('货号', ''))
+            ]
             
             excel_stock_numbers = self.load_excel_data()
-            
-            # 筛选只在JSON中存在但不在Excel中的售价>=599的商品货号
-            high_price_extra_in_json = []
-            if high_price_stock_numbers and excel_stock_numbers:
-                json_set = set(json_stock_numbers)
-                excel_set = set(excel_stock_numbers)
-                extra_in_json_set = json_set - excel_set
-                
-                for stock_num in high_price_stock_numbers:
-                    if stock_num in extra_in_json_set:
-                        high_price_extra_in_json.append(stock_num)
-            
             if not excel_stock_numbers:
                 print('无法从Excel文件读取货号')
                 return False
+            
+            json_set, excel_set = set(json_stock_numbers), set(excel_stock_numbers)
+            high_price_extra_in_json = [n for n in high_price_stock_numbers if n in json_set - excel_set]
             
             result = self.compare_stock_numbers(json_stock_numbers, excel_stock_numbers, high_price_extra_in_json)
             
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             date_str = datetime.now().strftime('%Y%m%d')
             
-            result_message = self.get_result_message(result, [])
+            data_change = "数据无变化" if result['missing_count'] == 0 and result['extra_in_json_count'] == 0 else f"数据有变化：缺失 {result['missing_count']} 个货号，多余 {result['extra_in_json_count']} 个货号"
             
-            if result['missing_count'] == 0 and result['extra_in_json_count'] == 0:
-                data_change = "数据无变化"
-            else:
-                data_change = f"数据有变化：缺失 {result['missing_count']} 个货号，多余 {result['extra_in_json_count']} 个货号"
+            added_products = [self._get_product_detail(p) for p in products if p.get('货号') and p.get('货号') not in excel_set] if products else []
             
-            comparison_with_descriptions = {
-                'missing_description': '微购相册比本地表格多出的序列号仅供参考',
-                'existing_description': '本地表格比微购相册上多的序列号，请仔细核对后删除多出的地方',
-                'extra_in_json_description': '微购相册比本地表格多出的序列号',
-                'high_price_extra_in_json': high_price_extra_in_json,
-                'high_price_extra_in_json_count': len(high_price_extra_in_json),
-                'high_price_extra_in_json_description': '只在JSON中存在但不在Excel中的售价>=599的货号',
-                **result
-            }
-            
-            def get_product_detail(item, stock_num=None):
-                return {
-                    "商品名称": item.get('商品名称', ''),
-                    "售价": item.get('售价', ''),
-                    "货号": stock_num or item.get('货号', ''),
-                    "备注": item.get('备注', ''),
-                    "员工": item.get('员工', '')
-                }
-            
-            added_products = [get_product_detail(p, p.get('货号')) for p in json_data if p.get('货号') and p.get('货号') not in set(excel_stock_numbers)] if isinstance(json_data, list) and excel_stock_numbers else []
-            
-            prev_file = FileManager.get_latest_json_file('微购相册')
             removed_products = []
+            prev_file = FileManager.get_latest_json_file('微购相册')
             if prev_file and prev_file != latest_json_file:
                 old_data = FileManager.read_json(prev_file)
                 if old_data and isinstance(old_data, dict):
-                    old_items = old_data.get('商品列表', [])
-                    removed_products = [get_product_detail(item) for item in old_items if item.get('货号') and item.get('货号') not in set(json_stock_numbers)]
+                    removed_products = [self._get_product_detail(item) for item in old_data.get('商品列表', []) if item.get('货号') and item.get('货号') not in json_set]
             
             diff_data = {
                 'timestamp': timestamp,
                 'date': date_str,
                 'json_file': os.path.basename(latest_json_file),
                 'excel_file': os.path.basename(self.excel_file),
-                'comparison': comparison_with_descriptions,
-                'result_message': result_message,
+                'comparison': {
+                    'missing_description': '微购相册比本地表格多出的序列号仅供参考',
+                    'existing_description': '本地表格比微购相册上多的序列号，请仔细核对后删除多出的地方',
+                    'extra_in_json_description': '微购相册比本地表格多出的序列号',
+                    'high_price_extra_in_json': high_price_extra_in_json,
+                    'high_price_extra_in_json_count': len(high_price_extra_in_json),
+                    'high_price_extra_in_json_description': '只在JSON中存在但不在Excel中的售价>=599的货号',
+                    **result
+                },
+                'result_message': self.get_result_message(result, []),
                 'data_change': data_change,
-                'high_price_extra_in_json': high_price_extra_in_json,
-                'high_price_extra_in_json_count': len(high_price_extra_in_json),
-                'high_price_extra_in_json_description': '只在JSON中存在但不在Excel中的售价>=599的货号',
                 '新增商品': added_products,
                 '新增商品数量': len(added_products),
                 '删除商品': removed_products,
                 '删除商品数量': len(removed_products)
             }
             
-            diff_log_file = f'file/diff_log_{date_str}.json'
-            
-            if FileManager.file_exists(diff_log_file):
-                existing_data = FileManager.read_json(diff_log_file)
-                if isinstance(existing_data, list):
-                    existing_data.append(diff_data)
-                elif isinstance(existing_data, dict) and 'logs' in existing_data:
-                    existing_data['logs'].append(diff_data)
-                else:
-                    existing_data = {'logs': [existing_data, diff_data]}
-            else:
-                existing_data = {'logs': [diff_data]}
-            
-            FileManager.write_json(diff_log_file, existing_data)
-            print(f'\n差异日志已保存到 {diff_log_file}')
-            
-            # 将高价商品信息写入原始JSON文件
-            self.add_high_price_info_to_json(latest_json_file, high_price_extra_in_json)
+            self._save_diff_log(date_str, diff_data)
+            self._add_high_price_info_to_json(latest_json_file, json_data, high_price_extra_in_json)
+            self._add_diff_to_json_summary(latest_json_file, json_data, diff_data)
             
             self.print_comparison_result(result, [])
             return True
@@ -1248,6 +1201,84 @@ class StockNumberComparator:
             import traceback
             traceback.print_exc()
             return False
+
+    def _get_product_detail(self, item):
+        return {
+            "商品名称": item.get('商品名称', ''),
+            "售价": item.get('售价', ''),
+            "货号": item.get('货号', ''),
+            "备注": item.get('备注', ''),
+            "员工": item.get('员工', '')
+        }
+    
+    def _save_diff_log(self, date_str, diff_data):
+        diff_log_file = f'file/diff_log_{date_str}.json'
+        existing_data = FileManager.read_json(diff_log_file) if FileManager.file_exists(diff_log_file) else {'logs': []}
+        
+        if isinstance(existing_data, list):
+            existing_data.append(diff_data)
+        elif isinstance(existing_data, dict) and 'logs' in existing_data:
+            existing_data['logs'].append(diff_data)
+        else:
+            existing_data = {'logs': [existing_data, diff_data]}
+        
+        FileManager.write_json(diff_log_file, existing_data)
+        print(f'\n差异日志已保存到 {diff_log_file}')
+    
+    def _add_high_price_info_to_json(self, json_file_path, json_data, high_price_stock_numbers):
+        if not json_data or not isinstance(json_data, dict):
+            return
+        
+        products = json_data.get('商品列表', [])
+        if not products:
+            return
+        
+        high_price_count = 0
+        for product in products:
+            stock_num = product.get('货号', '')
+            if stock_num in high_price_stock_numbers:
+                product['备注'] = f'高价商品(≥599) - 只在JSON中存在但不在Excel中'
+                high_price_count += 1
+        
+        if '统计信息' not in json_data:
+            json_data['统计信息'] = {}
+        
+        json_data['统计信息']['高价商品数量'] = high_price_count
+        json_data['统计信息']['高价商品货号'] = high_price_stock_numbers
+        json_data['统计信息']['高价商品描述'] = '只在JSON中存在但不在Excel中的售价>=599的货号'
+        
+        FileManager.write_json(json_file_path, json_data)
+        print(f'已为 {high_price_count} 个高价商品添加备注，并更新统计信息到 {json_file_path}')
+    
+    def _add_diff_to_json_summary(self, json_file_path, json_data, diff_data):
+        if not json_data or not isinstance(json_data, dict):
+            return
+        
+        if '小计' not in json_data:
+            json_data['小计'] = []
+        elif not isinstance(json_data['小计'], list):
+            json_data['小计'] = [json_data['小计']] if json_data['小计'] else []
+        
+        excel_diff_record = {
+            'timestamp': diff_data['timestamp'],
+            'date': diff_data['date'],
+            'json_file': diff_data['json_file'],
+            'excel_file': diff_data['excel_file'],
+            'comparison_type': 'Excel与JSON对比',
+            'missing_count': diff_data['comparison']['missing_count'],
+            'extra_in_json_count': diff_data['comparison']['extra_in_json_count'],
+            'high_price_extra_in_json_count': diff_data['comparison']['high_price_extra_in_json_count'],
+            'added_products_count': diff_data['新增商品数量'],
+            'removed_products_count': diff_data['删除商品数量'],
+            'data_change': diff_data['data_change'],
+            'result_message': diff_data['result_message']
+        }
+        
+        json_data['小计'].append(excel_diff_record)
+        json_data['小计'].sort(key=lambda x: x['timestamp'])
+        
+        FileManager.write_json(json_file_path, json_data)
+        print(f'Excel对比记录已追加到 {json_file_path} 的"小计"字段')
 
     @staticmethod
     def get_result_message(result, duplicates):
@@ -1307,47 +1338,6 @@ class StockNumberComparator:
         print('\n' + '='*60)
         print(StockNumberComparator.get_result_message(result, duplicates))
         print('='*60 + '\n')
-
-    def add_high_price_info_to_json(self, json_file_path, high_price_stock_numbers):
-        """
-        将高价商品信息写入原始JSON文件
-        """
-        try:
-            # 读取原始JSON数据
-            json_data = FileManager.read_json(json_file_path)
-            if not json_data:
-                print(f'无法读取JSON文件: {json_file_path}')
-                return
-            
-            # 获取商品列表
-            products = json_data.get('商品列表', [])
-            if not products:
-                print(f'JSON文件中没有商品列表')
-                return
-            
-            # 为高价商品添加备注
-            high_price_count = 0
-            for product in products:
-                stock_num = product.get('货号', '')
-                if stock_num in high_price_stock_numbers:
-                    # 添加高价商品备注
-                    product['备注'] = f'高价商品(≥599) - 只在JSON中存在但不在Excel中'
-                    high_price_count += 1
-            
-            # 更新统计信息
-            if '统计信息' not in json_data:
-                json_data['统计信息'] = {}
-            
-            json_data['统计信息']['高价商品数量'] = high_price_count
-            json_data['统计信息']['高价商品货号'] = high_price_stock_numbers
-            json_data['统计信息']['高价商品描述'] = '只在JSON中存在但不在Excel中的售价>=599的货号'
-            
-            # 保存更新后的JSON文件
-            FileManager.write_json(json_file_path, json_data)
-            print(f'已为 {high_price_count} 个高价商品添加备注，并更新统计信息到 {json_file_path}')
-            
-        except Exception as e:
-            print(f'添加高价商品信息失败: {e}')
 
     def run_interactive(self):
         print('\n' + '='*60)
