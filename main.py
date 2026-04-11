@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.3.3"
+VERSION = "2.3.4"
 
 
 try:
@@ -366,6 +366,19 @@ class WegoScraper:
                     price = '¥' + match.group(1)
                     break
             
+            cost_price_patterns = [
+                r'拿货价[：:]\s*¥?\s*(\d{3,6})',
+                r'成本价[：:]\s*¥?\s*(\d{3,6})',
+                r'进货价[：:]\s*¥?\s*(\d{3,6})'
+            ]
+            
+            cost_price = None
+            for pattern in cost_price_patterns:
+                match = re.search(pattern, element_text)
+                if match:
+                    cost_price = '¥' + match.group(1)
+                    break
+            
             remark_match = re.search(r'备注[：:]\s*(.+?)(?:\s*员工[：:]|$)', element_text, re.DOTALL)
             remark = re.sub(r'\s+', ' ', remark_match.group(1).strip()) if remark_match else None
             
@@ -389,6 +402,7 @@ class WegoScraper:
                     return {
                         '商品名称': cleaned_name,
                         '售价': price if price else '',
+                        '拿货价': cost_price if cost_price else '',
                         '货号': stock_number,
                         '备注': remark if remark else '',
                         '员工': employee if employee else ''
