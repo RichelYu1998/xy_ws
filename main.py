@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 
 
 try:
@@ -786,6 +786,12 @@ class WegoScraper:
                     save_start = time.time()
                     self.save_data(products)
                     print(f'数据保存耗时: {time.time() - save_start:.2f}秒')
+                    
+                    compare_start = time.time()
+                    print('\n开始自动对比当天JSON文件...')
+                    comparator = StockNumberComparator()
+                    comparator.compare_json_files()
+                    print(f'对比耗时: {time.time() - compare_start:.2f}秒')
                 
                 save_cookie_start = time.time()
                 cookies = await context.cookies()
