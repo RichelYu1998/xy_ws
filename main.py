@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 
-VERSION = "2.5.4"
+VERSION = "2.5.5"
 
 
 try:
@@ -1668,8 +1668,6 @@ def update_cookie():
         print(f'✗ Cookie更新失败: {e}')
         import traceback
         traceback.print_exc()
-    
-    input('按回车键继续...')
 
 
 if __name__ == '__main__':
