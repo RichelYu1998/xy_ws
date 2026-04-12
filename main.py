@@ -9,7 +9,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-VERSION = "2.5.12"
+VERSION = "2.5.13"
 
 
 try:
@@ -26,9 +26,81 @@ except ImportError:
     sys.exit(1)
 
 
+class PathManager:
+    """路径管理类，统一处理跨系统路径问题"""
+    
+    @staticmethod
+    def get_config_dir():
+        """获取配置文件目录"""
+        return 'config'
+    
+    @staticmethod
+    def get_file_dir():
+        """获取输出文件目录"""
+        return 'file'
+    
+    @staticmethod
+    def get_config_file():
+        """获取配置文件路径"""
+        return os.path.join(PathManager.get_config_dir(), 'config.json')
+    
+    @staticmethod
+    def get_cookie_file():
+        """获取Cookie文件路径"""
+        return os.path.join(PathManager.get_config_dir(), 'cookies.json')
+    
+    @staticmethod
+    def get_output_file():
+        """获取输出文件路径"""
+        return os.path.join(PathManager.get_file_dir(), 'output.json')
+    
+    @staticmethod
+    def get_input_file():
+        """获取输入文件路径"""
+        return os.path.join(PathManager.get_config_dir(), 'input_stock_numbers.txt')
+    
+    @staticmethod
+    def get_json_filename(date_str):
+        """获取JSON文件名"""
+        return f"{date_str}微购相册(小旭数码).json"
+    
+    @staticmethod
+    def get_cache_filename(date_str):
+        """获取缓存文件名"""
+        return f"{date_str}微购相册(小旭数码)_cache.json"
+    
+    @staticmethod
+    def get_json_file_path(date_str):
+        """获取JSON文件完整路径"""
+        return os.path.join(PathManager.get_file_dir(), PathManager.get_json_filename(date_str))
+    
+    @staticmethod
+    def get_cache_file_path(date_str):
+        """获取缓存文件完整路径"""
+        return os.path.join(PathManager.get_file_dir(), PathManager.get_cache_filename(date_str))
+    
+    @staticmethod
+    def get_diff_log_file(date_str):
+        """获取差异日志文件路径"""
+        return os.path.join(PathManager.get_file_dir(), f'diff_log_{date_str}.json')
+    
+    @staticmethod
+    def get_duplicate_log_file():
+        """获取重复日志文件路径"""
+        return os.path.join(PathManager.get_file_dir(), 'duplicate_log.json')
+    
+    @staticmethod
+    def ensure_dirs_exist():
+        """确保所有必要的目录存在"""
+        dirs = [PathManager.get_config_dir(), PathManager.get_file_dir()]
+        for dir_path in dirs:
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+
+
 class ConfigManager:
-    def __init__(self, config_path='config/config.json'):
-        self.config_path = config_path
+    def __init__(self, config_path=None):
+        self.config_path = config_path or PathManager.get_config_file()
         self._config = None
 
     @property
@@ -64,10 +136,10 @@ class ConfigManager:
             self.save_config()
 
     def get_cookie_file(self):
-        return self.config.get('cookie_file', 'config/cookies.json')
+        return self.config.get('cookie_file', PathManager.get_cookie_file())
 
     def get_output_file(self):
-        return self.config.get('output_file', 'file/output.json')
+        return self.config.get('output_file', PathManager.get_output_file())
 
     def get_excel_file(self):
         return self.config.get('excel_file', '')
@@ -76,7 +148,7 @@ class ConfigManager:
         return self.config.get('target_url', '')
 
     def get_user_agent(self):
-        return self.config.get('user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        return self.config.get('user_agent', WegoScraper.get_user_agent())
 
 
 class FileManager:
@@ -125,8 +197,9 @@ class FileManager:
         return os.path.exists(file_path)
 
     @staticmethod
-    def get_latest_json_file(directory='file', pattern='微购相册'):
+    def get_latest_json_file(directory=None, pattern='微购相册'):
         try:
+            directory = directory or PathManager.get_file_dir()
             if not os.path.exists(directory):
                 print(f'目录 {directory} 不存在')
                 return None
@@ -150,7 +223,7 @@ class FileManager:
             return None
 
     @staticmethod
-    def get_today_json_files(directory='file', pattern='微购相册'):
+    def get_today_json_files(directory=None, pattern='微购相册'):
         """
         获取用于对比的两个JSON文件
         优先级：
@@ -159,6 +232,7 @@ class FileManager:
         3. 最新的两个文件
         """
         try:
+            directory = directory or PathManager.get_file_dir()
             if not os.path.exists(directory):
                 print(f'目录 {directory} 不存在')
                 return None, None
@@ -181,7 +255,7 @@ class FileManager:
             latest_file = all_json_files[0][0]
             
             # 检查是否存在当天的缓存文件
-            cache_file = os.path.join(directory, f"{today}微购相册(小旭数码)_cache.json")
+            cache_file = PathManager.get_cache_file_path(today)
             if os.path.exists(cache_file):
                 print(f'找到当天缓存文件: {cache_file}')
                 print(f'找到当天最新文件: {latest_file}')
@@ -666,7 +740,7 @@ class WegoScraper:
             return ""
         
         try:
-            old_data = FileManager.read_json(f'file/{previous_file}')
+            old_data = FileManager.read_json(previous_file)
             if not old_data:
                 return ""
             
@@ -711,8 +785,8 @@ class WegoScraper:
     def save_data(self, data, filename=None):
         today = datetime.now().strftime('%Y%m%d')
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        new_filename = f"file/{today}微购相册(小旭数码).json"
-        cache_filename = f"file/{today}微购相册(小旭数码)_cache.json"
+        new_filename = PathManager.get_json_file_path(today)
+        cache_filename = PathManager.get_cache_file_path(today)
         
         # 如果当天的JSON文件已存在，先保存为缓存文件
         existing_summary = None
@@ -892,9 +966,9 @@ class WegoScraper:
 
 
 class StockNumberComparator:
-    def __init__(self, output_file='file/output.json', input_file='config/input_stock_numbers.txt', config_path='config/config.json'):
-        self.output_file = output_file
-        self.input_file = input_file
+    def __init__(self, output_file=None, input_file=None, config_path=None):
+        self.output_file = output_file or PathManager.get_output_file()
+        self.input_file = input_file or PathManager.get_input_file()
         self.config_manager = ConfigManager(config_path)
         self.excel_file = self._get_excel_file()
 
@@ -1000,8 +1074,9 @@ class StockNumberComparator:
         return [{'货号': num, 'count': count, 'positions': count} 
                 for num, count in seen.items() if count > 1]
 
-    def save_duplicate_log(self, duplicates, log_file='file/duplicate_log.json'):
+    def save_duplicate_log(self, duplicates, log_file=None):
         try:
+            log_file = log_file or PathManager.get_duplicate_log_file()
             log_data = {
                 'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'total_duplicates': len(duplicates),
@@ -1286,7 +1361,7 @@ class StockNumberComparator:
         }
     
     def _save_diff_log(self, date_str, diff_data):
-        diff_log_file = f'file/diff_log_{date_str}.json'
+        diff_log_file = PathManager.get_diff_log_file(date_str)
         existing_data = FileManager.read_json(diff_log_file) if FileManager.file_exists(diff_log_file) else {'logs': []}
         
         if isinstance(existing_data, list):
@@ -1524,8 +1599,8 @@ def main():
             input('按回车键退出...')
             return
         
-        if not FileManager.file_exists('config/cookies.json'):
-            print('⚠️  警告: Cookie文件不存在 (config/cookies.json)')
+        if not FileManager.file_exists(PathManager.get_cookie_file()):
+            print(f'⚠️  警告: Cookie文件不存在 ({PathManager.get_cookie_file()})')
             print('建议先运行"更新Cookie"功能')
             print('='*60)
         
@@ -1610,7 +1685,7 @@ def update_cookie():
                 
                 # 加载现有Cookie
                 existing_cookies = []
-                cookie_file = 'config/cookies.json'
+                cookie_file = PathManager.get_cookie_file()
                 if FileManager.file_exists(cookie_file):
                     existing_cookies = FileManager.read_json(cookie_file)
                     if existing_cookies:
@@ -1676,7 +1751,7 @@ def update_cookie():
                 print(f'✓ Cookie已保存到 {cookie_file}')
                 print(f'✓ 共保存 {len(szwego_cookies)} 个Cookie')
                 
-                config_file = 'config/config.json'
+                config_file = PathManager.get_config_file()
                 if FileManager.file_exists(config_file):
                     config_data = FileManager.read_json(config_file)
                     
