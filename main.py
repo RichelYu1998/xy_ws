@@ -9,7 +9,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-VERSION = "2.5.10"
+VERSION = "2.5.12"
 
 
 try:
@@ -237,6 +237,51 @@ class WegoScraper:
     def get_system_info():
         system = platform.system()
         return {'Windows': 'Windows', 'Darwin': 'Mac', 'Linux': 'Linux'}.get(system, 'Unknown')
+    
+    @staticmethod
+    def get_chrome_path():
+        """获取Chrome浏览器路径，支持Windows、Mac和Linux系统"""
+        system = platform.system()
+        chrome_path = None
+        
+        if system == 'Windows':
+            if os.path.exists(r'C:\Program Files\Google\Chrome\Application\chrome.exe'):
+                chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
+        elif system == 'Darwin':  # Mac系统返回的是'Darwin'，不是'Mac'
+            if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
+                chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        elif system == 'Linux':
+            if os.path.exists('/usr/bin/google-chrome'):
+                chrome_path = '/usr/bin/google-chrome'
+        
+        return chrome_path
+    
+    @staticmethod
+    def get_browser_args():
+        """获取浏览器启动参数，根据系统类型返回不同的参数"""
+        system = platform.system()
+        browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+        
+        if system == 'Windows':
+            browser_args.append('--disable-gpu')
+        elif system == 'Linux':
+            browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
+        
+        return browser_args
+    
+    @staticmethod
+    def get_user_agent():
+        """获取用户代理字符串，根据系统类型返回不同的UA"""
+        system = platform.system()
+        
+        if system == 'Windows':
+            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        elif system == 'Darwin':
+            return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        elif system == 'Linux':
+            return 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        else:
+            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
     @staticmethod
     def clean_product_name(text):
@@ -774,20 +819,8 @@ class WegoScraper:
                 print('正在启动浏览器...')
                 
                 system = self.get_system_info()
-                browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--disable-dev-shm-usage']
-                
-                chrome_path = None
-                if system == 'Windows':
-                    browser_args.append('--disable-gpu')
-                    if os.path.exists(r'C:\Program Files\Google\Chrome\Application\chrome.exe'):
-                        chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
-                elif system == 'Linux':
-                    browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
-                    if os.path.exists('/usr/bin/google-chrome'):
-                        chrome_path = '/usr/bin/google-chrome'
-                elif system == 'Mac':
-                    if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
-                        chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                browser_args = self.get_browser_args()
+                chrome_path = self.get_chrome_path()
                 
                 print(f'检测到系统: {system}')
                 if chrome_path:
@@ -801,7 +834,7 @@ class WegoScraper:
                 context_start = time.time()
                 context = await browser.new_context(
                     viewport={'width': 1920, 'height': 1080},
-                    user_agent=self.config_manager.get_user_agent()
+                    user_agent=self.get_user_agent()
                 )
                 print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
                 
@@ -1555,16 +1588,24 @@ def update_cookie():
         
         async def get_cookie():
             async with async_playwright() as p:
-                browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+                browser_args = WegoScraper.get_browser_args()
+                chrome_path = WegoScraper.get_chrome_path()
+                
+                print(f'检测到系统: {platform.system()}')
+                if chrome_path:
+                    print(f'使用系统Chrome: {chrome_path}')
+                else:
+                    print(f'使用Playwright内置Chromium')
+                
                 browser = await p.chromium.launch(
                     headless=False, 
                     args=browser_args, 
-                    executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                    executable_path=chrome_path
                 )
                 
                 context = await browser.new_context(
                     viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    user_agent=WegoScraper.get_user_agent()
                 )
                 
                 # 加载现有Cookie
