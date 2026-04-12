@@ -407,6 +407,15 @@ pip install openpyxl
 
 ## 更新日志
 
+### v2.5.13 (2026-04-12)
+- **新增PathManager类**：统一管理所有跨系统路径问题
+- **消除硬编码路径**：将所有硬编码的路径替换为PathManager方法调用
+- **优化ConfigManager**：使用PathManager作为默认路径
+- **优化FileManager**：使用PathManager作为默认路径
+- **优化StockNumberComparator**：使用PathManager作为默认路径
+- **提高跨平台兼容性**：确保所有路径在不同系统下都能正常工作
+- **简化代码维护**：统一路径管理，便于后续维护和扩展
+
 ### v2.5.12 (2026-04-12)
 - **优化系统检测逻辑**：统一Windows、Mac和Linux系统的浏览器路径检测
 - **修复Mac系统识别错误**：Mac系统返回'Darwin'，不是'Mac'
