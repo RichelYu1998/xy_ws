@@ -9,7 +9,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-VERSION = "2.5.13"
+VERSION = "2.5.14"
 
 
 try:
@@ -240,11 +240,11 @@ class FileManager:
             today = datetime.now().strftime('%Y%m%d')
             
             # 获取所有符合条件的JSON文件
-            all_json_files = [
-                (os.path.join(directory, file), os.path.getmtime(file_path))
-                for file in os.listdir(directory)
-                if file.endswith('.json') and pattern in file and '_cache' not in file
-            ]
+            all_json_files = []
+            for file in os.listdir(directory):
+                if file.endswith('.json') and pattern in file and '_cache' not in file:
+                    file_path = os.path.join(directory, file)
+                    all_json_files.append((file_path, os.path.getmtime(file_path)))
             
             if len(all_json_files) < 1:
                 print(f'未找到包含"{pattern}"的JSON文件')
@@ -262,11 +262,11 @@ class FileManager:
                 return latest_file, cache_file
             
             # 如果没有缓存文件，检查当天是否有多个文件
-            today_files = [
-                (os.path.join(directory, file), os.path.getmtime(file_path))
-                for file in os.listdir(directory)
-                if file.endswith('.json') and pattern in file and today in file and '_cache' not in file
-            ]
+            today_files = []
+            for file in os.listdir(directory):
+                if file.endswith('.json') and pattern in file and today in file and '_cache' not in file:
+                    file_path = os.path.join(directory, file)
+                    today_files.append((file_path, os.path.getmtime(file_path)))
             
             if len(today_files) >= 2:
                 today_files.sort(key=lambda x: x[1], reverse=True)
@@ -289,8 +289,9 @@ class FileManager:
             return None, None
 
     @staticmethod
-    def list_files(directory, pattern=None):
+    def list_files(directory=None, pattern=None):
         try:
+            directory = directory or PathManager.get_file_dir()
             if not os.path.exists(directory):
                 return []
             
@@ -832,12 +833,12 @@ class WegoScraper:
         # 计算平均每个设备售出均价
         avg_sell_price = total_sell_price / total_count if total_count > 0 else 0.0
         
-        existing_files = sorted(FileManager.list_files('file', '微购相册'), reverse=True)
+        existing_files = sorted(FileManager.list_files(PathManager.get_file_dir(), '微购相册'), reverse=True)
         
         previous_file = None
         for f in existing_files:
-            if f != f"{today}微购相册(小旭数码).json":
-                previous_file = f
+            if f != PathManager.get_json_filename(today):
+                previous_file = os.path.join(PathManager.get_file_dir(), f)
                 break
         
         change_summary = self.analyze_data_changes(data, previous_file)
