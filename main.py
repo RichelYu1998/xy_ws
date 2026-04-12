@@ -9,7 +9,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-VERSION = "2.5.14"
+VERSION = "2.5.16"
 
 
 try:
@@ -149,6 +149,145 @@ class ConfigManager:
 
     def get_user_agent(self):
         return self.config.get('user_agent', WegoScraper.get_user_agent())
+
+
+class CookieValidator:
+    """Cookie验证器 - 提供完整的cookie验证和友好提示"""
+    
+    @staticmethod
+    def validate_and_prompt(cookie_file):
+        """验证cookie并给出友好提示，返回: (is_valid, cookies_or_None)"""
+        print('='*60)
+        print('🔍 验证Cookie状态...')
+        print('='*60)
+        
+        # 1. 检查文件是否存在
+        if not os.path.exists(cookie_file):
+            CookieValidator._show_prompt('Cookie文件不存在', cookie_file, 
+                reasons=['首次使用程序，尚未获取Cookie', 'Cookie文件被误删除', '配置文件路径错误'],
+                solutions=['返回主菜单选择"4. 更新Cookie"', '浏览器将自动打开并跳转到登录页面', '手动登录账号后关闭浏览器', 'Cookie将自动保存并可以正常使用'],
+                tip='Cookie有效期为30天，建议定期更新')
+            return False, None
+        
+        # 2. 检查文件是否可读
+        try:
+            with open(cookie_file, 'r', encoding='utf-8') as f:
+                cookies = json.load(f)
+        except json.JSONDecodeError:
+            CookieValidator._show_prompt('Cookie文件格式错误', cookie_file,
+                reasons=['文件被意外修改', '文件保存时出错', '文件传输过程中损坏'],
+                solutions=['删除当前的Cookie文件', '运行"4. 更新Cookie"功能', '重新获取有效的Cookie'],
+                tip='建议定期备份Cookie文件')
+            return False, None
+        except Exception as e:
+            CookieValidator._show_prompt('Cookie文件读取失败', cookie_file,
+                extra_info=f'❌ 错误信息: {str(e)}',
+                reasons=['文件权限不足', '文件被其他程序占用', '磁盘空间不足'],
+                solutions=['检查文件权限设置', '关闭可能占用文件的其他程序', '检查磁盘空间', '如果问题持续，请重新运行"更新Cookie"功能'])
+            return False, None
+        
+        # 3. 检查cookie是否为空
+        if not cookies:
+            CookieValidator._show_prompt('Cookie为空', cookie_file,
+                reasons=['Cookie文件被清空', '获取Cookie时出错', 'Cookie保存失败'],
+                solutions=['运行"4. 更新Cookie"功能', '重新登录账号', '确认Cookie已正确保存'])
+            return False, None
+        
+        print(f'✓ Cookie文件存在，共 {len(cookies)} 个Cookie')
+        
+        # 4. 检查是否存在token
+        token_cookie = next((c for c in cookies if 'token' in c.get('name', '').lower()), None)
+        if not token_cookie:
+            CookieValidator._show_prompt('未找到Token Cookie', cookie_file,
+                reasons=['未登录或登录已失效', 'Token Cookie被清除', 'Cookie保存不完整'],
+                solutions=['运行"4. 更新Cookie"功能', '确保使用正确的账号登录', '登录成功后再关闭浏览器'],
+                tip='Token是保持登录状态的关键Cookie')
+            return False, None
+        
+        print(f'✓ 找到Token: {token_cookie["name"]}')
+        
+        # 5. 检查token是否过期
+        expires = token_cookie.get('expires')
+        if expires and expires < time.time():
+            expired_time = datetime.fromtimestamp(expires).strftime('%Y-%m-%d %H:%M:%S')
+            current_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            days_expired = int((time.time() - expires) / 86400)
+            CookieValidator._show_prompt('Token已过期', '',
+                extra_info=f'📅 过期时间: {expired_time}\n📅 当前时间: {current_time_str}\n⏱️  已过期: {days_expired}天',
+                reasons=['无法获取商品数据', '登录状态失效', '需要重新登录'],
+                solutions=['选择"4. 更新Cookie"功能', '使用您的账号重新登录', '更新完成后即可继续使用'],
+                tip='建议在Cookie过期前一周进行更新',
+                impact=True)
+            return False, None
+        
+        expires_time = datetime.fromtimestamp(expires).strftime('%Y-%m-%d %H:%M:%S') if expires else '未知'
+        print(f'✓ Token有效期至: {expires_time}')
+        
+        # 6. 检查token值是否有效
+        token_value = token_cookie.get('value', '')
+        if not token_value or len(token_value) < 10:
+            CookieValidator._show_prompt('Token值无效', cookie_file,
+                reasons=['Token值为空', 'Token值过短或格式错误', 'Token被意外修改'],
+                solutions=['运行"4. 更新Cookie"功能', '重新登录账号', '确认Token已正确保存'],
+                tip='正常的Token应该是一长串加密字符串')
+            return False, None
+        
+        print(f'✓ Token值有效 (长度: {len(token_value)} 字符)')
+        
+        # 7. 检查cookie是否即将过期（7天内）
+        if expires:
+            days_until_expiry = int((expires - time.time()) / 86400)
+            if days_until_expiry <= 7:
+                CookieValidator._show_expiry_warning(days_until_expiry)
+        
+        print('='*60)
+        print('✅ Cookie验证通过！')
+        print('='*60)
+        
+        return True, cookies
+    
+    @staticmethod
+    def _show_prompt(title, file_path, extra_info=None, reasons=None, solutions=None, tip=None, impact=False):
+        """显示统一的友好提示"""
+        print('\n' + '─'*60)
+        print(f'⚠️  检测到{title}')
+        print('─'*60)
+        if file_path:
+            print(f'📂 文件位置: {file_path}')
+        if extra_info:
+            print(extra_info)
+        print()
+        if reasons:
+            print('📝 可能原因:' if not impact else '📝 影响范围:')
+            for reason in reasons:
+                print(f'   • {reason}')
+            print()
+        if solutions:
+            print('✅ 解决方案:')
+            for i, solution in enumerate(solutions, 1):
+                print(f'   {i}. {solution}')
+            print()
+        if tip:
+            print(f'💡 提示: {tip}')
+        print('─'*60)
+    
+    @staticmethod
+    def _show_expiry_warning(days_until_expiry):
+        """显示即将过期的警告"""
+        print('\n' + '─'*60)
+        print('⏰  Cookie即将过期提醒')
+        print('─'*60)
+        print(f'⏱️  剩余有效期: {days_until_expiry}天')
+        print()
+        if days_until_expiry <= 3:
+            print('🔴 状态: 即将过期（3天内）')
+            print('⚠️  建议: 立即更新Cookie')
+        else:
+            print('🟡 状态: 即将过期（7天内）')
+            print('💡 建议: 近期更新Cookie')
+        print()
+        print('✅ 操作: 返回主菜单选择"4. 更新Cookie"')
+        print('─'*60)
 
 
 class FileManager:
@@ -1600,9 +1739,12 @@ def main():
             input('按回车键退出...')
             return
         
-        if not FileManager.file_exists(PathManager.get_cookie_file()):
-            print(f'⚠️  警告: Cookie文件不存在 ({PathManager.get_cookie_file()})')
-            print('建议先运行"更新Cookie"功能')
+        # 检查Cookie状态
+        cookie_file = PathManager.get_cookie_file()
+        is_valid, _ = CookieValidator.validate_and_prompt(cookie_file)
+        
+        if not is_valid:
+            print('\n⚠️  Cookie状态异常，建议先更新Cookie')
             print('='*60)
         
         print('请选择功能：')
@@ -1638,6 +1780,17 @@ def main():
 
 def run_scraper():
     try:
+        # 验证Cookie
+        cookie_file = PathManager.get_cookie_file()
+        is_valid, cookies = CookieValidator.validate_and_prompt(cookie_file)
+        
+        if not is_valid:
+            print('\n❌ Cookie验证失败，无法运行爬虫')
+            print('请先运行"更新Cookie"功能')
+            input('按回车键继续...')
+            return
+        
+        # Cookie验证通过，继续运行爬虫
         scraper = WegoScraper()
         asyncio.run(scraper.run())
     except Exception as e:
