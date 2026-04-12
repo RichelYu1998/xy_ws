@@ -9,9 +9,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-import current_time
-
-VERSION = "2.5.9"
+VERSION = "2.5.10"
 
 
 try:
