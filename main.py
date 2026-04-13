@@ -9,7 +9,12 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-VERSION = "2.5.16"
+
+def print_separator(char='=', length=60):
+    """打印分隔线"""
+    print(char * length)
+
+VERSION = "2.5.17"
 
 
 try:
@@ -157,9 +162,9 @@ class CookieValidator:
     @staticmethod
     def validate_and_prompt(cookie_file):
         """验证cookie并给出友好提示，返回: (is_valid, cookies_or_None)"""
-        print('='*60)
+        print_separator()
         print('🔍 验证Cookie状态...')
-        print('='*60)
+        print_separator()
         
         # 1. 检查文件是否存在
         if not os.path.exists(cookie_file):
@@ -240,9 +245,9 @@ class CookieValidator:
             if days_until_expiry <= 7:
                 CookieValidator._show_expiry_warning(days_until_expiry)
         
-        print('='*60)
+        print_separator()
         print('✅ Cookie验证通过！')
-        print('='*60)
+        print_separator()
         
         return True, cookies
     
@@ -622,6 +627,30 @@ class WegoScraper:
             
             price = extract_price(element_text)
             
+            def extract_cost_price(text, html):
+                cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', text)
+                if cost_match:
+                    cost_value = int(cost_match.group(1).replace(',', ''))
+                    if 100 <= cost_value <= 50000:
+                        return '¥' + cost_match.group(1)
+                
+                if html:
+                    html_cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', html)
+                    if html_cost_match:
+                        cost_value = int(html_cost_match.group(1).replace(',', ''))
+                        if 100 <= cost_value <= 50000:
+                            return '¥' + html_cost_match.group(1)
+                    
+                    html_cost_match2 = re.search(r'拿货价[：:]\s*([\d,]+)', html)
+                    if html_cost_match2:
+                        cost_value = int(html_cost_match2.group(1).replace(',', ''))
+                        if 100 <= cost_value <= 50000:
+                            return '¥' + html_cost_match2.group(1)
+                
+                return None
+            
+            cost_price = extract_cost_price(element_text, html_content)
+            
             employee_match = re.search(r'员工[：:]\s*(.+)', element_text)
             employee = employee_match.group(1).strip() if employee_match else None
             
@@ -658,6 +687,7 @@ class WegoScraper:
                 return {
                     '商品名称': name,
                     '售价': price if price else '',
+                    '拿货价': cost_price if cost_price else '',
                     '货号': stock_number,
                     '备注': remark if remark else '',
                     '员工': employee if employee else ''
@@ -675,7 +705,7 @@ class WegoScraper:
             try:
                 element_text = await asyncio.wait_for(element.text_content(), timeout=2.0)
                 html_content = await asyncio.wait_for(element.inner_html(), timeout=2.0)
-                
+
                 if not element_text or not element_text.strip():
                     continue
                 if '试试批量' in element_text or '暂无搭配' in element_text:
@@ -684,21 +714,21 @@ class WegoScraper:
                     continue
                 if len(element_text.strip()) < 30:
                     continue
-                
+
                 elements_data.append((element_text, html_content))
             except asyncio.TimeoutError:
                 continue
             except Exception as e:
                 print(f'收集元素 {i} 数据时出错: {e}')
-        
+
         print(f'收集了 {len(elements_data)} 个有效商品数据')
-        
+
         products = []
         seen_products = set()
-        
+
         with ThreadPoolExecutor(max_workers=15) as executor:
             futures = [executor.submit(self.extract_product_info, text, html) for text, html in elements_data]
-            
+
             for i, future in enumerate(futures):
                 try:
                     result = future.result(timeout=2)
@@ -843,6 +873,159 @@ class WegoScraper:
                 print('警告: 未找到任何商品项，可能页面加载失败或选择器不正确')
                 print('建议检查页面URL和Cookie是否有效')
             
+            # 模拟点击"f12 g9"这个class类来显示详细信息
+            print('模拟点击"f12 g9"这个class类来显示详细信息...')
+            try:
+                # 滚动到页面中间
+                await page.evaluate('window.scrollTo(0, document.body.scrollHeight / 2)')
+                await asyncio.sleep(1)
+                
+                # 使用JavaScript点击所有"f12 g9"元素
+                f12_g9_result = await page.evaluate('''
+                    () => {
+                        // 查找所有包含f12和g9的元素
+                        const f12Elements = document.querySelectorAll('.f12.g9');
+                        let count = 0;
+                        f12Elements.forEach((el, i) => {
+                            console.log('Clicking f12 g9 ' + count + ': ' + el.className);
+                            el.click();
+                            count++;
+                        });
+                        return count;
+                    }
+                ''')
+                print(f'点击了 {f12_g9_result} 个f12 g9元素')
+                await asyncio.sleep(3)  # 等待详细信息加载完成
+            except Exception as e:
+                print(f'点击f12 g9元素时出错: {e}')
+            
+            # 模拟点击"wego-iconfont-s icon-suo"这个class类来解锁拿货价
+            print('模拟点击"wego-iconfont-s icon-suo"这个class类来解锁拿货价...')
+            try:
+                # 滚动到页面中间
+                await page.evaluate('window.scrollTo(0, document.body.scrollHeight / 2)')
+                await asyncio.sleep(1)
+                
+                # 先遍历统计有多少个锁
+                print('统计页面中锁图标的数量...')
+                lock_count = await page.evaluate('''
+                    () => {
+                        const allElements = document.querySelectorAll('[class*="icon-suo"]');
+                        let count = 0;
+                        allElements.forEach((el, i) => {
+                            if (!el.classList.contains('icon-kaisuo')) {
+                                count++;
+                            }
+                        });
+                        return count;
+                    }
+                ''')
+                print(f'页面中共有 {lock_count} 个锁图标')
+                
+                # 根据锁的数量动态调整每批点击的次数
+                if lock_count <= 50:
+                    batch_size = 10  # 锁少时，每批点击10个
+                elif lock_count <= 100:
+                    batch_size = 20  # 锁中等时，每批点击20个
+                elif lock_count <= 200:
+                    batch_size = 30  # 锁较多时，每批点击30个
+                else:
+                    batch_size = 40  # 锁很多时，每批点击40个
+                
+                print(f'每批点击 {batch_size} 个锁图标')
+                
+                # 使用JavaScript分批点击锁图标
+                print('使用JavaScript分批点击锁图标...')
+                total_clicked = 0
+                batch_num = 0
+                
+                while total_clicked < lock_count:
+                    batch_result = await page.evaluate(f'''
+                        () => {{
+                            // 查找所有包含icon-suo但不包含icon-kaisuo的元素
+                            const allElements = document.querySelectorAll('[class*="icon-suo"]');
+                            let count = 0;
+                            let batchCount = 0;
+                            
+                            allElements.forEach((el, i) => {{
+                                // 排除已解锁的图标
+                                if (!el.classList.contains('icon-kaisuo')) {{
+                                    if (count >= {batch_size}) {{
+                                        return; // 只点击一批
+                                    }}
+                                    console.log('Clicking lock ' + count + ': ' + el.className);
+                                    el.click();
+                                    count++;
+                                    batchCount++;
+                                }}
+                            }});
+                            
+                            return batchCount;
+                        }}
+                    ''')
+                    
+                    if batch_result == 0:
+                        print(f'没有更多锁图标需要点击，总共点击了 {total_clicked} 个')
+                        break
+                    
+                    total_clicked += batch_result
+                    batch_num += 1
+                    print(f'第 {batch_num} 批：已点击第 {total_clicked} 个锁图标（本批: {batch_result} 个）')
+                    await asyncio.sleep(1)  # 每批点击后等待1秒
+                
+                print(f'总共点击了 {total_clicked} 个锁图标')
+                await asyncio.sleep(3)  # 等待拿货价信息加载完成
+                
+                # 检查页面中是否有拿货价信息
+                print('检查页面中是否有拿货价信息...')
+                page_content = await page.content()
+                if '拿货价' in page_content:
+                    print('✓ 页面中包含"拿货价"关键字')
+                    # 查找所有拿货价信息
+                    cost_matches = re.findall(r'拿货价[：:]\s*¥?\s*([\d,]+)', page_content)
+                    print(f'找到 {len(cost_matches)} 个拿货价: {cost_matches[:10]}')
+                else:
+                    print('✗ 页面中不包含"拿货价"关键字')
+                    
+                    # 检查第一个商品的HTML内容
+                    try:
+                        if item_elements:
+                            first_element = item_elements[0]
+                            first_html = await first_element.inner_html()
+                            print(f'\n第一个商品的HTML内容（前500字符）:')
+                            print(first_html[:500])
+                    except Exception as e:
+                        print(f'获取第一个商品HTML时出错: {e}')
+            except Exception as e:
+                print(f'点击锁图标时出错: {e}')
+            
+            # 重新获取商品元素，以获取包含拿货价的最新HTML
+            print('重新获取商品元素，以获取包含拿货价的最新HTML...')
+            await asyncio.sleep(2)
+            
+            item_selectors = [
+                '.normal_item-module_normalItemContent_mrLg3',
+                '.normal_item-module_timeline_common_item_eMbm2',
+            ]
+            
+            item_elements = []
+            seen_elements = set()
+            for selector in item_selectors:
+                try:
+                    elements = await page.query_selector_all(selector)
+                    if elements:
+                        print(f'重新获取：使用选择器 {selector} 找到 {len(elements)} 个元素')
+                        for element in elements:
+                            element_id = await element.get_attribute('data-id') or await element.text_content()
+                            if element_id not in seen_elements:
+                                seen_elements.add(element_id)
+                                item_elements.append(element)
+                except Exception as e:
+                    print(f'重新获取：使用选择器 {selector} 时出错: {e}')
+                    continue
+            
+            print(f'重新获取：总共找到 {len(item_elements)} 个商品项')
+            
             process_start = time.time()
             products = await self.process_elements_concurrently(page, item_elements)
             print(f'商品处理耗时: {time.time() - process_start:.2f}秒')
@@ -951,14 +1134,25 @@ class WegoScraper:
         # 计算累计值
         total_sell_price = 0.0
         total_platform_fee = 0.0
+        total_cost_price = 0.0  # 累计成本
         
         for product in data:
             sell_price = 0.0
+            cost_price = 0.0
             
             if '售价' in product:
                 try:
                     sell_price = float(str(product['售价']).replace('¥', '').replace(',', '').strip())
                     total_sell_price += sell_price
+                except (ValueError, TypeError):
+                    pass
+            
+            if '拿货价' in product:
+                try:
+                    cost_price_str = str(product['拿货价']).replace('¥', '').replace(',', '').strip()
+                    if cost_price_str:  # 确保不是空字符串
+                        cost_price = float(cost_price_str)
+                        total_cost_price += cost_price
                 except (ValueError, TypeError):
                     pass
             
@@ -971,6 +1165,18 @@ class WegoScraper:
         
         # 计算平均每个设备售出均价
         avg_sell_price = total_sell_price / total_count if total_count > 0 else 0.0
+        
+        # 计算预计毛利
+        estimated_gross_profit = total_sell_price - total_cost_price
+        
+        # 计算毛利率
+        gross_profit_margin = estimated_gross_profit / total_cost_price if total_cost_price > 0 else 0.0
+        
+        # 计算所有设备卖到闲鱼平台的毛利
+        idle_fish_gross_profit = total_sell_price - total_platform_fee
+        
+        # 计算单个设备的平均回收价格（累计成本 / 商品数量）
+        avg_cost_price = total_cost_price / total_count if total_count > 0 else 0.0
         
         existing_files = sorted(FileManager.list_files(PathManager.get_file_dir(), '微购相册'), reverse=True)
         
@@ -987,10 +1193,15 @@ class WegoScraper:
             "时间戳": current_time,
             "成功获取": f"{total_count} 个商品",
             "商品列表": data,
-            "统计": f"共计获取到 {total_count} 个商品",
-            "预计售出价格累计": f"{total_sell_price:,.2f}",
+            "单个设备的平均回收价格": f"{avg_cost_price:,.2f}",
             "平均每个设备售出均价": f"{avg_sell_price:,.2f}",
-            "闲鱼平台手续费累计": f"{total_platform_fee:,.2f}"
+            "累计成本": f"{total_cost_price:,.2f}",
+            "预计毛利": f"{estimated_gross_profit:,.2f}",
+            "毛利率": f"{gross_profit_margin:.2%}",
+            "预计售出价格累计": f"{total_sell_price:,.2f}",
+            "闲鱼平台手续费累计": f"{total_platform_fee:,.2f}",
+            "所有设备卖到闲鱼平台的毛利": f"{idle_fish_gross_profit:,.2f}",
+            "统计": f"共计获取到 {total_count} 个商品"
         }
         
         # 保留现有的"小计"字段（如果有）
@@ -1243,9 +1454,9 @@ class StockNumberComparator:
         如果使用缓存文件，对比完成后会删除缓存文件
         """
         try:
-            print('='*60)
+            print_separator()
             print('当天JSON文件对比工具')
-            print('='*60)
+            print_separator()
             
             # 获取用于对比的两个JSON文件
             latest_json_file, second_latest_json_file = FileManager.get_today_json_files()
@@ -1363,9 +1574,9 @@ class StockNumberComparator:
             print(f'当前共有 {len(latest_json_data["小计"])} 条对比记录')
             
             # 打印对比结果
-            print('\n' + '='*60)
+            print_separator()
             print('对比结果')
-            print('='*60)
+            print_separator()
             print(f'对比文件: {os.path.basename(second_latest_json_file)} -> {os.path.basename(latest_json_file)}')
             print(f'新增商品数: {len(added)}')
             print(f'删除商品数: {len(removed)}')
@@ -1404,9 +1615,9 @@ class StockNumberComparator:
 
     def compare_excel_with_json(self):
         try:
-            print('='*60)
+            print_separator()
             print('Excel与JSON数据对比工具')
-            print('='*60)
+            print_separator()
             
             latest_json_file = FileManager.get_latest_json_file()
             if not latest_json_file:
@@ -1728,24 +1939,23 @@ class StockNumberComparator:
 
 def main():
     while True:
-        print('='*60)
+        print_separator()
         print(f'Szwego商品爬虫和货号对比工具 - v{VERSION}')
-        print('='*60)
+        print_separator()
         
         if not FileManager.file_exists('config/config.json'):
             print('⚠️  警告: 配置文件不存在 (config/config.json)')
             print('请先配置 config/config.json 文件')
-            print('='*60)
+            print_separator()
             input('按回车键退出...')
             return
         
-        # 检查Cookie状态
         cookie_file = PathManager.get_cookie_file()
         is_valid, _ = CookieValidator.validate_and_prompt(cookie_file)
         
         if not is_valid:
             print('\n⚠️  Cookie状态异常，建议先更新Cookie')
-            print('='*60)
+            print_separator()
         
         print('请选择功能：')
         print('1. 运行爬虫（自动对比当天JSON文件）')
@@ -1753,7 +1963,7 @@ def main():
         print('3. Excel与JSON对比（自动保存差异日志）')
         print('4. 更新Cookie（自动更新）')
         print('0. 退出')
-        print('='*60)
+        print_separator()
         
         try:
             choice = input('请输入选项 (0-4): ').strip()
@@ -1779,8 +1989,8 @@ def main():
 
 
 def run_scraper():
+    """运行爬虫"""
     try:
-        # 验证Cookie
         cookie_file = PathManager.get_cookie_file()
         is_valid, cookies = CookieValidator.validate_and_prompt(cookie_file)
         
@@ -1790,7 +2000,6 @@ def run_scraper():
             input('按回车键继续...')
             return
         
-        # Cookie验证通过，继续运行爬虫
         scraper = WegoScraper()
         asyncio.run(scraper.run())
     except Exception as e:
@@ -1802,14 +2011,14 @@ def run_scraper():
 
 def update_cookie():
     """自动更新Cookie功能"""
-    print('='*60)
+    print_separator()
     print('Cookie自动更新工具')
-    print('='*60)
+    print_separator()
     print('说明：')
     print('  - 自动打开浏览器并获取最新Cookie')
     print('  - 用户手动登录后关闭浏览器')
     print('  - 完成后自动保存到配置文件')
-    print('='*60)
+    print_separator()
     
     try:
         from playwright.async_api import async_playwright
@@ -1859,15 +2068,15 @@ def update_cookie():
                 except Exception as e:
                     print(f'页面加载超时，继续获取Cookie: {e}')
                 
-                print('='*60)
+                print_separator()
                 print('浏览器已打开')
                 print('请在浏览器中完成以下操作：')
                 print('1. 如果需要登录，请完成登录')
                 print('2. 登录后刷新一下页面')
                 print('3. 程序会自动检测登录状态并关闭浏览器')
-                print('='*60)
+                print_separator()
                 print('自动检测登录状态...')
-                print('='*60)
+                print_separator()
                 
                 # 自动检测登录状态
                 start_time = time.time()
@@ -1909,34 +2118,23 @@ def update_cookie():
                 if FileManager.file_exists(config_file):
                     config_data = FileManager.read_json(config_file)
                     
-                    cookie_strings = []
-                    for cookie in szwego_cookies:
-                        cookie_strings.append(f'{cookie["name"]}={cookie["value"]}')
-                    
-                    cookie_header = '; '.join(cookie_strings)
+                    cookie_header = '; '.join([f'{c["name"]}={c["value"]}' for c in szwego_cookies])
                     
                     if 'headers' not in config_data:
                         config_data['headers'] = {}
                     config_data['headers']['cookie'] = cookie_header
-                    
                     config_data['cookies'] = szwego_cookies
                     
                     FileManager.write_json(config_file, config_data)
                     print('✓ config.json中的Cookie已更新')
                 
-                # 快速关闭浏览器，避免延迟
-                try:
-                    await browser.close()
-                except:
-                    pass
+                await browser.close()
                 print('✓ 浏览器已自动关闭')
                 
                 return True
         
-        # 运行异步函数
-        result = asyncio.run(get_cookie())
-        if result:
-            print('\n✓ Cookie更新完成')
+        asyncio.run(get_cookie())
+        print('\n✓ Cookie更新完成')
         
     except Exception as e:
         print(f'✗ Cookie更新失败: {e}')
