@@ -14,7 +14,7 @@ def print_separator(char='=', length=60):
     """打印分隔线"""
     print(char * length)
 
-VERSION = "2.5.19"
+VERSION = "2.5.20"
 
 
 try:
