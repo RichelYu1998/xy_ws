@@ -498,6 +498,11 @@ pip install openpyxl
 
 ## 更新日志
 
+### v2.5.19 (2026-04-15)
+- **优化macOS浏览器检测**：添加对 ~/Library/Caches/ms-playwright 目录的检测
+- **支持Google Chrome for Testing.app**：检测macOS特有的浏览器应用格式
+- **完善跨平台浏览器检测**：支持Linux、macOS、Windows各平台的浏览器目录
+
 ### v2.5.18 (2026-04-15)
 - **新增环境检测功能**：为run.bat和run.sh脚本添加完整的环境检测系统
 - **智能Python检测**：支持检测py、python3、python命令，适配不同系统环境

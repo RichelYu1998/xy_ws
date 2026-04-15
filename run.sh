@@ -139,8 +139,11 @@ setup_venv() {
     fi
     
     if command -v playwright &> /dev/null; then
-        PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
-        if [ -d "$PLAYWRIGHT_BROWSERS_PATH/chromium-"* ] || [ -d "$PLAYWRIGHT_BROWSERS_PATH/chrome-for-testing"* ]; then
+        if [ -d "$HOME/.cache/ms-playwright/chromium-"* ] || [ -d "$HOME/.cache/ms-playwright/chrome-for-testing"* ]; then
+            log_info "Playwright浏览器已存在，跳过下载"
+        elif [ -d "$HOME/Library/Caches/ms-playwright/chromium-"* ] || [ -d "$HOME/Library/Caches/ms-playwright/chrome-for-testing"* ]; then
+            log_info "Playwright浏览器已存在，跳过下载"
+        elif [ -d "$HOME/Library/Caches/ms-playwright/Google Chrome for Testing.app" ]; then
             log_info "Playwright浏览器已存在，跳过下载"
         else
             log_info "正在安装Playwright浏览器..."
