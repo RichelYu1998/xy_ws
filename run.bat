@@ -158,8 +158,15 @@ if exist "requirements.txt" (
 
 where playwright >nul 2>&1
 if %errorlevel% equ 0 (
-    call :log_info "正在安装Playwright浏览器..."
-    playwright install chromium
+    set "PLAYWRIGHT_BROWSERS_PATH=%LOCALAPPDATA%\ms-playwright"
+    if exist "%PLAYWRIGHT_BROWSERS_PATH%\chromium*" (
+        call :log_info "Playwright浏览器已存在，跳过下载"
+    ) else if exist "%PLAYWRIGHT_BROWSERS_PATH%\chrome-for-testing*" (
+        call :log_info "Playwright浏览器已存在，跳过下载"
+    ) else (
+        call :log_info "正在安装Playwright浏览器..."
+        playwright install chromium
+    )
 )
 
 call :log_info "虚拟环境设置完成"
