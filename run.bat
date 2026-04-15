@@ -159,9 +159,8 @@ if exist "requirements.txt" (
 where playwright >nul 2>&1
 if %errorlevel% equ 0 (
     set "PLAYWRIGHT_BROWSERS_PATH=%LOCALAPPDATA%\ms-playwright"
-    if exist "%PLAYWRIGHT_BROWSERS_PATH%\chromium*" (
-        call :log_info "Playwright浏览器已存在，跳过下载"
-    ) else if exist "%PLAYWRIGHT_BROWSERS_PATH%\chrome-for-testing*" (
+    dir /b "%PLAYWRIGHT_BROWSERS_PATH%" 2>nul | findstr /i "chromium chrome-for-testing" >nul
+    if %errorlevel% equ 0 (
         call :log_info "Playwright浏览器已存在，跳过下载"
     ) else (
         call :log_info "正在安装Playwright浏览器..."

@@ -498,6 +498,10 @@ pip install openpyxl
 
 ## 更新日志
 
+### v2.5.20 (2026-04-15)
+- **修复Windows浏览器检测**：使用dir+findstr替代if exist通配符，支持Windows正确检测浏览器目录
+- **优化跨平台浏览器检测**：统一Windows、macOS、Linux平台的浏览器检测逻辑
+
 ### v2.5.19 (2026-04-15)
 - **优化macOS浏览器检测**：添加对 ~/Library/Caches/ms-playwright 目录的检测
 - **支持Google Chrome for Testing.app**：检测macOS特有的浏览器应用格式
