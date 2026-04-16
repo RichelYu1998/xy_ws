@@ -628,23 +628,36 @@ class WegoScraper:
             price = extract_price(element_text)
             
             def extract_cost_price(text, html):
+                # 只匹配真正包含"拿货价"关键字的数据
+                # 移除价格范围限制，接受任何合理的拿货价
+                
+                # 模式1: 拿货价：¥1234 或 拿货价:1234
                 cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', text)
                 if cost_match:
                     cost_value = int(cost_match.group(1).replace(',', ''))
-                    if 100 <= cost_value <= 50000:
+                    if cost_value > 50:  # 拿货价至少要大于50元
                         return '¥' + cost_match.group(1)
                 
+                # 模式2: 带空格的情况 拿货价 ：1234
+                cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', text)
+                if cost_match2:
+                    cost_value = int(cost_match2.group(1).replace(',', ''))
+                    if cost_value > 50:
+                        return '¥' + cost_match2.group(1)
+                
+                # 模式3: HTML内容中的拿货价
                 if html:
                     html_cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', html)
                     if html_cost_match:
                         cost_value = int(html_cost_match.group(1).replace(',', ''))
-                        if 100 <= cost_value <= 50000:
+                        if cost_value > 50:
                             return '¥' + html_cost_match.group(1)
                     
-                    html_cost_match2 = re.search(r'拿货价[：:]\s*([\d,]+)', html)
+                    # 模式4: HTML中带空格的情况
+                    html_cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', html)
                     if html_cost_match2:
                         cost_value = int(html_cost_match2.group(1).replace(',', ''))
-                        if 100 <= cost_value <= 50000:
+                        if cost_value > 50:
                             return '¥' + html_cost_match2.group(1)
                 
                 return None
@@ -705,6 +718,27 @@ class WegoScraper:
             try:
                 element_text = await asyncio.wait_for(element.text_content(), timeout=2.0)
                 html_content = await asyncio.wait_for(element.inner_html(), timeout=2.0)
+                
+                # 尝试获取商品ID - 尝试多种属性
+                element_id = None
+                try:
+                    element_id = await element.get_attribute('data-id')
+                except:
+                    pass
+                if not element_id:
+                    try:
+                        href = await element.get_attribute('href')
+                        if href:
+                            href_match = re.search(r'/(\d+)(?:\?|$)', href)
+                            if href_match:
+                                element_id = href_match.group(1)
+                    except:
+                        pass
+                if not element_id:
+                    try:
+                        element_id = await element.get_attribute('data-goods-id')
+                    except:
+                        pass
 
                 if not element_text or not element_text.strip():
                     continue
@@ -715,7 +749,7 @@ class WegoScraper:
                 if len(element_text.strip()) < 30:
                     continue
 
-                elements_data.append((element_text, html_content))
+                elements_data.append((element_text, html_content, element_id))
             except asyncio.TimeoutError:
                 continue
             except Exception as e:
@@ -723,11 +757,13 @@ class WegoScraper:
 
         print(f'收集了 {len(elements_data)} 个有效商品数据')
 
+        # 第一轮：提取商品基本信息
         products = []
         seen_products = set()
+        products_need_api = []  # 需要通过API获取拿货价的商品
 
         with ThreadPoolExecutor(max_workers=15) as executor:
-            futures = [executor.submit(self.extract_product_info, text, html) for text, html in elements_data]
+            futures = [executor.submit(self.extract_product_info, text, html) for text, html, _ in elements_data]
 
             for i, future in enumerate(futures):
                 try:
@@ -736,16 +772,177 @@ class WegoScraper:
                         product_key = result['货号'] or result['商品名称']
                         if product_key not in seen_products:
                             seen_products.add(product_key)
-                            products.append(result)
                             
-                            if len(products) <= 10:
-                                print(f'商品 {len(products)}: {result["商品名称"][:50]}...')
+                            # 如果没有拿货价，记录下来后面用API获取
+                            if not result.get('拿货价'):
+                                products_need_api.append((result, elements_data[i][2]))  # result和element_id
+                            else:
+                                products.append(result)
+                            
+                            if len(products) + len(products_need_api) <= 10:
+                                print(f'商品 {len(products) + len(products_need_api)}: {result["商品名称"][:50]}...')
                                 print(f'  售价: {result["售价"]}')
-                                print(f'  货号: {result["货号"]}\n')
+                                print(f'  拿货价: {result["拿货价"]}')
+                                print(f'  货号: {result["货号"]}')
+                                print(f'  data-id: {elements_data[i][2]}\n')
                 except Exception:
                     pass
         
+        # 第二轮：通过API获取缺失拿货价的商品
+        if products_need_api:
+            print(f'\n通过API获取缺失的拿货价，需要处理 {len(products_need_api)} 个商品...')
+            await self.fetch_cost_prices_via_api(page, products_need_api, products)
+        
         return products
+    
+    async def fetch_cost_prices_via_api(self, page, products_need_api, products):
+        """通过API获取缺失拿货价的商品详情"""
+        print(f'开始通过API获取 {len(products_need_api)} 个商品的拿货价...')
+        
+        import os
+        cookie_file = os.path.join(os.path.dirname(__file__), 'config', 'cookies.json')
+        cookies = []
+        if os.path.exists(cookie_file):
+            try:
+                with open(cookie_file, 'r', encoding='utf-8') as f:
+                    cookies = json.load(f)
+                print(f'读取到 {len(cookies)} 个cookie')
+            except Exception as e:
+                print(f'读取cookie失败: {e}')
+                return
+        
+        cookie_str = '; '.join([f'{c["name"]}={c["value"]}' for c in cookies])
+        
+        current_url = page.url        # 尝试从URL中提取albumId（可能在query参数或hash中）
+        album_id_match = re.search(r'albumId=([^&/]+)|/shop_detail/([^/?#]+)', current_url)
+        if album_id_match:
+            album_id = album_id_match.group(1) or album_id_match.group(2)
+        else:
+            album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
+        print(f'Album ID: {album_id}')
+        
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+            'x-wg-language': 'zh'
+        }
+        
+        # 使用正确的API获取商品列表
+        api_url = 'https://www.szwego.com/album/personal/all'
+        
+        all_goods_data = []
+        
+        # 获取所有商品（处理分页）
+        page_timestamp = ''
+        for page_num in range(20):
+            params = {
+                'albumId': album_id,
+                'searchValue': '',
+                'searchImg': '',
+                'startDate': '',
+                'endDate': '',
+                'sourceId': ''
+            }
+            # 只有第一页不需要timestamp，后续需要
+            if page_timestamp:
+                params['timestamp'] = page_timestamp
+            
+            try:
+                # 使用带cookies的请求
+                # 在headers中添加Cookie
+                headers_with_cookie = dict(headers)
+                headers_with_cookie['Cookie'] = cookie_str
+                response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
+                if response.status == 200:
+                    text = await response.text()
+                    try:
+                        data = json.loads(text)
+                        result = data.get('result', {})
+                        items = result.get('items', [])
+                        pagination = result.get('pagination', {})
+                        
+                        if items:
+                            all_goods_data.extend(items)
+                            print(f'  第{page_num+1}页: 获取 {len(items)} 个商品')
+                            
+                            # 调试：打印第一个商品的title和goodsNum
+                            if page_num == 0 and items:
+                                print(f'    调试: 第一个商品 title={items[0].get("title", "")[:30]}... goodsNum={items[0].get("goodsNum", "")}')
+                            
+                            # 检查是否还有更多 - 使用 isLoadMore 判断
+                            is_load_more = pagination.get('isLoadMore', False)
+                            page_timestamp = str(pagination.get('pageTimestamp', ''))
+                            
+                            if is_load_more and page_timestamp:
+                                params['timestamp'] = page_timestamp
+                            else:
+                                break
+                        else:
+                            break
+                    except Exception as e:
+                        print(f'  解析失败: {e}')
+                        break
+                else:
+                    print(f'  请求失败: {response.status}')
+                    break
+            except Exception as e:
+                print(f'  请求异常: {e}')
+                break
+        
+        print(f'共获取 {len(all_goods_data)} 个商品数据')
+        
+        # 调试：打印API获取到的goodsNum列表
+        api_goods_nums = [item.get('goodsNum', '') for item in all_goods_data if item.get('goodsNum')]
+        print(f'  调试: API goodsNums: {api_goods_nums[:10]}')
+        
+        # 调试：打印products_need_api中的货号和名称
+        print(f'  调试: 需要API的商品数: {len(products_need_api)}')
+        if products_need_api:
+            sample = products_need_api[0][0]
+            print(f'  调试: 第一个商品的货号={sample.get("货号", "")}, 名称={sample.get("商品名称", "")[:30]}...')
+        
+        # 构建商品映射
+        goods_by_num = {}
+        goods_by_title = {}
+        for item in all_goods_data:
+            goods_num = item.get('goodsNum', '')
+            title = item.get('title', '')
+            if goods_num:
+                goods_by_num[goods_num] = item
+            if title:
+                goods_by_title[title] = item
+        
+        # 匹配并更新拿货价
+        success_count = 0
+        for product, element_id in products_need_api:
+            goods_num = product.get('货号', '')
+            title = product.get('商品名称', '')
+            
+            matched_item = None
+            if goods_num and goods_num in goods_by_num:
+                matched_item = goods_by_num[goods_num]
+            elif title and title in goods_by_title:
+                matched_item = goods_by_title[title]
+            
+            if matched_item:
+                price_arr = matched_item.get('priceArr', [])
+                cost_price = None
+                for price_item in price_arr:
+                    if price_item.get('priceType') == 2:
+                        cost_price = price_item.get('value')
+                        break
+                
+                if cost_price:
+                    product['拿货价'] = f'¥{int(cost_price):,}'
+                    success_count += 1
+                    print(f'  ✓ 获取拿货价: {product["商品名称"][:30]}... -> {product["拿货价"]}')
+                else:
+                    print(f'  ⚠ 无拿货价: {product["商品名称"][:30]}...')
+            else:
+                print(f'  ⚠ 未匹配到: {product["商品名称"][:30]}...')
+        
+        print(f'API获取完成，成功获取 {success_count}/{len(products_need_api)} 个拿货价')
 
     async def get_data_with_playwright(self, page):
         try:
@@ -780,268 +977,147 @@ class WegoScraper:
             
             await asyncio.sleep(2)
             
-            popup_start = time.time()
-            await self.close_popups(page)
-            print(f'弹窗关闭耗时: {time.time() - popup_start:.2f}秒')
+            # 直接通过API获取所有商品数据
+            print('直接通过API获取所有商品数据...')
+            products = await self.fetch_all_products_via_api(page)
             
-            print('滚动加载所有商品...')
-            scroll_start = time.time()
-            await self.scroll_to_load_all(page)
-            print(f'滚动加载耗时: {time.time() - scroll_start:.2f}秒')
+            if products:
+                print(f'通过API成功获取 {len(products)} 个商品')
+                print(f'get_data_with_playwright 返回: {len(products)} 个商品')
+                return products
             
-            await asyncio.sleep(3)
-            
-            # 等待商品元素加载（带超时和重试）
-            print('等待商品元素加载...')
-            wait_start = time.time()
-            elements_found = False
-            
-            for retry in range(2):
-                try:
-                    await page.wait_for_selector('.normal_item-module_normalItemContent_mrLg3', timeout=15000)
-                    print('商品元素已加载')
-                    elements_found = True
-                    break
-                except Exception as e:
-                    print(f'等待商品元素超时: {e}')
-                    if retry == 0:
-                        print('尝试滚动页面后重试...')
-                        await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
-                        await asyncio.sleep(2)
-                    else:
-                        print('尝试继续执行...')
-            
-            if not elements_found:
-                print('警告: 未找到商品元素，可能页面加载失败')
-            
-            print(f'等待商品元素耗时: {time.time() - wait_start:.2f}秒')
-            
-            page_text = await page.content()
-            
-            total_count = None
-            new_count = None
-            
-            total_patterns = [
-                (r'上新\s*(\d+)\s*\|\s*总数\s*(\d+)', lambda m: (int(m.group(1)), int(m.group(2)))),
-                (r'总数\s*[：:]\s*(\d+)', lambda m: (None, int(m.group(1)))),
-                (r'总\s*数\s*[：:]\s*(\d+)', lambda m: (None, int(m.group(1)))),
-            ]
-            
-            for pattern, extractor in total_patterns:
-                match = re.search(pattern, page_text)
-                if match:
-                    result = extractor(match)
-                    if len(result) == 2:
-                        new_count, total_count = result
-                        if new_count:
-                            print(f'网页显示上新: {new_count}, 总数: {total_count}')
-                        else:
-                            print(f'网页显示总数: {total_count}')
-                        break
-            
-            if not new_count:
-                new_match = re.search(r'上新\s*[：:]\s*(\d+)', page_text)
-                if new_match:
-                    new_count = int(new_match.group(1))
-                    print(f'网页显示上新: {new_count}')
-            
-            print('查找所有商品项...')
-            item_selectors = [
-                '.normal_item-module_normalItemContent_mrLg3',
-                '.normal_item-module_timeline_common_item_eMbm2',
-            ]
-            
-            item_elements = []
-            seen_elements = set()
-            for selector in item_selectors:
-                try:
-                    elements = await page.query_selector_all(selector)
-                    if elements:
-                        print(f'使用选择器 {selector} 找到 {len(elements)} 个元素')
-                        for element in elements:
-                            element_id = await element.get_attribute('data-id') or await element.text_content()
-                            if element_id not in seen_elements:
-                                seen_elements.add(element_id)
-                                item_elements.append(element)
-                except Exception as e:
-                    print(f'使用选择器 {selector} 时出错: {e}')
-                    continue
-            
-            print(f'总共找到 {len(item_elements)} 个商品项')
-            
-            if not item_elements:
-                print('警告: 未找到任何商品项，可能页面加载失败或选择器不正确')
-                print('建议检查页面URL和Cookie是否有效')
-            
-            # 模拟点击"f12 g9"这个class类来显示详细信息
-            print('模拟点击"f12 g9"这个class类来显示详细信息...')
-            try:
-                # 滚动到页面中间
-                await page.evaluate('window.scrollTo(0, document.body.scrollHeight / 2)')
-                await asyncio.sleep(1)
-                
-                # 使用JavaScript点击所有"f12 g9"元素
-                f12_g9_result = await page.evaluate('''
-                    () => {
-                        // 查找所有包含f12和g9的元素
-                        const f12Elements = document.querySelectorAll('.f12.g9');
-                        let count = 0;
-                        f12Elements.forEach((el, i) => {
-                            console.log('Clicking f12 g9 ' + count + ': ' + el.className);
-                            el.click();
-                            count++;
-                        });
-                        return count;
-                    }
-                ''')
-                print(f'点击了 {f12_g9_result} 个f12 g9元素')
-                await asyncio.sleep(3)  # 等待详细信息加载完成
-            except Exception as e:
-                print(f'点击f12 g9元素时出错: {e}')
-            
-            # 模拟点击"wego-iconfont-s icon-suo"这个class类来解锁拿货价
-            print('模拟点击"wego-iconfont-s icon-suo"这个class类来解锁拿货价...')
-            try:
-                # 滚动到页面中间
-                await page.evaluate('window.scrollTo(0, document.body.scrollHeight / 2)')
-                await asyncio.sleep(1)
-                
-                # 先遍历统计有多少个锁
-                print('统计页面中锁图标的数量...')
-                lock_count = await page.evaluate('''
-                    () => {
-                        const allElements = document.querySelectorAll('[class*="icon-suo"]');
-                        let count = 0;
-                        allElements.forEach((el, i) => {
-                            if (!el.classList.contains('icon-kaisuo')) {
-                                count++;
-                            }
-                        });
-                        return count;
-                    }
-                ''')
-                print(f'页面中共有 {lock_count} 个锁图标')
-                
-                # 根据锁的数量动态调整每批点击的次数
-                if lock_count <= 50:
-                    batch_size = 10  # 锁少时，每批点击10个
-                elif lock_count <= 100:
-                    batch_size = 20  # 锁中等时，每批点击20个
-                elif lock_count <= 200:
-                    batch_size = 30  # 锁较多时，每批点击30个
-                else:
-                    batch_size = 40  # 锁很多时，每批点击40个
-                
-                print(f'每批点击 {batch_size} 个锁图标')
-                
-                # 使用JavaScript分批点击锁图标
-                print('使用JavaScript分批点击锁图标...')
-                total_clicked = 0
-                batch_num = 0
-                
-                while total_clicked < lock_count:
-                    batch_result = await page.evaluate(f'''
-                        () => {{
-                            // 查找所有包含icon-suo但不包含icon-kaisuo的元素
-                            const allElements = document.querySelectorAll('[class*="icon-suo"]');
-                            let count = 0;
-                            let batchCount = 0;
-                            
-                            allElements.forEach((el, i) => {{
-                                // 排除已解锁的图标
-                                if (!el.classList.contains('icon-kaisuo')) {{
-                                    if (count >= {batch_size}) {{
-                                        return; // 只点击一批
-                                    }}
-                                    console.log('Clicking lock ' + count + ': ' + el.className);
-                                    el.click();
-                                    count++;
-                                    batchCount++;
-                                }}
-                            }});
-                            
-                            return batchCount;
-                        }}
-                    ''')
-                    
-                    if batch_result == 0:
-                        print(f'没有更多锁图标需要点击，总共点击了 {total_clicked} 个')
-                        break
-                    
-                    total_clicked += batch_result
-                    batch_num += 1
-                    print(f'第 {batch_num} 批：已点击第 {total_clicked} 个锁图标（本批: {batch_result} 个）')
-                    await asyncio.sleep(1)  # 每批点击后等待1秒
-                
-                print(f'总共点击了 {total_clicked} 个锁图标')
-                await asyncio.sleep(3)  # 等待拿货价信息加载完成
-                
-                # 检查页面中是否有拿货价信息
-                print('检查页面中是否有拿货价信息...')
-                page_content = await page.content()
-                if '拿货价' in page_content:
-                    print('✓ 页面中包含"拿货价"关键字')
-                    # 查找所有拿货价信息
-                    cost_matches = re.findall(r'拿货价[：:]\s*¥?\s*([\d,]+)', page_content)
-                    print(f'找到 {len(cost_matches)} 个拿货价: {cost_matches[:10]}')
-                else:
-                    print('✗ 页面中不包含"拿货价"关键字')
-                    
-                    # 检查第一个商品的HTML内容
-                    try:
-                        if item_elements:
-                            first_element = item_elements[0]
-                            first_html = await first_element.inner_html()
-                            print(f'\n第一个商品的HTML内容（前500字符）:')
-                            print(first_html[:500])
-                    except Exception as e:
-                        print(f'获取第一个商品HTML时出错: {e}')
-            except Exception as e:
-                print(f'点击锁图标时出错: {e}')
-            
-            # 重新获取商品元素，以获取包含拿货价的最新HTML
-            print('重新获取商品元素，以获取包含拿货价的最新HTML...')
-            await asyncio.sleep(2)
-            
-            item_selectors = [
-                '.normal_item-module_normalItemContent_mrLg3',
-                '.normal_item-module_timeline_common_item_eMbm2',
-            ]
-            
-            item_elements = []
-            seen_elements = set()
-            for selector in item_selectors:
-                try:
-                    elements = await page.query_selector_all(selector)
-                    if elements:
-                        print(f'重新获取：使用选择器 {selector} 找到 {len(elements)} 个元素')
-                        for element in elements:
-                            element_id = await element.get_attribute('data-id') or await element.text_content()
-                            if element_id not in seen_elements:
-                                seen_elements.add(element_id)
-                                item_elements.append(element)
-                except Exception as e:
-                    print(f'重新获取：使用选择器 {selector} 时出错: {e}')
-                    continue
-            
-            print(f'重新获取：总共找到 {len(item_elements)} 个商品项')
-            
-            process_start = time.time()
-            products = await self.process_elements_concurrently(page, item_elements)
-            print(f'商品处理耗时: {time.time() - process_start:.2f}秒')
-            
-            print(f'\n数量统计：')
-            print(f'网页显示总数: {total_count}')
-            print(f'网页显示上新: {new_count}')
-            print(f'实际获取商品数量: {len(products)}')
-            print(f'\n成功获取 {len(products)} 个商品')
-            
-            return products
+            # 如果API失败，返回空列表
+            print('API获取失败，返回空列表')
+            return []
         except Exception as e:
             print(f'获取数据失败: {e}')
             import traceback
             traceback.print_exc()
             return []
+
+    async def fetch_all_products_via_api(self, page):
+        """通过API获取所有商品数据"""
+        import os
+        cookie_file = os.path.join(os.path.dirname(__file__), 'config', 'cookies.json')
+        cookies = []
+        if os.path.exists(cookie_file):
+            try:
+                with open(cookie_file, 'r', encoding='utf-8') as f:
+                    cookies = json.load(f)
+                print(f'读取到 {len(cookies)} 个cookie')
+            except Exception as e:
+                print(f'读取cookie失败: {e}')
+                return None
+        
+        current_url = page.url
+        album_id_match = re.search(r'albumId=([^&/]+)|/shop_detail/([^/?#]+)', current_url)
+        if album_id_match:
+            album_id = album_id_match.group(1) or album_id_match.group(2)
+        else:
+            album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
+        print(f'Album ID: {album_id}')
+        
+        cookie_str = '; '.join([f'{c["name"]}={c["value"]}' for c in cookies])
+        
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+            'x-wg-language': 'zh'
+        }
+        
+        api_url = 'https://www.szwego.com/album/personal/all'
+        
+        all_goods_data = []
+        page_timestamp = ''
+        
+        print('开始通过API获取所有商品...')
+        for page_num in range(20):
+            params = {
+                'albumId': album_id,
+                'searchValue': '',
+                'searchImg': '',
+                'startDate': '',
+                'endDate': '',
+                'sourceId': ''
+            }
+            if page_timestamp:
+                params['timestamp'] = page_timestamp
+            
+            try:
+                # 在headers中添加Cookie
+                headers_with_cookie = dict(headers)
+                headers_with_cookie['Cookie'] = cookie_str
+                response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
+                
+                if response.status == 200:
+                    text = await response.text()
+                    try:
+                        data = json.loads(text)
+                        result = data.get('result', {})
+                        items = result.get('items', [])
+                        pagination = result.get('pagination', {})
+                        
+                        if items:
+                            all_goods_data.extend(items)
+                            print(f'  第{page_num+1}页: 获取 {len(items)} 个商品')
+                            
+                            is_load_more = pagination.get('isLoadMore', False)
+                            page_timestamp = str(pagination.get('pageTimestamp', ''))
+                            
+                            if is_load_more and page_timestamp:
+                                params['timestamp'] = page_timestamp
+                            else:
+                                break
+                        else:
+                            break
+                    except Exception as e:
+                        print(f'  解析失败: {e}')
+                        break
+                else:
+                    print(f'  请求失败: {response.status}')
+                    break
+            except Exception as e:
+                print(f'  请求异常: {e}')
+                break
+        
+        print(f'共获取 {len(all_goods_data)} 个商品数据')
+        
+        if not all_goods_data:
+            return None
+        
+        products = []
+        for item in all_goods_data:
+            title = item.get('title', '')
+            goods_num = item.get('goodsNum', '')
+            
+            price_arr = item.get('priceArr', [])
+            sale_price = None
+            cost_price = None
+            for price_item in price_arr:
+                if price_item.get('priceType') == 1:
+                    sale_price = price_item.get('value')
+                elif price_item.get('priceType') == 2:
+                    cost_price = price_item.get('value')
+            
+            note_arr = item.get('noteArr', [])
+            remark = note_arr[0].get('value', '') if note_arr else ''
+            
+            staff_info = item.get('staffInfo', {})
+            staff_nick = staff_info.get('staffNick', '')
+            
+            product = {
+                '商品描述': title,
+                '售价': f'¥{int(sale_price):,}' if sale_price else '',
+                '拿货价': f'¥{int(cost_price):,}' if cost_price else '',
+                '货号': goods_num,
+                '备注': remark,
+                '员工': staff_nick
+            }
+            products.append(product)
+        
+        print(f'fetch_all_products_via_api 返回: {len(products)} 个商品')
+        return products
 
     @staticmethod
     def parse_price(price_str):
