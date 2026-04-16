@@ -1716,8 +1716,7 @@ class StockNumberComparator:
             high_price_stock_numbers = [
                 p.get('货号', '') for p in products 
                 if WegoScraper.parse_price(p.get('售价', '')) is not None
-                and WegoScraper.parse_price(p.get('售价', '')) >= 599 
-                and re.match(r'^\d{3,6}$', p.get('货号', ''))
+                and WegoScraper.parse_price(p.get('售价', '')) >= 599
             ]
             
             excel_stock_numbers = self.load_excel_data()
@@ -1880,6 +1879,7 @@ class StockNumberComparator:
         print(f'重复序列号数: {len(duplicates)}')
         if result.get('high_price_count'):
             print(f'只在JSON中存在但不在Excel中的售价>=599货号数: {result["high_price_count"]}')
+        
         print('='*60)
         
         if result['existing']:
