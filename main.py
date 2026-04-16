@@ -929,7 +929,7 @@ class WegoScraper:
                 price_arr = matched_item.get('priceArr', [])
                 cost_price = None
                 for price_item in price_arr:
-                    if price_item.get('priceType') == 2:
+                    if price_item.get('priceType') == 1:
                         cost_price = price_item.get('value')
                         break
                 
@@ -1096,9 +1096,9 @@ class WegoScraper:
             cost_price = None
             for price_item in price_arr:
                 if price_item.get('priceType') == 1:
-                    sale_price = price_item.get('value')
-                elif price_item.get('priceType') == 2:
                     cost_price = price_item.get('value')
+                elif price_item.get('priceType') == 2:
+                    sale_price = price_item.get('value')
             
             note_arr = item.get('noteArr', [])
             remark = note_arr[0].get('value', '') if note_arr else ''
