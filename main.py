@@ -1448,7 +1448,7 @@ class StockNumberComparator:
                 cell_value = row[0]
                 if cell_value:
                     cell_str = str(cell_value).strip()
-                    number_match = re.match(r'^(\d{3,6})$', cell_str)
+                    number_match = re.match(r'^([A-Za-z0-9]{3,10})$', cell_str)
                     if number_match:
                         stock_numbers.append(cell_str)
             
