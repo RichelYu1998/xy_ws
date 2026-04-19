@@ -1232,11 +1232,9 @@ class WegoScraper:
                 except (ValueError, TypeError):
                     pass
             
-            # 计算闲鱼平台手续费（售价 * 1.6%，单机最高60封顶）
+            # 计算闲鱼平台手续费（售价 * 1.6%）
             if sell_price > 0:
                 platform_fee = sell_price * 0.016
-                if platform_fee > 60:
-                    platform_fee = 60
                 total_platform_fee += platform_fee
         
         # 计算平均每个设备售出均价
