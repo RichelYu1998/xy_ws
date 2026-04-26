@@ -517,6 +517,12 @@ pip install openpyxl
   - 通过headers传递Cookie解决Playwright兼容性问题
   - 优化了albumId的提取逻辑
 
+### v2.5.21 (2026-04-16)
+- **支持多平台Excel路径配置**：在config.json中配置excel_files数组，支持Windows和macOS多路径
+- **自动轮询检测**：程序自动按顺序检测每个路径，找到第一个存在的文件
+- **兼容旧版本**：保留excel_file单路径配置，优先使用excel_files数组
+- **路径展开**：支持~展开为用户主目录
+
 ### v2.5.20 (2026-04-15)
 - **修复Windows浏览器检测**：使用dir+findstr替代if exist通配符，支持Windows正确检测浏览器目录
 - **优化跨平台浏览器检测**：统一Windows、macOS、Linux平台的浏览器检测逻辑
