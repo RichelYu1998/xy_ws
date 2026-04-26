@@ -76,5 +76,9 @@
   ],
   "output_file": "file/output.json",
   "cookie_file": "config/cookies.json",
-  "excel_file": "C:\\Users\\Administrator\\Desktop\\小旭二手机.xlsx"
+  "excel_files": [
+    "C:\\Users\\Administrator\\Desktop\\小旭二手机.xlsx",
+    "/Users/yu/Downloads/小旭二手机.xlsx",
+    "~/Desktop/小旭二手机.xlsx"
+  ]
 }

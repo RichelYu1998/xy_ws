@@ -14,7 +14,7 @@ def print_separator(char='=', length=60):
     """打印分隔线"""
     print(char * length)
 
-VERSION = "2.5.20"
+VERSION = "2.5.21"
 
 
 try:
@@ -147,6 +147,12 @@ class ConfigManager:
         return self.config.get('output_file', PathManager.get_output_file())
 
     def get_excel_file(self):
+        excel_files = self.config.get('excel_files', [])
+        if excel_files:
+            for path in excel_files:
+                expanded_path = os.path.expanduser(path)
+                if FileManager.file_exists(expanded_path):
+                    return expanded_path
         return self.config.get('excel_file', '')
 
     def get_target_url(self):
