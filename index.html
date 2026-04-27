@@ -827,6 +827,19 @@ playwright install chromium</pre>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
     
     <script>
+        let currentSystem = 'Unknown';
+        
+        function detectSystem() {
+            const userAgent = navigator.userAgent;
+            if (userAgent.indexOf('Win') !== -1) return 'Windows';
+            if (userAgent.indexOf('Mac') !== -1) return 'Darwin';
+            if (userAgent.indexOf('Linux') !== -1) return 'Linux';
+            return 'Unknown';
+        }
+        
+        currentSystem = detectSystem();
+        console.log('检测到系统: ' + currentSystem);
+        
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -867,20 +880,21 @@ playwright install chromium</pre>
             .then(response => response.json())
             .then(data => {
                 const statusEl = document.getElementById('cookie-status');
+                let systemInfo = data.system ? ` (${data.system})` : '';
                 if (data.error) {
-                    statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Cookie无效';
+                    statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Cookie无效' + systemInfo;
                     return;
                 }
                 
                 if (data.expired) {
-                    statusEl.innerHTML = '<i class="fa fa-times-circle" style="color: #f56c6c;"></i> Cookie已过期';
+                    statusEl.innerHTML = '<i class="fa fa-times-circle" style="color: #f56c6c;"></i> Cookie已过期' + systemInfo;
                     return;
                 }
                 
                 if (data.hours_remaining <= 5) {
-                    statusEl.innerHTML = '<i class="fa fa-clock-o" style="color: #f56c6c;"></i> 有效期: ' + data.hours_remaining + '小时';
+                    statusEl.innerHTML = '<i class="fa fa-clock-o" style="color: #f56c6c;"></i> 有效期: ' + data.hours_remaining + '小时' + systemInfo;
                 } else {
-                    statusEl.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> 有效期至: ' + data.expires;
+                    statusEl.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> 有效期至: ' + data.expires + systemInfo;
                 }
             })
             .catch(error => {
