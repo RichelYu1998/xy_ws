@@ -2520,36 +2520,106 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
                 
-                excel_file = os.path.join(PROJECT_DIR, 'config', '本地商品表格.xlsx')
+                excel_file = None
+                config_file = os.path.join(PROJECT_DIR, 'config', 'config.json')
+                if os.path.exists(config_file):
+                    with open(config_file, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                    excel_files = config.get('excel_files', [])
+                    for path in excel_files:
+                        expanded_path = os.path.expanduser(path)
+                        if os.path.exists(expanded_path):
+                            excel_file = expanded_path
+                            break
+                
+                if excel_file is None:
+                    excel_file = os.path.join(PROJECT_DIR, 'config', '本地商品表格.xlsx')
+                
                 excel_stock_numbers = []
                 if os.path.exists(excel_file):
                     import pandas as pd
-                    df = pd.read_excel(excel_file)
-                    if '货号' in df.columns:
-                        excel_stock_numbers = sorted([str(x).strip() for x in df['货号'].dropna() if str(x).strip()])
+                    xls = pd.ExcelFile(excel_file)
+                    
+                    df = None
+                    sheet_name = None
+                    sku_column = None
+                    
+                    for sheet in xls.sheet_names:
+                        temp_df = xls.parse(sheet)
+                        
+                        if '货号' in temp_df.columns:
+                            df = temp_df
+                            sheet_name = sheet
+                            sku_column = '货号'
+                            break
+                        elif '序列号' in temp_df.columns:
+                            df = temp_df
+                            sheet_name = sheet
+                            sku_column = '序列号'
+                            break
+                        elif '闲鱼' in sheet:
+                            if len(temp_df.columns) > 4:
+                                second_row = temp_df.iloc[1].tolist()
+                                if '序列号' in second_row:
+                                    col_idx = second_row.index('序列号')
+                                    temp_df.columns = second_row
+                                    temp_df = temp_df.drop([0, 1]).reset_index(drop=True)
+                                    df = temp_df
+                                    sheet_name = sheet
+                                    sku_column = '序列号'
+                                    break
+                    
+                    if df is not None and sku_column is not None:
+                        excel_stock_numbers = sorted([str(int(x)) if isinstance(x, float) and x == int(x) else str(x).strip() 
+                                                     for x in df[sku_column].dropna() 
+                                                     if str(x).strip() and str(x).strip() != 'nan' and str(x).strip() != '序列号'])
+                    else:
+                        return jsonify({'error': f'Excel文件中未找到"货号"或"序列号"列'}), 404
+                else:
+                    return jsonify({'error': f'Excel文件不存在: {excel_file}'}), 404
                 
                 json_set = set(json_stock_numbers)
                 excel_set = set(excel_stock_numbers)
                 
+                json_sku_counts = {}
+                for sku in json_stock_numbers:
+                    json_sku_counts[sku] = json_sku_counts.get(sku, 0) + 1
+                duplicate_skus = {sku: count for sku, count in json_sku_counts.items() if count > 1}
+                
+                high_price_count = 0
+                for p in products:
+                    price = p.get('售价', '')
+                    if price:
+                        try:
+                            price_val = float(price.replace('¥', '').replace(',', ''))
+                            if price_val >= 599:
+                                high_price_count += 1
+                        except:
+                            pass
+                
                 result = {
                     'type': 'excel',
                     'json_file': os.path.basename(latest_json),
+                    'input_count': len(excel_set),
+                    'extra_count': len(json_set - excel_set),
                     'json_count': len(json_set),
-                    'excel_count': len(excel_set),
+                    'common_count': len(excel_set & json_set),
+                    'duplicate_count': len(duplicate_skus),
+                    'high_price_count': high_price_count,
                     'missing_in_json': sorted(list(excel_set - json_set)),
                     'extra_in_json': sorted(list(json_set - excel_set)),
                     'common': sorted(list(excel_set & json_set)),
-                    'missing_count': len(excel_set - json_set),
-                    'extra_count': len(json_set - excel_set),
-                    'common_count': len(excel_set & json_set)
+                    'duplicates': duplicate_skus,
+                    'missing_count': len(excel_set - json_set)
                 }
                 return jsonify(result)
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        @app.route('/api/sku/compare', methods=['GET'])
-        def get_products():
+        @app.route('/api/products', methods=['GET'])
+        def get_all_products():
             import glob
+            import base64
             system = platform.system()
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
@@ -2559,6 +2629,27 @@ if __name__ == '__main__':
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
+                
+                for p in products:
+                    media_result = []
+                    img_data = p.get('图片', '')
+                    if img_data:
+                        try:
+                            if isinstance(img_data, list):
+                                for b64_str in img_data:
+                                    try:
+                                        media_result.append(base64.b64decode(b64_str).decode('utf-8'))
+                                    except:
+                                        media_result.append(b64_str)
+                            else:
+                                try:
+                                    media_result = base64.b64decode(img_data).decode('utf-8')
+                                except:
+                                    media_result = img_data
+                        except:
+                            media_result = img_data
+                    p['图片'] = media_result if media_result else img_data
+                
                 high_price_products = []
                 for p in products:
                     try:

@@ -1429,7 +1429,9 @@ playwright install chromium</pre>
                 }, 100);
             })
             .catch(error => {
-                alert('获取商品失败: ' + error.message);
+                console.error('获取商品失败:', error);
+                console.error('URL:', url);
+                alert('获取商品失败: ' + error.message + '\n详情请查看控制台');
             });
         }
         
@@ -1470,8 +1472,18 @@ playwright install chromium</pre>
         function searchProductBySku(sku) {
             if (!sku) return;
             
-            fetch('/api/product/search?sku=' + encodeURIComponent(sku))
-            .then(response => response.json())
+            const url = '/api/product/search?sku=' + encodeURIComponent(sku);
+            console.log('搜索商品URL:', url);
+            
+            fetch(url)
+            .then(response => {
+                console.log('响应状态:', response.status);
+                console.log('响应类型:', response.headers.get('content-type'));
+                return response.text().then(text => {
+                    console.log('响应内容:', text.substring(0, 500));
+                    return JSON.parse(text);
+                });
+            })
             .then(data => {
                 if (data.found) {
                     const p = data.product;
@@ -1481,7 +1493,8 @@ playwright install chromium</pre>
                 }
             })
             .catch(error => {
-                alert('查询失败: ' + error.message);
+                console.error('查询失败:', error);
+                alert('查询失败: ' + error.message + '\n详情请查看控制台');
             });
         }
         
@@ -1659,9 +1672,16 @@ playwright install chromium</pre>
         document.querySelectorAll('.btn-sku-api').forEach(function(btn) {
             btn.onclick = function() {
                 var apiUrl = this.getAttribute('data-api');
+                console.log('货号对比 API URL:', apiUrl);
                 if (apiUrl) {
                     fetch(apiUrl)
-                    .then(response => response.json())
+                    .then(response => {
+                        console.log('响应状态:', response.status);
+                        return response.text().then(text => {
+                            console.log('响应内容:', text.substring(0, 500));
+                            return JSON.parse(text);
+                        });
+                    })
                     .then(data => {
                         if (data.error) {
                             alert('对比失败: ' + data.error);
@@ -1670,29 +1690,78 @@ playwright install chromium</pre>
                         
                         showOutputPanel();
                         const outputPanel = document.getElementById('output-panel');
-                        const existingCard = outputPanel.querySelector('.products-card');
+                        const existingCard = outputPanel.querySelector('.comparison-card, .products-card');
                         if (existingCard) existingCard.remove();
                         
-                        const typeLabel = data.type === 'excel' ? 'Excel' : 'TXT';
-                        const sourceCount = data.type === 'excel' ? data.excel_count : data.txt_count;
+                        let cardHtml = `
+                        <div class="comparison-card">
+                            <div class="comparison-header" style="background: #E6A23C;">
+                                <i class="fa fa-barcode"></i> 货号对比结果
+                            </div>
+                            <div class="comparison-body">
+                                <div class="comparison-stats">
+                                    <div class="stat-item ${data.input_count > 0 ? 'stat-info' : ''}">
+                                        <span class="stat-value">${data.input_count || 0}</span>
+                                        <span class="stat-label">输入货号</span>
+                                    </div>
+                                    <div class="stat-item ${data.extra_count > 0 ? 'stat-warning' : ''}">
+                                        <span class="stat-value">${data.extra_count || 0}</span>
+                                        <span class="stat-label">JSON多余</span>
+                                    </div>
+                                    <div class="stat-item ${data.json_count > 0 ? 'stat-info' : ''}">
+                                        <span class="stat-value">${data.json_count || 0}</span>
+                                        <span class="stat-label">JSON货号</span>
+                                    </div>
+                                    <div class="stat-item ${data.common_count > 0 ? 'stat-success' : ''}">
+                                        <span class="stat-value">${data.common_count || 0}</span>
+                                        <span class="stat-label">已存在</span>
+                                    </div>
+                                </div>
+                                <div class="comparison-stats">
+                                    <div class="stat-item ${data.missing_count > 0 ? 'stat-danger' : ''}">
+                                        <span class="stat-value">${data.missing_count || 0}</span>
+                                        <span class="stat-label">缺失货号</span>
+                                    </div>
+                                    <div class="stat-item ${data.duplicate_count > 0 ? 'stat-warning' : ''}">
+                                        <span class="stat-value">${data.duplicate_count || 0}</span>
+                                        <span class="stat-label">重复序列号</span>
+                                    </div>
+                                    <div class="stat-item ${data.high_price_count > 0 ? 'stat-success' : ''}">
+                                        <span class="stat-value">${data.high_price_count || 0}</span>
+                                        <span class="stat-label">高价商品(≥599)</span>
+                                    </div>
+                                </div>
+                        `;
                         
-                        let html = '<div class="products-card card mt-3" style="margin: 15px;"><div class="card-body">';
-                        html += '<h5 class="card-title">货号对比结果 (' + typeLabel + ' vs JSON)</h5>';
-                        html += `<p><strong>JSON文件:</strong> ${data.json_file}</p>`;
-                        html += `<p><strong>${typeLabel}货号数量:</strong> ${sourceCount} | <strong>JSON货号数量:</strong> ${data.json_count}</p>`;
-                        html += `<hr>`;
-                        html += `<p><strong>缺失货号(在${typeLabel}但不在JSON):</strong> ${data.missing_count}个</p>`;
-                        if (data.missing_in_json.length > 0) {
-                            html += `<div class="alert alert-warning">${data.missing_in_json.join(', ')}</div>`;
+                        if (data.missing_in_json && data.missing_in_json.length > 0) {
+                            const chunks = [];
+                            for (let i = 0; i < data.missing_in_json.length; i += 10) {
+                                chunks.push(data.missing_in_json.slice(i, i + 10).join(', '));
+                            }
+                            cardHtml += `
+                                <div class="missing-skus">
+                                    <div class="missing-title">缺失货号列表:</div>
+                                    <div class="missing-list">${chunks.join('<br>')}</div>
+                                </div>
+                            `;
                         }
-                        html += `<p><strong>多余货号(在JSON但不在${typeLabel}):</strong> ${data.extra_count}个</p>`;
-                        if (data.extra_in_json.length > 0) {
-                            html += `<div class="alert alert-info">${data.extra_in_json.slice(0, 50).join(', ')}${data.extra_in_json.length > 50 ? '...' : ''}</div>`;
-                        }
-                        html += `<p><strong>共同货号:</strong> ${data.common_count}个</p>`;
-                        html += '</div></div>';
                         
-                        outputPanel.insertAdjacentHTML('beforeend', html);
+                        if (data.extra_in_json && data.extra_in_json.length > 0) {
+                            const chunks = [];
+                            for (let i = 0; i < data.extra_in_json.length; i += 10) {
+                                chunks.push(data.extra_in_json.slice(i, i + 10).join(', '));
+                            }
+                            cardHtml += `
+                                <div class="missing-skus" style="background: #e3f2fd; border-color: #90caf9;">
+                                    <div class="missing-title" style="color: #1976d2;">JSON多余货号列表:</div>
+                                    <div class="missing-list">${chunks.join('<br>')}</div>
+                                </div>
+                            `;
+                        }
+                        
+                        cardHtml += `</div></div>`;
+                        
+                        outputPanel.insertAdjacentHTML('beforeend', cardHtml);
                     })
                     .catch(error => {
                         alert('请求失败: ' + error.message);
