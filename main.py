@@ -6,8 +6,14 @@ import re
 import platform
 import sys
 import shutil
+import subprocess
+import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+
+from flask import Flask, request, jsonify, send_file, Response
+import pymysql
 
 
 def print_separator(char='=', length=60):
@@ -15,6 +21,73 @@ def print_separator(char='=', length=60):
     print(char * length)
 
 VERSION = "2.5.21"
+
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+VENV_PYTHON = os.path.join(PROJECT_DIR, '.venv', 'bin', 'python')
+
+app = Flask(__name__)
+
+MYSQL_CONFIG = {
+    'host': 'localhost',
+    'port': 3306,
+    'user': 'root',
+    'password': 'Ty961106',
+    'database': 'products_db',
+    'charset': 'utf8mb4'
+}
+
+def get_db_connection():
+    return pymysql.connect(**MYSQL_CONFIG)
+
+def init_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS product_details (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            sku VARCHAR(255) UNIQUE NOT NULL,
+            product_desc TEXT,
+            price VARCHAR(255),
+            cost_price VARCHAR(255),
+            staff VARCHAR(255),
+            remark TEXT,
+            image_url TEXT,
+            filename VARCHAR(255),
+            searched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+processes = {}
+tasks = {}
+
+def run_command_background(task_id, command):
+    try:
+        tasks[task_id]['status'] = 'running'
+        process = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
+            cwd=PROJECT_DIR,
+            text=True
+        )
+        processes[task_id] = process
+        
+        stdout_lines = []
+        for line in iter(process.stdout.readline, ''):
+            if line:
+                stdout_lines.append(line)
+                tasks[task_id]['output'] = ''.join(stdout_lines)
+        
+        process.wait()
+        tasks[task_id]['returncode'] = process.returncode
+        tasks[task_id]['status'] = 'completed'
+    except Exception as e:
+        tasks[task_id]['error'] = str(e)
+        tasks[task_id]['status'] = 'error'
 
 
 try:
@@ -709,7 +782,8 @@ class WegoScraper:
                     '拿货价': cost_price if cost_price else '',
                     '货号': stock_number,
                     '备注': remark if remark else '',
-                    '员工': employee if employee else ''
+                    '员工': employee if employee else '',
+                    '图片': ''
                 }
             return None
         except Exception as e:
@@ -1112,13 +1186,26 @@ class WegoScraper:
             staff_info = item.get('staffInfo', {})
             staff_nick = staff_info.get('staffNick', '')
             
+            import base64
+            media_b64_list = []
+            imgs_src = item.get('imgsSrc', [])
+            if imgs_src:
+                for url in imgs_src:
+                    media_b64_list.append(base64.b64encode(url.encode('utf-8')).decode('utf-8'))
+            video_url = item.get('videoUrl', '')
+            if video_url:
+                media_b64_list.append(base64.b64encode(video_url.encode('utf-8')).decode('utf-8'))
+            
+            media_b64 = media_b64_list[0] if len(media_b64_list) == 1 else media_b64_list
+            
             product = {
                 '商品描述': title,
                 '售价': f'¥{int(sale_price):,}' if sale_price else '',
                 '拿货价': f'¥{int(cost_price):,}' if cost_price else '',
                 '货号': goods_num,
                 '备注': remark,
-                '员工': staff_nick
+                '员工': staff_nick,
+                '图片': media_b64
             }
             products.append(product)
         
@@ -2223,4 +2310,185 @@ def update_cookie():
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description='Szwego商品爬虫')
+    parser.add_argument('--web', action='store_true', help='启动Web服务模式')
+    parser.add_argument('--port', type=int, default=8888, help='Web服务端口 (默认8888)')
+    args = parser.parse_args()
+    
+    if args.web:
+        init_db()
+        
+        @app.route('/')
+        def index():
+            with open('index.html', 'r', encoding='utf-8') as f:
+                content = f.read()
+            response = Response(content, mimetype='text/html')
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+            return response
+
+        @app.route('/run', methods=['POST'])
+        def run_command():
+            data = request.get_json()
+            command = data.get('command', '')
+            if not command:
+                return jsonify({'error': '命令不能为空'}), 400
+            if command.startswith('python '):
+                command = command.replace('python ', VENV_PYTHON + ' ', 1)
+            if command.startswith('python3 '):
+                command = command.replace('python3 ', VENV_PYTHON + ' ', 1)
+            task_id = str(uuid.uuid4())[:8]
+            tasks[task_id] = {'command': command, 'status': 'starting', 'output': '', 'returncode': None, 'error': None}
+            thread = threading.Thread(target=run_command_background, args=(task_id, command))
+            thread.start()
+            return jsonify({'success': True, 'task_id': task_id, 'message': '命令已启动'})
+
+        @app.route('/input', methods=['POST'])
+        def send_input():
+            data = request.get_json()
+            task_id, user_input = data.get('task_id', ''), data.get('input', '')
+            if task_id not in processes:
+                return jsonify({'error': '没有正在运行的进程'}), 404
+            try:
+                process = processes[task_id]
+                process.stdin.write(user_input + '\n')
+                process.stdin.flush()
+                return jsonify({'success': True, 'message': '输入已发送'})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @app.route('/kill', methods=['POST'])
+        def kill_task():
+            data = request.get_json()
+            task_id = data.get('task_id', '')
+            if task_id not in processes:
+                return jsonify({'success': True, 'message': '进程已结束'})
+            try:
+                process = processes[task_id]
+                try:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                except:
+                    pass
+                if task_id in tasks:
+                    tasks[task_id]['status'] = 'killed'
+                if task_id in processes:
+                    del processes[task_id]
+                return jsonify({'success': True, 'message': '进程已终止'})
+            except:
+                return jsonify({'success': True, 'message': '操作完成'})
+
+        @app.route('/output/<task_id>', methods=['GET'])
+        def get_output(task_id):
+            if task_id not in tasks:
+                return jsonify({'error': '任务不存在'}), 404
+            task = tasks[task_id]
+            return jsonify({'status': task['status'], 'output': task.get('output', ''), 'returncode': task.get('returncode'), 'error': task.get('error')})
+
+        @app.route('/api/cookie', methods=['GET'])
+        def get_cookie_status():
+            import glob
+            cookie_file = os.path.join(PROJECT_DIR, 'config', 'cookies.json')
+            if not os.path.exists(cookie_file):
+                return jsonify({'error': 'Cookie文件不存在', 'valid': False}), 404
+            try:
+                with open(cookie_file, 'r', encoding='utf-8') as f:
+                    cookies = json.load(f)
+                token_cookie = next((c for c in cookies if c.get('name') == 'token'), None)
+                if not token_cookie:
+                    return jsonify({'error': '未找到token', 'valid': False}), 404
+                expires = token_cookie.get('expires')
+                if not expires:
+                    return jsonify({'error': 'token无过期时间', 'valid': False}), 404
+                import datetime
+                expires_time = datetime.datetime.fromtimestamp(expires)
+                hours_remaining = (expires_time - datetime.datetime.now()).total_seconds() / 3600
+                return jsonify({'valid': True, 'expires': expires_time.strftime('%Y-%m-%d %H:%M:%S'), 'hours_remaining': round(hours_remaining, 1), 'expired': hours_remaining <= 0})
+            except Exception as e:
+                return jsonify({'error': str(e), 'valid': False}), 500
+
+        @app.route('/api/products', methods=['GET'])
+        def get_products():
+            import glob
+            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+            if not json_files:
+                return jsonify({'error': '没有找到JSON文件'}), 404
+            latest_file = max(json_files, key=os.path.getmtime)
+            try:
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                products = data.get('商品列表', []) if isinstance(data, dict) else data
+                high_price_products = []
+                for p in products:
+                    try:
+                        price = float(p.get('售价', '¥0').replace('¥', '').replace(',', ''))
+                        if price >= 599:
+                            high_price_products.append(p)
+                    except:
+                        pass
+                return jsonify({'filename': os.path.basename(latest_file), 'total': len(products), 'products': products[:100], 'highPriceProducts': high_price_products[:500], 'highPriceCount': len(high_price_products)})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @app.route('/api/product/search', methods=['GET'])
+        def search_product():
+            sku = request.args.get('sku', '').strip()
+            if not sku:
+                return jsonify({'error': '请提供货号'}), 400
+            import glob
+            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+            if not json_files:
+                return jsonify({'error': '没有找到JSON文件'}), 404
+            latest_file = max(json_files, key=os.path.getmtime)
+            try:
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                products = data.get('商品列表', []) if isinstance(data, dict) else data
+                for p in products:
+                    if p.get('货号') == sku:
+                        conn = get_db_connection()
+                        cursor = conn.cursor()
+                        new_image_url = p.get('图片', '')
+                        if isinstance(new_image_url, list):
+                            new_image_url = json.dumps(new_image_url)
+                        cursor.execute('''INSERT INTO product_details (sku, product_desc, price, cost_price, staff, remark, image_url, filename, searched_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW()) ON DUPLICATE KEY UPDATE product_desc = VALUES(product_desc), price = VALUES(price), cost_price = VALUES(cost_price), staff = VALUES(staff), remark = VALUES(remark), image_url = VALUES(image_url), filename = VALUES(filename), searched_at = VALUES(searched_at)''', (p.get('货号', ''), p.get('商品描述', ''), p.get('售价', ''), p.get('拿货价', ''), p.get('员工', ''), p.get('备注', ''), new_image_url, os.path.basename(latest_file)))
+                        conn.commit()
+                        conn.close()
+                        import base64
+                        media_result = []
+                        if new_image_url:
+                            try:
+                                img_data = json.loads(new_image_url) if isinstance(new_image_url, str) else new_image_url
+                            except:
+                                img_data = new_image_url
+                            if isinstance(img_data, list):
+                                for b64_str in img_data:
+                                    try:
+                                        media_result.append(base64.b64decode(b64_str).decode('utf-8'))
+                                    except:
+                                        media_result.append(b64_str)
+                            else:
+                                try:
+                                    media_result = base64.b64decode(img_data).decode('utf-8')
+                                except:
+                                    media_result = img_data
+                        p['图片'] = media_result
+                        return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
+                return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        print("=" * 50)
+        print("Szwego商品爬虫 - Web服务")
+        print("=" * 50)
+        print(f"访问地址: http://localhost:{args.port}")
+        print("按 Ctrl+C 停止服务")
+        print("=" * 50)
+        app.run(host='0.0.0.0', port=args.port, debug=True)
+    else:
+        main()

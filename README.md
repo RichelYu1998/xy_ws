@@ -31,7 +31,8 @@
 
 ```
 D:\ws\xy_ws\
-├── main.py                      # 主程序文件
+├── main.py                      # 主程序文件（含爬虫和Web服务）
+├── index.html                   # Web服务前端页面
 ├── run.bat                      # Windows启动脚本
 ├── run.sh                       # Linux/Mac启动脚本
 ├── config/                      # 配置文件目录
@@ -124,9 +125,30 @@ chmod +x run.sh
 # 或
 source .venv/bin/activate  # Linux/Mac
 
-# 运行程序
+# 运行程序（命令行模式）
 python main.py
 ```
+
+### 方法3：启动Web服务（可视化界面）
+
+```bash
+# 激活虚拟环境后启动Web服务
+.venv\Scripts\activate  # Windows
+# 或
+source .venv/bin/activate  # Linux/Mac
+
+# 启动Web服务（默认端口8888）
+python main.py --web
+
+# 指定端口
+python main.py --web --port 9000
+```
+
+启动后访问 http://localhost:8888 即可使用可视化界面，支持：
+- 查看所有商品
+- 搜索特定货号
+- 点击货号查看商品详情（含图片和视频）
+- 直接在界面运行爬虫
 
 ## 功能选择
 
@@ -497,6 +519,23 @@ pip install openpyxl
 - **错误处理**：完善的异常处理机制
 
 ## 更新日志
+
+### v2.6.0 (2026-04-28)
+- **代码合并：将server.py合并到main.py**
+  - 移除了独立的server.py文件
+  - 使用命令行参数 `--web` 启动Web服务模式
+  - 使用 `--port` 参数指定端口（默认8888）
+  - 新启动方式：`python main.py --web`
+- **数据库升级：从SQLite迁移到MySQL**
+  - 使用MySQL存储商品查询记录
+  - 支持图片和视频URL的Base64编码存储
+- **UI优化：商品详情弹窗**
+  - 参考京东风格设计商品详情弹窗
+  - 支持图片点击放大查看
+  - 支持视频播放
+- **缓存优化：禁用页面缓存**
+  - 添加Cache-Control头防止浏览器缓存
+  - 确保每次获取最新代码
 
 ### v2.5.22 (2026-04-19)
 - **手续费计算优化**：移除闲鱼平台手续费60元封顶限制
