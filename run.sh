@@ -1,9 +1,24 @@
 #!/bin/bash
 
 echo "========================================"
-echo "Szwego商品爬虫和货号对比工具 - v1.8.0"
+echo "Szwego商品爬虫和货号对比工具 - v2.6.0"
 echo "========================================"
 echo ""
+echo "请选择运行模式："
+echo "  1. 命令行模式（爬虫、货号对比等）"
+echo "  2. Web服务模式（可视化界面）"
+echo ""
+
+read -p "请输入选项 (1-2): " MODE
+
+if [ "$MODE" = "1" ]; then
+    run_cli
+elif [ "$MODE" = "2" ]; then
+    run_web
+else
+    echo "无效选项，请输入 1 或 2"
+    exit 1
+fi
 
 log_section() {
     echo ""
@@ -165,6 +180,41 @@ run_program() {
     else
         $PYTHON_CMD main.py
     fi
+}
+
+run_web() {
+    echo ""
+    echo "========================================"
+    echo "启动Web服务模式"
+    echo "========================================"
+    
+    detect_python || exit 1
+    detect_venv || exit 1
+    check_dependencies || exit 1
+    check_config || exit 1
+    setup_venv || exit 1
+    
+    echo ""
+    echo "========================================"
+    echo "启动Web服务..."
+    echo "访问地址: http://localhost:8888"
+    echo "========================================"
+    
+    if [ -n "$VENV_PATH" ]; then
+        source "$VENV_PATH/bin/activate"
+        $PYTHON_CMD main.py --web
+        deactivate
+    else
+        $PYTHON_CMD main.py --web
+    fi
+}
+
+run_cli() {
+    echo ""
+    echo "========================================"
+    echo "启动命令行模式"
+    echo "========================================"
+    main
 }
 
 main() {

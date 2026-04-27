@@ -2,11 +2,69 @@
 setlocal enabledelayedexpansion
 chcp 65001 > nul
 echo ========================================
-echo Szwego商品爬虫和货号对比工具 - v1.8.0
+echo Szwego商品爬虫和货号对比工具 - v2.6.0
 echo ========================================
 echo.
+echo 请选择运行模式：
+echo   1. 命令行模式（爬虫、货号对比等）
+echo   2. Web服务模式（可视化界面）
+echo.
 
+set /p MODE="请输入选项 (1-2): "
+
+if "!MODE!"=="1" (
+    call :run_cli
+) else if "!MODE!"=="2" (
+    call :run_web
+) else (
+    echo 无效选项，请输入 1 或 2
+    exit /b 1
+)
+
+goto :eof
+
+:run_cli
+echo.
+echo ========================================
+echo 启动命令行模式
+echo ========================================
 call :main
+goto :eof
+
+:run_web
+echo.
+echo ========================================
+echo 启动Web服务模式
+echo ========================================
+call :detect_python
+if %errorlevel% neq 0 exit /b 1
+
+call :detect_venv
+if %errorlevel% neq 0 exit /b 1
+
+call :check_dependencies
+if %errorlevel% neq 0 exit /b 1
+
+call :check_config
+if %errorlevel% neq 0 exit /b 1
+
+call :setup_venv
+if %errorlevel% neq 0 exit /b 1
+
+echo.
+echo ========================================
+echo 启动Web服务...
+echo 访问地址: http://localhost:8888
+echo ========================================
+
+if defined VENV_PATH (
+    call "%VENV_PATH%\Scripts\activate.bat"
+    %PYTHON_CMD% main.py --web
+    call deactivate
+) else (
+    %PYTHON_CMD% main.py --web
+)
+goto :eof
 
 :log_section
 echo.
