@@ -1392,6 +1392,54 @@ class WegoScraper:
         print(f'闲鱼平台手续费累计: ¥{total_platform_fee:,.2f}')
         if change_summary:
             print(f'{change_summary}')
+            
+        # 将数据保存到数据库
+        self.save_to_database(data, os.path.basename(new_filename))
+    
+    def save_to_database(self, products, filename):
+        """将商品数据保存到数据库"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            inserted_count = 0
+            updated_count = 0
+            
+            for product in products:
+                sku = product.get('货号', '').strip()
+                product_desc = product.get('商品描述', product.get('商品名称', '')).strip()[:65535]
+                price = product.get('售价', '').strip()[:255]
+                cost_price = product.get('拿货价', '').strip()[:255]
+                staff = product.get('员工', '').strip()[:255]
+                remark = product.get('备注', '').strip()[:65535]
+                image_url = product.get('图片', '').strip()[:65535]
+                
+                if not sku:
+                    continue
+                
+                sql = """
+                    REPLACE INTO product_details 
+                    (sku, product_desc, price, cost_price, staff, remark, image_url, filename, searched_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                """
+                
+                cursor.execute(sql, (sku, product_desc, price, cost_price, staff, remark, image_url, filename))
+                
+                if cursor.rowcount > 0:
+                    # 判断是插入还是更新
+                    # REPLACE 返回的是新插入的行数，如果主键冲突会先删除再插入
+                    inserted_count += 1
+            
+            conn.commit()
+            cursor.close()
+            conn.close()
+            
+            print(f'已将 {len([p for p in products if p.get("货号", "").strip()])} 条商品数据保存到数据库')
+            
+        except Exception as e:
+            print(f'保存到数据库失败: {e}')
+            import traceback
+            traceback.print_exc()
 
     async def run(self):
         start_time = time.time()
