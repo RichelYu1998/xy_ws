@@ -2335,15 +2335,21 @@ if __name__ == '__main__':
             command = data.get('command', '')
             if not command:
                 return jsonify({'error': '命令不能为空'}), 400
+            
+            system = platform.system()
             if command.startswith('python '):
-                command = command.replace('python ', VENV_PYTHON + ' ', 1)
+                if system == 'Windows':
+                    command = command.replace('python ', VENV_PYTHON + ' ', 1)
+                else:
+                    command = command.replace('python ', VENV_PYTHON + ' ', 1)
             if command.startswith('python3 '):
                 command = command.replace('python3 ', VENV_PYTHON + ' ', 1)
+            
             task_id = str(uuid.uuid4())[:8]
             tasks[task_id] = {'command': command, 'status': 'starting', 'output': '', 'returncode': None, 'error': None}
             thread = threading.Thread(target=run_command_background, args=(task_id, command))
             thread.start()
-            return jsonify({'success': True, 'task_id': task_id, 'message': '命令已启动'})
+            return jsonify({'success': True, 'task_id': task_id, 'message': f'命令已启动 (系统: {system})'})
 
         @app.route('/input', methods=['POST'])
         def send_input():
@@ -2394,27 +2400,29 @@ if __name__ == '__main__':
         def get_cookie_status():
             import glob
             cookie_file = os.path.join(PROJECT_DIR, 'config', 'cookies.json')
+            system = platform.system()
             if not os.path.exists(cookie_file):
-                return jsonify({'error': 'Cookie文件不存在', 'valid': False}), 404
+                return jsonify({'error': 'Cookie文件不存在', 'valid': False, 'system': system}), 404
             try:
                 with open(cookie_file, 'r', encoding='utf-8') as f:
                     cookies = json.load(f)
                 token_cookie = next((c for c in cookies if c.get('name') == 'token'), None)
                 if not token_cookie:
-                    return jsonify({'error': '未找到token', 'valid': False}), 404
+                    return jsonify({'error': '未找到token', 'valid': False, 'system': system}), 404
                 expires = token_cookie.get('expires')
                 if not expires:
-                    return jsonify({'error': 'token无过期时间', 'valid': False}), 404
+                    return jsonify({'error': 'token无过期时间', 'valid': False, 'system': system}), 404
                 import datetime
                 expires_time = datetime.datetime.fromtimestamp(expires)
                 hours_remaining = (expires_time - datetime.datetime.now()).total_seconds() / 3600
-                return jsonify({'valid': True, 'expires': expires_time.strftime('%Y-%m-%d %H:%M:%S'), 'hours_remaining': round(hours_remaining, 1), 'expired': hours_remaining <= 0})
+                return jsonify({'valid': True, 'expires': expires_time.strftime('%Y-%m-%d %H:%M:%S'), 'hours_remaining': round(hours_remaining, 1), 'expired': hours_remaining <= 0, 'system': system})
             except Exception as e:
                 return jsonify({'error': str(e), 'valid': False}), 500
 
         @app.route('/api/products', methods=['GET'])
         def get_products():
             import glob
+            system = platform.system()
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'error': '没有找到JSON文件'}), 404
@@ -2431,7 +2439,7 @@ if __name__ == '__main__':
                             high_price_products.append(p)
                     except:
                         pass
-                return jsonify({'filename': os.path.basename(latest_file), 'total': len(products), 'products': products[:100], 'highPriceProducts': high_price_products[:500], 'highPriceCount': len(high_price_products)})
+                return jsonify({'filename': os.path.basename(latest_file), 'total': len(products), 'products': products[:100], 'highPriceProducts': high_price_products[:500], 'highPriceCount': len(high_price_products), 'system': system})
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
