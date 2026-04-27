@@ -2128,18 +2128,18 @@ def main():
             return
         
         def start_web():
-            print('\n' + '='*50)
-            print('启动Web服务')
-            print('='*50)
-            print('请运行以下命令启动Web服务：')
-            print('')
-            print('  python main.py --web')
-            print('')
-            print('或直接运行启动脚本选择Web模式：')
-            print('  ./run.sh    (Linux/Mac)')
-            print('  run.bat    (Windows)')
-            print('='*50 + '\n')
-            input('按回车键返回主菜单...')
+            import platform
+            import os
+            
+            venv_python = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.venv', 'bin', 'python')
+            if platform.system() == 'Windows':
+                venv_python = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.venv', 'Scripts', 'python.exe')
+            
+            print('\n正在启动Web服务...')
+            print('访问地址: http://localhost:8888')
+            print('按 Ctrl+C 停止服务\n')
+            
+            os.system(f'"{venv_python}" main.py --web')
         
         actions = {
             '1': lambda: run_scraper() or True,
