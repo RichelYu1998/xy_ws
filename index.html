@@ -1666,7 +1666,12 @@ playwright install chromium</pre>
                     return;
                 }
                 
-                let html = '<div class="card mt-3"><div class="card-body">';
+                showOutputPanel();
+                const outputPanel = document.getElementById('output-panel');
+                const existingCard = outputPanel.querySelector('.products-card');
+                if (existingCard) existingCard.remove();
+                
+                let html = '<div class="products-card card mt-3" style="margin: 15px;"><div class="card-body">';
                 html += '<h5 class="card-title">货号对比结果 (TXT vs JSON)</h5>';
                 html += `<p><strong>JSON文件:</strong> ${data.json_file}</p>`;
                 html += `<p><strong>TXT货号数量:</strong> ${data.txt_count} | <strong>JSON货号数量:</strong> ${data.json_count}</p>`;
@@ -1682,7 +1687,7 @@ playwright install chromium</pre>
                 html += `<p><strong>共同货号:</strong> ${data.common_count}个</p>`;
                 html += '</div></div>';
                 
-                document.getElementById('product-list').innerHTML = html;
+                outputPanel.insertAdjacentHTML('beforeend', html);
             })
             .catch(error => {
                 alert('请求失败: ' + error.message);
