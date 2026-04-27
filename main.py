@@ -2423,6 +2423,48 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'error': str(e), 'valid': False}), 500
 
+        @app.route('/api/sku/compare', methods=['GET'])
+        def compare_sku():
+            import glob
+            try:
+                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+                if not json_files:
+                    return jsonify({'error': '没有找到JSON文件'}), 404
+                latest_json = max(json_files, key=os.path.getmtime)
+                
+                with open(latest_json, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                products = data.get('商品列表', []) if isinstance(data, dict) else data
+                json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                
+                input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
+                txt_stock_numbers = []
+                if os.path.exists(input_file):
+                    with open(input_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        import re
+                        txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
+                
+                json_set = set(json_stock_numbers)
+                txt_set = set(txt_stock_numbers)
+                
+                result = {
+                    'json_file': os.path.basename(latest_json),
+                    'json_count': len(json_set),
+                    'txt_count': len(txt_set),
+                    'json_skus': json_stock_numbers,
+                    'txt_skus': txt_stock_numbers,
+                    'missing_in_json': sorted(list(txt_set - json_set)),
+                    'extra_in_json': sorted(list(json_set - txt_set)),
+                    'common': sorted(list(txt_set & json_set)),
+                    'missing_count': len(txt_set - json_set),
+                    'extra_count': len(json_set - txt_set),
+                    'common_count': len(txt_set & json_set)
+                }
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
         @app.route('/api/products', methods=['GET'])
         def get_products():
             import glob
