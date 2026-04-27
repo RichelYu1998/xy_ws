@@ -2117,20 +2117,36 @@ def main():
         print('2. 货号对比')
         print('3. Excel与JSON对比（自动保存差异日志）')
         print('4. 更新Cookie（自动更新）')
+        print('5. 启动Web服务（可视化界面）')
         print('0. 退出')
         print_separator()
         
         try:
-            choice = input('请输入选项 (0-4): ').strip()
+            choice = input('请输入选项 (0-5): ').strip()
         except (EOFError, KeyboardInterrupt):
             print('\n程序已退出')
             return
+        
+        def start_web():
+            print('\n' + '='*50)
+            print('启动Web服务')
+            print('='*50)
+            print('请运行以下命令启动Web服务：')
+            print('')
+            print('  python main.py --web')
+            print('')
+            print('或直接运行启动脚本选择Web模式：')
+            print('  ./run.sh    (Linux/Mac)')
+            print('  run.bat    (Windows)')
+            print('='*50 + '\n')
+            input('按回车键返回主菜单...')
         
         actions = {
             '1': lambda: run_scraper() or True,
             '2': lambda: StockNumberComparator().run_comparison() or True,
             '3': lambda: StockNumberComparator().compare_excel_with_json() or True,
             '4': lambda: update_cookie() or True,
+            '5': lambda: start_web() or True,
         }
         
         if choice == '0':
