@@ -2008,31 +2008,24 @@ class StockNumberComparator:
 
     def run_comparison(self):
         print('='*60)
-        print('货号对比工具')
+        print('货号对比工具 (TXT文件对比JSON)')
         print('='*60)
         
         data = self.load_json_data()
         json_stock_numbers = self.extract_stock_numbers(data)
-        print(f'已加载 {len(json_stock_numbers)} 个货号\n')
+        print(f'已从JSON加载 {len(json_stock_numbers)} 个货号\n')
         
         input_stock_numbers = None
         input_source = None
         
-        if self.excel_file and FileManager.file_exists(self.excel_file):
-            print(f'检测到Excel文件: {self.excel_file}')
-            input_stock_numbers = self.load_excel_data()
-            if input_stock_numbers:
-                input_source = 'Excel'
-                print(f'从Excel文件读取到 {len(input_stock_numbers)} 个货号\n')
-        
-        if not input_stock_numbers and FileManager.file_exists(self.input_file):
+        if FileManager.file_exists(self.input_file):
             print(f'从文件 {self.input_file} 读取输入...')
             input_str = FileManager.read_text(self.input_file)
             if input_str:
                 input_stock_numbers = self.parse_input_string(input_str)
                 if input_stock_numbers:
                     input_source = 'TXT'
-                    print(f'解析出 {len(input_stock_numbers)} 个货号\n')
+                    print(f'从TXT文件解析出 {len(input_stock_numbers)} 个货号\n')
         
         if not input_stock_numbers:
             print('未找到自动输入源，进入交互模式')
@@ -2070,20 +2063,15 @@ class StockNumberComparator:
                     continue
                 
                 if user_input.lower() in ['load', '读取']:
-                    if self.excel_file and FileManager.file_exists(self.excel_file):
-                        input_stock_numbers = self.load_excel_data()
-                        if input_stock_numbers:
-                            input_source = 'Excel'
-                            print(f'从Excel文件读取到 {len(input_stock_numbers)} 个货号\n')
-                            break
-                    
                     file_content = self.load_input_from_file()
                     if file_content:
                         input_stock_numbers = self.parse_input_string(file_content)
                         if input_stock_numbers:
                             input_source = 'TXT'
-                            print(f'从文件读取到 {len(input_stock_numbers)} 个货号\n')
+                            print(f'从TXT文件读取到 {len(input_stock_numbers)} 个货号\n')
                             break
+                    else:
+                        print('未找到TXT输入文件\n')
                 
                 if user_input:
                     input_stock_numbers = self.parse_input_string(user_input)
