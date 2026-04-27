@@ -794,11 +794,10 @@ playwright install chromium</pre>
     
     <div class="text-center mt-4 mb-4">
         <button class="btn btn-success m-1 btn-run" id="btn-run-spider" data-func="1"><i class="fa fa-spider"></i> 1. 运行爬虫</button>
-        <button class="btn btn-info m-1 btn-run" id="btn-run-sku" data-func="2"><i class="fa fa-exchange"></i> 2. 货号对比</button>
+        <button class="btn btn-info m-1 btn-sku-api" id="btn-run-sku" data-api="/api/sku/compare"><i class="fa fa-exchange"></i> 2. 货号对比</button>
         <button class="btn btn-warning m-1 btn-run" id="btn-run-excel" data-func="3"><i class="fa fa-file-excel-o"></i> 3. Excel与JSON对比</button>
         <button class="btn btn-primary m-1 btn-run" id="btn-run-cookie" data-func="4"><i class="fa fa-refresh"></i> 4. 更新Cookie</button>
         <button class="btn btn-secondary m-1" id="btn-view-products"><i class="fa fa-list"></i> 查看所有商品</button>
-        <button class="btn btn-dark m-1" id="btn-sku-compare"><i class="fa fa-balance-scale"></i> 货号对比(TXT)</button>
         <button class="btn btn-danger m-1" id="btn-stop-task" style="display: none;"><i class="fa fa-stop"></i> 停止</button>
     </div>
 
@@ -1657,41 +1656,46 @@ playwright install chromium</pre>
         
         document.getElementById('btn-view-products').addEventListener('click', showAllProducts);
         
-        document.getElementById('btn-sku-compare').addEventListener('click', function() {
-            fetch('/api/sku/compare')
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert('对比失败: ' + data.error);
-                    return;
+        document.querySelectorAll('.btn-sku-api').forEach(function(btn) {
+            btn.onclick = function() {
+                var apiUrl = this.getAttribute('data-api');
+                if (apiUrl) {
+                    fetch(apiUrl)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert('对比失败: ' + data.error);
+                            return;
+                        }
+                        
+                        showOutputPanel();
+                        const outputPanel = document.getElementById('output-panel');
+                        const existingCard = outputPanel.querySelector('.products-card');
+                        if (existingCard) existingCard.remove();
+                        
+                        let html = '<div class="products-card card mt-3" style="margin: 15px;"><div class="card-body">';
+                        html += '<h5 class="card-title">货号对比结果 (TXT vs JSON)</h5>';
+                        html += `<p><strong>JSON文件:</strong> ${data.json_file}</p>`;
+                        html += `<p><strong>TXT货号数量:</strong> ${data.txt_count} | <strong>JSON货号数量:</strong> ${data.json_count}</p>`;
+                        html += `<hr>`;
+                        html += `<p><strong>缺失货号(在TXT但不在JSON):</strong> ${data.missing_count}个</p>`;
+                        if (data.missing_in_json.length > 0) {
+                            html += `<div class="alert alert-warning">${data.missing_in_json.join(', ')}</div>`;
+                        }
+                        html += `<p><strong>多余货号(在JSON但不在TXT):</strong> ${data.extra_count}个</p>`;
+                        if (data.extra_in_json.length > 0) {
+                            html += `<div class="alert alert-info">${data.extra_in_json.slice(0, 50).join(', ')}${data.extra_in_json.length > 50 ? '...' : ''}</div>`;
+                        }
+                        html += `<p><strong>共同货号:</strong> ${data.common_count}个</p>`;
+                        html += '</div></div>';
+                        
+                        outputPanel.insertAdjacentHTML('beforeend', html);
+                    })
+                    .catch(error => {
+                        alert('请求失败: ' + error.message);
+                    });
                 }
-                
-                showOutputPanel();
-                const outputPanel = document.getElementById('output-panel');
-                const existingCard = outputPanel.querySelector('.products-card');
-                if (existingCard) existingCard.remove();
-                
-                let html = '<div class="products-card card mt-3" style="margin: 15px;"><div class="card-body">';
-                html += '<h5 class="card-title">货号对比结果 (TXT vs JSON)</h5>';
-                html += `<p><strong>JSON文件:</strong> ${data.json_file}</p>`;
-                html += `<p><strong>TXT货号数量:</strong> ${data.txt_count} | <strong>JSON货号数量:</strong> ${data.json_count}</p>`;
-                html += `<hr>`;
-                html += `<p><strong>缺失货号(在TXT但不在JSON):</strong> ${data.missing_count}个</p>`;
-                if (data.missing_in_json.length > 0) {
-                    html += `<div class="alert alert-warning">${data.missing_in_json.join(', ')}</div>`;
-                }
-                html += `<p><strong>多余货号(在JSON但不在TXT):</strong> ${data.extra_count}个</p>`;
-                if (data.extra_in_json.length > 0) {
-                    html += `<div class="alert alert-info">${data.extra_in_json.slice(0, 50).join(', ')}${data.extra_in_json.length > 50 ? '...' : ''}</div>`;
-                }
-                html += `<p><strong>共同货号:</strong> ${data.common_count}个</p>`;
-                html += '</div></div>';
-                
-                outputPanel.insertAdjacentHTML('beforeend', html);
-            })
-            .catch(error => {
-                alert('请求失败: ' + error.message);
-            });
+            };
         });
         
         document.getElementById('btn-stop-task').addEventListener('click', function() {
