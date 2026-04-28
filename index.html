@@ -1528,18 +1528,6 @@ playwright install chromium</pre>
                 });
         }
         
-        function decodeBase64Url(base64Str) {
-            try {
-                const decoded = atob(base64Str);
-                if (decoded.startsWith('http')) {
-                    return decoded;
-                }
-            } catch (e) {
-                console.log('不是Base64编码的URL');
-            }
-            return base64Str;
-        }
-        
         function showProductModal(p) {
             const images = p.图片;
             const imageList = images ? (Array.isArray(images) ? images : [images]) : [];
@@ -1563,12 +1551,11 @@ playwright install chromium</pre>
                 modalHtml += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;">`;
                 
                 validImages.forEach((img, i) => {
-                    const decodedUrl = decodeBase64Url(img);
-                    const isVideo = decodedUrl.toLowerCase().includes('.mp4') || decodedUrl.toLowerCase().includes('video');
+                    const isVideo = img.toLowerCase().includes('.mp4') || img.toLowerCase().includes('video');
                     if (isVideo) {
-                        modalHtml += `<video src="/api/image?url=${encodeURIComponent(decodedUrl)}" controls style="width:200px;height:150px;object-fit:cover;">您的浏览器不支持视频</video>`;
+                        modalHtml += `<video src="${img}" controls style="width:200px;height:150px;object-fit:cover;">您的浏览器不支持视频</video>`;
                     } else {
-                        modalHtml += `<a href="/api/image?url=${encodeURIComponent(decodedUrl)}" target="_blank"><img src="/api/image?url=${encodeURIComponent(decodedUrl)}" style="width:150px;height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;"></a>`;
+                        modalHtml += `<a href="${img}" target="_blank"><img src="${img}" style="width:150px;height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;"></a>`;
                     }
                 });
                 modalHtml += `</div>`;
