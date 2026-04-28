@@ -3461,6 +3461,7 @@ if __name__ == '__main__':
                     if p.get('货号') == sku:
                         import base64
                         media_result = []
+                        new_image_url = p.get('图片', '')
                         if new_image_url:
                             try:
                                 img_data = json.loads(new_image_url) if isinstance(new_image_url, str) else new_image_url
