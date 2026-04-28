@@ -3496,50 +3496,30 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 for p in products:
                     if str(p.get('货号')) == str(sku):
-                        # 解码Base64图片URL
-                        images = p.get('图片', [])
-                        if images and isinstance(images, list):
-                            decoded_images = []
-                            for img in images:
+                        # 解码Base64图片URL（与search接口保持一致）
+                        media_result = []
+                        new_image_url = p.get('图片', '')
+                        if new_image_url:
+                            try:
+                                img_data = json.loads(new_image_url) if isinstance(new_image_url, str) else new_image_url
+                            except:
+                                img_data = new_image_url
+                            if isinstance(img_data, list):
+                                for b64_str in img_data:
+                                    try:
+                                        media_result.append(base64.b64decode(b64_str).decode('utf-8'))
+                                    except:
+                                        media_result.append(b64_str)
+                            else:
                                 try:
-                                    decoded = base64.b64decode(img).decode('utf-8')
-                                    if decoded.startswith('http'):
-                                        decoded_images.append(decoded)
-                                    else:
-                                        decoded_images.append(img)
+                                    media_result = base64.b64decode(img_data).decode('utf-8')
                                 except:
-                                    decoded_images.append(img)
-                            p['图片'] = decoded_images
+                                    media_result = img_data
+                        p['图片'] = media_result
                         return jsonify({'found': True, 'product': p})
                 return jsonify({'found': False, 'error': '未找到该商品'})
             except Exception as e:
                 return jsonify({'found': False, 'error': str(e)})
-        
-        @app.route('/api/image', methods=['GET'])
-        def proxy_image():
-            import requests
-            url = request.args.get('url', '').strip()
-            if not url:
-                return jsonify({'error': '请提供图片URL'}), 400
-            
-            config_file = PathManager.get_config_file()
-            cookies = []
-            if os.path.exists(config_file):
-                config_data = FileManager.read_json(config_file)
-                cookies = config_data.get('cookies', [])
-            
-            try:
-                session = requests.Session()
-                for cookie in cookies:
-                    session.cookies.set(cookie['name'], cookie['value'], domain=cookie.get('domain'))
-                
-                response = session.get(url, stream=True)
-                response.raise_for_status()
-                
-                content_type = response.headers.get('content-type', 'image/jpeg')
-                return Response(response.content, content_type=content_type)
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
         
         @app.route('/api/product/search', methods=['GET'])
         def search_product():
