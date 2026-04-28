@@ -531,8 +531,9 @@ pip install openpyxl
   - `IMAGE_EXTENSIONS`: 图片文件扩展名集合
   - `VIDEO_EXTENSIONS`: 视频文件扩展名集合
   - `MEDIA_EXTENSIONS`: 媒体文件扩展名集合（图片+视频）
-  - `EXCLUDE_EXTENSIONS`: 排除的文件扩展名（.log, .sh, .py, .bat）
-- **安全性保障**：清理工具不会删除Python代码文件和其他重要配置文件
+  - `EXCLUDE_EXTENSIONS`: 排除的文件扩展名（.log, .sh, .py, .bat, .json, .md, .txt, .html, .htm, .sql, .xml, .yml, .yaml, .ini, .cfg, .conf）
+  - `EXCLUDE_FOLDERS`: 排除的文件夹（file, config, __pycache__, clean, .venv, templates, .git, .idea, node_modules, .vscode, static）
+- **安全性保障**：清理工具不会删除代码文件夹中的任何重要文件和文件夹
 - **功能测试**：所有文件清理API均已测试通过，功能正常运行
 - **提升代码健壮性**：添加浏览器路径存在性检查，确保代码在不同环境下都能正常运行
 

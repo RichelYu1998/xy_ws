@@ -50,7 +50,8 @@ def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, 
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.svg'}
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.m4v'}
 MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
-EXCLUDE_EXTENSIONS = {'.log', '.sh', '.py', '.bat'}
+EXCLUDE_EXTENSIONS = {'.log', '.sh', '.py', '.bat', '.json', '.md', '.txt', '.html', '.htm', '.sql', '.xml', '.yml', '.yaml', '.ini', '.cfg', '.conf'}
+EXCLUDE_FOLDERS = {'file', 'config', '__pycache__', 'clean', '.venv', 'templates', '.git', '.idea', 'node_modules', '.vscode', 'static'}
 
 
 def clean_old_files(
@@ -450,7 +451,10 @@ def clean_all_files(
             else:
                 logger.info(f"保留文件: {item.name}")
         elif item.is_dir():
-            folders_to_delete.append(item)
+            if item.name not in EXCLUDE_FOLDERS:
+                folders_to_delete.append(item)
+            else:
+                logger.info(f"保留文件夹: {item.name}")
 
     total_files = len(files_to_delete)
     total_folders = len(folders_to_delete)
