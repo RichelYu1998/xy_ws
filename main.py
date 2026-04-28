@@ -1998,11 +1998,13 @@ class WegoScraper:
     def parse_price(price_str):
         """解析价格字符串，返回整数价格或None"""
         if not price_str:
-            return None
-        price_clean = price_str.replace('¥', '').replace(',', '').strip()
-        if not price_clean.isdigit():
-            return None
-        return int(price_clean)
+            return None        # 移除常见的价格符号
+        price_clean = str(price_str).replace('¥', '').replace(',', '').replace('元', '').strip()
+        # 使用正则提取数字部分
+        match = re.search(r'(\d+)', price_clean)
+        if match:
+            return int(match.group(1))
+        return None
 
     def filter_high_price_products(self, data, min_price=599):
         """筛选高价商品"""
@@ -2769,15 +2771,13 @@ class StockNumberComparator:
         else:
             print('\n所有输入货号都已存在！')
         
-        if result.get('extra_in_json'):
-            print('\nJSON中多余的货号:')
-            for i, num in enumerate(result['extra_in_json'], 1):
-                print(f'  {i}. {num}')
-        
+        # 只显示售价>=599的多余货号
         if result.get('high_price_stock_numbers'):
-            print(f'\n只在JSON中存在但不在Excel中的售价>=599的货号:')
+            print('\nJSON中多余的货号(售价>=599):')
             for i, num in enumerate(result['high_price_stock_numbers'], 1):
                 print(f'  {i}. {num}')
+        else:
+            print('\nJSON中无售价>=599的多余货号')
         
         if duplicates:
             print('\n重复的序列号:')
