@@ -1747,14 +1747,27 @@ playwright install chromium</pre>
                             `;
                         }
                         
-                        if (data.extra_in_json && data.extra_in_json.length > 0) {
+                        if (data.high_price_extra_in_json && data.high_price_extra_in_json.length > 0) {
                             const chunks = [];
-                            for (let i = 0; i < data.extra_in_json.length; i += 10) {
-                                chunks.push(data.extra_in_json.slice(i, i + 10).join(', '));
+                            for (let i = 0; i < data.high_price_extra_in_json.length; i += 10) {
+                                chunks.push(data.high_price_extra_in_json.slice(i, i + 10).join(', '));
                             }
                             cardHtml += `
-                                <div class="missing-skus" style="background: #e3f2fd; border-color: #90caf9;">
-                                    <div class="missing-title" style="color: #1976d2;">JSON多余货号列表:</div>
+                                <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
+                                    <div class="missing-title" style="color: #f57c00;">JSON多余货号列表(高价商品≥599):</div>
+                                    <div class="missing-list">${chunks.join('<br>')}</div>
+                                </div>
+                            `;
+                        }
+                        
+                        if (data.high_price_existing && data.high_price_existing.length > 0) {
+                            const chunks = [];
+                            for (let i = 0; i < data.high_price_existing.length; i += 10) {
+                                chunks.push(data.high_price_existing.slice(i, i + 10).join(', '));
+                            }
+                            cardHtml += `
+                                <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
+                                    <div class="missing-title" style="color: #388e3c;">高价商品中已存在于Excel的货号:</div>
                                     <div class="missing-list">${chunks.join('<br>')}</div>
                                 </div>
                             `;
