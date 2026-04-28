@@ -1233,27 +1233,21 @@ playwright install chromium</pre>
                 `;
                 
                 if (missingSkus.length > 0) {
-                    const chunks = [];
-                    for (let i = 0; i < missingSkus.length; i += 10) {
-                        chunks.push(missingSkus.slice(i, i + 10).join(', '));
-                    }
+                    const items = missingSkus.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
                     cardHtml += `
                         <div class="missing-skus">
                             <div class="missing-title">缺失货号列表:</div>
-                            <div class="missing-list">${chunks.join('<br>')}</div>
+                            <div class="sku-container">${items}</div>
                         </div>
                     `;
                 }
                 
                 if (skuData.highPriceExtraSkus && skuData.highPriceExtraSkus.length > 0) {
-                    const chunks = [];
-                    for (let i = 0; i < skuData.highPriceExtraSkus.length; i += 10) {
-                        chunks.push(skuData.highPriceExtraSkus.slice(i, i + 10).join(', '));
-                    }
+                    const items = skuData.highPriceExtraSkus.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
                     cardHtml += `
                         <div class="missing-skus" style="background: #fff3e0; border-color: #ffcc80;">
                             <div class="missing-title" style="color: #E6A23C;">高价多余货号列表(≥599且不在Excel):</div>
-                            <div class="missing-list">${chunks.join('<br>')}</div>
+                            <div class="sku-container">${items}</div>
                         </div>
                     `;
                 }
@@ -1753,14 +1747,11 @@ playwright install chromium</pre>
                         `;
                         
                         if (data.missing_in_json && data.missing_in_json.length > 0) {
-                            const chunks = [];
-                            for (let i = 0; i < data.missing_in_json.length; i += 10) {
-                                chunks.push(data.missing_in_json.slice(i, i + 10).join(', '));
-                            }
+                            const items = data.missing_in_json.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
                             cardHtml += `
                                 <div class="missing-skus">
                                     <div class="missing-title">缺失货号列表:</div>
-                                    <div class="missing-list">${chunks.join('<br>')}</div>
+                                    <div class="sku-container">${items}</div>
                                 </div>
                             `;
                         }
