@@ -3496,10 +3496,50 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 for p in products:
                     if str(p.get('货号')) == str(sku):
+                        # 解码Base64图片URL
+                        images = p.get('图片', [])
+                        if images and isinstance(images, list):
+                            decoded_images = []
+                            for img in images:
+                                try:
+                                    decoded = base64.b64decode(img).decode('utf-8')
+                                    if decoded.startswith('http'):
+                                        decoded_images.append(decoded)
+                                    else:
+                                        decoded_images.append(img)
+                                except:
+                                    decoded_images.append(img)
+                            p['图片'] = decoded_images
                         return jsonify({'found': True, 'product': p})
                 return jsonify({'found': False, 'error': '未找到该商品'})
             except Exception as e:
                 return jsonify({'found': False, 'error': str(e)})
+        
+        @app.route('/api/image', methods=['GET'])
+        def proxy_image():
+            import requests
+            url = request.args.get('url', '').strip()
+            if not url:
+                return jsonify({'error': '请提供图片URL'}), 400
+            
+            config_file = PathManager.get_config_file()
+            cookies = []
+            if os.path.exists(config_file):
+                config_data = FileManager.read_json(config_file)
+                cookies = config_data.get('cookies', [])
+            
+            try:
+                session = requests.Session()
+                for cookie in cookies:
+                    session.cookies.set(cookie['name'], cookie['value'], domain=cookie.get('domain'))
+                
+                response = session.get(url, stream=True)
+                response.raise_for_status()
+                
+                content_type = response.headers.get('content-type', 'image/jpeg')
+                return Response(response.content, content_type=content_type)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
         
         @app.route('/api/product/search', methods=['GET'])
         def search_product():
