@@ -1359,6 +1359,22 @@ playwright install chromium</pre>
                     `;
                 }
                 
+                if (skuData.newHighPriceProducts && skuData.newHighPriceProducts.length > 0) {
+                    cardHtml += `
+                        <div class="change-section">
+                            <div class="change-title" style="color: #409EFF;">新增高价商品(≥599) (${skuData.newHighPriceProducts.length}个)</div>
+                            <div class="change-table-container">
+                                <table class="change-table">
+                                    <thead><tr><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
+                                    <tbody>
+                                        ${skuData.newHighPriceProducts.map(p => `<tr><td onclick="showProductDetail('${p.sku}')" style="cursor:pointer;color:#409EFF;">${p.sku}</td><td>${p.name ? p.name.substring(0, 20) : ''}${p.name && p.name.length > 20 ? '...' : ''}</td><td>${p.price}</td></tr>`).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                }
+                
                 cardHtml += `</div></div>`;
                 outputPanel.insertAdjacentHTML('beforeend', cardHtml);
             }
@@ -1708,11 +1724,18 @@ playwright install chromium</pre>
                     .then(response => {
                         console.log('响应状态:', response.status);
                         return response.text().then(text => {
-                            console.log('响应内容:', text.substring(0, 500));
-                            return JSON.parse(text);
+                            console.log('响应内容前500字符:', text.substring(0, 500));
+                            try {
+                                return JSON.parse(text);
+                            } catch(e) {
+                                console.error('JSON解析错误:', e);
+                                alert('数据解析错误: ' + e.message);
+                                return null;
+                            }
                         });
                     })
                     .then(data => {
+                        if (!data) return;
                         if (data.error) {
                             alert('对比失败: ' + data.error);
                             return;
@@ -1761,7 +1784,51 @@ playwright install chromium</pre>
                                         <span class="stat-label">高价商品(≥599)</span>
                                     </div>
                                 </div>
+                                <div class="comparison-stats">
+                                    <div class="stat-item ${data.added_products_count > 0 ? 'stat-success' : ''}">
+                                        <span class="stat-value">${data.added_products_count || 0}</span>
+                                        <span class="stat-label">新增商品</span>
+                                    </div>
+                                    <div class="stat-item ${data.removed_products_count > 0 ? 'stat-danger' : ''}">
+                                        <span class="stat-value">${data.removed_products_count || 0}</span>
+                                        <span class="stat-label">删除商品</span>
+                                    </div>
+                                    <div class="stat-item ${data.added_high_price_count > 0 ? 'stat-info' : ''}">
+                                        <span class="stat-value">${data.added_high_price_count || 0}</span>
+                                        <span class="stat-label">新增高价(≥599)</span>
+                                    </div>
+                                </div>
                         `;
+                        
+                        if (data.added_products && data.added_products.length > 0) {
+                            const items = data.added_products.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            cardHtml += `
+                                <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
+                                    <div class="missing-title" style="color: #2e7d32;">新增商品 (${data.added_products_count}个):</div>
+                                    <div class="sku-container">${items}</div>
+                                </div>
+                            `;
+                        }
+                        
+                        if (data.added_high_price && data.added_high_price.length > 0) {
+                            const items = data.added_high_price.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            cardHtml += `
+                                <div class="missing-skus" style="background: #e3f2fd; border-color: #64b5f6;">
+                                    <div class="missing-title" style="color: #1976d2;">新增高价商品(≥599) (${data.added_high_price_count}个):</div>
+                                    <div class="sku-container">${items}</div>
+                                </div>
+                            `;
+                        }
+                        
+                        if (data.removed_products && data.removed_products.length > 0) {
+                            const items = data.removed_products.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
+                            cardHtml += `
+                                <div class="missing-skus" style="background: #ffebee; border-color: #ef5350;">
+                                    <div class="missing-title" style="color: #c62828;">删除的商品 (${data.removed_products_count}个):</div>
+                                    <div class="sku-container">${items}</div>
+                                </div>
+                            `;
+                        }
                         
                         if (data.missing_in_json && data.missing_in_json.length > 0) {
                             const items = data.missing_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
