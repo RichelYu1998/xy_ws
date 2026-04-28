@@ -3104,8 +3104,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     if args.web:
-        init_db()
-        
         @app.route('/')
         def index():
             with open('index.html', 'r', encoding='utf-8') as f:
