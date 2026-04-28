@@ -798,6 +798,7 @@ playwright install chromium</pre>
         <button class="btn btn-primary btn-lg m-1 btn-sku-api" data-api="/api/sku/compare/excel" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-file-excel-o"></i> 3. Excel与JSON对比</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cookie" data-func="4" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-refresh"></i> 4. 更新Cookie</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-view-products" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-list"></i> 查看所有商品</span></button>
+        <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cleaner" data-func="6" onclick="showCleanerPanel()" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-trash"></i> 6. 文件清理工具</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-stop-task" style="display: none; min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-stop"></i> 停止</span></button>
     </div>
 
@@ -873,7 +874,7 @@ playwright install chromium</pre>
         let currentChoice = null;
         let pollingInterval = null;
         const VENV_PYTHON = '/Users/yu/Downloads/demo/python/.venv/bin/python';
-        const btnIds = {1: 'btn-run-spider', 2: 'btn-run-sku', 3: 'btn-run-excel', 4: 'btn-run-cookie'};
+        const btnIds = {1: 'btn-run-spider', 2: 'btn-run-sku', 3: 'btn-run-excel', 4: 'btn-run-cookie', 6: 'btn-run-cleaner'};
 
         function checkCookieStatus() {
             fetch('/api/cookie')
@@ -1777,11 +1778,129 @@ playwright install chromium</pre>
         document.querySelectorAll('.btn-run').forEach(function(btn) {
             btn.onclick = function() {
                 var choice = this.getAttribute('data-func');
-                if (choice) {
+                console.log('Button clicked:', btn.id, 'data-func:', choice);
+                if (choice && choice != '6') {
                     runFunction(parseInt(choice));
+                } else if (choice == '6') {
+                    console.log('Calling showCleanerPanel...');
+                    showCleanerPanel();
                 }
             };
         });
+        
+        function showCleanerPanel() {
+            const outputPanel = document.getElementById('output-panel');
+            outputPanel.innerHTML = `
+                <div class="output-header">
+                    <span><i class="fa fa-trash"></i> 文件清理工具</span>
+                    <button class="output-close" onclick="closeOutputPanel()"><i class="fa fa-times"></i></button>
+                </div>
+                <div style="padding: 20px;">
+                    <div class="form-group">
+                        <label><strong>清理目录:</strong></label>
+                        <input type="text" id="clean-directory" class="form-control" value="/Users/yu/Downloads/demo/python" placeholder="请输入要清理的目录">
+                    </div>
+                    <div class="form-group">
+                        <label><strong>清理模式:</strong></label>
+                        <select id="clean-mode" class="form-control">
+                            <option value="list">1. 列出文件（不删除）</option>
+                            <option value="group">2. 按组清理（保留最新的一组文件）</option>
+                            <option value="time">3. 按时间清理</option>
+                            <option value="png">4. 删除PNG文件</option>
+                            <option value="media">5. 删除媒体文件（PNG/JPG/GIF/MP4）</option>
+                            <option value="all">6. 删除所有文件和文件夹</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="minutes-group" style="display: none;">
+                        <label><strong>时间阈值（分钟）:</strong></label>
+                        <input type="number" id="clean-minutes" class="form-control" value="5" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-inline">
+                            <input type="checkbox" id="clean-dry-run" checked> 测试模式（不实际删除）
+                        </label>
+                    </div>
+                    <button id="btn-execute-clean" class="btn btn-danger btn-lg btn-block" style="margin-top: 20px;">
+                        <i class="fa fa-play"></i> 执行清理
+                    </button>
+                </div>
+                <div class="output-content" id="clean-output" style="display: none;"></div>
+                <div class="output-status" id="clean-status"></div>
+            `;
+            outputPanel.style.display = 'block';
+            outputPanel.scrollIntoView({ behavior: 'smooth' });
+            
+            document.getElementById('clean-mode').addEventListener('change', function() {
+                document.getElementById('minutes-group').style.display = this.value === 'time' ? 'block' : 'none';
+            });
+            
+            document.getElementById('btn-execute-clean').addEventListener('click', executeClean);
+        }
+        
+        function executeClean() {
+            const mode = document.getElementById('clean-mode').value;
+            const directory = document.getElementById('clean-directory').value || '/Users/yu/Downloads/demo/python';
+            const dryRun = document.getElementById('clean-dry-run').checked;
+            const minutes = document.getElementById('clean-minutes').value || 5;
+            
+            const btn = document.getElementById('btn-execute-clean');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 执行中...';
+            
+            const outputDiv = document.getElementById('clean-output');
+            const statusDiv = document.getElementById('clean-status');
+            outputDiv.style.display = 'block';
+            outputDiv.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
+            
+            let apiUrl = '';
+            let data = { directory, dry_run: dryRun };
+            
+            switch(mode) {
+                case 'list':
+                    apiUrl = '/api/clean/list';
+                    break;
+                case 'group':
+                    apiUrl = '/api/clean/group';
+                    break;
+                case 'time':
+                    apiUrl = '/api/clean/time';
+                    data.minutes = parseInt(minutes);
+                    break;
+                case 'png':
+                    apiUrl = '/api/clean/png';
+                    break;
+                case 'media':
+                    apiUrl = '/api/clean/media';
+                    break;
+                case 'all':
+                    apiUrl = '/api/clean/all';
+                    break;
+            }
+            
+            fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(result.output) + '</pre>';
+                    statusDiv.innerHTML = '<span style="color: #67c23a;">✓ 执行完成</span>';
+                } else {
+                    outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败: ' + result.error + '</span>';
+                    statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败</span>';
+                }
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
+            })
+            .catch(error => {
+                outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败: ' + error.message + '</span>';
+                statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败</span>';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
+            });
+        }
         
     </script>
 </body>
