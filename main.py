@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 from flask import Flask, request, jsonify, send_file, Response
-import pymysql
 
 
 def format_size(size_bytes: int) -> str:
@@ -838,38 +837,6 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 VENV_PYTHON = os.path.join(PROJECT_DIR, '.venv', 'bin', 'python')
 
 app = Flask(__name__)
-
-MYSQL_CONFIG = {
-    'host': 'localhost',
-    'port': 3306,
-    'user': 'root',
-    'password': 'Ty961106',
-    'database': 'products_db',
-    'charset': 'utf8mb4'
-}
-
-def get_db_connection():
-    return pymysql.connect(**MYSQL_CONFIG)
-
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS product_details (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            sku VARCHAR(255) UNIQUE NOT NULL,
-            product_desc TEXT,
-            price VARCHAR(255),
-            cost_price VARCHAR(255),
-            staff VARCHAR(255),
-            remark TEXT,
-            image_url TEXT,
-            filename VARCHAR(255),
-            searched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
 
 processes = {}
 tasks = {}
@@ -2205,53 +2172,7 @@ class WegoScraper:
         if change_summary:
             print(f'{change_summary}')
             
-        # 将数据保存到数据库
-        self.save_to_database(data, os.path.basename(new_filename))
-    
-    def save_to_database(self, products, filename):
-        """将商品数据保存到数据库"""
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            inserted_count = 0
-            updated_count = 0
-            
-            for product in products:
-                sku = product.get('货号', '').strip()
-                product_desc = product.get('商品描述', product.get('商品名称', '')).strip()[:65535]
-                price = product.get('售价', '').strip()[:255]
-                cost_price = product.get('拿货价', '').strip()[:255]
-                staff = product.get('员工', '').strip()[:255]
-                remark = product.get('备注', '').strip()[:65535]
-                image_url = product.get('图片', '').strip()[:65535]
-                
-                if not sku:
-                    continue
-                
-                sql = """
-                    REPLACE INTO product_details 
-                    (sku, product_desc, price, cost_price, staff, remark, image_url, filename, searched_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
-                """
-                
-                cursor.execute(sql, (sku, product_desc, price, cost_price, staff, remark, image_url, filename))
-                
-                if cursor.rowcount > 0:
-                    # 判断是插入还是更新
-                    # REPLACE 返回的是新插入的行数，如果主键冲突会先删除再插入
-                    inserted_count += 1
-            
-            conn.commit()
-            cursor.close()
-            conn.close()
-            
-            print(f'已将 {len([p for p in products if p.get("货号", "").strip()])} 条商品数据保存到数据库')
-            
-        except Exception as e:
-            print(f'保存到数据库失败: {e}')
-            import traceback
-            traceback.print_exc()
+        
 
     async def run(self):
         start_time = time.time()
@@ -3540,14 +3461,6 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 for p in products:
                     if p.get('货号') == sku:
-                        conn = get_db_connection()
-                        cursor = conn.cursor()
-                        new_image_url = p.get('图片', '')
-                        if isinstance(new_image_url, list):
-                            new_image_url = json.dumps(new_image_url)
-                        cursor.execute('''INSERT INTO product_details (sku, product_desc, price, cost_price, staff, remark, image_url, filename, searched_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW()) ON DUPLICATE KEY UPDATE product_desc = VALUES(product_desc), price = VALUES(price), cost_price = VALUES(cost_price), staff = VALUES(staff), remark = VALUES(remark), image_url = VALUES(image_url), filename = VALUES(filename), searched_at = VALUES(searched_at)''', (p.get('货号', ''), p.get('商品描述', ''), p.get('售价', ''), p.get('拿货价', ''), p.get('员工', ''), p.get('备注', ''), new_image_url, os.path.basename(latest_file)))
-                        conn.commit()
-                        conn.close()
                         import base64
                         media_result = []
                         if new_image_url:
