@@ -831,7 +831,7 @@ def print_separator(char='=', length=60):
     """打印分隔线"""
     print(char * length)
 
-VERSION = "2.7.1"
+VERSION = "2.8.0"
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 VENV_PYTHON = os.path.join(PROJECT_DIR, '.venv', 'bin', 'python')
@@ -2298,7 +2298,7 @@ class StockNumberComparator:
         numbers = re.split(r'[,，\s;；\n\t]+', cleaned)
         return [num.strip() for num in numbers if num.strip()]
 
-    def load_excel_data(self, excel_file=None):
+    def load_excel_data(self, excel_file=None, remove_duplicates=True):
         if excel_file is None:
             excel_file = self.excel_file
         
@@ -2329,7 +2329,7 @@ class StockNumberComparator:
                     if number_match:
                         stock_numbers.append(cell_str)
             
-            stock_numbers = list(set(stock_numbers))
+            stock_numbers = list(set(stock_numbers)) if remove_duplicates else stock_numbers
             print(f'从Excel文件的E列中读取到 {len(stock_numbers)} 个货号')
             return stock_numbers
         except Exception as e:
@@ -2596,7 +2596,7 @@ class StockNumberComparator:
                 and WegoScraper.parse_price(p.get('售价', '')) >= 599
             ]
             
-            excel_stock_numbers = self.load_excel_data()
+            excel_stock_numbers = self.load_excel_data(remove_duplicates=False)
             if not excel_stock_numbers:
                 print('无法从Excel文件读取货号')
                 return False
@@ -2622,14 +2622,14 @@ class StockNumberComparator:
             
             data_change = "数据无变化" if result['missing_count'] == 0 and result['extra_in_json_count'] == 0 else f"数据有变化：缺失 {result['missing_count']} 个货号，多余 {result['extra_in_json_count']} 个货号"
             
-            added_products = [self._get_product_detail(p) for p in products if p.get('货号') and p.get('货号') not in excel_set] if products else []
+            added_products = sorted([p.get('货号') for p in products if p.get('货号') and p.get('货号') not in excel_set]) if products else []
             
             removed_products = []
             prev_file = FileManager.get_latest_json_file('微购相册')
             if prev_file and prev_file != latest_json_file:
                 old_data = FileManager.read_json(prev_file)
                 if old_data and isinstance(old_data, dict):
-                    removed_products = [self._get_product_detail(item) for item in old_data.get('商品列表', []) if item.get('货号') and item.get('货号') not in json_set]
+                    removed_products = sorted([item.get('货号') for item in old_data.get('商品列表', []) if item.get('货号') and item.get('货号') not in json_set])
             
             diff_data = {
                 'timestamp': timestamp,
@@ -2640,13 +2640,15 @@ class StockNumberComparator:
                     'missing_description': '微购相册比本地表格多出的序列号仅供参考',
                     'existing_description': '本地表格比微购相册上多的序列号，请仔细核对后删除多出的地方',
                     'extra_in_json_description': '微购相册比本地表格多出的序列号',
-                    'high_price_extra_in_json': high_price_extra_in_json,
-                    'high_price_extra_in_json_count': len(high_price_extra_in_json),
+                    'high_price_extra_in_json': high_price_extra,
+                    'high_price_extra_in_json_count': len(high_price_extra),
                     'high_price_extra_in_json_description': '只在JSON中存在但不在Excel中的售价>=599的货号',
                     **result
                 },
-                'result_message': self.get_result_message(result, []),
+                'result_message': self.get_result_message(result, duplicates),
                 'data_change': data_change,
+                'duplicates': duplicates,
+                'duplicates_count': len(duplicates),
                 '新增商品': added_products,
                 '新增商品数量': len(added_products),
                 '删除商品': removed_products,
@@ -2654,10 +2656,11 @@ class StockNumberComparator:
             }
             
             self._save_diff_log(date_str, diff_data)
-            self._add_high_price_info_to_json(latest_json_file, json_data, high_price_extra_in_json)
+            self._add_high_price_info_to_json(latest_json_file, json_data, high_price_extra)
             self._add_diff_to_json_summary(latest_json_file, json_data, diff_data)
             
-            self.print_comparison_result(result, [])
+            duplicates = self.find_duplicate_stock_numbers(excel_stock_numbers)
+            self.print_comparison_result(result, duplicates)
             return True
         except Exception as e:
             print(f'对比失败: {e}')
@@ -3391,7 +3394,12 @@ if __name__ == '__main__':
                 json_sku_counts = {}
                 for sku in json_stock_numbers:
                     json_sku_counts[sku] = json_sku_counts.get(sku, 0) + 1
-                duplicate_skus = {sku: count for sku, count in json_sku_counts.items() if count > 1}
+                duplicate_skus_json = {sku: count for sku, count in json_sku_counts.items() if count > 1}
+                
+                excel_sku_counts = {}
+                for sku in excel_stock_numbers:
+                    excel_sku_counts[sku] = excel_sku_counts.get(sku, 0) + 1
+                duplicate_skus = {sku: count for sku, count in excel_sku_counts.items() if count > 1}
                 
                 high_price_count = 0
                 high_price_stock_numbers = []
@@ -3413,6 +3421,42 @@ if __name__ == '__main__':
                 high_price_existing = sorted(list(high_price_set & excel_set))
                 high_price_extra_in_json = sorted(list(high_price_set - excel_set))
                 
+                # 新增高价商品：与上一个JSON文件对比，新增的售价>=599的商品
+                added_products_all = []
+                added_high_price = []
+                prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')))
+                prev_stock_numbers = set()
+                if len(prev_json_files) > 1:
+                    prev_json = prev_json_files[-2]
+                    with open(prev_json, 'r', encoding='utf-8') as f:
+                        prev_data = json.load(f)
+                    prev_products = prev_data.get('商品列表', []) if isinstance(prev_data, dict) else prev_data
+                    prev_stock_numbers = set([p.get('货号', '') for p in prev_products if p.get('货号')])
+                
+                for p in products:
+                    sku = p.get('货号', '')
+                    if sku and sku not in prev_stock_numbers:
+                        added_products_all.append(sku)
+                        price = p.get('售价', '')
+                        try:
+                            price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
+                            if price_val >= 599:
+                                added_high_price.append(sku)
+                        except:
+                            pass
+                
+                added_high_price = sorted(added_high_price)
+                
+                removed_products = []
+                prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')))
+                if len(prev_json_files) > 1:
+                    prev_json = prev_json_files[-2]
+                    with open(prev_json, 'r', encoding='utf-8') as f:
+                        prev_data = json.load(f)
+                    prev_products = prev_data.get('商品列表', []) if isinstance(prev_data, dict) else prev_data
+                    prev_stock_numbers = set([p.get('货号', '') for p in prev_products if p.get('货号')])
+                    removed_products = sorted(list(prev_stock_numbers - json_set))
+                
                 result = {
                     'type': 'excel',
                     'json_file': os.path.basename(latest_json),
@@ -3421,14 +3465,24 @@ if __name__ == '__main__':
                     'json_count': len(json_set),
                     'common_count': len(excel_set & json_set),
                     'duplicate_count': len(duplicate_skus),
+                    'duplicate_count_json': len(duplicate_skus_json),
+                    'duplicate_count_excel': len(duplicate_skus),
                     'high_price_count': high_price_count,
                     'missing_in_json': sorted(list(excel_set - json_set)),
                     'extra_in_json': sorted(list(json_set - excel_set)),
                     'common': sorted(list(excel_set & json_set)),
                     'duplicates': duplicate_skus,
+                    'duplicates_json': duplicate_skus_json,
+                    'duplicates_excel': duplicate_skus,
                     'missing_count': len(excel_set - json_set),
                     'high_price_extra_in_json': high_price_extra_in_json,
-                    'high_price_existing': high_price_existing
+                    'high_price_existing': high_price_existing,
+                    'added_high_price': added_high_price,
+                    'added_high_price_count': len(added_high_price),
+                    'added_products': sorted(added_products_all)[:100],
+                    'added_products_count': len(added_products_all),
+                    'removed_products': removed_products[:100],
+                    'removed_products_count': len(removed_products)
                 }
                 return jsonify(result)
             except Exception as e:
