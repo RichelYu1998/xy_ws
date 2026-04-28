@@ -2602,9 +2602,20 @@ class StockNumberComparator:
                 return False
             
             json_set, excel_set = set(json_stock_numbers), set(excel_stock_numbers)
-            high_price_extra_in_json = [n for n in high_price_stock_numbers if n in json_set - excel_set]
             
-            result = self.compare_stock_numbers(json_stock_numbers, excel_stock_numbers, high_price_extra_in_json)
+            # 高价商品与已存在货号的对比
+            high_price_set = set(high_price_stock_numbers)
+            existing_set = json_set & excel_set  # 已存在的货号
+            
+            # 高价商品中已存在于Excel的货号
+            high_price_existing = sorted(list(high_price_set & existing_set))
+            # 高价商品中不在Excel的货号（多余的）
+            high_price_extra = sorted(list(high_price_set - excel_set))
+            
+            # 保存对比结果
+            result = self.compare_stock_numbers(json_stock_numbers, excel_stock_numbers, high_price_extra)
+            result['high_price_existing'] = high_price_existing
+            result['high_price_existing_count'] = len(high_price_existing)
             
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             date_str = datetime.now().strftime('%Y%m%d')
@@ -2771,14 +2782,25 @@ class StockNumberComparator:
         else:
             print('\n所有输入货号都已存在！')
         
-        # 显示高价商品中多余的货号（售价>=599且不在Excel中）
+        # 显示高价商品(≥599)与已存在货号的对比结果
+        print('\n=== 高价商品(≥599)与已存在货号对比 ===')
+        print(f"高价商品总数: {len(result.get('high_price_stock_numbers', []))}")
+        print(f"已存在于Excel的高价商品: {result.get('high_price_existing_count', 0)}")
+        print(f"不在Excel的高价商品(多余): {result.get('high_price_count', 0)}")
+        
+        if result.get('high_price_existing'):
+            print('\n高价商品中已存在于Excel的货号:')
+            for i, num in enumerate(result['high_price_existing'], 1):
+                print(f'  {num}', end=', ' if i % 5 != 0 else '\n')
+            print()
+        
         if result.get('high_price_stock_numbers'):
-            print('\nJSON多余货号列表:')
+            print('\nJSON多余货号列表(高价商品):')
             for i, num in enumerate(result['high_price_stock_numbers'], 1):
                 print(f'  {num}', end=', ' if i % 5 != 0 else '\n')
             print()
         else:
-            print('\nJSON多余货号列表: 无')
+            print('\nJSON多余货号列表(高价商品): 无')
         
         if duplicates:
             print('\n重复的序列号:')
