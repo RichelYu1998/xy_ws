@@ -1,6 +1,6 @@
 {
   "生成日期": "20260428",
-  "时间戳": "2026-04-28 08:33:46",
+  "时间戳": "2026-04-28 09:00:40",
   "成功获取": "89 个商品",
   "商品列表": [
     {
@@ -1680,6 +1680,19 @@
     },
     {
       "timestamp": "2026-04-28 08:33:46",
+      "date": "20260428",
+      "latest_file": "20260428微购相册(小旭数码).json",
+      "second_file": "20260428微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-04-28 09:00:40",
       "date": "20260428",
       "latest_file": "20260428微购相册(小旭数码).json",
       "second_file": "20260428微购相册(小旭数码)_cache.json",
