@@ -2771,13 +2771,14 @@ class StockNumberComparator:
         else:
             print('\n所有输入货号都已存在！')
         
-        # 只显示售价>=599的多余货号
+        # 显示高价商品中多余的货号（售价>=599且不在Excel中）
         if result.get('high_price_stock_numbers'):
-            print('\nJSON中多余的货号(售价>=599):')
+            print('\nJSON多余货号列表:')
             for i, num in enumerate(result['high_price_stock_numbers'], 1):
-                print(f'  {i}. {num}')
+                print(f'  {num}', end=', ' if i % 5 != 0 else '\n')
+            print()
         else:
-            print('\nJSON中无售价>=599的多余货号')
+            print('\nJSON多余货号列表: 无')
         
         if duplicates:
             print('\n重复的序列号:')
