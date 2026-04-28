@@ -659,6 +659,7 @@ pip install openpyxl
 - **新增本地Chrome检测**：Linux系统优先检测 `/chrome-linux64/chrome` 路径
 - **支持离线运行**：无需联网下载Chrome，可直接使用本地已有的浏览器
 - **修复Python 3.7兼容性**：将playwright版本调整为1.35.0以支持Python 3.7
+- **修复Flask缺失**：添加flask>=2.0.0到依赖列表
 
 ### v2.5.12 (2026-04-12)
 - **优化系统检测逻辑**：统一Windows、Mac和Linux系统的浏览器路径检测
