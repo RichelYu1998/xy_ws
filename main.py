@@ -3480,6 +3480,27 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
+        @app.route('/api/product', methods=['GET'])
+        def get_product():
+            sku = request.args.get('sku', '').strip()
+            if not sku:
+                return jsonify({'error': '请提供货号'}), 400
+            import glob
+            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+            if not json_files:
+                return jsonify({'found': False, 'error': '没有找到JSON文件'})
+            latest_file = max(json_files, key=os.path.getmtime)
+            try:
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                products = data.get('商品列表', []) if isinstance(data, dict) else data
+                for p in products:
+                    if str(p.get('货号')) == str(sku):
+                        return jsonify({'found': True, 'product': p})
+                return jsonify({'found': False, 'error': '未找到该商品'})
+            except Exception as e:
+                return jsonify({'found': False, 'error': str(e)})
+        
         @app.route('/api/product/search', methods=['GET'])
         def search_product():
             sku = request.args.get('sku', '').strip()

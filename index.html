@@ -1511,6 +1511,23 @@ playwright install chromium</pre>
             });
         }
         
+        function showProductDetail(sku) {
+            fetch(`/api/product?sku=${encodeURIComponent(sku)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.found) {
+                        const p = data.product;
+                        showProductModal(p);
+                    } else {
+                        alert(data.error || '未找到该商品');
+                    }
+                })
+                .catch(error => {
+                    console.error('查询失败:', error);
+                    alert('查询失败: ' + error.message);
+                });
+        }
+        
         function showProductModal(p) {
             const images = p.图片;
             const imageList = images ? (Array.isArray(images) ? images : [images]) : [];
@@ -1747,7 +1764,7 @@ playwright install chromium</pre>
                         `;
                         
                         if (data.missing_in_json && data.missing_in_json.length > 0) {
-                            const items = data.missing_in_json.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
+                            const items = data.missing_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                             cardHtml += `
                                 <div class="missing-skus">
                                     <div class="missing-title">缺失货号列表:</div>
@@ -1757,7 +1774,7 @@ playwright install chromium</pre>
                         }
                         
                         if (data.high_price_extra_in_json && data.high_price_extra_in_json.length > 0) {
-                            const items = data.high_price_extra_in_json.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
+                            const items = data.high_price_extra_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
                                     <div class="missing-title" style="color: #f57c00;">JSON多余货号列表(高价商品≥599):</div>
@@ -1767,7 +1784,7 @@ playwright install chromium</pre>
                         }
                         
                         if (data.high_price_existing && data.high_price_existing.length > 0) {
-                            const items = data.high_price_existing.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
+                            const items = data.high_price_existing.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
                                     <div class="missing-title" style="color: #388e3c;">高价商品中已存在于Excel的货号:</div>
