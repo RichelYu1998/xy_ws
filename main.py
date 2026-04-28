@@ -3496,26 +3496,28 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 for p in products:
                     if str(p.get('货号')) == str(sku):
-                        # 解码Base64图片URL（与search接口保持一致）
-                        media_result = []
-                        new_image_url = p.get('图片', '')
-                        if new_image_url:
-                            try:
-                                img_data = json.loads(new_image_url) if isinstance(new_image_url, str) else new_image_url
-                            except:
-                                img_data = new_image_url
-                            if isinstance(img_data, list):
-                                for b64_str in img_data:
+                        # 解码Base64图片URL
+                        images = p.get('图片', [])
+                        if images:
+                            if isinstance(images, list):
+                                decoded_images = []
+                                for img in images:
                                     try:
-                                        media_result.append(base64.b64decode(b64_str).decode('utf-8'))
+                                        decoded = base64.b64decode(img).decode('utf-8')
+                                        decoded_images.append(decoded)
                                     except:
-                                        media_result.append(b64_str)
-                            else:
+                                        decoded_images.append(img)
+                                p['图片'] = decoded_images
+                            elif isinstance(images, str):
                                 try:
-                                    media_result = base64.b64decode(img_data).decode('utf-8')
+                                    decoded = base64.b64decode(images).decode('utf-8')
+                                    p['图片'] = [decoded]
                                 except:
-                                    media_result = img_data
-                        p['图片'] = media_result
+                                    p['图片'] = [images]
+                            else:
+                                p['图片'] = []
+                        else:
+                            p['图片'] = []
                         return jsonify({'found': True, 'product': p})
                 return jsonify({'found': False, 'error': '未找到该商品'})
             except Exception as e:
