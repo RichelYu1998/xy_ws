@@ -1762,8 +1762,8 @@ playwright install chromium</pre>
                         
                         if (data.high_price_existing && data.high_price_existing.length > 0) {
                             const chunks = [];
-                            for (let i = 0; i < data.high_price_existing.length; i += 10) {
-                                chunks.push(data.high_price_existing.slice(i, i + 10).join(', '));
+                            for (let i = 0; i < data.high_price_existing.length; i += 5) {
+                                chunks.push(data.high_price_existing.slice(i, i + 5).join(', '));
                             }
                             cardHtml += `
                                 <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
