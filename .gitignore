@@ -1,0 +1,17 @@
+# Virtual environment
+.venv/
+
+# IDE files
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Output files
+file/
+*.json
+
+# OS files
+.DS_Store
+Thumbs.db
