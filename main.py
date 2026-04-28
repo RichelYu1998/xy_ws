@@ -831,7 +831,7 @@ def print_separator(char='=', length=60):
     """打印分隔线"""
     print(char * length)
 
-VERSION = "2.5.21"
+VERSION = "2.7.1"
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 VENV_PYTHON = os.path.join(PROJECT_DIR, '.venv', 'bin', 'python')
@@ -3482,6 +3482,7 @@ if __name__ == '__main__':
 
         @app.route('/api/product', methods=['GET'])
         def get_product():
+            import base64
             sku = request.args.get('sku', '').strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}), 400
