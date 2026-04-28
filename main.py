@@ -1328,7 +1328,10 @@ class WegoScraper:
             if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
                 chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
         elif system == 'Linux':
-            if os.path.exists('/usr/bin/google-chrome'):
+            # 优先检测 /chrome-linux64 目录下的Chrome
+            if os.path.exists('/chrome-linux64/chrome'):
+                chrome_path = '/chrome-linux64/chrome'
+            elif os.path.exists('/usr/bin/google-chrome'):
                 chrome_path = '/usr/bin/google-chrome'
         
         return chrome_path
