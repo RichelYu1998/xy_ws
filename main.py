@@ -52,6 +52,7 @@ VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.m
 MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 EXCLUDE_EXTENSIONS = {'.log', '.sh', '.py', '.bat', '.json', '.md', '.txt', '.html', '.htm', '.sql', '.xml', '.yml', '.yaml', '.ini', '.cfg', '.conf'}
 EXCLUDE_FOLDERS = {'file', 'config', '__pycache__', 'clean', '.venv', 'templates', '.git', '.idea', 'node_modules', '.vscode', 'static'}
+EXCLUDE_FILE_NAMES = {'.DS_Store', 'Thumbs.db', '.gitkeep', '.gitignore'}  # 特殊文件名保护
 
 
 def clean_old_files(
@@ -446,7 +447,9 @@ def clean_all_files(
     for item in directory.iterdir():
         if item.is_file():
             ext = item.suffix.lower()
-            if ext not in EXCLUDE_EXTENSIONS:
+            if item.name in EXCLUDE_FILE_NAMES:
+                logger.info(f"保留文件: {item.name}")
+            elif ext not in EXCLUDE_EXTENSIONS:
                 files_to_delete.append(item)
             else:
                 logger.info(f"保留文件: {item.name}")
