@@ -3404,6 +3404,11 @@ if __name__ == '__main__':
                         except:
                             pass
                 
+                # 高价商品与已存在货号的对比
+                high_price_set = set(high_price_stock_numbers)
+                high_price_existing = sorted(list(high_price_set & excel_set))
+                high_price_extra_in_json = sorted(list(high_price_set - excel_set))
+                
                 result = {
                     'type': 'excel',
                     'json_file': os.path.basename(latest_json),
@@ -3417,7 +3422,9 @@ if __name__ == '__main__':
                     'extra_in_json': sorted(list(json_set - excel_set)),
                     'common': sorted(list(excel_set & json_set)),
                     'duplicates': duplicate_skus,
-                    'missing_count': len(excel_set - json_set)
+                    'missing_count': len(excel_set - json_set),
+                    'high_price_extra_in_json': high_price_extra_in_json,
+                    'high_price_existing': high_price_existing
                 }
                 return jsonify(result)
             except Exception as e:
