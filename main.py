@@ -3394,6 +3394,7 @@ if __name__ == '__main__':
                 duplicate_skus = {sku: count for sku, count in json_sku_counts.items() if count > 1}
                 
                 high_price_count = 0
+                high_price_stock_numbers = []
                 for p in products:
                     price = p.get('售价', '')
                     if price:
@@ -3401,6 +3402,9 @@ if __name__ == '__main__':
                             price_val = float(price.replace('¥', '').replace(',', ''))
                             if price_val >= 599:
                                 high_price_count += 1
+                                sku = p.get('货号', '')
+                                if sku:
+                                    high_price_stock_numbers.append(str(sku))
                         except:
                             pass
                 
