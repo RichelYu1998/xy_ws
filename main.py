@@ -9,11 +9,816 @@ import shutil
 import subprocess
 import threading
 import uuid
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Optional
 
 from flask import Flask, request, jsonify, send_file, Response
 import pymysql
+
+
+def format_size(size_bytes: int) -> str:
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} PB"
+
+
+def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, stream=None) -> logging.Logger:
+    logger = logging.getLogger('FileCleaner')
+    logger.setLevel(log_level)
+    logger.handlers.clear()
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    console_handler = logging.StreamHandler(stream)
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    if log_file:
+        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    return logger
+
+
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.svg'}
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.m4v'}
+MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
+EXCLUDE_EXTENSIONS = {'.log', '.sh', '.py', '.bat'}
+
+
+def clean_old_files(
+        directory: str,
+        dry_run: bool = False,
+        log_file: Optional[str] = None,
+        log_level: int = logging.INFO,
+        stream=None
+) -> None:
+    logger = setup_logger(log_file, log_level, stream)
+    logger.info("=" * 60)
+    logger.info("开始清理旧文件")
+    logger.info(f"清理目录: {directory}")
+    logger.info(f"保留规则: 最新的一组文件（'_'前完全一致的为一组）")
+    logger.info(f"排序方式: 按文件下载到本地的毫秒时间")
+    logger.info(f"测试模式: {'是' if dry_run else '否'}")
+    logger.info("=" * 60)
+
+    directory = Path(directory)
+
+    if not directory.exists():
+        logger.error(f"目录不存在: {directory}")
+        return
+
+    if not directory.is_dir():
+        logger.error(f"路径不是目录: {directory}")
+        return
+
+    matched_files = []
+    logger.info("扫描文件中...")
+    for file in directory.iterdir():
+        if file.is_file():
+            ext = file.suffix.lower()
+            if ext in MEDIA_EXTENSIONS:
+                file_stat = file.stat()
+                mtime = file_stat.st_mtime
+                download_time = datetime.fromtimestamp(mtime)
+
+                name_without_ext = file.stem
+                if '_' in name_without_ext:
+                    group_key = name_without_ext.split('_')[0]
+                else:
+                    group_key = name_without_ext
+
+                matched_files.append({
+                    'file': file,
+                    'group_key': group_key,
+                    'ext': ext,
+                    'is_image': ext in IMAGE_EXTENSIONS,
+                    'is_video': ext in VIDEO_EXTENSIONS,
+                    'mtime': mtime,
+                    'size': file_stat.st_size,
+                    'download_time': download_time
+                })
+
+    if not matched_files:
+        logger.warning("没有找到图片或视频文件")
+        return
+
+    matched_files.sort(key=lambda x: x['mtime'], reverse=True)
+    logger.info(f"按文件下载到本地的毫秒时间排序（从最新到最旧）")
+
+    total_files = len(matched_files)
+    image_count = sum(1 for f in matched_files if f['is_image'])
+    video_count = sum(1 for f in matched_files if f['is_video'])
+    total_size = sum(f['size'] for f in matched_files)
+
+    logger.info(f"找到 {total_files} 个符合条件的文件")
+    logger.info(f"  - 图片: {image_count} 个")
+    logger.info(f"  - 视频: {video_count} 个")
+    logger.info(f"  - 总大小: {format_size(total_size)}")
+
+    groups = {}
+    for file_info in matched_files:
+        group_key = file_info['group_key']
+        if group_key not in groups:
+            groups[group_key] = []
+        groups[group_key].append(file_info)
+
+    def get_group_latest_mtime(group_key):
+        group_files = groups[group_key]
+        return max(f['mtime'] for f in group_files)
+
+    sorted_group_keys = sorted(groups.keys(), key=get_group_latest_mtime, reverse=True)
+
+    logger.info(f"共 {len(groups)} 组文件（按'_'前部分分组）")
+    for i, group_key in enumerate(sorted_group_keys[:5], 1):
+        group_files = groups[group_key]
+        latest_file = max(group_files, key=lambda x: x['mtime'])
+        group_time = latest_file['download_time'].strftime('%Y-%m-%d %H:%M:%S')
+        group_images = sum(1 for f in group_files if f['is_image'])
+        group_videos = sum(1 for f in group_files if f['is_video'])
+        logger.info(
+            f"  组{i}: {group_key} - {len(group_files)}个文件 (图片:{group_images}, 视频:{group_videos}, 最新下载时间:{group_time})")
+
+    if len(sorted_group_keys) > 5:
+        logger.info(f"  ... 还有 {len(sorted_group_keys) - 5} 组")
+
+    latest_group_key = sorted_group_keys[0]
+    latest_group = groups[latest_group_key]
+    latest_file = max(latest_group, key=lambda x: x['mtime'])
+    latest_time_str = latest_file['download_time'].strftime('%Y-%m-%d %H:%M:%S')
+
+    logger.info(f"\n将保留最新的一组文件（组名: {latest_group_key}, 最新下载时间: {latest_time_str}）")
+    logger.info(f"  该组共 {len(latest_group)} 个文件")
+    logger.info(f"  将删除其他 {len(sorted_group_keys) - 1} 组旧文件，共 {total_files - len(latest_group)} 个文件")
+
+    logger.info("\n文件列表（从最新到最旧）：")
+    for i, file_info in enumerate(matched_files[:10], 1):
+        is_latest = file_info['group_key'] == latest_group_key
+        status = "保留" if is_latest else "删除"
+        file_type = "图片" if file_info['is_image'] else "视频"
+        download_time_str = file_info['download_time'].strftime('%Y-%m-%d %H:%M:%S')
+        logger.info(
+            f"{i:3d}. [{status}] {file_info['file'].name} ({file_type}, {format_size(file_info['size'])}, 下载时间: {download_time_str})")
+
+    if len(matched_files) > 10:
+        logger.info(f"... 还有 {len(matched_files) - 10} 个文件")
+
+    files_to_delete = [f for f in matched_files if f['group_key'] != latest_group_key]
+
+    if not files_to_delete:
+        logger.info("没有需要删除的文件")
+        logger.info("清理完成")
+        return
+
+    delete_size = sum(f['size'] for f in files_to_delete)
+    logger.info(f"\n准备删除 {len(files_to_delete)} 个旧文件，释放空间: {format_size(delete_size)}")
+
+    for file_info in files_to_delete:
+        file_type = "图片" if file_info['is_image'] else "视频"
+        download_time_str = file_info['download_time'].strftime('%Y-%m-%d %H:%M:%S')
+        logger.info(
+            f"  - {file_info['file'].name} ({file_type}, {format_size(file_info['size'])}, 下载时间: {download_time_str})")
+
+    if dry_run:
+        logger.info("\n[测试模式] 未实际删除文件")
+        logger.info("清理完成（测试模式）")
+        return
+
+    logger.info("\n开始删除文件...")
+    deleted_count = 0
+    failed_count = 0
+    deleted_size = 0
+
+    for file_info in files_to_delete:
+        try:
+            file_info['file'].unlink()
+            deleted_count += 1
+            deleted_size += file_info['size']
+            logger.info(f"已删除: {file_info['file'].name} ({format_size(file_info['size'])})")
+        except PermissionError:
+            logger.error(f"删除失败（权限不足）: {file_info['file'].name}")
+            failed_count += 1
+        except FileNotFoundError:
+            logger.warning(f"文件不存在（可能已被删除）: {file_info['file'].name}")
+            failed_count += 1
+        except Exception as e:
+            logger.error(f"删除失败 {file_info['file'].name}: {e}")
+            failed_count += 1
+
+    logger.info("\n" + "=" * 60)
+    logger.info("清理完成")
+    logger.info(f"成功删除: {deleted_count} 个文件，释放空间: {format_size(deleted_size)}")
+    if failed_count > 0:
+        logger.warning(f"删除失败: {failed_count} 个文件")
+    logger.info("=" * 60)
+
+
+def clean_old_files_by_time(
+        directory: str,
+        minutes: int = 5,
+        dry_run: bool = False,
+        log_file: Optional[str] = None,
+        log_level: int = logging.INFO,
+        stream=None
+) -> None:
+    logger = setup_logger(log_file, log_level, stream)
+    logger.info("=" * 60)
+    logger.info("开始按时间清理旧文件")
+    logger.info(f"清理目录: {directory}")
+    logger.info(f"删除规则: 删除 {minutes} 分钟前下载到本地的所有文件")
+    logger.info(f"测试模式: {'是' if dry_run else '否'}")
+    logger.info("=" * 60)
+
+    directory = Path(directory)
+
+    if not directory.exists():
+        logger.error(f"目录不存在: {directory}")
+        return
+
+    if not directory.is_dir():
+        logger.error(f"路径不是目录: {directory}")
+        return
+
+    matched_files = []
+    logger.info("扫描文件中...")
+
+    current_time = datetime.now()
+    cutoff_time = current_time.timestamp() - (minutes * 60)
+
+    for file in directory.iterdir():
+        if file.is_file():
+            ext = file.suffix.lower()
+            if ext in MEDIA_EXTENSIONS:
+                file_stat = file.stat()
+                mtime = file_stat.st_mtime
+                download_time = datetime.fromtimestamp(mtime)
+
+                matched_files.append({
+                    'file': file,
+                    'ext': ext,
+                    'is_image': ext in IMAGE_EXTENSIONS,
+                    'is_video': ext in VIDEO_EXTENSIONS,
+                    'mtime': mtime,
+                    'size': file_stat.st_size,
+                    'download_time': download_time
+                })
+
+    if not matched_files:
+        logger.warning("没有找到图片或视频文件")
+        return
+
+    matched_files.sort(key=lambda x: x['mtime'], reverse=True)
+
+    total_files = len(matched_files)
+    image_count = sum(1 for f in matched_files if f['is_image'])
+    video_count = sum(1 for f in matched_files if f['is_video'])
+    total_size = sum(f['size'] for f in matched_files)
+
+    logger.info(f"找到 {total_files} 个符合条件的文件")
+    logger.info(f"  - 图片: {image_count} 个")
+    logger.info(f"  - 视频: {video_count} 个")
+    logger.info(f"  - 总大小: {format_size(total_size)}")
+
+    cutoff_time_str = datetime.fromtimestamp(cutoff_time).strftime('%Y-%m-%d %H:%M:%S')
+    current_time_str = current_time.strftime('%Y-%m-%d %H:%M:%S')
+
+    logger.info(f"\n当前时间: {current_time_str}")
+    logger.info(f"删除时间阈值: {cutoff_time_str} ( {minutes} 分钟前)")
+
+    files_to_delete = [f for f in matched_files if f['mtime'] < cutoff_time]
+    files_to_keep = [f for f in matched_files if f['mtime'] >= cutoff_time]
+
+    logger.info(f"\n将保留 {len(files_to_keep)} 个文件（{minutes} 分钟内下载的）")
+    logger.info(f"将删除 {len(files_to_delete)} 个文件（{minutes} 分钟前下载的）")
+
+    if not files_to_delete:
+        logger.info("没有需要删除的文件")
+        logger.info("清理完成")
+        return
+
+    delete_size = sum(f['size'] for f in files_to_delete)
+    logger.info(f"\n准备删除 {len(files_to_delete)} 个旧文件，释放空间: {format_size(delete_size)}")
+
+    logger.info("\n将要删除的文件列表：")
+    for i, file_info in enumerate(files_to_delete, 1):
+        file_type = "图片" if file_info['is_image'] else "视频"
+        download_time_str = file_info['download_time'].strftime('%Y-%m-%d %H:%M:%S')
+        time_diff = (current_time - file_info['download_time']).total_seconds() / 60
+        logger.info(
+            f"{i:3d}. {file_info['file'].name} ({file_type}, {format_size(file_info['size'])}, 下载时间: {download_time_str}, {time_diff:.1f}分钟前)")
+
+    if dry_run:
+        logger.info("\n[测试模式] 未实际删除文件")
+        logger.info("清理完成（测试模式）")
+        return
+
+    logger.info("\n开始删除文件...")
+    deleted_count = 0
+    failed_count = 0
+    deleted_size = 0
+
+    for file_info in files_to_delete:
+        try:
+            file_info['file'].unlink()
+            deleted_count += 1
+            deleted_size += file_info['size']
+            logger.info(f"已删除: {file_info['file'].name} ({format_size(file_info['size'])})")
+        except PermissionError:
+            logger.error(f"删除失败（权限不足）: {file_info['file'].name}")
+            failed_count += 1
+        except FileNotFoundError:
+            logger.warning(f"文件不存在（可能已被删除）: {file_info['file'].name}")
+            failed_count += 1
+        except Exception as e:
+            logger.error(f"删除失败 {file_info['file'].name}: {e}")
+            failed_count += 1
+
+    logger.info("\n" + "=" * 60)
+    logger.info("清理完成")
+    logger.info(f"成功删除: {deleted_count} 个文件，释放空间: {format_size(deleted_size)}")
+    if failed_count > 0:
+        logger.warning(f"删除失败: {failed_count} 个文件")
+    logger.info("=" * 60)
+
+
+def list_files(
+        directory: str,
+        log_file: Optional[str] = None,
+        log_level: int = logging.INFO,
+        stream=None
+) -> None:
+    logger = setup_logger(log_file, log_level, stream)
+    logger.info("=" * 60)
+    logger.info("扫描文件列表")
+    logger.info(f"扫描目录: {directory}")
+    logger.info(f"排序方式: 按文件下载到本地的毫秒时间")
+    logger.info("=" * 60)
+
+    directory = Path(directory)
+
+    if not directory.exists():
+        logger.error(f"目录不存在: {directory}")
+        return
+
+    matched_files = []
+    logger.info("扫描文件中...")
+    for file in directory.iterdir():
+        if file.is_file():
+            ext = file.suffix.lower()
+            if ext in MEDIA_EXTENSIONS:
+                file_stat = file.stat()
+                mtime = file_stat.st_mtime
+                download_time = datetime.fromtimestamp(mtime)
+
+                matched_files.append({
+                    'file': file,
+                    'ext': ext,
+                    'is_image': ext in IMAGE_EXTENSIONS,
+                    'is_video': ext in VIDEO_EXTENSIONS,
+                    'mtime': mtime,
+                    'size': file_stat.st_size,
+                    'download_time': download_time
+                })
+
+    if not matched_files:
+        logger.warning("没有找到图片或视频文件")
+        return
+
+    matched_files.sort(key=lambda x: x['mtime'], reverse=True)
+
+    total_files = len(matched_files)
+    image_count = sum(1 for f in matched_files if f['is_image'])
+    video_count = sum(1 for f in matched_files if f['is_video'])
+    total_size = sum(f['size'] for f in matched_files)
+
+    logger.info(f"找到 {total_files} 个符合条件的文件")
+    logger.info(f"  - 图片: {image_count} 个")
+    logger.info(f"  - 视频: {video_count} 个")
+    logger.info(f"  - 总大小: {format_size(total_size)}")
+
+    logger.info("\n文件列表：")
+    for i, file_info in enumerate(matched_files, 1):
+        file_type = "图片" if file_info['is_image'] else "视频"
+        download_time_str = file_info['download_time'].strftime('%Y-%m-%d %H:%M:%S')
+        logger.info(
+            f"{i:3d}. {file_info['file'].name} ({file_type}, {format_size(file_info['size'])}, 下载时间: {download_time_str})")
+
+    logger.info("\n扫描完成")
+
+
+def clean_all_files(
+        directory: str,
+        dry_run: bool = False,
+        log_file: Optional[str] = None,
+        log_level: int = logging.INFO,
+        stream=None
+) -> None:
+    logger = setup_logger(log_file, log_level, stream)
+    logger.info("=" * 60)
+    logger.info("开始删除所有文件和文件夹")
+    logger.info(f"清理目录: {directory}")
+    logger.info(f"删除规则: 删除所有文件和文件夹，除了 log, sh, py, bat 格式的文件")
+    logger.info(f"测试模式: {'是' if dry_run else '否'}")
+    logger.info("=" * 60)
+
+    directory = Path(directory)
+
+    if not directory.exists():
+        logger.error(f"目录不存在: {directory}")
+        return
+
+    if not directory.is_dir():
+        logger.error(f"路径不是目录: {directory}")
+        return
+
+    files_to_delete = []
+    folders_to_delete = []
+    logger.info("扫描文件和文件夹中...")
+
+    for item in directory.iterdir():
+        if item.is_file():
+            ext = item.suffix.lower()
+            if ext not in EXCLUDE_EXTENSIONS:
+                files_to_delete.append(item)
+            else:
+                logger.info(f"保留文件: {item.name}")
+        elif item.is_dir():
+            folders_to_delete.append(item)
+
+    total_files = len(files_to_delete)
+    total_folders = len(folders_to_delete)
+    total_size = sum(file.stat().st_size for file in files_to_delete)
+
+    logger.info(f"找到 {total_files} 个文件和 {total_folders} 个文件夹")
+    logger.info(f"  - 总大小: {format_size(total_size)}")
+
+    if not files_to_delete and not folders_to_delete:
+        logger.warning("没有需要删除的文件或文件夹")
+        logger.info("清理完成")
+        return
+
+    logger.info(f"\n将删除 {total_files} 个文件和 {total_folders} 个文件夹")
+
+    if files_to_delete:
+        logger.info("\n将要删除的文件列表：")
+        for i, file in enumerate(files_to_delete, 1):
+            file_size = file.stat().st_size
+            logger.info(f"{i:3d}. {file.name} ({format_size(file_size)})")
+
+    if folders_to_delete:
+        logger.info("\n将要删除的文件夹列表：")
+        for i, folder in enumerate(folders_to_delete, 1):
+            logger.info(f"{i:3d}. {folder.name}")
+
+    if dry_run:
+        logger.info("\n[测试模式] 未实际删除文件和文件夹")
+        logger.info("清理完成（测试模式）")
+        return
+
+    logger.info("\n开始删除文件...")
+    deleted_files_count = 0
+    deleted_folders_count = 0
+    deleted_size = 0
+    failed_count = 0
+
+    for file in files_to_delete:
+        try:
+            file_size = file.stat().st_size
+            file.unlink()
+            deleted_files_count += 1
+            deleted_size += file_size
+            logger.info(f"已删除文件: {file.name} ({format_size(file_size)})")
+        except PermissionError:
+            logger.error(f"删除文件失败（权限不足）: {file.name}")
+            failed_count += 1
+        except FileNotFoundError:
+            logger.warning(f"文件不存在（可能已被删除）: {file.name}")
+            failed_count += 1
+        except Exception as e:
+            logger.error(f"删除文件失败 {file.name}: {e}")
+            failed_count += 1
+
+    for folder in folders_to_delete:
+        try:
+            shutil.rmtree(folder)
+            deleted_folders_count += 1
+            logger.info(f"已删除文件夹: {folder.name}")
+        except PermissionError:
+            logger.error(f"删除文件夹失败（权限不足）: {folder.name}")
+            failed_count += 1
+        except FileNotFoundError:
+            logger.warning(f"文件夹不存在（可能已被删除）: {folder.name}")
+            failed_count += 1
+        except Exception as e:
+            logger.error(f"删除文件夹失败 {folder.name}: {e}")
+            failed_count += 1
+
+    logger.info("\n" + "=" * 60)
+    logger.info("清理完成")
+    logger.info(f"成功删除: {deleted_files_count} 个文件，{deleted_folders_count} 个文件夹，释放空间: {format_size(deleted_size)}")
+    if failed_count > 0:
+        logger.warning(f"删除失败: {failed_count} 个项目")
+    logger.info("=" * 60)
+
+
+def clean_png_files(
+        directory: str,
+        dry_run: bool = False,
+        log_file: Optional[str] = None,
+        log_level: int = logging.INFO,
+        stream=None
+) -> None:
+    logger = setup_logger(log_file, log_level, stream)
+    logger.info("=" * 60)
+    logger.info("开始删除PNG文件")
+    logger.info(f"清理目录: {directory}")
+    logger.info(f"删除规则: 删除所有以.png结尾的文件，不保留任何文件")
+    logger.info(f"测试模式: {'是' if dry_run else '否'}")
+    logger.info("=" * 60)
+
+    directory = Path(directory)
+
+    if not directory.exists():
+        logger.error(f"目录不存在: {directory}")
+        return
+
+    if not directory.is_dir():
+        logger.error(f"路径不是目录: {directory}")
+        return
+
+    matched_files = []
+    logger.info("扫描文件中...")
+
+    for file in directory.iterdir():
+        if file.is_file() and file.name.lower().endswith('.png'):
+            file_stat = file.stat()
+            mtime = file_stat.st_mtime
+            download_time = datetime.fromtimestamp(mtime)
+
+            matched_files.append({
+                'file': file,
+                'main_num': file.name,
+                'sub_num': 0,
+                'ext': '.png',
+                'is_image': True,
+                'is_video': False,
+                'mtime': mtime,
+                'size': file_stat.st_size,
+                'download_time': download_time
+            })
+
+    if not matched_files:
+        logger.warning("没有找到PNG文件")
+        return
+
+    matched_files.sort(key=lambda x: x['mtime'], reverse=True)
+
+    total_files = len(matched_files)
+    total_size = sum(f['size'] for f in matched_files)
+
+    logger.info(f"找到 {total_files} 个PNG文件")
+    logger.info(f"  - 总大小: {format_size(total_size)}")
+
+    logger.info(f"\n将删除所有 {total_files} 个PNG文件，释放空间: {format_size(total_size)}")
+
+    logger.info("\n文件列表：")
+    for i, file_info in enumerate(matched_files, 1):
+        download_time_str = file_info['download_time'].strftime('%Y-%m-%d %H:%M:%S')
+        logger.info(
+            f"{i:3d}. {file_info['file'].name} ({format_size(file_info['size'])}, 下载时间: {download_time_str})")
+
+    if dry_run:
+        logger.info("\n[测试模式] 未实际删除文件")
+        logger.info("清理完成（测试模式）")
+        return
+
+    logger.info("\n开始删除文件...")
+    deleted_count = 0
+    failed_count = 0
+    deleted_size = 0
+
+    for file_info in matched_files:
+        try:
+            file_info['file'].unlink()
+            deleted_count += 1
+            deleted_size += file_info['size']
+            logger.info(f"已删除: {file_info['file'].name} ({format_size(file_info['size'])})")
+        except PermissionError:
+            logger.error(f"删除失败（权限不足）: {file_info['file'].name}")
+            failed_count += 1
+        except FileNotFoundError:
+            logger.warning(f"文件不存在（可能已被删除）: {file_info['file'].name}")
+            failed_count += 1
+        except Exception as e:
+            logger.error(f"删除失败 {file_info['file'].name}: {e}")
+            failed_count += 1
+
+    logger.info("\n" + "=" * 60)
+    logger.info("清理完成")
+    logger.info(f"成功删除: {deleted_count} 个文件，释放空间: {format_size(deleted_size)}")
+    if failed_count > 0:
+        logger.warning(f"删除失败: {failed_count} 个文件")
+    logger.info("=" * 60)
+
+
+def clean_media_files(
+        directory: str,
+        dry_run: bool = False,
+        log_file: Optional[str] = None,
+        log_level: int = logging.INFO,
+        stream=None
+) -> None:
+    logger = setup_logger(log_file, log_level, stream)
+    logger.info("=" * 60)
+    logger.info("开始删除媒体文件")
+    logger.info(f"清理目录: {directory}")
+    logger.info(f"删除规则: 删除所有以.png、.jpg、.gif和.mp4结尾的文件，不保留任何文件")
+    logger.info(f"测试模式: {'是' if dry_run else '否'}")
+    logger.info("=" * 60)
+
+    valid_extensions = {'.png', '.jpg', '.gif', '.mp4'}
+
+    directory = Path(directory)
+
+    if not directory.exists():
+        logger.error(f"目录不存在: {directory}")
+        return
+
+    if not directory.is_dir():
+        logger.error(f"路径不是目录: {directory}")
+        return
+
+    matched_files = []
+    logger.info("扫描文件中...")
+
+    for file in directory.iterdir():
+        if file.is_file():
+            ext = file.name.lower().split('.')[-1] if '.' in file.name else ''
+            ext_with_dot = f'.{ext}' if ext else ''
+
+            if ext_with_dot in valid_extensions:
+                file_stat = file.stat()
+                mtime = file_stat.st_mtime
+                download_time = datetime.fromtimestamp(mtime)
+
+                matched_files.append({
+                    'file': file,
+                    'main_num': file.name,
+                    'sub_num': 0,
+                    'ext': ext_with_dot,
+                    'is_image': ext_with_dot in {'.png', '.jpg', '.gif'},
+                    'is_video': ext_with_dot == '.mp4',
+                    'mtime': mtime,
+                    'size': file_stat.st_size,
+                    'download_time': download_time
+                })
+
+    if not matched_files:
+        logger.warning("没有找到PNG、JPG、GIF或MP4文件")
+        return
+
+    matched_files.sort(key=lambda x: x['mtime'], reverse=True)
+
+    total_files = len(matched_files)
+    png_count = sum(1 for f in matched_files if f['ext'] == '.png')
+    jpg_count = sum(1 for f in matched_files if f['ext'] == '.jpg')
+    gif_count = sum(1 for f in matched_files if f['ext'] == '.gif')
+    video_count = sum(1 for f in matched_files if f['is_video'])
+    total_size = sum(f['size'] for f in matched_files)
+
+    logger.info(f"找到 {total_files} 个媒体文件")
+    logger.info(f"  - PNG图片: {png_count} 个")
+    logger.info(f"  - JPG图片: {jpg_count} 个")
+    logger.info(f"  - GIF图片: {gif_count} 个")
+    logger.info(f"  - MP4视频: {video_count} 个")
+    logger.info(f"  - 总大小: {format_size(total_size)}")
+
+    logger.info(f"\n将删除所有 {total_files} 个媒体文件，释放空间: {format_size(total_size)}")
+
+    logger.info("\n文件列表：")
+    for i, file_info in enumerate(matched_files, 1):
+        if file_info['ext'] == '.png':
+            file_type = "PNG图片"
+        elif file_info['ext'] == '.jpg':
+            file_type = "JPG图片"
+        elif file_info['ext'] == '.gif':
+            file_type = "GIF图片"
+        else:
+            file_type = "MP4视频"
+        download_time_str = file_info['download_time'].strftime('%Y-%m-%d %H:%M:%S')
+        logger.info(
+            f"{i:3d}. {file_info['file'].name} ({file_type}, {format_size(file_info['size'])}, 下载时间: {download_time_str})")
+
+    if dry_run:
+        logger.info("\n[测试模式] 未实际删除文件")
+        logger.info("清理完成（测试模式）")
+        return
+
+    logger.info("\n开始删除文件...")
+    deleted_count = 0
+    failed_count = 0
+    deleted_size = 0
+
+    for file_info in matched_files:
+        try:
+            file_info['file'].unlink()
+            deleted_count += 1
+            deleted_size += file_info['size']
+            if file_info['ext'] == '.png':
+                file_type = "PNG图片"
+            elif file_info['ext'] == '.jpg':
+                file_type = "JPG图片"
+            elif file_info['ext'] == '.gif':
+                file_type = "GIF图片"
+            else:
+                file_type = "MP4视频"
+            logger.info(f"已删除: {file_info['file'].name} ({file_type}, {format_size(file_info['size'])})")
+        except PermissionError:
+            logger.error(f"删除失败（权限不足）: {file_info['file'].name}")
+            failed_count += 1
+        except FileNotFoundError:
+            logger.warning(f"文件不存在（可能已被删除）: {file_info['file'].name}")
+            failed_count += 1
+        except Exception as e:
+            logger.error(f"删除失败 {file_info['file'].name}: {e}")
+            failed_count += 1
+
+    logger.info("\n" + "=" * 60)
+    logger.info("清理完成")
+    logger.info(f"成功删除: {deleted_count} 个文件，释放空间: {format_size(deleted_size)}")
+    if failed_count > 0:
+        logger.warning(f"删除失败: {failed_count} 个文件")
+    logger.info("=" * 60)
+
+
+def run_cleaner():
+    """文件清理工具主函数"""
+    print_separator()
+    print('文件清理工具')
+    print_separator()
+    
+    default_dir = os.path.dirname(os.path.abspath(__file__))
+    print(f"默认清理目录: {default_dir}")
+    
+    while True:
+        print('\n请选择清理模式：')
+        print('1. 按组清理（保留最新的一组文件）')
+        print('2. 按时间清理（删除指定分钟前的文件）')
+        print('3. 列出文件（不删除）')
+        print('4. 删除所有文件和文件夹')
+        print('5. 删除PNG文件')
+        print('6. 删除媒体文件（PNG/JPG/GIF/MP4）')
+        print('0. 返回主菜单')
+        print_separator()
+        
+        try:
+            choice = input('请输入选项 (0-6): ').strip()
+        except (EOFError, KeyboardInterrupt):
+            print('\n已退出清理工具')
+            return
+        
+        if choice == '0':
+            print('返回主菜单')
+            return
+        
+        # 获取目录
+        dir_input = input(f'请输入清理目录（回车使用默认目录 {default_dir}）: ').strip()
+        directory = dir_input if dir_input else default_dir
+        
+        # 询问是否测试模式
+        dry_run_input = input('是否启用测试模式（不实际删除文件）？(y/n): ').strip().lower()
+        dry_run = dry_run_input in ['y', 'yes', '是']
+        
+        log_file = os.path.join(directory, 'clean_files.log')
+        
+        if choice == '1':
+            clean_old_files(directory=directory, dry_run=dry_run, log_file=log_file)
+        elif choice == '2':
+            try:
+                minutes = int(input('请输入分钟数（默认5分钟）: ').strip() or '5')
+                clean_old_files_by_time(directory=directory, minutes=minutes, dry_run=dry_run, log_file=log_file)
+            except ValueError:
+                print('无效的分钟数，使用默认值5分钟')
+                clean_old_files_by_time(directory=directory, minutes=5, dry_run=dry_run, log_file=log_file)
+        elif choice == '3':
+            list_files(directory=directory, log_file=log_file)
+        elif choice == '4':
+            clean_all_files(directory=directory, dry_run=dry_run, log_file=log_file)
+        elif choice == '5':
+            clean_png_files(directory=directory, dry_run=dry_run, log_file=log_file)
+        elif choice == '6':
+            clean_media_files(directory=directory, dry_run=dry_run, log_file=log_file)
+        else:
+            print('无效的选项')
+        
+        input('\n按回车键继续...')
 
 
 def print_separator(char='=', length=60):
@@ -2166,11 +2971,12 @@ def main():
         print('3. Excel与JSON对比（自动保存差异日志）')
         print('4. 更新Cookie（自动更新）')
         print('5. 启动Web服务（可视化界面）')
+        print('6. 文件清理工具')
         print('0. 退出')
         print_separator()
         
         try:
-            choice = input('请输入选项 (0-5): ').strip()
+            choice = input('请输入选项 (0-6): ').strip()
         except (EOFError, KeyboardInterrupt):
             print('\n程序已退出')
             return
@@ -2195,6 +3001,7 @@ def main():
             '3': lambda: StockNumberComparator().compare_excel_with_json() or True,
             '4': lambda: update_cookie() or True,
             '5': lambda: start_web() or True,
+            '6': lambda: run_cleaner() or True,
         }
         
         if choice == '0':
@@ -2757,6 +3564,102 @@ if __name__ == '__main__':
                 return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
+
+        @app.route('/api/clean/list', methods=['POST'])
+        def api_clean_list():
+            try:
+                import io
+                data = request.get_json()
+                directory = data.get('directory', PROJECT_DIR)
+                log_file = os.path.join(directory, 'clean_files.log')
+                
+                log_stream = io.StringIO()
+                list_files(directory=directory, log_file=log_file, stream=log_stream)
+                
+                return jsonify({'success': True, 'output': log_stream.getvalue()})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
+        @app.route('/api/clean/group', methods=['POST'])
+        def api_clean_group():
+            try:
+                import io
+                data = request.get_json()
+                directory = data.get('directory', PROJECT_DIR)
+                dry_run = data.get('dry_run', False)
+                log_file = os.path.join(directory, 'clean_files.log')
+                
+                log_stream = io.StringIO()
+                clean_old_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                
+                return jsonify({'success': True, 'output': log_stream.getvalue()})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
+        @app.route('/api/clean/time', methods=['POST'])
+        def api_clean_time():
+            try:
+                import io
+                data = request.get_json()
+                directory = data.get('directory', PROJECT_DIR)
+                minutes = data.get('minutes', 5)
+                dry_run = data.get('dry_run', False)
+                log_file = os.path.join(directory, 'clean_files.log')
+                
+                log_stream = io.StringIO()
+                clean_old_files_by_time(directory=directory, minutes=minutes, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                
+                return jsonify({'success': True, 'output': log_stream.getvalue()})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
+        @app.route('/api/clean/all', methods=['POST'])
+        def api_clean_all():
+            try:
+                import io
+                data = request.get_json()
+                directory = data.get('directory', PROJECT_DIR)
+                dry_run = data.get('dry_run', False)
+                log_file = os.path.join(directory, 'clean_files.log')
+                
+                log_stream = io.StringIO()
+                clean_all_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                
+                return jsonify({'success': True, 'output': log_stream.getvalue()})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
+        @app.route('/api/clean/png', methods=['POST'])
+        def api_clean_png():
+            try:
+                import io
+                data = request.get_json()
+                directory = data.get('directory', PROJECT_DIR)
+                dry_run = data.get('dry_run', False)
+                log_file = os.path.join(directory, 'clean_files.log')
+                
+                log_stream = io.StringIO()
+                clean_png_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                
+                return jsonify({'success': True, 'output': log_stream.getvalue()})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
+        @app.route('/api/clean/media', methods=['POST'])
+        def api_clean_media():
+            try:
+                import io
+                data = request.get_json()
+                directory = data.get('directory', PROJECT_DIR)
+                dry_run = data.get('dry_run', False)
+                log_file = os.path.join(directory, 'clean_files.log')
+                
+                log_stream = io.StringIO()
+                clean_media_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                
+                return jsonify({'success': True, 'output': log_stream.getvalue()})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
 
         print("=" * 50)
         print("Szwego商品爬虫 - Web服务")
