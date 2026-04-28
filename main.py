@@ -3568,14 +3568,22 @@ if __name__ == '__main__':
                             if isinstance(img_data, list):
                                 for b64_str in img_data:
                                     try:
-                                        media_result.append(base64.b64decode(b64_str).decode('utf-8'))
+                                        decoded_url = base64.b64decode(b64_str).decode('utf-8')
+                                        if decoded_url.startswith('http'):
+                                            media_result.append(decoded_url)
+                                        else:
+                                            media_result.append(b64_str)
                                     except:
                                         media_result.append(b64_str)
                             else:
                                 try:
-                                    media_result = base64.b64decode(img_data).decode('utf-8')
+                                    decoded_url = base64.b64decode(img_data).decode('utf-8')
+                                    if decoded_url.startswith('http'):
+                                        media_result = [decoded_url]
+                                    else:
+                                        media_result = [img_data]
                                 except:
-                                    media_result = img_data
+                                    media_result = [img_data]
                         p['图片'] = media_result
                         return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
                 return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
