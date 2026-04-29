@@ -548,6 +548,9 @@ pip install openpyxl
   - 修复新增商品显示为[object Object]的问题
   - 修复后端返回数据类型问题，统一返回货号字符串列表
 
+### v2.7.2 (2026-04-29)
+- **修复/api/clean/list文件显示格式**：将`list_files`函数改为显示所有非排除类型的文件，支持图片、视频和其他文件分类统计，与`/api/clean/all`保持一致的显示范围
+
 ### v2.7.1 (2026-04-28)
 - **修复商品详情页图片加载问题**：在`/api/product`接口中添加`import base64`语句，确保Base64编码的图片URL能正确解码为实际地址
 - **功能测试**：测试`/api/products`和`/api/product`接口，图片显示功能正常运行
