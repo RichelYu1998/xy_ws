@@ -373,7 +373,9 @@ def list_files(
     for file in directory.iterdir():
         if file.is_file():
             ext = file.suffix.lower()
-            if ext in MEDIA_EXTENSIONS:
+            if file.name in EXCLUDE_FILE_NAMES:
+                continue
+            elif ext not in EXCLUDE_EXTENSIONS:
                 file_stat = file.stat()
                 mtime = file_stat.st_mtime
                 download_time = datetime.fromtimestamp(mtime)
@@ -389,7 +391,7 @@ def list_files(
                 })
 
     if not matched_files:
-        logger.warning("没有找到图片或视频文件")
+        logger.warning("没有找到需要显示的文件")
         return
 
     matched_files.sort(key=lambda x: x['mtime'], reverse=True)
@@ -397,16 +399,23 @@ def list_files(
     total_files = len(matched_files)
     image_count = sum(1 for f in matched_files if f['is_image'])
     video_count = sum(1 for f in matched_files if f['is_video'])
+    other_count = total_files - image_count - video_count
     total_size = sum(f['size'] for f in matched_files)
 
     logger.info(f"找到 {total_files} 个符合条件的文件")
     logger.info(f"  - 图片: {image_count} 个")
     logger.info(f"  - 视频: {video_count} 个")
+    logger.info(f"  - 其他: {other_count} 个")
     logger.info(f"  - 总大小: {format_size(total_size)}")
 
     logger.info("\n文件列表：")
     for i, file_info in enumerate(matched_files, 1):
-        file_type = "图片" if file_info['is_image'] else "视频"
+        if file_info['is_image']:
+            file_type = "图片"
+        elif file_info['is_video']:
+            file_type = "视频"
+        else:
+            file_type = "其他"
         download_time_str = file_info['download_time'].strftime('%Y-%m-%d %H:%M:%S')
         logger.info(
             f"{i:3d}. {file_info['file'].name} ({file_type}, {format_size(file_info['size'])}, 下载时间: {download_time_str})")
