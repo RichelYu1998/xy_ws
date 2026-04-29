@@ -520,6 +520,20 @@ pip install openpyxl
 
 ## 更新日志
 
+### v2.9.3 (2026-04-29)
+- **Cookie更新前自动清空机制**：
+  - 网页端点击"更新Cookie"按钮时，先自动清空 `cookies.json` 文件
+  - 清空 `config.json` 中的 cookie 相关配置
+  - 然后启动浏览器进行登录，确保获取全新的 cookie
+  - 避免旧 cookie 残留导致登录异常
+- **新增 Cookie 状态提示 API**：
+  - 新增 `/api/cookie/clear` 接口，支持在更新前清空 cookie
+  - 网页端 Cookie 状态检测优化，过期/即将过期时显示醒目提示
+- **Cookie 更新安全性提升**：
+  - 更新前验证 Cookie 有效性
+  - 只在获取到有效新 Cookie 时才更新文件
+  - 避免无效 Cookie 覆盖原有有效 Cookie
+
 ### v2.9.2 (2026-04-29)
 - **商品列表联动滚动功能优化**：
   - 改进同步滚动算法，找到屏幕中心最近的行进行匹配
