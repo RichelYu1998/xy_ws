@@ -551,7 +551,7 @@ pip install openpyxl
 ### v2.7.2 (2026-04-29)
 - **修复/api/clean/list文件显示格式**：将`list_files`函数改为显示所有非排除类型的文件，支持图片、视频和其他文件分类统计，与`/api/clean/all`保持一致的显示范围
 
-### v2.7.1 (2026-04-28)
+### v2.7.1 (2026-04-27)
 - **修复商品详情页图片加载问题**：在`/api/product`接口中添加`import base64`语句，确保Base64编码的图片URL能正确解码为实际地址
 - **功能测试**：测试`/api/products`和`/api/product`接口，图片显示功能正常运行
 
@@ -613,8 +613,7 @@ pip install openpyxl
   - 通过headers传递Cookie解决Playwright兼容性问题
   - 优化了albumId的提取逻辑
 
-### v2.5.21 (2026-04-16)
-- **支持多平台Excel路径配置**：在config.json中配置excel_files数组，支持Windows和macOS多路径
+### v2.5.20 (2026-04-16)
 - **自动轮询检测**：程序自动按顺序检测每个路径，找到第一个存在的文件
 - **兼容旧版本**：保留excel_file单路径配置，优先使用excel_files数组
 - **路径展开**：支持~展开为用户主目录
