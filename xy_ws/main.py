@@ -840,7 +840,7 @@ def print_separator(char='=', length=60):
     """打印分隔线"""
     print(char * length)
 
-VERSION = "2.9.0"
+VERSION = "2.9.3"
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 VENV_PYTHON = os.path.join(PROJECT_DIR, '.venv', 'bin', 'python')
@@ -3101,24 +3101,36 @@ def update_cookie():
                 cookies = await context.cookies()
                 szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
                 
-                FileManager.write_json(cookie_file, szwego_cookies)
-                
-                print(f'✓ Cookie已保存到 {cookie_file}')
-                print(f'✓ 共保存 {len(szwego_cookies)} 个Cookie')
+                # 检查Cookie是否有效，如果无效或为空则保留原有Cookie
+                if not szwego_cookies:
+                    print('⚠️ 未获取到有效Cookie，保留原有Cookie')
+                else:
+                    # 验证Cookie是否有实质内容（value长度>10）
+                    valid_cookies = [c for c in szwego_cookies if c.get('value') and len(c.get('value', '')) > 10]
+                    if not valid_cookies:
+                        print('⚠️ Cookie内容无效，保留原有Cookie')
+                        szwego_cookies = []
+                    else:
+                        FileManager.write_json(cookie_file, szwego_cookies)
+                        print(f'✓ Cookie已保存到 {cookie_file}')
+                        print(f'✓ 共保存 {len(szwego_cookies)} 个Cookie')
                 
                 config_file = PathManager.get_config_file()
                 if FileManager.file_exists(config_file):
-                    config_data = FileManager.read_json(config_file)
+                    config_data = FileManager.read_json(config_file) or {}
                     
-                    cookie_header = '; '.join([f'{c["name"]}={c["value"]}' for c in szwego_cookies])
-                    
-                    if 'headers' not in config_data:
-                        config_data['headers'] = {}
-                    config_data['headers']['cookie'] = cookie_header
-                    config_data['cookies'] = szwego_cookies
-                    
-                    FileManager.write_json(config_file, config_data)
-                    print('✓ config.json中的Cookie已更新')
+                    if szwego_cookies:
+                        cookie_header = '; '.join([f'{c["name"]}={c["value"]}' for c in szwego_cookies])
+                        
+                        if 'headers' not in config_data:
+                            config_data['headers'] = {}
+                        config_data['headers']['cookie'] = cookie_header
+                        config_data['cookies'] = szwego_cookies
+                        
+                        FileManager.write_json(config_file, config_data)
+                        print('✓ config.json中的Cookie已更新')
+                    else:
+                        print('⚠️ 跳过config.json更新，保留原有配置')
                 
                 await browser.close()
                 print('✓ 浏览器已自动关闭')
@@ -3241,6 +3253,26 @@ if __name__ == '__main__':
                 return jsonify({'valid': True, 'expires': expires_time.strftime('%Y-%m-%d %H:%M:%S'), 'hours_remaining': round(hours_remaining, 1), 'expired': hours_remaining <= 0, 'system': system})
             except Exception as e:
                 return jsonify({'error': str(e), 'valid': False}), 500
+        
+        @app.route('/api/cookie/clear', methods=['POST'])
+        def clear_cookie():
+            cookie_file = os.path.join(PROJECT_DIR, 'config', 'cookies.json')
+            config_file = os.path.join(PROJECT_DIR, 'config', 'config.json')
+            try:
+                with open(cookie_file, 'w', encoding='utf-8') as f:
+                    json.dump([], f)
+                if os.path.exists(config_file):
+                    with open(config_file, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                    if 'headers' in config and 'cookie' in config['headers']:
+                        del config['headers']['cookie']
+                    if 'cookies' in config:
+                        del config['cookies']
+                    with open(config_file, 'w', encoding='utf-8') as f:
+                        json.dump(config, f, ensure_ascii=False, indent=2)
+                return jsonify({'success': True, 'message': 'Cookie已清空'})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)}), 500
 
         @app.route('/api/sku/compare', methods=['GET'])
         def compare_sku():

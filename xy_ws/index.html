@@ -827,7 +827,7 @@ playwright install chromium</pre>
                 <div class="col-md-6">
                     <h5>Szwego商品爬虫</h5>
                     <p class="text-muted">基于Playwright的跨平台商品数据采集与货号对比工具</p>
-                    <p class="text-muted">版本: 2.9.2</p>
+                    <p class="text-muted">版本: 2.9.3</p>
                 </div>
                 <div class="col-md-6 text-md-right">
                     <h5>相关链接</h5>
@@ -900,19 +900,26 @@ playwright install chromium</pre>
             .then(response => response.json())
             .then(data => {
                 const statusEl = document.getElementById('cookie-status');
+                const alertEl = document.getElementById('cookie-alert');
                 let systemInfo = data.system ? ` (${data.system})` : '';
+                
+                if (alertEl) alertEl.style.display = 'none';
+                
                 if (data.error) {
                     statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Cookie无效' + systemInfo;
+                    showCookieAlert('error', 'Cookie无效，请立即更新！');
                     return;
                 }
                 
                 if (data.expired) {
                     statusEl.innerHTML = '<i class="fa fa-times-circle" style="color: #f56c6c;"></i> Cookie已过期' + systemInfo;
+                    showCookieAlert('danger', '⚠️ Cookie已过期！请立即点击"更新Cookie"重新获取，否则无法使用爬虫功能。');
                     return;
                 }
                 
                 if (data.hours_remaining <= 5) {
                     statusEl.innerHTML = '<i class="fa fa-clock-o" style="color: #f56c6c;"></i> 有效期: ' + data.hours_remaining + '小时' + systemInfo;
+                    showCookieAlert('warning', '⚠️ Cookie即将过期（剩余 ' + data.hours_remaining + ' 小时），建议尽快更新以避免中断。');
                 } else {
                     statusEl.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> 有效期至: ' + data.expires + systemInfo;
                 }
@@ -920,7 +927,49 @@ playwright install chromium</pre>
             .catch(error => {
                 const statusEl = document.getElementById('cookie-status');
                 statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> 获取失败';
+                showCookieAlert('error', '获取Cookie状态失败，请刷新页面重试。');
             });
+        }
+        
+        function showCookieAlert(type, message) {
+            let alertEl = document.getElementById('cookie-alert');
+            if (!alertEl) {
+                alertEl = document.createElement('div');
+                alertEl.id = 'cookie-alert';
+                alertEl.style.cssText = 'position: fixed; top: 70px; right: 20px; z-index: 9999; max-width: 400px;';
+                document.body.appendChild(alertEl);
+            }
+            
+            const typeClass = {
+                'danger': 'alert-danger',
+                'warning': 'alert-warning', 
+                'error': 'alert-danger'
+            }[type] || 'alert-info';
+            
+            const iconClass = {
+                'danger': 'fa-times-circle',
+                'warning': 'fa-exclamation-triangle',
+                'error': 'fa-exclamation-circle'
+            }[type] || 'fa-info-circle';
+            
+            const alertId = 'cookie-alert';
+            alertEl.innerHTML = `
+                <div class="alert ${typeClass} alert-dismissible fade show" role="alert" style="margin-bottom: 0;">
+                    <i class="fa ${iconClass}"></i> ${message}
+                    <button type="button" class="close" onclick="document.getElementById('${alertId}').style.display='none'">
+                        <span>&times;</span>
+                    </button>
+                </div>
+            `;
+            alertEl.style.display = 'block';
+            
+            // 警告提示10秒后自动消失（仅warning类型）
+            if (type === 'warning') {
+                setTimeout(() => {
+                    const el = document.getElementById(alertId);
+                    if (el) el.style.display = 'none';
+                }, 10000);
+            }
         }
         
         function updateCurrentTime() {
@@ -973,13 +1022,13 @@ playwright install chromium</pre>
                 } else {
                     alert('启动失败: ' + data.error);
                     btn.disabled = false;
-                    btn.innerHTML = '运行';
+                    btn.innerHTML = btn.getAttribute('data-original') || '运行';
                 }
             })
             .catch(error => {
                 alert('请求失败: ' + error.message);
                 btn.disabled = false;
-                btn.innerHTML = '运行';
+                btn.innerHTML = btn.getAttribute('data-original') || '运行';
             });
         }
         
@@ -1522,36 +1571,50 @@ playwright install chromium</pre>
             
             const cmd = VENV_PYTHON + ' main.py';
             
-            fetch('/run', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command: cmd })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    currentTaskId = data.task_id;
-                    showOutputPanel();
-                    document.getElementById('output-content').innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
-                    pollingInterval = setInterval(() => pollOutput(), 1000);
-                    setTimeout(() => {
-                        fetch('/input', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ task_id: currentTaskId, input: choice.toString() })
-                        });
-                    }, 1500);
-                } else {
-                    alert('启动失败: ' + data.error);
+            const doRun = () => {
+                fetch('/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: cmd })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentTaskId = data.task_id;
+                        showOutputPanel();
+                        document.getElementById('output-content').innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
+                        pollingInterval = setInterval(() => pollOutput(), 1000);
+                        setTimeout(() => {
+                            fetch('/input', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ task_id: currentTaskId, input: choice.toString() })
+                            });
+                        }, 1500);
+                    } else {
+                        alert('启动失败: ' + data.error);
+                        btn.disabled = false;
+                        btn.innerHTML = btn.getAttribute('data-original');
+                    }
+                })
+                .catch(error => {
+                    alert('请求失败: ' + error.message);
                     btn.disabled = false;
                     btn.innerHTML = btn.getAttribute('data-original');
-                }
-            })
-            .catch(error => {
-                alert('请求失败: ' + error.message);
-                btn.disabled = false;
-                btn.innerHTML = btn.getAttribute('data-original');
-            });
+                });
+            };
+            
+            if (choice === 4) {
+                fetch('/api/cookie/clear', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    console.log('Cookie已清空');
+                    document.getElementById('output-content').innerHTML = '<span style="color: #409EFF;"><i class="fa fa-trash"></i> 已清空旧Cookie，正在启动浏览器...</span>';
+                })
+                .finally(() => doRun());
+            } else {
+                doRun();
+            }
         }
         
         function sendUserInput() {
