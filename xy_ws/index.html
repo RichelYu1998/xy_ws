@@ -566,7 +566,7 @@
             <a class="navbar-brand" href="#">
                 <i class="fa fa-cloud-download"></i> Szwego爬虫
             </a>
-            <span id="current-time" style="color: #fff; font-size: 12px; margin-left: 10px;"></span>
+            <span id="current-time" style="color: #fff; font-size: 12px; margin-left: 10px;"><i class="fa fa-clock-o"></i> <span id="time-display"></span></span>
             <span id="cookie-status" style="color: #fff; font-size: 12px; margin-left: 15px;"></span>
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -932,7 +932,7 @@ playwright install chromium</pre>
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const seconds = String(now.getSeconds()).padStart(2, '0');
             const timeStr = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-            document.getElementById('current-time').innerHTML = '<i class="fa fa-clock-o"></i> ' + timeStr;
+            document.getElementById('time-display').textContent = timeStr;
         }
         
         updateCurrentTime();
