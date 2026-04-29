@@ -827,7 +827,7 @@ playwright install chromium</pre>
                 <div class="col-md-6">
                     <h5>Szwego商品爬虫</h5>
                     <p class="text-muted">基于Playwright的跨平台商品数据采集与货号对比工具</p>
-                    <p class="text-muted">版本: 2.9.0</p>
+                    <p class="text-muted">版本: 2.9.2</p>
                 </div>
                 <div class="col-md-6 text-md-right">
                     <h5>相关链接</h5>
@@ -1689,35 +1689,58 @@ playwright install chromium</pre>
                     return;
                 }
                 
-                const sourceSku = sourceTable.querySelector('tbody tr[data-sku]');
-                if (!sourceSku) {
+                const sourceTbody = sourceTable.querySelector('tbody');
+                const targetTbody = targetTable.querySelector('tbody');
+                if (!sourceTbody || !targetTbody) {
                     isSyncing = false;
                     return;
                 }
                 
-                const sourceRows = Array.from(sourceTable.querySelectorAll('tbody tr[data-sku]'));
-                const targetRows = Array.from(targetTable.querySelectorAll('tbody tr[data-sku]'));
+                const sourceRows = Array.from(sourceTbody.querySelectorAll('tr[data-sku]'));
+                const targetRows = Array.from(targetTbody.querySelectorAll('tr[data-sku]'));
                 
-                const sourceScrollTop = sourceContainer.scrollTop;
-                const sourceRowHeight = sourceRows.length > 1 ? 
-                    sourceRows[1].offsetTop - sourceRows[0].offsetTop : 30;
-                const sourceVisibleIndex = Math.floor(sourceScrollTop / sourceRowHeight);
+                if (sourceRows.length === 0 || targetRows.length === 0) {
+                    isSyncing = false;
+                    return;
+                }
                 
-                if (sourceVisibleIndex >= 0 && sourceVisibleIndex < sourceRows.length) {
-                    const sourceSkuValue = sourceRows[sourceVisibleIndex].getAttribute('data-sku');
+                const scrollTop = sourceContainer.scrollTop;
+                const containerHeight = sourceContainer.clientHeight;
+                const scrollTopMid = scrollTop + containerHeight / 2;
+                
+                let sourceSkuValue = null;
+                let minDiff = Infinity;
+                
+                for (let i = 0; i < sourceRows.length; i++) {
+                    const rowTop = sourceRows[i].offsetTop;
+                    const rowHeight = sourceRows[i].offsetHeight;
+                    const rowMid = rowTop + rowHeight / 2;
+                    const diff = Math.abs(scrollTopMid - rowMid);
                     
-                    let targetIndex = -1;
-                    for (let i = 0; i < targetRows.length; i++) {
-                        if (targetRows[i].getAttribute('data-sku') === sourceSkuValue) {
-                            targetIndex = i;
-                            break;
-                        }
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        sourceSkuValue = sourceRows[i].getAttribute('data-sku');
                     }
-                    
-                    if (targetIndex >= 0) {
-                        const targetScrollTop = targetIndex * sourceRowHeight;
-                        targetContainer.scrollTop = targetScrollTop;
+                }
+                
+                if (!sourceSkuValue) {
+                    isSyncing = false;
+                    return;
+                }
+                
+                let targetRow = null;
+                for (let i = 0; i < targetRows.length; i++) {
+                    if (targetRows[i].getAttribute('data-sku') === sourceSkuValue) {
+                        targetRow = targetRows[i];
+                        break;
                     }
+                }
+                
+                if (targetRow) {
+                    const targetTop = targetRow.offsetTop;
+                    const targetRowHeight = targetRow.offsetHeight;
+                    const newScrollTop = targetTop - (containerHeight / 2) + (targetRowHeight / 2);
+                    targetContainer.scrollTop = Math.max(0, newScrollTop);
                 }
                 
                 setTimeout(() => { isSyncing = false; }, 50);
