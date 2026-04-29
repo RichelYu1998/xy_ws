@@ -582,3 +582,71 @@
 2026-04-28 10:32:47 - FileCleaner - INFO -   - 总大小: 0.00 B
 2026-04-28 10:32:47 - FileCleaner - WARNING - 没有需要删除的文件或文件夹
 2026-04-28 10:32:47 - FileCleaner - INFO - 清理完成
+2026-04-29 16:43:15 - FileCleaner - INFO - ============================================================
+2026-04-29 16:43:15 - FileCleaner - INFO - 扫描文件列表
+2026-04-29 16:43:15 - FileCleaner - INFO - 扫描目录: /Users/yu/Downloads/demo/python
+2026-04-29 16:43:15 - FileCleaner - INFO - 排序方式: 按文件下载到本地的毫秒时间
+2026-04-29 16:43:15 - FileCleaner - INFO - ============================================================
+2026-04-29 16:43:15 - FileCleaner - INFO - 扫描文件中...
+2026-04-29 16:43:15 - FileCleaner - WARNING - 没有找到图片或视频文件
+2026-04-29 16:43:40 - FileCleaner - INFO - ============================================================
+2026-04-29 16:43:40 - FileCleaner - INFO - 开始删除所有文件和文件夹
+2026-04-29 16:43:40 - FileCleaner - INFO - 清理目录: /Users/yu/Downloads/demo/python
+2026-04-29 16:43:40 - FileCleaner - INFO - 删除规则: 删除所有文件和文件夹，除了 log, sh, py, bat 格式的文件
+2026-04-29 16:43:40 - FileCleaner - INFO - 测试模式: 是
+2026-04-29 16:43:40 - FileCleaner - INFO - ============================================================
+2026-04-29 16:43:40 - FileCleaner - INFO - 扫描文件和文件夹中...
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件: index.html
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件: .DS_Store
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件: requirements.txt
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件夹: file
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件: run.bat
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件夹: config
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件夹: __pycache__
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件: run.sh
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件: README.md
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件: clean_files.log
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件: .gitignore
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件夹: .venv
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件夹: .git
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件: main.py
+2026-04-29 16:43:40 - FileCleaner - INFO - 保留文件夹: .idea
+2026-04-29 16:43:40 - FileCleaner - INFO - 找到 0 个文件和 2 个文件夹
+2026-04-29 16:43:40 - FileCleaner - INFO -   - 总大小: 0.00 B
+2026-04-29 16:43:40 - FileCleaner - INFO - 
+将删除 0 个文件和 2 个文件夹
+2026-04-29 16:43:40 - FileCleaner - INFO - 
+将要删除的文件夹列表：
+2026-04-29 16:43:40 - FileCleaner - INFO -   1. xy_ws
+2026-04-29 16:43:40 - FileCleaner - INFO -   2. wifi_scan
+2026-04-29 16:43:40 - FileCleaner - INFO - 
+[测试模式] 未实际删除文件和文件夹
+2026-04-29 16:43:40 - FileCleaner - INFO - 清理完成（测试模式）
+2026-04-29 16:46:09 - FileCleaner - INFO - ============================================================
+2026-04-29 16:46:09 - FileCleaner - INFO - 扫描文件列表
+2026-04-29 16:46:09 - FileCleaner - INFO - 扫描目录: /Users/yu/Downloads/demo/python
+2026-04-29 16:46:09 - FileCleaner - INFO - 排序方式: 按文件下载到本地的毫秒时间
+2026-04-29 16:46:09 - FileCleaner - INFO - ============================================================
+2026-04-29 16:46:09 - FileCleaner - INFO - 扫描文件中...
+2026-04-29 16:46:09 - FileCleaner - WARNING - 没有找到需要显示的文件
+2026-04-29 16:46:11 - FileCleaner - INFO - ============================================================
+2026-04-29 16:46:11 - FileCleaner - INFO - 扫描文件列表
+2026-04-29 16:46:11 - FileCleaner - INFO - 扫描目录: /Users/yu/Downloads/demo/python
+2026-04-29 16:46:11 - FileCleaner - INFO - 排序方式: 按文件下载到本地的毫秒时间
+2026-04-29 16:46:11 - FileCleaner - INFO - ============================================================
+2026-04-29 16:46:11 - FileCleaner - INFO - 扫描文件中...
+2026-04-29 16:46:11 - FileCleaner - WARNING - 没有找到需要显示的文件
+2026-04-29 16:46:11 - FileCleaner - INFO - ============================================================
+2026-04-29 16:46:11 - FileCleaner - INFO - 扫描文件列表
+2026-04-29 16:46:11 - FileCleaner - INFO - 扫描目录: /Users/yu/Downloads/demo/python
+2026-04-29 16:46:11 - FileCleaner - INFO - 排序方式: 按文件下载到本地的毫秒时间
+2026-04-29 16:46:11 - FileCleaner - INFO - ============================================================
+2026-04-29 16:46:11 - FileCleaner - INFO - 扫描文件中...
+2026-04-29 16:46:11 - FileCleaner - WARNING - 没有找到需要显示的文件
+2026-04-29 19:47:09 - FileCleaner - INFO - ============================================================
+2026-04-29 19:47:09 - FileCleaner - INFO - 扫描文件列表
+2026-04-29 19:47:09 - FileCleaner - INFO - 扫描目录: /Users/yu/Downloads/demo/python
+2026-04-29 19:47:09 - FileCleaner - INFO - 排序方式: 按文件下载到本地的毫秒时间
+2026-04-29 19:47:09 - FileCleaner - INFO - ============================================================
+2026-04-29 19:47:09 - FileCleaner - INFO - 扫描文件中...
+2026-04-29 19:47:09 - FileCleaner - WARNING - 没有找到需要显示的文件

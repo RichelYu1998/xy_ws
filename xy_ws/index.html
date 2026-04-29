@@ -1344,8 +1344,8 @@
                 </div>
                 <div class="col-md-6 col-lg-4 mb-4">
                     <div class="feature-card">
-                        <div class="icon-wrapper" style="background: #fef0e6;">
-                            <i class="fa fa-exchange" style="color: #e6a23c;"></i>
+                        <div class="icon-wrapper" style="background: #ecf5ff;">
+                            <i class="fa fa-exchange" style="color: #409EFF;"></i>
                         </div>
                         <h5>货号对比</h5>
                         <p>支持交互式和简化版两种模式，自动检测重复序列号，详细对比结果展示</p>
@@ -1538,7 +1538,7 @@ playwright install chromium</pre>
     
     <div class="text-center mt-4 mb-4 button-group-container">
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-spider" data-func="1"><span><i class="fa fa-spider"></i> 1. 运行爬虫</span></button>
-        <button class="btn btn-warning btn-lg m-1" id="btn-sku-interactive" onclick="toggleSkuInputPanel()"><span><i class="fa fa-exchange"></i> 2. 货号对比</span></button>
+        <button class="btn btn-primary btn-lg m-1" id="btn-sku-interactive" onclick="toggleSkuInputPanel()"><span><i class="fa fa-exchange"></i> 2. 货号对比</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-sku-api" data-api="/api/sku/compare/excel"><span><i class="fa fa-file-excel-o"></i> 3. Excel与JSON对比</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cookie" data-func="4"><span><i class="fa fa-refresh"></i> 4. 更新Cookie</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-view-products"><span><i class="fa fa-list"></i> 查看所有商品</span></button>
@@ -2222,14 +2222,14 @@ playwright install chromium</pre>
             const btn = document.getElementById('btn-sku-interactive');
             if (panel.style.display === 'none' || panel.style.display === '') {
                 panel.style.display = 'block';
-                btn.classList.remove('btn-warning');
+                btn.classList.remove('btn-primary');
                 btn.classList.add('btn-success');
                 btn.innerHTML = '<span style="font-size: 14px;"><i class="fa fa-check"></i> 关闭对比</span>';
                 panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } else {
                 panel.style.display = 'none';
                 btn.classList.remove('btn-success');
-                btn.classList.add('btn-warning');
+                btn.classList.add('btn-primary');
                 btn.innerHTML = '<span style="font-size: 14px;"><i class="fa fa-exchange"></i> 2. 货号对比</span>';
             }
         }
