@@ -1636,9 +1636,9 @@ playwright install chromium</pre>
                 if (existingCard) existingCard.remove();
                 window.allProductsData = data;
                 
-                function renderTable(products, title, color) {
+                function renderTable(products, title, color, tableId) {
                     if (!products || products.length === 0) return '';
-                    let tableHtml = `<div class="change-section"><div class="change-title" style="color: ${color};">${title}</div><div class="change-table-container"><table class="change-table"><thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead><tbody>`;
+                    let tableHtml = `<div class="change-section"><div class="change-title" style="color: ${color};">${title}</div><div class="change-table-container${tableId ? ' ' + tableId + '-container' : ''}"><table class="change-table${tableId ? ' ' + tableId : ''}"><thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead><tbody>`;
                     products.forEach((p, i) => {
                         const sku = p.货号 || '';
                         const isHighPrice = parseFloat((p.售价 || '¥0').replace('¥', '').replace(',', '')) >= 599;
@@ -1652,12 +1652,83 @@ playwright install chromium</pre>
                     return tableHtml + `</tbody></table></div></div>`;
                 }
                 
-                let html = `<div class="comparison-card products-card"><div class="comparison-header" style="background: #409EFF;"><i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}</div><div class="comparison-body"><div class="summary-stats"><span class="summary-badge" style="background: #409EFF;">总商品: ${data.total}个</span><span class="summary-badge" style="background: #E6A23C;">高价(≥599): ${data.highPriceCount || 0}个</span><span class="summary-badge" style="background: #67c23a;">新增: ${data.addedCount || 0}个</span></div>${renderTable(data.products, '总商品列表 (' + data.total + '个)', '#409EFF')}${renderTable(data.highPriceProducts, '高价商品 (≥599元)', '#E6A23C')}${renderTable(data.addedProducts, '新增商品', '#67c23a')}</div></div>`;
+                let html = `<div class="comparison-card products-card"><div class="comparison-header" style="background: #409EFF;"><i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}</div><div class="comparison-body"><div class="summary-stats"><span class="summary-badge" style="background: #409EFF;">总商品: ${data.total}个</span><span class="summary-badge" style="background: #E6A23C;">高价(≥599): ${data.highPriceCount || 0}个</span><span class="summary-badge" style="background: #67c23a;">新增: ${data.addedCount || 0}个</span></div>${renderTable(data.products, '总商品列表 (' + data.total + '个)', '#409EFF', 'all-products-table')}${renderTable(data.highPriceProducts, '高价商品 (≥599元)', '#E6A23C', 'high-price-table')}${renderTable(data.addedProducts, '新增商品', '#67c23a')}</div></div>`;
                 outputPanel.insertAdjacentHTML('beforeend', html);
+                
+                setTimeout(setupTableSync, 100);
             })
             .catch(error => {
                 console.error('获取商品失败:', error);
                 alert('获取商品失败: ' + error.message);
+            });
+        }
+        
+        function setupTableSync() {
+            const allTableContainer = document.querySelector('.all-products-table-container');
+            const highPriceContainer = document.querySelector('.high-price-table-container');
+            if (!allTableContainer || !highPriceContainer) return;
+            
+            const allTable = document.querySelector('.all-products-table');
+            const highPriceTable = document.querySelector('.high-price-table');
+            if (!allTable || !highPriceTable) return;
+            
+            const allRows = Array.from(allTable.querySelectorAll('tbody tr[data-sku]'));
+            const highPriceRows = Array.from(highPriceTable.querySelectorAll('tbody tr[data-sku]'));
+            const highPriceSkus = new Set(highPriceRows.map(r => r.getAttribute('data-sku')));
+            
+            let isSyncing = false;
+            
+            function syncScroll(sourceContainer, targetContainer) {
+                if (isSyncing) return;
+                isSyncing = true;
+                
+                const sourceTable = sourceContainer.querySelector('table');
+                const targetTable = targetContainer.querySelector('table');
+                if (!sourceTable || !targetTable) {
+                    isSyncing = false;
+                    return;
+                }
+                
+                const sourceSku = sourceTable.querySelector('tbody tr[data-sku]');
+                if (!sourceSku) {
+                    isSyncing = false;
+                    return;
+                }
+                
+                const sourceRows = Array.from(sourceTable.querySelectorAll('tbody tr[data-sku]'));
+                const targetRows = Array.from(targetTable.querySelectorAll('tbody tr[data-sku]'));
+                
+                const sourceScrollTop = sourceContainer.scrollTop;
+                const sourceRowHeight = sourceRows.length > 1 ? 
+                    sourceRows[1].offsetTop - sourceRows[0].offsetTop : 30;
+                const sourceVisibleIndex = Math.floor(sourceScrollTop / sourceRowHeight);
+                
+                if (sourceVisibleIndex >= 0 && sourceVisibleIndex < sourceRows.length) {
+                    const sourceSkuValue = sourceRows[sourceVisibleIndex].getAttribute('data-sku');
+                    
+                    let targetIndex = -1;
+                    for (let i = 0; i < targetRows.length; i++) {
+                        if (targetRows[i].getAttribute('data-sku') === sourceSkuValue) {
+                            targetIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    if (targetIndex >= 0) {
+                        const targetScrollTop = targetIndex * sourceRowHeight;
+                        targetContainer.scrollTop = targetScrollTop;
+                    }
+                }
+                
+                setTimeout(() => { isSyncing = false; }, 50);
+            }
+            
+            allTableContainer.addEventListener('scroll', function() {
+                syncScroll(allTableContainer, highPriceContainer);
+            });
+            
+            highPriceContainer.addEventListener('scroll', function() {
+                syncScroll(highPriceContainer, allTableContainer);
             });
         }
         
