@@ -3274,86 +3274,92 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)}), 500
 
+        def get_latest_json_products():
+            """通用函数：获取最新JSON文件中的所有货号"""
+            import glob
+            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+            if not json_files:
+                return None, '没有找到JSON文件'
+            latest_json = max(json_files, key=os.path.getmtime)
+            with open(latest_json, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            products = data.get('商品列表', []) if isinstance(data, dict) else data
+            return [p.get('货号', '') for p in products if p.get('货号')], os.path.basename(latest_json)
+
         @app.route('/api/sku/compare', methods=['GET'])
         def compare_sku():
-            import glob
             try:
-                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                if not json_files:
-                    return jsonify({'error': '没有找到JSON文件'}), 404
-                latest_json = max(json_files, key=os.path.getmtime)
-                
-                with open(latest_json, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                products = data.get('商品列表', []) if isinstance(data, dict) else data
-                json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                json_stock_numbers, json_file = get_latest_json_products()
+                if json_stock_numbers is None:
+                    return jsonify({'error': json_file}), 404
                 
                 input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
                 txt_stock_numbers = []
                 if os.path.exists(input_file):
                     with open(input_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
                         import re
-                        txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
+                        txt_stock_numbers = sorted(set(re.findall(r'\d+', f.read())))
                 
-                json_set = set(json_stock_numbers)
-                txt_set = set(txt_stock_numbers)
+                json_set, txt_set = set(json_stock_numbers), set(txt_stock_numbers)
                 
-                result = {
-                    'json_file': os.path.basename(latest_json),
-                    'json_count': len(json_set),
-                    'txt_count': len(txt_set),
-                    'json_skus': json_stock_numbers,
-                    'txt_skus': txt_stock_numbers,
-                    'missing_in_json': sorted(list(txt_set - json_set)),
-                    'extra_in_json': sorted(list(json_set - txt_set)),
-                    'common': sorted(list(txt_set & json_set)),
-                    'missing_count': len(txt_set - json_set),
-                    'extra_count': len(json_set - txt_set),
-                    'common_count': len(txt_set & json_set)
-                }
-                return jsonify(result)
+                return jsonify({
+                    'json_file': json_file, 'json_count': len(json_set), 'txt_count': len(txt_set),
+                    'json_skus': sorted(json_stock_numbers), 'txt_skus': txt_stock_numbers,
+                    'missing_in_json': sorted(txt_set - json_set), 'extra_in_json': sorted(json_set - txt_set),
+                    'common': sorted(txt_set & json_set), 'missing_count': len(txt_set - json_set),
+                    'extra_count': len(json_set - txt_set), 'common_count': len(txt_set & json_set)
+                })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
         @app.route('/api/sku/compare/txt', methods=['GET'])
         def compare_sku_txt():
-            import glob
             try:
-                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                if not json_files:
-                    return jsonify({'error': '没有找到JSON文件'}), 404
-                latest_json = max(json_files, key=os.path.getmtime)
-                
-                with open(latest_json, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                products = data.get('商品列表', []) if isinstance(data, dict) else data
-                json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                json_stock_numbers, json_file = get_latest_json_products()
+                if json_stock_numbers is None:
+                    return jsonify({'error': json_file}), 404
                 
                 input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
                 txt_stock_numbers = []
                 if os.path.exists(input_file):
                     with open(input_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
                         import re
-                        txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
+                        txt_stock_numbers = sorted(set(re.findall(r'\d+', f.read())))
                 
-                json_set = set(json_stock_numbers)
-                txt_set = set(txt_stock_numbers)
+                json_set, txt_set = set(json_stock_numbers), set(txt_stock_numbers)
                 
-                result = {
-                    'type': 'txt',
-                    'json_file': os.path.basename(latest_json),
-                    'json_count': len(json_set),
-                    'txt_count': len(txt_set),
-                    'missing_in_json': sorted(list(txt_set - json_set)),
-                    'extra_in_json': sorted(list(json_set - txt_set)),
-                    'common': sorted(list(txt_set & json_set)),
-                    'missing_count': len(txt_set - json_set),
-                    'extra_count': len(json_set - txt_set),
-                    'common_count': len(txt_set & json_set)
-                }
-                return jsonify(result)
+                return jsonify({
+                    'type': 'txt', 'json_file': json_file, 'json_count': len(json_set), 'txt_count': len(txt_set),
+                    'missing_in_json': sorted(txt_set - json_set), 'extra_in_json': sorted(json_set - txt_set),
+                    'common': sorted(txt_set & json_set), 'missing_count': len(txt_set - json_set),
+                    'extra_count': len(json_set - txt_set), 'common_count': len(txt_set & json_set)
+                })
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @app.route('/api/sku/compare/input', methods=['POST'])
+        def compare_sku_input():
+            try:
+                data = request.get_json()
+                if not data or 'skus' not in data:
+                    return jsonify({'error': '请提供货号列表'}), 400
+                
+                input_skus = [str(sku).strip() for sku in data.get('skus', []) if sku]
+                if not input_skus:
+                    return jsonify({'error': '货号列表为空'}), 400
+                
+                json_stock_numbers, json_file = get_latest_json_products()
+                if json_stock_numbers is None:
+                    return jsonify({'error': json_file}), 404
+                
+                input_set, json_set = set(input_skus), set(json_stock_numbers)
+                
+                return jsonify({
+                    'type': 'interactive', 'json_file': json_file, 'json_count': len(json_set), 'input_count': len(input_set),
+                    'missing_in_json': sorted(input_set - json_set), 'extra_in_json': sorted(json_set - input_set),
+                    'common': sorted(input_set & json_set), 'missing_count': len(input_set - json_set),
+                    'extra_count': len(json_set - input_set), 'common_count': len(input_set & json_set)
+                })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
@@ -3361,15 +3367,9 @@ if __name__ == '__main__':
         def compare_sku_excel():
             import glob
             try:
-                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                if not json_files:
-                    return jsonify({'error': '没有找到JSON文件'}), 404
-                latest_json = max(json_files, key=os.path.getmtime)
-                
-                with open(latest_json, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                products = data.get('商品列表', []) if isinstance(data, dict) else data
-                json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                json_stock_numbers, json_file = get_latest_json_products()
+                if json_stock_numbers is None:
+                    return jsonify({'error': json_file}), 404
                 
                 excel_file = None
                 config_file = os.path.join(PROJECT_DIR, 'config', 'config.json')
