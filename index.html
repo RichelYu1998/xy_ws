@@ -1377,25 +1377,25 @@ playwright install chromium</pre>
                 const statusEl = document.getElementById('cookie-status');
                 let systemInfo = data.system ? ` (${data.system})` : '';
                 if (data.error) {
-                    statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Cookie有效期: 无效' + systemInfo;
+                    statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Token有效期: 无效' + systemInfo;
                     return;
                 }
                 
                 if (data.expired) {
-                    statusEl.innerHTML = '<i class="fa fa-times-circle" style="color: #f56c6c;"></i> Cookie有效期: 已过期' + systemInfo;
+                    statusEl.innerHTML = '<i class="fa fa-times-circle" style="color: #f56c6c;"></i> Token有效期: 已过期' + systemInfo;
                     return;
                 }
                 
                 if (data.hours_remaining <= 5) {
-                    statusEl.innerHTML = '<i class="fa fa-clock-o" style="color: #f56c6c;"></i> Cookie有效期: ' + data.hours_remaining + '小时' + systemInfo;
+                    statusEl.innerHTML = '<i class="fa fa-clock-o" style="color: #f56c6c;"></i> Token有效期: ' + data.hours_remaining + '小时' + systemInfo;
                 } else {
                     let cookieInfo = data.cookie_name ? `(${data.cookie_name}) ` : '';
-                    statusEl.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> Cookie有效期: ' + cookieInfo + data.expires + systemInfo;
+                    statusEl.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> Token有效期: ' + cookieInfo + data.expires + systemInfo;
                 }
             })
             .catch(error => {
                 const statusEl = document.getElementById('cookie-status');
-                statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Cookie有效期: 获取失败';
+                statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Token有效期: 获取失败';
             });
         }
         
@@ -1445,64 +1445,6 @@ playwright install chromium</pre>
                 btn.disabled = false;
                 btn.innerHTML = '运行';
             });
-        }
-        
-        function formatOutput(text) {
-            if (!text) return '';
-            
-            text = text.replace(/\x1b\[[0-9;]*m/g, '');
-            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            
-            let lines = text.split('\n');
-            let filteredLines = [];
-            let inCookieSection = false;
-            
-            for (let line of lines) {
-                if (line.includes('验证Cookie状态') || line.includes('Cookie文件存在') || 
-                    line.includes('找到Token') || line.includes('Token有效期') || 
-                    line.includes('Token值有效') || line.includes('Cookie验证通过')) {
-                    inCookieSection = true;
-                    continue;
-                }
-                if (inCookieSection && (line.includes('===') || line.includes('请选择功能'))) {
-                    inCookieSection = false;
-                }
-                if (!inCookieSection) {
-                    filteredLines.push(line);
-                }
-            }
-            
-            text = filteredLines.join('\n');
-            
-            let formatted = text
-                .replace(/^(.*✓.*)$/gm, '<span style="color: #67c23a;">$1</span>')
-                .replace(/^(.*✗.*)$/gm, '<span style="color: #f56c6c;">$1</span>')
-                .replace(/^(.*🔍.*)$/gm, '<span style="color: #409EFF;">$1</span>')
-                .replace(/^(.*🔧.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
-                .replace(/^(.*⚠️.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
-                .replace(/^(.*✅.*)$/gm, '<span style="color: #67c23a;">$1</span>')
-                .replace(/^(.*❌.*)$/gm, '<span style="color: #f56c6c;">$1</span>')
-                .replace(/^(.*📊.*)$/gm, '<span style="color: #909399;">$1</span>')
-                .replace(/^(.*¥[0-9,.]*.*)$/gm, '<span style="color: #E6A23C; font-weight: bold;">$1</span>')
-                .replace(/^(.*预计.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
-                .replace(/^(.*耗时.*)$/gm, '<span style="color: #909399;">$1</span>')
-                .replace(/^(.*保存.*)$/gm, '<span style="color: #409EFF;">$1</span>')
-                .replace(/^(.*获取.*)$/gm, '<span style="color: #409EFF;">$1</span>')
-                .replace(/^(.*成功.*)$/gm, '<span style="color: #67c23a;">$1</span>')
-                .replace(/^(===.*===)$/gm, '<span style="color: #909399;">$1</span>')
-                .replace(/^(---.*---)$/gm, '<span style="color: #909399;">$1</span>')
-                .replace(/^(={50,})$/gm, '<span style="color: #909399;">$1</span>')
-                .replace(/^(\s*\d+\/\s*\d+\s*页:.*)$/gm, '<span style="color: #409EFF;">$1</span>')
-                .replace(/^(开始时间:|结束时间:|总运行时间:.*)$/gm, '<span style="color: #909399;">$1</span>')
-                .replace(/^(开始运行...|浏览器启动耗时:|页面创建耗时:.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
-                .replace(/^(Cookie已保存|浏览器关闭耗时:.*)$/gm, '<span style="color: #67c23a;">$1</span>')
-                .replace(/^(注意：|提示：.*)$/gm, '<span style="color: #909399; font-style: italic;">$1</span>')
-                .replace(/^(请输入选项.*)$/gm, '<span style="color: #409EFF; font-weight: bold;">$1</span>')
-                .replace(/^(\d+\.\s+.*)$/gm, '<span style="color: #333; font-weight: bold;">$1</span>')
-                .replace(/^(对比文件:|新增商品数:|删除商品数:|新增高价商品数:.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
-                .replace(/^(输入货号总数:|JSON中货号总数:|已存在货号数:|缺失货号数:|JSON中多余货号数:|重复序列号数:.*)$/gm, '<span style="color: #E6A23C;">$1</span>');
-            
-            return formatted;
         }
         
         function pollOutput() {
@@ -1733,7 +1675,7 @@ playwright install chromium</pre>
                 }
                 
                 if (skuData.highPriceExtraSkus && skuData.highPriceExtraSkus.length > 0) {
-                    const items = skuData.highPriceExtraSkus.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
+                    const items = skuData.highPriceExtraSkus.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                     cardHtml += `
                         <div class="missing-skus" style="background: #fff3e0; border-color: #ffcc80;">
                             <div class="missing-title" style="color: #E6A23C;">高价多余货号列表(≥599且不在Excel):</div>
@@ -2268,7 +2210,7 @@ playwright install chromium</pre>
                         }
                         
                         if (data.removed_products && data.removed_products.length > 0) {
-                            const items = data.removed_products.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
+                            const items = data.removed_products.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #ffebee; border-color: #ef5350;">
                                     <div class="missing-title" style="color: #c62828;">删除的商品 (${data.removed_products_count}个):</div>
@@ -2278,7 +2220,7 @@ playwright install chromium</pre>
                         }
                         
                         if (data.missing_in_json && data.missing_in_json.length > 0) {
-                            const items = data.missing_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            const items = data.missing_in_json.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
                             cardHtml += `
                                 <div class="missing-skus">
                                     <div class="missing-title">缺失货号列表:</div>
@@ -2318,10 +2260,67 @@ playwright install chromium</pre>
             };
         });
         
-        document.getElementById('btn-stop-task').addEventListener('click', function() {
-            stopTask();
-        });
-        
+        }); // DOMContentLoaded结束
+
+        // 全局函数定义
+        function formatOutput(text) {
+            if (!text) return '';
+            
+            text = text.replace(/\x1b\[[0-9;]*m/g, '');
+            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            let lines = text.split('\n');
+            let filteredLines = [];
+            let inCookieSection = false;
+            
+            for (let line of lines) {
+                if (line.includes('验证Cookie状态') || line.includes('Cookie文件存在') || 
+                    line.includes('找到Token') || line.includes('Token有效期') || 
+                    line.includes('Token值有效') || line.includes('Cookie验证通过')) {
+                    inCookieSection = true;
+                    continue;
+                }
+                if (inCookieSection && (line.includes('===') || line.includes('请选择功能'))) {
+                    inCookieSection = false;
+                }
+                if (!inCookieSection) {
+                    filteredLines.push(line);
+                }
+            }
+            
+            text = filteredLines.join('\n');
+            
+            let formatted = text
+                .replace(/^(.*✓.*)$/gm, '<span style="color: #67c23a;">$1</span>')
+                .replace(/^(.*✗.*)$/gm, '<span style="color: #f56c6c;">$1</span>')
+                .replace(/^(.*🔍.*)$/gm, '<span style="color: #409EFF;">$1</span>')
+                .replace(/^(.*🔧.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(.*⚠️.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(.*✅.*)$/gm, '<span style="color: #67c23a;">$1</span>')
+                .replace(/^(.*❌.*)$/gm, '<span style="color: #f56c6c;">$1</span>')
+                .replace(/^(.*📊.*)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(.*¥[0-9,.]*.*)$/gm, '<span style="color: #E6A23C; font-weight: bold;">$1</span>')
+                .replace(/^(.*预计.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(.*耗时.*)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(.*保存.*)$/gm, '<span style="color: #409EFF;">$1</span>')
+                .replace(/^(.*获取.*)$/gm, '<span style="color: #409EFF;">$1</span>')
+                .replace(/^(.*成功.*)$/gm, '<span style="color: #67c23a;">$1</span>')
+                .replace(/^(===.*===)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(---.*---)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(={50,})$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(\s*\d+\/\s*\d+\s*页:.*)$/gm, '<span style="color: #409EFF;">$1</span>')
+                .replace(/^(开始时间:|结束时间:|总运行时间:.*)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(开始运行...|浏览器启动耗时:|页面创建耗时:.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(Cookie已保存|浏览器关闭耗时:.*)$/gm, '<span style="color: #67c23a;">$1</span>')
+                .replace(/^(注意：|提示：.*)$/gm, '<span style="color: #909399; font-style: italic;">$1</span>')
+                .replace(/^(请输入选项.*)$/gm, '<span style="color: #409EFF; font-weight: bold;">$1</span>')
+                .replace(/^(\d+\.\s+.*)$/gm, '<span style="color: #333; font-weight: bold;">$1</span>')
+                .replace(/^(对比文件:|新增商品数:|删除商品数:|新增高价商品数:.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(输入货号总数:|JSON中货号总数:|已存在货号数:|缺失货号数:|JSON中多余货号数:|重复序列号数:.*)$/gm, '<span style="color: #E6A23C;">$1</span>');
+            
+            return formatted;
+        }
+
         function showSkuInputPanel() {
             const outputPanel = document.getElementById('output-panel');
             outputPanel.innerHTML = `
@@ -2564,8 +2563,6 @@ playwright install chromium</pre>
                 btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
             });
         }
-        
-        }); // DOMContentLoaded结束
         
     </script>
 </body>

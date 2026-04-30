@@ -1,144 +1,148 @@
 @echo off
-setlocal enabledelayedexpansion
 chcp 65001 > nul 2>&1
 set PYTHONIOENCODING=utf-8
 title Szwego Crawler Tool
 
 echo ========================================
-echo Szwego Crawler and SKU Comparison Tool
-echo Version: 2.9.6
+echo Szwego商品爬虫和货号对比工具 - v2.6.0
 echo ========================================
+5
+goto run_web
 
-REM Check Python
-where py >nul 2>&1
-if %errorlevel% neq 0 (
-    echo ERROR: Python not found
-    echo Install from: https://www.python.org/downloads/
-    pause & exit /b 1
-)
-echo Python: 
-py --version
-
-REM Setup virtual environment
-if not exist "venv" (
-    echo Creating virtual environment...
-    py -m venv venv >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo ERROR: Failed to create venv
-        pause & exit /b 1
-    )
-)
-
-REM Set Python path
-set PYTHON_EXE=venv\Scripts\python.exe
-if not exist "%PYTHON_EXE%" (
-    echo ERROR: Virtual environment Python not found
-    echo Creating new venv...
-    py -m venv venv >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo ERROR: Failed to create venv
-        pause & exit /b 1
-    )
-)
-
-REM Install dependencies
-if exist "requirements.txt" (
-    echo Installing dependencies...
-    "%PYTHON_EXE%" -m pip install -r requirements.txt -q --disable-pip-version-check >nul 2>&1
-)
-
-REM Menu
+:run_web
 echo.
-echo 1 - Web Service (port 8888)
-echo 2 - Web Service (custom port)
-echo 3 - Scraper Task
-echo 4 - SKU Comparison
-echo 5 - Excel Comparison
-echo 6 - Update Cookie
-echo 7 - File Cleaner
-echo 0 - Exit
+echo ========================================
+echo 启动Web服务模式
+echo ========================================
+goto detect_python
+
+:detect_python
+echo.
+echo ========================================
+echo 环境检测与配置
+echo ========================================
+echo [1/6] 检测Python环境...
+
+where py >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Python环境检测失败
+    echo.
+    echo 请先安装Python 3.10或更高版本：
+    echo   下载地址: https://www.python.org/downloads/
+    pause
+    exit /b 1
+)
+
+echo Python版本：
+py --version
+goto detect_venv
+
+:detect_venv
+echo [2/6] 检测虚拟环境...
+
+if exist venv\Scripts\activate.bat (
+    echo 检测到虚拟环境：venv
+    set VENV_EXISTS=1
+    set VENV_PATH=venv
+) else if exist .venv\Scripts\activate.bat (
+    echo 检测到虚拟环境：.venv
+    set VENV_EXISTS=1
+    set VENV_PATH=.venv
+) else (
+    echo 未检测到虚拟环境
+    set VENV_EXISTS=0
+    set VENV_PATH=
+)
+goto check_dependencies
+
+:check_dependencies
+echo [3/6] 检测依赖包...
+
+if defined VENV_PATH (
+    call %VENV_PATH%\Scripts\activate.bat
+    py -c "import aiohttp" >nul 2>&1
+    if errorlevel 1 (
+        echo aiohttp未安装
+    ) else (
+        echo aiohttp依赖正常
+    )
+    call deactivate
+) else (
+    py -c "import aiohttp" >nul 2>&1
+    if errorlevel 1 (
+        echo aiohttp未安装
+    ) else (
+        echo aiohttp依赖正常
+    )
+)
+goto check_config
+
+:check_config
+echo [4/6] 检测配置文件...
+
+if exist config\config.json (
+    echo 配置文件存在
+) else (
+    echo ERROR: 配置文件不存在：config\config.json
+    pause
+    exit /b 1
+)
+goto setup_venv
+
+:setup_venv
+echo [5/6] 设置虚拟环境...
+
+if %VENV_EXISTS%==0 (
+    echo 正在创建虚拟环境...
+    py -m venv .venv
+    if errorlevel 1 (
+        echo ERROR: 创建虚拟环境失败
+        pause
+        exit /b 1
+    )
+    set VENV_PATH=.venv
+    set VENV_EXISTS=1
+)
+
+if not exist %VENV_PATH% (
+    echo ERROR: 虚拟环境路径不存在：%VENV_PATH%
+    pause
+    exit /b 1
+)
+
+call %VENV_PATH%\Scripts\activate.bat
+
+if exist requirements.txt (
+    echo 正在安装依赖...
+    %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check
+    if errorlevel 1 (
+        echo ERROR: 安装依赖失败
+        call deactivate
+        pause
+        exit /b 1
+    )
+)
+
+echo 虚拟环境设置完成
+goto run_program
+
+:run_program
+echo [6/6] 运行程序...
+
+echo.
+echo ========================================
+echo 启动Web服务...
+echo 访问地址: http://localhost:8888
 echo ========================================
 
-:menu
-set /p CHOICE="Select option (0-7): "
-set CHOICE=%CHOICE: =%
-set CHOICE=%CHOICE:"=%
-
-if "%CHOICE%"=="0" (
-    exit /b 0
+if defined VENV_PATH (
+    call %VENV_PATH%\Scripts\activate.bat
+    %VENV_PATH%\Scripts\python.exe main.py --web
+    call deactivate
+) else (
+    py main.py --web
 )
-
-if "%CHOICE%"=="1" (
-    echo.
-    echo Starting Web Service on port 8888...
-    echo Open: http://127.0.0.1:8888
-    echo Press Ctrl+C to stop
-    echo.
-    "%PYTHON_EXE%" main.py --web
-    goto end
-)
-
-if "%CHOICE%"=="2" (
-    set /p PORT="Port (default 8888): "
-    set PORT=%PORT: =%
-    set PORT=%PORT:"=%
-    if "%PORT%"=="" set PORT=8888
-    echo.
-    echo Starting Web Service on port %PORT%...
-    echo Open: http://127.0.0.1:%PORT%
-    echo Press Ctrl+C to stop
-    echo.
-    "%PYTHON_EXE%" main.py --web --port %PORT%
-    goto end
-)
-
-if "%CHOICE%"=="3" (
-    echo.
-    echo Running Scraper Task...
-    echo.
-    "%PYTHON_EXE%" main.py --task 1
-    goto end
-)
-
-if "%CHOICE%"=="4" (
-    echo.
-    echo Running SKU Comparison Task...
-    echo.
-    "%PYTHON_EXE%" main.py --task 2
-    goto end
-)
-
-if "%CHOICE%"=="5" (
-    echo.
-    echo Running Excel Comparison Task...
-    echo.
-    "%PYTHON_EXE%" main.py --task 3
-    goto end
-)
-
-if "%CHOICE%"=="6" (
-    echo.
-    echo Running Update Cookie Task...
-    echo.
-    "%PYTHON_EXE%" main.py --task 4
-    goto end
-)
-
-if "%CHOICE%"=="7" (
-    echo.
-    echo Running File Cleaner Task...
-    echo.
-    "%PYTHON_EXE%" main.py --task 6
-    goto end
-)
-
-echo Invalid option
-goto menu
+goto end
 
 :end
-if %errorlevel% neq 0 (
-    echo.
-    echo ERROR: Task failed (code: %errorlevel%)
-    echo Fix: "%PYTHON_EXE%" -m pip install -r requirements.txt
-    pause
-)
+pause
