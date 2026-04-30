@@ -79,6 +79,7 @@
   "excel_files": [
     "C:\\Users\\Administrator\\Desktop\\小旭二手机.xlsx",
     "/Users/yu/Downloads/小旭二手机.xlsx",
-    "~/Desktop/小旭二手机.xlsx"
+    "~/Desktop/小旭二手机.xlsx",
+    "D:\\ws\\xy_ws\\小旭二手机.xlsx"
   ]
 }

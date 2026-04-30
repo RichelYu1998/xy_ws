@@ -1208,6 +1208,16 @@ class ConfigManager:
                     return expanded_path
         return self.config.get('excel_file', '')
 
+    def get_all_excel_files(self):
+        excel_files = self.config.get('excel_files', [])
+        existing_files = []
+        if excel_files:
+            for path in excel_files:
+                expanded_path = os.path.expanduser(path)
+                if FileManager.file_exists(expanded_path):
+                    existing_files.append(expanded_path)
+        return existing_files
+
     def get_target_url(self):
         return self.config.get('target_url', '')
 
@@ -2509,6 +2519,56 @@ class StockNumberComparator:
             traceback.print_exc()
             return None
 
+    def load_all_excel_data(self, remove_duplicates=True):
+        all_stock_numbers = []
+        excel_files = self.config_manager.get_all_excel_files()
+        
+        if not excel_files:
+            print('未找到任何Excel文件')
+            return None
+        
+        print(f'找到 {len(excel_files)} 个Excel文件')
+        
+        for excel_file in excel_files:
+            try:
+                if not FileManager.file_exists(excel_file):
+                    continue
+                
+                print(f'正在读取Excel文件: {excel_file}')
+                workbook = openpyxl.load_workbook(excel_file)
+                
+                sheet = next((workbook[sheet_name] for sheet_name in workbook.sheetnames if '闲鱼' in sheet_name), None)
+                
+                if sheet is None:
+                    print('未找到"闲鱼"工作表，使用第一个工作表')
+                    sheet = workbook.active
+                else:
+                    print(f'使用工作表: {sheet.title}')
+                
+                file_stock_numbers = []
+                for row in sheet.iter_rows(min_col=5, max_col=5, values_only=True):
+                    cell_value = row[0]
+                    if cell_value:
+                        cell_str = str(cell_value).strip()
+                        number_match = re.match(r'^([A-Za-z0-9]{3,10})$', cell_str)
+                        if number_match:
+                            file_stock_numbers.append(cell_str)
+                
+                print(f'从 {os.path.basename(excel_file)} 的E列中读取到 {len(file_stock_numbers)} 个货号')
+                all_stock_numbers.extend(file_stock_numbers)
+                
+            except Exception as e:
+                print(f'读取Excel文件失败 {excel_file}: {e}')
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        if remove_duplicates:
+            all_stock_numbers = list(set(all_stock_numbers))
+        
+        print(f'总共读取到 {len(all_stock_numbers)} 个货号（已去重）')
+        return all_stock_numbers
+
     def save_input_to_file(self, input_str):
         if FileManager.write_text(self.input_file, input_str):
             print(f'输入已保存到 {self.input_file}')
@@ -2767,7 +2827,7 @@ class StockNumberComparator:
                 and WegoScraper.parse_price(p.get('售价', '')) >= 599
             ]
             
-            excel_stock_numbers = self.load_excel_data(remove_duplicates=False)
+            excel_stock_numbers = self.load_all_excel_data(remove_duplicates=False)
             if not excel_stock_numbers:
                 print('无法从Excel文件读取货号')
                 return False
@@ -3562,7 +3622,7 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
                 
-                excel_file = None
+                excel_files_list = []
                 config_file = os.path.join(PROJECT_DIR, 'config', 'config.json')
                 if os.path.exists(config_file):
                     with open(config_file, 'r', encoding='utf-8') as f:
@@ -3571,53 +3631,53 @@ if __name__ == '__main__':
                     for path in excel_files:
                         expanded_path = os.path.expanduser(path)
                         if os.path.exists(expanded_path):
-                            excel_file = expanded_path
-                            break
+                            excel_files_list.append(expanded_path)
                 
-                if excel_file is None:
-                    excel_file = os.path.join(PROJECT_DIR, 'config', '本地商品表格.xlsx')
+                if not excel_files_list:
+                    excel_files_list = [os.path.join(PROJECT_DIR, 'config', '本地商品表格.xlsx')]
                 
                 excel_stock_numbers = []
-                if os.path.exists(excel_file):
-                    xls = pd.ExcelFile(excel_file)
-                    
-                    df = None
-                    sheet_name = None
-                    sku_column = None
-                    
-                    for sheet in xls.sheet_names:
-                        temp_df = xls.parse(sheet)
+                for excel_file in excel_files_list:
+                    if os.path.exists(excel_file):
+                        xls = pd.ExcelFile(excel_file)
                         
-                        if '货号' in temp_df.columns:
-                            df = temp_df
-                            sheet_name = sheet
-                            sku_column = '货号'
-                            break
-                        elif '序列号' in temp_df.columns:
-                            df = temp_df
-                            sheet_name = sheet
-                            sku_column = '序列号'
-                            break
-                        elif '闲鱼' in sheet:
-                            if len(temp_df.columns) > 4:
-                                second_row = temp_df.iloc[1].tolist()
-                                if '序列号' in second_row:
-                                    col_idx = second_row.index('序列号')
-                                    temp_df.columns = second_row
-                                    temp_df = temp_df.drop([0, 1]).reset_index(drop=True)
-                                    df = temp_df
-                                    sheet_name = sheet
-                                    sku_column = '序列号'
-                                    break
-                    
-                    if df is not None and sku_column is not None:
-                        excel_stock_numbers = sorted([str(int(x)) if isinstance(x, float) and x == int(x) else str(x).strip() 
-                                                     for x in df[sku_column].dropna() 
-                                                     if str(x).strip() and str(x).strip() != 'nan' and str(x).strip() != '序列号'])
-                    else:
-                        return jsonify({'error': f'Excel文件中未找到"货号"或"序列号"列'}), 404
-                else:
-                    return jsonify({'error': f'Excel文件不存在: {excel_file}'}), 404
+                        df = None
+                        sheet_name = None
+                        sku_column = None
+                        
+                        for sheet in xls.sheet_names:
+                            temp_df = xls.parse(sheet)
+                            
+                            if '货号' in temp_df.columns:
+                                df = temp_df
+                                sheet_name = sheet
+                                sku_column = '货号'
+                                break
+                            elif '序列号' in temp_df.columns:
+                                df = temp_df
+                                sheet_name = sheet
+                                sku_column = '序列号'
+                                break
+                            elif '闲鱼' in sheet:
+                                if len(temp_df.columns) > 4:
+                                    second_row = temp_df.iloc[1].tolist()
+                                    if '序列号' in second_row:
+                                        col_idx = second_row.index('序列号')
+                                        temp_df.columns = second_row
+                                        temp_df = temp_df.drop([0, 1]).reset_index(drop=True)
+                                        df = temp_df
+                                        sheet_name = sheet
+                                        sku_column = '序列号'
+                                        break
+                        
+                        if df is not None and sku_column is not None:
+                            file_stock_numbers = sorted([str(int(x)) if isinstance(x, float) and x == int(x) else str(x).strip() 
+                                                         for x in df[sku_column].dropna() 
+                                                         if str(x).strip() and str(x).strip() != 'nan' and str(x).strip() != '序列号'])
+                            excel_stock_numbers.extend(file_stock_numbers)
+                
+                if not excel_stock_numbers:
+                    return jsonify({'error': f'Excel文件中未找到"货号"或"序列号"列'}), 404
                 
                 json_set = set(json_stock_numbers)
                 excel_set = set(excel_stock_numbers)
@@ -3691,6 +3751,8 @@ if __name__ == '__main__':
                 result = {
                     'type': 'excel',
                     'json_file': os.path.basename(latest_json),
+                    'excel_files': [os.path.basename(f) for f in excel_files_list],
+                    'excel_files_count': len(excel_files_list),
                     'input_count': len(excel_set),
                     'extra_count': len(json_set - excel_set),
                     'json_count': len(json_set),
