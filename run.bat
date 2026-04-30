@@ -2,177 +2,143 @@
 setlocal enabledelayedexpansion
 chcp 65001 > nul 2>&1
 set PYTHONIOENCODING=utf-8
-
 title Szwego Crawler Tool
 
 echo ========================================
 echo Szwego Crawler and SKU Comparison Tool
-echo Version: 2.8.0
+echo Version: 2.9.6
 echo ========================================
-echo.
 
-REM Check if Python is installed
+REM Check Python
 where py >nul 2>&1
 if %errorlevel% neq 0 (
     echo ERROR: Python not found
-    echo Please install Python from https://www.python.org/downloads/
-    echo.
-    pause
-    exit /b 1
+    echo Install from: https://www.python.org/downloads/
+    pause & exit /b 1
 )
-
-echo Python detected:
+echo Python: 
 py --version
-echo.
 
-REM Check and create virtual environment
+REM Setup virtual environment
 if not exist "venv" (
-    echo Virtual environment not found, creating...
-    py -m venv venv
+    echo Creating virtual environment...
+    py -m venv venv >nul 2>&1
     if %errorlevel% neq 0 (
-        echo ERROR: Failed to create virtual environment
-        pause
-        exit /b 1
+        echo ERROR: Failed to create venv
+        pause & exit /b 1
     )
-    echo Virtual environment created successfully.
-) else (
-    echo Virtual environment found.
 )
 
-REM Activate virtual environment and install dependencies
-echo.
-echo Checking and installing dependencies...
-call venv\Scripts\activate.bat
-if %errorlevel% neq 0 (
-    echo ERROR: Failed to activate virtual environment
-    pause
-    exit /b 1
+REM Set Python path
+set PYTHON_EXE=venv\Scripts\python.exe
+if not exist "%PYTHON_EXE%" (
+    echo ERROR: Virtual environment Python not found
+    echo Creating new venv...
+    py -m venv venv >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo ERROR: Failed to create venv
+        pause & exit /b 1
+    )
 )
 
+REM Install dependencies
 if exist "requirements.txt" (
-    echo Installing requirements from requirements.txt...
-    venv\Scripts\python.exe -m pip install -r requirements.txt
-    if %errorlevel% neq 0 (
-        echo WARNING: Some dependencies failed to install, but continuing...
-        echo You may need to install dependencies manually.
-        echo Run: venv\Scripts\python.exe -m pip install -r requirements.txt
-    )
-    echo Dependencies installed.
-) else (
-    echo No requirements.txt found, skipping dependency installation.
+    echo Installing dependencies...
+    "%PYTHON_EXE%" -m pip install -r requirements.txt -q --disable-pip-version-check >nul 2>&1
 )
 
+REM Menu
 echo.
+echo 1 - Web Service (port 8888)
+echo 2 - Web Service (custom port)
+echo 3 - Scraper Task
+echo 4 - SKU Comparison
+echo 5 - Excel Comparison
+echo 6 - Update Cookie
+echo 7 - File Cleaner
+echo 0 - Exit
 echo ========================================
-echo Select running mode:
-echo ========================================
-echo   1 - Web Service Mode (Default port: 8888)
-echo   2 - Web Service Mode (Custom port)
-echo   3 - Run Scraper Task (Task 1)
-echo   4 - SKU Comparison Task (Task 2)
-echo   5 - Excel Comparison Task (Task 3)
-echo   6 - Update Cookie Task (Task 4)
-echo   7 - File Cleaner Task (Task 6)
-echo   0 - Exit
-echo ========================================
-echo.
 
 :menu
-set /p CHOICE="Please enter option (0-7): "
-
+set /p CHOICE="Select option (0-7): "
 set CHOICE=%CHOICE: =%
 set CHOICE=%CHOICE:"=%
 
 if "%CHOICE%"=="0" (
-    echo Exiting...
-    call venv\Scripts\deactivate.bat
     exit /b 0
 )
 
 if "%CHOICE%"=="1" (
     echo.
-    echo Starting Web Service Mode on port 8888...
-    echo Please open http://127.0.0.1:8888 in your browser
-    echo Press Ctrl+C to stop the server
+    echo Starting Web Service on port 8888...
+    echo Open: http://127.0.0.1:8888
+    echo Press Ctrl+C to stop
     echo.
-    venv\Scripts\python.exe main.py --web
+    "%PYTHON_EXE%" main.py --web
     goto end
 )
 
 if "%CHOICE%"=="2" (
-    echo.
-    set /p PORT="Enter port number (default 8888): "
+    set /p PORT="Port (default 8888): "
     set PORT=%PORT: =%
     set PORT=%PORT:"=%
-    
-    if "%PORT%"=="" (
-        set PORT=8888
-    )
-    
-    echo Starting Web Service Mode on port %PORT%...
-    echo Please open http://127.0.0.1:%PORT% in your browser
-    echo Press Ctrl+C to stop the server
+    if "%PORT%"=="" set PORT=8888
     echo.
-    venv\Scripts\python.exe main.py --web --port %PORT%
+    echo Starting Web Service on port %PORT%...
+    echo Open: http://127.0.0.1:%PORT%
+    echo Press Ctrl+C to stop
+    echo.
+    "%PYTHON_EXE%" main.py --web --port %PORT%
     goto end
 )
 
 if "%CHOICE%"=="3" (
     echo.
-    echo Running Scraper Task (Task 1)...
+    echo Running Scraper Task...
     echo.
-    venv\Scripts\python.exe main.py --task 1
+    "%PYTHON_EXE%" main.py --task 1
     goto end
 )
 
 if "%CHOICE%"=="4" (
     echo.
-    echo Running SKU Comparison Task (Task 2)...
+    echo Running SKU Comparison Task...
     echo.
-    venv\Scripts\python.exe main.py --task 2
+    "%PYTHON_EXE%" main.py --task 2
     goto end
 )
 
 if "%CHOICE%"=="5" (
     echo.
-    echo Running Excel Comparison Task (Task 3)...
+    echo Running Excel Comparison Task...
     echo.
-    venv\Scripts\python.exe main.py --task 3
+    "%PYTHON_EXE%" main.py --task 3
     goto end
 )
 
 if "%CHOICE%"=="6" (
     echo.
-    echo Running Update Cookie Task (Task 4)...
+    echo Running Update Cookie Task...
     echo.
-    venv\Scripts\python.exe main.py --task 4
+    "%PYTHON_EXE%" main.py --task 4
     goto end
 )
 
 if "%CHOICE%"=="7" (
     echo.
-    echo Running File Cleaner Task (Task 6)...
+    echo Running File Cleaner Task...
     echo.
-    venv\Scripts\python.exe main.py --task 6
+    "%PYTHON_EXE%" main.py --task 6
     goto end
 )
 
-echo.
-echo ERROR: Invalid option. Please enter 0-7.
+echo Invalid option
 goto menu
 
 :end
 if %errorlevel% neq 0 (
     echo.
-    echo ERROR: Task failed with error code %errorlevel%
-    echo.
-    echo If you see module errors, please install dependencies:
-    echo   venv\Scripts\python.exe -m pip install -r requirements.txt
-    echo.
-    pause
-) else (
-    echo.
-    echo Task completed successfully.
-    echo.
+    echo ERROR: Task failed (code: %errorlevel%)
+    echo Fix: "%PYTHON_EXE%" -m pip install -r requirements.txt
     pause
 )
