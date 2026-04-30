@@ -1508,7 +1508,9 @@ class FileManager:
 
 
 class WegoScraper:
-    def __init__(self, config_path='config/config.json'):
+    def __init__(self, config_path=None):
+        if config_path is None:
+            config_path = PathManager.get_config_file()
         self.config_manager = ConfigManager(config_path)
 
     @staticmethod
@@ -2410,7 +2412,12 @@ class WegoScraper:
                 
                 save_cookie_start = time.time()
                 cookies = await context.cookies()
-                FileManager.write_json(cookie_file, cookies)
+                # 统一domain格式，将所有cookie的domain改为.szwego.com
+                szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+                for cookie in szwego_cookies:
+                    if cookie['domain'] == 'www.szwego.com':
+                        cookie['domain'] = '.szwego.com'
+                FileManager.write_json(cookie_file, szwego_cookies)
                 print(f'Cookie已保存到 {cookie_file}')
                 print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
                 
@@ -3072,9 +3079,10 @@ def main():
         print(f'Szwego商品爬虫和货号对比工具 - v{VERSION}')
         print_separator()
         
-        if not FileManager.file_exists('config/config.json'):
-            print('⚠️  警告: 配置文件不存在 (config/config.json)')
-            print('请先配置 config/config.json 文件')
+        config_file = PathManager.get_config_file()
+        if not FileManager.file_exists(config_file):
+            print(f'⚠️  警告: 配置文件不存在 ({config_file})')
+            print(f'请先配置 {config_file} 文件')
             print_separator()
             input('按回车键退出...')
             return
@@ -3131,17 +3139,8 @@ def main():
 def run_scraper():
     """运行爬虫"""
     try:
-        cookie_file = PathManager.get_cookie_file()
-        
-        # 自动清空cookies.json文件
-        if os.path.exists(cookie_file):
-            print(f'清空Cookie文件: {cookie_file}')
-            with open(cookie_file, 'w', encoding='utf-8') as f:
-                json.dump([], f)
-            print('✓ Cookie文件已清空')
-        
-        # 跳过cookie验证，直接运行爬虫（爬虫会自动打开浏览器获取新cookie）
-        print('准备启动爬虫，将自动打开浏览器获取Cookie...')
+        # 直接运行爬虫，使用现有的cookie
+        print('准备启动爬虫，将使用现有Cookie...')
         
         scraper = WegoScraper()
         asyncio.run(scraper.run())
@@ -3162,6 +3161,13 @@ def update_cookie():
     print('  - 用户手动登录后关闭浏览器')
     print('  - 完成后自动保存到配置文件')
     print_separator()
+    
+    # 清空现有的Cookie文件，确保获取最新的Cookie
+    cookie_file = PathManager.get_cookie_file()
+    if FileManager.file_exists(cookie_file):
+        print(f'清空现有Cookie文件: {cookie_file}')
+        FileManager.write_json(cookie_file, [])
+        print('✓ Cookie文件已清空')
     
     try:
         from playwright.async_api import async_playwright
@@ -3252,10 +3258,28 @@ def update_cookie():
                 cookies = await context.cookies()
                 szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
                 
+                # 统一domain格式，将所有cookie的domain改为.szwego.com
+                for cookie in szwego_cookies:
+                    if cookie['domain'] == 'www.szwego.com':
+                        cookie['domain'] = '.szwego.com'
+                
                 FileManager.write_json(cookie_file, szwego_cookies)
                 
                 print(f'✓ Cookie已保存到 {cookie_file}')
                 print(f'✓ 共保存 {len(szwego_cookies)} 个Cookie')
+                
+                # 显示Cookie有效期
+                print_separator()
+                print('Cookie有效期信息：')
+                token_cookie = next((c for c in szwego_cookies if c['name'] == 'token'), None)
+                if token_cookie and 'expires' in token_cookie and token_cookie['expires']:
+                    from datetime import datetime
+                    expiry_time = datetime.fromtimestamp(token_cookie['expires'])
+                    expiry_str = expiry_time.strftime('%Y-%m-%d')
+                    print(f'Token有效期: {expiry_str}')
+                else:
+                    print('未找到Token Cookie')
+                print_separator()
                 
                 config_file = PathManager.get_config_file()
                 if FileManager.file_exists(config_file):
@@ -3401,29 +3425,31 @@ if __name__ == '__main__':
                 if not cookies or len(cookies) == 0:
                     return jsonify({'error': 'Cookie文件为空', 'valid': False, 'system': Environment.SYSTEM}), 404
                 
-                valid_cookie = None
+                # 查找token cookie
+                token_cookie = None
                 for c in cookies:
-                    expires = c.get('expires')
-                    if expires and isinstance(expires, (int, float)) and expires > 0:
-                        valid_cookie = c
+                    if c.get('name') == 'token':
+                        token_cookie = c
                         break
                 
-                if not valid_cookie:
-                    return jsonify({'error': '未找到有效的Cookie', 'valid': False, 'system': Environment.SYSTEM}), 404
+                if not token_cookie:
+                    return jsonify({'error': '未找到Token Cookie', 'valid': False, 'system': Environment.SYSTEM}), 404
                 
-                expires = valid_cookie.get('expires')
-                cookie_name = valid_cookie.get('name', '未知Cookie')
+                expires = token_cookie.get('expires')
+                if not expires or not isinstance(expires, (int, float)) or expires <= 0:
+                    return jsonify({'error': 'Token Cookie无效', 'valid': False, 'system': Environment.SYSTEM}), 404
+                
                 import datetime
                 expires_time = datetime.datetime.fromtimestamp(expires)
                 hours_remaining = (expires_time - datetime.datetime.now()).total_seconds() / 3600
                 
                 return jsonify({
                     'valid': True, 
-                    'expires': expires_time.strftime('%Y-%m-%d %H:%M:%S'), 
+                    'expires': expires_time.strftime('%Y-%m-%d'), 
                     'hours_remaining': round(hours_remaining, 1), 
                     'expired': hours_remaining <= 0, 
                     'system': Environment.SYSTEM,
-                    'cookie_name': cookie_name
+                    'cookie_name': 'Token'
                 })
             except Exception as e:
                 return jsonify({'error': str(e), 'valid': False}), 500

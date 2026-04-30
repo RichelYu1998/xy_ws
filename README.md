@@ -2,6 +2,31 @@
 
 ## 更新日志
 
+### v3.0.0 (2026-04-30)
+- **Cookie管理优化**
+  - 修改Cookie清空逻辑：只在"更新Cookie"时清空cookie文件，其他任意时间都不清空
+  - 恢复爬虫运行结束时保存cookie的逻辑，确保Cookie状态同步
+  - 统一Cookie domain格式为`.szwego.com`，解决domain不匹配问题
+  - 修复Token Cookie丢失导致爬虫无法正常工作的问题
+- **Token有效期显示优化**
+  - 统一前端和后端显示为"Token有效期"而非"Cookie有效期"
+  - 简化显示格式：从"Cookie有效期 (sajssdk_2015_cross_new_user): 2026-04-30 23:59:59"改为"Token有效期: 2026-05-30"
+  - 只显示Token的有效期，不显示其他Cookie信息
+  - 后端API专门查找Token Cookie，提供更准确的状态信息
+- **跨平台兼容性提升**
+  - 移除硬编码的路径分隔符，使用`os.path.join()`确保跨平台兼容
+  - 修复`config/config.json`硬编码路径问题，改用`PathManager.get_config_file()`
+  - 统一所有文件路径处理，支持Windows、Mac、Linux系统
+  - 完善系统检测和浏览器路径适配逻辑
+- **Cookie认证问题修复**
+  - 解决爬虫获取数据不完整的问题（从66个商品恢复到89个）
+  - 修复Token和client_type Cookie因domain不匹配而丢失的问题
+  - 优化Cookie加载和保存流程，确保认证信息完整
+- **代码质量提升**
+  - 改进错误处理和日志输出
+  - 优化Cookie验证逻辑，提供更友好的错误提示
+  - 统一代码风格和注释规范
+
 ### v2.9.6 (2026-04-30)
 - **启动脚本优化**
   - 新增虚拟环境自动检测和创建功能
