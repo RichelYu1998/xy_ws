@@ -1,273 +1,178 @@
 @echo off
 setlocal enabledelayedexpansion
-chcp 65001 > nul
+chcp 65001 > nul 2>&1
+set PYTHONIOENCODING=utf-8
+
+title Szwego Crawler Tool
+
 echo ========================================
-echo Szwego商品爬虫和货号对比工具 - v2.6.0
+echo Szwego Crawler and SKU Comparison Tool
+echo Version: 2.8.0
 echo ========================================
 echo.
-echo 请选择运行模式：
-echo   1. 命令行模式（爬虫、货号对比等）
-echo   2. Web服务模式（可视化界面）
-echo.
 
-set /p MODE="请输入选项 (1-2): "
-
-if "!MODE!"=="1" (
-    call :run_cli
-) else if "!MODE!"=="2" (
-    call :run_web
-) else (
-    echo 无效选项，请输入 1 或 2
-    exit /b 1
-)
-
-goto :eof
-
-:run_cli
-echo.
-echo ========================================
-echo 启动命令行模式
-echo ========================================
-call :main
-goto :eof
-
-:run_web
-echo.
-echo ========================================
-echo 启动Web服务模式
-echo ========================================
-call :detect_python
-if %errorlevel% neq 0 exit /b 1
-
-call :detect_venv
-if %errorlevel% neq 0 exit /b 1
-
-call :check_dependencies
-if %errorlevel% neq 0 exit /b 1
-
-call :check_config
-if %errorlevel% neq 0 exit /b 1
-
-call :setup_venv
-if %errorlevel% neq 0 exit /b 1
-
-echo.
-echo ========================================
-echo 启动Web服务...
-echo 访问地址: http://localhost:8888
-echo ========================================
-
-if defined VENV_PATH (
-    call "%VENV_PATH%\Scripts\activate.bat"
-    %PYTHON_CMD% main.py --web
-    call deactivate
-) else (
-    %PYTHON_CMD% main.py --web
-)
-goto :eof
-
-:log_section
-echo.
-echo ========================================
-echo %~1
-echo ========================================
-goto :eof
-
-:log_info
-echo ✓ %~1
-goto :eof
-
-:log_warn
-echo ⚠ %~1
-goto :eof
-
-:log_error
-echo ✗ %~1
-goto :eof
-
-:detect_python
-call :log_section "🔍 环境检测与配置"
-
-echo [1/6] 检测Python环境...
-set PYTHON_CMD=
-
+REM Check if Python is installed
 where py >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=py
-    for /f "tokens=2" %%i in ('py --version 2^>^&1') do set PYTHON_VERSION=%%i
-    call :log_info "Python版本：!PYTHON_VERSION! (命令: py)"
-    goto :python_found
-)
-
-where python3 >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=python3
-    for /f "tokens=2" %%i in ('python3 --version 2^>^&1') do set PYTHON_VERSION=%%i
-    call :log_info "Python版本：!PYTHON_VERSION! (命令: python3)"
-    goto :python_found
-)
-
-where python >nul 2>&1
-if %errorlevel% equ 0 (
-    set PYTHON_CMD=python
-    for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
-    call :log_info "Python版本：!PYTHON_VERSION! (命令: python)"
-    goto :python_found
-)
-
-call :log_error "Python环境检测失败"
-echo.
-echo 请先安装Python 3.10或更高版本：
-echo   从 https://www.python.org/downloads/ 下载安装
-exit /b 1
-
-:python_found
-exit /b 0
-
-:detect_venv
-echo [2/6] 检测虚拟环境...
-
-set VENV_EXISTS=0
-set VENV_PATH=
-
-if exist "venv\Scripts\activate.bat" (
-    call :log_info "检测到虚拟环境：venv"
-    set VENV_EXISTS=1
-    set VENV_PATH=venv
-    goto :venv_found
-)
-
-if exist ".venv\Scripts\activate.bat" (
-    call :log_info "检测到虚拟环境：.venv"
-    set VENV_EXISTS=1
-    set VENV_PATH=.venv
-    goto :venv_found
-)
-
-call :log_warn "未检测到虚拟环境"
-
-:venv_found
-exit /b 0
-
-:check_dependencies
-echo [3/6] 检测依赖包...
-
-if defined VENV_PATH (
-    call "%VENV_PATH%\Scripts\activate.bat"
-    %PYTHON_CMD% -c "import aiohttp" >nul 2>&1
-    if %errorlevel% equ 0 (
-        call :log_info "aiohttp依赖正常"
-    ) else (
-        call :log_warn "aiohttp未安装"
-    )
-    call deactivate
-) else (
-    %PYTHON_CMD% -c "import aiohttp" >nul 2>&1
-    if %errorlevel% equ 0 (
-        call :log_info "aiohttp依赖正常"
-    ) else (
-        call :log_warn "aiohttp未安装"
-    )
-)
-
-exit /b 0
-
-:check_config
-echo [4/6] 检测配置文件...
-
-if exist "config\config.json" (
-    call :log_info "配置文件存在"
-    exit /b 0
-) else (
-    call :log_error "配置文件不存在：config\config.json"
+if %errorlevel% neq 0 (
+    echo ERROR: Python not found
+    echo Please install Python from https://www.python.org/downloads/
+    echo.
+    pause
     exit /b 1
 )
 
-:setup_venv
-echo [5/6] 设置虚拟环境...
+echo Python detected:
+py --version
+echo.
 
-if %VENV_EXISTS% equ 0 (
-    call :log_info "正在创建虚拟环境..."
-    %PYTHON_CMD% -m venv .venv
+REM Check and create virtual environment
+if not exist "venv" (
+    echo Virtual environment not found, creating...
+    py -m venv venv
     if %errorlevel% neq 0 (
-        call :log_error "创建虚拟环境失败"
+        echo ERROR: Failed to create virtual environment
+        pause
         exit /b 1
     )
-    set VENV_PATH=.venv
-    set VENV_EXISTS=1
+    echo Virtual environment created successfully.
+) else (
+    echo Virtual environment found.
 )
 
-if not exist "%VENV_PATH%" (
-    call :log_error "虚拟环境路径不存在：%VENV_PATH%"
+REM Activate virtual environment and install dependencies
+echo.
+echo Checking and installing dependencies...
+call venv\Scripts\activate.bat
+if %errorlevel% neq 0 (
+    echo ERROR: Failed to activate virtual environment
+    pause
     exit /b 1
 )
-
-call "%VENV_PATH%\Scripts\activate.bat"
 
 if exist "requirements.txt" (
-    call :log_info "正在安装依赖（使用阿里云镜像加速）..."
-    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+    echo Installing requirements from requirements.txt...
+    venv\Scripts\python.exe -m pip install -r requirements.txt
     if %errorlevel% neq 0 (
-        call :log_error "安装依赖失败"
-        call deactivate
-        exit /b 1
+        echo WARNING: Some dependencies failed to install, but continuing...
+        echo You may need to install dependencies manually.
+        echo Run: venv\Scripts\python.exe -m pip install -r requirements.txt
     )
-)
-
-where playwright >nul 2>&1
-if %errorlevel% equ 0 (
-    set "PLAYWRIGHT_BROWSERS_PATH=%LOCALAPPDATA%\ms-playwright"
-    dir /b "%PLAYWRIGHT_BROWSERS_PATH%" 2>nul | findstr /i "chromium chrome-for-testing" >nul
-    if %errorlevel% equ 0 (
-        call :log_info "Playwright浏览器已存在，跳过下载"
-    ) else (
-        call :log_info "正在安装Playwright浏览器..."
-        playwright install chromium
-    )
-)
-
-call :log_info "虚拟环境设置完成"
-exit /b 0
-
-:run_program
-echo [6/6] 运行程序...
-
-if defined VENV_PATH (
-    call "%VENV_PATH%\Scripts\activate.bat"
-    %PYTHON_CMD% main.py
-    call deactivate
+    echo Dependencies installed.
 ) else (
-    %PYTHON_CMD% main.py
+    echo No requirements.txt found, skipping dependency installation.
 )
 
-exit /b 0
-
-:main
-call :detect_python
-if %errorlevel% neq 0 exit /b 1
-
-call :detect_venv
-if %errorlevel% neq 0 exit /b 1
-
-call :check_dependencies
-if %errorlevel% neq 0 exit /b 1
-
-call :check_config
-if %errorlevel% neq 0 exit /b 1
-
-call :setup_venv
-if %errorlevel% neq 0 exit /b 1
-
 echo.
 echo ========================================
-echo 开始执行任务
+echo Select running mode:
+echo ========================================
+echo   1 - Web Service Mode (Default port: 8888)
+echo   2 - Web Service Mode (Custom port)
+echo   3 - Run Scraper Task (Task 1)
+echo   4 - SKU Comparison Task (Task 2)
+echo   5 - Excel Comparison Task (Task 3)
+echo   6 - Update Cookie Task (Task 4)
+echo   7 - File Cleaner Task (Task 6)
+echo   0 - Exit
 echo ========================================
 echo.
 
-call :run_program
+:menu
+set /p CHOICE="Please enter option (0-7): "
+
+set CHOICE=%CHOICE: =%
+set CHOICE=%CHOICE:"=%
+
+if "%CHOICE%"=="0" (
+    echo Exiting...
+    call venv\Scripts\deactivate.bat
+    exit /b 0
+)
+
+if "%CHOICE%"=="1" (
+    echo.
+    echo Starting Web Service Mode on port 8888...
+    echo Please open http://127.0.0.1:8888 in your browser
+    echo Press Ctrl+C to stop the server
+    echo.
+    venv\Scripts\python.exe main.py --web
+    goto end
+)
+
+if "%CHOICE%"=="2" (
+    echo.
+    set /p PORT="Enter port number (default 8888): "
+    set PORT=%PORT: =%
+    set PORT=%PORT:"=%
+    
+    if "%PORT%"=="" (
+        set PORT=8888
+    )
+    
+    echo Starting Web Service Mode on port %PORT%...
+    echo Please open http://127.0.0.1:%PORT% in your browser
+    echo Press Ctrl+C to stop the server
+    echo.
+    venv\Scripts\python.exe main.py --web --port %PORT%
+    goto end
+)
+
+if "%CHOICE%"=="3" (
+    echo.
+    echo Running Scraper Task (Task 1)...
+    echo.
+    venv\Scripts\python.exe main.py --task 1
+    goto end
+)
+
+if "%CHOICE%"=="4" (
+    echo.
+    echo Running SKU Comparison Task (Task 2)...
+    echo.
+    venv\Scripts\python.exe main.py --task 2
+    goto end
+)
+
+if "%CHOICE%"=="5" (
+    echo.
+    echo Running Excel Comparison Task (Task 3)...
+    echo.
+    venv\Scripts\python.exe main.py --task 3
+    goto end
+)
+
+if "%CHOICE%"=="6" (
+    echo.
+    echo Running Update Cookie Task (Task 4)...
+    echo.
+    venv\Scripts\python.exe main.py --task 4
+    goto end
+)
+
+if "%CHOICE%"=="7" (
+    echo.
+    echo Running File Cleaner Task (Task 6)...
+    echo.
+    venv\Scripts\python.exe main.py --task 6
+    goto end
+)
 
 echo.
-echo ========================================
-echo 任务完成
-echo ========================================
-pause
+echo ERROR: Invalid option. Please enter 0-7.
+goto menu
+
+:end
+if %errorlevel% neq 0 (
+    echo.
+    echo ERROR: Task failed with error code %errorlevel%
+    echo.
+    echo If you see module errors, please install dependencies:
+    echo   venv\Scripts\python.exe -m pip install -r requirements.txt
+    echo.
+    pause
+) else (
+    echo.
+    echo Task completed successfully.
+    echo.
+    pause
+)
