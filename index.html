@@ -559,6 +559,221 @@
             font-size: 12px;
             color: #333;
         }
+        
+        /* 响应式设计 - 移动端适配 */
+        
+        /* 超小屏幕手机 (< 576px) */
+        @media (max-width: 575.98px) {
+            .hero-section {
+                padding: 60px 0;
+                margin-bottom: 30px;
+            }
+            
+            .hero-section h1 {
+                font-size: 1.8rem;
+            }
+            
+            .hero-section .lead {
+                font-size: 1rem;
+            }
+            
+            .text-center.mt-4.mb-4 {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 8px;
+                padding: 10px 5px;
+            }
+            
+            .text-center.mt-4.mb-4 .btn {
+                min-width: 140px !important;
+                height: 44px !important;
+                font-size: 13px !important;
+                padding: 6px 10px !important;
+                flex: 0 0 calc(50% - 4px);
+            }
+            
+            .text-center.mt-4.mb-4 .btn span {
+                font-size: 12px !important;
+            }
+            
+            .footer {
+                padding: 20px 0;
+            }
+            
+            .footer h5 {
+                font-size: 1rem;
+            }
+            
+            .footer p {
+                font-size: 0.85rem;
+            }
+            
+            #output-panel {
+                width: 100%;
+                left: 0;
+                margin: 0;
+                border-radius: 0;
+                max-height: 60vh;
+            }
+            
+            .product-table {
+                font-size: 12px;
+            }
+            
+            .product-table th,
+            .product-table td {
+                padding: 6px 4px;
+            }
+            
+            .status-row {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .status-row .col-6 {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
+            
+            .card {
+                margin-bottom: 15px;
+            }
+            
+            .card-body {
+                padding: 15px 10px;
+            }
+            
+            .modal-dialog {
+                max-width: 95%;
+                margin: 10px auto;
+            }
+            
+            #productModal > div {
+                max-width: 95% !important;
+                padding: 15px !important;
+            }
+            
+            .comparison-results {
+                font-size: 12px;
+            }
+            
+            .comparison-results .row {
+                margin: 0 -5px;
+            }
+            
+            .comparison-results [class*="col-"] {
+                padding: 0 5px;
+                margin-bottom: 10px;
+            }
+        }
+        
+        /* 小屏幕平板 (576px - 767px) */
+        @media (min-width: 576px) and (max-width: 767.98px) {
+            .hero-section h1 {
+                font-size: 2.2rem;
+            }
+            
+            .text-center.mt-4.mb-4 .btn {
+                min-width: 150px;
+                height: 46px;
+                font-size: 13px;
+            }
+            
+            .footer {
+                padding: 30px 0;
+            }
+        }
+        
+        /* 平板和笔记本 (768px - 991px) */
+        @media (min-width: 768px) and (max-width: 991.98px) {
+            .hero-section h1 {
+                font-size: 2.5rem;
+            }
+            
+            .text-center.mt-4.mb-4 .btn {
+                min-width: 155px;
+                height: 47px;
+            }
+            
+            #output-panel {
+                width: 95%;
+                left: 2.5%;
+            }
+        }
+        
+        /* 大屏幕 (992px - 1199px) */
+        @media (min-width: 992px) and (max-width: 1199.98px) {
+            .hero-section h1 {
+                font-size: 2.8rem;
+            }
+        }
+        
+        /* 超大屏幕 (>= 1200px) */
+        @media (min-width: 1200px) {
+            .hero-section h1 {
+                font-size: 3rem;
+            }
+        }
+        
+        /* 移动端特定的元素调整 */
+        .is-phone .navbar-brand {
+            font-size: 1rem;
+        }
+        
+        .is-phone .nav-link {
+            font-size: 14px;
+            padding: 8px 10px !important;
+        }
+        
+        .is-mobile .table-responsive {
+            font-size: 12px;
+        }
+        
+        .is-mobile .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        
+        /* 触摸友好的按钮 */
+        @media (hover: none) and (pointer: coarse) {
+            .btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            .btn-lg {
+                min-height: 48px;
+            }
+            
+            a, button, .clickable {
+                min-height: 44px;
+                min-width: 44px;
+            }
+        }
+        
+        /* 横屏模式适配 */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .hero-section {
+                padding: 30px 0;
+            }
+            
+            .hero-section h1 {
+                font-size: 1.5rem;
+                margin-bottom: 10px;
+            }
+            
+            .text-center.mt-4.mb-4 {
+                flex-wrap: wrap;
+            }
+            
+            .text-center.mt-4.mb-4 .btn {
+                flex: 0 0 auto;
+                min-width: 120px;
+                height: 40px;
+            }
+        }
 </style></head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
@@ -566,7 +781,10 @@
             <a class="navbar-brand" href="#">
                 <i class="fa fa-cloud-download"></i> Szwego爬虫
             </a>
-            <span id="cookie-status" style="color: #fff; font-size: 12px; margin-left: 10px;"></span>
+            <div style="display: flex; align-items: center; margin-left: 10px;">
+                <span id="current-time" style="color: #fff; font-size: 12px; margin-right: 15px;"></span>
+                <span id="cookie-status" style="color: #fff; font-size: 12px;"></span>
+            </div>
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -810,13 +1028,12 @@ playwright install chromium</pre>
         </div>
     </section>
     
-    <div class="text-center mt-4 mb-4">
-        <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-spider" data-func="1" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-spider"></i> 1. 运行爬虫</span></button>
+    <div class="text-center mt-4 mb-4"><button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-spider" data-func="1" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-spider"></i> 1. 运行爬虫</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-sku-api" data-api="/api/sku/compare/txt" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-exchange"></i> 2. 货号对比</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-sku-api" data-api="/api/sku/compare/excel" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-file-excel-o"></i> 3. Excel与JSON对比</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cookie" data-func="4" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-refresh"></i> 4. 更新Cookie</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-view-products" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-list"></i> 查看所有商品</span></button>
-        <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cleaner" data-func="6" onclick="showCleanerPanel()" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-trash"></i> 6. 文件清理工具</span></button>
+        <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cleaner" data-func="6" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-trash"></i> 6. 文件清理工具</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-stop-task" style="display: none; min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-stop"></i> 停止</span></button>
     </div>
 
@@ -845,39 +1062,298 @@ playwright install chromium</pre>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
     
-    <script>
-        let currentSystem = 'Unknown';
-        
-        function detectSystem() {
-            const userAgent = navigator.userAgent;
-            if (userAgent.indexOf('Win') !== -1) return 'Windows';
-            if (userAgent.indexOf('Mac') !== -1) return 'Darwin';
-            if (userAgent.indexOf('Linux') !== -1) return 'Linux';
-            return 'Unknown';
+    <script>// 全局设备检测和响应式适配
+        function detectDevice() {
+            const ua = navigator.userAgent.toLowerCase();
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            let deviceType = 'desktop';
+            let deviceInfo = '';
+            
+            // 检测移动设备类型
+            const mobileDevices = {
+                'android': /android/i.test(ua),
+                'iphone': /iphone|ipad|ipod/i.test(ua),
+                'ipad': /ipad/i.test(ua),
+                'wechat': /micromessenger/i.test(ua),
+                'weibo': /weibo/i.test(ua),
+                'qq': /qq\//i.test(ua),
+                'mobile': /mobile|android|iphone|ipad|ipod/i.test(ua)
+            };
+            
+            // 根据屏幕宽度判断设备类型
+            if (width < 576) {
+                deviceType = 'phone';
+            } else if (width < 768) {
+                deviceType = 'tablet';
+            } else if (width < 992) {
+                deviceType = 'laptop';
+            } else if (width < 1200) {
+                deviceType = 'desktop';
+            } else {
+                deviceType = 'large-desktop';
+            }
+            
+            // 组装设备信息
+            if (mobileDevices.wechat) {
+                deviceInfo = '微信浏览器';
+            } else if (mobileDevices.weibo) {
+                deviceInfo = '微博浏览器';
+            } else if (mobileDevices.qq) {
+                deviceInfo = 'QQ浏览器';
+            } else if (mobileDevices.iphone) {
+                deviceInfo = 'iPhone';
+            } else if (mobileDevices.ipad) {
+                deviceInfo = 'iPad';
+            } else if (mobileDevices.android) {
+                deviceInfo = 'Android';
+            } else {
+                deviceInfo = '桌面设备';
+            }
+            
+            // 添加分辨率信息
+            deviceInfo += ` (${width}x${height})`;
+            
+            return {
+                type: deviceType,
+                isMobile: mobileDevices.mobile,
+                isPhone: deviceType === 'phone',
+                isTablet: deviceType === 'tablet',
+                isDesktop: deviceType === 'desktop' || deviceType === 'laptop' || deviceType === 'large-desktop',
+                width: width,
+                height: height,
+                info: deviceInfo,
+                userAgent: ua,
+                pixelRatio: window.devicePixelRatio || 1
+            };
         }
         
-        currentSystem = detectSystem();
-        console.log('检测到系统: ' + currentSystem);
+        // 应用设备适配样式
+        function applyDeviceStyles() {
+            const device = detectDevice();
+            document.body.classList.remove('is-phone', 'is-tablet', 'is-desktop', 'is-mobile', 'is-desktop-device');
+            document.body.classList.add('is-' + device.type);
+            if (device.isMobile) {
+                document.body.classList.add('is-mobile');
+            } else {
+                document.body.classList.add('is-desktop-device');
+            }
+            
+            // 在控制台输出设备信息
+            console.log('设备检测结果:', device);
+            console.log('设备类型:', device.type);
+            console.log('设备信息:', device.info);
+            console.log('屏幕分辨率:', device.width, 'x', device.height);
+            console.log('设备像素比:', device.pixelRatio);
+            
+            // 调整按钮容器样式
+            const btnContainer = document.querySelector('.text-center.mt-4.mb-4');
+            if (btnContainer && device.isPhone) {
+                btnContainer.style.padding = '10px 5px';
+            }
+            
+            return device;
+        }
         
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth'
-                    });
+        // 监听窗口大小变化
+        let resizeTimeout;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(function() {
+                applyDeviceStyles();
+            }, 250);
+        });
+        
+        // 全局函数定义
+        function showOutputPanel() {
+            const panel = document.getElementById('output-panel');
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function highlightRow(sku, allProductsData) {
+            const data = allProductsData || window.allProductsData;
+            document.querySelectorAll(`tr[data-sku="${sku}"]`).forEach(row => {
+                row.style.background = '#bbdefb';
+            });
+        }
+        
+        function unhighlightRow(sku, allProductsData) {
+            const data = allProductsData || window.allProductsData;
+            document.querySelectorAll(`tr[data-sku="${sku}"]`).forEach(row => {
+                const priceCell = row.querySelector('td:nth-child(4)');
+                if (priceCell) {
+                    const price = parseFloat((priceCell.textContent || '¥0').replace('¥', '').replace(',', ''));
+                    const cells = row.querySelectorAll('td');
+                    const skuCell = cells[1];
+                    const skuText = skuCell ? skuCell.textContent : '';
+                    const isAdded = row.classList.contains('added') || (allProductsData && allProductsData.addedProducts && allProductsData.addedProducts.some(ap => ap.货号 === skuText));
+                    if (price >= 599 && isAdded) row.style.background = '#e8f5e9';
+                    else if (price >= 599) row.style.background = '#fff3e0';
+                    else if (isAdded) row.style.background = '#e3f2fd';
+                    else row.style.background = '';
+                } else {
+                    row.style.background = '';
                 }
             });
-        });
+        }
         
-        $(window).scroll(function() {
-            if ($(this).scrollTop() > 50) {
-                $('.navbar').addClass('scrolled');
-            } else {
-                $('.navbar').removeClass('scrolled');
+        function scrollToSku(sku) {
+            const rows = document.querySelectorAll(`tr[data-sku="${sku}"]`);
+            if (rows.length > 0) {
+                rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
-        });
+        }
+        
+        function searchProductBySku(sku) {
+            if (!sku) return;
+            
+            const url = '/api/product/search?sku=' + encodeURIComponent(sku);
+            console.log('搜索商品URL:', url);
+            
+            fetch(url)
+            .then(response => {
+                console.log('响应状态:', response.status);
+                console.log('响应类型:', response.headers.get('content-type'));
+                return response.text().then(text => {
+                    console.log('响应内容:', text.substring(0, 500));
+                    return JSON.parse(text);
+                });
+            })
+            .then(data => {
+                console.log('搜索结果:', data);
+                if (data.error) {
+                    alert('搜索失败: ' + data.error);
+                    return;
+                }
+                
+                if (data.product) {
+                    showProductModal(data.product);
+                } else {
+                    alert('未找到该商品');
+                }
+            })
+            .catch(error => {
+                console.error('搜索商品出错:', error);
+                alert('搜索商品出错: ' + error.message);
+            });
+        }
+        
+        function showProductModal(p) {
+            const images = p.图片;
+            const imageList = images ? (Array.isArray(images) ? images : [images]) : [];
+            const validImages = imageList.filter(img => img);
+            
+            let modalHtml = `
+                <div id="productModal" onclick="if(event.target === this) this.remove()" style="position:fixed;z-index:9999;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;">
+                    <div style="background:#fff;padding:20px;border-radius:8px;max-width:90%;max-height:90%;overflow:auto;position:relative;">
+                        <button onclick="this.parentElement.parentElement.remove()" style="position:absolute;top:10px;right:15px;font-size:24px;border:none;background:none;cursor:pointer;">&times;</button>
+                        <h3 style="margin:0 0 15px 0;color:#e4393c;">商品详情</h3>
+                        <div style="margin-bottom:10px;"><strong>货号:</strong> ${p.货号 || '-'}</div>
+                        <div style="margin-bottom:10px;"><strong>商品描述:</strong> ${p.商品描述 || '-'}</div>
+                        <div style="margin-bottom:10px;color:#e4393c;font-size:20px;"><strong>售价:</strong> ${p.售价 || '-'}</div>
+                        <div style="margin-bottom:10px;color:#2a9838;"><strong>拿货价:</strong> ${p.拿货价 || '-'}</div>
+                        <div style="margin-bottom:10px;"><strong>员工:</strong> ${p.员工 || '-'}</div>
+                        <div style="margin-bottom:15px;"><strong>备注:</strong> ${p.备注 || '-'}</div>
+            `;
+            
+            if (validImages.length > 0) {
+                modalHtml += `<div style="margin-top:15px;"><strong>图片/视频 (${validImages.length}个):</strong></div>`;
+                modalHtml += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;">`;
+                
+                validImages.forEach((img, i) => {
+                    const isVideo = img.toLowerCase().includes('.mp4') || img.toLowerCase().includes('video');
+                    if (isVideo) {
+                        modalHtml += `<video src="${img}" controls style="width:200px;height:150px;object-fit:cover;">您的浏览器不支持视频</video>`;
+                    } else {
+                        modalHtml += `<a href="${img}" target="_blank"><img src="${img}" style="width:150px;height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;"></a>`;
+                    }
+                });
+                modalHtml += `</div>`;
+            }
+            
+            modalHtml += `</div></div>`;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+        
+        function showProductDetail(sku) {
+            fetch(`/api/product?sku=${encodeURIComponent(sku)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.found) {
+                        const p = data.product;
+                        showProductModal(p);
+                    } else {
+                        alert(data.error || '未找到该商品');
+                    }
+                })
+                .catch(error => {
+                    console.error('查询失败:', error);
+                    alert('查询失败: ' + error.message);
+                });
+        }
+        
+        // 确保DOM加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM加载完成，开始绑定按钮事件...');
+            // 执行设备检测和样式适配
+            const device = applyDeviceStyles();
+            console.log('当前设备:', device.info);
+            
+            let currentSystem = 'Unknown';
+            
+            function detectSystem() {
+                const userAgent = navigator.userAgent;
+                if (userAgent.indexOf('Win') !== -1) return 'Windows';
+                if (userAgent.indexOf('Mac') !== -1) return 'Darwin';
+                if (userAgent.indexOf('Linux') !== -1) return 'Linux';
+                return 'Unknown';
+            }
+            
+            currentSystem = detectSystem();
+            console.log('检测到系统: ' + currentSystem);
+            
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+            
+            $(window).scroll(function() {
+                if ($(this).scrollTop() > 50) {
+                    $('.navbar').addClass('scrolled');
+                } else {
+                    $('.navbar').removeClass('scrolled');
+                }
+            });
+            
+            function updateTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            const timeEl = document.getElementById('current-time');
+            if (timeEl) {
+                timeEl.innerHTML = '当前时间: ' + timeStr;
+            }
+        }
+        
+        setInterval(updateTime, 1000);
+        updateTime();
         
         function copyCommand(cmd) {
             const textarea = document.createElement('textarea');
@@ -888,11 +1364,11 @@ playwright install chromium</pre>
             document.body.removeChild(textarea);
         }
         
+        let pollingInterval = null;
         let currentTaskId = null;
         let currentChoice = null;
-        let pollingInterval = null;
-        const VENV_PYTHON = '/Users/yu/Downloads/demo/python/.venv/bin/python';
-        const btnIds = {1: 'btn-run-spider', 2: 'btn-run-sku', 3: 'btn-run-excel', 4: 'btn-run-cookie', 6: 'btn-run-cleaner'};
+        let VENV_PYTHON = 'python';
+         const btnIds = {'1': 'btn-run-spider', '4': 'btn-run-cookie', '6': 'btn-run-cleaner'};
 
         function checkCookieStatus() {
             fetch('/api/cookie')
@@ -901,24 +1377,25 @@ playwright install chromium</pre>
                 const statusEl = document.getElementById('cookie-status');
                 let systemInfo = data.system ? ` (${data.system})` : '';
                 if (data.error) {
-                    statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Cookie无效' + systemInfo;
+                    statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Cookie有效期: 无效' + systemInfo;
                     return;
                 }
                 
                 if (data.expired) {
-                    statusEl.innerHTML = '<i class="fa fa-times-circle" style="color: #f56c6c;"></i> Cookie已过期' + systemInfo;
+                    statusEl.innerHTML = '<i class="fa fa-times-circle" style="color: #f56c6c;"></i> Cookie有效期: 已过期' + systemInfo;
                     return;
                 }
                 
                 if (data.hours_remaining <= 5) {
-                    statusEl.innerHTML = '<i class="fa fa-clock-o" style="color: #f56c6c;"></i> 有效期: ' + data.hours_remaining + '小时' + systemInfo;
+                    statusEl.innerHTML = '<i class="fa fa-clock-o" style="color: #f56c6c;"></i> Cookie有效期: ' + data.hours_remaining + '小时' + systemInfo;
                 } else {
-                    statusEl.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> 有效期至: ' + data.expires + systemInfo;
+                    let cookieInfo = data.cookie_name ? `(${data.cookie_name}) ` : '';
+                    statusEl.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> Cookie有效期: ' + cookieInfo + data.expires + systemInfo;
                 }
             })
             .catch(error => {
                 const statusEl = document.getElementById('cookie-status');
-                statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> 获取失败';
+                statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Cookie有效期: 获取失败';
             });
         }
         
@@ -949,10 +1426,13 @@ playwright install chromium</pre>
             })
             .then(response => response.json())
             .then(data => {
+                console.log('runCommand 返回数据:', data);
                 if (data.success) {
                     currentTaskId = data.task_id;
+                    console.log('设置 currentTaskId:', currentTaskId);
                     showOutputPanel();
                     if (outputContent) outputContent.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
+                    console.log('启动轮询，每1秒调用一次 pollOutput()');
                     pollingInterval = setInterval(() => pollOutput(), 1000);
                 } else {
                     alert('启动失败: ' + data.error);
@@ -1026,9 +1506,14 @@ playwright install chromium</pre>
         }
         
         function pollOutput() {
+            console.log('pollOutput() 被调用，currentTaskId:', currentTaskId);
             fetch('/output/' + currentTaskId)
-            .then(response => response.json())
+            .then(response => {
+                console.log('API响应状态:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('pollOutput 返回数据:', data);
                 const outputDiv = document.getElementById('output-content');
                 const statusDiv = document.getElementById('output-status');
                 
@@ -1048,12 +1533,14 @@ playwright install chromium</pre>
                 if (data.status === 'completed') {
                     clearInterval(pollingInterval);
                     const completedChoice = currentChoice;
+                    console.log('任务完成，completedChoice:', completedChoice);
                     if (statusDiv) statusDiv.innerHTML = '<span style="color: #67c23a;">✓ 执行完成 (返回码: ' + data.returncode + ')</span>';
                     if (data.returncode === -15) {
                         if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行 (返回码: -15)</span>';
                     }
                     resetButtons();
-                    if (completedChoice === 3) {
+                    if (completedChoice === 1 || completedChoice === 3) {
+                        console.log('准备调用 showAllProducts()');
                         showAllProducts();
                     }
                 } else if (data.status === 'error') {
@@ -1061,6 +1548,9 @@ playwright install chromium</pre>
                     if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 错误: ' + data.error + '</span>';
                     resetButtons();
                 }
+            })
+            .catch(error => {
+                console.error('pollOutput 出错:', error);
             });
         }
         
@@ -1380,16 +1870,30 @@ playwright install chromium</pre>
             }
         }
         
-        function showOutputPanel() {
-            const panel = document.getElementById('output-panel');
-            panel.style.display = 'block';
-            panel.scrollIntoView({ behavior: 'smooth' });
-        }
-        
-        function showAllProducts() {
-            fetch('/api/products')
-            .then(response => response.json())
+         function showAllProducts() {
+            console.log('开始调用 /api/products API');
+            
+            const timestamp = new Date().getTime();
+            fetch(`/api/products?t=${timestamp}`, {
+                method: 'GET',
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
+            .then(response => {
+                console.log('API响应状态:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('API返回的完整数据:', data);
+                console.log('totalPrice:', data.totalPrice);
+                console.log('avgPrice:', data.avgPrice);
+                console.log('fee:', data.fee);
+                console.log('total:', data.total);
+                console.log('highPriceCount:', data.highPriceCount);
+                
                 if (data.error) {
                     alert(data.error);
                     return;
@@ -1398,7 +1902,7 @@ playwright install chromium</pre>
                 showOutputPanel();
                 
                 const outputPanel = document.getElementById('output-panel');
-                const existingCard = outputPanel.querySelector('.products-card');
+                const existingCard = outputPanel.querySelector('.products-card, .comparison-card');
                 if (existingCard) existingCard.remove();
                 
                 window.allProductsData = data;
@@ -1439,6 +1943,20 @@ playwright install chromium</pre>
                         <i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}
                     </div>
                     <div class="comparison-body">
+                        <div class="comparison-stats">
+                            <div class="stat-item">
+                                <span class="stat-value" style="color: #E6A23C; font-weight: bold;">${data.totalPrice || '-'}</span>
+                                <span class="stat-label">预计售出总价</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value">${data.avgPrice || '-'}</span>
+                                <span class="stat-label">平均售出均价</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" style="color: #f56c6c;">${data.fee || '-'}</span>
+                                <span class="stat-label">平台手续费</span>
+                            </div>
+                        </div>
                         <div class="summary-stats">
                             <span class="summary-badge" style="background: #409EFF;">总商品: ${data.total}个</span>
                             <span class="summary-badge" style="background: #E6A23C;">高价(≥599): ${data.highPriceCount || 0}个</span>
@@ -1453,133 +1971,34 @@ playwright install chromium</pre>
                 </div>`;
                 outputPanel.insertAdjacentHTML('beforeend', html);
                 
+                // 添加表格滚动联动功能
                 setTimeout(() => {
+                    const tableContainers = outputPanel.querySelectorAll('.change-table-container');
+                    const tables = outputPanel.querySelectorAll('.change-table');
+                    
+                    // 为每个表格容器添加滚动事件
+                    tableContainers.forEach((container, index) => {
+                        container.addEventListener('scroll', function(e) {
+                            const scrollTop = e.target.scrollTop;
+                            const scrollLeft = e.target.scrollLeft;
+                            
+                            // 同步所有其他表格的滚动位置
+                            tableContainers.forEach((otherContainer, otherIndex) => {
+                                if (otherIndex !== index) {
+                                    otherContainer.scrollTop = scrollTop;
+                                    otherContainer.scrollLeft = scrollLeft;
+                                }
+                            });
+                        });
+                    });
+                    
                     outputPanel.scrollTop = outputPanel.scrollHeight;
                 }, 100);
             })
             .catch(error => {
                 console.error('获取商品失败:', error);
-                console.error('URL:', url);
-                alert('获取商品失败: ' + error.message + '\n详情请查看控制台');
+                 alert('获取商品失败: ' + error.message + '\n详情请查看控制台');
             });
-        }
-        
-        function highlightRow(sku, allProductsData) {
-            const data = allProductsData || window.allProductsData;
-            document.querySelectorAll(`tr[data-sku="${sku}"]`).forEach(row => {
-                row.style.background = '#bbdefb';
-            });
-        }
-        
-        function unhighlightRow(sku, allProductsData) {
-            const data = allProductsData || window.allProductsData;
-            document.querySelectorAll(`tr[data-sku="${sku}"]`).forEach(row => {
-                const isHighPrice = row.querySelector('td:nth-child(4)');
-                if (isHighPrice) {
-                    const price = parseFloat((isHighPrice.textContent || '¥0').replace('¥', '').replace(',', ''));
-                    const cells = row.querySelectorAll('td');
-                    const skuCell = cells[1];
-                    const skuText = skuCell ? skuCell.textContent : '';
-                    const isAdded = row.classList.contains('added') || (allProductsData && allProductsData.addedProducts && allProductsData.addedProducts.some(ap => ap.货号 === skuText));
-                    if (price >= 599 && isAdded) row.style.background = '#e8f5e9';
-                    else if (price >= 599) row.style.background = '#fff3e0';
-                    else if (isAdded) row.style.background = '#e3f2fd';
-                    else row.style.background = '';
-                } else {
-                    row.style.background = '';
-                }
-            });
-        }
-        
-        function scrollToSku(sku) {
-            const rows = document.querySelectorAll(`tr[data-sku="${sku}"]`);
-            if (rows.length > 0) {
-                rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }
-        
-        function searchProductBySku(sku) {
-            if (!sku) return;
-            
-            const url = '/api/product/search?sku=' + encodeURIComponent(sku);
-            console.log('搜索商品URL:', url);
-            
-            fetch(url)
-            .then(response => {
-                console.log('响应状态:', response.status);
-                console.log('响应类型:', response.headers.get('content-type'));
-                return response.text().then(text => {
-                    console.log('响应内容:', text.substring(0, 500));
-                    return JSON.parse(text);
-                });
-            })
-            .then(data => {
-                if (data.found) {
-                    const p = data.product;
-                    showProductModal(p);
-                } else {
-                    alert(data.error || '未找到该商品');
-                }
-            })
-            .catch(error => {
-                console.error('查询失败:', error);
-                alert('查询失败: ' + error.message + '\n详情请查看控制台');
-            });
-        }
-        
-        function showProductDetail(sku) {
-            fetch(`/api/product?sku=${encodeURIComponent(sku)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.found) {
-                        const p = data.product;
-                        showProductModal(p);
-                    } else {
-                        alert(data.error || '未找到该商品');
-                    }
-                })
-                .catch(error => {
-                    console.error('查询失败:', error);
-                    alert('查询失败: ' + error.message);
-                });
-        }
-        
-        function showProductModal(p) {
-            const images = p.图片;
-            const imageList = images ? (Array.isArray(images) ? images : [images]) : [];
-            const validImages = imageList.filter(img => img);
-            
-            let modalHtml = `
-                <div id="productModal" onclick="if(event.target === this) this.remove()" style="position:fixed;z-index:9999;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;">
-                    <div style="background:#fff;padding:20px;border-radius:8px;max-width:90%;max-height:90%;overflow:auto;position:relative;">
-                        <button onclick="this.parentElement.parentElement.remove()" style="position:absolute;top:10px;right:15px;font-size:24px;border:none;background:none;cursor:pointer;">&times;</button>
-                        <h3 style="margin:0 0 15px 0;color:#e4393c;">商品详情</h3>
-                        <div style="margin-bottom:10px;"><strong>货号:</strong> ${p.货号 || '-'}</div>
-                        <div style="margin-bottom:10px;"><strong>商品描述:</strong> ${p.商品描述 || '-'}</div>
-                        <div style="margin-bottom:10px;color:#e4393c;font-size:20px;"><strong>售价:</strong> ${p.售价 || '-'}</div>
-                        <div style="margin-bottom:10px;color:#2a9838;"><strong>拿货价:</strong> ${p.拿货价 || '-'}</div>
-                        <div style="margin-bottom:10px;"><strong>员工:</strong> ${p.员工 || '-'}</div>
-                        <div style="margin-bottom:15px;"><strong>备注:</strong> ${p.备注 || '-'}</div>
-            `;
-            
-            if (validImages.length > 0) {
-                modalHtml += `<div style="margin-top:15px;"><strong>图片/视频 (${validImages.length}个):</strong></div>`;
-                modalHtml += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;">`;
-                
-                validImages.forEach((img, i) => {
-                    const isVideo = img.toLowerCase().includes('.mp4') || img.toLowerCase().includes('video');
-                    if (isVideo) {
-                        modalHtml += `<video src="${img}" controls style="width:200px;height:150px;object-fit:cover;">您的浏览器不支持视频</video>`;
-                    } else {
-                        modalHtml += `<a href="${img}" target="_blank"><img src="${img}" style="width:150px;height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;"></a>`;
-                    }
-                });
-                modalHtml += `</div>`;
-            }
-            
-            modalHtml += `</div></div>`;
-            
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
         }
         
         function closeOutputPanel() {
@@ -1597,9 +2016,11 @@ playwright install chromium</pre>
             const btnId = btnIds[choice];
             const btn = document.getElementById(btnId);
             if (!btn) {
-                alert('找不到按钮: ' + btnId);
+                console.error('找不到按钮:', choice, 'btnId:', btnId);
+                alert('找不到按钮: ' + choice);
                 return;
             }
+            console.log('运行功能:', choice, '按钮ID:', btnId);
             btn.setAttribute('data-original', btn.innerHTML);
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
@@ -1613,7 +2034,7 @@ playwright install chromium</pre>
             const stopBtn = document.getElementById('btn-stop-task');
             if (stopBtn) stopBtn.style.display = 'inline-block';
             
-            const cmd = VENV_PYTHON + ' main.py';
+            const cmd = VENV_PYTHON + ' main.py --task ' + choice;
             
             fetch('/run', {
                 method: 'POST',
@@ -1627,13 +2048,6 @@ playwright install chromium</pre>
                     showOutputPanel();
                     document.getElementById('output-content').innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
                     pollingInterval = setInterval(() => pollOutput(), 1000);
-                    setTimeout(() => {
-                        fetch('/input', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ task_id: currentTaskId, input: choice.toString() })
-                        });
-                    }, 1500);
                 } else {
                     alert('启动失败: ' + data.error);
                     btn.disabled = false;
@@ -1713,12 +2127,45 @@ playwright install chromium</pre>
             });
         }
         
-        document.getElementById('btn-view-products').addEventListener('click', showAllProducts);
+        // 统一按钮事件绑定 - 避免重复绑定导致冲突
+        console.log('开始统一绑定按钮事件...');
         
+        // 绑定运行类按钮
+        document.querySelectorAll('.btn-run').forEach(function(btn) {
+            console.log('绑定运行按钮:', btn.id, 'data-func:', btn.getAttribute('data-func'));
+            btn.onclick = function() {
+                var choice = this.getAttribute('data-func');
+                console.log('运行按钮被点击:', this.id, 'data-func:', choice);
+                if (choice && choice != '6') {
+                    runFunction(parseInt(choice));
+                } else if (choice == '6') {
+                    console.log('调用文件清理工具...');
+                    showCleanerPanel();
+                }
+            };
+        });
+        
+        // 绑定查看所有商品按钮
+        const viewProductsBtn = document.getElementById('btn-view-products');
+        if (viewProductsBtn) {
+            console.log('绑定查看所有商品按钮');
+            viewProductsBtn.onclick = showAllProducts;
+        }
+        
+        // 绑定货号对比API按钮
         document.querySelectorAll('.btn-sku-api').forEach(function(btn) {
+            console.log('绑定货号对比按钮:', btn.id, 'data-api:', btn.getAttribute('data-api'));
             btn.onclick = function() {
                 var apiUrl = this.getAttribute('data-api');
                 console.log('货号对比 API URL:', apiUrl);
+                
+                // 如果是货号对比API，显示输入框
+                if (apiUrl === '/api/sku/compare/txt') {
+                    showSkuInputPanel();
+                    return;
+                }
+                
+                // 其他API直接调用
                 if (apiUrl) {
                     fetch(apiUrl)
                     .then(response => {
@@ -1753,8 +2200,8 @@ playwright install chromium</pre>
                             </div>
                             <div class="comparison-body">
                                 <div class="comparison-stats">
-                                    <div class="stat-item ${data.input_count > 0 ? 'stat-info' : ''}">
-                                        <span class="stat-value">${data.input_count || 0}</span>
+                                    <div class="stat-item ${data.txt_count > 0 ? 'stat-info' : ''}">
+                                        <span class="stat-value">${data.txt_count || 0}</span>
                                         <span class="stat-label">输入货号</span>
                                     </div>
                                     <div class="stat-item ${data.extra_count > 0 ? 'stat-warning' : ''}">
@@ -1875,18 +2322,134 @@ playwright install chromium</pre>
             stopTask();
         });
         
-        document.querySelectorAll('.btn-run').forEach(function(btn) {
-            btn.onclick = function() {
-                var choice = this.getAttribute('data-func');
-                console.log('Button clicked:', btn.id, 'data-func:', choice);
-                if (choice && choice != '6') {
-                    runFunction(parseInt(choice));
-                } else if (choice == '6') {
-                    console.log('Calling showCleanerPanel...');
-                    showCleanerPanel();
+        function showSkuInputPanel() {
+            const outputPanel = document.getElementById('output-panel');
+            outputPanel.innerHTML = `
+                <div class="output-header">
+                    <span><i class="fa fa-barcode"></i> 货号对比</span>
+                    <button class="output-close" onclick="closeOutputPanel()"><i class="fa fa-times"></i></button>
+                </div>
+                <div style="padding: 20px;">
+                    <div class="form-group">
+                        <label><strong>输入货号:</strong></label>
+                        <textarea id="sku-input" class="form-control" rows="10" placeholder="请输入货号，支持以下格式：&#10;• 每行一个货号&#10;• 用逗号分隔&#10;• 用空格分隔&#10;• 任意数字组合"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <button id="btn-compare-sku" class="btn btn-primary btn-block" onclick="compareSku()">
+                            <i class="fa fa-exchange"></i> 开始对比
+                        </button>
+                    </div>
+                    <div class="form-group">
+                        <small class="text-muted">
+                            <i class="fa fa-info-circle"></i> 系统会自动提取输入中的所有数字作为货号进行对比
+                        </small>
+                    </div>
+                </div>
+            `;
+            showOutputPanel();
+        }
+        
+        function compareSku() {
+            const skuInput = document.getElementById('sku-input').value;
+            if (!skuInput.trim()) {
+                alert('请输入货号');
+                return;
+            }
+            
+            const btn = document.getElementById('btn-compare-sku');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 对比中...';
+            
+            fetch('/api/sku/compare/txt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ skus: skuInput })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('对比失败: ' + data.error);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa fa-exchange"></i> 开始对比';
+                    return;
                 }
-            };
-        });
+                
+                showComparisonResult(data);
+            })
+            .catch(error => {
+                alert('请求失败: ' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-exchange"></i> 开始对比';
+            });
+        }
+        
+        function showComparisonResult(data) {
+            const outputPanel = document.getElementById('output-panel');
+            const existingCard = outputPanel.querySelector('.comparison-card');
+            if (existingCard) existingCard.remove();
+            
+            let cardHtml = `
+            <div class="comparison-card">
+                <div class="comparison-header" style="background: #E6A23C;">
+                    <i class="fa fa-barcode"></i> 货号对比结果
+                </div>
+                <div class="comparison-body">
+                    <div class="comparison-stats">
+                        <div class="stat-item ${data.txt_count > 0 ? 'stat-info' : ''}">
+                            <span class="stat-value">${data.txt_count || 0}</span>
+                            <span class="stat-label">输入货号</span>
+                        </div>
+                        <div class="stat-item ${data.extra_count > 0 ? 'stat-warning' : ''}">
+                            <span class="stat-value">${data.extra_count || 0}</span>
+                            <span class="stat-label">JSON多余</span>
+                        </div>
+                        <div class="stat-item ${data.json_count > 0 ? 'stat-info' : ''}">
+                            <span class="stat-value">${data.json_count || 0}</span>
+                            <span class="stat-label">JSON货号</span>
+                        </div>
+                        <div class="stat-item ${data.common_count > 0 ? 'stat-success' : ''}">
+                            <span class="stat-value">${data.common_count || 0}</span>
+                            <span class="stat-label">已存在</span>
+                        </div>
+                    </div>
+                    <div class="comparison-stats">
+                        <div class="stat-item ${data.missing_count > 0 ? 'stat-danger' : ''}">
+                            <span class="stat-value">${data.missing_count || 0}</span>
+                            <span class="stat-label">缺失货号</span>
+                        </div>
+                    </div>`;
+            
+            if (data.missing_in_json && data.missing_in_json.length > 0) {
+                const items = data.missing_in_json.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #ffebee; border-color: #ef9a9a;">
+                        <div class="missing-title" style="color: #c62828;">输入货号中JSON中不存在的货号:</div>
+                        <div class="sku-container">${items}</div>
+                    </div>`;
+            }
+            
+            if (data.extra_in_json && data.extra_in_json.length > 0) {
+                const items = data.extra_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
+                        <div class="missing-title" style="color: #f57c00;">JSON中多余货号列表(高价商品≥599):</div>
+                        <div class="sku-container">${items}</div>
+                    </div>`;
+            }
+            
+            if (data.common && data.common.length > 0) {
+                const items = data.common.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
+                        <div class="missing-title" style="color: #388e3c;">共同货号:</div>
+                        <div class="sku-container">${items}</div>
+                    </div>`;
+            }
+            
+            cardHtml += `</div></div>`;
+            
+            outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+        }
         
         function showCleanerPanel() {
             const outputPanel = document.getElementById('output-panel');
@@ -1898,7 +2461,7 @@ playwright install chromium</pre>
                 <div style="padding: 20px;">
                     <div class="form-group">
                         <label><strong>清理目录:</strong></label>
-                        <input type="text" id="clean-directory" class="form-control" value="/Users/yu/Downloads/demo/python" placeholder="请输入要清理的目录">
+                        <input type="text" id="clean-directory" class="form-control" value="" placeholder="请输入要清理的目录（留空使用当前目录）">
                     </div>
                     <div class="form-group">
                         <label><strong>清理模式:</strong></label>
@@ -1939,7 +2502,7 @@ playwright install chromium</pre>
         
         function executeClean() {
             const mode = document.getElementById('clean-mode').value;
-            const directory = document.getElementById('clean-directory').value || '/Users/yu/Downloads/demo/python';
+            const directory = document.getElementById('clean-directory').value || '';
             const dryRun = document.getElementById('clean-dry-run').checked;
             const minutes = document.getElementById('clean-minutes').value || 5;
             
@@ -2001,6 +2564,8 @@ playwright install chromium</pre>
                 btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
             });
         }
+        
+        }); // DOMContentLoaded结束
         
     </script>
 </body>

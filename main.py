@@ -15,8 +15,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
 
+# Windows特定的subprocess参数
+if platform.system() == 'Windows':
+     subprocess.CREATE_NO_WINDOW = 0x08000000
+
 from flask import Flask, request, jsonify, send_file, Response
 
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+    print("警告: pandas未安装，Excel对比功能将不可用")
 
 def format_size(size_bytes: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
@@ -360,6 +369,7 @@ def list_files(
     logger.info("扫描文件列表")
     logger.info(f"扫描目录: {directory}")
     logger.info(f"排序方式: 按文件下载到本地的毫秒时间")
+    logger.info("扫描模式: 递归扫描所有子目录")
     logger.info("=" * 60)
 
     directory = Path(directory)
@@ -369,24 +379,34 @@ def list_files(
         return
 
     matched_files = []
+    scanned_dirs = 0
     logger.info("扫描文件中...")
-    for file in directory.iterdir():
-        if file.is_file():
-            ext = file.suffix.lower()
+    
+    for root, dirs, files in os.walk(directory):
+        root_path = Path(root)
+        scanned_dirs += 1
+        
+        for file in files:
+            file_path = root_path / file
+            ext = Path(file).suffix.lower()
             if ext in MEDIA_EXTENSIONS:
-                file_stat = file.stat()
-                mtime = file_stat.st_mtime
-                download_time = datetime.fromtimestamp(mtime)
+                try:
+                    file_stat = file_path.stat()
+                    mtime = file_stat.st_mtime
+                    download_time = datetime.fromtimestamp(mtime)
 
-                matched_files.append({
-                    'file': file,
-                    'ext': ext,
-                    'is_image': ext in IMAGE_EXTENSIONS,
-                    'is_video': ext in VIDEO_EXTENSIONS,
-                    'mtime': mtime,
-                    'size': file_stat.st_size,
-                    'download_time': download_time
-                })
+                    matched_files.append({
+                        'file': file_path,
+                        'relative_path': str(file_path.relative_to(directory)),
+                        'ext': ext,
+                        'is_image': ext in IMAGE_EXTENSIONS,
+                        'is_video': ext in VIDEO_EXTENSIONS,
+                        'mtime': mtime,
+                        'size': file_stat.st_size,
+                        'download_time': download_time
+                    })
+                except Exception as e:
+                    logger.warning(f"无法访问文件 {file_path}: {e}")
 
     if not matched_files:
         logger.warning("没有找到图片或视频文件")
@@ -399,6 +419,7 @@ def list_files(
     video_count = sum(1 for f in matched_files if f['is_video'])
     total_size = sum(f['size'] for f in matched_files)
 
+    logger.info(f"扫描了 {scanned_dirs} 个目录")
     logger.info(f"找到 {total_files} 个符合条件的文件")
     logger.info(f"  - 图片: {image_count} 个")
     logger.info(f"  - 视频: {video_count} 个")
@@ -409,7 +430,7 @@ def list_files(
         file_type = "图片" if file_info['is_image'] else "视频"
         download_time_str = file_info['download_time'].strftime('%Y-%m-%d %H:%M:%S')
         logger.info(
-            f"{i:3d}. {file_info['file'].name} ({file_type}, {format_size(file_info['size'])}, 下载时间: {download_time_str})")
+            f"{i:3d}. {file_info['relative_path']} ({file_type}, {format_size(file_info['size'])}, 下载时间: {download_time_str})")
 
     logger.info("\n扫描完成")
 
@@ -834,9 +855,131 @@ def print_separator(char='=', length=60):
 VERSION = "2.8.0"
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-VENV_PYTHON = os.path.join(PROJECT_DIR, '.venv', 'bin', 'python')
 
-app = Flask(__name__)
+# 统一环境检测类
+class Environment:
+    """统一环境检测和管理"""
+    
+    # 系统类型
+    SYSTEM = platform.system()  # 'Windows', 'Darwin'(Mac), 'Linux'
+    
+    # 是否为Windows系统
+    IS_WINDOWS = SYSTEM == 'Windows'
+    
+    # 是否为Mac系统
+    IS_MAC = SYSTEM == 'Darwin'
+    
+    # 是否为Linux系统
+    IS_LINUX = SYSTEM == 'Linux'
+    
+    @staticmethod
+    def get_venv_python():
+        """获取虚拟环境Python路径"""
+        if Environment.IS_WINDOWS:
+            return os.path.join(PROJECT_DIR, '.venv', 'Scripts', 'python.exe')
+        else:
+            return os.path.join(PROJECT_DIR, '.venv', 'bin', 'python')
+    
+    @staticmethod
+    def get_chrome_path():
+        """获取Chrome浏览器路径，支持Windows、Mac和Linux系统"""
+        chrome_path = None
+        
+        if Environment.IS_WINDOWS:
+            if os.path.exists(r'C:\Program Files\Google\Chrome\Application\chrome.exe'):
+                chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
+        elif Environment.IS_MAC:
+            if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
+                chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        elif Environment.IS_LINUX:
+            # 优先检测 /chrome-linux64 目录下的Chrome
+            if os.path.exists('/chrome-linux64/chrome'):
+                chrome_path = '/chrome-linux64/chrome'
+            elif os.path.exists('/usr/bin/google-chrome'):
+                chrome_path = '/usr/bin/google-chrome'
+        
+        return chrome_path
+    
+    @staticmethod
+    def get_browser_args():
+        """获取浏览器启动参数，根据系统类型返回不同的参数"""
+        browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+        
+        if Environment.IS_WINDOWS:
+            browser_args.append('--disable-gpu')
+        elif Environment.IS_LINUX:
+            browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
+        
+        return browser_args
+    
+    @staticmethod
+    def get_user_agent():
+        """获取用户代理字符串，根据系统类型返回不同的UA"""
+        if Environment.IS_WINDOWS:
+            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        elif Environment.IS_MAC:
+            return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        elif Environment.IS_LINUX:
+            return 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        else:
+            # 默认使用Windows UA
+            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    
+    @staticmethod
+    def get_system_info():
+        """获取系统信息"""
+        return {
+            'system': Environment.SYSTEM,
+            'is_windows': Environment.IS_WINDOWS,
+            'is_mac': Environment.IS_MAC,
+            'is_linux': Environment.IS_LINUX,
+            'venv_python': Environment.get_venv_python(),
+            'project_dir': PROJECT_DIR
+        }
+
+# Windows上的emoji安全打印
+def safe_print(*args, **kwargs):
+    """安全打印，处理Windows上的emoji编码问题"""
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        # Windows上无法打印emoji，替换为ASCII字符
+        safe_args = []
+        for arg in args:
+            if isinstance(arg, str):
+                # 替换emoji为ASCII字符
+                safe_arg = arg
+                emoji_map = {
+                    '🔍': '[检查]',
+                    '❌': '[错误]',
+                    '✓': '[OK]',
+                    '⚠️': '[警告]',
+                    '✗': '[失败]',
+                    '📝': '[说明]',
+                    '💡': '[提示]',
+                    '🚀': '[启动]',
+                    '🎯': '[目标]',
+                    '📊': '[数据]',
+                    '🔧': '[设置]',
+                    '🎉': '[完成]'
+                }
+                for emoji, replacement in emoji_map.items():
+                    safe_arg = safe_arg.replace(emoji, replacement)
+                safe_args.append(safe_arg)
+            else:
+                safe_args.append(arg)
+        print(*safe_args, **kwargs)
+
+# 根据系统选择打印函数
+if Environment.IS_WINDOWS:
+    print_func = safe_print
+else:
+    print_func = print
+
+# 使用Environment类的VENV_PYTHON
+VENV_PYTHON = Environment.get_venv_python()
+
+app = Flask(__name__, template_folder='.', static_folder=None)
 
 processes = {}
 tasks = {}
@@ -844,25 +987,83 @@ tasks = {}
 def run_command_background(task_id, command):
     try:
         tasks[task_id]['status'] = 'running'
-        process = subprocess.Popen(
-            command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-            cwd=PROJECT_DIR,
-            text=True
-        )
+        
+        # 设置环境变量，确保使用UTF-8编码
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
+        # Windows上使用不同的参数
+        if Environment.IS_WINDOWS:
+            # Windows需要使用shell=True来处理路径
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # 合并stderr到stdout
+                stdin=subprocess.PIPE,
+                cwd=PROJECT_DIR,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                bufsize=1,  # 行缓冲
+                env=env  # 设置环境变量
+            )
+        else:
+            # Mac/Linux使用更安全的参数
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,  # 合并stderr到stdout
+                stdin=subprocess.PIPE,
+                cwd=PROJECT_DIR,
+                text=True,
+                bufsize=1,  # 行缓冲
+                env=env  # 设置环境变量
+            )
+        
         processes[task_id] = process
         
         stdout_lines = []
-        for line in iter(process.stdout.readline, ''):
-            if line:
-                stdout_lines.append(line)
-                tasks[task_id]['output'] = ''.join(stdout_lines)
+        # 使用非阻塞读取
+        import select
+        import sys
+        
+        while True:
+            # 检查进程是否结束
+            if process.poll() is not None:
+                # 读取剩余输出
+                remaining = process.stdout.read()
+                if remaining:
+                    stdout_lines.append(remaining)
+                break
+            
+            # 读取可用输出
+            try:
+                if Environment.IS_WINDOWS:
+                    # Windows不支持select，使用超时读取
+                    import time
+                    time.sleep(0.1)
+                    line = process.stdout.readline()
+                    if line:
+                        stdout_lines.append(line)
+                else:
+                    # Mac/Linux使用select
+                    readable, _, _ = select.select([process.stdout], [], [], 0.1)
+                    if readable:
+                        line = process.stdout.readline()
+                        if line:
+                            stdout_lines.append(line)
+            except Exception as e:
+                # 读取出错，继续
+                pass
+            
+            # 更新输出
+            tasks[task_id]['output'] = ''.join(stdout_lines)
         
         process.wait()
         tasks[task_id]['returncode'] = process.returncode
+        tasks[task_id]['output'] = ''.join(stdout_lines)
         tasks[task_id]['status'] = 'completed'
     except Exception as e:
         tasks[task_id]['error'] = str(e)
@@ -1312,56 +1513,19 @@ class WegoScraper:
 
     @staticmethod
     def get_system_info():
-        system = platform.system()
-        return {'Windows': 'Windows', 'Darwin': 'Mac', 'Linux': 'Linux'}.get(system, 'Unknown')
+        return Environment.get_system_info()
     
     @staticmethod
     def get_chrome_path():
-        """获取Chrome浏览器路径，支持Windows、Mac和Linux系统"""
-        system = platform.system()
-        chrome_path = None
-        
-        if system == 'Windows':
-            if os.path.exists(r'C:\Program Files\Google\Chrome\Application\chrome.exe'):
-                chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
-        elif system == 'Darwin':  # Mac系统返回的是'Darwin'，不是'Mac'
-            if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
-                chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-        elif system == 'Linux':
-            # 优先检测 /chrome-linux64 目录下的Chrome
-            if os.path.exists('/chrome-linux64/chrome'):
-                chrome_path = '/chrome-linux64/chrome'
-            elif os.path.exists('/usr/bin/google-chrome'):
-                chrome_path = '/usr/bin/google-chrome'
-        
-        return chrome_path
+        return Environment.get_chrome_path()
     
     @staticmethod
     def get_browser_args():
-        """获取浏览器启动参数，根据系统类型返回不同的参数"""
-        system = platform.system()
-        browser_args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
-        
-        if system == 'Windows':
-            browser_args.append('--disable-gpu')
-        elif system == 'Linux':
-            browser_args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
-        
-        return browser_args
+        return Environment.get_browser_args()
     
     @staticmethod
     def get_user_agent():
-        """获取用户代理字符串，根据系统类型返回不同的UA"""
-        system = platform.system()
-        
-        if system == 'Windows':
-            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        elif system == 'Darwin':
-            return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        elif system == 'Linux':
-            return 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        else:
-            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        return Environment.get_user_agent()
 
     @staticmethod
     def clean_product_name(text):
@@ -2939,18 +3103,11 @@ def main():
             return
         
         def start_web():
-            import platform
-            import os
-            
-            venv_python = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.venv', 'bin', 'python')
-            if platform.system() == 'Windows':
-                venv_python = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.venv', 'Scripts', 'python.exe')
-            
             print('\n正在启动Web服务...')
             print('访问地址: http://localhost:8888')
             print('按 Ctrl+C 停止服务\n')
             
-            os.system(f'"{venv_python}" main.py --web')
+            os.system(f'"{VENV_PYTHON}" main.py --web')
         
         actions = {
             '1': lambda: run_scraper() or True,
@@ -2975,13 +3132,16 @@ def run_scraper():
     """运行爬虫"""
     try:
         cookie_file = PathManager.get_cookie_file()
-        is_valid, cookies = CookieValidator.validate_and_prompt(cookie_file)
         
-        if not is_valid:
-            print('\n❌ Cookie验证失败，无法运行爬虫')
-            print('请先运行"更新Cookie"功能')
-            input('按回车键继续...')
-            return
+        # 自动清空cookies.json文件
+        if os.path.exists(cookie_file):
+            print(f'清空Cookie文件: {cookie_file}')
+            with open(cookie_file, 'w', encoding='utf-8') as f:
+                json.dump([], f)
+            print('✓ Cookie文件已清空')
+        
+        # 跳过cookie验证，直接运行爬虫（爬虫会自动打开浏览器获取新cookie）
+        print('准备启动爬虫，将自动打开浏览器获取Cookie...')
         
         scraper = WegoScraper()
         asyncio.run(scraper.run())
@@ -3012,7 +3172,7 @@ def update_cookie():
                 browser_args = WegoScraper.get_browser_args()
                 chrome_path = WegoScraper.get_chrome_path()
                 
-                print(f'检测到系统: {platform.system()}')
+                print(f'检测到系统: {Environment.SYSTEM}')
                 if chrome_path:
                     print(f'使用系统Chrome: {chrome_path}')
                 else:
@@ -3130,7 +3290,29 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Szwego商品爬虫')
     parser.add_argument('--web', action='store_true', help='启动Web服务模式')
     parser.add_argument('--port', type=int, default=8888, help='Web服务端口 (默认8888)')
+    parser.add_argument('--task', type=int, choices=[1, 2, 3, 4, 6], help='直接执行指定任务后退出 (1:爬虫, 2:货号对比, 3:Excel对比, 4:更新Cookie, 6:文件清理)')
     args = parser.parse_args()
+    
+    if args.task:
+        print(f'执行任务 {args.task}...')
+        try:
+            if args.task == 1:
+                run_scraper()
+            elif args.task == 2:
+                StockNumberComparator().run_comparison()
+            elif args.task == 3:
+                StockNumberComparator().compare_excel_with_json()
+            elif args.task == 4:
+                update_cookie()
+            elif args.task == 6:
+                run_cleaner()
+            print('任务完成')
+        except Exception as e:
+            print(f'任务执行失败: {e}')
+            import traceback
+            traceback.print_exc()
+        import sys
+        sys.exit(0)
     
     if args.web:
         @app.route('/')
@@ -3150,12 +3332,8 @@ if __name__ == '__main__':
             if not command:
                 return jsonify({'error': '命令不能为空'}), 400
             
-            system = platform.system()
             if command.startswith('python '):
-                if system == 'Windows':
-                    command = command.replace('python ', VENV_PYTHON + ' ', 1)
-                else:
-                    command = command.replace('python ', VENV_PYTHON + ' ', 1)
+                command = command.replace('python ', VENV_PYTHON + ' ', 1)
             if command.startswith('python3 '):
                 command = command.replace('python3 ', VENV_PYTHON + ' ', 1)
             
@@ -3163,7 +3341,7 @@ if __name__ == '__main__':
             tasks[task_id] = {'command': command, 'status': 'starting', 'output': '', 'returncode': None, 'error': None}
             thread = threading.Thread(target=run_command_background, args=(task_id, command))
             thread.start()
-            return jsonify({'success': True, 'task_id': task_id, 'message': f'命令已启动 (系统: {system})'})
+            return jsonify({'success': True, 'task_id': task_id, 'message': f'命令已启动 (系统: {Environment.SYSTEM})'})
 
         @app.route('/input', methods=['POST'])
         def send_input():
@@ -3214,22 +3392,39 @@ if __name__ == '__main__':
         def get_cookie_status():
             import glob
             cookie_file = os.path.join(PROJECT_DIR, 'config', 'cookies.json')
-            system = platform.system()
             if not os.path.exists(cookie_file):
-                return jsonify({'error': 'Cookie文件不存在', 'valid': False, 'system': system}), 404
+                return jsonify({'error': 'Cookie文件不存在', 'valid': False, 'system': Environment.SYSTEM}), 404
             try:
                 with open(cookie_file, 'r', encoding='utf-8') as f:
                     cookies = json.load(f)
-                token_cookie = next((c for c in cookies if c.get('name') == 'token'), None)
-                if not token_cookie:
-                    return jsonify({'error': '未找到token', 'valid': False, 'system': system}), 404
-                expires = token_cookie.get('expires')
-                if not expires:
-                    return jsonify({'error': 'token无过期时间', 'valid': False, 'system': system}), 404
+                
+                if not cookies or len(cookies) == 0:
+                    return jsonify({'error': 'Cookie文件为空', 'valid': False, 'system': Environment.SYSTEM}), 404
+                
+                valid_cookie = None
+                for c in cookies:
+                    expires = c.get('expires')
+                    if expires and isinstance(expires, (int, float)) and expires > 0:
+                        valid_cookie = c
+                        break
+                
+                if not valid_cookie:
+                    return jsonify({'error': '未找到有效的Cookie', 'valid': False, 'system': Environment.SYSTEM}), 404
+                
+                expires = valid_cookie.get('expires')
+                cookie_name = valid_cookie.get('name', '未知Cookie')
                 import datetime
                 expires_time = datetime.datetime.fromtimestamp(expires)
                 hours_remaining = (expires_time - datetime.datetime.now()).total_seconds() / 3600
-                return jsonify({'valid': True, 'expires': expires_time.strftime('%Y-%m-%d %H:%M:%S'), 'hours_remaining': round(hours_remaining, 1), 'expired': hours_remaining <= 0, 'system': system})
+                
+                return jsonify({
+                    'valid': True, 
+                    'expires': expires_time.strftime('%Y-%m-%d %H:%M:%S'), 
+                    'hours_remaining': round(hours_remaining, 1), 
+                    'expired': hours_remaining <= 0, 
+                    'system': Environment.SYSTEM,
+                    'cookie_name': cookie_name
+                })
             except Exception as e:
                 return jsonify({'error': str(e), 'valid': False}), 500
 
@@ -3275,7 +3470,7 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        @app.route('/api/sku/compare/txt', methods=['GET'])
+        @app.route('/api/sku/compare/txt', methods=['GET', 'POST'])
         def compare_sku_txt():
             import glob
             try:
@@ -3289,13 +3484,21 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
                 
-                input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
-                txt_stock_numbers = []
-                if os.path.exists(input_file):
-                    with open(input_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        import re
-                        txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
+                # 如果是POST请求，从请求体中获取货号
+                if request.method == 'POST':
+                    data = request.get_json()
+                    input_skus = data.get('skus', '')
+                    import re
+                    txt_stock_numbers = sorted(set(re.findall(r'\d+', input_skus)))
+                else:
+                    # GET请求，从文件中读取
+                    input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
+                    txt_stock_numbers = []
+                    if os.path.exists(input_file):
+                        with open(input_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            import re
+                            txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
                 
                 json_set = set(json_stock_numbers)
                 txt_set = set(txt_stock_numbers)
@@ -3320,6 +3523,9 @@ if __name__ == '__main__':
         def compare_sku_excel():
             import glob
             try:
+                if pd is None:
+                    return jsonify({'error': 'pandas未安装，Excel对比功能不可用'}), 500
+                
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
                 if not json_files:
                     return jsonify({'error': '没有找到JSON文件'}), 404
@@ -3347,7 +3553,6 @@ if __name__ == '__main__':
                 
                 excel_stock_numbers = []
                 if os.path.exists(excel_file):
-                    import pandas as pd
                     xls = pd.ExcelFile(excel_file)
                     
                     df = None
@@ -3492,7 +3697,6 @@ if __name__ == '__main__':
         def get_all_products():
             import glob
             import base64
-            system = platform.system()
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'error': '没有找到JSON文件'}), 404
@@ -3523,14 +3727,51 @@ if __name__ == '__main__':
                     p['图片'] = media_result if media_result else img_data
                 
                 high_price_products = []
+                total_price = 0
+                total_fee = 0
+                valid_price_count = 0
+                
+                print(f'开始处理 {len(products)} 个商品...')
+                
                 for p in products:
                     try:
-                        price = float(p.get('售价', '¥0').replace('¥', '').replace(',', ''))
+                        price_str = p.get('售价', '')
+                        if not price_str or not price_str.strip():
+                            continue
+                        
+                        price_clean = price_str.replace('¥', '').replace(',', '').strip()
+                        price = float(price_clean)
+                        
                         if price >= 599:
                             high_price_products.append(p)
-                    except:
+                        
+                        # 计算总价和手续费
+                        if price > 0:
+                            total_price += price
+                            # 计算闲鱼平台手续费（售价 * 1.6%）
+                            fee = price * 0.016
+                            total_fee += fee
+                            valid_price_count += 1
+                    except Exception as e:
+                        print(f'处理商品时出错: {e}, price_str: {p.get("售价", "")}')
                         pass
-                return jsonify({'filename': os.path.basename(latest_file), 'total': len(products), 'products': products[:100], 'highPriceProducts': high_price_products[:500], 'highPriceCount': len(high_price_products), 'system': system})
+                
+                print(f'统计结果: valid_price_count={valid_price_count}, total_price={total_price}, high_price_count={len(high_price_products)}')
+                
+                # 计算平均价格
+                avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
+                
+                return jsonify({
+                    'filename': os.path.basename(latest_file), 
+                    'total': len(products), 
+                    'products': products[:100], 
+                    'highPriceProducts': high_price_products[:500], 
+                    'highPriceCount': len(high_price_products),
+                    'totalPrice': f'¥{total_price:,.2f}',
+                    'avgPrice': f'¥{avg_price:,.2f}',
+                    'fee': f'¥{total_fee:,.2f}',
+                    'system': Environment.SYSTEM
+                })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
@@ -3632,7 +3873,16 @@ if __name__ == '__main__':
             try:
                 import io
                 data = request.get_json()
-                directory = data.get('directory', PROJECT_DIR)
+                directory = data.get('directory', '')
+                
+                if not directory or directory.strip() == '':
+                    directory = PROJECT_DIR
+                elif not os.path.isabs(directory):
+                    directory = os.path.join(PROJECT_DIR, directory)
+                
+                if not os.path.exists(directory):
+                    return jsonify({'success': False, 'error': f'目录不存在: {directory}'})
+                
                 log_file = os.path.join(directory, 'clean_files.log')
                 
                 log_stream = io.StringIO()
