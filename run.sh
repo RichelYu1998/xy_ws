@@ -4,21 +4,9 @@ echo "========================================"
 echo "Szwego商品爬虫和货号对比工具 - v2.6.0"
 echo "========================================"
 echo ""
-echo "请选择运行模式："
-echo "  1. 命令行模式（爬虫、货号对比等）"
-echo "  2. Web服务模式（可视化界面）"
+echo "启动Web服务模式..."
 echo ""
-
-read -p "请输入选项 (1-2): " MODE
-
-if [ "$MODE" = "1" ]; then
-    run_cli
-elif [ "$MODE" = "2" ]; then
-    run_web
-else
-    echo "无效选项，请输入 1 或 2"
-    exit 1
-fi
+run_web
 
 log_section() {
     echo ""
