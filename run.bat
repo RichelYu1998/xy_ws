@@ -6,7 +6,6 @@ title Szwego Crawler Tool
 echo ========================================
 echo Szwego商品爬虫和货号对比工具 - v2.6.0
 echo ========================================
-5
 goto run_web
 
 :run_web
