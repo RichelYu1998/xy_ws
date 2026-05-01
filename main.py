@@ -2527,6 +2527,8 @@ class StockNumberComparator:
             print('未找到任何Excel文件')
             return None
         
+        excel_files = list(dict.fromkeys(os.path.abspath(f) for f in excel_files))
+        
         print(f'找到 {len(excel_files)} 个Excel文件')
         
         for excel_file in excel_files:
@@ -2862,6 +2864,8 @@ class StockNumberComparator:
                 if old_data and isinstance(old_data, dict):
                     removed_products = sorted([item.get('货号') for item in old_data.get('商品列表', []) if item.get('货号') and item.get('货号') not in json_set])
             
+            duplicates = self.find_duplicate_stock_numbers(excel_stock_numbers)
+            
             diff_data = {
                 'timestamp': timestamp,
                 'date': date_str,
@@ -2890,7 +2894,6 @@ class StockNumberComparator:
             self._add_high_price_info_to_json(latest_json_file, json_data, high_price_extra)
             self._add_diff_to_json_summary(latest_json_file, json_data, diff_data)
             
-            duplicates = self.find_duplicate_stock_numbers(excel_stock_numbers)
             self.print_comparison_result(result, duplicates)
             return True
         except Exception as e:
@@ -3636,6 +3639,8 @@ if __name__ == '__main__':
                 if not excel_files_list:
                     excel_files_list = [os.path.join(PROJECT_DIR, 'config', '本地商品表格.xlsx')]
                 
+                excel_files_list = list(dict.fromkeys(os.path.abspath(f) for f in excel_files_list))
+                
                 excel_stock_numbers = []
                 for excel_file in excel_files_list:
                     if os.path.exists(excel_file):
@@ -3671,9 +3676,9 @@ if __name__ == '__main__':
                                         break
                         
                         if df is not None and sku_column is not None:
-                            file_stock_numbers = sorted([str(int(x)) if isinstance(x, float) and x == int(x) else str(x).strip() 
+                            file_stock_numbers = [str(int(x)) if isinstance(x, float) and x == int(x) else str(x).strip() 
                                                          for x in df[sku_column].dropna() 
-                                                         if str(x).strip() and str(x).strip() != 'nan' and str(x).strip() != '序列号'])
+                                                         if str(x).strip() and str(x).strip() != 'nan' and str(x).strip() != '序列号']
                             excel_stock_numbers.extend(file_stock_numbers)
                 
                 if not excel_stock_numbers:
