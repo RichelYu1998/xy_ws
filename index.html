@@ -17,15 +17,17 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             color: #333;
             overflow-x: hidden;
-        }
-
-        html, body {
-            height: 100%;
             -webkit-overflow-scrolling: touch;
+            padding-top: 56px;
         }
         
         .navbar {
             box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 9999;
         }
         
         .navbar-dark {
@@ -37,6 +39,8 @@
             color: white;
             padding: 80px 0;
             margin-bottom: 40px;
+            position: relative;
+            z-index: 1;
         }
         
         .hero-section h1 {
@@ -572,6 +576,48 @@
         
         /* 超小屏幕手机 (< 576px) */
         @media (max-width: 575.98px) {
+            body {
+                padding-top: 56px;
+            }
+
+            .navbar {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 9999 !important;
+                min-height: 56px !important;
+            }
+
+            .navbar .container {
+                padding: 0 10px;
+            }
+
+            .navbar-brand {
+                font-size: 14px !important;
+                padding: 5px 0;
+            }
+
+            .navbar-brand i {
+                font-size: 16px;
+            }
+
+            #current-time,
+            #cookie-status {
+                font-size: 10px !important;
+                margin-right: 8px !important;
+            }
+
+            .navbar-toggler {
+                padding: 4px 8px;
+                font-size: 14px;
+            }
+
+            .navbar-toggler-icon {
+                width: 20px;
+                height: 20px;
+            }
+
             .hero-section {
                 padding: 60px 0;
                 margin-bottom: 30px;
@@ -624,7 +670,7 @@
                 margin: 20px 0;
                 border-radius: 8px;
                 max-height: none;
-                z-index: 9999;
+                z-index: 1;
                 display: flex;
                 flex-direction: column;
                 background: #fff;
@@ -895,8 +941,7 @@
             }
 
             .change-table th {
-                position: sticky;
-                top: 0;
+                position: static !important;
                 z-index: 1;
                 background: #f5f5f5;
             }
@@ -1033,6 +1078,18 @@
         
         /* 小屏幕平板 (576px - 767px) */
         @media (min-width: 576px) and (max-width: 767.98px) {
+            body {
+                padding-top: 56px;
+            }
+
+            .navbar {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 9999 !important;
+            }
+
             .hero-section h1 {
                 font-size: 2.2rem;
             }
@@ -1050,6 +1107,18 @@
         
         /* 平板和笔记本 (768px - 991px) */
         @media (min-width: 768px) and (max-width: 991.98px) {
+            body {
+                padding-top: 56px;
+            }
+
+            .navbar {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 9999 !important;
+            }
+
             .hero-section h1 {
                 font-size: 2.5rem;
             }
@@ -1067,6 +1136,18 @@
         
         /* 大屏幕 (992px - 1199px) */
         @media (min-width: 992px) and (max-width: 1199.98px) {
+            body {
+                padding-top: 56px;
+            }
+
+            .navbar {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 9999 !important;
+            }
+
             .hero-section h1 {
                 font-size: 2.8rem;
             }
@@ -1074,6 +1155,18 @@
         
         /* 超大屏幕 (>= 1200px) */
         @media (min-width: 1200px) {
+            body {
+                padding-top: 56px;
+            }
+
+            .navbar {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                z-index: 9999 !important;
+            }
+
             .hero-section h1 {
                 font-size: 3rem;
             }
