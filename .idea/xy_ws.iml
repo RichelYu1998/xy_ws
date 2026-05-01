@@ -7,7 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/clean/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/xy_ws/.venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.14 (xy_ws) (2)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.9 (xy_ws)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

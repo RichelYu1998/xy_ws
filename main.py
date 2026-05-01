@@ -3721,6 +3721,7 @@ if __name__ == '__main__':
                 added_products_all = []
                 added_high_price = []
                 prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')))
+                prev_json_files = [f for f in prev_json_files if '_cache' not in f]
                 prev_stock_numbers = set()
                 if len(prev_json_files) > 1:
                     prev_json = prev_json_files[-2]
@@ -3731,7 +3732,7 @@ if __name__ == '__main__':
                 
                 for p in products:
                     sku = p.get('货号', '')
-                    if sku and sku not in prev_stock_numbers:
+                    if sku and sku not in prev_stock_numbers and sku not in excel_set:
                         added_products_all.append(sku)
                         price = p.get('售价', '')
                         try:
@@ -3745,6 +3746,7 @@ if __name__ == '__main__':
                 
                 removed_products = []
                 prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')))
+                prev_json_files = [f for f in prev_json_files if '_cache' not in f]
                 if len(prev_json_files) > 1:
                     prev_json = prev_json_files[-2]
                     with open(prev_json, 'r', encoding='utf-8') as f:
