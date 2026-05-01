@@ -1162,3 +1162,49 @@
 2026-04-30 17:47:46 - FileCleaner - INFO -   7. .venv\Lib\site-packages\werkzeug\debug\shared\console.png (图片, 507.00 B, 下载时间: 2026-04-30 16:28:44)
 2026-04-30 17:47:46 - FileCleaner - INFO - 
 扫描完成
+2026-05-01 19:32:07 - FileCleaner - INFO - ============================================================
+2026-05-01 19:32:07 - FileCleaner - INFO - 扫描文件列表
+2026-05-01 19:32:07 - FileCleaner - INFO - 扫描目录: /Users/yu/Downloads/demo/python/xy_ws
+2026-05-01 19:32:07 - FileCleaner - INFO - 排序方式: 按文件下载到本地的毫秒时间
+2026-05-01 19:32:07 - FileCleaner - INFO - 扫描模式: 递归扫描所有子目录
+2026-05-01 19:32:07 - FileCleaner - INFO - ============================================================
+2026-05-01 19:32:07 - FileCleaner - INFO - 扫描文件中...
+2026-05-01 19:32:07 - FileCleaner - INFO - 扫描了 568 个目录
+2026-05-01 19:32:07 - FileCleaner - INFO - 找到 7 个符合条件的文件
+2026-05-01 19:32:07 - FileCleaner - INFO -   - 图片: 7 个
+2026-05-01 19:32:07 - FileCleaner - INFO -   - 视频: 0 个
+2026-05-01 19:32:07 - FileCleaner - INFO -   - 总大小: 43.06 KB
+2026-05-01 19:32:07 - FileCleaner - INFO - 
+文件列表：
+2026-05-01 19:32:07 - FileCleaner - INFO -   1. .venv/lib/python3.9/site-packages/playwright/driver/package/lib/vite/traceViewer/playwright-logo.svg (图片, 4.92 KB, 下载时间: 2026-04-30 19:43:32)
+2026-05-01 19:32:07 - FileCleaner - INFO -   2. .venv/lib/python3.9/site-packages/playwright/driver/package/lib/vite/recorder/playwright-logo.svg (图片, 4.92 KB, 下载时间: 2026-04-30 19:43:32)
+2026-05-01 19:32:07 - FileCleaner - INFO -   3. .venv/lib/python3.9/site-packages/playwright/driver/package/lib/tools/dashboard/appIcon.png (图片, 16.18 KB, 下载时间: 2026-04-30 19:43:32)
+2026-05-01 19:32:07 - FileCleaner - INFO -   4. .venv/lib/python3.9/site-packages/playwright/driver/package/lib/server/chromium/appIcon.png (图片, 16.18 KB, 下载时间: 2026-04-30 19:43:32)
+2026-05-01 19:32:07 - FileCleaner - INFO -   5. .venv/lib/python3.9/site-packages/werkzeug/debug/shared/more.png (图片, 200.00 B, 下载时间: 2026-04-30 19:43:30)
+2026-05-01 19:32:07 - FileCleaner - INFO -   6. .venv/lib/python3.9/site-packages/werkzeug/debug/shared/less.png (图片, 191.00 B, 下载时间: 2026-04-30 19:43:30)
+2026-05-01 19:32:07 - FileCleaner - INFO -   7. .venv/lib/python3.9/site-packages/werkzeug/debug/shared/console.png (图片, 507.00 B, 下载时间: 2026-04-30 19:43:30)
+2026-05-01 19:32:07 - FileCleaner - INFO - 
+扫描完成
+2026-05-01 19:32:09 - FileCleaner - INFO - ============================================================
+2026-05-01 19:32:09 - FileCleaner - INFO - 扫描文件列表
+2026-05-01 19:32:09 - FileCleaner - INFO - 扫描目录: /Users/yu/Downloads/demo/python/xy_ws
+2026-05-01 19:32:09 - FileCleaner - INFO - 排序方式: 按文件下载到本地的毫秒时间
+2026-05-01 19:32:09 - FileCleaner - INFO - 扫描模式: 递归扫描所有子目录
+2026-05-01 19:32:09 - FileCleaner - INFO - ============================================================
+2026-05-01 19:32:09 - FileCleaner - INFO - 扫描文件中...
+2026-05-01 19:32:09 - FileCleaner - INFO - 扫描了 568 个目录
+2026-05-01 19:32:09 - FileCleaner - INFO - 找到 7 个符合条件的文件
+2026-05-01 19:32:09 - FileCleaner - INFO -   - 图片: 7 个
+2026-05-01 19:32:09 - FileCleaner - INFO -   - 视频: 0 个
+2026-05-01 19:32:09 - FileCleaner - INFO -   - 总大小: 43.06 KB
+2026-05-01 19:32:09 - FileCleaner - INFO - 
+文件列表：
+2026-05-01 19:32:09 - FileCleaner - INFO -   1. .venv/lib/python3.9/site-packages/playwright/driver/package/lib/vite/traceViewer/playwright-logo.svg (图片, 4.92 KB, 下载时间: 2026-04-30 19:43:32)
+2026-05-01 19:32:09 - FileCleaner - INFO -   2. .venv/lib/python3.9/site-packages/playwright/driver/package/lib/vite/recorder/playwright-logo.svg (图片, 4.92 KB, 下载时间: 2026-04-30 19:43:32)
+2026-05-01 19:32:09 - FileCleaner - INFO -   3. .venv/lib/python3.9/site-packages/playwright/driver/package/lib/tools/dashboard/appIcon.png (图片, 16.18 KB, 下载时间: 2026-04-30 19:43:32)
+2026-05-01 19:32:09 - FileCleaner - INFO -   4. .venv/lib/python3.9/site-packages/playwright/driver/package/lib/server/chromium/appIcon.png (图片, 16.18 KB, 下载时间: 2026-04-30 19:43:32)
+2026-05-01 19:32:09 - FileCleaner - INFO -   5. .venv/lib/python3.9/site-packages/werkzeug/debug/shared/more.png (图片, 200.00 B, 下载时间: 2026-04-30 19:43:30)
+2026-05-01 19:32:09 - FileCleaner - INFO -   6. .venv/lib/python3.9/site-packages/werkzeug/debug/shared/less.png (图片, 191.00 B, 下载时间: 2026-04-30 19:43:30)
+2026-05-01 19:32:09 - FileCleaner - INFO -   7. .venv/lib/python3.9/site-packages/werkzeug/debug/shared/console.png (图片, 507.00 B, 下载时间: 2026-04-30 19:43:30)
+2026-05-01 19:32:09 - FileCleaner - INFO - 
+扫描完成
