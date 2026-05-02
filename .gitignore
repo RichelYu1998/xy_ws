@@ -8,9 +8,8 @@
 # Logs
 *.log
 
-# Output files
-file/
-*.json
+# Sensitive config files
+config/cookies.json
 
 # OS files
 .DS_Store
