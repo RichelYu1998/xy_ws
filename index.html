@@ -2681,7 +2681,7 @@ playwright install chromium</pre>
                         }
                         
                         if (data.removed_products && data.removed_products.length > 0) {
-                            const items = data.removed_products.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            const items = data.removed_products.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #ffebee; border-color: #ef5350;">
                                     <div class="missing-title" style="color: #c62828;">删除的商品 (${data.removed_products_count}个):</div>
