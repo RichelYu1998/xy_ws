@@ -3720,7 +3720,7 @@ if __name__ == '__main__':
                 # 新增高价商品：与上一个JSON文件对比，新增的售价>=599的商品
                 added_products_all = []
                 added_high_price = []
-                prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')))
+                prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')), key=os.path.getmtime)
                 prev_json_files = [f for f in prev_json_files if '_cache' not in f]
                 prev_stock_numbers = set()
                 if len(prev_json_files) > 1:
@@ -3745,7 +3745,7 @@ if __name__ == '__main__':
                 added_high_price = sorted(added_high_price)
                 
                 removed_products = []
-                prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')))
+                prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')), key=os.path.getmtime)
                 prev_json_files = [f for f in prev_json_files if '_cache' not in f]
                 if len(prev_json_files) > 1:
                     prev_json = prev_json_files[-2]
