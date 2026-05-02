@@ -3748,8 +3748,18 @@ if __name__ == '__main__':
                 removed_products = []
                 prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')), key=os.path.getmtime)
                 prev_json_files = [f for f in prev_json_files if '_cache' not in f]
-                if len(prev_json_files) > 1:
+                
+                today = datetime.now().strftime('%Y%m%d')
+                today_files = [f for f in prev_json_files if today in os.path.basename(f)]
+                
+                if len(today_files) >= 2:
+                    prev_json = today_files[-2]
+                elif len(prev_json_files) >= 2:
                     prev_json = prev_json_files[-2]
+                else:
+                    prev_json = None
+                
+                if prev_json:
                     with open(prev_json, 'r', encoding='utf-8') as f:
                         prev_data = json.load(f)
                     prev_products = prev_data.get('商品列表', []) if isinstance(prev_data, dict) else prev_data
