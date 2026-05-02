@@ -3615,6 +3615,9 @@ if __name__ == '__main__':
                 if pd is None:
                     return jsonify({'error': 'pandas未安装，Excel对比功能不可用'}), 500
                 
+                today = datetime.now().strftime('%Y%m%d')
+                diff_log_file = os.path.join(PROJECT_DIR, 'file', f'diff_log_{today}.json')
+                
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
                 json_files = [f for f in json_files if '_cache' not in f]
                 if not json_files:
@@ -3718,53 +3721,45 @@ if __name__ == '__main__':
                 high_price_existing = sorted(list(high_price_set & excel_set))
                 high_price_extra_in_json = sorted(list(high_price_set - excel_set))
                 
-                # 新增高价商品：与上一个JSON文件对比，新增的售价>=599的商品
+                # 判断今天是否运行过爬虫：从 JSON 的"小计"中查找今天的记录
+                xiaoji_records = data.get('小计', []) if isinstance(data, dict) else []
+                today_xiaoji = None
+                for record in reversed(xiaoji_records):
+                    if record.get('timestamp', '').startswith(today):
+                        today_xiaoji = record
+                        break
+                
+                # 从差异日志读取今天之前的数据（昨天 vs 今天）
                 added_products_all = []
-                added_high_price = []
-                prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')), key=os.path.getmtime)
-                prev_json_files = [f for f in prev_json_files if '_cache' not in f]
-                prev_stock_numbers = set()
-                if len(prev_json_files) > 1:
-                    prev_json = prev_json_files[-2]
-                    with open(prev_json, 'r', encoding='utf-8') as f:
-                        prev_data = json.load(f)
-                    prev_products = prev_data.get('商品列表', []) if isinstance(prev_data, dict) else prev_data
-                    prev_stock_numbers = set([p.get('货号', '') for p in prev_products if p.get('货号')])
-                
-                for p in products:
-                    sku = p.get('货号', '')
-                    if sku and sku not in prev_stock_numbers and sku not in excel_set:
-                        added_products_all.append(sku)
-                        price = p.get('售价', '')
-                        try:
-                            price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
-                            if price_val >= 599:
-                                added_high_price.append(sku)
-                        except:
-                            pass
-                
-                added_high_price = sorted(added_high_price)
-                
                 removed_products = []
-                prev_json_files = sorted(glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json')), key=os.path.getmtime)
-                prev_json_files = [f for f in prev_json_files if '_cache' not in f]
+                added_high_price = []
                 
-                today = datetime.now().strftime('%Y%m%d')
-                today_files = [f for f in prev_json_files if today in os.path.basename(f)]
+                if os.path.exists(diff_log_file):
+                    with open(diff_log_file, 'r', encoding='utf-8') as f:
+                        diff_data = json.load(f)
+                    if diff_data.get('logs'):
+                        last_log = diff_data['logs'][-1]
+                        added_products_all = last_log.get('added', [])
+                        removed_products = last_log.get('removed', [])
                 
-                if len(today_files) >= 2:
-                    prev_json = today_files[-2]
-                elif len(prev_json_files) >= 2:
-                    prev_json = prev_json_files[-2]
-                else:
-                    prev_json = None
+                # 如果今天运行过爬虫（有小计记录），使用小计的数据
+                if today_xiaoji:
+                    added_products_all = today_xiaoji.get('added', [])
+                    removed_products = today_xiaoji.get('removed', [])
+                    # 高价新增从新增商品中筛选
+                    for sku in added_products_all:
+                        for p in products:
+                            if str(p.get('货号', '')) == str(sku):
+                                price = p.get('售价', '')
+                                try:
+                                    price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
+                                    if price_val >= 599:
+                                        added_high_price.append(sku)
+                                except:
+                                    pass
+                                break
                 
-                if prev_json:
-                    with open(prev_json, 'r', encoding='utf-8') as f:
-                        prev_data = json.load(f)
-                    prev_products = prev_data.get('商品列表', []) if isinstance(prev_data, dict) else prev_data
-                    prev_stock_numbers = set([p.get('货号', '') for p in prev_products if p.get('货号')])
-                    removed_products = sorted(list(prev_stock_numbers - json_set))
+                added_high_price = sorted(list(set(added_high_price)))
                 
                 result = {
                     'type': 'excel',
