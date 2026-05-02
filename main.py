@@ -3616,6 +3616,7 @@ if __name__ == '__main__':
                     return jsonify({'error': 'pandas未安装，Excel对比功能不可用'}), 500
                 
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+                json_files = [f for f in json_files if '_cache' not in f]
                 if not json_files:
                     return jsonify({'error': '没有找到JSON文件'}), 404
                 latest_json = max(json_files, key=os.path.getmtime)
