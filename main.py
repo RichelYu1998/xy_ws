@@ -3404,13 +3404,17 @@ if __name__ == '__main__':
     if args.web:
         @app.route('/')
         def index():
-            with open('index.html', 'r', encoding='utf-8') as f:
+            with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
                 content = f.read()
             response = Response(content, mimetype='text/html')
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response.headers['Pragma'] = 'no-cache'
             response.headers['Expires'] = '0'
             return response
+
+        @app.route('/dist/<path:filename>')
+        def dist_files(filename):
+            return send_file(os.path.join(PROJECT_DIR, 'dist', filename))
 
         @app.route('/run', methods=['POST'])
         def run_command():
