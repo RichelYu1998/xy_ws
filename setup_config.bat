@@ -5,36 +5,34 @@ echo   Szwego爬虫 - 配置文件初始化
 echo ========================================
 echo.
 
-set /p USERNAME="请输入用户名: "
-set /p PASSWORD="请输入密码: "
-set /p URL="请输入目标URL: "
-set /p EXCEL="请输入Excel路径(可留空): "
-
-echo.
-echo 正在启动浏览器进行登录...
-echo 请在浏览器中登录您的账号
-echo.
-
-if exist ".venv\Scripts\python.exe" (
-    set PYTHON_CMD=.venv\Scripts\python.exe
-) else (
-    where python >nul 2>&1
-    if %ERRORLEVEL% EQU 0 (
-        set PYTHON_CMD=python
-    ) else (
-        where python3 >nul 2>&1
-        if %ERRORLEVEL% EQU 0 (
-            set PYTHON_CMD=python3
-        ) else (
-            echo 错误: 未找到Python命令
-            echo 请确保Python已安装并添加到系统PATH
-            pause
-            exit /b 1
-        )
-    )
+if exist config\config.json (
+    echo 配置文件已存在，如需重新初始化请先删除 config\config.json
+    pause
+    exit /b 0
 )
 
-echo 使用Python: %PYTHON_CMD%
-%PYTHON_CMD% setup_config.py -u "%USERNAME%" -p "%PASSWORD%" -l "%URL%" -e "%EXCEL%"
+echo 正在复制配置文件模板...
+
+if exist config\config.json.example (
+    copy /Y config\config.json.example config\config.json >nul
+    echo ✓ config.json 已创建
+) else (
+    echo ⚠ config.json.example 不存在
+)
+
+if exist config\cookies.json.example (
+    copy /Y config\cookies.json.example config\cookies.json >nul
+    echo ✓ cookies.json 已创建
+)
+
+echo.
+echo 请编辑 config\config.json，填写以下信息：
+echo   - login.username: 用户名
+echo   - login.password: 密码
+echo   - target_url: 目标URL
+echo   - headers.cookie: Cookie值
+echo   - cookies中的token和sensorsdata值
+echo.
+echo 配置文件已创建完成
 
 pause
