@@ -15,6 +15,26 @@ echo 正在启动浏览器进行登录...
 echo 请在浏览器中登录您的账号
 echo.
 
-python setup_config.py -u "%USERNAME%" -p "%PASSWORD%" -l "%URL%" -e "%EXCEL%"
+if exist ".venv\Scripts\python.exe" (
+    set PYTHON_CMD=.venv\Scripts\python.exe
+) else (
+    where python >nul 2>&1
+    if %ERRORLEVEL% EQU 0 (
+        set PYTHON_CMD=python
+    ) else (
+        where python3 >nul 2>&1
+        if %ERRORLEVEL% EQU 0 (
+            set PYTHON_CMD=python3
+        ) else (
+            echo 错误: 未找到Python命令
+            echo 请确保Python已安装并添加到系统PATH
+            pause
+            exit /b 1
+        )
+    )
+)
+
+echo 使用Python: %PYTHON_CMD%
+%PYTHON_CMD% setup_config.py -u "%USERNAME%" -p "%PASSWORD%" -l "%URL%" -e "%EXCEL%"
 
 pause
