@@ -4,11 +4,29 @@
 
 ### config 目录
 
+配置文件模板已提交到仓库，首次使用需要运行初始化脚本或手动复制配置：
+
+**模板文件：**
+- `config.json.example` - 主配置模板
+- `cookies.json.example` - Cookies模板
+
+**敏感配置文件（不在Git中更新）：**
 - `config.json` - 主配置文件，包含登录信息、目标URL、滚动配置、HTTP头和Cookies
 - `cookies.json` - Cookies数据文件
-- `input_stock_numbers.txt` - 输入的货号列表
 
 > ⚠️ **注意**：配置文件包含敏感信息，请勿分享给他人。
+
+### 快速开始
+
+**方法一：使用初始化脚本（推荐）**
+1. 克隆仓库后，双击运行 `setup_config.bat`
+2. 根据提示编辑 `config\config.json` 填写用户名、密码、URL等
+3. 填写 cookies 中的 token 值
+
+**方法二：手动复制**
+1. 复制 `config\config.json.example` 为 `config\config.json`
+2. 复制 `config\cookies.json.example` 为 `config\cookies.json`
+3. 编辑两个文件，填写对应的值
 
 ## 更新日志
 

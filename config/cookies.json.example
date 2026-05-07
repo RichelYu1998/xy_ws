@@ -1,0 +1,32 @@
+[
+  {
+    "name": "token",
+    "value": "YOUR_TOKEN",
+    "domain": ".szwego.com",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "client_type",
+    "value": "net",
+    "domain": ".szwego.com",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "Lax"
+  },
+  {
+    "name": "sensorsdata2015jssdkcross",
+    "value": "YOUR_SENSORS_DATA",
+    "domain": ".szwego.com",
+    "path": "/",
+    "expires": -1,
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "Lax"
+  }
+]
