@@ -8,14 +8,16 @@ cd xy_ws
 ```
 
 ### 2. 初始化配置
-运行初始化脚本，根据提示输入配置信息：
+运行初始化脚本：
 - Windows: 双击 `setup_config.bat`
 - Linux/Mac: 运行 `bash setup_config.sh`
 
-或使用命令行参数（高级用户）：
-```bash
-python setup_config.py -u 用户名 -p 密码 -l URL -t token
-```
+**脚本会自动：**
+- 打开浏览器让你登录
+- 自动获取 Cookie 和 Token
+- 生成配置文件
+
+只需要提供：**用户名、密码、目标URL**
 
 ### 3. 安装依赖并运行
 ```bash
