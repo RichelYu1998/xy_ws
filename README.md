@@ -7,23 +7,22 @@ git clone https://github.com/RichelYu1998/xy_ws.git
 cd xy_ws
 ```
 
-### 2. 初始化配置
-运行初始化脚本：
-- Windows: 双击 `setup_config.bat`
-- Linux/Mac: 运行 `bash setup_config.sh`
-
-**脚本会自动：**
-- 打开浏览器让你登录
-- 自动获取 Cookie 和 Token
-- 生成配置文件
-
-只需要提供：**用户名、密码、目标URL**
-
-### 3. 安装依赖并运行
+### 2. 运行程序
 ```bash
-pip install -r requirements.txt
-python main.py
+# Windows
+run.bat
+
+# Linux/Mac
+bash run.sh
 ```
+
+**程序会自动：**
+- ✅ 检测/创建虚拟环境
+- ✅ 安装依赖
+- ✅ 检测配置文件（首次使用自动从模板复制）
+- ✅ 启动Web服务
+
+首次使用会提示编辑配置文件，填写用户名、密码、目标URL和Cookie信息。
 
 ## 配置文件说明
 
