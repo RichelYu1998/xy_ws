@@ -1,5 +1,23 @@
 # Szwego商品爬虫和货号对比工具
 
+## 敏感配置文件说明
+
+### config/config.json 和 config/cookies.json
+
+这两个配置文件包含敏感信息（用户名、密码、token、Cookie等），**不会被推送到 Git 仓库**。
+
+**配置步骤：**
+1. 首次使用前，从仓库拉取代码后，需要手动创建 `config/config.json` 配置文件
+2. 或联系项目维护者获取配置模板
+
+**配置项说明：**
+- `login` - 登录信息（用户名、密码、登录方式）
+- `target_url` - 目标店铺URL
+- `scroll_config` - 滚动配置参数
+- `headers` - HTTP请求头（包含Cookie）
+- `cookies` - Cookie数组
+- `excel_files` - Excel文件路径列表
+
 ## 更新日志
 
 ### v3.0.6 (2026-05-06)
