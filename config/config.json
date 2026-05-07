@@ -1,0 +1,85 @@
+{
+  "login": {
+    "username": "15705606662",
+    "password": "xxsm8888",
+    "login_type": "phone"
+  },
+  "target_url": "https://www.szwego.com/static/index.html?link_type=pc_home&shop_id=_dmJmJEsu5AD3WiJ2MxfM3CmGtKrxJ3cFCPnT3zA&shop_name=%E5%A8%83%E5%A4%A7%E7%93%9C%E6%93%A6#/shop_detail/_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ",
+  "scroll_config": {
+    "max_attempts": 30,
+    "same_height_limit": 8,
+    "scroll_wait_time": 0.8,
+    "popup_close_interval": 5,
+    "popup_close_limit": 3,
+    "popup_close_wait": 0.3,
+    "dynamic_adjust": true
+  },
+  "headers": {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "accept-encoding": "gzip, deflate, br, zstd",
+    "accept-language": "zh-CN,zh;q=0.9",
+    "cache-control": "max-age=0",
+    "connection": "keep-alive",
+    "cookie": "sajssdk_2015_cross_new_user=1; token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1dWlkIjoiMDUwZmJlMjFmZWQ4NDQ3MWZiNjMyMmFhYjExMDJjY2YiLCJzdGFmZklkIjoiUzIzMDcxNTIzMDMzODg2NDIwMDAwMTMyMyIsInRva2VuIjoiTnpRMU16a3hRVFpDT1RZNU16SXhSVGRCTXpCRU5rRTJRa1kwTmpjeE5EazJRalEzUlRRNFFrRkZRakJGTlRBM1F6SXpOamxFUWpCRVJFRTNRakJDTVRrNE9UTXhRVUkxTURnMk5VTXhRVU5GTkRrNFJUTkZNVFJETURSR1JVTkUiLCJhbGJ1bUlkIjoiQTIwMjIwNTIwMTgxNzU1OTU0MDAwMTk4MyIsInYiOjIsIm1hc3RlckFjY291bnQiOnRydWV9.6MD-YBtPOcLBwLxtrMdRg3vH9mcUOEspNsIghQT2a3g; client_type=net; sensorsdata2015jssdkcross=%7B%22distinct_id%22%3A%22_du7u7sPzETcOchbjnUawvG3Q6v8rkdUQ_S5FHkQ%22%2C%22first_id%22%3A%2219de7b2ea3de59-093de01d378df1-26001951-2073600-19de7b2ea3e130c%22%2C%22props%22%3A%7B%22%24latest_traffic_source_type%22%3A%22%E7%9B%B4%E6%8E%A5%E6%B5%81%E9%87%8F%22%2C%22%24latest_search_keyword%22%3A%22%E6%9C%AA%E5%8F%96%E5%88%B0%E5%80%BC_%E7%9B%B4%E6%8E%A5%E6%89%93%E5%BC%80%22%2C%22%24latest_referrer%22%3A%22%22%7D%2C%22identities%22%3A%22eyIkaWRlbnRpdHlfbG9naW5faWQiOiJfZHU3dTdzUHpFVGNPY2hiam5VYXd2RzNRNnY4cmtkVVFfUzVGSGtRIiwiJGlkZW50aXR5X2Nvb2tpZV9pZCI6IjE5ZGU3YjJlYTNkZTU5LTA5M2RlMDFkMzc4ZGYxLTI2MDAxOTUxLTIwNzM2MDAtMTlkZTdiMmVhM2UxMzBjIn0%3D%22%2C%22history_login_id%22%3A%7B%22name%22%3A%22%24identity_login_id%22%2C%22value%22%3A%22_du7u7sPzETcOchbjnUawvG3Q6v8rkdUQ_S5FHkQ%22%7D%2C%22%24device_id%22%3A%2219de7b2ea3de59-093de01d378df1-26001951-2073600-19de7b2ea3e130c%22%7D",
+    "host": "www.szwego.com",
+    "sec-ch-ua": "\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "none",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+  },
+  "cookies": [
+    {
+      "name": "sajssdk_2015_cross_new_user",
+      "value": "1",
+      "domain": ".szwego.com",
+      "path": "/",
+      "expires": 1777737599,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "token",
+      "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1dWlkIjoiMDUwZmJlMjFmZWQ4NDQ3MWZiNjMyMmFhYjExMDJjY2YiLCJzdGFmZklkIjoiUzIzMDcxNTIzMDMzODg2NDIwMDAwMTMyMyIsInRva2VuIjoiTnpRMU16a3hRVFpDT1RZNU16SXhSVGRCTXpCRU5rRTJRa1kwTmpjeE5EazJRalEzUlRRNFFrRkZRakJGTlRBM1F6SXpOamxFUWpCRVJFRTNRakJDTVRrNE9UTXhRVUkxTURnMk5VTXhRVU5GTkRrNFJUTkZNVFJETURSR1JVTkUiLCJhbGJ1bUlkIjoiQTIwMjIwNTIwMTgxNzU1OTU0MDAwMTk4MyIsInYiOjIsIm1hc3RlckFjY291bnQiOnRydWV9.6MD-YBtPOcLBwLxtrMdRg3vH9mcUOEspNsIghQT2a3g",
+      "domain": ".szwego.com",
+      "path": "/",
+      "expires": 1780300777.070562,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "client_type",
+      "value": "net",
+      "domain": ".szwego.com",
+      "path": "/",
+      "expires": 1780300777.070736,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "sensorsdata2015jssdkcross",
+      "value": "%7B%22distinct_id%22%3A%22_du7u7sPzETcOchbjnUawvG3Q6v8rkdUQ_S5FHkQ%22%2C%22first_id%22%3A%2219de7b2ea3de59-093de01d378df1-26001951-2073600-19de7b2ea3e130c%22%2C%22props%22%3A%7B%22%24latest_traffic_source_type%22%3A%22%E7%9B%B4%E6%8E%A5%E6%B5%81%E9%87%8F%22%2C%22%24latest_search_keyword%22%3A%22%E6%9C%AA%E5%8F%96%E5%88%B0%E5%80%BC_%E7%9B%B4%E6%8E%A5%E6%89%93%E5%BC%80%22%2C%22%24latest_referrer%22%3A%22%22%7D%2C%22identities%22%3A%22eyIkaWRlbnRpdHlfbG9naW5faWQiOiJfZHU3dTdzUHpFVGNPY2hiam5VYXd2RzNRNnY4cmtkVVFfUzVGSGtRIiwiJGlkZW50aXR5X2Nvb2tpZV9pZCI6IjE5ZGU3YjJlYTNkZTU5LTA5M2RlMDFkMzc4ZGYxLTI2MDAxOTUxLTIwNzM2MDAtMTlkZTdiMmVhM2UxMzBjIn0%3D%22%2C%22history_login_id%22%3A%7B%22name%22%3A%22%24identity_login_id%22%2C%22value%22%3A%22_du7u7sPzETcOchbjnUawvG3Q6v8rkdUQ_S5FHkQ%22%7D%2C%22%24device_id%22%3A%2219de7b2ea3de59-093de01d378df1-26001951-2073600-19de7b2ea3e130c%22%7D",
+      "domain": ".szwego.com",
+      "path": "/",
+      "expires": 1812268778.669799,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "output_file": "file/output.json",
+  "cookie_file": "config/cookies.json",
+  "excel_files": [
+    "C:\\Users\\Administrator\\Desktop\\小旭二手机.xlsx",
+    "/Users/yu/Downloads/小旭二手机.xlsx",
+    "~/Desktop/小旭二手机.xlsx",
+    "D:\\ws\\xy_ws\\小旭二手机.xlsx"
+  ]
+}
