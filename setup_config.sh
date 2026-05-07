@@ -1,39 +1,20 @@
 #!/bin/bash
 
 echo "========================================"
-echo "   Szwego爬虫 - 配置文件初始化脚本"
+echo "   Szwego爬虫 - 配置文件初始化"
 echo "========================================"
 echo ""
 
-if [ ! -f "config/config.json" ]; then
-    echo "正在创建 config.json..."
-    cp config/config.json.example config/config.json
+read -p "请输入用户名: " USERNAME
+read -p "请输入密码: " PASSWORD
+read -p "请输入目标URL: " URL
+read -p "请输入token: " TOKEN
+read -p "请输入sensorsdata(可留空): " SENSORS
+read -p "请输入Excel路径(可留空): " EXCEL
 
-    echo ""
-    echo "请编辑 config/config.json，填写以下信息："
-    echo "  - login.username: 用户名"
-    echo "  - login.password: 密码"
-    echo "  - target_url: 目标URL"
-    echo "  - headers.cookie: Cookie值"
-    echo "  - cookies中的token和sensorsdata值"
-    echo ""
-else
-    echo "config.json 已存在，跳过创建。"
-fi
+python3 setup_config.py -u "$USERNAME" -p "$PASSWORD" -l "$URL" -t "$TOKEN" -s "$SENSORS" -e "$EXCEL"
 
-if [ ! -f "config/cookies.json" ]; then
-    echo "正在创建 cookies.json..."
-    cp config/cookies.json.example config/cookies.json
-
-    echo ""
-    echo "请编辑 config/cookies.json，填写以下信息："
-    echo "  - token值"
-    echo "  - sensorsdata2015jssdkcross值"
-    echo ""
-else
-    echo "cookies.json 已存在，跳过创建。"
-fi
-
+echo ""
 echo "========================================"
 echo "   初始化完成！"
 echo "========================================"

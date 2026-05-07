@@ -1,40 +1,17 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo   Szwego爬虫 - 配置文件初始化脚本
+echo   Szwego爬虫 - 配置文件初始化
 echo ========================================
 echo.
 
-if not exist "config\config.json" (
-    echo 正在创建 config.json...
-    copy config\config.json.example config\config.json
+set /p USERNAME="请输入用户名: "
+set /p PASSWORD="请输入密码: "
+set /p URL="请输入目标URL: "
+set /p TOKEN="请输入token: "
+set /p SENSORS="请输入sensorsdata(可留空): "
+set /p EXCEL="请输入Excel路径(可留空): "
 
-    echo.
-    echo 请编辑 config\config.json，填写以下信息：
-    echo   - login.username: 用户名
-    echo   - login.password: 密码
-    echo   - target_url: 目标URL
-    echo   - headers.cookie: Cookie值
-    echo   - cookies中的token和sensorsdata值
-    echo.
-) else (
-    echo config.json 已存在，跳过创建。
-)
+python setup_config.py -u "%USERNAME%" -p "%PASSWORD%" -l "%URL%" -t "%TOKEN%" -s "%SENSORS%" -e "%EXCEL%"
 
-if not exist "config\cookies.json" (
-    echo 正在创建 cookies.json...
-    copy config\cookies.json.example config\cookies.json
-
-    echo.
-    echo 请编辑 config\cookies.json，填写以下信息：
-    echo   - token值
-    echo   - sensorsdata2015jssdkcross值
-    echo.
-) else (
-    echo cookies.json 已存在，跳过创建。
-)
-
-echo ========================================
-echo   初始化完成！
-echo ========================================
 pause
