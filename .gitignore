@@ -9,8 +9,8 @@
 *.log
 
 # Sensitive config files
-config/cookies.json
-config/config.json
+# config/cookies.json
+# config/config.json
 
 # OS files
 .DS_Store
