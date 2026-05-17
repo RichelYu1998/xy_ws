@@ -15,9 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
 
-# Windows特定的subprocess参数
-if platform.system() == 'Windows':
-     subprocess.CREATE_NO_WINDOW = 0x08000000
+if not hasattr(subprocess, 'CREATE_NO_WINDOW'):
+    subprocess.CREATE_NO_WINDOW = 0x08000000 if platform.system() == 'Windows' else 0
 
 from flask import Flask, request, jsonify, send_file, Response
 
@@ -4219,10 +4218,138 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
+        @app.route('/api/server/info', methods=['GET'])
+        def get_server_info():
+            import socket
+            port = args.port
+            
+            # 获取局域网 IP
+            lan_ip = None
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                lan_ip = s.getsockname()[0]
+                s.close()
+            except:
+                pass
+            
+            return jsonify({
+                'success': True,
+                'local_url': f'http://127.0.0.1:{port}',
+                'lan_url': f'http://{lan_ip}:{port}' if lan_ip else None,
+                'lan_ip': lan_ip,
+                'port': port
+            })
+
+        # ==================== Hostc Tunnel API ====================
+        hostc_process = None
+        hostc_tunnel_url = None
+
+        @app.route('/api/tunnel/start', methods=['POST'])
+        def start_tunnel():
+            global hostc_process, hostc_tunnel_url
+            
+            if hostc_process and hostc_process.poll() is None:
+                return jsonify({'success': True, 'url': hostc_tunnel_url, 'message': '隧道已在运行'})
+            
+            try:
+                import threading
+                import re
+                
+                port = args.port
+                hostc_tunnel_url = None
+                
+                tunnel_process = subprocess.Popen(
+                    'npx hostc@latest ' + str(port),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    shell=True,
+                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
+                )
+                
+                hostc_process = tunnel_process
+                
+                def read_output():
+                    global hostc_tunnel_url
+                    while True:
+                        if tunnel_process.poll() is not None:
+                            break
+                        try:
+                            line = tunnel_process.stdout.readline()
+                            if line:
+                                print(f"[Tunnel] {line.strip()}")
+                                if 'https://' in line or 'http://' in line:
+                                    urls = re.findall(r'https?://[^\s]+', line)
+                                    for url in urls:
+                                        if 'hostc' in url.lower() or 'tunnel' in url.lower():
+                                            hostc_tunnel_url = url.split(' ')[0].rstrip('/')
+                                            break
+                                        elif not hostc_tunnel_url:
+                                            hostc_tunnel_url = url.split(' ')[0].rstrip('/')
+                        except:
+                            break
+                
+                read_thread = threading.Thread(target=read_output, daemon=True)
+                read_thread.start()
+                
+                return jsonify({
+                    'success': True, 
+                    'url': hostc_tunnel_url or 'https://tunnel-preview.hostc.dev',
+                    'message': '隧道启动中，请稍候刷新页面获取最新URL...'
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
+        @app.route('/api/tunnel/stop', methods=['POST'])
+        def stop_tunnel():
+            global hostc_process, hostc_tunnel_url
+            
+            if hostc_process:
+                try:
+                    hostc_process.terminate()
+                    try:
+                        hostc_process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        hostc_process.kill()
+                except:
+                    pass
+                hostc_process = None
+                hostc_tunnel_url = None
+            
+            return jsonify({'success': True, 'message': '隧道已停止'})
+
+        @app.route('/api/tunnel/status', methods=['GET'])
+        def tunnel_status():
+            global hostc_process, hostc_tunnel_url
+            
+            if hostc_process and hostc_process.poll() is None:
+                return jsonify({
+                    'running': True,
+                    'url': hostc_tunnel_url
+                })
+            else:
+                return jsonify({
+                    'running': False,
+                    'url': None
+                })
+
+        # 启动前获取一次局域网 IP 用于显示
+        lan_ip_startup = None
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            lan_ip_startup = s.getsockname()[0]
+            s.close()
+        except:
+            pass
+
         print("=" * 50)
         print("Szwego商品爬虫 - Web服务")
         print("=" * 50)
         print(f"访问地址: http://localhost:{args.port}")
+        print(f"局域网地址: http://{lan_ip_startup}:{args.port}" if lan_ip_startup else "")
         print("按 Ctrl+C 停止服务")
         print("=" * 50)
         app.run(host='0.0.0.0', port=args.port, debug=True)
