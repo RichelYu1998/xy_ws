@@ -4300,24 +4300,6 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        @app.route('/api/tunnel/stop', methods=['POST'])
-        def stop_tunnel():
-            global tunnel_process, tunnel_url
-            
-            if tunnel_process:
-                try:
-                    tunnel_process.terminate()
-                    try:
-                        tunnel_process.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        tunnel_process.kill()
-                except:
-                    pass
-                tunnel_process = None
-                tunnel_url = None
-            
-            return jsonify({'success': True, 'message': '隧道已停止'})
-
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():
             global tunnel_process, tunnel_url

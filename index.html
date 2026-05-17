@@ -2733,11 +2733,7 @@ playwright install chromium</pre>
                                     <i class="fa fa-spinner fa-spin"></i> <span id="tunnel-public-url">获取中...</span>
                                 </div>
                             </div>
-                            <div class="text-center mt-3">
-                                <button class="btn btn-danger" onclick="stopTunnelAndReset()">
-                                    <i class="fa fa-stop"></i> 停止隧道
-                                </button>
-                            </div>
+
                         </div>
                     </div>
                 `;
@@ -2823,18 +2819,6 @@ playwright install chromium</pre>
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 2000);
         }
-
-        async function stopTunnelAndReset() {
-            try {
-                await fetch('/api/tunnel/stop', { method: 'POST' });
-                const panel = document.getElementById('output-panel');
-                panel.style.display = 'none';
-                panel.innerHTML = '';
-            } catch (e) {
-                alert('停止失败: ' + e.message);
-            }
-        }
-
 
         // 绑定货号对比API按钮
         document.querySelectorAll('.btn-sku-api').forEach(function(btn) {
@@ -3345,9 +3329,9 @@ playwright install chromium</pre>
             const urlDisplay = document.getElementById('tunnel-public-url');
             
             if (running) {
-                btn.className = 'btn btn-danger';
-                btn.innerHTML = '<i class="fa fa-stop"></i> 停止隧道';
-                btn.disabled = false;
+                btn.className = 'btn btn-secondary';
+                btn.innerHTML = '<i class="fa fa-check"></i> 隧道运行中';
+                btn.disabled = true;
                 status.innerHTML = '<span class="badge badge-success"><i class="fa fa-circle"></i> 已连接</span>';
                 if (url) {
                     urlDisplay.innerHTML = `<a href="${url}" target="_blank" class="text-primary font-weight-bold">${url}</a>`;
@@ -3372,10 +3356,7 @@ playwright install chromium</pre>
                 const response = await fetch('/api/tunnel/status');
                 const data = await response.json();
                 
-                if (data.running) {
-                    await fetch('/api/tunnel/stop', { method: 'POST' });
-                    updateTunnelUI(false);
-                } else {
+                if (!data.running) {
                     const startRes = await fetch('/api/tunnel/start', { method: 'POST' });
                     const startData = await startRes.json();
                     if (startData.success) {
