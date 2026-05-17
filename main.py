@@ -4241,62 +4241,60 @@ if __name__ == '__main__':
                 'port': port
             })
 
-        # ==================== Hostc Tunnel API ====================
-        hostc_process = None
-        hostc_tunnel_url = None
+        # ==================== Tunnel API ====================
+        tunnel_process = None
+        tunnel_url = None
 
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
-            global hostc_process, hostc_tunnel_url
+            global tunnel_process, tunnel_url
             
-            if hostc_process and hostc_process.poll() is None:
-                return jsonify({'success': True, 'url': hostc_tunnel_url, 'message': '隧道已在运行'})
+            if tunnel_process and tunnel_process.poll() is None:
+                return jsonify({'success': True, 'url': tunnel_url, 'message': '隧道已在运行'})
             
             try:
                 import threading
                 import re
                 
                 port = args.port
-                hostc_tunnel_url = None
+                tunnel_url = None
                 
                 tunnel_process = subprocess.Popen(
-                    'npx hostc@latest ' + str(port),
+                    f'npx hostc@latest {port}',
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
-                    bufsize=1,
+                    bufsize=0,
                     shell=True,
                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
                 )
                 
-                hostc_process = tunnel_process
-                
                 def read_output():
-                    global hostc_tunnel_url
+                    global tunnel_url
                     while True:
-                        if tunnel_process.poll() is not None:
+                        if tunnel_process and tunnel_process.poll() is not None:
                             break
                         try:
                             line = tunnel_process.stdout.readline()
                             if line:
                                 print(f"[Tunnel] {line.strip()}")
                                 if 'https://' in line or 'http://' in line:
-                                    urls = re.findall(r'https?://[^\s]+', line)
+                                    urls = re.findall(r'https?://[^\s<>"\']+', line)
                                     for url in urls:
-                                        if 'hostc' in url.lower() or 'tunnel' in url.lower():
-                                            hostc_tunnel_url = url.split(' ')[0].rstrip('/')
+                                        clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
+                                        if len(clean_url) > 10 and '.' in clean_url:
+                                            tunnel_url = clean_url
+                                            print(f"[Tunnel] 找到URL: {tunnel_url}")
                                             break
-                                        elif not hostc_tunnel_url:
-                                            hostc_tunnel_url = url.split(' ')[0].rstrip('/')
                         except:
-                            break
+                            pass
                 
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
                 
                 return jsonify({
                     'success': True, 
-                    'url': hostc_tunnel_url or 'https://tunnel-preview.hostc.dev',
+                    'url': tunnel_url or '',
                     'message': '隧道启动中，请稍候刷新页面获取最新URL...'
                 })
             except Exception as e:
@@ -4304,30 +4302,30 @@ if __name__ == '__main__':
 
         @app.route('/api/tunnel/stop', methods=['POST'])
         def stop_tunnel():
-            global hostc_process, hostc_tunnel_url
+            global tunnel_process, tunnel_url
             
-            if hostc_process:
+            if tunnel_process:
                 try:
-                    hostc_process.terminate()
+                    tunnel_process.terminate()
                     try:
-                        hostc_process.wait(timeout=3)
+                        tunnel_process.wait(timeout=3)
                     except subprocess.TimeoutExpired:
-                        hostc_process.kill()
+                        tunnel_process.kill()
                 except:
                     pass
-                hostc_process = None
-                hostc_tunnel_url = None
+                tunnel_process = None
+                tunnel_url = None
             
             return jsonify({'success': True, 'message': '隧道已停止'})
 
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():
-            global hostc_process, hostc_tunnel_url
+            global tunnel_process, tunnel_url
             
-            if hostc_process and hostc_process.poll() is None:
+            if tunnel_process and tunnel_process.poll() is None:
                 return jsonify({
                     'running': True,
-                    'url': hostc_tunnel_url
+                    'url': tunnel_url
                 })
             else:
                 return jsonify({

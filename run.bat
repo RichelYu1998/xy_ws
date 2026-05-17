@@ -131,7 +131,9 @@ if /i "%CHOICE%"=="Q" exit /b 0
 goto run_web
 
 :run_web
-echo [6/6] 启动Web服务...
+echo [6/6] 预启动隧道服务(加快首次启动速度)...
+call npx -y hostc@latest --help >nul 2>&1
+echo 隧道服务就绪
 
 echo.
 echo ========================================
