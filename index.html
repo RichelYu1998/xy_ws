@@ -1606,7 +1606,7 @@ playwright install chromium</pre>
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cookie" data-func="4" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-refresh"></i> 4. 更新Cookie</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-view-products" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-list"></i> 查看所有商品</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cleaner" data-func="6" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-trash"></i> 6. 文件清理工具</span></button>
-        <button class="btn btn-success btn-lg m-1" id="btn-run-tunnel" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-external-link"></i> 7. 隧道共享</span></button>
+        <button class="btn btn-primary btn-lg m-1" id="btn-run-tunnel" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-external-link"></i> 7. 隧道共享</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-stop-task" style="display: none; min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-stop"></i> 停止</span></button>
     </div>
 
@@ -2682,7 +2682,6 @@ playwright install chromium</pre>
             viewProductsBtn.onclick = showAllProducts;
         }
 
-        // 绑定隧道共享按钮 - 点击直接启动并显示结果
         const tunnelBtn = document.getElementById('btn-run-tunnel');
         if (tunnelBtn) {
             console.log('绑定隧道共享按钮');
@@ -2694,21 +2693,17 @@ playwright install chromium</pre>
             const btn = document.getElementById('btn-run-tunnel');
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 启动中...';
-            
+
             try {
-                // 获取服务器信息
                 const serverRes = await fetch('/api/server/info');
                 const serverData = await serverRes.json();
-                
-                // 启动隧道
+
                 const startRes = await fetch('/api/tunnel/start', { method: 'POST' });
                 const startData = await startRes.json();
-                
-                // 弹出结果显示
+
                 const localUrl = serverData.success ? serverData.local_url : 'http://127.0.0.1:8888';
                 const lanUrl = serverData.success && serverData.lan_url ? serverData.lan_url : '';
-                
-                // 立即显示界面，然后轮询获取公网 URL
+
                 const container = document.getElementById('output-panel');
                 container.style.display = 'block';
                 container.innerHTML = `
@@ -2746,45 +2741,87 @@ playwright install chromium</pre>
                         </div>
                     </div>
                 `;
-                
-                // 轮询获取公网 URL
+
                 let retryCount = 0;
-                const maxRetries = 30;
+                const maxRetries = 120;
                 const pollUrl = setInterval(async () => {
                     retryCount++;
                     try {
                         const statusRes = await fetch('/api/tunnel/status');
                         const statusData = await statusRes.json();
-                        
-                        if (statusData.url && statusData.url !== 'https://tunnel-preview.hostc.dev') {
+
+                        if (statusData.url && statusData.url.startsWith('http')) {
                             clearInterval(pollUrl);
                             const urlContainer = document.getElementById('tunnel-public-url-container');
                             urlContainer.innerHTML = `
-                                <code id="tunnel-public-url">${statusData.url}</code>
-                                <br><small class="d-block mt-1">复制上方链接分享给其他人</small>
+                                <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
+                                    <i class="fa fa-external-link"></i> ${statusData.url}
+                                </a>
+                                <button class="btn btn-sm btn-light ml-2" onclick="copyToClipboard('${statusData.url}')">
+                                    <i class="fa fa-copy"></i> 复制
+                                </button>
                             `;
                         } else if (retryCount >= maxRetries) {
                             clearInterval(pollUrl);
-                            document.getElementById('tunnel-public-url').textContent = startData.url || '获取失败，请稍后刷新页面';
+                            document.getElementById('tunnel-public-url').textContent = '获取失败，请检查网络连接';
                         }
                     } catch (e) {
                         console.error('获取状态失败:', e);
                     }
-                }, 500);
-                
+                }, 1000);
+
                 if (!startData.success) {
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert alert-danger mt-3';
                     alertDiv.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>启动失败:</strong> ' + (startData.error || '未知错误');
                     container.insertBefore(alertDiv, container.firstChild);
                 }
-                
+
             } catch (e) {
                 alert('操作失败: ' + e.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fa fa-external-link"></i> 7. 隧道共享';
             }
+        }
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    showToast('链接已复制到剪贴板');
+                }, function() {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast('链接已复制到剪贴板');
+            } catch (err) {
+                alert('复制失败，请手动复制');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        function showToast(message) {
+            const existing = document.getElementById('copy-toast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.id = 'copy-toast';
+            toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#28a745;color:#fff;padding:10px 20px;border-radius:5px;z-index:9999;font-size:14px;';
+            toast.innerHTML = '<i class="fa fa-check"></i> ' + message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2000);
         }
 
         async function stopTunnelAndReset() {
@@ -2797,7 +2834,8 @@ playwright install chromium</pre>
                 alert('停止失败: ' + e.message);
             }
         }
-        
+
+
         // 绑定货号对比API按钮
         document.querySelectorAll('.btn-sku-api').forEach(function(btn) {
             console.log('绑定货号对比按钮:', btn.id, 'data-api:', btn.getAttribute('data-api'));
@@ -3403,7 +3441,8 @@ playwright install chromium</pre>
                                     <li>点击"启动隧道"按钮，将本地服务暴露到公网</li>
                                     <li>生成公网地址后，可以复制链接分享给其他人</li>
                                     <li>公网地址仅在隧道运行时有效，关闭后会失效</li>
-                                    <li>如果启动失败，请确保已安装 <code>npx hostc@latest</code> 或检查网络连接</li>
+                                    <li>默认使用 <code>hostc</code> 隧道服务</li>
+                                    <li>确保网络连接正常</li>
                                 </ul>
                             </div>
                         </div>

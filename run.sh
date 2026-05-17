@@ -107,7 +107,9 @@ auto_setup() {
 }
 
 run_web() {
-    echo "[6/6] 启动Web服务..."
+    echo "[6/6] 预启动隧道服务(加快首次启动速度)..."
+    npx -y hostc@latest --help >/dev/null 2>&1
+    echo "隧道服务就绪"
 
     echo ""
     echo "========================================"
