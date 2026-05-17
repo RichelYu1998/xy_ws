@@ -1606,6 +1606,7 @@ playwright install chromium</pre>
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cookie" data-func="4" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-refresh"></i> 4. 更新Cookie</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-view-products" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-list"></i> 查看所有商品</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cleaner" data-func="6" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-trash"></i> 6. 文件清理工具</span></button>
+        <button class="btn btn-success btn-lg m-1" id="btn-run-tunnel" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-external-link"></i> 7. 隧道共享</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-stop-task" style="display: none; min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-stop"></i> 停止</span></button>
     </div>
 
@@ -2680,6 +2681,122 @@ playwright install chromium</pre>
             console.log('绑定查看所有商品按钮');
             viewProductsBtn.onclick = showAllProducts;
         }
+
+        // 绑定隧道共享按钮 - 点击直接启动并显示结果
+        const tunnelBtn = document.getElementById('btn-run-tunnel');
+        if (tunnelBtn) {
+            console.log('绑定隧道共享按钮');
+            tunnelBtn.onclick = startTunnelAndShow;
+        }
+
+        // 一键启动隧道并显示结果
+        async function startTunnelAndShow() {
+            const btn = document.getElementById('btn-run-tunnel');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 启动中...';
+            
+            try {
+                // 获取服务器信息
+                const serverRes = await fetch('/api/server/info');
+                const serverData = await serverRes.json();
+                
+                // 启动隧道
+                const startRes = await fetch('/api/tunnel/start', { method: 'POST' });
+                const startData = await startRes.json();
+                
+                // 弹出结果显示
+                const localUrl = serverData.success ? serverData.local_url : 'http://127.0.0.1:8888';
+                const lanUrl = serverData.success && serverData.lan_url ? serverData.lan_url : '';
+                
+                // 立即显示界面，然后轮询获取公网 URL
+                const container = document.getElementById('output-panel');
+                container.style.display = 'block';
+                container.innerHTML = `
+                    <div class="card mt-3">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fa fa-check-circle"></i> 隧道已启动</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label><strong><i class="fa fa-desktop"></i> 本地地址:</strong></label>
+                                <div class="p-2 bg-light rounded">
+                                    <code>${localUrl}</code>
+                                </div>
+                            </div>
+                            ${lanUrl ? `
+                            <div class="form-group">
+                                <label><strong><i class="fa fa-wifi"></i> 局域网地址:</strong></label>
+                                <div class="p-2 bg-light rounded">
+                                    <code>${lanUrl}</code>
+                                    <small class="text-muted d-block">同一网络下的设备可访问</small>
+                                </div>
+                            </div>
+                            ` : ''}
+                            <div class="form-group">
+                                <label><strong><i class="fa fa-globe"></i> 公网地址:</strong></label>
+                                <div class="p-2 bg-success text-white rounded" id="tunnel-public-url-container">
+                                    <i class="fa fa-spinner fa-spin"></i> <span id="tunnel-public-url">获取中...</span>
+                                </div>
+                            </div>
+                            <div class="text-center mt-3">
+                                <button class="btn btn-danger" onclick="stopTunnelAndReset()">
+                                    <i class="fa fa-stop"></i> 停止隧道
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // 轮询获取公网 URL
+                let retryCount = 0;
+                const maxRetries = 30;
+                const pollUrl = setInterval(async () => {
+                    retryCount++;
+                    try {
+                        const statusRes = await fetch('/api/tunnel/status');
+                        const statusData = await statusRes.json();
+                        
+                        if (statusData.url && statusData.url !== 'https://tunnel-preview.hostc.dev') {
+                            clearInterval(pollUrl);
+                            const urlContainer = document.getElementById('tunnel-public-url-container');
+                            urlContainer.innerHTML = `
+                                <code id="tunnel-public-url">${statusData.url}</code>
+                                <br><small class="d-block mt-1">复制上方链接分享给其他人</small>
+                            `;
+                        } else if (retryCount >= maxRetries) {
+                            clearInterval(pollUrl);
+                            document.getElementById('tunnel-public-url').textContent = startData.url || '获取失败，请稍后刷新页面';
+                        }
+                    } catch (e) {
+                        console.error('获取状态失败:', e);
+                    }
+                }, 500);
+                
+                if (!startData.success) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-danger mt-3';
+                    alertDiv.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>启动失败:</strong> ' + (startData.error || '未知错误');
+                    container.insertBefore(alertDiv, container.firstChild);
+                }
+                
+            } catch (e) {
+                alert('操作失败: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa fa-external-link"></i> 7. 隧道共享';
+            }
+        }
+
+        async function stopTunnelAndReset() {
+            try {
+                await fetch('/api/tunnel/stop', { method: 'POST' });
+                const panel = document.getElementById('output-panel');
+                panel.style.display = 'none';
+                panel.innerHTML = '';
+            } catch (e) {
+                alert('停止失败: ' + e.message);
+            }
+        }
         
         // 绑定货号对比API按钮
         document.querySelectorAll('.btn-sku-api').forEach(function(btn) {
@@ -3150,6 +3267,155 @@ playwright install chromium</pre>
                 btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
             });
         }
+        
+        // ==================== Hostc Tunnel ====================
+        function initHostcTunnel() {
+            loadServerInfo();
+            checkTunnelStatus();
+            setInterval(checkTunnelStatus, 5000);
+        }
+
+        async function loadServerInfo() {
+            try {
+                const response = await fetch('/api/server/info');
+                const data = await response.json();
+                if (data.success) {
+                    document.getElementById('tunnel-local-url').textContent = data.local_url;
+                    if (data.lan_url) {
+                        document.getElementById('tunnel-lan-url').textContent = data.lan_url;
+                        document.getElementById('tunnel-lan-url').parentElement.style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                console.error('获取服务器信息失败:', e);
+            }
+        }
+
+        async function checkTunnelStatus() {
+            try {
+                const response = await fetch('/api/tunnel/status');
+                const data = await response.json();
+                updateTunnelUI(data.running, data.url);
+            } catch (e) {
+                console.error('检查隧道状态失败:', e);
+            }
+        }
+
+        function updateTunnelUI(running, url) {
+            const btn = document.getElementById('btn-toggle-tunnel');
+            const status = document.getElementById('tunnel-status');
+            const urlDisplay = document.getElementById('tunnel-public-url');
+            
+            if (running) {
+                btn.className = 'btn btn-danger';
+                btn.innerHTML = '<i class="fa fa-stop"></i> 停止隧道';
+                btn.disabled = false;
+                status.innerHTML = '<span class="badge badge-success"><i class="fa fa-circle"></i> 已连接</span>';
+                if (url) {
+                    urlDisplay.innerHTML = `<a href="${url}" target="_blank" class="text-primary font-weight-bold">${url}</a>`;
+                    urlDisplay.parentElement.style.display = 'block';
+                }
+            } else {
+                btn.className = 'btn btn-success';
+                btn.innerHTML = '<i class="fa fa-play"></i> 启动隧道';
+                btn.disabled = false;
+                status.innerHTML = '<span class="badge badge-secondary"><i class="fa fa-circle"></i> 未连接</span>';
+                urlDisplay.parentElement.style.display = 'none';
+            }
+        }
+
+        async function toggleTunnel() {
+            const btn = document.getElementById('btn-toggle-tunnel');
+            const status = document.getElementById('tunnel-status');
+            btn.disabled = true;
+            status.innerHTML = '<span class="badge badge-warning"><i class="fa fa-spinner fa-spin"></i> 处理中...</span>';
+            
+            try {
+                const response = await fetch('/api/tunnel/status');
+                const data = await response.json();
+                
+                if (data.running) {
+                    await fetch('/api/tunnel/stop', { method: 'POST' });
+                    updateTunnelUI(false);
+                } else {
+                    const startRes = await fetch('/api/tunnel/start', { method: 'POST' });
+                    const startData = await startRes.json();
+                    if (startData.success) {
+                        updateTunnelUI(true, startData.url);
+                    } else {
+                        alert('启动失败: ' + (startData.error || '未知错误'));
+                        updateTunnelUI(false);
+                    }
+                }
+            } catch (e) {
+                alert('操作失败: ' + e.message);
+                checkTunnelStatus();
+            }
+        }
+
+        function showTunnelSection() {
+            const container = document.getElementById('content-container');
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0"><i class="fa fa-external-link"></i> 隧道共享</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="info-section mb-4">
+                                    <h5><i class="fa fa-server"></i> 本地服务</h5>
+                                    <div class="alert alert-info mb-2">
+                                        <i class="fa fa-desktop"></i> <strong>本地地址:</strong> 
+                                        <span id="tunnel-local-url" class="font-weight-bold">加载中...</span>
+                                    </div>
+                                    <div class="alert alert-info" style="display: none;">
+                                        <i class="fa fa-globe"></i> <strong>局域网地址:</strong> 
+                                        <span id="tunnel-lan-url" class="font-weight-bold"></span>
+                                        <small class="text-muted ml-2">(同一网络下的设备可访问)</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="info-section mb-4">
+                                    <h5><i class="fa fa-cloud"></i> 公网隧道</h5>
+                                    <div id="tunnel-status-display" class="mb-2">
+                                        <span id="tunnel-status"><span class="badge badge-secondary"><i class="fa fa-circle"></i> 未连接</span></span>
+                                    </div>
+                                    <div class="alert alert-success" id="tunnel-url-section" style="display: none;">
+                                        <i class="fa fa-link"></i> <strong>公网地址:</strong><br>
+                                        <span id="tunnel-public-url"></span>
+                                        <small class="text-muted d-block mt-1">复制链接分享给其他人，他们可以通过这个地址访问你的本地服务</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="text-center">
+                            <button id="btn-toggle-tunnel" class="btn btn-success btn-lg" onclick="toggleTunnel()">
+                                <i class="fa fa-play"></i> 启动隧道
+                            </button>
+                        </div>
+                        <div class="mt-4">
+                            <div class="alert alert-warning">
+                                <i class="fa fa-info-circle"></i> <strong>使用说明:</strong>
+                                <ul class="mb-0 mt-2">
+                                    <li>点击"启动隧道"按钮，将本地服务暴露到公网</li>
+                                    <li>生成公网地址后，可以复制链接分享给其他人</li>
+                                    <li>公网地址仅在隧道运行时有效，关闭后会失效</li>
+                                    <li>如果启动失败，请确保已安装 <code>npx hostc@latest</code> 或检查网络连接</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            loadServerInfo();
+            checkTunnelStatus();
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', initHostcTunnel);
         
     </script>
 </body>
