@@ -113,12 +113,24 @@ run_web() {
 
     echo ""
     echo "========================================"
-    echo "启动Web服务..."
-    echo "访问地址: http://localhost:8888"
+    echo "启动Web服务和隧道..."
     echo "========================================"
 
     source "$VENV_PATH/bin/activate"
+
+    # 后台启动 hostc 隧道并保存URL
+    echo "正在启动隧道服务（公网URL会保存到 file/tunnel_url.txt）..."
+    npx -y hostc@latest 8888 > file/tunnel_url.txt 2>&1 &
+    HOSTC_PID=$!
+
+    # 启动 Flask Web 服务
+    echo ""
+    echo "正在启动 Web 服务..."
+    echo ""
     $PYTHON_CMD main.py --web
+
+    # Flask 退出时清理 hostc 进程
+    kill $HOSTC_PID 2>/dev/null
     deactivate
 }
 

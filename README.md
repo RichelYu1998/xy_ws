@@ -20,7 +20,8 @@ bash run.sh
 - ✅ 检测/创建虚拟环境
 - ✅ 安装依赖
 - ✅ 检测配置文件（首次使用自动从模板复制）
-- ✅ 启动Web服务
+- ✅ 启动 Web 服务
+- ✅ 启动 hostc 隧道（公网 URL 保存到 `file/tunnel_url.txt`）
 
 首次使用会提示编辑配置文件，填写用户名、密码、目标URL和Cookie信息。
 
@@ -31,6 +32,12 @@ bash run.sh
 - `config.json` - 主配置文件，包含登录信息、目标URL、滚动配置、HTTP头和Cookies
 - `cookies.json` - Cookies数据文件
 - `input_stock_numbers.txt` - 输入的货号列表
+
+### file 目录
+
+- `tunnel_url.txt` - hostc 隧道公网 URL（启动后自动生成）
+
+> 💡 **提示**：查看 `file/tunnel_url.txt` 获取公网访问地址
 
 > ⚠️ **注意**：配置文件包含敏感信息，请勿分享给他人。
 
