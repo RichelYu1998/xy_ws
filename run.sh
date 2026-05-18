@@ -35,7 +35,7 @@ detect_venv() {
         VENV_EXISTS=1
         VENV_PATH=".venv"
     else
-        echo "未检测到虚拟环境，将创建"
+        echo "未检测到虚拟环境"
         VENV_EXISTS=0
         VENV_PATH=""
     fi
@@ -81,14 +81,14 @@ auto_setup() {
 
     if [ -f "config/config.json.example" ]; then
         cp -f config/config.json.example config/config.json
-        echo "✓ config.json 已创建"
+        echo "[OK] config.json 已创建"
     else
-        echo "⚠ config.json.example 不存在"
+        echo "[WARNING] config.json.example 不存在"
     fi
 
     if [ -f "config/cookies.json.example" ]; then
         cp -f config/cookies.json.example config/cookies.json
-        echo "✓ cookies.json 已创建"
+        echo "[OK] cookies.json 已创建"
     fi
 
     echo ""
@@ -116,36 +116,23 @@ run_web() {
     echo "启动Web服务和隧道..."
     echo "========================================"
 
-    source "$VENV_PATH/bin/activate"
-
-    # 后台启动 Flask Web 服务
     echo ""
     echo "正在启动 Web 服务..."
     echo ""
     $PYTHON_CMD main.py --web &
     FLASK_PID=$!
 
-    # 等待 Flask 启动（需要几秒初始化）
     echo "等待 Web 服务启动完成..."
     sleep 5
 
-    # 检查 Flask 是否已启动
-    while true; do
-        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8888 2>/dev/null)
-        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
-            break
-        fi
-        sleep 2
-    done
-
-    echo "Web 服务已就绪 (HTTP $HTTP_CODE)，正在启动隧道..."
+    echo "Web 服务已就绪，正在启动隧道..."
+    mkdir -p file
     npx -y hostc@latest 8888 > file/tunnel_url.txt 2>&1 &
     HOSTC_PID=$!
 
-    # 等待 Flask 进程结束
-    wait $FLASK_PID
+    trap 'kill $FLASK_PID $HOSTC_PID 2>/dev/null; deactivate 2>/dev/null; exit 0' INT TERM
 
-    # 清理 hostc 进程
+    wait $FLASK_PID
     kill $HOSTC_PID 2>/dev/null
     deactivate
 }

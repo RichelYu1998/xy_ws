@@ -975,8 +975,29 @@ if Environment.IS_WINDOWS:
 else:
     print_func = print
 
-# 使用Environment类的VENV_PYTHON
-VENV_PYTHON = Environment.get_venv_python()
+# 使用Environment类的VENV_PYTHON，自动创建虚拟环境
+def get_python_executable():
+    """获取Python可执行文件路径，优先使用虚拟环境，不存在则创建"""
+    venv_python = Environment.get_venv_python()
+    if os.path.exists(venv_python):
+        return venv_python
+    # 虚拟环境不存在，创建它
+    print(f"虚拟环境不存在，正在创建...")
+    try:
+        import sys
+        subprocess.run(
+            [sys.executable, '-m', 'venv', '.venv'],
+            check=True,
+            capture_output=True
+        )
+        print(f"虚拟环境创建成功: .venv")
+        return venv_python
+    except Exception as e:
+        print(f"创建虚拟环境失败: {e}")
+        # 创建失败，fallback到系统Python
+        return 'python' if Environment.IS_WINDOWS else 'python3'
+
+VENV_PYTHON = get_python_executable()
 
 app = Flask(__name__, template_folder='.', static_folder=None)
 
@@ -1025,8 +1046,8 @@ def run_command_background(task_id, command):
         
         stdout_lines = []
         # 使用非阻塞读取
-        import select
-        import sys
+        if not Environment.IS_WINDOWS:
+            import select
         
         while True:
             # 检查进程是否结束
