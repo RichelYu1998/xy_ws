@@ -43,7 +43,26 @@ bash run.sh
 
 ## 更新日志
 
-### v3.1.2 (2026-05-18)
+### v3.1.3 (2026-05-18)
+- **跨系统兼容性增强**
+  - 统一 `run.bat` 和 `run.sh` 的逻辑流程，确保功能完全一致
+  - 两个脚本都支持：Python检测 → 虚拟环境检测/创建 → 安装依赖 → 配置检测 → Web服务 → 隧道启动
+  - 修复 `run.sh` 中重复激活虚拟环境的问题
+  - 修复 `run.bat` 中缺少 HTTP 状态检查的问题
+  - 统一 emoji 为 ASCII 字符，确保 Windows 命令行兼容性
+- **虚拟环境自动创建**
+  - `main.py` 启动时自动检测虚拟环境，不存在时自动创建
+  - 使用当前 Python 解释器创建 `.venv` 虚拟环境
+  - 创建失败时才 fallback 到系统 Python
+  - 确保所有操作都在虚拟环境中执行
+- **进程清理逻辑完善**
+  - `run.sh` 使用 `trap` 信号处理，捕获 INT/TERM 信号自动清理进程
+  - `run.bat` 添加 `:cleanup_exit` 标签，支持 Q 退出时清理进程
+  - 用户输入 Q 或关闭窗口时会正确终止所有子进程
+- **代码质量提升**
+  - 修复 Windows 上 `import select` 报错问题（select 模块只在 Unix 可用）
+  - `select` 模块只在非 Windows 系统导入
+  - 完善错误处理和用户提示信息
 - **天气时钟看板预加载优化**
   - 移除懒加载（IntersectionObserver），改为页面加载时立即预加载 iframe
   - 移除 `loading="lazy"` 属性，确保 iframe 不延迟加载

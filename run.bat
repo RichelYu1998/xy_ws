@@ -99,14 +99,14 @@ echo 正在复制配置文件模板...
 
 if exist config\config.json.example (
     copy /Y config\config.json.example config\config.json >nul
-    echo ✓ config.json 已创建
+    echo [OK] config.json 已创建
 ) else (
-    echo ⚠ config.json.example 不存在
+    echo [WARNING] config.json.example 不存在
 )
 
 if exist config\cookies.json.example (
     copy /Y config\cookies.json.example config\cookies.json >nul
-    echo ✓ cookies.json 已创建
+    echo [OK] cookies.json 已创建
 )
 
 echo.
@@ -121,14 +121,9 @@ echo   - target_url: 目标URL
 echo   - headers.cookie: Cookie值
 echo   - cookies中的token和sensorsdata值
 echo.
-echo 或运行交互式初始化：
-echo   python setup_config.py --interactive
-echo.
 set /p CHOICE="按回车键启动Web服务，或输入 Q 退出: "
 
-if /i "%CHOICE%"=="Q" exit /b 0
-
-goto run_web
+if /i "%CHOICE%"=="Q" goto cleanup_exit
 
 :run_web
 echo [6/6] 预启动隧道服务(加快首次启动速度)...
@@ -140,20 +135,16 @@ echo ========================================
 echo 启动Web服务和隧道...
 echo ========================================
 
-REM 激活虚拟环境
 call %VENV_PATH%\Scripts\activate.bat
 
-REM 启动 Flask Web 服务（后台运行）
 echo.
 echo 正在启动 Web 服务...
 echo.
 start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web"
 
-REM 等待 Flask 启动（需要几秒初始化）
 echo 等待 Web 服务启动完成...
 timeout /t 5 /nobreak >nul
 
-REM 检查 Flask 是否已启动
 :wait_flask
 for /f %%i in ('curl -s -o nul -w "%%{http_code}" http://localhost:8888') do set "HTTP_CODE=%%i"
 if not "%HTTP_CODE%"=="200" (
@@ -163,7 +154,7 @@ if not "%HTTP_CODE%"=="200" (
     )
 )
 
-echo Web 服务已就绪 (HTTP %HTTP_CODE%)，正在启动隧道...
+echo Web 服务已就绪，正在启动隧道...
 start /b cmd /c "npx -y hostc@latest 8888 > file\tunnel_url.txt 2>&1"
 
 echo.
@@ -171,5 +162,17 @@ echo ========================================
 echo 启动完成！
 echo ========================================
 echo.
-echo 按任意键退出此窗口（服务将继续在后台运行）...
-pause >nul
+echo 注意：服务将继续在后台运行
+echo.
+echo 按 Ctrl+C 停止所有服务，或关闭此窗口后使用:
+echo   taskkill /f /im python.exe
+echo   taskkill /f /im node.exe
+echo.
+
+:cleanup_exit
+echo.
+echo 正在清理进程...
+taskkill /f /im python.exe >nul 2>&1
+taskkill /f /im node.exe >nul 2>&1
+echo 清理完成
+exit /b 0
