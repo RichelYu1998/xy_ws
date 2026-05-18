@@ -3366,6 +3366,17 @@ playwright install chromium</pre>
                         document.getElementById('tunnel-lan-url').textContent = data.lan_url;
                         document.getElementById('tunnel-lan-url').parentElement.style.display = 'block';
                     }
+                    // 更新页面版本号
+                    if (data.version) {
+                        document.querySelectorAll('.badge-version, .page-version').forEach(el => {
+                            el.textContent = '版本: ' + data.version;
+                        });
+                        document.querySelectorAll('p.text-muted').forEach(el => {
+                            if (el.textContent.includes('版本:')) {
+                                el.textContent = '版本: ' + data.version;
+                            }
+                        });
+                    }
                 }
             } catch (e) {
                 console.error('获取服务器信息失败:', e);

@@ -4279,7 +4279,8 @@ if __name__ == '__main__':
                 'local_url': f'http://127.0.0.1:{port}',
                 'lan_url': f'http://{lan_ip}:{port}' if lan_ip else None,
                 'lan_ip': lan_ip,
-                'port': port
+                'port': port,
+                'version': VERSION
             })
 
         # ==================== Tunnel API ====================
