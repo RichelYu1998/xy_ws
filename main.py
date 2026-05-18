@@ -3578,9 +3578,10 @@ if __name__ == '__main__':
     if args.web:
         @app.route('/')
         def index():
+            current_version = get_version_from_readme()
             with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
                 content = f.read()
-            content = content.replace('版本: 3.0.9', f'版本: {VERSION}')
+            content = content.replace('版本: 3.0.9', f'版本: {current_version}')
             response = Response(content, mimetype='text/html')
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response.headers['Pragma'] = 'no-cache'
@@ -4293,6 +4294,10 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
+        @app.route('/api/version', methods=['GET'])
+        def get_version():
+            return jsonify({'version': get_version_from_readme()})
+
         @app.route('/api/server/info', methods=['GET'])
         def get_server_info():
             import socket
@@ -4314,7 +4319,7 @@ if __name__ == '__main__':
                 'lan_url': f'http://{lan_ip}:{port}' if lan_ip else None,
                 'lan_ip': lan_ip,
                 'port': port,
-                'version': VERSION
+                'version': get_version_from_readme()
             })
 
         # ==================== Tunnel API ====================
