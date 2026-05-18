@@ -2738,6 +2738,31 @@ playwright install chromium</pre>
                     </div>
                 `;
 
+                document.addEventListener('click', function(e) {
+                    if (e.target.closest('.btn-copy-tunnel-url')) {
+                        const btn = e.target.closest('.btn-copy-tunnel-url');
+                        const url = btn.getAttribute('data-url');
+                        if (url) {
+                            const textarea = document.createElement('textarea');
+                            textarea.value = url;
+                            textarea.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+                            document.body.appendChild(textarea);
+                            textarea.select();
+                            try {
+                                document.execCommand('copy');
+                                showToast('链接已复制到剪贴板');
+                                btn.innerHTML = '<i class="fa fa-check"></i> 已复制';
+                                setTimeout(() => {
+                                    btn.innerHTML = '<i class="fa fa-copy"></i> 复制';
+                                }, 2000);
+                            } catch (err) {
+                                showToast('复制失败，请手动选择文本复制');
+                            }
+                            document.body.removeChild(textarea);
+                        }
+                    }
+                });
+
                 let retryCount = 0;
                 const maxRetries = 120;
                 const pollUrl = setInterval(async () => {
@@ -2745,6 +2770,7 @@ playwright install chromium</pre>
                     try {
                         const statusRes = await fetch('/api/tunnel/status');
                         const statusData = await statusRes.json();
+                        console.log('Tunnel status:', statusData);
 
                         if (statusData.url && statusData.url.startsWith('http')) {
                             clearInterval(pollUrl);
@@ -2753,10 +2779,11 @@ playwright install chromium</pre>
                                 <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
                                     <i class="fa fa-external-link"></i> ${statusData.url}
                                 </a>
-                                <button class="btn btn-sm btn-light ml-2" onclick="copyToClipboard('${statusData.url}')">
+                                <button class="btn btn-sm btn-light ml-2 btn-copy-tunnel-url" id="btn-copy-tunnel-url">
                                     <i class="fa fa-copy"></i> 复制
                                 </button>
                             `;
+                            document.getElementById('btn-copy-tunnel-url').dataset.url = statusData.url;
                         } else if (retryCount >= maxRetries) {
                             clearInterval(pollUrl);
                             document.getElementById('tunnel-public-url').textContent = '获取失败，请检查网络连接';
@@ -3328,21 +3355,37 @@ playwright install chromium</pre>
             const status = document.getElementById('tunnel-status');
             const urlDisplay = document.getElementById('tunnel-public-url');
             
-            if (running) {
-                btn.className = 'btn btn-secondary';
-                btn.innerHTML = '<i class="fa fa-check"></i> 隧道运行中';
-                btn.disabled = true;
-                status.innerHTML = '<span class="badge badge-success"><i class="fa fa-circle"></i> 已连接</span>';
+            if (btn) {
+                if (running) {
+                    btn.className = 'btn btn-secondary';
+                    btn.innerHTML = '<i class="fa fa-check"></i> 隧道运行中';
+                    btn.disabled = true;
+                } else {
+                    btn.className = 'btn btn-success';
+                    btn.innerHTML = '<i class="fa fa-play"></i> 启动隧道';
+                    btn.disabled = false;
+                }
+            }
+            
+            if (status) {
+                if (running) {
+                    status.innerHTML = '<span class="badge badge-success"><i class="fa fa-circle"></i> 已连接</span>';
+                } else {
+                    status.innerHTML = '<span class="badge badge-secondary"><i class="fa fa-circle"></i> 未连接</span>';
+                }
+            }
+            
+            if (urlDisplay) {
                 if (url) {
                     urlDisplay.innerHTML = `<a href="${url}" target="_blank" class="text-primary font-weight-bold">${url}</a>`;
-                    urlDisplay.parentElement.style.display = 'block';
+                    if (urlDisplay.parentElement) {
+                        urlDisplay.parentElement.style.display = 'block';
+                    }
+                } else {
+                    if (urlDisplay.parentElement) {
+                        urlDisplay.parentElement.style.display = 'none';
+                    }
                 }
-            } else {
-                btn.className = 'btn btn-success';
-                btn.innerHTML = '<i class="fa fa-play"></i> 启动隧道';
-                btn.disabled = false;
-                status.innerHTML = '<span class="badge badge-secondary"><i class="fa fa-circle"></i> 未连接</span>';
-                urlDisplay.parentElement.style.display = 'none';
             }
         }
 

@@ -4260,7 +4260,7 @@ if __name__ == '__main__':
                 tunnel_url = None
                 
                 tunnel_process = subprocess.Popen(
-                    f'npx hostc@latest {port}',
+                    f'npx hostc@latest {port} --local-host 0.0.0.0',
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -4283,9 +4283,10 @@ if __name__ == '__main__':
                                     for url in urls:
                                         clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
                                         if len(clean_url) > 10 and '.' in clean_url:
-                                            tunnel_url = clean_url
-                                            print(f"[Tunnel] 找到URL: {tunnel_url}")
-                                            break
+                                            if '0.0.0.0' not in clean_url and 'localhost' not in clean_url.lower():
+                                                tunnel_url = clean_url
+                                                print(f"[Tunnel] 找到公网URL: {tunnel_url}")
+                                                break
                         except:
                             pass
                 
