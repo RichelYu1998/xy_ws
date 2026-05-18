@@ -59,10 +59,11 @@ bash run.sh
   - `run.sh` 使用 `trap` 信号处理，捕获 INT/TERM 信号自动清理进程
   - `run.bat` 添加 `:cleanup_exit` 标签，支持 Q 退出时清理进程
   - 用户输入 Q 或关闭窗口时会正确终止所有子进程
-- **代码质量提升**
-  - 修复 Windows 上 `import select` 报错问题（select 模块只在 Unix 可用）
-  - `select` 模块只在非 Windows 系统导入
-  - 完善错误处理和用户提示信息
+- **版本号自动同步**
+  - `main.py` 自动从 `README.md` 解析最新版本号
+  - 只需在 README.md 更新日志顶部添加新版本即可
+  - 无需手动修改 `main.py` 中的 `VERSION` 变量
+  - 前端页面自动显示最新版本号
 - **天气时钟看板预加载优化**
   - 移除懒加载（IntersectionObserver），改为页面加载时立即预加载 iframe
   - 移除 `loading="lazy"` 属性，确保 iframe 不延迟加载
