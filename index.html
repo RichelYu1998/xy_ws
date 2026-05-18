@@ -3430,12 +3430,28 @@ playwright install chromium</pre>
             try {
                 const response = await fetch('/api/tunnel/status');
                 const data = await response.json();
-                
+
                 if (!data.running) {
                     const startRes = await fetch('/api/tunnel/start', { method: 'POST' });
                     const startData = await startRes.json();
                     if (startData.success) {
-                        updateTunnelUI(true, startData.url);
+                        // 如果返回了 URL，直接显示
+                        if (startData.url) {
+                            updateTunnelUI(true, startData.url);
+                        } else {
+                            // 持续轮询直到获取到 URL
+                            const pollInterval = setInterval(async () => {
+                                const statusRes = await fetch('/api/tunnel/status');
+                                const statusData = await statusRes.json();
+                                if (statusData.url) {
+                                    clearInterval(pollInterval);
+                                    updateTunnelUI(true, statusData.url);
+                                }
+                            }, 1000);
+                            // 最多轮询 30 秒
+                            setTimeout(() => clearInterval(pollInterval), 30000);
+                            updateTunnelUI(true, null);
+                        }
                     } else {
                         alert('启动失败: ' + (startData.error || '未知错误'));
                         updateTunnelUI(false);

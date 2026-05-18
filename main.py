@@ -4289,17 +4289,19 @@ if __name__ == '__main__':
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
             global tunnel_process, tunnel_url
-            
+
             if tunnel_process and tunnel_process.poll() is None:
                 return jsonify({'success': True, 'url': tunnel_url, 'message': '隧道已在运行'})
-            
+
             try:
                 import threading
                 import re
-                
+                import time
+
                 port = args.port
                 tunnel_url = None
-                
+                url_ready = False
+
                 tunnel_process = subprocess.Popen(
                     f'npx hostc@latest {port} --local-host 0.0.0.0',
                     stdout=subprocess.PIPE,
@@ -4309,9 +4311,9 @@ if __name__ == '__main__':
                     shell=True,
                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
                 )
-                
+
                 def read_output():
-                    global tunnel_url
+                    global tunnel_url, url_ready
                     while True:
                         if tunnel_process and tunnel_process.poll() is not None:
                             break
@@ -4326,18 +4328,26 @@ if __name__ == '__main__':
                                         if len(clean_url) > 10 and '.' in clean_url:
                                             if '0.0.0.0' not in clean_url and 'localhost' not in clean_url.lower():
                                                 tunnel_url = clean_url
+                                                url_ready = True
                                                 print(f"[Tunnel] 找到公网URL: {tunnel_url}")
                                                 break
                         except:
                             pass
-                
+
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
-                
+
+                # 等待 URL 生成，最多等待 15 秒
+                max_wait = 15
+                waited = 0
+                while not url_ready and waited < max_wait:
+                    time.sleep(0.5)
+                    waited += 0.5
+
                 return jsonify({
-                    'success': True, 
+                    'success': True,
                     'url': tunnel_url or '',
-                    'message': '隧道启动中，请稍候刷新页面获取最新URL...'
+                    'message': f'隧道已启动{"，URL: " + tunnel_url if tunnel_url else "，URL 正在获取中..."}'
                 })
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
