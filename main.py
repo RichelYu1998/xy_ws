@@ -847,13 +847,27 @@ def run_cleaner():
         input('\n按回车键继续...')
 
 
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def print_separator(char='=', length=60):
     """打印分隔线"""
     print(char * length)
 
-VERSION = "3.1.3"
+def get_version_from_readme():
+    """从 README.md 自动解析最新版本号"""
+    readme_path = os.path.join(PROJECT_DIR, 'README.md')
+    try:
+        with open(readme_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        import re
+        match = re.search(r'###\s+v(\d+\.\d+\.\d+)', content)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return "0.0.0"
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+VERSION = get_version_from_readme()
 
 # 统一环境检测类
 class Environment:
