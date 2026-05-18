@@ -851,7 +851,7 @@ def print_separator(char='=', length=60):
     """打印分隔线"""
     print(char * length)
 
-VERSION = "3.1.2"
+VERSION = "3.1.3"
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
