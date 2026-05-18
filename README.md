@@ -44,6 +44,10 @@ bash run.sh
 ## 更新日志
 
 ### v3.1.2 (2026-05-18)
+- **天气时钟看板预加载优化**
+  - 移除懒加载（IntersectionObserver），改为页面加载时立即预加载 iframe
+  - 移除 `loading="lazy"` 属性，确保 iframe 不延迟加载
+  - 公网访问时天气模块加载速度大幅提升，特别是移动端
 - **版本号自动同步**
   - 前端页面版本号现在从后端 API 实时获取
   - 修改 `main.py` 中的 `VERSION` 变量后，刷新页面自动显示新版本号
@@ -58,11 +62,6 @@ bash run.sh
   - 确保 Flask Web 服务完全启动后再启动 hostc 隧道
   - 使用 curl 检测 HTTP 状态码，等待返回 200 或 302 才启动隧道
   - 彻底解决 502 Bad Gateway 错误
-- **天气时钟看板性能优化**
-  - 添加懒加载功能，使用 IntersectionObserver 按需加载 iframe
-  - 添加 loading 动画和提示文字，提升用户体验
-  - 首次加载时显示渐变背景 + 旋转云图标 + 加载提示
-  - 加载完成后平滑淡入显示内容
 - **静态资源传输优化**
   - 为 `/dist` 路由添加 Gzip 压缩支持（JS/CSS/HTML/SVG）
   - 添加浏览器缓存头 `Cache-Control: max-age=86400`

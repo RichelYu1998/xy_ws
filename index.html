@@ -1458,7 +1458,6 @@
                             data-src="/dist/index.html"
                             style="width: 100%; border: none; background: #fff; opacity: 0; position: relative; z-index: 0;"
                             title="天气时钟看板"
-                            loading="lazy"
                             onload="this.style.opacity='1'; document.getElementById('weather-loading').style.display='none';">
                         </iframe>
                     </div>
@@ -1885,23 +1884,14 @@ playwright install chromium</pre>
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM加载完成，开始绑定按钮事件...');
 
-            // 懒加载天气 iframe
+            // 预加载天气 iframe（不等滚动触发）
             const weatherIframe = document.getElementById('weather-iframe');
             if (weatherIframe) {
-                const observer = new IntersectionObserver(function(entries) {
-                    entries.forEach(function(entry) {
-                        if (entry.isIntersecting) {
-                            const src = weatherIframe.getAttribute('data-src');
-                            if (src) {
-                                weatherIframe.src = src;
-                                weatherIframe.removeAttribute('data-src');
-                            }
-                            observer.unobserve(entry.target);
-                        }
-                    });
-                }, { threshold: 0.1 });
-
-                observer.observe(weatherIframe);
+                const src = weatherIframe.getAttribute('data-src');
+                if (src) {
+                    weatherIframe.src = src;
+                    weatherIframe.removeAttribute('data-src');
+                }
             }
 
             // 执行设备检测和样式适配
