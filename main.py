@@ -851,7 +851,7 @@ def print_separator(char='=', length=60):
     """打印分隔线"""
     print(char * length)
 
-VERSION = "2.8.0"
+VERSION = "3.1.1"
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -3546,6 +3546,7 @@ if __name__ == '__main__':
         def index():
             with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
                 content = f.read()
+            content = content.replace('版本: 3.0.9', f'版本: {VERSION}')
             response = Response(content, mimetype='text/html')
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response.headers['Pragma'] = 'no-cache'
