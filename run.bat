@@ -155,7 +155,7 @@ if not "%HTTP_CODE%"=="200" (
 )
 
 echo Web 服务已就绪，正在启动隧道...
-start /b cmd /c "npx -y hostc@latest 8888 > file\tunnel_url.txt 2>&1"
+start /b cmd /c "npx -y hostc@latest 8888 --local-host 127.0.0.1 > file\tunnel_url.txt 2>&1"
 
 echo.
 echo ========================================

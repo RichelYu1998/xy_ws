@@ -3377,16 +3377,17 @@ playwright install chromium</pre>
             try {
                 const response = await fetch('/api/tunnel/status');
                 const data = await response.json();
-                updateTunnelUI(data.running, data.url);
+                updateTunnelUI(data.running, data.url, data.auto_restart, data.restart_count, data.last_error);
             } catch (e) {
                 console.error('检查隧道状态失败:', e);
             }
         }
 
-        function updateTunnelUI(running, url) {
+        function updateTunnelUI(running, url, autoRestart, restartCount, lastError) {
             const btn = document.getElementById('btn-toggle-tunnel');
             const status = document.getElementById('tunnel-status');
             const urlDisplay = document.getElementById('tunnel-public-url');
+            const restartInfo = document.getElementById('tunnel-restart-info');
             
             if (btn) {
                 if (running) {
@@ -3404,7 +3405,11 @@ playwright install chromium</pre>
                 if (running) {
                     status.innerHTML = '<span class="badge badge-success"><i class="fa fa-circle"></i> 已连接</span>';
                 } else {
-                    status.innerHTML = '<span class="badge badge-secondary"><i class="fa fa-circle"></i> 未连接</span>';
+                    if (restartCount > 0) {
+                        status.innerHTML = '<span class="badge badge-warning"><i class="fa fa-refresh fa-spin"></i> 正在重连...</span>';
+                    } else {
+                        status.innerHTML = '<span class="badge badge-secondary"><i class="fa fa-circle"></i> 未连接</span>';
+                    }
                 }
             }
             
@@ -3418,6 +3423,22 @@ playwright install chromium</pre>
                     if (urlDisplay.parentElement) {
                         urlDisplay.parentElement.style.display = 'none';
                     }
+                }
+            }
+            
+            if (restartInfo) {
+                if (restartCount > 0 || lastError) {
+                    let infoHtml = '';
+                    if (restartCount > 0) {
+                        infoHtml += `<span class="text-info"><i class="fa fa-refresh"></i> 已自动重连 ${restartCount} 次</span>`;
+                    }
+                    if (lastError) {
+                        infoHtml += `<br><small class="text-muted">最近错误: ${lastError}</small>`;
+                    }
+                    restartInfo.innerHTML = infoHtml;
+                    restartInfo.style.display = 'block';
+                } else {
+                    restartInfo.style.display = 'none';
                 }
             }
         }
@@ -3492,6 +3513,7 @@ playwright install chromium</pre>
                                     <h5><i class="fa fa-cloud"></i> 公网隧道</h5>
                                     <div id="tunnel-status-display" class="mb-2">
                                         <span id="tunnel-status"><span class="badge badge-secondary"><i class="fa fa-circle"></i> 未连接</span></span>
+                                        <div id="tunnel-restart-info" class="mt-1" style="display: none;"></div>
                                     </div>
                                     <div class="alert alert-success" id="tunnel-url-section" style="display: none;">
                                         <i class="fa fa-link"></i> <strong>公网地址:</strong><br>
