@@ -4322,13 +4322,139 @@ if __name__ == '__main__':
                 'version': get_version_from_readme()
             })
 
-        # ==================== Tunnel API ====================
         tunnel_process = None
         tunnel_url = None
-
+        tunnel_auto_restart = True
+        tunnel_restart_thread = None
+        tunnel_last_error = None
+        tunnel_restart_count = 0
+        tunnel_max_restart_count = 1000
+        tunnel_restart_delay = 1
+        tunnel_heartbeat_thread = None
+        tunnel_last_heartbeat = 0
+        
+        def send_heartbeat():
+            global tunnel_url, tunnel_last_heartbeat
+            if not tunnel_url:
+                return
+            try:
+                import urllib.request
+                req = urllib.request.Request(tunnel_url, method='HEAD')
+                req.add_header('User-Agent', 'hostc-heartbeat/1.0')
+                urllib.request.urlopen(req, timeout=5)
+                tunnel_last_heartbeat = time.time()
+            except:
+                pass
+        
+        def heartbeat_loop():
+            global tunnel_process, tunnel_auto_restart
+            while tunnel_auto_restart:
+                if tunnel_process and tunnel_process.poll() is None:
+                    send_heartbeat()
+                time.sleep(30)
+        
+        def restart_tunnel():
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count
+            
+            while tunnel_auto_restart and tunnel_restart_count < tunnel_max_restart_count:
+                if tunnel_process and tunnel_process.poll() is None:
+                    time.sleep(1)
+                    continue
+                
+                if not tunnel_auto_restart:
+                    break
+                
+                tunnel_restart_count += 1
+                print(f"[Tunnel] 检测到隧道断开，正在尝试重启 ({tunnel_restart_count}/{tunnel_max_restart_count})...")
+                
+                if tunnel_process:
+                    try:
+                        tunnel_process.terminate()
+                        tunnel_process.wait(timeout=2)
+                    except:
+                        try:
+                            tunnel_process.kill()
+                        except:
+                            pass
+                
+                tunnel_process = None
+                
+                time.sleep(tunnel_restart_delay)
+                
+                if not tunnel_auto_restart:
+                    break
+                
+                try:
+                    port = args.port
+                    tunnel_url = None
+                    url_ready = False
+                    new_tunnel_process = None
+                    
+                    new_tunnel_process = subprocess.Popen(
+                        f'npx hostc@latest {port} --local-host 127.0.0.1',
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=0,
+                        shell=True,
+                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
+                    )
+                    
+                    new_tunnel_process_local = new_tunnel_process
+                    new_url_ready = False
+                    new_tunnel_url = None
+                    
+                    def read_new_output():
+                        nonlocal new_url_ready, new_tunnel_url
+                        while True:
+                            if new_tunnel_process_local and new_tunnel_process_local.poll() is not None:
+                                break
+                            try:
+                                line = new_tunnel_process_local.stdout.readline()
+                                if line:
+                                    print(f"[Tunnel] {line.strip()}")
+                                    if 'https://' in line or 'http://' in line:
+                                        urls = re.findall(r'https?://[^\s<>"\']+', line)
+                                        for url in urls:
+                                            clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
+                                            if len(clean_url) > 10 and '.' in clean_url:
+                                                if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
+                                                    new_tunnel_url = clean_url
+                                                    new_url_ready = True
+                                                    print(f"[Tunnel] 重启后找到公网URL: {new_tunnel_url}")
+                                                    break
+                            except:
+                                pass
+                    
+                    read_thread = threading.Thread(target=read_new_output, daemon=True)
+                    read_thread.start()
+                    
+                    wait_start = time.time()
+                    while not new_url_ready and time.time() - wait_start < 15:
+                        time.sleep(0.5)
+                    
+                    if new_url_ready:
+                        tunnel_process = new_tunnel_process
+                        tunnel_url = new_tunnel_url
+                        tunnel_last_error = None
+                        print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
+                    else:
+                        tunnel_last_error = "启动超时"
+                        try:
+                            new_tunnel_process.terminate()
+                        except:
+                            pass
+                        
+                except Exception as e:
+                    tunnel_last_error = str(e)
+                    print(f"[Tunnel] 重启失败: {e}")
+            
+            if tunnel_restart_count >= tunnel_max_restart_count:
+                print(f"[Tunnel] 已达到最大重启次数 ({tunnel_max_restart_count})，停止自动重启")
+        
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
-            global tunnel_process, tunnel_url
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error
 
             if tunnel_process and tunnel_process.poll() is None:
                 return jsonify({'success': True, 'url': tunnel_url, 'message': '隧道已在运行'})
@@ -4341,9 +4467,12 @@ if __name__ == '__main__':
                 port = args.port
                 tunnel_url = None
                 url_ready = False
+                tunnel_last_error = None
+                tunnel_restart_count = 0
+                tunnel_auto_restart = True
 
                 tunnel_process = subprocess.Popen(
-                    f'npx hostc@latest {port} --local-host 0.0.0.0',
+                    f'npx hostc@latest {port} --local-host 127.0.0.1',
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -4366,7 +4495,7 @@ if __name__ == '__main__':
                                     for url in urls:
                                         clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
                                         if len(clean_url) > 10 and '.' in clean_url:
-                                            if '0.0.0.0' not in clean_url and 'localhost' not in clean_url.lower():
+                                            if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
                                                 tunnel_url = clean_url
                                                 url_ready = True
                                                 print(f"[Tunnel] 找到公网URL: {tunnel_url}")
@@ -4377,7 +4506,12 @@ if __name__ == '__main__':
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
 
-                # 等待 URL 生成，最多等待 15 秒
+                tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
+                tunnel_restart_thread.start()
+                
+                tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+                tunnel_heartbeat_thread.start()
+
                 max_wait = 15
                 waited = 0
                 while not url_ready and waited < max_wait:
@@ -4394,17 +4528,25 @@ if __name__ == '__main__':
 
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():
-            global tunnel_process, tunnel_url
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat
             
             if tunnel_process and tunnel_process.poll() is None:
                 return jsonify({
                     'running': True,
-                    'url': tunnel_url
+                    'url': tunnel_url,
+                    'auto_restart': tunnel_auto_restart,
+                    'restart_count': tunnel_restart_count,
+                    'last_error': tunnel_last_error,
+                    'last_heartbeat': tunnel_last_heartbeat
                 })
             else:
                 return jsonify({
                     'running': False,
-                    'url': None
+                    'url': None,
+                    'auto_restart': tunnel_auto_restart,
+                    'restart_count': tunnel_restart_count,
+                    'last_error': tunnel_last_error,
+                    'last_heartbeat': tunnel_last_heartbeat
                 })
 
         # 启动前获取一次局域网 IP 用于显示

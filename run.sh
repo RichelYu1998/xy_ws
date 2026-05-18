@@ -136,7 +136,7 @@ run_web() {
 
     echo "Web 服务已就绪，正在启动隧道..."
     mkdir -p file
-    npx -y hostc@latest 8888 > file/tunnel_url.txt 2>&1 &
+    npx -y hostc@latest 8888 --local-host 127.0.0.1 > file/tunnel_url.txt 2>&1 &
     HOSTC_PID=$!
 
     trap 'kill $FLASK_PID $HOSTC_PID 2>/dev/null; deactivate 2>/dev/null; exit 0' INT TERM
