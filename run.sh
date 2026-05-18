@@ -118,18 +118,34 @@ run_web() {
 
     source "$VENV_PATH/bin/activate"
 
-    # 后台启动 hostc 隧道并保存URL
-    echo "正在启动隧道服务（公网URL会保存到 file/tunnel_url.txt）..."
-    npx -y hostc@latest 8888 > file/tunnel_url.txt 2>&1 &
-    HOSTC_PID=$!
-
-    # 启动 Flask Web 服务
+    # 后台启动 Flask Web 服务
     echo ""
     echo "正在启动 Web 服务..."
     echo ""
-    $PYTHON_CMD main.py --web
+    $PYTHON_CMD main.py --web &
+    FLASK_PID=$!
 
-    # Flask 退出时清理 hostc 进程
+    # 等待 Flask 启动（需要几秒初始化）
+    echo "等待 Web 服务启动完成..."
+    sleep 5
+
+    # 检查 Flask 是否已启动
+    while true; do
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8888 2>/dev/null)
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+            break
+        fi
+        sleep 2
+    done
+
+    echo "Web 服务已就绪 (HTTP $HTTP_CODE)，正在启动隧道..."
+    npx -y hostc@latest 8888 > file/tunnel_url.txt 2>&1 &
+    HOSTC_PID=$!
+
+    # 等待 Flask 进程结束
+    wait $FLASK_PID
+
+    # 清理 hostc 进程
     kill $HOSTC_PID 2>/dev/null
     deactivate
 }

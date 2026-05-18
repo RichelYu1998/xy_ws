@@ -143,12 +143,33 @@ echo ========================================
 REM 激活虚拟环境
 call %VENV_PATH%\Scripts\activate.bat
 
-REM 启动隧道服务到后台并保存URL
-echo 正在启动隧道服务（公网URL会保存到 file\tunnel_url.txt）...
-start /b cmd /c "npx -y hostc@latest 8888 > file\tunnel_url.txt 2>&1"
-
-REM 启动 Flask Web 服务
+REM 启动 Flask Web 服务（后台运行）
 echo.
 echo 正在启动 Web 服务...
 echo.
-python main.py --web
+start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web"
+
+REM 等待 Flask 启动（需要几秒初始化）
+echo 等待 Web 服务启动完成...
+timeout /t 5 /nobreak >nul
+
+REM 检查 Flask 是否已启动
+:wait_flask
+for /f %%i in ('curl -s -o nul -w "%%{http_code}" http://localhost:8888') do set "HTTP_CODE=%%i"
+if not "%HTTP_CODE%"=="200" (
+    if not "%HTTP_CODE%"=="302" (
+        timeout /t 2 /nobreak >nul
+        goto wait_flask
+    )
+)
+
+echo Web 服务已就绪 (HTTP %HTTP_CODE%)，正在启动隧道...
+start /b cmd /c "npx -y hostc@latest 8888 > file\tunnel_url.txt 2>&1"
+
+echo.
+echo ========================================
+echo 启动完成！
+echo ========================================
+echo.
+echo 按任意键退出此窗口（服务将继续在后台运行）...
+pause >nul
