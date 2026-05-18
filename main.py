@@ -3555,7 +3555,47 @@ if __name__ == '__main__':
 
         @app.route('/dist/<path:filename>')
         def dist_files(filename):
-            return send_file(os.path.join(PROJECT_DIR, 'dist', filename))
+            import gzip
+            import os
+            from functools import wraps
+
+            file_path = os.path.join(PROJECT_DIR, 'dist', filename)
+
+            if not os.path.isfile(file_path):
+                return "File not found", 404
+
+            mimetype_map = {
+                '.js': 'application/javascript',
+                '.css': 'text/css',
+                '.html': 'text/html',
+                '.json': 'application/json',
+                '.png': 'image/png',
+                '.jpg': 'image/jpeg',
+                '.svg': 'image/svg+xml',
+                '.ico': 'image/x-icon',
+                '.woff': 'font/woff',
+                '.woff2': 'font/woff2',
+            }
+            ext = os.path.splitext(filename)[1].lower()
+            mimetype = mimetype_map.get(ext, 'application/octet-stream')
+
+            accept_encoding = request.headers.get('Accept-Encoding', '')
+            gzip_enabled = 'gzip' in accept_encoding.lower()
+
+            if gzip_enabled and ext in ['.js', '.css', '.html', '.json', '.svg']:
+                with open(file_path, 'rb') as f:
+                    content = f.read()
+
+                gzip_content = gzip.compress(content, compresslevel=6)
+                response = Response(gzip_content, mimetype=mimetype)
+                response.headers['Content-Encoding'] = 'gzip'
+                response.headers['Vary'] = 'Accept-Encoding'
+                response.headers['Cache-Control'] = 'public, max-age=86400'
+                return response
+            else:
+                response = send_file(file_path, mimetype=mimetype)
+                response.headers['Cache-Control'] = 'public, max-age=86400'
+                return response
 
         @app.route('/run', methods=['POST'])
         def run_command():

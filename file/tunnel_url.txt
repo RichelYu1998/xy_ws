@@ -1,0 +1,5 @@
+Success  Tunnel ready
+  Public URL: https://t-j74vaodj2s.hostc.dev
+  Local:      http://localhost:8888/
+  Tunnel:     t-j74vaodj2s
+  Channels:   2
