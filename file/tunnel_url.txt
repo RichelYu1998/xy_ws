@@ -1,5 +1,5 @@
 Success  Tunnel ready
-  Public URL: https://t-km6cu90e9q.hostc.dev
+  Public URL: https://t-dc7anwgrs3.hostc.dev
   Local:      http://localhost:8888/
-  Tunnel:     t-km6cu90e9q
+  Tunnel:     t-dc7anwgrs3
   Channels:   2
