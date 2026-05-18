@@ -1,5 +1,5 @@
 Success  Tunnel ready
-  Public URL: https://t-j74vaodj2s.hostc.dev
+  Public URL: https://t-km6cu90e9q.hostc.dev
   Local:      http://localhost:8888/
-  Tunnel:     t-j74vaodj2s
+  Tunnel:     t-km6cu90e9q
   Channels:   2
