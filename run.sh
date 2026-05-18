@@ -117,6 +117,15 @@ run_web() {
     echo "========================================"
 
     echo ""
+    echo "========================================"
+    echo "启动完成！"
+    echo "========================================"
+    echo ""
+    echo "访问地址: http://localhost:8888"
+    echo "隧道地址: 查看 file/tunnel_url.txt"
+    echo ""
+    echo "按 Ctrl+C 停止服务"
+    echo ""
     echo "正在启动 Web 服务..."
     echo ""
     $PYTHON_CMD main.py --web &

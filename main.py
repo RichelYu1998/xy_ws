@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
 
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 if not hasattr(subprocess, 'CREATE_NO_WINDOW'):
     subprocess.CREATE_NO_WINDOW = 0x08000000 if platform.system() == 'Windows' else 0
 
@@ -845,9 +847,6 @@ def run_cleaner():
             print('无效的选项')
         
         input('\n按回车键继续...')
-
-
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def print_separator(char='=', length=60):
     """打印分隔线"""

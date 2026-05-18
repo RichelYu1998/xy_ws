@@ -162,12 +162,16 @@ echo ========================================
 echo 启动完成！
 echo ========================================
 echo.
+echo 访问地址: http://localhost:8888
+echo 隧道地址: 查看 tunnel_url.txt
+echo.
 echo 注意：服务将继续在后台运行
 echo.
-echo 按 Ctrl+C 停止所有服务，或关闭此窗口后使用:
+echo 关闭此窗口可停止服务，或使用:
 echo   taskkill /f /im python.exe
 echo   taskkill /f /im node.exe
 echo.
+exit /b 0
 
 :cleanup_exit
 echo.
