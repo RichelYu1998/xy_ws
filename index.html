@@ -2964,6 +2964,27 @@ playwright install chromium</pre>
                                 </div>
                         `;
                         
+                        if ((data.duplicates && Object.keys(data.duplicates).length > 0) || (data.duplicates_excel && Object.keys(data.duplicates_excel).length > 0)) {
+                            const dupData = data.duplicates || data.duplicates_excel || {};
+                            const dupItems = Object.entries(dupData).map(([sku, count]) => `<span class="sku-tag" style="background: #ff9800; color: white;">${sku} (重复${count}次)</span>`).join('');
+                            cardHtml += `
+                                <div class="missing-skus" style="background: #fff3e0; border-color: #ff9800;">
+                                    <div class="missing-title" style="color: #e65100;">Excel重复货号列表:</div>
+                                    <div class="sku-container">${dupItems}</div>
+                                </div>
+                            `;
+                        }
+                        
+                        if (data.duplicates_json && Object.keys(data.duplicates_json).length > 0) {
+                            const dupItems = Object.entries(data.duplicates_json).map(([sku, count]) => `<span class="sku-tag" style="background: #e91e63; color: white;">${sku} (重复${count}次)</span>`).join('');
+                            cardHtml += `
+                                <div class="missing-skus" style="background: #fce4ec; border-color: #e91e63;">
+                                    <div class="missing-title" style="color: #c2185b;">JSON重复货号列表:</div>
+                                    <div class="sku-container">${dupItems}</div>
+                                </div>
+                            `;
+                        }
+                        
                         if (data.added_products && data.added_products.length > 0) {
                             const items = data.added_products.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                             cardHtml += `
@@ -3191,7 +3212,20 @@ playwright install chromium</pre>
                             <span class="stat-value">${data.missing_count || 0}</span>
                             <span class="stat-label">缺失货号</span>
                         </div>
+                        <div class="stat-item ${data.duplicate_count > 0 ? 'stat-warning' : ''}">
+                            <span class="stat-value">${data.duplicate_count || 0}</span>
+                            <span class="stat-label">重复序列号</span>
+                        </div>
                     </div>`;
+            
+            if (data.duplicates && data.duplicates.length > 0) {
+                const dupItems = data.duplicates.map(d => `<span class="sku-tag" style="background: #ff9800; color: white;">${d.货号} (重复${d.count}次)</span>`).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #fff3e0; border-color: #ff9800;">
+                        <div class="missing-title" style="color: #e65100;">重复货号列表:</div>
+                        <div class="sku-container">${dupItems}</div>
+                    </div>`;
+            }
             
             if (data.missing_in_json && data.missing_in_json.length > 0) {
                 const items = data.missing_in_json.map(sku => `<span class="sku-tag">${sku}</span>`).join('');
@@ -3206,7 +3240,7 @@ playwright install chromium</pre>
                 const items = data.extra_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                 cardHtml += `
                     <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
-                        <div class="missing-title" style="color: #f57c00;">JSON中多余货号列表(高价商品≥599):</div>
+                        <div class="missing-title" style="color: #f57c00;">JSON中多余货号(有货但不在输入中):</div>
                         <div class="sku-container">${items}</div>
                     </div>`;
             }

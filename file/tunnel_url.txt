@@ -1,5 +1,5 @@
 Success  Tunnel ready
-  Public URL: https://t-yznhbd9ci0.hostc.dev
+  Public URL: https://t-vvde4404nc.hostc.dev
   Local:      http://127.0.0.1:8888/
-  Tunnel:     t-yznhbd9ci0
+  Tunnel:     t-vvde4404nc
   Channels:   2
