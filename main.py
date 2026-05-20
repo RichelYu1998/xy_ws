@@ -4336,6 +4336,7 @@ if __name__ == '__main__':
         tunnel_last_heartbeat = 0
         tunnel_heartbeat_failed = False
         tunnel_need_restart = False
+        tunnel_daemon_started = False
         
         def send_heartbeat():
             global tunnel_url, tunnel_last_heartbeat, tunnel_heartbeat_failed
@@ -4355,11 +4356,14 @@ if __name__ == '__main__':
                 return False
         
         def heartbeat_loop():
-            global tunnel_process, tunnel_auto_restart, tunnel_need_restart
+            global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url
             consecutive_failures = 0
             max_consecutive_failures = 2
             while tunnel_auto_restart:
-                if tunnel_process and tunnel_process.poll() is None:
+                is_tunnel_running = tunnel_process and tunnel_process.poll() is None
+                if not is_tunnel_running and tunnel_url:
+                    is_tunnel_running = True
+                if is_tunnel_running:
                     success = send_heartbeat()
                     if not success:
                         consecutive_failures += 1
@@ -4374,7 +4378,23 @@ if __name__ == '__main__':
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart
             
             while tunnel_auto_restart:
-                if tunnel_process and tunnel_process.poll() is None and not tunnel_need_restart:
+                is_internal_running = tunnel_process and tunnel_process.poll() is None
+                is_external_running = False
+                
+                if not is_internal_running and tunnel_url:
+                    try:
+                        if Environment.IS_WINDOWS:
+                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
+                                                  capture_output=True, text=True, shell=True, timeout=3)
+                            is_external_running = result.returncode == 0 and 'node.exe' in result.stdout
+                        else:
+                            result = subprocess.run('pgrep -f "hostc"', 
+                                                  capture_output=True, text=True, timeout=3)
+                            is_external_running = result.returncode == 0
+                    except:
+                        pass
+                
+                if (is_internal_running or is_external_running) and not tunnel_need_restart:
                     time.sleep(1)
                     continue
                 
@@ -4395,6 +4415,7 @@ if __name__ == '__main__':
                             pass
                 
                 tunnel_process = None
+                tunnel_url = None
                 
                 time.sleep(tunnel_restart_delay)
                 
@@ -4469,7 +4490,7 @@ if __name__ == '__main__':
         
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started
 
             tunnel_need_restart = False
             
@@ -4578,7 +4599,7 @@ if __name__ == '__main__':
 
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat, tunnel_daemon_started, tunnel_restart_thread, tunnel_heartbeat_thread
             
             heartbeat_str = datetime.fromtimestamp(tunnel_last_heartbeat).strftime('%Y-%m-%d %H:%M:%S') if tunnel_last_heartbeat > 0 else None
             
@@ -4614,6 +4635,18 @@ if __name__ == '__main__':
                         is_running = result.returncode == 0
                 except:
                     pass
+            
+            # 如果检测到外部隧道但守护线程未启动，则启动守护线程
+            if is_running and current_url and not tunnel_daemon_started:
+                tunnel_daemon_started = True
+                if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
+                    tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
+                    tunnel_restart_thread.start()
+                    print("[Tunnel] 检测到外部隧道，启动自动重启守护进程")
+                if tunnel_heartbeat_thread is None or not tunnel_heartbeat_thread.is_alive():
+                    tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+                    tunnel_heartbeat_thread.start()
+                    print("[Tunnel] 检测到外部隧道，启动心跳守护进程")
             
             if is_running:
                 return jsonify({
@@ -4651,6 +4684,6 @@ if __name__ == '__main__':
         print(f"局域网地址: http://{lan_ip_startup}:{args.port}" if lan_ip_startup else "")
         print("按 Ctrl+C 停止服务")
         print("=" * 50)
-        app.run(host='0.0.0.0', port=args.port, debug=True)
+        app.run(host='0.0.0.0', port=args.port, debug=False)
     else:
         main()
