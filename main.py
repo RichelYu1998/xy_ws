@@ -4487,6 +4487,40 @@ if __name__ == '__main__':
                 tunnel_last_error = None
                 tunnel_auto_restart = True
 
+                tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                
+                if os.path.exists(tunnel_file):
+                    try:
+                        with open(tunnel_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                            if match:
+                                existing_url = match.group(1).rstrip('/')
+                                if existing_url and len(existing_url) > 10:
+                                    try:
+                                        if Environment.IS_WINDOWS:
+                                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
+                                                                  capture_output=True, text=True, shell=True, timeout=3)
+                                            is_running = result.returncode == 0 and 'node.exe' in result.stdout
+                                        else:
+                                            result = subprocess.run('pgrep -f "hostc"', 
+                                                                  capture_output=True, text=True, timeout=3)
+                                            is_running = result.returncode == 0
+                                        
+                                        if is_running:
+                                            print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
+                                            tunnel_url = existing_url
+                                            url_ready = True
+                                            return jsonify({
+                                                'success': True,
+                                                'url': tunnel_url,
+                                                'message': f'复用已有隧道，URL: {tunnel_url}'
+                                            })
+                                    except:
+                                        pass
+                    except:
+                        pass
+
                 tunnel_process = subprocess.Popen(
                     f'npx hostc@latest {port} --local-host 127.0.0.1',
                     stdout=subprocess.PIPE,
@@ -4569,12 +4603,15 @@ if __name__ == '__main__':
             if is_running or current_url:
                 is_running = True
             else:
-                # 检查是否有外部 hostc 进程
                 try:
-                    result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
-                                          capture_output=True, text=True, shell=True, timeout=3)
-                    if result.returncode == 0 and 'node.exe' in result.stdout:
-                        is_running = True
+                    if Environment.IS_WINDOWS:
+                        result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
+                                              capture_output=True, text=True, shell=True, timeout=3)
+                        is_running = result.returncode == 0 and 'node.exe' in result.stdout
+                    else:
+                        result = subprocess.run('pgrep -f "hostc"', 
+                                              capture_output=True, text=True, timeout=3)
+                        is_running = result.returncode == 0
                 except:
                     pass
             
