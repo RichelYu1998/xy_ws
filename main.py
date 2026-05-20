@@ -4428,6 +4428,43 @@ if __name__ == '__main__':
                     url_ready = False
                     new_tunnel_process = None
                     
+                    # 优先尝试复用 tunnel_url.txt 中的已有 URL
+                    tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                    existing_url = None
+                    if os.path.exists(tunnel_file):
+                        try:
+                            with open(tunnel_file, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                                match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                                if match:
+                                    existing_url = match.group(1).rstrip('/')
+                        except:
+                            pass
+                    
+                    # 检查是否有 hostc 进程在运行
+                    is_hostc_running = False
+                    try:
+                        if Environment.IS_WINDOWS:
+                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
+                                                  capture_output=True, text=True, shell=True, timeout=3)
+                            is_hostc_running = result.returncode == 0 and 'node.exe' in result.stdout
+                        else:
+                            result = subprocess.run('pgrep -f "hostc"', 
+                                                  capture_output=True, text=True, timeout=3)
+                            is_hostc_running = result.returncode == 0
+                    except:
+                        pass
+                    
+                    # 如果有已有 URL 且 hostc 进程在运行，直接复用
+                    if existing_url and is_hostc_running:
+                        print(f"[Tunnel] 复用已有隧道 URL: {existing_url}")
+                        tunnel_url = existing_url
+                        tunnel_last_error = None
+                        tunnel_need_restart = False
+                        continue
+                    
+                    # 否则启动新的 hostc 进程
+                    print(f"[Tunnel] 启动新的 hostc 进程...")
                     new_tunnel_process = subprocess.Popen(
                         f'npx hostc@latest {port} --local-host 127.0.0.1',
                         stdout=subprocess.PIPE,
