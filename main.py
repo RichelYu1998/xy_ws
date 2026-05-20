@@ -4532,10 +4532,40 @@ if __name__ == '__main__':
             
             heartbeat_str = datetime.fromtimestamp(tunnel_last_heartbeat).strftime('%Y-%m-%d %H:%M:%S') if tunnel_last_heartbeat > 0 else None
             
-            if tunnel_process and tunnel_process.poll() is None:
+            is_running = tunnel_process and tunnel_process.poll() is None
+            current_url = tunnel_url
+            
+            # 优先使用内部 URL，否则从 tunnel_url.txt 读取
+            if not current_url:
+                try:
+                    tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                    if os.path.exists(tunnel_file):
+                        with open(tunnel_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                            if match:
+                                current_url = match.group(1).rstrip('/')
+                                tunnel_url = current_url
+                except:
+                    pass
+            
+            # 检测是否有 hostc 隧道在运行（内部或外部）
+            if is_running or current_url:
+                is_running = True
+            else:
+                # 检查是否有外部 hostc 进程
+                try:
+                    result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
+                                          capture_output=True, text=True, shell=True, timeout=3)
+                    if result.returncode == 0 and 'node.exe' in result.stdout:
+                        is_running = True
+                except:
+                    pass
+            
+            if is_running:
                 return jsonify({
                     'running': True,
-                    'url': tunnel_url,
+                    'url': current_url,
                     'auto_restart': tunnel_auto_restart,
                     'restart_count': tunnel_restart_count,
                     'last_error': tunnel_last_error,

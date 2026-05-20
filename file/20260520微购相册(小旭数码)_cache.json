@@ -1,7 +1,7 @@
 {
   "生成日期": "20260520",
-  "时间戳": "2026-05-20 11:56:39",
-  "成功获取": "78 个商品",
+  "时间戳": "2026-05-20 12:29:19",
+  "成功获取": "77 个商品",
   "商品列表": [
     {
       "商品描述": "荣耀Magic V2     16+256G黑色      电池容量92%     边框有轻微磕碰如图      外屏比较新",
@@ -52,23 +52,6 @@
         "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTMxNzcyOV84NzI1XzBfNC5qcGc=",
         "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTM3MDAwNF80MTE1XzBfNS5qcGc=",
         "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MTgvbzE3NzkxMDU0MjA5NTVfNDM5Ml8wXzAubXA0"
-      ]
-    },
-    {
-      "商品描述": "15Pro256白色 95新 有个边框磕碰 屏幕新 没划痕 电池效率80% ",
-      "售价": "¥4,199",
-      "拿货价": "¥3,700",
-      "货号": "65151",
-      "备注": "",
-      "员工": "店长",
-      "图片": [
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MTA0Nl83OTZfMF8xLmpwZw==",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MDk5MF81MTZfMF8yLmpwZw==",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MTAzNl8xMTMxXzBfMy5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MzU4MF8zOTM1XzBfNC5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MTA0MF82MjE5XzBfNS5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA5NTg0NF8xNzc5XzBfNi5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MTgvbzE3NzkxMDUxMzI1NzBfODAyMF8wXzAubXA0"
       ]
     },
     {
@@ -1291,15 +1274,15 @@
       ]
     }
   ],
-  "单个设备的平均回收价格": "1,229.51",
-  "平均每个设备售出均价": "1,562.24",
-  "累计成本": "95,902.00",
-  "预计毛利": "25,953.00",
-  "毛利率": "27.06%",
-  "预计售出价格累计": "121,855.00",
-  "闲鱼平台手续费累计": "1,949.68",
-  "所有设备卖到闲鱼平台的毛利": "119,905.32",
-  "统计": "共计获取到 78 个商品",
+  "单个设备的平均回收价格": "1,197.43",
+  "平均每个设备售出均价": "1,528.00",
+  "累计成本": "92,202.00",
+  "预计毛利": "25,454.00",
+  "毛利率": "27.61%",
+  "预计售出价格累计": "117,656.00",
+  "闲鱼平台手续费累计": "1,882.50",
+  "所有设备卖到闲鱼平台的毛利": "115,773.50",
+  "统计": "共计获取到 77 个商品",
   "小计": [
     {
       "timestamp": "2026-05-20 10:14:33",
@@ -1436,11 +1419,78 @@
       "high_price_added": [],
       "high_price_added_count": 0,
       "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 11:56:54",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 12:02:11",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 12:02:18",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 12:29:10",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 1,
+      "added": [],
+      "removed": [
+        "65151"
+      ],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 12:29:19",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
     }
   ],
   "高价商品统计": {
     "筛选条件": "售价 >= 599",
-    "数量": 59,
+    "数量": 58,
     "商品列表": [
       {
         "商品描述": "荣耀Magic V2     16+256G黑色      电池容量92%     边框有轻微磕碰如图      外屏比较新",
@@ -1491,23 +1541,6 @@
           "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTMxNzcyOV84NzI1XzBfNC5qcGc=",
           "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTM3MDAwNF80MTE1XzBfNS5qcGc=",
           "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MTgvbzE3NzkxMDU0MjA5NTVfNDM5Ml8wXzAubXA0"
-        ]
-      },
-      {
-        "商品描述": "15Pro256白色 95新 有个边框磕碰 屏幕新 没划痕 电池效率80% ",
-        "售价": "¥4,199",
-        "拿货价": "¥3,700",
-        "货号": "65151",
-        "备注": "",
-        "员工": "店长",
-        "图片": [
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MTA0Nl83OTZfMF8xLmpwZw==",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MDk5MF81MTZfMF8yLmpwZw==",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MTAzNl8xMTMxXzBfMy5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MzU4MF8zOTM1XzBfNC5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA4MTA0MF82MjE5XzBfNS5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOC9pMTc3OTEwNTA5NTg0NF8xNzc5XzBfNi5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MTgvbzE3NzkxMDUxMzI1NzBfODAyMF8wXzAubXA0"
         ]
       },
       {
