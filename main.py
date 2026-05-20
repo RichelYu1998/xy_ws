@@ -4331,36 +4331,50 @@ if __name__ == '__main__':
         tunnel_restart_thread = None
         tunnel_last_error = None
         tunnel_restart_count = 0
-        tunnel_max_restart_count = 1000
         tunnel_restart_delay = 1
         tunnel_heartbeat_thread = None
         tunnel_last_heartbeat = 0
+        tunnel_heartbeat_failed = False
+        tunnel_need_restart = False
         
         def send_heartbeat():
-            global tunnel_url, tunnel_last_heartbeat
+            global tunnel_url, tunnel_last_heartbeat, tunnel_heartbeat_failed
             if not tunnel_url:
-                return
+                tunnel_heartbeat_failed = True
+                return False
             try:
                 import urllib.request
                 req = urllib.request.Request(tunnel_url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-heartbeat/1.0')
                 urllib.request.urlopen(req, timeout=5)
                 tunnel_last_heartbeat = time.time()
+                tunnel_heartbeat_failed = False
+                return True
             except:
-                pass
+                tunnel_heartbeat_failed = True
+                return False
         
         def heartbeat_loop():
-            global tunnel_process, tunnel_auto_restart
+            global tunnel_process, tunnel_auto_restart, tunnel_need_restart
+            consecutive_failures = 0
+            max_consecutive_failures = 2
             while tunnel_auto_restart:
                 if tunnel_process and tunnel_process.poll() is None:
-                    send_heartbeat()
+                    success = send_heartbeat()
+                    if not success:
+                        consecutive_failures += 1
+                        if consecutive_failures >= max_consecutive_failures:
+                            print(f"[Tunnel] 心跳连续失败 {consecutive_failures} 次，标记需要重启")
+                            tunnel_need_restart = True
+                    else:
+                        consecutive_failures = 0
                 time.sleep(30)
         
         def restart_tunnel():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart
             
-            while tunnel_auto_restart and tunnel_restart_count < tunnel_max_restart_count:
-                if tunnel_process and tunnel_process.poll() is None:
+            while tunnel_auto_restart:
+                if tunnel_process and tunnel_process.poll() is None and not tunnel_need_restart:
                     time.sleep(1)
                     continue
                 
@@ -4368,7 +4382,7 @@ if __name__ == '__main__':
                     break
                 
                 tunnel_restart_count += 1
-                print(f"[Tunnel] 检测到隧道断开，正在尝试重启 ({tunnel_restart_count}/{tunnel_max_restart_count})...")
+                print(f"[Tunnel] 检测到隧道断开，正在尝试重启 ({tunnel_restart_count}次)...")
                 
                 if tunnel_process:
                     try:
@@ -4440,6 +4454,7 @@ if __name__ == '__main__':
                         tunnel_process = new_tunnel_process
                         tunnel_url = new_tunnel_url
                         tunnel_last_error = None
+                        tunnel_need_restart = False
                         print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
                     else:
                         tunnel_last_error = "启动超时"
@@ -4451,14 +4466,13 @@ if __name__ == '__main__':
                 except Exception as e:
                     tunnel_last_error = str(e)
                     print(f"[Tunnel] 重启失败: {e}")
-            
-            if tunnel_restart_count >= tunnel_max_restart_count:
-                print(f"[Tunnel] 已达到最大重启次数 ({tunnel_max_restart_count})，停止自动重启")
         
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart
 
+            tunnel_need_restart = False
+            
             if tunnel_process and tunnel_process.poll() is None:
                 return jsonify({'success': True, 'url': tunnel_url, 'message': '隧道已在运行'})
 
@@ -4471,7 +4485,6 @@ if __name__ == '__main__':
                 tunnel_url = None
                 url_ready = False
                 tunnel_last_error = None
-                tunnel_restart_count = 0
                 tunnel_auto_restart = True
 
                 tunnel_process = subprocess.Popen(
