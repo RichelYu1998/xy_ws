@@ -1,7 +1,7 @@
 {
   "生成日期": "20260520",
-  "时间戳": "2026-05-20 15:14:15",
-  "成功获取": "79 个商品",
+  "时间戳": "2026-05-20 17:20:36",
+  "成功获取": "78 个商品",
   "商品列表": [
     {
       "商品描述": "华为mate70Pro+     16+512G飞天青       电池容量97%    边框轻微磨损     售后换过屏幕    现外屏碎     ",
@@ -50,24 +50,6 @@
         "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxMS9pMTc3ODUwMDIxMjk1Ml85OTI2XzBfNS5qcGc=",
         "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxMS9pMTc3ODUwMDIxMzA1OF80NzE0XzBfNi5qcGc=",
         "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxMS9pMTc3ODUwMDIxMTk2M184ODc0XzBfNy5qcGc="
-      ]
-    },
-    {
-      "商品描述": "iPhone 16 Pro Max     国行256G金色      电池容量92%     边框成色九九新",
-      "售价": "¥6,199",
-      "拿货价": "¥5,700",
-      "货号": "04391",
-      "备注": "屏幕细微划痕",
-      "员工": "店长",
-      "图片": [
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl83OTcyXzBfMS5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl8zNjE2XzBfMi5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl8yMTA3XzBfMy5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NjkxNF85NDE4XzBfNC5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl80NTQ3XzBfNS5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NjkwNF80MTkxXzBfNi5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl8xODIzXzBfNy5qcGc=",
-        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MTkvbzE3NzkxNTk4Nzk5MTFfODQ1XzBfMC5tcDQ="
       ]
     },
     {
@@ -1306,15 +1288,15 @@
       ]
     }
   ],
-  "单个设备的平均回收价格": "1,202.56",
-  "平均每个设备售出均价": "1,489.32",
-  "累计成本": "95,002.00",
-  "预计毛利": "22,654.00",
-  "毛利率": "23.85%",
-  "预计售出价格累计": "117,656.00",
-  "闲鱼平台手续费累计": "1,882.50",
-  "所有设备卖到闲鱼平台的毛利": "115,773.50",
-  "统计": "共计获取到 79 个商品",
+  "单个设备的平均回收价格": "1,144.90",
+  "平均每个设备售出均价": "1,428.94",
+  "累计成本": "89,302.00",
+  "预计毛利": "22,155.00",
+  "毛利率": "24.81%",
+  "预计售出价格累计": "111,457.00",
+  "闲鱼平台手续费累计": "1,783.31",
+  "所有设备卖到闲鱼平台的毛利": "109,673.69",
+  "统计": "共计获取到 78 个商品",
   "小计": [
     {
       "timestamp": "2026-05-20 10:14:33",
@@ -1780,11 +1762,117 @@
       "high_price_added": [],
       "high_price_added_count": 0,
       "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 15:19:27",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 15:19:43",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 15:38:49",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 15:41:03",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 16:09:11",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 16:36:05",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 17:15:56",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 1,
+      "added": [],
+      "removed": [
+        "04391"
+      ],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 17:20:36",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
     }
   ],
   "高价商品统计": {
     "筛选条件": "售价 >= 599",
-    "数量": 58,
+    "数量": 57,
     "商品列表": [
       {
         "商品描述": "荣耀Magic V2     16+256G黑色      电池容量92%     边框有轻微磕碰如图      外屏比较新",
@@ -1801,24 +1889,6 @@
           "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxMS9pMTc3ODUwMDIxMjk1Ml85OTI2XzBfNS5qcGc=",
           "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxMS9pMTc3ODUwMDIxMzA1OF80NzE0XzBfNi5qcGc=",
           "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxMS9pMTc3ODUwMDIxMTk2M184ODc0XzBfNy5qcGc="
-        ]
-      },
-      {
-        "商品描述": "iPhone 16 Pro Max     国行256G金色      电池容量92%     边框成色九九新",
-        "售价": "¥6,199",
-        "拿货价": "¥5,700",
-        "货号": "04391",
-        "备注": "屏幕细微划痕",
-        "员工": "店长",
-        "图片": [
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl83OTcyXzBfMS5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl8zNjE2XzBfMi5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl8yMTA3XzBfMy5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NjkxNF85NDE4XzBfNC5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl80NTQ3XzBfNS5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NjkwNF80MTkxXzBfNi5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUxOS9pMTc3OTE1OTc3NTI2Nl8xODIzXzBfNy5qcGc=",
-          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MTkvbzE3NzkxNTk4Nzk5MTFfODQ1XzBfMC5tcDQ="
         ]
       },
       {
