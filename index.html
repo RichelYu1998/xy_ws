@@ -2908,18 +2908,26 @@ playwright install chromium</pre>
                             clearInterval(tunnelPollInterval);
                             tunnelPollInterval = null;
                             const urlContainer = document.getElementById('tunnel-public-url-container');
-                            const copyBtn = document.getElementById('btn-copy-tunnel-url');
                             if (urlContainer) {
                                 urlContainer.innerHTML = `
                                     <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
                                         <i class="fa fa-external-link"></i> ${statusData.url}
                                     </a>
-                                    <button class="btn btn-sm btn-light ml-2 btn-copy-tunnel-url" id="btn-copy-tunnel-url">
+                                    <button class="btn btn-sm btn-light ml-2 btn-copy-tunnel-url" id="btn-copy-tunnel-url" data-url="${statusData.url}">
                                         <i class="fa fa-copy"></i> 复制
                                     </button>
                                 `;
+                                const newCopyBtn = document.getElementById('btn-copy-tunnel-url');
+                                if (newCopyBtn) {
+                                    newCopyBtn.onclick = function() {
+                                        copyToClipboard(this.dataset.url);
+                                        this.innerHTML = '<i class="fa fa-check"></i> 已复制';
+                                        setTimeout(() => {
+                                            this.innerHTML = '<i class="fa fa-copy"></i> 复制';
+                                        }, 2000);
+                                    };
+                                }
                             }
-                            if (copyBtn) copyBtn.dataset.url = statusData.url;
                         } else if (retryCount >= maxRetries) {
                             clearInterval(tunnelPollInterval);
                             tunnelPollInterval = null;
