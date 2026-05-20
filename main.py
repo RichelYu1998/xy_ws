@@ -4530,6 +4530,8 @@ if __name__ == '__main__':
         def tunnel_status():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat
             
+            heartbeat_str = datetime.fromtimestamp(tunnel_last_heartbeat).strftime('%Y-%m-%d %H:%M:%S') if tunnel_last_heartbeat > 0 else None
+            
             if tunnel_process and tunnel_process.poll() is None:
                 return jsonify({
                     'running': True,
@@ -4537,7 +4539,7 @@ if __name__ == '__main__':
                     'auto_restart': tunnel_auto_restart,
                     'restart_count': tunnel_restart_count,
                     'last_error': tunnel_last_error,
-                    'last_heartbeat': tunnel_last_heartbeat
+                    'last_heartbeat': heartbeat_str
                 })
             else:
                 return jsonify({
@@ -4546,7 +4548,7 @@ if __name__ == '__main__':
                     'auto_restart': tunnel_auto_restart,
                     'restart_count': tunnel_restart_count,
                     'last_error': tunnel_last_error,
-                    'last_heartbeat': tunnel_last_heartbeat
+                    'last_heartbeat': heartbeat_str
                 })
 
         # 启动前获取一次局域网 IP 用于显示
