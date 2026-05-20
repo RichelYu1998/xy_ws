@@ -3793,21 +3793,22 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
                 
-                # 如果是POST请求，从请求体中获取货号
+                txt_stock_numbers_raw = []
                 if request.method == 'POST':
-                    data = request.get_json()
-                    input_skus = data.get('skus', '')
+                    req_data = request.get_json()
+                    input_skus = req_data.get('skus', '')
                     import re
-                    txt_stock_numbers = sorted(set(re.findall(r'\d+', input_skus)))
+                    txt_stock_numbers_raw = re.findall(r'\d+', input_skus)
                 else:
-                    # GET请求，从文件中读取
                     input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
-                    txt_stock_numbers = []
                     if os.path.exists(input_file):
                         with open(input_file, 'r', encoding='utf-8') as f:
                             content = f.read()
                             import re
-                            txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
+                            txt_stock_numbers_raw = re.findall(r'\d+', content)
+                
+                txt_stock_numbers = sorted(set(txt_stock_numbers_raw))
+                duplicates = StockNumberComparator.find_duplicate_stock_numbers(txt_stock_numbers_raw)
                 
                 json_set = set(json_stock_numbers)
                 txt_set = set(txt_stock_numbers)
@@ -3822,7 +3823,9 @@ if __name__ == '__main__':
                     'common': sorted(list(txt_set & json_set)),
                     'missing_count': len(txt_set - json_set),
                     'extra_count': len(json_set - txt_set),
-                    'common_count': len(txt_set & json_set)
+                    'common_count': len(txt_set & json_set),
+                    'duplicate_count': len(duplicates),
+                    'duplicates': duplicates
                 }
                 return jsonify(result)
             except Exception as e:

@@ -1,6 +1,6 @@
 {
   "生成日期": "20260520",
-  "时间戳": "2026-05-20 12:47:32",
+  "时间戳": "2026-05-20 13:52:05",
   "成功获取": "77 个商品",
   "商品列表": [
     {
@@ -1489,6 +1489,71 @@
     },
     {
       "timestamp": "2026-05-20 12:47:32",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 13:10:35",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 13:10:36",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 13:30:35",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 13:31:07",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 13:52:05",
       "date": "20260520",
       "latest_file": "20260520微购相册(小旭数码).json",
       "second_file": "20260520微购相册(小旭数码)_cache.json",
