@@ -1,5 +1,5 @@
 Success  Tunnel ready
-  Public URL: https://t-y0fzpiinxl.hostc.dev
-  Local:      http://localhost:8888/
-  Tunnel:     t-y0fzpiinxl
+  Public URL: https://t-yznhbd9ci0.hostc.dev
+  Local:      http://127.0.0.1:8888/
+  Tunnel:     t-yznhbd9ci0
   Channels:   2

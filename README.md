@@ -52,6 +52,9 @@ bash run.sh
   - 修复 `--local-host 0.0.0.0` 改为 `127.0.0.1`，提高连接稳定性
   - 前端显示自动重连次数和最近错误信息
   - 后端 API 新增 `auto_restart`、`restart_count`、`last_error`、`last_heartbeat` 字段
+- **隧道状态时间戳优化**
+  - `last_heartbeat` 字段从 Unix 时间戳转换为可读时间格式（`YYYY-MM-DD HH:MM:SS`）
+  - 提升 API 返回数据的可读性，便于调试和日志分析
 
 ### v3.1.4 (2026-05-18)
 - **run.bat 服务启动后被意外终止修复**
