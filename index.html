@@ -3025,11 +3025,21 @@ playwright install chromium</pre>
                             `;
                         }
                         
+                        if (data.extra_in_json && data.extra_in_json.length > 0) {
+                            const items = data.extra_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            cardHtml += `
+                                <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
+                                    <div class="missing-title" style="color: #f57c00;">JSON多余货号(所有价格):</div>
+                                    <div class="sku-container">${items}</div>
+                                </div>
+                            `;
+                        }
+                        
                         if (data.high_price_extra_in_json && data.high_price_extra_in_json.length > 0) {
                             const items = data.high_price_extra_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                             cardHtml += `
-                                <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
-                                    <div class="missing-title" style="color: #f57c00;">JSON多余货号列表(高价商品≥599):</div>
+                                <div class="missing-skus" style="background: #ffebee; border-color: #ef9a9a;">
+                                    <div class="missing-title" style="color: #c62828;">JSON多余货号(高价商品≥599):</div>
                                     <div class="sku-container">${items}</div>
                                 </div>
                             `;
