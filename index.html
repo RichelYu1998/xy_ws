@@ -1458,7 +1458,7 @@
                             data-src="/dist/index.html"
                             style="width: 100%; border: none; background: #fff; opacity: 0; position: relative; z-index: 0;"
                             title="天气时钟看板"
-                            onload="this.style.opacity='1'; document.getElementById('weather-loading').style.display='none';">
+                            onload="this.style.opacity='1'; const wl = document.getElementById('weather-loading'); if (wl) wl.style.display='none';">
                         </iframe>
                     </div>
                 </div>
@@ -1606,6 +1606,46 @@ playwright install chromium</pre>
                         <div class="output-content" id="output-content"></div>
                         <div class="output-status" id="output-status"></div>
                     </div>
+                    
+                    <div id="sku-input-panel" class="output-panel" style="display: none;">
+                        <div class="output-header">
+                            <span><i class="fa fa-barcode"></i> 货号对比</span>
+                            <button class="output-close" onclick="closeSkuInputPanel()"><i class="fa fa-times"></i></button>
+                        </div>
+                        <div id="sku-input-content"></div>
+                    </div>
+                    
+                    <div id="cleaner-panel" class="output-panel" style="display: none;">
+                        <div class="output-header">
+                            <span><i class="fa fa-trash"></i> 文件清理</span>
+                            <button class="output-close" onclick="closeCleanerPanel()"><i class="fa fa-times"></i></button>
+                        </div>
+                        <div id="cleaner-content"></div>
+                    </div>
+                    
+                    <div id="tunnel-panel" class="output-panel" style="display: none;">
+                        <div class="output-header">
+                            <span><i class="fa fa-external-link"></i> 隧道共享</span>
+                            <button class="output-close" onclick="closeTunnelPanel()"><i class="fa fa-times"></i></button>
+                        </div>
+                        <div id="tunnel-content"></div>
+                    </div>
+                    
+                    <div id="products-panel" class="output-panel" style="display: none;">
+                        <div class="output-header">
+                            <span><i class="fa fa-list"></i> 商品数据</span>
+                            <button class="output-close" onclick="closeProductsPanel()"><i class="fa fa-times"></i></button>
+                        </div>
+                        <div id="products-content"></div>
+                    </div>
+                    
+                    <div id="spider-output-panel" class="output-panel" style="display: none;">
+                        <div class="output-header">
+                            <span><i class="fa fa-terminal"></i> 爬虫运行结果</span>
+                            <button class="output-close" onclick="closeSpiderOutputPanel()"><i class="fa fa-times"></i></button>
+                        </div>
+                        <div id="spider-output-content"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1749,11 +1789,35 @@ playwright install chromium</pre>
             }, 250);
         });
         
+        // 全局定时器管理
+        let tunnelPollInterval = null;
+        let tunnelRetryInterval = null;
+        let tunnelStatusInterval = null;
+        
+        function clearAllPollingIntervals() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+            if (tunnelPollInterval) {
+                clearInterval(tunnelPollInterval);
+                tunnelPollInterval = null;
+            }
+            if (tunnelRetryInterval) {
+                clearInterval(tunnelRetryInterval);
+                tunnelRetryInterval = null;
+            }
+            if (tunnelStatusInterval) {
+                clearInterval(tunnelStatusInterval);
+                tunnelStatusInterval = null;
+            }
+        }
+        
         // 全局函数定义
         function showOutputPanel() {
             const panel = document.getElementById('output-panel');
-            const isMobile = window.innerWidth < 576;
-            panel.style.display = isMobile ? 'flex' : 'block';
+            if (!panel) return;
+            panel.style.display = 'block';
             panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         
@@ -2055,16 +2119,20 @@ playwright install chromium</pre>
                 const outputDiv = document.getElementById('output-content');
                 const statusDiv = document.getElementById('output-status');
                 
-                if (data.output && outputDiv) {
-                    outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(data.output) + '</pre>';
-                    const isMobile = window.innerWidth < 576;
-                    if (!isMobile) {
-                        outputDiv.scrollTop = outputDiv.scrollHeight;
+                if (data.output) {
+                    const hasComparison = data.output.includes('对比文件:') || data.output.includes('货号对比结果') || data.output.includes('共获取') || data.output.includes('成功获取');
+                    
+                    if (!hasComparison && outputDiv) {
+                        outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(data.output) + '</pre>';
+                        const isMobile = window.innerWidth < 576;
+                        if (!isMobile) {
+                            outputDiv.scrollTop = outputDiv.scrollHeight;
+                        }
                     }
                     
-                    if (data.output.includes('对比文件:') || data.output.includes('货号对比结果') || data.output.includes('共获取') || data.output.includes('成功获取')) {
-                        const outputPanel = document.getElementById('output-panel');
-                        const existingCard = outputPanel ? outputPanel.querySelector('.comparison-card, .products-card') : null;
+                    if (hasComparison) {
+                        const spiderContent = document.getElementById('spider-output-content');
+                        const existingCard = spiderContent ? spiderContent.querySelector('.comparison-card, .products-card') : null;
                         if (!existingCard) {
                             showComparisonCard(data.output);
                         }
@@ -2096,6 +2164,13 @@ playwright install chromium</pre>
         }
         
         function showComparisonCard(output) {
+            const spiderPanel = document.getElementById('spider-output-panel');
+            const spiderContent = document.getElementById('spider-output-content');
+            if (!spiderPanel || !spiderContent) return;
+            
+            spiderPanel.style.display = 'block';
+            spiderPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
             const lines = output.split('\n');
             let skuData = {};
             let missingSkus = [];
@@ -2218,8 +2293,7 @@ playwright install chromium</pre>
              const displayCount = parseInt(skuData.missingCount) || missingSkus.length;
              missingSkus = missingSkus.slice(0, displayCount);
             
-            const outputPanel = document.getElementById('output-panel');
-            const existingCard = outputPanel.querySelector('.comparison-card');
+            const existingCard = spiderContent.querySelector('.comparison-card');
             if (existingCard) existingCard.remove();
             
             if (skuData.type === 'sku') {
@@ -2284,7 +2358,7 @@ playwright install chromium</pre>
                 }
                 
                 cardHtml += `</div></div>`;
-                outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+                spiderContent.insertAdjacentHTML('beforeend', cardHtml);
                 
             } else if (skuData.newProducts !== undefined || skuData.deletedProducts !== undefined) {
                 let cardHtml = `
@@ -2323,7 +2397,7 @@ playwright install chromium</pre>
                 }
                 
                 cardHtml += `</div></div>`;
-                outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+                spiderContent.insertAdjacentHTML('beforeend', cardHtml);
                 
             } else if (skuData.type === 'spider' && skuData.totalProducts) {
                 let cardHtml = `
@@ -2407,13 +2481,13 @@ playwright install chromium</pre>
                 }
                 
                 cardHtml += `</div></div>`;
-                outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+                spiderContent.insertAdjacentHTML('beforeend', cardHtml);
                 
                 const isMobile = window.innerWidth < 576;
                 if (isMobile) {
-                    const outputContent = document.getElementById('output-content');
-                    if (outputContent) {
-                        outputContent.scrollTop = 0;
+                    const spiderOutputContent = document.getElementById('spider-output-content');
+                    if (spiderOutputContent) {
+                        spiderOutputContent.scrollTop = 0;
                     }
                 }
             }
@@ -2421,6 +2495,13 @@ playwright install chromium</pre>
         
          function showAllProducts() {
             console.log('开始调用 /api/products API');
+            
+            const productsPanel = document.getElementById('products-panel');
+            const productsContent = document.getElementById('products-content');
+            if (!productsPanel || !productsContent) {
+                alert('找不到商品面板');
+                return;
+            }
             
             const timestamp = new Date().getTime();
             fetch(`/api/products?t=${timestamp}`, {
@@ -2448,10 +2529,10 @@ playwright install chromium</pre>
                     return;
                 }
                 
-                showOutputPanel();
+                productsPanel.style.display = 'block';
+                productsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 
-                const outputPanel = document.getElementById('output-panel');
-                const existingCard = outputPanel.querySelector('.products-card, .comparison-card');
+                const existingCard = productsContent.querySelector('.products-card, .comparison-card');
                 if (existingCard) existingCard.remove();
                 
                 window.allProductsData = data;
@@ -2518,12 +2599,11 @@ playwright install chromium</pre>
                         ${renderTable(data.addedProducts, '新增商品 (' + (data.addedCount || 0) + '个)', '#67c23a', 'table-added')}
                     </div>
                 </div>`;
-                outputPanel.insertAdjacentHTML('beforeend', html);
+                productsContent.insertAdjacentHTML('beforeend', html);
                 
                 // 添加表格滚动联动功能
                 setTimeout(() => {
-                    const tableContainers = outputPanel.querySelectorAll('.change-table-container');
-                    const tables = outputPanel.querySelectorAll('.change-table');
+                    const tableContainers = productsContent.querySelectorAll('.change-table-container');
                     
                     // 为每个表格容器添加滚动事件
                     tableContainers.forEach((container, index) => {
@@ -2543,7 +2623,7 @@ playwright install chromium</pre>
                     
                     const isMobile = window.innerWidth < 576;
                     if (!isMobile) {
-                        outputPanel.scrollTop = outputPanel.scrollHeight;
+                        productsContent.scrollTop = productsContent.scrollHeight;
                     }
                 }, 100);
             })
@@ -2556,11 +2636,42 @@ playwright install chromium</pre>
         function closeOutputPanel() {
             if (pollingInterval) {
                 clearInterval(pollingInterval);
+                pollingInterval = null;
             }
-            document.getElementById('output-panel').style.display = 'none';
+            const outputPanel = document.getElementById('output-panel');
+            if (outputPanel) outputPanel.style.display = 'none';
             const outputInputArea = document.getElementById('output-input-area');
             if (outputInputArea) outputInputArea.style.display = 'none';
             currentTaskId = null;
+        }
+        
+        function closeSkuInputPanel() {
+            const skuPanel = document.getElementById('sku-input-panel');
+            if (skuPanel) skuPanel.style.display = 'none';
+        }
+        
+        function closeCleanerPanel() {
+            const cleanerPanel = document.getElementById('cleaner-panel');
+            if (cleanerPanel) cleanerPanel.style.display = 'none';
+        }
+        
+        function closeTunnelPanel() {
+            if (tunnelPollInterval) {
+                clearInterval(tunnelPollInterval);
+                tunnelPollInterval = null;
+            }
+            const tunnelPanel = document.getElementById('tunnel-panel');
+            if (tunnelPanel) tunnelPanel.style.display = 'none';
+        }
+        
+        function closeProductsPanel() {
+            const productsPanel = document.getElementById('products-panel');
+            if (productsPanel) productsPanel.style.display = 'none';
+        }
+        
+        function closeSpiderOutputPanel() {
+            const spiderPanel = document.getElementById('spider-output-panel');
+            if (spiderPanel) spiderPanel.style.display = 'none';
         }
         
         function runFunction(choice) {
@@ -2598,7 +2709,8 @@ playwright install chromium</pre>
                 if (data.success) {
                     currentTaskId = data.task_id;
                     showOutputPanel();
-                    document.getElementById('output-content').innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
+                    const outputContent = document.getElementById('output-content');
+                    if (outputContent) outputContent.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
                     pollingInterval = setInterval(() => pollOutput(), 1000);
                 } else {
                     alert('启动失败: ' + data.error);
@@ -2631,7 +2743,8 @@ playwright install chromium</pre>
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    document.getElementById('user-input').value = '';
+                    const userInput = document.getElementById('user-input');
+                    if (userInput) userInput.value = '';
                 } else {
                     alert('发送失败: ' + data.error);
                 }
@@ -2713,6 +2826,7 @@ playwright install chromium</pre>
         // 一键启动隧道并显示结果
         async function startTunnelAndShow() {
             const btn = document.getElementById('btn-run-tunnel');
+            if (!btn) return;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 启动中...';
 
@@ -2726,9 +2840,18 @@ playwright install chromium</pre>
                 const localUrl = serverData.success ? serverData.local_url : 'http://127.0.0.1:8888';
                 const lanUrl = serverData.success && serverData.lan_url ? serverData.lan_url : '';
 
-                const container = document.getElementById('output-panel');
-                container.style.display = 'block';
-                container.innerHTML = `
+                const tunnelPanel = document.getElementById('tunnel-panel');
+                const tunnelContent = document.getElementById('tunnel-content');
+                if (!tunnelPanel || !tunnelContent) {
+                    alert('找不到隧道面板');
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa fa-external-link"></i> 7. 隧道共享';
+                    return;
+                }
+                
+                tunnelPanel.style.display = 'block';
+                tunnelPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                tunnelContent.innerHTML = `
                     <div class="card mt-3">
                         <div class="card-header bg-success text-white">
                             <h5 class="mb-0"><i class="fa fa-check-circle"></i> 隧道已启动</h5>
@@ -2760,34 +2883,9 @@ playwright install chromium</pre>
                     </div>
                 `;
 
-                document.addEventListener('click', function(e) {
-                    if (e.target.closest('.btn-copy-tunnel-url')) {
-                        const btn = e.target.closest('.btn-copy-tunnel-url');
-                        const url = btn.getAttribute('data-url');
-                        if (url) {
-                            const textarea = document.createElement('textarea');
-                            textarea.value = url;
-                            textarea.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
-                            document.body.appendChild(textarea);
-                            textarea.select();
-                            try {
-                                document.execCommand('copy');
-                                showToast('链接已复制到剪贴板');
-                                btn.innerHTML = '<i class="fa fa-check"></i> 已复制';
-                                setTimeout(() => {
-                                    btn.innerHTML = '<i class="fa fa-copy"></i> 复制';
-                                }, 2000);
-                            } catch (err) {
-                                showToast('复制失败，请手动选择文本复制');
-                            }
-                            document.body.removeChild(textarea);
-                        }
-                    }
-                });
-
                 let retryCount = 0;
                 const maxRetries = 120;
-                const pollUrl = setInterval(async () => {
+                tunnelPollInterval = setInterval(async () => {
                     retryCount++;
                     try {
                         const statusRes = await fetch('/api/tunnel/status');
@@ -2795,20 +2893,26 @@ playwright install chromium</pre>
                         console.log('Tunnel status:', statusData);
 
                         if (statusData.url && statusData.url.startsWith('http')) {
-                            clearInterval(pollUrl);
+                            clearInterval(tunnelPollInterval);
+                            tunnelPollInterval = null;
                             const urlContainer = document.getElementById('tunnel-public-url-container');
-                            urlContainer.innerHTML = `
-                                <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
-                                    <i class="fa fa-external-link"></i> ${statusData.url}
-                                </a>
-                                <button class="btn btn-sm btn-light ml-2 btn-copy-tunnel-url" id="btn-copy-tunnel-url">
-                                    <i class="fa fa-copy"></i> 复制
-                                </button>
-                            `;
-                            document.getElementById('btn-copy-tunnel-url').dataset.url = statusData.url;
+                            const copyBtn = document.getElementById('btn-copy-tunnel-url');
+                            if (urlContainer) {
+                                urlContainer.innerHTML = `
+                                    <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
+                                        <i class="fa fa-external-link"></i> ${statusData.url}
+                                    </a>
+                                    <button class="btn btn-sm btn-light ml-2 btn-copy-tunnel-url" id="btn-copy-tunnel-url">
+                                        <i class="fa fa-copy"></i> 复制
+                                    </button>
+                                `;
+                            }
+                            if (copyBtn) copyBtn.dataset.url = statusData.url;
                         } else if (retryCount >= maxRetries) {
-                            clearInterval(pollUrl);
-                            document.getElementById('tunnel-public-url').textContent = '获取失败，请检查网络连接';
+                            clearInterval(tunnelPollInterval);
+                            tunnelPollInterval = null;
+                            const pubUrl = document.getElementById('tunnel-public-url');
+                            if (pubUrl) pubUrl.textContent = '获取失败，请检查网络连接';
                         }
                     } catch (e) {
                         console.error('获取状态失败:', e);
@@ -2819,14 +2923,16 @@ playwright install chromium</pre>
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert alert-danger mt-3';
                     alertDiv.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>启动失败:</strong> ' + (startData.error || '未知错误');
-                    container.insertBefore(alertDiv, container.firstChild);
+                    if (tunnelContent) tunnelContent.insertBefore(alertDiv, tunnelContent.firstChild);
                 }
 
             } catch (e) {
                 alert('操作失败: ' + e.message);
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa fa-external-link"></i> 7. 隧道共享';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa fa-external-link"></i> 7. 隧道共享';
+                }
             }
         }
 
@@ -3128,12 +3234,12 @@ playwright install chromium</pre>
         }
 
         function showSkuInputPanel() {
-            const outputPanel = document.getElementById('output-panel');
-            outputPanel.innerHTML = `
-                <div class="output-header">
-                    <span><i class="fa fa-barcode"></i> 货号对比</span>
-                    <button class="output-close" onclick="closeOutputPanel()"><i class="fa fa-times"></i></button>
-                </div>
+哦你呢个            const skuPanel = document.getElementById('sku-input-panel');
+            const skuContent = document.getElementById('sku-input-content');
+            if (!skuPanel || !skuContent) return;
+            skuPanel.style.display = 'block';
+            skuPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            skuContent.innerHTML = `
                 <div style="padding: 20px;">
                     <div class="form-group">
                         <label><strong>输入货号:</strong></label>
@@ -3151,19 +3257,25 @@ playwright install chromium</pre>
                     </div>
                 </div>
             `;
-            showOutputPanel();
         }
         
         function compareSku() {
-            const skuInput = document.getElementById('sku-input').value;
+            const skuInputEl = document.getElementById('sku-input');
+            if (!skuInputEl) {
+                alert('找不到输入框');
+                return;
+            }
+            const skuInput = skuInputEl.value;
             if (!skuInput.trim()) {
                 alert('请输入货号');
                 return;
             }
             
             const btn = document.getElementById('btn-compare-sku');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 对比中...';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 对比中...';
+            }
             
             fetch('/api/sku/compare/txt', {
                 method: 'POST',
@@ -3174,8 +3286,10 @@ playwright install chromium</pre>
             .then(data => {
                 if (data.error) {
                     alert('对比失败: ' + data.error);
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa fa-exchange"></i> 开始对比';
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa fa-exchange"></i> 开始对比';
+                    }
                     return;
                 }
                 
@@ -3183,14 +3297,22 @@ playwright install chromium</pre>
             })
             .catch(error => {
                 alert('请求失败: ' + error.message);
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa fa-exchange"></i> 开始对比';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa fa-exchange"></i> 开始对比';
+                }
             });
         }
         
         function showComparisonResult(data) {
-            const outputPanel = document.getElementById('output-panel');
-            const existingCard = outputPanel.querySelector('.comparison-card');
+            const skuPanel = document.getElementById('sku-input-panel');
+            const skuContent = document.getElementById('sku-input-content');
+            if (!skuPanel || !skuContent) return;
+            
+            skuPanel.style.display = 'block';
+            skuPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            const existingCard = skuContent.querySelector('.comparison-card');
             if (existingCard) existingCard.remove();
             
             let cardHtml = `
@@ -3266,16 +3388,16 @@ playwright install chromium</pre>
             
             cardHtml += `</div></div>`;
             
-            outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+            skuContent.insertAdjacentHTML('beforeend', cardHtml);
         }
         
         function showCleanerPanel() {
-            const outputPanel = document.getElementById('output-panel');
-            outputPanel.innerHTML = `
-                <div class="output-header">
-                    <span><i class="fa fa-trash"></i> 文件清理工具</span>
-                    <button class="output-close" onclick="closeOutputPanel()"><i class="fa fa-times"></i></button>
-                </div>
+            const cleanerPanel = document.getElementById('cleaner-panel');
+            const cleanerContent = document.getElementById('cleaner-content');
+            if (!cleanerPanel || !cleanerContent) return;
+            cleanerPanel.style.display = 'block';
+            cleanerPanel.scrollIntoView({ behavior: 'smooth' });
+            cleanerContent.innerHTML = `
                 <div style="padding: 20px;">
                     <div class="form-group">
                         <label><strong>清理目录:</strong></label>
@@ -3308,30 +3430,42 @@ playwright install chromium</pre>
                 <div class="output-content" id="clean-output" style="display: none;"></div>
                 <div class="output-status" id="clean-status"></div>
             `;
-            outputPanel.style.display = 'block';
-            outputPanel.scrollIntoView({ behavior: 'smooth' });
             
-            document.getElementById('clean-mode').addEventListener('change', function() {
-                document.getElementById('minutes-group').style.display = this.value === 'time' ? 'block' : 'none';
-            });
+            const cleanModeEl = document.getElementById('clean-mode');
+            const minutesGroupEl = document.getElementById('minutes-group');
+            if (cleanModeEl) {
+                cleanModeEl.addEventListener('change', function() {
+                    if (minutesGroupEl) minutesGroupEl.style.display = this.value === 'time' ? 'block' : 'none';
+                });
+            }
             
-            document.getElementById('btn-execute-clean').addEventListener('click', executeClean);
+            const cleanBtn = document.getElementById('btn-execute-clean');
+            if (cleanBtn) cleanBtn.addEventListener('click', executeClean);
         }
         
         function executeClean() {
-            const mode = document.getElementById('clean-mode').value;
-            const directory = document.getElementById('clean-directory').value || '';
-            const dryRun = document.getElementById('clean-dry-run').checked;
-            const minutes = document.getElementById('clean-minutes').value || 5;
-            
+            const modeEl = document.getElementById('clean-mode');
+            const directoryEl = document.getElementById('clean-directory');
+            const dryRunEl = document.getElementById('clean-dry-run');
+            const minutesEl = document.getElementById('clean-minutes');
             const btn = document.getElementById('btn-execute-clean');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 执行中...';
-            
             const outputDiv = document.getElementById('clean-output');
             const statusDiv = document.getElementById('clean-status');
-            outputDiv.style.display = 'block';
-            outputDiv.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
+            
+            const mode = modeEl ? modeEl.value : 'time';
+            const directory = directoryEl ? directoryEl.value || '' : '';
+            const dryRun = dryRunEl ? dryRunEl.checked : false;
+            const minutes = minutesEl ? minutesEl.value || 5 : 5;
+            
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 执行中...';
+            }
+            
+            if (outputDiv) {
+                outputDiv.style.display = 'block';
+                outputDiv.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
+            }
             
             let apiUrl = '';
             let data = { directory, dry_run: dryRun };
@@ -3366,20 +3500,24 @@ playwright install chromium</pre>
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
-                    outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(result.output) + '</pre>';
-                    statusDiv.innerHTML = '<span style="color: #67c23a;">✓ 执行完成</span>';
+                    if (outputDiv) outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(result.output) + '</pre>';
+                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #67c23a;">✓ 执行完成</span>';
                 } else {
-                    outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败: ' + result.error + '</span>';
-                    statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败</span>';
+                    if (outputDiv) outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败: ' + result.error + '</span>';
+                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败</span>';
                 }
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
+                }
             })
             .catch(error => {
-                outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败: ' + error.message + '</span>';
-                statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败</span>';
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
+                if (outputDiv) outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败: ' + error.message + '</span>';
+                if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败</span>';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
+                }
             });
         }
         
@@ -3395,10 +3533,12 @@ playwright install chromium</pre>
                 const response = await fetch('/api/server/info');
                 const data = await response.json();
                 if (data.success) {
-                    document.getElementById('tunnel-local-url').textContent = data.local_url;
-                    if (data.lan_url) {
-                        document.getElementById('tunnel-lan-url').textContent = data.lan_url;
-                        document.getElementById('tunnel-lan-url').parentElement.style.display = 'block';
+                    const localUrlEl = document.getElementById('tunnel-local-url');
+                    const lanUrlEl = document.getElementById('tunnel-lan-url');
+                    if (localUrlEl) localUrlEl.textContent = data.local_url;
+                    if (data.lan_url && lanUrlEl) {
+                        lanUrlEl.textContent = data.lan_url;
+                        if (lanUrlEl.parentElement) lanUrlEl.parentElement.style.display = 'block';
                     }
                     // 更新页面版本号
                     if (data.version) {
@@ -3490,8 +3630,8 @@ playwright install chromium</pre>
         async function toggleTunnel() {
             const btn = document.getElementById('btn-toggle-tunnel');
             const status = document.getElementById('tunnel-status');
-            btn.disabled = true;
-            status.innerHTML = '<span class="badge badge-warning"><i class="fa fa-spinner fa-spin"></i> 处理中...</span>';
+            if (btn) btn.disabled = true;
+            if (status) status.innerHTML = '<span class="badge badge-warning"><i class="fa fa-spinner fa-spin"></i> 处理中...</span>';
             
             try {
                 const response = await fetch('/api/tunnel/status');
@@ -3531,6 +3671,7 @@ playwright install chromium</pre>
 
         function showTunnelSection() {
             const container = document.getElementById('content-container');
+            if (!container) return;
             container.innerHTML = `
                 <div class="card">
                     <div class="card-header bg-primary text-white">

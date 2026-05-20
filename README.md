@@ -43,6 +43,20 @@ bash run.sh
 
 ## 更新日志
 
+### v3.1.8 (2026-05-20)
+- **面板冲突问题彻底修复**
+  - 所有功能采用独立容器，彻底解决多功能并行运行时面板冲突问题
+  - 新增 6 个独立面板：
+    - `output-panel` - 通用命令输出
+    - `tunnel-panel` - 隧道共享
+    - `sku-input-panel` - 货号对比输入
+    - `cleaner-panel` - 文件清理
+    - `products-panel` - 商品数据展示
+    - `spider-output-panel` - 爬虫执行结果
+  - 每个面板有独立的关闭函数，互不干扰
+  - 修复 "Cannot set properties of null (setting 'innerHTML')" 错误
+  - 修复多窗口/多功能同时运行时的 DOM 冲突问题
+
 ### v3.1.7 (2026-05-20)
 - **货号对比重复检测优化**
   - 后端 `/api/sku/compare/txt` API 新增重复货号检测逻辑
