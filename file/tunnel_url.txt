@@ -1,0 +1,5 @@
+Success  Tunnel ready
+  Public URL: https://t-zuxljzzcex.hostc.dev
+  Local:      http://127.0.0.1:8888/
+  Tunnel:     t-zuxljzzcex
+  Channels:   2
