@@ -2435,12 +2435,16 @@ playwright install chromium</pre>
                 if (skuData.addedProducts && skuData.addedProducts.length > 0) {
                     cardHtml += `
                         <div class="change-section">
-                            <div class="change-title" style="color: #67c23a;">新增商品 (${skuData.addedProducts.length}个)</div>
+                            <div class="change-title" style="color: #67c23a;">新增商品序列号 (${skuData.addedProducts.length}个)</div>
                             <div class="change-table-container">
                                 <table class="change-table">
-                                    <thead><tr><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
+                                    <thead><tr><th>序号</th><th>货号</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.addedProducts.map(p => `<tr><td>${p.sku}</td><td>${p.name ? p.name.substring(0, 20) : ''}${p.name && p.name.length > 20 ? '...' : ''}</td><td>${p.price}</td></tr>`).join('')}
+                                        ${skuData.addedProducts.map((p, idx) => `<tr>
+                                            <td>${idx + 1}</td>
+                                            <td><a href="javascript:void(0)" onclick="showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
+                                            <td>${p.price || '-'}</td>
+                                        </tr>`).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -2451,12 +2455,16 @@ playwright install chromium</pre>
                 if (skuData.deletedProducts && skuData.deletedProducts.length > 0) {
                     cardHtml += `
                         <div class="change-section">
-                            <div class="change-title" style="color: #f56c6c;">删除商品 (${skuData.deletedProducts.length}个)</div>
+                            <div class="change-title" style="color: #f56c6c;">删除商品序列号 (${skuData.deletedProducts.length}个)</div>
                             <div class="change-table-container">
                                 <table class="change-table">
-                                    <thead><tr><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
+                                    <thead><tr><th>序号</th><th>货号</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.deletedProducts.map(p => `<tr><td>${p.sku}</td><td>${p.name ? p.name.substring(0, 20) : ''}${p.name && p.name.length > 20 ? '...' : ''}</td><td>${p.price}</td></tr>`).join('')}
+                                        ${skuData.deletedProducts.map((p, idx) => `<tr>
+                                            <td>${idx + 1}</td>
+                                            <td>${p.sku}</td>
+                                            <td>${p.price || '-'}</td>
+                                        </tr>`).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -2470,9 +2478,13 @@ playwright install chromium</pre>
                             <div class="change-title" style="color: #409EFF;">新增高价商品(≥599) (${skuData.newHighPriceProducts.length}个)</div>
                             <div class="change-table-container">
                                 <table class="change-table">
-                                    <thead><tr><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
+                                    <thead><tr><th>序号</th><th>货号</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.newHighPriceProducts.map(p => `<tr><td onclick="showProductDetail('${p.sku}')" style="cursor:pointer;color:#409EFF;">${p.sku}</td><td>${p.name ? p.name.substring(0, 20) : ''}${p.name && p.name.length > 20 ? '...' : ''}</td><td>${p.price}</td></tr>`).join('')}
+                                        ${skuData.newHighPriceProducts.map((p, idx) => `<tr>
+                                            <td>${idx + 1}</td>
+                                            <td><a href="javascript:void(0)" onclick="showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
+                                            <td>${p.price || '-'}</td>
+                                        </tr>`).join('')}
                                     </tbody>
                                 </table>
                             </div>
