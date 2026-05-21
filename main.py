@@ -10,6 +10,14 @@ import subprocess
 import threading
 import uuid
 import logging
+import base64
+import glob
+import gzip
+import traceback
+import select
+import argparse
+import socket
+from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -861,7 +869,6 @@ def get_version_from_readme():
     try:
         with open(readme_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        import re
         match = re.search(r'###\s+v(\d+\.\d+\.\d+)', content)
         if match:
             return match.group(1)
@@ -985,12 +992,6 @@ def safe_print(*args, **kwargs):
                 safe_args.append(arg)
         print(*safe_args, **kwargs)
 
-# 根据系统选择打印函数
-if Environment.IS_WINDOWS:
-    print_func = safe_print
-else:
-    print_func = print
-
 # 使用Environment类的VENV_PYTHON，自动创建虚拟环境
 def get_python_executable():
     """获取Python可执行文件路径，优先使用虚拟环境，不存在则创建"""
@@ -1000,7 +1001,6 @@ def get_python_executable():
     # 虚拟环境不存在，创建它
     print(f"虚拟环境不存在，正在创建...")
     try:
-        import sys
         subprocess.run(
             [sys.executable, '-m', 'venv', '.venv'],
             check=True,
@@ -1062,9 +1062,6 @@ def run_command_background(task_id, command):
         
         stdout_lines = []
         # 使用非阻塞读取
-        if not Environment.IS_WINDOWS:
-            import select
-        
         while True:
             # 检查进程是否结束
             if process.poll() is not None:
@@ -1182,6 +1179,11 @@ class PathManager:
     def get_duplicate_log_file():
         """获取重复日志文件路径"""
         return os.path.join(PathManager.get_file_dir(), 'duplicate_log.json')
+    
+    @staticmethod
+    def get_tunnel_url_file():
+        """获取隧道URL文件路径"""
+        return os.path.join(PathManager.get_file_dir(), 'tunnel_url.txt')
     
     @staticmethod
     def ensure_dirs_exist():
@@ -1873,7 +1875,6 @@ class WegoScraper:
         """通过API获取缺失拿货价的商品详情"""
         print(f'开始通过API获取 {len(products_need_api)} 个商品的拿货价...')
         
-        import os
         cookie_file = os.path.join(os.path.dirname(__file__), 'config', 'cookies.json')
         cookies = []
         if os.path.exists(cookie_file):
@@ -2065,13 +2066,11 @@ class WegoScraper:
             return []
         except Exception as e:
             print(f'获取数据失败: {e}')
-            import traceback
             traceback.print_exc()
             return []
 
     async def fetch_all_products_via_api(self, page):
         """通过API获取所有商品数据"""
-        import os
         cookie_file = os.path.join(os.path.dirname(__file__), 'config', 'cookies.json')
         cookies = []
         if os.path.exists(cookie_file):
@@ -2180,7 +2179,6 @@ class WegoScraper:
             staff_info = item.get('staffInfo', {})
             staff_nick = staff_info.get('staffNick', '')
             
-            import base64
             media_b64_list = []
             imgs_src = item.get('imgsSrc', [])
             if imgs_src:
@@ -2280,7 +2278,6 @@ class WegoScraper:
         existing_summary = None
         if os.path.exists(new_filename):
             try:
-                import shutil
                 shutil.copy2(new_filename, cache_filename)
                 print(f'已将旧数据保存为缓存文件: {cache_filename}')
                 
@@ -2473,7 +2470,6 @@ class WegoScraper:
                 
         except Exception as e:
             print(f'运行失败: {e}')
-            import traceback
             traceback.print_exc()
         finally:
             end_time = time.time()
@@ -2551,7 +2547,6 @@ class StockNumberComparator:
             return stock_numbers
         except Exception as e:
             print(f'读取Excel文件失败: {e}')
-            import traceback
             traceback.print_exc()
             return None
 
@@ -2597,7 +2592,6 @@ class StockNumberComparator:
                 
             except Exception as e:
                 print(f'读取Excel文件失败 {excel_file}: {e}')
-                import traceback
                 traceback.print_exc()
                 continue
         
@@ -2831,7 +2825,6 @@ class StockNumberComparator:
             return True
         except Exception as e:
             print(f'对比失败: {e}')
-            import traceback
             traceback.print_exc()
             return False
 
@@ -2934,7 +2927,6 @@ class StockNumberComparator:
             return True
         except Exception as e:
             print(f'对比失败: {e}')
-            import traceback
             traceback.print_exc()
             return False
 
@@ -3245,7 +3237,6 @@ def run_scraper():
         asyncio.run(scraper.run())
     except Exception as e:
         print(f'运行爬虫时出错: {e}')
-        import traceback
         traceback.print_exc()
         input('按回车键继续...')
 
@@ -3270,7 +3261,6 @@ def update_cookie():
     
     try:
         from playwright.async_api import async_playwright
-        import asyncio
         
         async def get_cookie():
             async with async_playwright() as p:
@@ -3404,12 +3394,10 @@ def update_cookie():
         
     except Exception as e:
         print(f'✗ Cookie更新失败: {e}')
-        import traceback
         traceback.print_exc()
 
 
 if __name__ == '__main__':
-    import argparse
     parser = argparse.ArgumentParser(description='Szwego商品爬虫')
     parser.add_argument('--web', action='store_true', help='启动Web服务模式')
     parser.add_argument('--port', type=int, default=8888, help='Web服务端口 (默认8888)')
@@ -3573,9 +3561,7 @@ if __name__ == '__main__':
             print('任务完成')
         except Exception as e:
             print(f'任务执行失败: {e}')
-            import traceback
             traceback.print_exc()
-        import sys
         sys.exit(0)
     
     if args.web:
@@ -3593,10 +3579,6 @@ if __name__ == '__main__':
 
         @app.route('/dist/<path:filename>')
         def dist_files(filename):
-            import gzip
-            import os
-            from functools import wraps
-
             file_path = os.path.join(PROJECT_DIR, 'dist', filename)
 
             if not os.path.isfile(file_path):
@@ -3700,7 +3682,6 @@ if __name__ == '__main__':
 
         @app.route('/api/cookie', methods=['GET'])
         def get_cookie_status():
-            import glob
             cookie_file = os.path.join(PROJECT_DIR, 'config', 'cookies.json')
             if not os.path.exists(cookie_file):
                 return jsonify({'error': 'Cookie文件不存在', 'valid': False, 'system': Environment.SYSTEM}), 404
@@ -3725,9 +3706,8 @@ if __name__ == '__main__':
                 if not expires or not isinstance(expires, (int, float)) or expires <= 0:
                     return jsonify({'error': 'Token Cookie无效', 'valid': False, 'system': Environment.SYSTEM}), 404
                 
-                import datetime
-                expires_time = datetime.datetime.fromtimestamp(expires)
-                hours_remaining = (expires_time - datetime.datetime.now()).total_seconds() / 3600
+                expires_time = datetime.fromtimestamp(expires)
+                hours_remaining = (expires_time - datetime.now()).total_seconds() / 3600
                 
                 return jsonify({
                     'valid': True, 
@@ -3742,7 +3722,6 @@ if __name__ == '__main__':
 
         @app.route('/api/sku/compare', methods=['GET'])
         def compare_sku():
-            import glob
             try:
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
                 if not json_files:
@@ -3759,7 +3738,6 @@ if __name__ == '__main__':
                 if os.path.exists(input_file):
                     with open(input_file, 'r', encoding='utf-8') as f:
                         content = f.read()
-                        import re
                         txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
                 
                 json_set = set(json_stock_numbers)
@@ -3784,7 +3762,6 @@ if __name__ == '__main__':
 
         @app.route('/api/sku/compare/txt', methods=['GET', 'POST'])
         def compare_sku_txt():
-            import glob
             try:
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
                 if not json_files:
@@ -3800,14 +3777,12 @@ if __name__ == '__main__':
                 if request.method == 'POST':
                     req_data = request.get_json()
                     input_skus = req_data.get('skus', '')
-                    import re
                     txt_stock_numbers_raw = re.findall(r'\d+', input_skus)
                 else:
                     input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
                     if os.path.exists(input_file):
                         with open(input_file, 'r', encoding='utf-8') as f:
                             content = f.read()
-                            import re
                             txt_stock_numbers_raw = re.findall(r'\d+', content)
                 
                 txt_stock_numbers = sorted(set(txt_stock_numbers_raw))
@@ -3836,7 +3811,6 @@ if __name__ == '__main__':
 
         @app.route('/api/sku/compare/excel', methods=['GET'])
         def compare_sku_excel():
-            import glob
             try:
                 if pd is None:
                     return jsonify({'error': 'pandas未安装，Excel对比功能不可用'}), 500
@@ -4022,8 +3996,6 @@ if __name__ == '__main__':
 
         @app.route('/api/products', methods=['GET'])
         def get_all_products():
-            import glob
-            import base64
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'error': '没有找到JSON文件'}), 404
@@ -4104,11 +4076,9 @@ if __name__ == '__main__':
 
         @app.route('/api/product', methods=['GET'])
         def get_product():
-            import base64
             sku = request.args.get('sku', '').strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}), 400
-            import glob
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'found': False, 'error': '没有找到JSON文件'})
@@ -4151,7 +4121,6 @@ if __name__ == '__main__':
             sku = request.args.get('sku', '').strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}), 400
-            import glob
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'error': '没有找到JSON文件'}), 404
@@ -4162,7 +4131,6 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 for p in products:
                     if p.get('货号') == sku:
-                        import base64
                         media_result = []
                         new_image_url = p.get('图片', '')
                         if new_image_url:
@@ -4306,7 +4274,6 @@ if __name__ == '__main__':
 
         @app.route('/api/server/info', methods=['GET'])
         def get_server_info():
-            import socket
             port = args.port
             
             # 获取局域网 IP
@@ -4452,7 +4419,7 @@ if __name__ == '__main__':
                 if url_ready:
                     # 更新 tunnel_url.txt 文件
                     try:
-                        tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                        tunnel_file = PathManager.get_tunnel_url_file()
                         with file_write_lock:
                             with open(tunnel_file, 'w', encoding='utf-8') as f:
                                 f.write(f'Success  Tunnel ready\n')
@@ -4527,7 +4494,7 @@ if __name__ == '__main__':
                     new_tunnel_process = None
                     
                     # 优先尝试复用 tunnel_url.txt 中的已有 URL
-                    tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                    tunnel_file = PathManager.get_tunnel_url_file()
                     existing_url = None
                     if os.path.exists(tunnel_file):
                         try:
@@ -4637,7 +4604,7 @@ if __name__ == '__main__':
                         
                         # 更新 tunnel_url.txt 文件
                         try:
-                            tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                            tunnel_file = PathManager.get_tunnel_url_file()
                             with file_write_lock:
                                 with open(tunnel_file, 'w', encoding='utf-8') as f:
                                     f.write(f'Success  Tunnel ready\n')
@@ -4669,101 +4636,97 @@ if __name__ == '__main__':
                 return jsonify({'success': True, 'url': tunnel_url, 'message': '隧道已在运行'})
 
             try:
-                import threading
-                import re
-                import time
-
                 port = args.port
                 tunnel_url = None
                 url_ready = False
                 tunnel_last_error = None
                 tunnel_auto_restart = True
 
-                tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                tunnel_file = PathManager.get_tunnel_url_file()
                 
                 print("[Tunnel] 使用 hostc 隧道")
                 tunnel_type = 'hostc'
                 
                 if os.path.exists(tunnel_file):
+                    try:
+                        with open(tunnel_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                            if match:
+                                existing_url = match.group(1).rstrip('/')
+                                if existing_url and len(existing_url) > 10:
+                                    try:
+                                        if Environment.IS_WINDOWS:
+                                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
+                                                                  capture_output=True, text=True, shell=True, timeout=3)
+                                            is_running = result.returncode == 0 and 'node.exe' in result.stdout
+                                        else:
+                                            result = subprocess.run('pgrep -f "hostc"', 
+                                                                  capture_output=True, text=True, timeout=3)
+                                            is_running = result.returncode == 0
+                                        
+                                        if is_running:
+                                            print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
+                                            tunnel_url = existing_url
+                                            url_ready = True
+                                            return jsonify({
+                                                'success': True,
+                                                'url': tunnel_url,
+                                                'message': f'复用已有隧道，URL: {tunnel_url}'
+                                            })
+                                    except:
+                                        pass
+                    except:
+                        pass
+
+                tunnel_process = subprocess.Popen(
+                    f'npx hostc@latest {port} --local-host 127.0.0.1',
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=0,
+                    shell=True,
+                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
+                )
+
+                def read_output():
+                    global tunnel_url, url_ready
+                    while True:
+                        if tunnel_process and tunnel_process.poll() is not None:
+                            break
                         try:
-                            with open(tunnel_file, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                                match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                                if match:
-                                    existing_url = match.group(1).rstrip('/')
-                                    if existing_url and len(existing_url) > 10:
-                                        try:
-                                            if Environment.IS_WINDOWS:
-                                                result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
-                                                                      capture_output=True, text=True, shell=True, timeout=3)
-                                                is_running = result.returncode == 0 and 'node.exe' in result.stdout
-                                            else:
-                                                result = subprocess.run('pgrep -f "hostc"', 
-                                                                      capture_output=True, text=True, timeout=3)
-                                                is_running = result.returncode == 0
-                                            
-                                            if is_running:
-                                                print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
-                                                tunnel_url = existing_url
+                            line = tunnel_process.stdout.readline()
+                            if line:
+                                print(f"[Tunnel] {line.strip()}")
+                                if 'https://' in line or 'http://' in line:
+                                    urls = re.findall(r'https?://[^\s<>"\']+', line)
+                                    for url in urls:
+                                        clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
+                                        if len(clean_url) > 10 and '.' in clean_url:
+                                            if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
+                                                tunnel_url = clean_url
                                                 url_ready = True
-                                                return jsonify({
-                                                    'success': True,
-                                                    'url': tunnel_url,
-                                                    'message': f'复用已有隧道，URL: {tunnel_url}'
-                                                })
-                                        except:
-                                            pass
+                                                print(f"[Tunnel] 找到公网URL: {tunnel_url}")
+                                                
+                                                # 更新 tunnel_url.txt 文件
+                                                try:
+                                                    tunnel_file = PathManager.get_tunnel_url_file()
+                                                    with file_write_lock:
+                                                        with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                                            f.write(f'Success  Tunnel ready\n')
+                                                            f.write(f'  Type:       hostc\n')
+                                                            f.write(f'  Public URL: {clean_url}\n')
+                                                            f.write(f'  Local:      http://127.0.0.1:{port}/\n')
+                                                    print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
+                                                except Exception as e:
+                                                    print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
+                                                
+                                                break
                         except:
                             pass
 
-                    tunnel_process = subprocess.Popen(
-                        f'npx hostc@latest {port} --local-host 127.0.0.1',
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        bufsize=0,
-                        shell=True,
-                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
-                    )
-
-                    def read_output():
-                        global tunnel_url, url_ready
-                        while True:
-                            if tunnel_process and tunnel_process.poll() is not None:
-                                break
-                            try:
-                                line = tunnel_process.stdout.readline()
-                                if line:
-                                    print(f"[Tunnel] {line.strip()}")
-                                    if 'https://' in line or 'http://' in line:
-                                        urls = re.findall(r'https?://[^\s<>"\']+', line)
-                                        for url in urls:
-                                            clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
-                                            if len(clean_url) > 10 and '.' in clean_url:
-                                                if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
-                                                    tunnel_url = clean_url
-                                                    url_ready = True
-                                                    print(f"[Tunnel] 找到公网URL: {tunnel_url}")
-                                                    
-                                                    # 更新 tunnel_url.txt 文件
-                                                    try:
-                                                        tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
-                                                        with file_write_lock:
-                                                            with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                                                f.write(f'Success  Tunnel ready\n')
-                                                                f.write(f'  Type:       hostc\n')
-                                                                f.write(f'  Public URL: {clean_url}\n')
-                                                                f.write(f'  Local:      http://127.0.0.1:{port}/\n')
-                                                        print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
-                                                    except Exception as e:
-                                                        print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
-                                                    
-                                                    break
-                            except:
-                                pass
-
-                    read_thread = threading.Thread(target=read_output, daemon=True)
-                    read_thread.start()
+                read_thread = threading.Thread(target=read_output, daemon=True)
+                read_thread.start()
 
                 tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
                 tunnel_restart_thread.start()
@@ -4799,7 +4762,7 @@ if __name__ == '__main__':
             # 优先使用内部 URL，否则从 tunnel_url.txt 读取
             if not current_url:
                 try:
-                    tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                    tunnel_file = PathManager.get_tunnel_url_file()
                     if os.path.exists(tunnel_file):
                         with open(tunnel_file, 'r', encoding='utf-8') as f:
                             content = f.read()
