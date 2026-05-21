@@ -3586,38 +3586,22 @@ playwright install chromium</pre>
             try {
                 const response = await fetch('/api/tunnel/status');
                 const data = await response.json();
-                updateTunnelUI(data.running, data.url, data.auto_restart, data.restart_count, data.last_error, data.tunnel_type, data.cloudflare_configured, data.cloudflare_info);
+                updateTunnelUI(data.running, data.url, data.auto_restart, data.restart_count, data.last_error, data.tunnel_type);
             } catch (e) {
                 console.error('检查隧道状态失败:', e);
             }
         }
 
-        function updateTunnelUI(running, url, autoRestart, restartCount, lastError, tunnelType, cloudflareConfigured, cloudflareInfo) {
+        function updateTunnelUI(running, url, autoRestart, restartCount, lastError, tunnelType) {
             const btn = document.getElementById('btn-toggle-tunnel');
             const status = document.getElementById('tunnel-status');
             const urlDisplay = document.getElementById('tunnel-public-url');
             const restartInfo = document.getElementById('tunnel-restart-info');
             const tunnelTypeDisplay = document.getElementById('tunnel-type');
-            const cloudflareStatus = document.getElementById('cloudflare-config-status');
-            const cloudflareDetails = document.getElementById('cloudflare-config-details');
             
             // 显示隧道类型
             if (tunnelTypeDisplay) {
-                if (tunnelType === 'cloudflare') {
-                    tunnelTypeDisplay.innerHTML = '<span class="text-primary"><i class="fa fa-cloud"></i> Cloudflare Tunnel</span>';
-                } else {
-                    tunnelTypeDisplay.innerHTML = '<span class="text-success"><i class="fa fa-bolt"></i> hostc</span>';
-                }
-            }
-            
-            // 显示 Cloudflare 配置状态
-            if (cloudflareStatus && cloudflareDetails) {
-                if (cloudflareConfigured && cloudflareInfo) {
-                    cloudflareStatus.style.display = 'block';
-                    cloudflareDetails.innerHTML = `Tunnel: ${cloudflareInfo.tunnel_name || cloudflareInfo.tunnel_id} (${cloudflareInfo.tunnel_id.substring(0, 8)}...)`;
-                } else {
-                    cloudflareStatus.style.display = 'none';
-                }
+                tunnelTypeDisplay.innerHTML = '<span class="text-success"><i class="fa fa-bolt"></i> hostc</span>';
             }
             
             if (btn) {
@@ -3752,10 +3736,6 @@ playwright install chromium</pre>
                                         <i class="fa fa-info-circle"></i> <strong>隧道类型:</strong> 
                                         <span id="tunnel-type" class="font-weight-bold">加载中...</span>
                                     </div>
-                                    <div id="cloudflare-config-status" class="alert alert-success mb-2" style="display: none;">
-                                        <i class="fa fa-check-circle"></i> <strong>Cloudflare Tunnel 已配置</strong>
-                                        <div id="cloudflare-config-details" class="mt-1 small text-muted"></div>
-                                    </div>
                                     <div id="tunnel-status-display" class="mb-2">
                                         <span id="tunnel-status"><span class="badge badge-secondary"><i class="fa fa-circle"></i> 未连接</span></span>
                                         <div id="tunnel-restart-info" class="mt-1" style="display: none;"></div>
@@ -3773,9 +3753,6 @@ playwright install chromium</pre>
                             <button id="btn-toggle-tunnel" class="btn btn-success btn-lg" onclick="toggleTunnel()">
                                 <i class="fa fa-play"></i> 启动隧道
                             </button>
-                            <button id="btn-config-cloudflare" class="btn btn-info btn-lg ml-2" onclick="showCloudflareConfig()">
-                                <i class="fa fa-cog"></i> 配置 Cloudflare
-                            </button>
                         </div>
                         <div class="mt-4">
                             <div class="alert alert-warning">
@@ -3785,7 +3762,6 @@ playwright install chromium</pre>
                                     <li>生成公网地址后，可以复制链接分享给其他人</li>
                                     <li>公网地址仅在隧道运行时有效，关闭后会失效</li>
                                     <li>默认使用 <code>hostc</code> 隧道服务</li>
-                                    <li>如需使用 Cloudflare Tunnel，点击"配置 Cloudflare"按钮</li>
                                     <li>确保网络连接正常</li>
                                 </ul>
                             </div>
@@ -3795,190 +3771,6 @@ playwright install chromium</pre>
             `;
             loadServerInfo();
             checkTunnelStatus();
-        }
-
-        async function showCloudflareConfig() {
-            try {
-                const response = await fetch('/api/tunnel/config/cloudflare');
-                const data = await response.json();
-                
-                const tunnelId = data.tunnel_id || '';
-                const tunnelName = data.tunnel_name || '';
-                const accountId = data.account_id || '';
-                
-                const modalHtml = `
-                    <div class="modal fade" id="cloudflareConfigModal" tabindex="-1" role="dialog">
-地方                        <div class="modal-dialog" role="document" style="max-width: 600px;">
-                            <div class="modal-content">
-                                <div class="modal-header bg-info text-white">
-                                    <h5 class="modal-title"><i class="fa fa-cog"></i> Cloudflare Tunnel 配置</h5>
-                                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                                        <span aria-hidden="true">&times;</span>
-                                    </button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="alert alert-info">
-                                        <i class="fa fa-info-circle"></i> <strong>配置步骤：</strong>
-                                        <ol class="mb-0 mt-2">
-                                            <li>在本地运行 <code>cloudflared tunnel login</code></li>
-                                            <li>在本地运行 <code>cloudflared tunnel create my-tunnel</code></li>
-                                            <li>在本地运行 <code>cloudflared tunnel token &lt;tunnel-id&gt; &gt; &lt;tunnel-id&gt;.json</code></li>
-                                            <li>上传生成的 JSON 凭证文件</li>
-                                            <li>填写 Tunnel ID、Tunnel Name 和 Account ID</li>
-                                        </ol>
-                                    </div>
-                                    
-                                    <div class="form-group mb-3">
-                                        <label for="credential-file"><strong>步骤 1: 上传凭证文件</strong></label>
-                                        <input type="file" class="form-control-file" id="credential-file" accept=".json">
-                                        <small class="text-muted">凭证文件名必须为 &lt;tunnel-id&gt;.json，例如: 12345678-1234-1234-1234-123456789012.json</small>
-                                        <button type="button" class="btn btn-sm btn-primary mt-2" onclick="uploadCredentialFile()">上传凭证文件</button>
-                                        <div id="upload-status" class="mt-2"></div>
-                                    </div>
-                                    
-                                    <hr>
-                                    
-                                    <form id="cloudflare-config-form">
-                                        <div class="form-group">
-                                            <label for="tunnel-id"><strong>步骤 2: Tunnel ID</strong></label>
-                                            <input type="text" class="form-control" id="tunnel-id" value="${tunnelId}" placeholder="例如: 12345678-1234-1234-1234-123456789012" required>
-                                            <small class="text-muted">运行 <code>cloudflared tunnel create</code> 命令后显示的 ID</small>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="tunnel-name"><strong>步骤 3: Tunnel Name</strong></label>
-                                            <input type="text" class="form-control" id="tunnel-name" value="${tunnelName}" placeholder="例如: my-tunnel">
-                                            <small class="text-muted">隧道的名称</small>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="account-id"><strong>步骤 4: Account ID</strong></label>
-                                            <input type="text" class="form-control" id="account-id" value="${accountId}" placeholder="例如: 98765432-9876-9876-9876-987654321098" required>
-                                            <small class="text-muted">Cloudflare 账户 ID</small>
-                                        </div>
-                                    </form>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-danger" onclick="deleteCloudflareConfig()">删除配置</button>
-                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
-                                    <button type="button" class="btn btn-primary" onclick="saveCloudflareConfig()">保存配置</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
-                $('#cloudflareConfigModal').modal('show');
-                
-                $('#cloudflareConfigModal').on('hidden.bs.modal', function () {
-                    $(this).remove();
-                });
-            } catch (e) {
-                alert('加载配置失败: ' + e.message);
-            }
-        }
-
-        async function uploadCredentialFile() {
-            const fileInput = document.getElementById('credential-file');
-            const uploadStatus = document.getElementById('upload-status');
-            
-            if (!fileInput.files || fileInput.files.length === 0) {
-                alert('请选择凭证文件');
-                return;
-            }
-            
-            const file = fileInput.files[0];
-            
-            if (!file.name.endsWith('.json')) {
-                alert('凭证文件必须是 JSON 格式');
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            uploadStatus.innerHTML = '<span class="text-info"><i class="fa fa-spinner fa-spin"></i> 上传中...</span>';
-            
-            try {
-                const response = await fetch('/api/tunnel/credential/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    uploadStatus.innerHTML = '<span class="text-success"><i class="fa fa-check"></i> 凭证文件上传成功！</span>';
-                    
-                    if (data.tunnel_id) {
-                        document.getElementById('tunnel-id').value = data.tunnel_id;
-                    }
-                } else {
-                    uploadStatus.innerHTML = '<span class="text-danger"><i class="fa fa-times"></i> 上传失败: ' + (data.error || '未知错误') + '</span>';
-                }
-            } catch (e) {
-                uploadStatus.innerHTML = '<span class="text-danger"><i class="fa fa-times"></i> 上传失败: ' + e.message + '</span>';
-            }
-        }
-
-        async function saveCloudflareConfig() {
-            const tunnelId = document.getElementById('tunnel-id').value.trim();
-            const tunnelName = document.getElementById('tunnel-name').value.trim();
-            const accountId = document.getElementById('account-id').value.trim();
-            
-            if (!tunnelId || !accountId) {
-                alert('请填写 Tunnel ID 和 Account ID');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/tunnel/config/cloudflare', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        tunnel_id: tunnelId,
-                        tunnel_name: tunnelName,
-                        account_id: accountId
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('Cloudflare Tunnel 配置已保存！');
-                    $('#cloudflareConfigModal').modal('hide');
-                    checkTunnelStatus();
-                } else {
-                    alert('保存失败: ' + (data.error || '未知错误'));
-                }
-            } catch (e) {
-                alert('保存失败: ' + e.message);
-            }
-        }
-
-        async function deleteCloudflareConfig() {
-            if (!confirm('确定要删除 Cloudflare Tunnel 配置吗？删除后将使用默认的 hostc 隧道。')) {
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/tunnel/config/cloudflare', {
-                    method: 'DELETE'
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert('Cloudflare Tunnel 配置已删除！');
-                    $('#cloudflareConfigModal').modal('hide');
-                    checkTunnelStatus();
-                } else {
-                    alert('删除失败: ' + (data.error || '未知错误'));
-                }
-            } catch (e) {
-                alert('删除失败: ' + e.message);
-            }
         }
 
         // 页面加载完成后初始化

@@ -1,5 +1,6 @@
 Success  Tunnel ready
-  Public URL: https://t-6ta4y91ld6.hostc.dev
+  Public URL: https://t-7nsngoq5do.hostc.dev
   Local:      http://127.0.0.1:8888/
-  Tunnel:     t-6ta4y91ld6
+  Tunnel:     t-7nsngoq5do
   Channels:   2
+^C^C

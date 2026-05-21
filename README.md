@@ -43,6 +43,25 @@ bash run.sh
 
 ## 更新日志
 
+### v3.2.4 (2026-05-21)
+- **移除 Cloudflare Tunnel 功能**
+  - 简化隧道服务，移除 Cloudflare Tunnel 配置选项
+  - 启动脚本从 7 步简化为 5 步，删除 Cloudflare 配置检测步骤
+  - run.bat 和 run.sh 现在只提供 2 个选项：
+    - 选项 1：使用 hostc 隧道（默认，快速启动）
+    - 选项 2：不使用隧道（仅本地访问）
+  - 删除 main.py 中的 Cloudflare 相关代码：
+    - 删除 `start_cloudflare_tunnel()` 函数
+    - 删除 4 个 Cloudflare API 路由（配置、获取、删除、上传凭证）
+    - 删除 Cloudflare 配置检测逻辑
+    - 简化隧道类型为仅 `hostc`
+  - 删除 index.html 中的 Cloudflare 相关代码：
+    - 删除 Cloudflare 配置状态显示
+    - 删除"配置 Cloudflare"按钮
+    - 删除 4 个 JavaScript 函数（配置、上传、保存、删除）
+    - 简化 `updateTunnelUI()` 函数
+  - 所有 Cloudflare 相关功能完全移除，代码更简洁易维护
+
 ### v3.2.3 (2026-05-21)
 - **Cloudflare Tunnel 配置功能**
   - 新增 Cloudflare Tunnel 自动配置功能，支持替代 hostc 隧道

@@ -1,8 +1,74 @@
 {
   "生成日期": "20260520",
-  "时间戳": "2026-05-20 17:20:36",
-  "成功获取": "78 个商品",
+  "时间戳": "2026-05-20 20:25:40",
+  "成功获取": "82 个商品",
   "商品列表": [
+    {
+      "商品描述": "iPhone 13     国行256G红色     电池容量100%，换过第三方电池     边框有磕碰如图    屏幕细微划痕",
+      "售价": "¥1,299",
+      "拿货价": "¥1,000",
+      "货号": "70948",
+      "备注": "",
+      "员工": "店长",
+      "图片": [
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNjU4MV8yNjYyXzBfMS5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNzgzNF83MTI2XzBfMi5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNjYyNV82MTE0XzBfMy5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNjYyNF81MzYzXzBfNC5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNzgxMl80MDY3XzBfNS5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNzg0MV8zNTYyXzBfNi5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNjY2M184MTEwXzBfNy5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MjAvbzE3NzkyNzExOTgwOTRfNjNfMF8wLm1wNA=="
+      ]
+    },
+    {
+      "商品描述": "iPhone 17     国行256G白色     充电0次    成色准新     保修到2027年5月19日",
+      "售价": "¥4,999",
+      "拿货价": "¥4,600",
+      "货号": "37968",
+      "备注": "",
+      "员工": "店长",
+      "图片": [
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTY1NTIxNl85MjY2XzBfMS5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTY1NTI2NV8zNDQzXzBfMi5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTY1NTI1OF85NjA4XzBfMy5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MjAvbzE3NzkyNjk5OTc4MjZfMTk5MF8wXzAubXA0"
+      ]
+    },
+    {
+      "商品描述": "红米K30    6+128G蓝色     成色97新    一点点使用痕迹",
+      "售价": "¥399",
+      "拿货价": "¥300",
+      "货号": "04237",
+      "备注": "",
+      "员工": "店长",
+      "图片": [
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTMyMzMzN181MTE3XzBfMC5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTMyMjM0NV81ODc2XzBfMS5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTMyMjQxM18zMjcwXzBfMi5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTMyMjQxNF8yNDYzXzBfMy5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTMyMjM2NV80OTg4XzBfNC5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTMyMjQwMl84NDUzXzBfNS5qcGc="
+      ]
+    },
+    {
+      "商品描述": "红米K80    12+256G白色     电池容量99%    边框有磕碰   ",
+      "售价": "¥1,399",
+      "拿货价": "¥1,100",
+      "货号": "40388",
+      "备注": "",
+      "员工": "店长",
+      "图片": [
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MF85NjY0XzBfMS5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MF80NDMxXzBfMi5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA4ODMzN183MDc4XzBfNy5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MV82MjAzXzBfMy5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MV8zNTA3XzBfNC5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NjM0OF82MDY1XzBfNS5qcGc=",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MV82MDFfMF82LmpwZw==",
+        "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MjAvbzE3NzkyNjkxOTE5MTlfNzAxM18wXzAubXA0"
+      ]
+    },
     {
       "商品描述": "华为mate70Pro+     16+512G飞天青       电池容量97%    边框轻微磨损     售后换过屏幕    现外屏碎     ",
       "售价": "",
@@ -23,7 +89,7 @@
     },
     {
       "商品描述": "AirPods4   非降噪版     充电仓一点点轻微划痕   ",
-      "售价": "",
+      "售价": "¥650",
       "拿货价": "¥400",
       "货号": "",
       "备注": "",
@@ -1288,15 +1354,15 @@
       ]
     }
   ],
-  "单个设备的平均回收价格": "1,144.90",
-  "平均每个设备售出均价": "1,428.94",
-  "累计成本": "89,302.00",
-  "预计毛利": "22,155.00",
-  "毛利率": "24.81%",
-  "预计售出价格累计": "111,457.00",
-  "闲鱼平台手续费累计": "1,783.31",
-  "所有设备卖到闲鱼平台的毛利": "109,673.69",
-  "统计": "共计获取到 78 个商品",
+  "单个设备的平均回收价格": "1,174.41",
+  "平均每个设备售出均价": "1,465.89",
+  "累计成本": "96,302.00",
+  "预计毛利": "23,901.00",
+  "毛利率": "24.82%",
+  "预计售出价格累计": "120,203.00",
+  "闲鱼平台手续费累计": "1,923.25",
+  "所有设备卖到闲鱼平台的毛利": "118,279.75",
+  "统计": "共计获取到 82 个商品",
   "小计": [
     {
       "timestamp": "2026-05-20 10:14:33",
@@ -1868,12 +1934,225 @@
       "high_price_added": [],
       "high_price_added_count": 0,
       "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 17:55:12",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 3,
+      "removed_count": 0,
+      "added": [
+        "04237",
+        "37968",
+        "40388"
+      ],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 18:02:30",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 1,
+      "removed_count": 0,
+      "added": [
+        "70948"
+      ],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 18:16:23",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 18:24:08",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 18:31:31",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 19:00:43",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 19:01:05",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 19:22:13",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 19:46:19",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 20:12:31",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
+    },
+    {
+      "timestamp": "2026-05-20 20:25:40",
+      "date": "20260520",
+      "latest_file": "20260520微购相册(小旭数码).json",
+      "second_file": "20260520微购相册(小旭数码)_cache.json",
+      "added_count": 0,
+      "removed_count": 0,
+      "added": [],
+      "removed": [],
+      "high_price_added": [],
+      "high_price_added_count": 0,
+      "high_price_description": "新增的售价>=599的商品"
     }
   ],
   "高价商品统计": {
     "筛选条件": "售价 >= 599",
-    "数量": 57,
+    "数量": 61,
     "商品列表": [
+      {
+        "商品描述": "iPhone 13     国行256G红色     电池容量100%，换过第三方电池     边框有磕碰如图    屏幕细微划痕",
+        "售价": "¥1,299",
+        "拿货价": "¥1,000",
+        "货号": "70948",
+        "备注": "",
+        "员工": "店长",
+        "图片": [
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNjU4MV8yNjYyXzBfMS5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNzgzNF83MTI2XzBfMi5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNjYyNV82MTE0XzBfMy5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNjYyNF81MzYzXzBfNC5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNzgxMl80MDY3XzBfNS5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNzg0MV8zNTYyXzBfNi5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI3MTExNjY2M184MTEwXzBfNy5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MjAvbzE3NzkyNzExOTgwOTRfNjNfMF8wLm1wNA=="
+        ]
+      },
+      {
+        "商品描述": "iPhone 17     国行256G白色     充电0次    成色准新     保修到2027年5月19日",
+        "售价": "¥4,999",
+        "拿货价": "¥4,600",
+        "货号": "37968",
+        "备注": "",
+        "员工": "店长",
+        "图片": [
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTY1NTIxNl85MjY2XzBfMS5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTY1NTI2NV8zNDQzXzBfMi5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTY1NTI1OF85NjA4XzBfMy5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MjAvbzE3NzkyNjk5OTc4MjZfMTk5MF8wXzAubXA0"
+        ]
+      },
+      {
+        "商品描述": "红米K80    12+256G白色     电池容量99%    边框有磕碰   ",
+        "售价": "¥1,399",
+        "拿货价": "¥1,100",
+        "货号": "40388",
+        "备注": "",
+        "员工": "店长",
+        "图片": [
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MF85NjY0XzBfMS5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MF80NDMxXzBfMi5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA4ODMzN183MDc4XzBfNy5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MV82MjAzXzBfMy5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MV8zNTA3XzBfNC5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NjM0OF82MDY1XzBfNS5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI2OTA2NTA0MV82MDFfMF82LmpwZw==",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MjAvbzE3NzkyNjkxOTE5MTlfNzAxM18wXzAubXA0"
+        ]
+      },
+      {
+        "商品描述": "AirPods4   非降噪版     充电仓一点点轻微划痕   ",
+        "售价": "¥650",
+        "拿货价": "¥400",
+        "货号": "",
+        "备注": "",
+        "员工": "店长",
+        "图片": [
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI1ODQ1NTY2OV81MjQ4XzBfMS5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI1ODQ1NTY3Ml8yMjMyXzBfMi5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL2ltZy80ZTNjYWMyNi8yMDI2MDUyMC9pMTc3OTI1ODQ1NTY0MF8xMDc0XzBfMy5qcGc=",
+          "aHR0cHM6Ly94Y2ltZy5zendlZ28uY29tL3B2b2QvNGUzY2FjMjYvMjAyNjA1MjAvbzE3NzkyNTg1MTE4MTNfNTI5Nl8wXzAubXA0"
+        ]
+      },
       {
         "商品描述": "荣耀Magic V2     16+256G黑色      电池容量92%     边框有轻微磕碰如图      外屏比较新",
         "售价": "¥2,699",
