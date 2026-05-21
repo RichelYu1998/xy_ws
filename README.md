@@ -43,6 +43,15 @@ bash run.sh
 
 ## 更新日志
 
+### v3.2.5 (2026-05-21)
+- **简化启动流程**
+  - 移除隧道服务选择菜单，直接启动 hostc 隧道
+  - 启动脚本自动配置并启动 hostc 隧道，无需用户选择
+  - 修复 run.bat 中 `select_tunnel` 标签不存在的错误
+  - run.bat 和 run.sh 现在都直接调用 `run_web` 函数启动服务
+  - 删除 `run_web_no_tunnel` 函数，简化代码结构
+  - 用户体验更流畅，无需手动选择隧道类型
+
 ### v3.2.4 (2026-05-21)
 - **移除 Cloudflare Tunnel 功能**
   - 简化隧道服务，移除 Cloudflare Tunnel 配置选项

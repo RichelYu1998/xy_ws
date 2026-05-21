@@ -67,7 +67,7 @@ check_config() {
 
     if [ -f "config/config.json" ]; then
         echo "配置文件存在"
-        select_tunnel
+        run_web
     else
         echo "配置文件不存在，开始首次配置向导"
         auto_setup
@@ -105,34 +105,7 @@ auto_setup() {
     echo "  - cookies中的token和sensorsdata值"
     echo ""
     read -p "按回车键继续，或 Ctrl+C 退出: "
-    select_tunnel
-}
-
-select_tunnel() {
-    echo ""
-    echo "========================================"
-    echo "隧道服务选择"
-    echo "========================================"
-    echo ""
-    echo "请选择隧道服务类型："
-    echo "  1. 使用 hostc 隧道（默认，快速启动）"
-    echo "  2. 不使用隧道（仅本地访问）"
-    echo ""
-    read -p "请输入选项 (1-2，默认: 1): " TUNNEL_CHOICE
-    TUNNEL_CHOICE=${TUNNEL_CHOICE:-1}
-
-    case "$TUNNEL_CHOICE" in
-        1)
-            run_web
-            ;;
-        2)
-            run_web_no_tunnel
-            ;;
-        *)
-            echo "无效选项，使用默认的 hostc 隧道"
-            run_web
-            ;;
-    esac
+    run_web
 }
 
 run_web() {
@@ -173,39 +146,6 @@ run_web() {
     echo "关闭此窗口可停止服务，或使用:"
     echo "  kill $PYTHON_PID"
     echo "  kill $TUNNEL_PID"
-    echo ""
-}
-
-run_web_no_tunnel() {
-    echo "[5/5] 启动Web服务..."
-
-    echo ""
-    echo "========================================"
-    echo "启动Web服务（无隧道）..."
-    echo "========================================"
-
-    source "$VENV_PATH/bin/activate"
-
-    echo ""
-    echo "正在启动 Web 服务..."
-    echo ""
-    python main.py --web &
-    PYTHON_PID=$!
-
-    echo "等待 Web 服务启动完成..."
-    sleep 5
-
-    echo ""
-    echo "========================================"
-    echo "启动完成！"
-    echo "========================================"
-    echo ""
-    echo "本地访问: http://localhost:8888"
-    echo ""
-    echo "注意：服务将继续在后台运行"
-    echo ""
-    echo "关闭此窗口可停止服务，或使用:"
-    echo "  kill $PYTHON_PID"
     echo ""
 }
 

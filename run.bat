@@ -85,7 +85,7 @@ if not exist config mkdir config
 
 if exist config\config.json (
     echo 配置文件存在
-    goto select_tunnel
+    goto run_web
 ) else (
     echo 配置文件不存在，开始首次配置向导
     goto auto_setup
@@ -125,27 +125,13 @@ set /p CHOICE="按回车键继续，或输入 Q 退出: "
 
 if /i "%CHOICE%"=="Q" goto cleanup_exit
 
-:select_tunnel
-echo.
-echo ========================================
-echo 隧道服务选择
-echo ========================================
-echo.
-echo 请选择隧道服务类型：
-echo   1. 使用 hostc 隧道（默认，快速启动）
-echo   2. 不使用隧道（仅本地访问）
-echo.
-set /p TUNNEL_CHOICE="请输入选项 (1-2，默认: 1): "
-
-if "%TUNNEL_CHOICE%"=="" set TUNNEL_CHOICE=1
-
-if "%TUNNEL_CHOICE%"=="1" goto run_web
-if "%TUNNEL_CHOICE%"=="2" goto run_web_no_tunnel
-
-echo 无效选项，使用默认 hostc 隧道
-goto run_web
-
 :run_web
+echo.
+echo ========================================
+echo 隧道服务配置
+echo ========================================
+echo.
+echo 正在配置 hostc 隧道服务...
 echo [5/5] 预启动隧道服务(加快首次启动速度)...
 call npx -y hostc@latest --help >nul 2>&1
 echo 隧道服务就绪
@@ -190,47 +176,6 @@ echo.
 echo 关闭此窗口可停止服务，或使用:
 echo   taskkill /f /im python.exe
 echo   taskkill /f /im node.exe
-echo.
-exit /b 0
-
-:run_web_no_tunnel
-echo [5/5] 启动Web服务...
-
-echo.
-echo ========================================
-echo 启动Web服务（无隧道）...
-echo ========================================
-
-call %VENV_PATH%\Scripts\activate.bat
-
-echo.
-echo 正在启动 Web 服务...
-echo.
-start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web"
-
-echo 等待 Web 服务启动完成...
-timeout /t 5 /nobreak >nul
-
-:wait_flask_no_tunnel
-for /f %%i in ('curl -s -o nul -w "%%{http_code}" http://localhost:8888') do set "HTTP_CODE=%%i"
-if not "%HTTP_CODE%"=="200" (
-    if not "%HTTP_CODE%"=="302" (
-        timeout /t 2 /nobreak >nul
-        goto wait_flask_no_tunnel
-    )
-)
-
-echo.
-echo ========================================
-echo 启动完成！
-echo ========================================
-echo.
-echo 本地访问: http://localhost:8888
-echo.
-echo 注意：服务将继续在后台运行
-echo.
-echo 关闭此窗口可停止服务，或使用:
-echo   taskkill /f /im python.exe
 echo.
 exit /b 0
 
