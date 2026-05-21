@@ -43,6 +43,17 @@ bash run.sh
 
 ## 更新日志
 
+### v3.2.7 (2026-05-21)
+- **前端代码优化**
+  - 新增 DOM 辅助函数 `$`, `$$`, `el()`，简化元素查询操作
+  - 合并 6 个独立的 `closeXxxPanel` 函数为通用的 `closePanel()` 函数
+  - 优化 `showComparisonCard()` 解析逻辑，使用规则表 `SKU_PARSE_RULES` 替代冗长的 if-else 链
+  - 简化 `renderTable()` 函数，使用 `map().join()` 替代字符串拼接
+  - 优化 `copyToClipboard()` 和 `fallbackCopy()` 函数，简化 Promise 处理和样式设置
+  - 优化事件绑定逻辑，使用箭头函数和 `dataset` API
+  - 合并 CSS 重复规则，减少冗余样式定义
+  - index.html 代码行数减少约 80 行，提升可维护性
+
 ### v3.2.6 (2026-05-21)
 - **代码质量优化**
   - 修复 main.py 缩进错误，解决 IndentationError 问题
