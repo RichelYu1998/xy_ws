@@ -28,6 +28,9 @@ except ImportError:
     pd = None
     print("警告: pandas未安装，Excel对比功能将不可用")
 
+# 文件写入锁，防止多线程同时写入同一文件
+file_write_lock = threading.Lock()
+
 def format_size(size_bytes: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size_bytes < 1024.0:
@@ -4337,6 +4340,7 @@ if __name__ == '__main__':
         tunnel_heartbeat_failed = False
         tunnel_need_restart = False
         tunnel_daemon_started = False
+        tunnel_type = 'hostc'  # 'hostc' or 'cloudflare'
         
         def send_heartbeat():
             global tunnel_url, tunnel_last_heartbeat, tunnel_heartbeat_failed
@@ -4373,6 +4377,100 @@ if __name__ == '__main__':
                     else:
                         consecutive_failures = 0
                 time.sleep(30)
+        
+        def start_cloudflare_tunnel(port):
+            global tunnel_url, tunnel_process
+            
+            tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__), 'file', 'cloudflare_tunnel.txt'))
+            
+            # 检查是否已配置 Cloudflare Tunnel
+            tunnel_id = None
+            tunnel_name = None
+            account_id = None
+            
+            if os.path.exists(tunnel_file):
+                try:
+                    with open(tunnel_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        tunnel_id_match = re.search(r'Tunnel ID:\s*([^\s\n]+)', content)
+                        tunnel_name_match = re.search(r'Tunnel Name:\s*([^\s\n]+)', content)
+                        account_id_match = re.search(r'Account ID:\s*([^\s\n]+)', content)
+                        
+                        if tunnel_id_match:
+                            tunnel_id = tunnel_id_match.group(1)
+                        if tunnel_name_match:
+                            tunnel_name = tunnel_name_match.group(1)
+                        if account_id_match:
+                            account_id = account_id_match.group(1)
+                except:
+                    pass
+            
+            if not tunnel_id or not account_id:
+                print("[Cloudflare] 未找到 Cloudflare Tunnel 配置，请先运行 cloudflared tunnel login")
+                return None, None
+            
+            # 启动 Cloudflare Tunnel
+            try:
+                config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'cloudflare_config.yml')
+                cloudflared_cmd = 'cloudflared tunnel --url http://127.0.0.1:{} --config {} run {}'.format(
+                    port, 
+                    config_path,
+                    tunnel_id
+                )
+                
+                process = subprocess.Popen(
+                    cloudflared_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=0,
+                    shell=True,
+                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
+                )
+                
+                # 等待并解析输出中的 URL
+                url_ready = False
+                tunnel_url = None
+                wait_start = time.time()
+                
+                while not url_ready and time.time() - wait_start < 30:
+                    try:
+                        line = process.stdout.readline()
+                        if line:
+                            print(f"[Cloudflare] {line.strip()}")
+                            # Cloudflare Tunnel 通常会显示访问 URL
+                            url_match = re.search(r'https?://[^\s<>"\']+', line)
+                            if url_match:
+                                tunnel_url = url_match.group(0).rstrip('/')
+                                url_ready = True
+                                print(f"[Cloudflare] 找到公网URL: {tunnel_url}")
+                                break
+                    except:
+                        pass
+                    time.sleep(0.5)
+                
+                if url_ready:
+                    # 更新 tunnel_url.txt 文件
+                    try:
+                        tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                        with file_write_lock:
+                            with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                f.write(f'Success  Tunnel ready\n')
+                                f.write(f'  Type:       Cloudflare Tunnel\n')
+                                f.write(f'  Public URL: {tunnel_url}\n')
+                                f.write(f'  Local:      http://127.0.0.1:{port}/\n')
+                        print(f"[Cloudflare] 已更新 tunnel_url.txt: {tunnel_url}")
+                    except Exception as e:
+                        print(f"[Cloudflare] 更新 tunnel_url.txt 失败: {e}")
+                    
+                    return process, tunnel_url
+                else:
+                    process.terminate()
+                    return None, None
+                    
+            except Exception as e:
+                print(f"[Cloudflare] 启动失败: {e}")
+                return None, None
         
         def restart_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart
@@ -4540,10 +4638,11 @@ if __name__ == '__main__':
                         # 更新 tunnel_url.txt 文件
                         try:
                             tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
-                            with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                f.write(f'Success  Tunnel ready\n')
-                                f.write(f'  Public URL: {new_tunnel_url}\n')
-                                f.write(f'  Local:      http://127.0.0.1:{port}/\n')
+                            with file_write_lock:
+                                with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                    f.write(f'Success  Tunnel ready\n')
+                                    f.write(f'  Public URL: {new_tunnel_url}\n')
+                                    f.write(f'  Local:      http://127.0.0.1:{port}/\n')
                             print(f"[Tunnel] 已更新 tunnel_url.txt: {new_tunnel_url}")
                         except Exception as e:
                             print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
@@ -4562,7 +4661,7 @@ if __name__ == '__main__':
         
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type
 
             tunnel_need_restart = False
             
@@ -4582,84 +4681,109 @@ if __name__ == '__main__':
 
                 tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
                 
-                if os.path.exists(tunnel_file):
-                    try:
-                        with open(tunnel_file, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                            if match:
-                                existing_url = match.group(1).rstrip('/')
-                                if existing_url and len(existing_url) > 10:
-                                    try:
-                                        if Environment.IS_WINDOWS:
-                                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
-                                                                  capture_output=True, text=True, shell=True, timeout=3)
-                                            is_running = result.returncode == 0 and 'node.exe' in result.stdout
-                                        else:
-                                            result = subprocess.run('pgrep -f "hostc"', 
-                                                                  capture_output=True, text=True, timeout=3)
-                                            is_running = result.returncode == 0
-                                        
-                                        if is_running:
-                                            print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
-                                            tunnel_url = existing_url
-                                            url_ready = True
-                                            return jsonify({
-                                                'success': True,
-                                                'url': tunnel_url,
-                                                'message': f'复用已有隧道，URL: {tunnel_url}'
-                                            })
-                                    except:
-                                        pass
-                    except:
-                        pass
-
-                tunnel_process = subprocess.Popen(
-                    f'npx hostc@latest {port} --local-host 127.0.0.1',
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=0,
-                    shell=True,
-                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
-                )
-
-                def read_output():
-                    global tunnel_url, url_ready
-                    while True:
-                        if tunnel_process and tunnel_process.poll() is not None:
-                            break
+                # 检查是否有 Cloudflare Tunnel 配置
+                cloudflare_config = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'cloudflare_tunnel.txt')
+                use_cloudflare = os.path.exists(cloudflare_config)
+                
+                if use_cloudflare:
+                    print("[Tunnel] 使用 Cloudflare Tunnel")
+                    tunnel_type = 'cloudflare'
+                    
+                    # 尝试启动 Cloudflare Tunnel
+                    tunnel_process, tunnel_url = start_cloudflare_tunnel(port)
+                    
+                    if tunnel_process and tunnel_url:
+                        url_ready = True
+                        print(f"[Tunnel] Cloudflare Tunnel 启动成功: {tunnel_url}")
+                    else:
+                        print("[Tunnel] Cloudflare Tunnel 启动失败，尝试使用 hostc")
+                        use_cloudflare = False
+                        tunnel_type = 'hostc'
+                
+                if not use_cloudflare:
+                    print("[Tunnel] 使用 hostc 隧道")
+                    tunnel_type = 'hostc'
+                    
+                    if os.path.exists(tunnel_file):
                         try:
-                            line = tunnel_process.stdout.readline()
-                            if line:
-                                print(f"[Tunnel] {line.strip()}")
-                                if 'https://' in line or 'http://' in line:
-                                    urls = re.findall(r'https?://[^\s<>"\']+', line)
-                                    for url in urls:
-                                        clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
-                                        if len(clean_url) > 10 and '.' in clean_url:
-                                            if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
-                                                tunnel_url = clean_url
+                            with open(tunnel_file, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                                match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                                if match:
+                                    existing_url = match.group(1).rstrip('/')
+                                    if existing_url and len(existing_url) > 10:
+                                        try:
+                                            if Environment.IS_WINDOWS:
+                                                result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
+                                                                      capture_output=True, text=True, shell=True, timeout=3)
+                                                is_running = result.returncode == 0 and 'node.exe' in result.stdout
+                                            else:
+                                                result = subprocess.run('pgrep -f "hostc"', 
+                                                                      capture_output=True, text=True, timeout=3)
+                                                is_running = result.returncode == 0
+                                            
+                                            if is_running:
+                                                print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
+                                                tunnel_url = existing_url
                                                 url_ready = True
-                                                print(f"[Tunnel] 找到公网URL: {tunnel_url}")
-                                                
-                                                # 更新 tunnel_url.txt 文件
-                                                try:
-                                                    tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
-                                                    with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                                        f.write(f'Success  Tunnel ready\n')
-                                                        f.write(f'  Public URL: {clean_url}\n')
-                                                        f.write(f'  Local:      http://127.0.0.1:{port}/\n')
-                                                    print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
-                                                except Exception as e:
-                                                    print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
-                                                
-                                                break
+                                                return jsonify({
+                                                    'success': True,
+                                                    'url': tunnel_url,
+                                                    'message': f'复用已有隧道，URL: {tunnel_url}'
+                                                })
+                                        except:
+                                            pass
                         except:
                             pass
 
-                read_thread = threading.Thread(target=read_output, daemon=True)
-                read_thread.start()
+                    tunnel_process = subprocess.Popen(
+                        f'npx hostc@latest {port} --local-host 127.0.0.1',
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=0,
+                        shell=True,
+                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
+                    )
+
+                    def read_output():
+                        global tunnel_url, url_ready
+                        while True:
+                            if tunnel_process and tunnel_process.poll() is not None:
+                                break
+                            try:
+                                line = tunnel_process.stdout.readline()
+                                if line:
+                                    print(f"[Tunnel] {line.strip()}")
+                                    if 'https://' in line or 'http://' in line:
+                                        urls = re.findall(r'https?://[^\s<>"\']+', line)
+                                        for url in urls:
+                                            clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
+                                            if len(clean_url) > 10 and '.' in clean_url:
+                                                if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
+                                                    tunnel_url = clean_url
+                                                    url_ready = True
+                                                    print(f"[Tunnel] 找到公网URL: {tunnel_url}")
+                                                    
+                                                    # 更新 tunnel_url.txt 文件
+                                                    try:
+                                                        tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                                                        with file_write_lock:
+                                                            with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                                                f.write(f'Success  Tunnel ready\n')
+                                                                f.write(f'  Type:       hostc\n')
+                                                                f.write(f'  Public URL: {clean_url}\n')
+                                                                f.write(f'  Local:      http://127.0.0.1:{port}/\n')
+                                                        print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
+                                                    except Exception as e:
+                                                        print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
+                                                    
+                                                    break
+                            except:
+                                pass
+
+                    read_thread = threading.Thread(target=read_output, daemon=True)
+                    read_thread.start()
 
                 tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
                 tunnel_restart_thread.start()
@@ -4681,6 +4805,114 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
+        @app.route('/api/tunnel/config/cloudflare', methods=['POST'])
+        def config_cloudflare_tunnel():
+            try:
+                data = request.json
+                tunnel_id = data.get('tunnel_id')
+                tunnel_name = data.get('tunnel_name')
+                account_id = data.get('account_id')
+                
+                if not tunnel_id or not account_id:
+                    return jsonify({'success': False, 'error': '缺少必要参数: tunnel_id 和 account_id'})
+                
+                # 保存配置到文件
+                config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'cloudflare_tunnel.txt')
+                with file_write_lock:
+                    with open(config_file, 'w', encoding='utf-8') as f:
+                        f.write(f'Tunnel ID: {tunnel_id}\n')
+                        f.write(f'Tunnel Name: {tunnel_name or "unnamed"}\n')
+                        f.write(f'Account ID: {account_id}\n')
+                
+                # 创建 cloudflared 配置文件
+                config_yml = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'cloudflare_config.yml')
+                with file_write_lock:
+                    with open(config_yml, 'w', encoding='utf-8') as f:
+                        f.write(f'tunnel: {tunnel_id}\n')
+                        f.write(f'credentials-file: {os.path.join(os.path.dirname(os.path.abspath(__file__)), "file", f"{tunnel_id}.json")}\n')
+                
+                print(f"[Cloudflare] 配置已保存: {tunnel_id}")
+                return jsonify({'success': True, 'message': 'Cloudflare Tunnel 配置已保存'})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @app.route('/api/tunnel/config/cloudflare', methods=['GET'])
+        def get_cloudflare_config():
+            try:
+                config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'cloudflare_tunnel.txt')
+                if not os.path.exists(config_file):
+                    return jsonify({'success': True, 'configured': False})
+                
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    tunnel_id_match = re.search(r'Tunnel ID:\s*([^\s\n]+)', content)
+                    tunnel_name_match = re.search(r'Tunnel Name:\s*([^\s\n]+)', content)
+                    account_id_match = re.search(r'Account ID:\s*([^\s\n]+)', content)
+                    
+                    return jsonify({
+                        'success': True,
+                        'configured': True,
+                        'tunnel_id': tunnel_id_match.group(1) if tunnel_id_match else None,
+                        'tunnel_name': tunnel_name_match.group(1) if tunnel_name_match else None,
+                        'account_id': account_id_match.group(1) if account_id_match else None
+                    })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+        
+        @app.route('/api/tunnel/config/cloudflare', methods=['DELETE'])
+        def delete_cloudflare_config():
+            try:
+                config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'cloudflare_tunnel.txt')
+                config_yml = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'cloudflare_config.yml')
+                
+                if os.path.exists(config_file):
+                    os.remove(config_file)
+                if os.path.exists(config_yml):
+                    os.remove(config_yml)
+                
+                print("[Cloudflare] 配置已删除")
+                return jsonify({'success': True, 'message': 'Cloudflare Tunnel 配置已删除'})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
+        @app.route('/api/tunnel/credential/upload', methods=['POST'])
+        def upload_credential_file():
+            try:
+                if 'file' not in request.files:
+                    return jsonify({'success': False, 'error': '没有文件'})
+                
+                file = request.files['file']
+                if file.filename == '':
+                    return jsonify({'success': False, 'error': '没有选择文件'})
+                
+                if not file.filename.endswith('.json'):
+                    return jsonify({'success': False, 'error': '文件必须是 JSON 格式'})
+                
+                file_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file')
+                os.makedirs(file_dir, exist_ok=True)
+                
+                file_path = os.path.join(file_dir, file.filename)
+                file.save(file_path)
+                
+                tunnel_id = None
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        import json
+                        data = json.loads(content)
+                        tunnel_id = data.get('TunnelID') or data.get('tunnelId') or data.get('tunnel_id')
+                except:
+                    pass
+                
+                print(f"[Cloudflare] 凭证文件已上传: {file.filename}")
+                return jsonify({
+                    'success': True, 
+                    'message': '凭证文件上传成功',
+                    'tunnel_id': tunnel_id
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat, tunnel_daemon_started, tunnel_restart_thread, tunnel_heartbeat_thread
@@ -4689,6 +4921,31 @@ if __name__ == '__main__':
             
             is_running = tunnel_process and tunnel_process.poll() is None
             current_url = tunnel_url
+            
+            # 检测 Cloudflare Tunnel 配置
+            cloudflare_configured = False
+            cloudflare_tunnel_info = None
+            cloudflare_config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'cloudflare_tunnel.txt')
+            if os.path.exists(cloudflare_config_file):
+                try:
+                    with open(cloudflare_config_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        tunnel_id_match = re.search(r'Tunnel ID:\s*([^\s\n]+)', content)
+                        tunnel_name_match = re.search(r'Tunnel Name:\s*([^\s\n]+)', content)
+                        account_id_match = re.search(r'Account ID:\s*([^\s\n]+)', content)
+                        
+                        if tunnel_id_match:
+                            cloudflare_configured = True
+                            cloudflare_tunnel_info = {
+                                'tunnel_id': tunnel_id_match.group(1),
+                                'tunnel_name': tunnel_name_match.group(1) if tunnel_name_match else None,
+                                'account_id': account_id_match.group(1) if account_id_match else None
+                            }
+                except:
+                    pass
+            
+            # 确定隧道类型
+            tunnel_type = 'cloudflare' if cloudflare_configured else 'hostc'
             
             # 优先使用内部 URL，否则从 tunnel_url.txt 读取
             if not current_url:
@@ -4739,7 +4996,10 @@ if __name__ == '__main__':
                     'auto_restart': tunnel_auto_restart,
                     'restart_count': tunnel_restart_count,
                     'last_error': tunnel_last_error,
-                    'last_heartbeat': heartbeat_str
+                    'last_heartbeat': heartbeat_str,
+                    'tunnel_type': tunnel_type,
+                    'cloudflare_configured': cloudflare_configured,
+                    'cloudflare_info': cloudflare_tunnel_info
                 })
             else:
                 return jsonify({
@@ -4748,7 +5008,10 @@ if __name__ == '__main__':
                     'auto_restart': tunnel_auto_restart,
                     'restart_count': tunnel_restart_count,
                     'last_error': tunnel_last_error,
-                    'last_heartbeat': heartbeat_str
+                    'last_heartbeat': heartbeat_str,
+                    'tunnel_type': tunnel_type,
+                    'cloudflare_configured': cloudflare_configured,
+                    'cloudflare_info': cloudflare_tunnel_info
                 })
 
         # 启动前获取一次局域网 IP 用于显示
