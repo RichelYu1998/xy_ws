@@ -329,7 +329,7 @@ echo.
 
 REM Check if already logged in
 echo Checking Cloudflare login status...
-"!CLOUDFLARED_EXE!" tunnel list >nul 2>&1
+"%CLOUDFLARED_EXE%" tunnel list >nul 2>&1
 if errorlevel 1 (
     echo Need to login to Cloudflare account
     echo.
@@ -337,7 +337,7 @@ if errorlevel 1 (
     echo.
     pause
     echo Logging in...
-    "!CLOUDFLARED_EXE!" tunnel login
+    "%CLOUDFLARED_EXE%" tunnel login
     if errorlevel 1 (
         echo ERROR: Login failed
         pause
@@ -357,7 +357,7 @@ echo.
 
 REM Check if tunnel already exists
 echo Checking if tunnel exists...
-"!CLOUDFLARED_EXE!" tunnel info %TUNNEL_NAME% >nul 2>&1
+"%CLOUDFLARED_EXE%" tunnel info %TUNNEL_NAME% >nul 2>&1
 if not errorlevel 1 (
     echo Tunnel "%TUNNEL_NAME%" already exists
     echo.
@@ -367,7 +367,7 @@ if not errorlevel 1 (
         goto get_tunnel_info
     )
     echo Deleting existing tunnel...
-    "!CLOUDFLARED_EXE!" tunnel delete %TUNNEL_NAME% -f
+    "%CLOUDFLARED_EXE%" tunnel delete %TUNNEL_NAME% -f
     if errorlevel 1 (
         echo ERROR: Failed to delete tunnel
         pause
@@ -379,7 +379,7 @@ echo.
 
 REM Create new tunnel
 echo Creating new tunnel: %TUNNEL_NAME%...
-"!CLOUDFLARED_EXE!" tunnel create %TUNNEL_NAME%
+"%CLOUDFLARED_EXE%" tunnel create %TUNNEL_NAME%
 if errorlevel 1 (
     echo ERROR: Failed to create tunnel
     pause
@@ -391,8 +391,8 @@ echo.
 :get_tunnel_info
 REM Get tunnel information
 echo Getting tunnel information...
-for /f "tokens=2" %%i in ('"!CLOUDFLARED_EXE!" tunnel info %TUNNEL_NAME% ^| findstr /C:"ID:"') do set TUNNEL_ID=%%i
-for /f "tokens=2" %%i in ('"!CLOUDFLARED_EXE!" tunnel info %TUNNEL_NAME% ^| findstr /C:"Account:"') do set ACCOUNT_ID=%%i
+for /f "tokens=2" %%i in ('"%CLOUDFLARED_EXE%" tunnel info %TUNNEL_NAME% ^| findstr /C:"ID:"') do set TUNNEL_ID=%%i
+for /f "tokens=2" %%i in ('"%CLOUDFLARED_EXE%" tunnel info %TUNNEL_NAME% ^| findstr /C:"Account:"') do set ACCOUNT_ID=%%i
 
 echo Tunnel ID: %TUNNEL_ID%
 echo Account ID: %ACCOUNT_ID%
@@ -404,7 +404,7 @@ if not exist file mkdir file
 set CREDENTIAL_FILE=file\%TUNNEL_ID%.json
 
 echo Generating credential file: %CREDENTIAL_FILE%...
-"!CLOUDFLARED_EXE!" tunnel token %TUNNEL_ID% > %CREDENTIAL_FILE%
+"%CLOUDFLARED_EXE%" tunnel token %TUNNEL_ID% > %CREDENTIAL_FILE%
 if errorlevel 1 (
     echo ERROR: Failed to generate credential file
     pause
