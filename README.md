@@ -43,6 +43,25 @@ bash run.sh
 
 ## 更新日志
 
+### v3.2.3 (2026-05-21)
+- **Cloudflare Tunnel 配置功能**
+  - 新增 Cloudflare Tunnel 自动配置功能，支持替代 hostc 隧道
+  - 启动脚本新增选项 2：配置 Cloudflare Tunnel（会自动下载安装 cloudflared）
+  - 自动检测系统已安装的 cloudflared，支持 Windows/Linux/Mac 多平台
+  - 智能检测本地 cloudflared 文件，支持多种命名格式：
+    - Windows: `cloudflared.exe`, `cloudflared-windows-amd64.exe`, `cloudflared-windows-arm64.exe`, `cloudflared-windows-386.exe`
+    - Linux: `cloudflared`, `cloudflared-linux-amd64`, `cloudflared-linux-arm64`, `cloudflared-linux-arm`
+    - Mac: `cloudflared`, `cloudflared-darwin-amd64`, `cloudflared-darwin-arm64`
+  - 自动重命名检测到的文件为标准名称（`cloudflared.exe` / `cloudflared`），便于统一管理
+  - 支持从 `file/` 目录和当前目录自动查找 cloudflared 文件
+  - 未找到本地文件时自动从 GitHub 下载最新版本
+  - 自动执行 Cloudflare 账户登录、隧道创建、凭证文件生成
+  - 生成的隧道配置文件保存到 `file/` 目录，包含隧道 ID 和凭证
+  - run.bat 和 run.sh 逻辑完全统一，确保跨平台功能一致
+  - 变量作用域正确管理，避免局部变量传递问题
+  - 完善的错误处理和用户提示，支持中文和英文双语提示
+  - 支持手动下载 cloudflared 后放置到 `file/` 目录，脚本自动识别使用
+
 ### v3.2.2 (2026-05-21)
 - **隧道自动重连死循环修复**
   - 修复隧道心跳失败后无限重试但无法成功的问题
