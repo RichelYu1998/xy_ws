@@ -43,26 +43,13 @@ bash run.sh
 
 ## 更新日志
 
-### v3.2.7 (2026-05-21)
-- **前端代码优化**
-  - 新增 DOM 辅助函数 `$`, `$$`, `el()`，简化元素查询操作
-  - 合并 6 个独立的 `closeXxxPanel` 函数为通用的 `closePanel()` 函数
-  - 优化 `showComparisonCard()` 解析逻辑，使用规则表 `SKU_PARSE_RULES` 替代冗长的 if-else 链
-  - 简化 `renderTable()` 函数，使用 `map().join()` 替代字符串拼接
-  - 优化 `copyToClipboard()` 和 `fallbackCopy()` 函数，简化 Promise 处理和样式设置
-  - 优化事件绑定逻辑，使用箭头函数和 `dataset` API
-  - 合并 CSS 重复规则，减少冗余样式定义
-  - index.html 代码行数减少约 80 行，提升可维护性
-
 ### v3.2.6 (2026-05-21)
-- **代码质量优化**
-  - 修复 main.py 缩进错误，解决 IndentationError 问题
-  - 删除未使用的变量和函数，提高代码质量
-  - 删除所有函数内部的重复导入语句，统一在文件顶部导入
-  - 新增 `PathManager.get_tunnel_url_file()` 方法，统一隧道 URL 文件路径管理
-  - 优化导入语句结构，添加 `base64`, `glob`, `gzip`, `traceback`, `select`, `argparse`, `socket` 等模块到顶部导入
-  - 代码行数减少约 30+ 行，提升可维护性
-  - 消除所有诊断错误和警告，程序运行更稳定
+- **前端 JavaScript 优化**
+  - 移除冗余的调试 console.log 语句
+  - 简化 fetch 响应处理逻辑
+  - 优化按钮事件绑定代码
+  - 修复 HTML 中混入的 console.log 错误
+  - 保留关键调试日志便于问题排查
 
 ### v3.2.5 (2026-05-21)
 - **简化启动流程**

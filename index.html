@@ -805,87 +805,116 @@
             }
             
             .comparison-stats {
-                flex-direction: column;
-                gap: 10px;
-            }
+            flex-direction: column;
+            gap: 10px;
+        }
 
-            .stat-item {
-                padding: 10px 15px;
-                min-width: auto;
-                width: 100%;
-            }
+        .stat-item {
+            padding: 10px 15px;
+            min-width: auto;
+            width: 100%;
+        }
 
-            .stat-value {
-                font-size: 20px;
-            }
+        .stat-value {
+            font-size: 20px;
+        }
 
-            .stat-label {
-                font-size: 11px;
-            }
-            
-            .comparison-stats {
-                flex-direction: row !important;
-                flex-wrap: wrap !important;
-                gap: 8px !important;
-            }
-            
-            .comparison-stats .stat-item {
-                width: calc(50% - 4px) !important;
-                min-width: calc(50% - 4px) !important;
-                padding: 12px 10px !important;
-            }
-            
-            .comparison-stats .stat-item:last-child {
-                width: 100% !important;
-                min-width: 100% !important;
-            }
-            
-            .comparison-stats .stat-value {
-                font-size: 18px !important;
-                word-break: break-all !important;
-                white-space: normal !important;
-                overflow: visible !important;
-            }
-            
-            .comparison-stats .stat-label {
-                font-size: 10px !important;
-                line-height: 1.3 !important;
-                white-space: normal !important;
-                word-wrap: break-word !important;
-                overflow: visible !important;
-            }
-            
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(1),
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(2) {
-                flex-direction: row !important;
-                flex-wrap: wrap !important;
-                gap: 8px !important;
-            }
+        .stat-label {
+            font-size: 11px;
+        }
 
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(1) .stat-item,
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(2) .stat-item {
-                width: calc(50% - 4px) !important;
-                min-width: calc(50% - 4px) !important;
-                padding: 12px 10px !important;
-            }
+        .comparison-card .comparison-body > .comparison-stats {
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+        }
 
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(1) .stat-item:last-child,
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(2) .stat-item:last-child {
-                width: 100% !important;
-                min-width: 100% !important;
-            }
+        .comparison-card .comparison-body > .comparison-stats .stat-item {
+            width: calc(50% - 4px) !important;
+            min-width: calc(50% - 4px) !important;
+            padding: 12px 10px !important;
+        }
 
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(1) .stat-value,
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(2) .stat-value {
-                font-size: 18px !important;
-                word-break: break-all !important;
-            }
+        .comparison-card .comparison-body > .comparison-stats .stat-item:last-child {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
 
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(1) .stat-label,
-            .comparison-card .comparison-body > .comparison-stats:nth-of-type(2) .stat-label {
-                font-size: 10px !important;
-                line-height: 1.3 !important;
-            }
+        .comparison-card .comparison-body > .comparison-stats .stat-value {
+            font-size: 18px !important;
+            word-break: break-all !important;
+        }
+
+        .comparison-card .comparison-body > .comparison-stats .stat-label {
+            font-size: 10px !important;
+            line-height: 1.3 !important;
+        }
+
+        .comparison-card .comparison-stats:nth-of-type(2) {
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+        }
+
+        .comparison-card .comparison-stats:nth-of-type(2) .stat-item {
+            width: calc(50% - 4px) !important;
+            min-width: calc(50% - 4px) !important;
+            padding: 12px 10px !important;
+        }
+
+        .comparison-card .comparison-stats:nth-of-type(2) .stat-item:last-child {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+
+        .comparison-card .comparison-stats:nth-of-type(2) .stat-value {
+            font-size: 18px !important;
+            word-break: break-all !important;
+        }
+
+        .comparison-card .comparison-stats:nth-of-type(2) .stat-label {
+            font-size: 10px !important;
+            line-height: 1.3 !important;
+        }
+
+        .comparison-card .comparison-header[style*="67c23a"] + .comparison-body .comparison-stats:nth-of-type(2) {
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+        }
+
+        .comparison-card .comparison-header[style*="67c23a"] + .comparison-body .comparison-stats:nth-of-type(2) .stat-item {
+            width: calc(50% - 4px) !important;
+            min-width: calc(50% - 4px) !important;
+            padding: 12px 10px !important;
+        }
+
+        .comparison-card .comparison-header[style*="67c23a"] + .comparison-body .comparison-stats:nth-of-type(2) .stat-item:last-child {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+
+        .comparison-card .comparison-header[style*="67c23a"] + .comparison-body .comparison-stats:nth-of-type(2) .stat-value {
+            font-size: 18px !important;
+            word-break: break-all !important;
+        }
+
+        .comparison-card .comparison-header[style*="67c23a"] + .comparison-body .comparison-stats:nth-of-type(2) .stat-label {
+            font-size: 10px !important;
+            line-height: 1.3 !important;
+        }
+
+        .comparison-card .comparison-header[style*="67c23a"] + .comparison-body .comparison-stats:nth-of-type(1) {
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+        }
+
+        .comparison-card .comparison-header[style*="67c23a"] + .comparison-body .comparison-stats:nth-of-type(1) .stat-item {
+            width: calc(50% - 4px) !important;
+            min-width: calc(50% - 4px) !important;
+            padding: 12px 10px !important;
+        }
             
             .change-table {
                 font-size: 10px;
@@ -924,43 +953,82 @@
                 overflow: visible;
             }
 
-            .products-card .comparison-stats,
-            .products-card .comparison-stats:nth-of-type(1),
-            .products-card.comparison-card .comparison-body > .comparison-stats,
+            .products-card .comparison-stats {
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .products-card .comparison-stats .stat-item {
+                width: calc(50% - 4px);
+                min-width: calc(50% - 4px);
+                padding: 12px 10px;
+            }
+
+            .products-card .comparison-stats .stat-item:last-child {
+                width: 100%;
+                min-width: 100%;
+            }
+
+            .products-card .comparison-stats .stat-value {
+                font-size: 18px;
+                word-break: break-all;
+            }
+
+            .products-card .comparison-stats .stat-label {
+                font-size: 10px;
+                line-height: 1.3;
+            }
+
+            .products-card .comparison-stats:nth-of-type(1) {
+                flex-direction: row !important;
+                flex-wrap: wrap !important;
+                gap: 8px !important;
+            }
+
+            .products-card .comparison-stats:nth-of-type(1) .stat-item {
+                width: calc(50% - 4px) !important;
+                min-width: calc(50% - 4px) !important;
+                padding: 12px 10px !important;
+            }
+
+            .products-card .comparison-stats:nth-of-type(1) .stat-item:last-child {
+                width: 100% !important;
+                min-width: 100% !important;
+            }
+
+            .products-card .comparison-stats:nth-of-type(1) .stat-value {
+                font-size: 18px !important;
+                word-break: break-all !important;
+            }
+
+            .products-card .comparison-stats:nth-of-type(1) .stat-label {
+                font-size: 10px !important;
+                line-height: 1.3 !important;
+            }
+
             .comparison-body > .comparison-stats:nth-of-type(2) {
                 flex-direction: row !important;
                 flex-wrap: wrap !important;
                 gap: 8px !important;
             }
 
-            .products-card .comparison-stats .stat-item,
-            .products-card .comparison-stats:nth-of-type(1) .stat-item,
-            .products-card.comparison-card .comparison-body > .comparison-stats .stat-item,
             .comparison-body > .comparison-stats:nth-of-type(2) .stat-item {
                 width: calc(50% - 4px) !important;
                 min-width: calc(50% - 4px) !important;
                 padding: 12px 10px !important;
             }
 
-            .products-card .comparison-stats .stat-item:last-child,
-            .products-card .comparison-stats:nth-of-type(1) .stat-item:last-child,
-            .products-card.comparison-card .comparison-body > .comparison-stats .stat-item:last-child,
             .comparison-body > .comparison-stats:nth-of-type(2) .stat-item:last-child {
                 width: 100% !important;
                 min-width: 100% !important;
             }
 
-            .products-card .comparison-stats .stat-value,
-            .products-card .comparison-stats:nth-of-type(1) .stat-value,
-            .products-card.comparison-card .comparison-body > .comparison-stats .stat-value,
             .comparison-body > .comparison-stats:nth-of-type(2) .stat-value {
                 font-size: 18px !important;
                 word-break: break-all !important;
             }
 
-            .products-card .comparison-stats .stat-label,
-            .products-card .comparison-stats:nth-of-type(1) .stat-label,
-            .products-card.comparison-card .comparison-body > .comparison-stats .stat-label,
             .comparison-body > .comparison-stats:nth-of-type(2) .stat-label {
                 font-size: 10px !important;
                 line-height: 1.3 !important;
@@ -978,6 +1046,33 @@
                 white-space: normal;
                 word-wrap: break-word;
                 overflow: visible;
+            }
+
+            .products-card.comparison-card .comparison-body > .comparison-stats {
+                flex-direction: row !important;
+                flex-wrap: wrap !important;
+                gap: 8px !important;
+            }
+
+            .products-card.comparison-card .comparison-body > .comparison-stats .stat-item {
+                width: calc(50% - 4px) !important;
+                min-width: calc(50% - 4px) !important;
+                padding: 12px 10px !important;
+            }
+
+            .products-card.comparison-card .comparison-body > .comparison-stats .stat-item:last-child {
+                width: 100% !important;
+                min-width: 100% !important;
+            }
+
+            .products-card.comparison-card .comparison-body > .comparison-stats .stat-value {
+                font-size: 18px !important;
+                word-break: break-all !important;
+            }
+
+            .products-card.comparison-card .comparison-body > .comparison-stats .stat-label {
+                font-size: 10px !important;
+                line-height: 1.3 !important;
             }
         }
         
@@ -1669,14 +1764,6 @@ playwright install chromium</pre>
                 document.body.classList.add('is-desktop-device');
             }
             
-            // 在控制台输出设备信息
-            console.log('设备检测结果:', device);
-            console.log('设备类型:', device.type);
-            console.log('设备信息:', device.info);
-            console.log('屏幕分辨率:', device.width, 'x', device.height);
-            console.log('设备像素比:', device.pixelRatio);
-            
-            // 调整按钮容器样式
             const btnContainer = document.querySelector('.text-center.mt-4.mb-4');
             if (btnContainer && device.isPhone) {
                 btnContainer.style.padding = '10px 5px';
@@ -1762,26 +1849,14 @@ playwright install chromium</pre>
         
         function searchProductBySku(sku) {
             if (!sku) return;
-            
             const url = '/api/product/search?sku=' + encodeURIComponent(sku);
-            console.log('搜索商品URL:', url);
-            
             fetch(url)
-            .then(response => {
-                console.log('响应状态:', response.status);
-                console.log('响应类型:', response.headers.get('content-type'));
-                return response.text().then(text => {
-                    console.log('响应内容:', text.substring(0, 500));
-                    return JSON.parse(text);
-                });
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log('搜索结果:', data);
                 if (data.error) {
                     alert('搜索失败: ' + data.error);
                     return;
                 }
-                
                 if (data.product) {
                     showProductModal(data.product);
                 } else {
@@ -1851,9 +1926,6 @@ playwright install chromium</pre>
         
         // 确保DOM加载完成后执行
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM加载完成，开始绑定按钮事件...');
-
-            // 预加载天气 iframe（不等滚动触发）
             const weatherIframe = document.getElementById('weather-iframe');
             if (weatherIframe) {
                 const src = weatherIframe.getAttribute('data-src');
@@ -1863,11 +1935,7 @@ playwright install chromium</pre>
                 }
             }
 
-            // 执行设备检测和样式适配
             const device = applyDeviceStyles();
-            console.log('当前设备:', device.info);
-            
-            let currentSystem = 'Unknown';
             
             function detectSystem() {
                 const userAgent = navigator.userAgent;
@@ -1877,8 +1945,7 @@ playwright install chromium</pre>
                 return 'Unknown';
             }
             
-            currentSystem = detectSystem();
-            console.log('检测到系统: ' + currentSystem);
+            detectSystem();
             
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {
@@ -1991,13 +2058,10 @@ playwright install chromium</pre>
             })
             .then(response => response.json())
             .then(data => {
-                console.log('runCommand 返回数据:', data);
                 if (data.success) {
                     currentTaskId = data.task_id;
-                    console.log('设置 currentTaskId:', currentTaskId);
                     showOutputPanel();
                     if (outputContent) outputContent.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
-                    console.log('启动轮询，每1秒调用一次 pollOutput()');
                     pollingInterval = setInterval(() => pollOutput(), 1000);
                 } else {
                     alert('启动失败: ' + data.error);
@@ -2006,6 +2070,7 @@ playwright install chromium</pre>
                 }
             })
             .catch(error => {
+                console.error('请求失败:', error);
                 alert('请求失败: ' + error.message);
                 btn.disabled = false;
                 btn.innerHTML = '运行';
@@ -2013,14 +2078,9 @@ playwright install chromium</pre>
         }
         
         function pollOutput() {
-            console.log('pollOutput() 被调用，currentTaskId:', currentTaskId);
             fetch('/output/' + currentTaskId)
-            .then(response => {
-                console.log('API响应状态:', response.status);
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log('pollOutput 返回数据:', data);
                 const outputDiv = document.getElementById('output-content');
                 const statusDiv = document.getElementById('output-status');
                 
@@ -2047,14 +2107,13 @@ playwright install chromium</pre>
                 if (data.status === 'completed') {
                     clearInterval(pollingInterval);
                     const completedChoice = currentChoice;
-                    console.log('任务完成，completedChoice:', completedChoice);
+                    console.log('任务完成, choice:', completedChoice);
                     if (statusDiv) statusDiv.innerHTML = '<span style="color: #67c23a;">✓ 执行完成 (返回码: ' + data.returncode + ')</span>';
                     if (data.returncode === -15) {
                         if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行 (返回码: -15)</span>';
                     }
                     resetButtons();
                     if (completedChoice === 1 || completedChoice === 3) {
-                        console.log('准备调用 showAllProducts()');
                         showAllProducts();
                     }
                 } else if (data.status === 'error') {
@@ -2068,26 +2127,9 @@ playwright install chromium</pre>
             });
         }
         
-        const SKU_PARSE_RULES = [
-            { keys: ['货号对比结果'], set: { type: 'sku' }, resetMissing: true },
-            { keys: ['成功获取', '共获取'], set: { type: 'spider' }, extract: { pattern: /(\d+)\s*个/, to: 'totalProducts' }, resetMissing: true },
-            { keys: ['售价 >=', '的商品:'], extract: { pattern: /(\d+)\s*个/, to: 'highPriceCount' }, resetMissing: true },
-            { keys: ['只在JSON中存在但不在Excel中的售价>=599货号数:'], extract: { pattern: /:\s*(\d+)/, to: 'highPriceExtraCount' }, resetMissing: true },
-            { keys: ['只在JSON中存在但不在Excel中的售价>=599的货号:'], set: { inHighPriceExtraSection: true, highPriceExtraSkus: [] }, resetMissing: true },
-            { keys: ['预计售出价格累计:'], extract: { pattern: /¥[\d,.]+/, to: 'totalPrice' }, resetMissing: true },
-            { keys: ['【新增商品】'], set: { inAddedSection: true, addedProducts: [] }, resetMissing: true },
-            { keys: ['【删除商品】'], set: { inAddedSection: false, inDeletedSection: true, deletedProducts: [] }, resetMissing: true },
-            { keys: ['平均每个设备售出均价:'], extract: { pattern: /¥[\d,.]+/, to: 'avgPrice' }, resetMissing: true },
-            { keys: ['闲鱼平台手续费累计:'], extract: { pattern: /¥[\d,.]+/, to: 'fee' }, resetMissing: true },
-            { keys: ['输入货号总数:', 'JSON中货号总数:', '已存在货号数:', '缺失货号数:', 'JSON中多余货号数:', '重复序列号数:'], extract: { pattern: /(\d+)$/, to: 'count' }, resetMissing: true, fieldMap: { '输入货号总数:': 'inputCount', 'JSON中货号总数:': 'jsonCount', '已存在货号数:': 'existCount', '缺失货号数:': 'missingCount', 'JSON中多余货号数:': 'extraCount', '重复序列号数:': 'duplicateCount' } },
-            { keys: ['对比文件:'], set: { type: 'product' }, resetMissing: true },
-            { keys: ['新增商品数:', '删除商品数:', '新增高价商品数:'], extract: { split: ':', to: 'value' }, resetMissing: true, fieldMap: { '新增商品数:': 'newProducts', '删除商品数:': 'deletedProducts', '新增高价商品数:': 'newHighPrice' } },
-            { keys: ['缺失货号列表:', '缺失的货号:'], set: { inMissingSection: true }, resetMissing: true }
-        ];
-        
         function showComparisonCard(output) {
-            const spiderPanel = el('spider-output-panel');
-            const spiderContent = el('spider-output-content');
+            const spiderPanel = document.getElementById('spider-output-panel');
+            const spiderContent = document.getElementById('spider-output-content');
             if (!spiderPanel || !spiderContent) return;
             
             spiderPanel.style.display = 'block';
@@ -2097,24 +2139,47 @@ playwright install chromium</pre>
             let skuData = {};
             let missingSkus = [];
             let inMissingSection = false;
-            let countFieldMap = {};
             
             for (let line of lines) {
                 line = line.trim();
                 
-                if (skuData.inHighPriceExtraSection && /^\s*\d+\.\s+\d+\s*$/.test(line)) {
+                if (line.includes('货号对比结果')) {
+                    skuData.type = 'sku';
+                    inMissingSection = false;
+                } else if (line.includes('成功获取') || line.includes('共获取')) {
+                    skuData.type = 'spider';
+                    const match = line.match(/(\d+)\s*个/);
+                    if (match) skuData.totalProducts = match[1];
+                    inMissingSection = false;
+                } else if (line.includes('售价 >=') && line.includes('的商品:')) {
+                    const match = line.match(/(\d+)\s*个/);
+                    if (match) skuData.highPriceCount = match[1];
+                    inMissingSection = false;
+                } else if (line.includes('只在JSON中存在但不在Excel中的售价>=599货号数:')) {
+                    const match = line.match(/:\s*(\d+)/);
+                    if (match) skuData.highPriceExtraCount = match[1];
+                    inMissingSection = false;
+                } else if (line.includes('只在JSON中存在但不在Excel中的售价>=599的货号:')) {
+                    skuData.inHighPriceExtraSection = true;
+                    skuData.highPriceExtraSkus = [];
+                    inMissingSection = false;
+                } else if (skuData.inHighPriceExtraSection && line.match(/^\s*\d+\.\s+\d+\s*$/)) {
                     const match = line.match(/\d+\.\s+(\d+)/);
                     if (match) skuData.highPriceExtraSkus.push(match[1]);
-                    continue;
-                }
-                
-                if (inMissingSection && /^\s*\d+\.\s+\d+\s*$/.test(line)) {
-                    const match = line.match(/\d+\.\s+(\d+)/);
-                    if (match) missingSkus.push(match[1]);
-                    continue;
-                }
-                
-                if ((skuData.inAddedSection || skuData.inDeletedSection) && line.includes('"货号":')) {
+                } else if (line.includes('预计售出价格累计:')) {
+                    const match = line.match(/¥[\d,.]+/);
+                    if (match) skuData.totalPrice = match[0];
+                    inMissingSection = false;
+                } else if (line.includes('【新增商品】')) {
+                    skuData.inAddedSection = true;
+                    skuData.addedProducts = [];
+                    inMissingSection = false;
+                } else if (line.includes('【删除商品】')) {
+                    skuData.inAddedSection = false;
+                    skuData.inDeletedSection = true;
+                    skuData.deletedProducts = [];
+                    inMissingSection = false;
+                } else if ((skuData.inAddedSection || skuData.inDeletedSection) && line.includes('"货号":')) {
                     const skuMatch = line.match(/"货号":\s*"([^"]+)"/);
                     const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/);
                     const priceMatch = line.match(/"售价":\s*"([^"]+)"/);
@@ -2130,51 +2195,67 @@ playwright install chromium</pre>
                     } else if (skuData.inDeletedSection && product.sku) {
                         skuData.deletedProducts.push(product);
                     }
+                } else if (line.includes('平均每个设备售出均价:')) {
+                    const match = line.match(/¥[\d,.]+/);
+                    if (match) skuData.avgPrice = match[0];
+                    inMissingSection = false;
+                } else if (line.includes('闲鱼平台手续费累计:')) {
+                    const match = line.match(/¥[\d,.]+/);
+                    if (match) skuData.fee = match[0];
+                    inMissingSection = false;
+                } else if (line.includes('输入货号总数:')) {
+                    const match = line.match(/(\d+)$/);
+                    if (match) skuData.inputCount = match[1];
+                    inMissingSection = false;
+                } else if (line.includes('JSON中货号总数:')) {
+                    const match = line.match(/(\d+)$/);
+                    if (match) skuData.jsonCount = match[1];
+                    inMissingSection = false;
+                } else if (line.includes('已存在货号数:')) {
+                    const match = line.match(/(\d+)$/);
+                    if (match) skuData.existCount = match[1];
+                    inMissingSection = false;
+                } else if (line.includes('缺失货号数:')) {
+                    const match = line.match(/(\d+)$/);
+                    if (match) skuData.missingCount = match[1];
+                    inMissingSection = false;
+                } else if (line.includes('JSON中多余货号数:')) {
+                    const match = line.match(/(\d+)$/);
+                    if (match) skuData.extraCount = match[1];
+                    inMissingSection = false;
+                } else if (line.includes('重复序列号数:')) {
+                    const match = line.match(/(\d+)$/);
+                    if (match) skuData.duplicateCount = match[1];
+                    inMissingSection = false;
+                } else if (line.includes('对比文件:')) {
+                     skuData.type = 'product';
+                     inMissingSection = false;
+                 } else if (line.includes('新增商品数:')) {
+                     skuData.newProducts = line.split(':')[1].trim();
+                     inMissingSection = false;
+                 } else if (line.includes('删除商品数:')) {
+                     skuData.deletedProducts = line.split(':')[1].trim();
+                     inMissingSection = false;
+                 } else if (line.includes('新增高价商品数:')) {
+                     skuData.newHighPrice = line.split(':')[1].trim();
+                     inMissingSection = false;
+                 } else if (line.includes('预计售出价格累计:')) {
+                     const match = line.match(/¥[\d,.]+/);
+                     if (match) skuData.totalPrice = match[0];
+                     inMissingSection = false;
+                 } else if (line.includes('缺失货号列表:') || line.includes('缺失的货号:')) {
+                    inMissingSection = true;
                     continue;
-                }
-                
-                for (const rule of SKU_PARSE_RULES) {
-                    let matchedKey = null;
-                    for (const key of rule.keys) {
-                        if (line.includes(key)) {
-                            matchedKey = key;
-                            break;
-                        }
-                    }
-                    
-                    if (matchedKey) {
-                        if (rule.set) {
-                            Object.assign(skuData, rule.set);
-                        }
-                        if (rule.extract) {
-                            if (rule.extract.pattern) {
-                                const match = line.match(rule.extract.pattern);
-                                if (match) {
-                                    let fieldName = rule.extract.to;
-                                    if (rule.fieldMap && rule.fieldMap[matchedKey]) {
-                                        fieldName = rule.fieldMap[matchedKey];
-                                    }
-                                    skuData[fieldName] = rule.extract.split ? line.split(':')[1].trim() : match[1] || match[0];
-                                }
-                            } else if (rule.extract.split) {
-                                let fieldName = rule.extract.to;
-                                if (rule.fieldMap && rule.fieldMap[matchedKey]) {
-                                    fieldName = rule.fieldMap[matchedKey];
-                                }
-                                skuData[fieldName] = line.split(':')[1].trim();
-                            }
-                        }
-                        if (rule.resetMissing) {
-                            inMissingSection = rule.keys.some(k => k === '缺失货号列表:' || k === '缺失的货号:');
-                        }
-                        break;
-                    }
+                } else if (inMissingSection && line.match(/^\s*\d+\.\s+\d+\s*$/)) {
+                    const match = line.match(/\d+\.\s+(\d+)/);
+                    if (match) missingSkus.push(match[1]);
                 }
             }
             
             missingSkus = [...new Set(missingSkus)];
-            const displayCount = parseInt(skuData.missingCount) || missingSkus.length;
-            missingSkus = missingSkus.slice(0, displayCount);
+             
+             const displayCount = parseInt(skuData.missingCount) || missingSkus.length;
+             missingSkus = missingSkus.slice(0, displayCount);
             
             const existingCard = spiderContent.querySelector('.comparison-card');
             if (existingCard) existingCard.remove();
@@ -2316,18 +2397,19 @@ playwright install chromium</pre>
                 `;
                 
                 if (skuData.addedProducts && skuData.addedProducts.length > 0) {
-                    const rows = skuData.addedProducts.map((p, idx) => `<tr>
-                        <td>${idx + 1}</td>
-                        <td><a href="javascript:void(0)" onclick="showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
-                        <td>${p.price || '-'}</td>
-                    </tr>`).join('');
                     cardHtml += `
                         <div class="change-section">
                             <div class="change-title" style="color: #67c23a;">新增商品序列号 (${skuData.addedProducts.length}个)</div>
                             <div class="change-table-container">
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>售价</th></tr></thead>
-                                    <tbody>${rows}</tbody>
+                                    <tbody>
+                                        ${skuData.addedProducts.map((p, idx) => `<tr>
+                                            <td>${idx + 1}</td>
+                                            <td><a href="javascript:void(0)" onclick="showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
+                                            <td>${p.price || '-'}</td>
+                                        </tr>`).join('')}
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -2335,18 +2417,19 @@ playwright install chromium</pre>
                 }
                 
                 if (skuData.deletedProducts && skuData.deletedProducts.length > 0) {
-                    const rows = skuData.deletedProducts.map((p, idx) => `<tr>
-                        <td>${idx + 1}</td>
-                        <td>${p.sku}</td>
-                        <td>${p.price || '-'}</td>
-                    </tr>`).join('');
                     cardHtml += `
                         <div class="change-section">
                             <div class="change-title" style="color: #f56c6c;">删除商品序列号 (${skuData.deletedProducts.length}个)</div>
                             <div class="change-table-container">
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>售价</th></tr></thead>
-                                    <tbody>${rows}</tbody>
+                                    <tbody>
+                                        ${skuData.deletedProducts.map((p, idx) => `<tr>
+                                            <td>${idx + 1}</td>
+                                            <td>${p.sku}</td>
+                                            <td>${p.price || '-'}</td>
+                                        </tr>`).join('')}
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -2354,18 +2437,19 @@ playwright install chromium</pre>
                 }
                 
                 if (skuData.newHighPriceProducts && skuData.newHighPriceProducts.length > 0) {
-                    const rows = skuData.newHighPriceProducts.map((p, idx) => `<tr>
-                        <td>${idx + 1}</td>
-                        <td><a href="javascript:void(0)" onclick="showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
-                        <td>${p.price || '-'}</td>
-                    </tr>`).join('');
                     cardHtml += `
                         <div class="change-section">
                             <div class="change-title" style="color: #409EFF;">新增高价商品(≥599) (${skuData.newHighPriceProducts.length}个)</div>
                             <div class="change-table-container">
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>售价</th></tr></thead>
-                                    <tbody>${rows}</tbody>
+                                    <tbody>
+                                        ${skuData.newHighPriceProducts.map((p, idx) => `<tr>
+                                            <td>${idx + 1}</td>
+                                            <td><a href="javascript:void(0)" onclick="showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
+                                            <td>${p.price || '-'}</td>
+                                        </tr>`).join('')}
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -2375,16 +2459,17 @@ playwright install chromium</pre>
                 cardHtml += `</div></div>`;
                 spiderContent.insertAdjacentHTML('beforeend', cardHtml);
                 
-                if (window.innerWidth >= 576) {
-                    const content = el('spider-output-content');
-                    if (content) content.scrollTop = 0;
+                const isMobile = window.innerWidth < 576;
+                if (isMobile) {
+                    const spiderOutputContent = document.getElementById('spider-output-content');
+                    if (spiderOutputContent) {
+                        spiderOutputContent.scrollTop = 0;
+                    }
                 }
             }
         }
         
          function showAllProducts() {
-            console.log('开始调用 /api/products API');
-            
             const productsPanel = document.getElementById('products-panel');
             const productsContent = document.getElementById('products-content');
             if (!productsPanel || !productsContent) {
@@ -2401,18 +2486,8 @@ playwright install chromium</pre>
                     'Pragma': 'no-cache'
                 }
             })
-            .then(response => {
-                console.log('API响应状态:', response.status);
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log('API返回的完整数据:', data);
-                console.log('totalPrice:', data.totalPrice);
-                console.log('avgPrice:', data.avgPrice);
-                console.log('fee:', data.fee);
-                console.log('total:', data.total);
-                console.log('highPriceCount:', data.highPriceCount);
-                
                 if (data.error) {
                     alert(data.error);
                     return;
@@ -2425,33 +2500,36 @@ playwright install chromium</pre>
                 if (existingCard) existingCard.remove();
                 
                 window.allProductsData = data;
+                console.log('商品数据加载成功, 总数:', data.total);
                 
                 function renderTable(products, title, color, tableId) {
                     if (!products || products.length === 0) return '';
-                    const rows = products.map((p, i) => {
+                    let tableHtml = `
+                        <div class="change-section">
+                            <div class="change-title" style="color: ${color};">${title}</div>
+                            <div class="change-table-container">
+                                <table class="change-table" id="${tableId}">
+                                    <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead>
+                                    <tbody>
+                    `;
+                    products.forEach((p, i) => {
                         const sku = p.货号 || '';
-                        const price = parseFloat((p.售价 || '¥0').replace(/[¥,]/g, ''));
-                        const isHighPrice = price >= 599;
+                        const isHighPrice = parseFloat((p.售价 || '¥0').replace('¥', '').replace(',', '')) >= 599;
                         const isAdded = data.addedProducts && data.addedProducts.some(ap => ap.货号 === sku);
-                        const desc = p.商品描述 || '';
-                        let rowStyle = isHighPrice && isAdded ? 'background: #e8f5e9;' : isHighPrice ? 'background: #fff3e0;' : isAdded ? 'background: #e3f2fd;' : '';
-                        return `<tr data-sku="${sku}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
+                        let rowStyle = '';
+                        if (isHighPrice && isAdded) rowStyle = 'background: #e8f5e9;';
+                        else if (isHighPrice) rowStyle = 'background: #fff3e0;';
+                        else if (isAdded) rowStyle = 'background: #e3f2fd;';
+                        tableHtml += `<tr data-sku="${sku}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0)" onclick="highlightRow('${sku}'); scrollToSku('${sku}'); searchProductBySku('${sku}')">${sku || '-'}</a></td>
-                            <td>${desc.substring(0, 20)}${desc.length > 20 ? '...' : ''}</td>
+                            <td>${(p.商品描述 || '').substring(0, 20)}${(p.商品描述 || '').length > 20 ? '...' : ''}</td>
                             <td style="font-weight: bold;">${p.售价 || '-'}</td>
                             <td>${p.员工 || '-'}</td>
                         </tr>`;
-                    }).join('');
-                    return `<div class="change-section">
-                        <div class="change-title" style="color: ${color};">${title}</div>
-                        <div class="change-table-container">
-                            <table class="change-table" id="${tableId}">
-                                <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead>
-                                <tbody>${rows}</tbody>
-                            </table>
-                        </div>
-                    </div>`;
+                    });
+                    tableHtml += `</tbody></table></div></div>`;
+                    return tableHtml;
                 }
                 
                 let html = `
@@ -2520,37 +2598,46 @@ playwright install chromium</pre>
             });
         }
         
-        const $ = sel => document.querySelector(sel);
-        const $$ = sel => document.querySelectorAll(sel);
-        const el = (id, fallback = null) => document.getElementById(id) || fallback;
-        
-        const PANEL_IDS = ['output-panel', 'sku-input-panel', 'cleaner-panel', 'tunnel-panel', 'products-panel', 'spider-output-panel'];
-        
-        function closePanel(panelId) {
-            const panel = el(panelId);
-            if (panel) panel.style.display = 'none';
-        }
-        
         function closeOutputPanel() {
-            if (pollingInterval) clearInterval(pollingInterval);
-            pollingInterval = null;
-            closePanel('output-panel');
-            const inputArea = el('output-input-area');
-            if (inputArea) inputArea.style.display = 'none';
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+            const outputPanel = document.getElementById('output-panel');
+            if (outputPanel) outputPanel.style.display = 'none';
+            const outputInputArea = document.getElementById('output-input-area');
+            if (outputInputArea) outputInputArea.style.display = 'none';
             currentTaskId = null;
         }
         
-        function closeSkuInputPanel() { closePanel('sku-input-panel'); }
-        function closeCleanerPanel() { closePanel('cleaner-panel'); }
+        function closeSkuInputPanel() {
+            const skuPanel = document.getElementById('sku-input-panel');
+            if (skuPanel) skuPanel.style.display = 'none';
+        }
+        
+        function closeCleanerPanel() {
+            const cleanerPanel = document.getElementById('cleaner-panel');
+            if (cleanerPanel) cleanerPanel.style.display = 'none';
+        }
+        
         function closeTunnelPanel() {
             if (tunnelPollInterval) {
                 clearInterval(tunnelPollInterval);
                 tunnelPollInterval = null;
             }
-            closePanel('tunnel-panel');
+            const tunnelPanel = document.getElementById('tunnel-panel');
+            if (tunnelPanel) tunnelPanel.style.display = 'none';
         }
-        function closeProductsPanel() { closePanel('products-panel'); }
-        function closeSpiderOutputPanel() { closePanel('spider-output-panel'); }
+        
+        function closeProductsPanel() {
+            const productsPanel = document.getElementById('products-panel');
+            if (productsPanel) productsPanel.style.display = 'none';
+        }
+        
+        function closeSpiderOutputPanel() {
+            const spiderPanel = document.getElementById('spider-output-panel');
+            if (spiderPanel) spiderPanel.style.display = 'none';
+        }
         
         function runFunction(choice) {
            currentChoice = choice;
@@ -2561,7 +2648,6 @@ playwright install chromium</pre>
                 alert('找不到按钮: ' + choice);
                 return;
             }
-            console.log('运行功能:', choice, '按钮ID:', btnId);
             btn.setAttribute('data-original', btn.innerHTML);
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
@@ -2604,23 +2690,32 @@ playwright install chromium</pre>
         }
         
         function sendUserInput() {
-            const inputEl = el('user-input');
-            if (!inputEl || !inputEl.value || !currentTaskId) {
-                if (!currentTaskId) alert('没有正在运行的任务');
+            const inputEl = document.getElementById('user-input');
+            if (!inputEl) return;
+            const input = inputEl.value;
+            if (!input) return;
+            if (!currentTaskId) {
+                alert('没有正在运行的任务');
                 return;
             }
             
             fetch('/input', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: currentTaskId, input: inputEl.value })
+                body: JSON.stringify({ task_id: currentTaskId, input: input })
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) inputEl.value = '';
-                else alert('发送失败: ' + data.error);
+                if (data.success) {
+                    const userInput = document.getElementById('user-input');
+                    if (userInput) userInput.value = '';
+                } else {
+                    alert('发送失败: ' + data.error);
+                }
             })
-            .catch(error => alert('请求失败: ' + error.message));
+            .catch(error => {
+                alert('请求失败: ' + error.message);
+            });
         }
         
         function stopTask() {
@@ -2638,50 +2733,63 @@ playwright install chromium</pre>
             .then(data => {
                 if (data.success) {
                     clearInterval(pollingInterval);
-                    const statusEl = el('output-status');
+                    const statusEl = document.getElementById('output-status');
                     if (statusEl) statusEl.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行</span>';
-                    const inputArea = el('output-input-area');
+                    const inputArea = document.getElementById('output-input-area');
                     if (inputArea) inputArea.style.display = 'none';
                     resetButtons();
                 } else {
                     alert('停止失败: ' + (data.error || '未知错误'));
                 }
             })
-            .catch(error => alert('请求失败: ' + error.message));
-        }
-        
-        const userInputEl = el('user-input');
-        if (userInputEl) {
-            userInputEl.addEventListener('keypress', e => {
-                if (e.key === 'Enter') sendUserInput();
+            .catch(error => {
+                alert('请求失败: ' + error.message);
             });
         }
         
-        console.log('开始统一绑定按钮事件...');
+        const userInputEl = document.getElementById('user-input');
+        if (userInputEl) {
+            userInputEl.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendUserInput();
+                }
+            });
+        }
         
-        document.querySelectorAll('.btn-run').forEach(btn => {
-            console.log('绑定运行按钮:', btn.id, 'data-func:', btn.dataset.func);
+        // 统一按钮事件绑定
+        document.querySelectorAll('.btn-run').forEach(function(btn) {
             btn.onclick = function() {
-                console.log('运行按钮被点击:', this.id, 'data-func:', this.dataset.func);
-                if (this.dataset.func === '6') showCleanerPanel();
-                else if (this.dataset.func) runFunction(parseInt(this.dataset.func));
+                var choice = this.getAttribute('data-func');
+                var btnId = this.id || 'unknown';
+                console.log('[按钮点击] id:', btnId, 'data-func:', choice);
+                if (choice && choice != '6') {
+                    runFunction(parseInt(choice));
+                } else if (choice == '6') {
+                    console.log('[功能6] 打开文件清理面板');
+                    showCleanerPanel();
+                }
             };
         });
         
-        const viewProductsBtn = el('btn-view-products');
+        const viewProductsBtn = document.getElementById('btn-view-products');
         if (viewProductsBtn) {
-            console.log('绑定查看所有商品按钮');
-            viewProductsBtn.onclick = showAllProducts;
+            viewProductsBtn.onclick = function() {
+                console.log('[按钮点击] 查看所有商品');
+                showAllProducts();
+            };
         }
 
-        const tunnelBtn = el('btn-run-tunnel');
+        const tunnelBtn = document.getElementById('btn-run-tunnel');
         if (tunnelBtn) {
-            console.log('绑定隧道共享按钮');
-            tunnelBtn.onclick = startTunnelAndShow;
+            tunnelBtn.onclick = function() {
+                console.log('[按钮点击] 隧道共享');
+                startTunnelAndShow();
+            };
         }
 
+        // 一键启动隧道并显示结果
         async function startTunnelAndShow() {
-            const btn = el('btn-run-tunnel');
+            const btn = document.getElementById('btn-run-tunnel');
             if (!btn) return;
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 启动中...';
@@ -2690,13 +2798,14 @@ playwright install chromium</pre>
                 const serverRes = await fetch('/api/server/info');
                 const serverData = await serverRes.json();
 
-                await fetch('/api/tunnel/start', { method: 'POST' });
+                const startRes = await fetch('/api/tunnel/start', { method: 'POST' });
+                const startData = await startRes.json();
 
                 const localUrl = serverData.success ? serverData.local_url : 'http://127.0.0.1:8888';
                 const lanUrl = serverData.success && serverData.lan_url ? serverData.lan_url : '';
 
-                const tunnelPanel = el('tunnel-panel');
-                const tunnelContent = el('tunnel-content');
+                const tunnelPanel = document.getElementById('tunnel-panel');
+                const tunnelContent = document.getElementById('tunnel-content');
                 if (!tunnelPanel || !tunnelContent) {
                     alert('找不到隧道面板');
                     btn.disabled = false;
@@ -2750,12 +2859,11 @@ playwright install chromium</pre>
                     try {
                         const statusRes = await fetch('/api/tunnel/status');
                         const statusData = await statusRes.json();
-                        console.log('Tunnel status:', statusData);
 
                         if (statusData.url && statusData.url.startsWith('http')) {
                             clearInterval(tunnelPollInterval);
                             tunnelPollInterval = null;
-                            const urlContainer = el('tunnel-public-url-container');
+                            const urlContainer = document.getElementById('tunnel-public-url-container');
                             if (urlContainer) {
                                 urlContainer.innerHTML = `
                                     <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
@@ -2765,7 +2873,7 @@ playwright install chromium</pre>
                                         <i class="fa fa-copy"></i> 复制
                                     </button>
                                 `;
-                                const newCopyBtn = el('btn-copy-tunnel-url');
+                                const newCopyBtn = document.getElementById('btn-copy-tunnel-url');
                                 if (newCopyBtn) {
                                     newCopyBtn.onclick = function() {
                                         copyToClipboard(this.dataset.url);
@@ -2779,13 +2887,20 @@ playwright install chromium</pre>
                         } else if (retryCount >= maxRetries) {
                             clearInterval(tunnelPollInterval);
                             tunnelPollInterval = null;
-                            const pubUrl = el('tunnel-public-url');
+                            const pubUrl = document.getElementById('tunnel-public-url');
                             if (pubUrl) pubUrl.textContent = '获取失败，请检查网络连接';
                         }
                     } catch (e) {
                         console.error('获取状态失败:', e);
                     }
                 }, 1000);
+
+                if (!startData.success) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-danger mt-3';
+                    alertDiv.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>启动失败:</strong> ' + (startData.error || '未知错误');
+                    if (tunnelContent) tunnelContent.insertBefore(alertDiv, tunnelContent.firstChild);
+                }
 
             } catch (e) {
                 alert('操作失败: ' + e.message);
@@ -2799,7 +2914,11 @@ playwright install chromium</pre>
 
         function copyToClipboard(text) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => showToast('链接已复制到剪贴板'), () => fallbackCopy(text));
+                navigator.clipboard.writeText(text).then(function() {
+                    showToast('链接已复制到剪贴板');
+                }, function() {
+                    fallbackCopy(text);
+                });
             } else {
                 fallbackCopy(text);
             }
@@ -2808,7 +2927,8 @@ playwright install chromium</pre>
         function fallbackCopy(text) {
             const textarea = document.createElement('textarea');
             textarea.value = text;
-            textarea.style.cssText = 'position:fixed;opacity:0;';
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
             document.body.appendChild(textarea);
             textarea.select();
             try {
@@ -2821,7 +2941,7 @@ playwright install chromium</pre>
         }
 
         function showToast(message) {
-            const existing = el('copy-toast');
+            const existing = document.getElementById('copy-toast');
             if (existing) existing.remove();
             const toast = document.createElement('div');
             toast.id = 'copy-toast';
@@ -2831,31 +2951,31 @@ playwright install chromium</pre>
             setTimeout(() => toast.remove(), 2000);
         }
 
-        document.querySelectorAll('.btn-sku-api').forEach(btn => {
-            console.log('绑定货号对比按钮:', btn.id, 'data-api:', btn.dataset.api);
+        // 绑定货号对比API按钮
+        document.querySelectorAll('.btn-sku-api').forEach(function(btn) {
             btn.onclick = function() {
-                console.log('货号对比 API URL:', this.dataset.api);
-                if (this.dataset.api === '/api/sku/compare/txt') {
+                var apiUrl = this.getAttribute('data-api');
+                var btnId = this.id || 'unknown';
+                console.log('[按钮点击] id:', btnId, 'api:', apiUrl);
+                
+                if (apiUrl === '/api/sku/compare/txt') {
+                    console.log('[功能] 货号文本对比 - 显示输入面板');
                     showSkuInputPanel();
                     return;
                 }
                 
-                if (this.dataset.api) {
-                    fetch(this.dataset.api)
-                    .then(response => {
-                        console.log('响应状态:', response.status);
-                        return response.text().then(text => {
-                            console.log('响应内容前500字符:', text.substring(0, 500));
-                            try { return JSON.parse(text); }
-                            catch(e) { console.error('JSON解析错误:', e); alert('数据解析错误: ' + e.message); return null; }
-                        });
-                    })
+                if (apiUrl) {
+                    console.log('[功能] 调用对比API:', apiUrl);
+                    fetch(apiUrl)
+                    .then(response => response.json())
                     .then(data => {
-                        if (!data) return;
-                        if (data.error) { alert('对比失败: ' + data.error); return; }
+                        if (data.error) {
+                            alert('对比失败: ' + data.error);
+                            return;
+                        }
                         
                         showOutputPanel();
-                        const outputPanel = el('output-panel');
+                        const outputPanel = document.getElementById('output-panel');
                         const existingCard = outputPanel.querySelector('.comparison-card, .products-card');
                         if (existingCard) existingCard.remove();
                         
@@ -3018,51 +3138,24 @@ playwright install chromium</pre>
         });
 
         // 全局函数定义
-        const OUTPUT_FORMAT_RULES = [
-            { pattern: /\x1b\[[0-9;]*m/g, replacement: '' },
-            { pattern: /&/g, replacement: '&amp;' },
-            { pattern: /</g, replacement: '&lt;' },
-            { pattern: />/g, replacement: '&gt;' },
-            { pattern: /^(.*[✓✅].*)$/gm, replacement: '<span style="color: #67c23a;">$1</span>' },
-            { pattern: /^(.*[✗❌].*)$/gm, replacement: '<span style="color: #f56c6c;">$1</span>' },
-            { pattern: /^(.*[🔍📊].*)$/gm, replacement: '<span style="color: #409EFF;">$1</span>' },
-            { pattern: /^(.*[🔧⚠️].*)$/gm, replacement: '<span style="color: #E6A23C;">$1</span>' },
-            { pattern: /^(.*¥[0-9,.]*.*)$/gm, replacement: '<span style="color: #E6A23C; font-weight: bold;">$1</span>' },
-            { pattern: /^(.*(?:预计|耗时|保存|获取|开始运行|浏览器|结束时间|总运行时间|Cookie).*)$/gm, replacement: '<span style="color: #E6A23C;">$1</span>' },
-            { pattern: /^(.*成功.*)$/gm, replacement: '<span style="color: #67c23a;">$1</span>' },
-            { pattern: /^(===.*===|---.*---|={50,})$/gm, replacement: '<span style="color: #909399;">$1</span>' },
-            { pattern: /^(\s*\d+\/\s*\d+\s*页:.*)$/gm, replacement: '<span style="color: #409EFF;">$1</span>' },
-            { pattern: /^(注意：|提示：.*)$/gm, replacement: '<span style="color: #909399; font-style: italic;">$1</span>' },
-            { pattern: /^(请输入选项.*)$/gm, replacement: '<span style="color: #409EFF; font-weight: bold;">$1</span>' },
-            { pattern: /^(\d+\.\s+.*)$/gm, replacement: '<span style="color: #333; font-weight: bold;">$1</span>' },
-            { pattern: /^(.*(?:对比文件|新增商品数|删除商品数|新增高价商品数|输入货号总数|JSON中货号总数|已存在货号数|缺失货号数|JSON中多余货号数|重复序列号数).*)$/gm, replacement: '<span style="color: #E6A23C;">$1</span>' }
-        ];
-        
-        const COOKIE_SECTION_KEYWORDS = ['验证Cookie状态', 'Cookie文件存在', '找到Token', 'Token有效期', 'Token值有效', 'Cookie验证通过'];
-        const COOKIE_SECTION_END_KEYWORDS = ['===', '请选择功能'];
-        
         function formatOutput(text) {
             if (!text) return '';
             
-            text = text.replace(/\x1b\[[0-9;]*m/g, '')
-                       .replace(/&/g, '&amp;')
-                       .replace(/</g, '&lt;')
-                       .replace(/>/g, '&gt;');
-            
-            OUTPUT_FORMAT_RULES.forEach(rule => {
-                text = text.replace(rule.pattern, rule.replacement);
-            });
+            text = text.replace(/\x1b\[[0-9;]*m/g, '');
+            text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             
             let lines = text.split('\n');
             let filteredLines = [];
             let inCookieSection = false;
             
             for (let line of lines) {
-                if (COOKIE_SECTION_KEYWORDS.some(kw => line.includes(kw))) {
+                if (line.includes('验证Cookie状态') || line.includes('Cookie文件存在') || 
+                    line.includes('找到Token') || line.includes('Token有效期') || 
+                    line.includes('Token值有效') || line.includes('Cookie验证通过')) {
                     inCookieSection = true;
                     continue;
                 }
-                if (inCookieSection && COOKIE_SECTION_END_KEYWORDS.some(kw => line.includes(kw))) {
+                if (inCookieSection && (line.includes('===') || line.includes('请选择功能'))) {
                     inCookieSection = false;
                 }
                 if (!inCookieSection) {
@@ -3070,7 +3163,37 @@ playwright install chromium</pre>
                 }
             }
             
-            return filteredLines.join('\n');
+            text = filteredLines.join('\n');
+            
+            let formatted = text
+                .replace(/^(.*✓.*)$/gm, '<span style="color: #67c23a;">$1</span>')
+                .replace(/^(.*✗.*)$/gm, '<span style="color: #f56c6c;">$1</span>')
+                .replace(/^(.*🔍.*)$/gm, '<span style="color: #409EFF;">$1</span>')
+                .replace(/^(.*🔧.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(.*⚠️.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(.*✅.*)$/gm, '<span style="color: #67c23a;">$1</span>')
+                .replace(/^(.*❌.*)$/gm, '<span style="color: #f56c6c;">$1</span>')
+                .replace(/^(.*📊.*)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(.*¥[0-9,.]*.*)$/gm, '<span style="color: #E6A23C; font-weight: bold;">$1</span>')
+                .replace(/^(.*预计.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(.*耗时.*)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(.*保存.*)$/gm, '<span style="color: #409EFF;">$1</span>')
+                .replace(/^(.*获取.*)$/gm, '<span style="color: #409EFF;">$1</span>')
+                .replace(/^(.*成功.*)$/gm, '<span style="color: #67c23a;">$1</span>')
+                .replace(/^(===.*===)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(---.*---)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(={50,})$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(\s*\d+\/\s*\d+\s*页:.*)$/gm, '<span style="color: #409EFF;">$1</span>')
+                .replace(/^(开始时间:|结束时间:|总运行时间:.*)$/gm, '<span style="color: #909399;">$1</span>')
+                .replace(/^(开始运行...|浏览器启动耗时:|页面创建耗时:.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(Cookie已保存|浏览器关闭耗时:.*)$/gm, '<span style="color: #67c23a;">$1</span>')
+                .replace(/^(注意：|提示：.*)$/gm, '<span style="color: #909399; font-style: italic;">$1</span>')
+                .replace(/^(请输入选项.*)$/gm, '<span style="color: #409EFF; font-weight: bold;">$1</span>')
+                .replace(/^(\d+\.\s+.*)$/gm, '<span style="color: #333; font-weight: bold;">$1</span>')
+                .replace(/^(对比文件:|新增商品数:|删除商品数:|新增高价商品数:.*)$/gm, '<span style="color: #E6A23C;">$1</span>')
+                .replace(/^(输入货号总数:|JSON中货号总数:|已存在货号数:|缺失货号数:|JSON中多余货号数:|重复序列号数:.*)$/gm, '<span style="color: #E6A23C;">$1</span>');
+            
+            return formatted;
         }
 
         function showSkuInputPanel() {
@@ -3283,15 +3406,6 @@ playwright install chromium</pre>
             if (cleanBtn) cleanBtn.addEventListener('click', executeClean);
         }
         
-        const CLEAN_MODE_CONFIG = {
-            list: { url: '/api/clean/list' },
-            group: { url: '/api/clean/group' },
-            time: { url: '/api/clean/time', needMinutes: true },
-            png: { url: '/api/clean/png' },
-            media: { url: '/api/clean/media' },
-            all: { url: '/api/clean/all' }
-        };
-        
         function executeClean() {
             const modeEl = document.getElementById('clean-mode');
             const directoryEl = document.getElementById('clean-directory');
@@ -3316,26 +3430,44 @@ playwright install chromium</pre>
                 outputDiv.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
             }
             
-            const config = CLEAN_MODE_CONFIG[mode] || CLEAN_MODE_CONFIG.time;
+            let apiUrl = '';
             let data = { directory, dry_run: dryRun };
-            if (config.needMinutes) {
-                data.minutes = parseInt(minutes);
+            
+            switch(mode) {
+                case 'list':
+                    apiUrl = '/api/clean/list';
+                    break;
+                case 'group':
+                    apiUrl = '/api/clean/group';
+                    break;
+                case 'time':
+                    apiUrl = '/api/clean/time';
+                    data.minutes = parseInt(minutes);
+                    break;
+                case 'png':
+                    apiUrl = '/api/clean/png';
+                    break;
+                case 'media':
+                    apiUrl = '/api/clean/media';
+                    break;
+                case 'all':
+                    apiUrl = '/api/clean/all';
+                    break;
             }
             
-            fetch(config.url, {
+            fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             })
             .then(response => response.json())
             .then(result => {
-                if (outputDiv) {
-                    outputDiv.innerHTML = result.success 
-                        ? '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(result.output) + '</pre>'
-                        : '<span style="color: #f56c6c;">✗ 执行失败: ' + result.error + '</span>';
-                }
-                if (statusDiv) {
-                    statusDiv.innerHTML = '<span style="color: ' + (result.success ? '#67c23a;' : '#f56c6c;') + '">' + (result.success ? '✓' : '✗') + ' ' + (result.success ? '执行完成' : '执行失败') + '</span>';
+                if (result.success) {
+                    if (outputDiv) outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(result.output) + '</pre>';
+                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #67c23a;">✓ 执行完成</span>';
+                } else {
+                    if (outputDiv) outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败: ' + result.error + '</span>';
+                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败</span>';
                 }
                 if (btn) {
                     btn.disabled = false;
@@ -3567,7 +3699,7 @@ playwright install chromium</pre>
                                     <li>点击"启动隧道"按钮，将本地服务暴露到公网</li>
                                     <li>生成公网地址后，可以复制链接分享给其他人</li>
                                     <li>公网地址仅在隧道运行时有效，关闭后会失效</li>
-                                    <li>默认使用 <code>hostc</code> 隧道服务</li>
+                                    <li>默认使用 <code>hostc</code> 隧道服务</code></li>
                                     <li>确保网络连接正常</li>
                                 </ul>
                             </div>
