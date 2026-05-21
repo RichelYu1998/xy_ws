@@ -4455,16 +4455,39 @@ if __name__ == '__main__':
                     except:
                         pass
                     
-                    # 如果有已有 URL 且 hostc 进程在运行，直接复用
+                    # 如果有已有 URL 且 hostc 进程在运行，先验证 URL 是否可用
                     if existing_url and is_hostc_running:
-                        print(f"[Tunnel] 复用已有隧道 URL: {existing_url}")
-                        tunnel_url = existing_url
-                        tunnel_last_error = None
-                        tunnel_need_restart = False
-                        continue
+                        try:
+                            import urllib.request
+                            req = urllib.request.Request(existing_url, method='HEAD')
+                            req.add_header('User-Agent', 'hostc-heartbeat/1.0')
+                            urllib.request.urlopen(req, timeout=5)
+                            print(f"[Tunnel] 验证已有隧道 URL 成功: {existing_url}")
+                            tunnel_url = existing_url
+                            tunnel_last_error = None
+                            tunnel_need_restart = False
+                            continue
+                        except:
+                            print(f"[Tunnel] 已有隧道 URL 不可用，将启动新的 hostc 进程")
+                            pass
                     
                     # 否则启动新的 hostc 进程
                     print(f"[Tunnel] 启动新的 hostc 进程...")
+                    
+                    # 先清理可能存在的旧 hostc 进程
+                    if is_hostc_running:
+                        try:
+                            if Environment.IS_WINDOWS:
+                                subprocess.run('taskkill /F /IM node.exe /FI "WINDOWTITLE eq hostc*"', 
+                                              capture_output=True, shell=True, timeout=5)
+                            else:
+                                subprocess.run('pkill -f "hostc"', 
+                                              capture_output=True, timeout=5)
+                            print(f"[Tunnel] 已清理旧的 hostc 进程")
+                            time.sleep(2)
+                        except:
+                            pass
+                    
                     new_tunnel_process = subprocess.Popen(
                         f'npx hostc@latest {port} --local-host 127.0.0.1',
                         stdout=subprocess.PIPE,
@@ -4513,6 +4536,18 @@ if __name__ == '__main__':
                         tunnel_url = new_tunnel_url
                         tunnel_last_error = None
                         tunnel_need_restart = False
+                        
+                        # 更新 tunnel_url.txt 文件
+                        try:
+                            tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                            with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                f.write(f'Success  Tunnel ready\n')
+                                f.write(f'  Public URL: {new_tunnel_url}\n')
+                                f.write(f'  Local:      http://127.0.0.1:{port}/\n')
+                            print(f"[Tunnel] 已更新 tunnel_url.txt: {new_tunnel_url}")
+                        except Exception as e:
+                            print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
+                        
                         print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
                     else:
                         tunnel_last_error = "启动超时"
@@ -4607,6 +4642,18 @@ if __name__ == '__main__':
                                                 tunnel_url = clean_url
                                                 url_ready = True
                                                 print(f"[Tunnel] 找到公网URL: {tunnel_url}")
+                                                
+                                                # 更新 tunnel_url.txt 文件
+                                                try:
+                                                    tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'tunnel_url.txt')
+                                                    with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                                        f.write(f'Success  Tunnel ready\n')
+                                                        f.write(f'  Public URL: {clean_url}\n')
+                                                        f.write(f'  Local:      http://127.0.0.1:{port}/\n')
+                                                    print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
+                                                except Exception as e:
+                                                    print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
+                                                
                                                 break
                         except:
                             pass
