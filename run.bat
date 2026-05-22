@@ -6,7 +6,18 @@ title Szwego Crawler Tool
 echo ========================================
 echo Szwego商品爬虫和货号对比工具 - v2.6.0
 echo ========================================
+
+call :cleanup_exit >nul 2>&1
+
 goto detect_python
+
+:cleanup_exit
+echo.
+echo 正在清理进程...
+taskkill /f /im python.exe >nul 2>&1
+taskkill /f /im node.exe >nul 2>&1
+echo 清理完成
+goto :eof
 
 :detect_python
 echo.
@@ -161,7 +172,9 @@ call %VENV_PATH%\Scripts\activate.bat
 echo.
 echo 正在启动 Web 服务...
 echo.
-start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web"
+
+set PYTHON_LOG_FILE=%CD%\file\web_output.log
+start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web > %PYTHON_LOG_FILE% 2>&1"
 
 echo 等待 Web 服务启动完成...
 timeout /t 5 /nobreak >nul
@@ -185,19 +198,11 @@ echo ========================================
 echo.
 echo 本地访问: http://localhost:8888
 echo 公网访问: 查看 file\tunnel_url.txt
+echo Web日志: 查看 file\web_output.log
 echo.
-echo 注意：服务将继续在后台运行
+echo 按 Ctrl+C 停止服务，或关闭此窗口
 echo.
-echo 关闭此窗口可停止服务，或使用:
-echo   taskkill /f /im python.exe
-echo   taskkill /f /im node.exe
-echo.
-exit /b 0
 
-:cleanup_exit
-echo.
-echo 正在清理进程...
-taskkill /f /im python.exe >nul 2>&1
-taskkill /f /im node.exe >nul 2>&1
-echo 清理完成
-exit /b 0
+:wait_loop
+timeout /t 1 /nobreak >nul
+goto wait_loop
