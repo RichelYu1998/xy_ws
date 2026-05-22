@@ -144,15 +144,29 @@ run_web() {
     echo ""
     echo "正在启动 Web 服务..."
     echo ""
-    python main.py --web &
+
+    python main.py --web 2>&1 | tee file/web_output.log &
     PYTHON_PID=$!
 
     echo "等待 Web 服务启动完成..."
     sleep 5
 
+    if ! kill -0 $PYTHON_PID 2>/dev/null; then
+        echo "Web 服务启动失败，请检查 file/web_output.log"
+        exit 1
+    fi
+
     echo "Web 服务已就绪，正在启动隧道..."
     npx -y hostc@latest 8888 --local-host 127.0.0.1 > file/tunnel_url.txt 2>&1 &
     TUNNEL_PID=$!
+
+    sleep 2
+
+    if ! kill -0 $TUNNEL_PID 2>/dev/null; then
+        echo "隧道服务启动失败"
+        kill $PYTHON_PID 2>/dev/null
+        exit 1
+    fi
 
     echo ""
     echo "========================================"
@@ -161,18 +175,23 @@ run_web() {
     echo ""
     echo "本地访问: http://localhost:8888"
     echo "公网访问: 查看 file/tunnel_url.txt"
+    echo "Web日志: 查看 file/web_output.log"
     echo ""
-    echo "注意：服务将继续在后台运行"
+    echo "关闭此窗口可停止服务，或使用 Ctrl+C"
     echo ""
-    echo "关闭此窗口可停止服务，或使用:"
-    echo "  kill $PYTHON_PID"
-    echo "  kill $TUNNEL_PID"
-    echo ""
+
+    wait $PYTHON_PID $TUNNEL_PID
 }
 
 cleanup_exit() {
     echo ""
     echo "正在清理进程..."
+    if [ -n "$PYTHON_PID" ]; then
+        kill -15 $PYTHON_PID 2>/dev/null
+    fi
+    if [ -n "$TUNNEL_PID" ]; then
+        kill -15 $TUNNEL_PID 2>/dev/null
+    fi
     pkill -f "python main.py" >/dev/null 2>&1
     pkill -f "hostc" >/dev/null 2>&1
     echo "清理完成"
@@ -186,6 +205,6 @@ main() {
     check_config
 }
 
-trap cleanup_exit INT TERM
+trap cleanup_exit INT TERM EXIT
 
 main

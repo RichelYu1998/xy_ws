@@ -5,8 +5,15 @@
 .idea/
 .vscode/
 
-# Logs
-*.log
+# Data files
+file/*.json
+!file/*_cache.json
+
+# Tunnel URL
+file/tunnel_url.txt
+
+# Web output log
+file/web_output.log
 
 # Sensitive config files
 config/cookies.json
