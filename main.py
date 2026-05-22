@@ -17,6 +17,10 @@ import traceback
 import select
 import argparse
 import socket
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.header import Header
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -1192,6 +1196,91 @@ class PathManager:
         for dir_path in dirs:
             if not os.path.exists(dir_path):
                 os.makedirs(dir_path)
+
+
+class EmailNotifier:
+    """邮件通知类"""
+    
+    def __init__(self, config_manager=None):
+        self.config_manager = config_manager or ConfigManager()
+    
+    def get_email_config(self):
+        """获取邮件配置"""
+        return {
+            'enabled': self.config_manager.get('email_notification_enabled', False),
+            'smtp_host': self.config_manager.get('email_smtp_host', 'smtp.qq.com'),
+            'smtp_port': self.config_manager.get('email_smtp_port', 587),
+            'smtp_user': self.config_manager.get('email_smtp_user', ''),
+            'smtp_password': self.config_manager.get('email_smtp_password', ''),
+            'from_name': self.config_manager.get('email_from_name', '公网IP监控'),
+            'to_email': self.config_manager.get('email_to', '980187223@qq.com'),
+        }
+    
+    def send_tunnel_notification(self, tunnel_url, event_type='new'):
+        """发送隧道URL变化通知邮件"""
+        config = self.get_email_config()
+        
+        if not config['enabled']:
+            return False
+        
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['From'] = f"{Header(config['from_name'], 'utf-8').encode()} <{config['smtp_user']}>"
+            msg['To'] = config['to_email']
+            msg['Subject'] = Header(f'【{"新" if event_type == "new" else "更新"}公网地址】{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 'utf-8')
+            
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            body = f"""公网地址已{"生成" if event_type == "new" else "更新"}
+
+时间: {current_time}
+公网地址: {tunnel_url}
+
+请妥善保管此地址。
+"""
+            
+            html_body = f"""
+<html>
+<body>
+<h2>{"新公网地址已生成" if event_type == "new" else "公网地址已更新"}</h2>
+<table>
+<tr><td><b>时间:</b></td><td>{current_time}</td></tr>
+<tr><td><b>公网地址:</b></td><td><a href="{tunnel_url}">{tunnel_url}</a></td></tr>
+</table>
+<p>请妥善保管此地址。</p>
+</body>
+</html>
+"""
+            
+            msg.attach(MIMEText(body, 'plain', 'utf-8'))
+            msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+            
+            if config['smtp_port'] == 465:
+                server = smtplib.SMTP_SSL(config['smtp_host'], config['smtp_port'])
+            else:
+                server = smtplib.SMTP(config['smtp_host'], config['smtp_port'])
+                server.starttls()
+            
+            server.login(config['smtp_user'], config['smtp_password'])
+            server.sendmail(config['smtp_user'], config['to_email'], msg.as_string())
+            server.quit()
+            
+            print(f"[Email] 已发送邮件通知到 {config['to_email']}")
+            return True
+        except Exception as e:
+            print(f"[Email] 发送邮件失败: {e}")
+            return False
+    
+    def save_email_config(self, smtp_host, smtp_port, smtp_user, smtp_password, from_name, to_email):
+        """保存邮件配置"""
+        self.config_manager.set('email_notification_enabled', True)
+        self.config_manager.set('email_smtp_host', smtp_host)
+        self.config_manager.set('email_smtp_port', smtp_port)
+        self.config_manager.set('email_smtp_user', smtp_user)
+        self.config_manager.set('email_smtp_password', smtp_password)
+        self.config_manager.set('email_from_name', from_name)
+        self.config_manager.set('email_to', to_email)
+        return True
 
 
 class ConfigManager:
@@ -4272,6 +4361,52 @@ if __name__ == '__main__':
         def get_version():
             return jsonify({'version': get_version_from_readme()})
 
+        @app.route('/api/email/config', methods=['GET'])
+        def get_email_config():
+            notifier = EmailNotifier()
+            config = notifier.get_email_config()
+            if config['smtp_password']:
+                config['smtp_password'] = '******'
+            return jsonify({'success': True, 'config': config})
+
+        @app.route('/api/email/config', methods=['POST'])
+        def save_email_config():
+            try:
+                data = request.get_json()
+                notifier = EmailNotifier()
+                notifier.save_email_config(
+                    smtp_host=data.get('smtp_host', 'smtp.qq.com'),
+                    smtp_port=int(data.get('smtp_port', 587)),
+                    smtp_user=data.get('smtp_user', ''),
+                    smtp_password=data.get('smtp_password', ''),
+                    from_name=data.get('from_name', '公网IP监控'),
+                    to_email=data.get('to_email', '980187223@qq.com')
+                )
+                return jsonify({'success': True, 'message': '邮件配置已保存'})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
+        @app.route('/api/email/test', methods=['POST'])
+        def test_email():
+            try:
+                data = request.get_json()
+                test_notifier = EmailNotifier()
+                test_notifier.save_email_config(
+                    smtp_host=data.get('smtp_host', 'smtp.qq.com'),
+                    smtp_port=int(data.get('smtp_port', 587)),
+                    smtp_user=data.get('smtp_user', ''),
+                    smtp_password=data.get('smtp_password', ''),
+                    from_name=data.get('from_name', '公网IP监控'),
+                    to_email=data.get('to_email', '980187223@qq.com')
+                )
+                success = test_notifier.send_tunnel_notification('https://test.example.com', 'test')
+                if success:
+                    return jsonify({'success': True, 'message': '测试邮件发送成功'})
+                else:
+                    return jsonify({'success': False, 'error': '请先启用邮件通知'})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)})
+
         @app.route('/api/server/info', methods=['GET'])
         def get_server_info():
             port = args.port
@@ -4308,6 +4443,11 @@ if __name__ == '__main__':
         tunnel_need_restart = False
         tunnel_daemon_started = False
         tunnel_type = 'hostc'
+        email_notifier = EmailNotifier()
+        old_tunnel_url = None
+        
+        def send_tunnel_notification(new_url, event_type='new'):
+            threading.Thread(target=lambda: email_notifier.send_tunnel_notification(new_url, event_type), daemon=True).start()
         
         def send_heartbeat():
             global tunnel_url, tunnel_last_heartbeat, tunnel_heartbeat_failed
@@ -4411,6 +4551,7 @@ if __name__ == '__main__':
                                 tunnel_url = url_match.group(0).rstrip('/')
                                 url_ready = True
                                 print(f"[Cloudflare] 找到公网URL: {tunnel_url}")
+                                send_tunnel_notification(tunnel_url, 'new')
                                 break
                     except:
                         pass
@@ -4585,6 +4726,7 @@ if __name__ == '__main__':
                                                     new_tunnel_url = clean_url
                                                     new_url_ready = True
                                                     print(f"[Tunnel] 重启后找到公网URL: {new_tunnel_url}")
+                                                    send_tunnel_notification(new_tunnel_url, 'update')
                                                     break
                             except:
                                 pass
@@ -4707,6 +4849,7 @@ if __name__ == '__main__':
                                                 tunnel_url = clean_url
                                                 url_ready = True
                                                 print(f"[Tunnel] 找到公网URL: {tunnel_url}")
+                                                send_tunnel_notification(tunnel_url, 'new')
                                                 
                                                 # 更新 tunnel_url.txt 文件
                                                 try:

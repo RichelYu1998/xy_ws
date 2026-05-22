@@ -1,6 +1,5 @@
 Success  Tunnel ready
-  Public URL: https://t-7nsngoq5do.hostc.dev
+  Public URL: https://t-hrssa3o31u.hostc.dev
   Local:      http://127.0.0.1:8888/
-  Tunnel:     t-7nsngoq5do
+  Tunnel:     t-hrssa3o31u
   Channels:   2
-^C^C
