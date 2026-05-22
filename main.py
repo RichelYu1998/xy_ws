@@ -4445,9 +4445,53 @@ if __name__ == '__main__':
         tunnel_type = 'hostc'
         email_notifier = EmailNotifier()
         old_tunnel_url = None
+        tunnel_consecutive_failures = 0
+        tunnel_max_consecutive_failures = 5
+        tunnel_backoff_delay = 5
+        last_email_sent_time = 0
+        email_cooldown = 300
+        email_fail_count = 0
+        email_max_fail_count = 3
+        email_fail_cooldown = 600
         
         def send_tunnel_notification(new_url, event_type='new'):
-            threading.Thread(target=lambda: email_notifier.send_tunnel_notification(new_url, event_type), daemon=True).start()
+            global last_email_sent_time, email_fail_count
+            
+            current_time = time.time()
+            
+            if email_fail_count >= email_max_fail_count:
+                if current_time - last_email_sent_time < email_fail_cooldown:
+                    print(f"[Email] 邮件发送失败次数过多 ({email_fail_count}次)，暂停发送 {email_fail_cooldown} 秒")
+                    return
+            
+            if current_time - last_email_sent_time < email_cooldown:
+                print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒")
+                return
+            
+            def send_with_retry():
+                global last_email_sent_time, email_fail_count
+                try:
+                    success = email_notifier.send_tunnel_notification(new_url, event_type)
+                    if success:
+                        last_email_sent_time = time.time()
+                        email_fail_count = 0
+                    else:
+                        email_fail_count += 1
+                except Exception as e:
+                    email_fail_count += 1
+                    print(f"[Email] 发送邮件异常: {e}")
+            
+            threading.Thread(target=send_with_retry, daemon=True).start()
+        
+        def verify_url(url, timeout=5):
+            try:
+                import urllib.request
+                req = urllib.request.Request(url, method='HEAD')
+                req.add_header('User-Agent', 'hostc-verify/1.0')
+                urllib.request.urlopen(req, timeout=timeout)
+                return True
+            except:
+                return False
         
         def send_heartbeat():
             global tunnel_url, tunnel_last_heartbeat, tunnel_heartbeat_failed
@@ -4467,13 +4511,20 @@ if __name__ == '__main__':
                 return False
         
         def heartbeat_loop():
-            global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url
+            global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             consecutive_failures = 0
             max_consecutive_failures = 2
             while tunnel_auto_restart:
                 is_tunnel_running = tunnel_process and tunnel_process.poll() is None
                 if not is_tunnel_running and tunnel_url:
-                    is_tunnel_running = True
+                    if verify_url(tunnel_url):
+                        is_tunnel_running = True
+                    else:
+                        print(f"[Tunnel] URL验证失败，标记需要重启: {tunnel_url}")
+                        tunnel_need_restart = True
+                        tunnel_consecutive_failures += 1
+                        time.sleep(30)
+                        continue
                 if is_tunnel_running:
                     success = send_heartbeat()
                     if not success:
@@ -4521,7 +4572,7 @@ if __name__ == '__main__':
                                                                   capture_output=True, text=True, timeout=3)
                                             is_running = result.returncode == 0
                                         
-                                        if is_running:
+                                        if is_running and verify_url(existing_url):
                                             print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
                                             tunnel_url = existing_url
                                             url_ready = True
@@ -4531,6 +4582,10 @@ if __name__ == '__main__':
                                                 'url': tunnel_url,
                                                 'message': f'复用已有隧道，URL: {tunnel_url}'
                                             }
+                                        elif is_running and not verify_url(existing_url):
+                                            print(f"[Tunnel] 已有进程运行但URL不可用，将清理并重新启动: {existing_url}")
+                                        else:
+                                            print(f"[Tunnel] 旧URL存在但无进程运行，将启动新隧道: {existing_url}")
                                     except:
                                         pass
                     except:
@@ -4547,7 +4602,7 @@ if __name__ == '__main__':
                 )
 
                 def read_output():
-                    global tunnel_url, url_ready, old_tunnel_url
+                    global tunnel_url, url_ready, old_tunnel_url, tunnel_consecutive_failures
                     while True:
                         if tunnel_process and tunnel_process.poll() is not None:
                             break
@@ -4564,6 +4619,7 @@ if __name__ == '__main__':
                                                 if old_tunnel_url != clean_url:
                                                     tunnel_url = clean_url
                                                     url_ready = True
+                                                    tunnel_consecutive_failures = 0
                                                     print(f"[Tunnel] 找到公网URL: {tunnel_url}")
                                                     send_tunnel_notification(tunnel_url, 'new')
                                                     
@@ -4704,7 +4760,7 @@ if __name__ == '__main__':
                 return None, None
         
         def restart_tunnel():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay
             
             while tunnel_auto_restart:
                 is_internal_running = tunnel_process and tunnel_process.poll() is None
@@ -4712,14 +4768,11 @@ if __name__ == '__main__':
                 
                 if not is_internal_running and tunnel_url:
                     try:
-                        if Environment.IS_WINDOWS:
-                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
-                                                  capture_output=True, text=True, shell=True, timeout=3)
-                            is_external_running = result.returncode == 0 and 'node.exe' in result.stdout
+                        if verify_url(tunnel_url):
+                            is_external_running = True
                         else:
-                            result = subprocess.run('pgrep -f "hostc"', 
-                                                  capture_output=True, text=True, timeout=3)
-                            is_external_running = result.returncode == 0
+                            print(f"[Tunnel] URL验证失败，需要重启: {tunnel_url}")
+                            tunnel_need_restart = True
                     except:
                         pass
                 
@@ -4733,7 +4786,19 @@ if __name__ == '__main__':
                 tunnel_restart_count += 1
                 print(f"[Tunnel] 检测到隧道断开，正在尝试重启 ({tunnel_restart_count}次)...")
                 
-                # 保存旧的URL用于比较
+                if tunnel_consecutive_failures >= tunnel_max_consecutive_failures:
+                    print(f"[Tunnel] 连续失败次数过多 ({tunnel_consecutive_failures}次)，延长等待时间...")
+                    delay = min(tunnel_backoff_delay * (tunnel_consecutive_failures - tunnel_max_consecutive_failures + 1), 60)
+                    print(f"[Tunnel] 等待 {delay} 秒后重试...")
+                    time.sleep(delay)
+                
+                tunnel_consecutive_failures += 1
+                
+                if tunnel_consecutive_failures > tunnel_max_consecutive_failures + 10:
+                    print(f"[Tunnel] 连续失败次数过多 ({tunnel_consecutive_failures}次)，停止自动重启")
+                    tunnel_auto_restart = False
+                    break
+                
                 old_url = tunnel_url
                 
                 if tunnel_process:
@@ -4749,24 +4814,37 @@ if __name__ == '__main__':
                 tunnel_process = None
                 tunnel_url = None
                 
+                if old_url:
+                    try:
+                        tunnel_file = PathManager.get_tunnel_url_file()
+                        if os.path.exists(tunnel_file):
+                            with open(tunnel_file, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                                if old_url in content:
+                                    print(f"[Tunnel] 清理无效URL: {old_url}")
+                                    with file_write_lock:
+                                        with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                            f.write('')
+                    except Exception as e:
+                        print(f"[Tunnel] 清理URL失败: {e}")
+                
                 time.sleep(tunnel_restart_delay)
                 
                 if not tunnel_auto_restart:
                     break
                 
                 try:
-                    # 调用自动启动隧道函数
                     result = auto_start_tunnel()
                     
                     if result['success'] and result.get('url'):
                         new_url = result['url']
-                        # 如果URL发生变化，发送更新通知
                         if old_url and old_url != new_url:
                             print(f"[Tunnel] 隧道URL已变化: {old_url} -> {new_url}")
                             send_tunnel_notification(new_url, 'update')
                         
                         tunnel_last_error = None
                         tunnel_need_restart = False
+                        tunnel_consecutive_failures = 0
                         print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
                     else:
                         tunnel_last_error = result.get('error', '启动失败')
@@ -4778,9 +4856,10 @@ if __name__ == '__main__':
         
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, tunnel_consecutive_failures
 
             tunnel_need_restart = False
+            tunnel_consecutive_failures = 0
             
             if tunnel_process and tunnel_process.poll() is None:
                 return jsonify({'success': True, 'url': tunnel_url, 'message': '隧道已在运行'})
