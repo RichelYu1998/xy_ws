@@ -95,6 +95,12 @@ bash run.sh
 
 ## 更新日志
 
+### v3.3.1 (2026-05-22)
+- **修复 Web 界面运行爬虫时 Input/output error 问题**
+  - 子进程 stdin 改为 `DEVNULL`，避免 `input()` 调用导致 Errno 5
+  - API 路由中的 print 语句改为 safe_print，捕获 IOError 避免崩溃
+  - 提升 Web 服务在无终端环境下的稳定性
+
 ### v3.3.0 (2026-05-22)
 - **自动配置阿里云pip镜像加速**
   - 安装依赖时自动检测并配置阿里云镜像源

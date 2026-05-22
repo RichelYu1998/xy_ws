@@ -1035,12 +1035,13 @@ def run_command_background(task_id, command):
         # Windows上使用不同的参数
         if Environment.IS_WINDOWS:
             # Windows需要使用shell=True来处理路径
+            # 注意：使用 stdin=DEVNULL 避免 input() 调用导致 Input/output error
             process = subprocess.Popen(
                 command,
                 shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,  # 合并stderr到stdout
-                stdin=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
                 cwd=PROJECT_DIR,
                 text=True,
                 encoding='utf-8',
@@ -1050,12 +1051,13 @@ def run_command_background(task_id, command):
             )
         else:
             # Mac/Linux使用更安全的参数
+            # 注意：使用 stdin=DEVNULL 避免 input() 调用导致 Input/output error
             process = subprocess.Popen(
                 command,
                 shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,  # 合并stderr到stdout
-                stdin=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
                 cwd=PROJECT_DIR,
                 text=True,
                 bufsize=1,  # 行缓冲
@@ -4119,7 +4121,14 @@ if __name__ == '__main__':
                 total_fee = 0
                 valid_price_count = 0
                 
-                print(f'开始处理 {len(products)} 个商品...')
+                import sys
+                def safe_print(*args, **kwargs):
+                    try:
+                        print(*args, **kwargs)
+                    except (IOError, OSError):
+                        pass
+                
+                safe_print(f'开始处理 {len(products)} 个商品...')
                 
                 for p in products:
                     try:
@@ -4141,10 +4150,10 @@ if __name__ == '__main__':
                             total_fee += fee
                             valid_price_count += 1
                     except Exception as e:
-                        print(f'处理商品时出错: {e}, price_str: {p.get("售价", "")}')
+                        safe_print(f'处理商品时出错: {e}, price_str: {p.get("售价", "")}')
                         pass
                 
-                print(f'统计结果: valid_price_count={valid_price_count}, total_price={total_price}, high_price_count={len(high_price_products)}')
+                safe_print(f'统计结果: valid_price_count={valid_price_count}, total_price={total_price}, high_price_count={len(high_price_products)}')
                 
                 # 计算平均价格
                 avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
