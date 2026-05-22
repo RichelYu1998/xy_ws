@@ -41,6 +41,30 @@ bash run.sh
 
 > ⚠️ **注意**：配置文件包含敏感信息，请勿分享给他人。
 
+## 跨平台支持
+
+本程序完全支持跨平台运行，无需修改任何配置。
+
+### 支持的操作系统
+
+- ✅ Windows
+- ✅ macOS
+- ✅ Linux
+
+### 路径处理机制
+
+程序使用 `os.path.abspath(__file__)` 自动获取项目根目录，所有配置文件路径都是相对于 `main.py` 的位置计算的。
+
+| 操作系统 | 配置文件路径示例 |
+|---------|-----------------|
+| Windows | `D:\ws\xy_ws\config\config.json` |
+| macOS | `/Users/username/project/config/config.json` |
+| Linux | `/home/username/project/config/config.json` |
+
+### 项目迁移
+
+将整个项目文件夹复制到任何操作系统上即可直接运行，无需修改任何代码或配置。
+
 ## 更新日志
 
 ### v3.2.7 (2026-05-22)
