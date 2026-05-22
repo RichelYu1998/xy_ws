@@ -1,5 +1,7 @@
+Warning  Local service 127.0.0.1:8888 is not accepting connections yet.
+         The tunnel will still start.
 Success  Tunnel ready
-  Public URL: https://t-hrssa3o31u.hostc.dev
+  Public URL: https://t-p1kaw1x70b.hostc.dev
   Local:      http://127.0.0.1:8888/
-  Tunnel:     t-hrssa3o31u
+  Tunnel:     t-p1kaw1x70b
   Channels:   2

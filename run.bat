@@ -72,6 +72,21 @@ call %VENV_PATH%\Scripts\activate.bat
 
 if exist requirements.txt (
     echo 正在安装依赖...
+
+    echo [*] 检测pip镜像源配置...
+    set PIP_CONFIG_FILE=%VENV_PATH%\pip_config\pip.ini
+
+    if not exist "%VENV_PATH%\pip_config\pip.ini" (
+        echo [*] 检测到未配置pip镜像源，启用阿里云加速...
+        if not exist "%VENV_PATH%\pip_config" mkdir "%VENV_PATH%\pip_config"
+        (
+            echo [global]
+            echo index-url = https://mirrors.aliyun.com/pypi/simple/
+            echo [install]
+            echo trusted-host = mirrors.aliyun.com
+        ) > "%VENV_PATH%\pip_config\pip.ini"
+    )
+
     %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check -q
 )
 

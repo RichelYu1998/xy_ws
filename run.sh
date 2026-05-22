@@ -54,6 +54,27 @@ setup_venv() {
 
     if [ -f "requirements.txt" ]; then
         echo "正在安装依赖..."
+
+        ALIYUN_MIRROR="https://mirrors.aliyun.com/pypi/simple/"
+        USE_ALIYUN=0
+
+        if [ -f "$VENV_PATH/pip.conf" ]; then
+            if grep -q "aliyun" "$VENV_PATH/pip.conf" 2>/dev/null; then
+                USE_ALIYUN=1
+            fi
+        fi
+
+        if [ "$USE_ALIYUN" -eq 0 ]; then
+            echo "[*] 检测到未配置pip镜像源，启用阿里云加速..."
+            mkdir -p "$VENV_PATH/pip_config"
+            echo "[global]" > "$VENV_PATH/pip_config/pip.conf"
+            echo "index-url = $ALIYUN_MIRROR" >> "$VENV_PATH/pip_config/pip.conf"
+            echo "[install]" >> "$VENV_PATH/pip_config/pip.conf"
+            echo "trusted-host = mirrors.aliyun.com" >> "$VENV_PATH/pip_config/pip.conf"
+
+            export PIP_CONFIG_FILE="$VENV_PATH/pip_config/pip.conf"
+        fi
+
         pip install -r requirements.txt -q
     fi
 
