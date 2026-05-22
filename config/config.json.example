@@ -80,7 +80,7 @@
     "D:/ws/xy_ws/小旭二手机.xlsx",
     "~/.xiaoxu/xiaoxu.xlsx"
   ],
-  "email_notification_enabled": false,
+  "email_notification_enabled": true,
   "email_smtp_host": "smtp.qq.com",
   "email_smtp_port": 587,
   "email_smtp_user": "your_email@qq.com",
