@@ -33,6 +33,33 @@ bash run.sh
 - `cookies.json` - Cookies数据文件
 - `input_stock_numbers.txt` - 输入的货号列表
 
+**邮件配置说明：**
+首次运行后，`config.json` 会自动从模板生成，邮件通知默认已启用。只需修改以下配置即可自动发送邮件：
+
+```json
+{
+  "email_notification_enabled": true,
+  "email_smtp_host": "smtp.qq.com",
+  "email_smtp_port": 587,
+  "email_smtp_user": "your_email@qq.com",
+  "email_smtp_password": "授权码",
+  "email_from_name": "公网IP监控",
+  "email_to": "980187223@qq.com"
+}
+```
+
+**QQ邮箱授权码获取步骤：**
+1. 登录 QQ邮箱网页版
+2. 设置 → 账户 → POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV服务
+3. 开启"POP3/SMTP服务"
+4. 生成授权码（16位字符串）
+5. 将授权码填入 `email_smtp_password` 字段（不是QQ密码）
+
+**邮件发送时机：**
+- Flask 启动时生成新公网地址
+- 公网地址变更时更新
+- 可通过 Web 界面测试发送
+
 ### file 目录
 
 - `tunnel_url.txt` - hostc 隧道公网 URL（启动后自动生成）
