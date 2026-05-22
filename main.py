@@ -1127,12 +1127,12 @@ class PathManager:
     @staticmethod
     def get_config_dir():
         """获取配置文件目录"""
-        return 'config'
+        return os.path.join(PROJECT_DIR, 'config')
     
     @staticmethod
     def get_file_dir():
         """获取输出文件目录"""
-        return 'file'
+        return os.path.join(PROJECT_DIR, 'file')
     
     @staticmethod
     def get_config_file():
