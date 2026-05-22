@@ -4485,6 +4485,129 @@ if __name__ == '__main__':
                         consecutive_failures = 0
                 time.sleep(30)
         
+        def auto_start_tunnel():
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
+
+            if tunnel_process and tunnel_process.poll() is None:
+                return {'success': True, 'url': tunnel_url, 'message': '隧道已在运行'}
+
+            try:
+                port = args.port
+                tunnel_url = None
+                url_ready = False
+                tunnel_last_error = None
+                tunnel_auto_restart = True
+
+                tunnel_file = PathManager.get_tunnel_url_file()
+                
+                print("[Tunnel] 使用 hostc 隧道")
+                tunnel_type = 'hostc'
+                
+                if os.path.exists(tunnel_file):
+                    try:
+                        with open(tunnel_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                            if match:
+                                existing_url = match.group(1).rstrip('/')
+                                if existing_url and len(existing_url) > 10:
+                                    try:
+                                        if Environment.IS_WINDOWS:
+                                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
+                                                                  capture_output=True, text=True, shell=True, timeout=3)
+                                            is_running = result.returncode == 0 and 'node.exe' in result.stdout
+                                        else:
+                                            result = subprocess.run('pgrep -f "hostc"', 
+                                                                  capture_output=True, text=True, timeout=3)
+                                            is_running = result.returncode == 0
+                                        
+                                        if is_running:
+                                            print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
+                                            tunnel_url = existing_url
+                                            url_ready = True
+                                            send_tunnel_notification(tunnel_url, 'new')
+                                            return {
+                                                'success': True,
+                                                'url': tunnel_url,
+                                                'message': f'复用已有隧道，URL: {tunnel_url}'
+                                            }
+                                    except:
+                                        pass
+                    except:
+                        pass
+
+                tunnel_process = subprocess.Popen(
+                    f'npx hostc@latest {port} --local-host 127.0.0.1',
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=0,
+                    shell=True,
+                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
+                )
+
+                def read_output():
+                    global tunnel_url, url_ready, old_tunnel_url
+                    while True:
+                        if tunnel_process and tunnel_process.poll() is not None:
+                            break
+                        try:
+                            line = tunnel_process.stdout.readline()
+                            if line:
+                                print(f"[Tunnel] {line.strip()}")
+                                if 'https://' in line or 'http://' in line:
+                                    urls = re.findall(r'https?://[^\s<>"\']+', line)
+                                    for url in urls:
+                                        clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
+                                        if len(clean_url) > 10 and '.' in clean_url:
+                                            if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
+                                                if old_tunnel_url != clean_url:
+                                                    tunnel_url = clean_url
+                                                    url_ready = True
+                                                    print(f"[Tunnel] 找到公网URL: {tunnel_url}")
+                                                    send_tunnel_notification(tunnel_url, 'new')
+                                                    
+                                                    # 更新 tunnel_url.txt 文件
+                                                    try:
+                                                        tunnel_file = PathManager.get_tunnel_url_file()
+                                                        with file_write_lock:
+                                                            with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                                                f.write(f'Success  Tunnel ready\n')
+                                                                f.write(f'  Type:       hostc\n')
+                                                                f.write(f'  Public URL: {clean_url}\n')
+                                                                f.write(f'  Local:      http://127.0.0.1:{port}/\n')
+                                                        print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
+                                                    except Exception as e:
+                                                        print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
+                                                    
+                                                    old_tunnel_url = clean_url
+                                                    break
+                        except:
+                            pass
+
+                read_thread = threading.Thread(target=read_output, daemon=True)
+                read_thread.start()
+
+                tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
+                tunnel_restart_thread.start()
+                
+                tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+                tunnel_heartbeat_thread.start()
+
+                max_wait = 15
+                waited = 0
+                while not url_ready and waited < max_wait:
+                    time.sleep(0.5)
+                    waited += 0.5
+
+                return {
+                    'success': True,
+                    'url': tunnel_url or '',
+                    'message': f'隧道已启动{"，URL: " + tunnel_url if tunnel_url else "，URL 正在获取中..."}'
+                }
+            except Exception as e:
+                return {'success': False, 'error': str(e)}
+        
         def start_cloudflare_tunnel(port):
             global tunnel_url, tunnel_process
             
@@ -4581,7 +4704,7 @@ if __name__ == '__main__':
                 return None, None
         
         def restart_tunnel():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url
             
             while tunnel_auto_restart:
                 is_internal_running = tunnel_process and tunnel_process.poll() is None
@@ -4610,6 +4733,9 @@ if __name__ == '__main__':
                 tunnel_restart_count += 1
                 print(f"[Tunnel] 检测到隧道断开，正在尝试重启 ({tunnel_restart_count}次)...")
                 
+                # 保存旧的URL用于比较
+                old_url = tunnel_url
+                
                 if tunnel_process:
                     try:
                         tunnel_process.terminate()
@@ -4629,140 +4755,22 @@ if __name__ == '__main__':
                     break
                 
                 try:
-                    port = args.port
-                    tunnel_url = None
-                    url_ready = False
-                    new_tunnel_process = None
+                    # 调用自动启动隧道函数
+                    result = auto_start_tunnel()
                     
-                    # 优先尝试复用 tunnel_url.txt 中的已有 URL
-                    tunnel_file = PathManager.get_tunnel_url_file()
-                    existing_url = None
-                    if os.path.exists(tunnel_file):
-                        try:
-                            with open(tunnel_file, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                                match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                                if match:
-                                    existing_url = match.group(1).rstrip('/')
-                        except:
-                            pass
-                    
-                    # 检查是否有 hostc 进程在运行
-                    is_hostc_running = False
-                    try:
-                        if Environment.IS_WINDOWS:
-                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
-                                                  capture_output=True, text=True, shell=True, timeout=3)
-                            is_hostc_running = result.returncode == 0 and 'node.exe' in result.stdout
-                        else:
-                            result = subprocess.run('pgrep -f "hostc"', 
-                                                  capture_output=True, text=True, timeout=3)
-                            is_hostc_running = result.returncode == 0
-                    except:
-                        pass
-                    
-                    # 如果有已有 URL 且 hostc 进程在运行，先验证 URL 是否可用
-                    if existing_url and is_hostc_running:
-                        try:
-                            import urllib.request
-                            req = urllib.request.Request(existing_url, method='HEAD')
-                            req.add_header('User-Agent', 'hostc-heartbeat/1.0')
-                            urllib.request.urlopen(req, timeout=5)
-                            print(f"[Tunnel] 验证已有隧道 URL 成功: {existing_url}")
-                            tunnel_url = existing_url
-                            tunnel_last_error = None
-                            tunnel_need_restart = False
-                            continue
-                        except:
-                            print(f"[Tunnel] 已有隧道 URL 不可用，将启动新的 hostc 进程")
-                            pass
-                    
-                    # 否则启动新的 hostc 进程
-                    print(f"[Tunnel] 启动新的 hostc 进程...")
-                    
-                    # 先清理可能存在的旧 hostc 进程
-                    if is_hostc_running:
-                        try:
-                            if Environment.IS_WINDOWS:
-                                subprocess.run('taskkill /F /IM node.exe /FI "WINDOWTITLE eq hostc*"', 
-                                              capture_output=True, shell=True, timeout=5)
-                            else:
-                                subprocess.run('pkill -f "hostc"', 
-                                              capture_output=True, timeout=5)
-                            print(f"[Tunnel] 已清理旧的 hostc 进程")
-                            time.sleep(2)
-                        except:
-                            pass
-                    
-                    new_tunnel_process = subprocess.Popen(
-                        f'npx hostc@latest {port} --local-host 127.0.0.1',
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        bufsize=0,
-                        shell=True,
-                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
-                    )
-                    
-                    new_tunnel_process_local = new_tunnel_process
-                    new_url_ready = False
-                    new_tunnel_url = None
-                    
-                    def read_new_output():
-                        nonlocal new_url_ready, new_tunnel_url
-                        while True:
-                            if new_tunnel_process_local and new_tunnel_process_local.poll() is not None:
-                                break
-                            try:
-                                line = new_tunnel_process_local.stdout.readline()
-                                if line:
-                                    print(f"[Tunnel] {line.strip()}")
-                                    if 'https://' in line or 'http://' in line:
-                                        urls = re.findall(r'https?://[^\s<>"\']+', line)
-                                        for url in urls:
-                                            clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
-                                            if len(clean_url) > 10 and '.' in clean_url:
-                                                if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
-                                                    new_tunnel_url = clean_url
-                                                    new_url_ready = True
-                                                    print(f"[Tunnel] 重启后找到公网URL: {new_tunnel_url}")
-                                                    send_tunnel_notification(new_tunnel_url, 'update')
-                                                    break
-                            except:
-                                pass
-                    
-                    read_thread = threading.Thread(target=read_new_output, daemon=True)
-                    read_thread.start()
-                    
-                    wait_start = time.time()
-                    while not new_url_ready and time.time() - wait_start < 15:
-                        time.sleep(0.5)
-                    
-                    if new_url_ready:
-                        tunnel_process = new_tunnel_process
-                        tunnel_url = new_tunnel_url
+                    if result['success'] and result.get('url'):
+                        new_url = result['url']
+                        # 如果URL发生变化，发送更新通知
+                        if old_url and old_url != new_url:
+                            print(f"[Tunnel] 隧道URL已变化: {old_url} -> {new_url}")
+                            send_tunnel_notification(new_url, 'update')
+                        
                         tunnel_last_error = None
                         tunnel_need_restart = False
-                        
-                        # 更新 tunnel_url.txt 文件
-                        try:
-                            tunnel_file = PathManager.get_tunnel_url_file()
-                            with file_write_lock:
-                                with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                    f.write(f'Success  Tunnel ready\n')
-                                    f.write(f'  Public URL: {new_tunnel_url}\n')
-                                    f.write(f'  Local:      http://127.0.0.1:{port}/\n')
-                            print(f"[Tunnel] 已更新 tunnel_url.txt: {new_tunnel_url}")
-                        except Exception as e:
-                            print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
-                        
                         print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
                     else:
-                        tunnel_last_error = "启动超时"
-                        try:
-                            new_tunnel_process.terminate()
-                        except:
-                            pass
+                        tunnel_last_error = result.get('error', '启动失败')
+                        print(f"[Tunnel] 重启失败: {tunnel_last_error}")
                         
                 except Exception as e:
                     tunnel_last_error = str(e)
@@ -4777,119 +4785,11 @@ if __name__ == '__main__':
             if tunnel_process and tunnel_process.poll() is None:
                 return jsonify({'success': True, 'url': tunnel_url, 'message': '隧道已在运行'})
 
-            try:
-                port = args.port
-                tunnel_url = None
-                url_ready = False
-                tunnel_last_error = None
-                tunnel_auto_restart = True
-
-                tunnel_file = PathManager.get_tunnel_url_file()
-                
-                print("[Tunnel] 使用 hostc 隧道")
-                tunnel_type = 'hostc'
-                
-                if os.path.exists(tunnel_file):
-                    try:
-                        with open(tunnel_file, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                            if match:
-                                existing_url = match.group(1).rstrip('/')
-                                if existing_url and len(existing_url) > 10:
-                                    try:
-                                        if Environment.IS_WINDOWS:
-                                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
-                                                                  capture_output=True, text=True, shell=True, timeout=3)
-                                            is_running = result.returncode == 0 and 'node.exe' in result.stdout
-                                        else:
-                                            result = subprocess.run('pgrep -f "hostc"', 
-                                                                  capture_output=True, text=True, timeout=3)
-                                            is_running = result.returncode == 0
-                                        
-                                        if is_running:
-                                            print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
-                                            tunnel_url = existing_url
-                                            url_ready = True
-                                            return jsonify({
-                                                'success': True,
-                                                'url': tunnel_url,
-                                                'message': f'复用已有隧道，URL: {tunnel_url}'
-                                            })
-                                    except:
-                                        pass
-                    except:
-                        pass
-
-                tunnel_process = subprocess.Popen(
-                    f'npx hostc@latest {port} --local-host 127.0.0.1',
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=0,
-                    shell=True,
-                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
-                )
-
-                def read_output():
-                    global tunnel_url, url_ready
-                    while True:
-                        if tunnel_process and tunnel_process.poll() is not None:
-                            break
-                        try:
-                            line = tunnel_process.stdout.readline()
-                            if line:
-                                print(f"[Tunnel] {line.strip()}")
-                                if 'https://' in line or 'http://' in line:
-                                    urls = re.findall(r'https?://[^\s<>"\']+', line)
-                                    for url in urls:
-                                        clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
-                                        if len(clean_url) > 10 and '.' in clean_url:
-                                            if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
-                                                tunnel_url = clean_url
-                                                url_ready = True
-                                                print(f"[Tunnel] 找到公网URL: {tunnel_url}")
-                                                send_tunnel_notification(tunnel_url, 'new')
-                                                
-                                                # 更新 tunnel_url.txt 文件
-                                                try:
-                                                    tunnel_file = PathManager.get_tunnel_url_file()
-                                                    with file_write_lock:
-                                                        with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                                            f.write(f'Success  Tunnel ready\n')
-                                                            f.write(f'  Type:       hostc\n')
-                                                            f.write(f'  Public URL: {clean_url}\n')
-                                                            f.write(f'  Local:      http://127.0.0.1:{port}/\n')
-                                                    print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
-                                                except Exception as e:
-                                                    print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
-                                                
-                                                break
-                        except:
-                            pass
-
-                read_thread = threading.Thread(target=read_output, daemon=True)
-                read_thread.start()
-
-                tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
-                tunnel_restart_thread.start()
-                
-                tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
-                tunnel_heartbeat_thread.start()
-
-                max_wait = 15
-                waited = 0
-                while not url_ready and waited < max_wait:
-                    time.sleep(0.5)
-                    waited += 0.5
-
-                return jsonify({
-                    'success': True,
-                    'url': tunnel_url or '',
-                    'message': f'隧道已启动{"，URL: " + tunnel_url if tunnel_url else "，URL 正在获取中..."}'
-                })
-            except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+            result = auto_start_tunnel()
+            if result['success']:
+                return jsonify(result)
+            else:
+                return jsonify({'success': False, 'error': result.get('error', '启动失败')})
 
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():
@@ -4980,6 +4880,15 @@ if __name__ == '__main__':
         print("=" * 50)
         print(f"访问地址: http://localhost:{args.port}")
         print(f"局域网地址: http://{lan_ip_startup}:{args.port}" if lan_ip_startup else "")
+        
+        # 自动启动隧道
+        print("[Tunnel] 正在自动启动隧道...")
+        tunnel_result = auto_start_tunnel()
+        if tunnel_result['success']:
+            print(f"[Tunnel] 隧道启动成功: {tunnel_result.get('url', 'URL正在获取中...')}")
+        else:
+            print(f"[Tunnel] 隧道启动失败: {tunnel_result.get('error', '未知错误')}")
+        
         print("按 Ctrl+C 停止服务")
         print("=" * 50)
         app.run(host='0.0.0.0', port=args.port, debug=False)

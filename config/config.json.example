@@ -79,5 +79,12 @@
   "excel_files": [
     "D:/ws/xy_ws/小旭二手机.xlsx",
     "~/.xiaoxu/xiaoxu.xlsx"
-  ]
+  ],
+  "email_notification_enabled": false,
+  "email_smtp_host": "smtp.qq.com",
+  "email_smtp_port": 587,
+  "email_smtp_user": "your_email@qq.com",
+  "email_smtp_password": "your_email_password",
+  "email_from_name": "公网IP监控",
+  "email_to": "980187223@qq.com"
 }
