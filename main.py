@@ -1223,9 +1223,15 @@ class EmailNotifier:
         config = self.get_email_config()
         
         if not config['enabled']:
+            print(f"[Email] 邮件通知未启用，跳过发送")
             return False
         
         try:
+            print(f"[Email] 开始发送邮件通知: {tunnel_url} (事件类型: {event_type})")
+            print(f"[Email] SMTP服务器: {config['smtp_host']}:{config['smtp_port']}")
+            print(f"[Email] 发送人: {config['smtp_user']}")
+            print(f"[Email] 接收人: {config['to_email']}")
+            
             msg = MIMEMultipart('alternative')
             msg['From'] = f"{Header(config['from_name'], 'utf-8').encode()} <{config['smtp_user']}>"
             msg['To'] = config['to_email']
@@ -1257,18 +1263,28 @@ class EmailNotifier:
             msg.attach(MIMEText(body, 'plain', 'utf-8'))
             msg.attach(MIMEText(html_body, 'html', 'utf-8'))
             
+            print(f"[Email] 正在连接SMTP服务器...")
             if config['smtp_port'] == 465:
                 server = smtplib.SMTP_SSL(config['smtp_host'], config['smtp_port'])
             else:
                 server = smtplib.SMTP(config['smtp_host'], config['smtp_port'])
                 server.starttls()
             
+            print(f"[Email] 正在登录SMTP服务器...")
             server.login(config['smtp_user'], config['smtp_password'])
+            
+            print(f"[Email] 正在发送邮件...")
             server.sendmail(config['smtp_user'], config['to_email'], msg.as_string())
             server.quit()
             
-            print(f"[Email] 已发送邮件通知到 {config['to_email']}")
+            print(f"[Email] 已成功发送邮件通知到 {config['to_email']}")
             return True
+        except smtplib.SMTPAuthenticationError as e:
+            print(f"[Email] SMTP认证失败: {e}")
+            return False
+        except smtplib.SMTPException as e:
+            print(f"[Email] SMTP错误: {e}")
+            return False
         except Exception as e:
             print(f"[Email] 发送邮件失败: {e}")
             return False
@@ -4458,10 +4474,10 @@ if __name__ == '__main__':
         tunnel_max_consecutive_failures = 5
         tunnel_backoff_delay = 5
         last_email_sent_time = 0
-        email_cooldown = 300
+        email_cooldown = 60
         email_fail_count = 0
         email_max_fail_count = 3
-        email_fail_cooldown = 600
+        email_fail_cooldown = 300
         
         def send_tunnel_notification(new_url, event_type='new'):
             global last_email_sent_time, email_fail_count
@@ -4472,6 +4488,9 @@ if __name__ == '__main__':
                 if current_time - last_email_sent_time < email_fail_cooldown:
                     print(f"[Email] 邮件发送失败次数过多 ({email_fail_count}次)，暂停发送 {email_fail_cooldown} 秒")
                     return
+                else:
+                    print(f"[Email] 邮件发送失败冷却期已过，重置失败计数")
+                    email_fail_count = 0
             
             if current_time - last_email_sent_time < email_cooldown:
                 print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒")
@@ -4480,26 +4499,30 @@ if __name__ == '__main__':
             def send_with_retry():
                 global last_email_sent_time, email_fail_count
                 try:
+                    print(f"[Email] 准备发送邮件通知: {new_url} (事件类型: {event_type})")
                     success = email_notifier.send_tunnel_notification(new_url, event_type)
                     if success:
                         last_email_sent_time = time.time()
                         email_fail_count = 0
+                        print(f"[Email] 邮件发送成功")
                     else:
                         email_fail_count += 1
+                        print(f"[Email] 邮件发送失败，当前失败次数: {email_fail_count}")
                 except Exception as e:
                     email_fail_count += 1
-                    print(f"[Email] 发送邮件异常: {e}")
+                    print(f"[Email] 发送邮件异常: {e}，当前失败次数: {email_fail_count}")
             
             threading.Thread(target=send_with_retry, daemon=True).start()
         
-        def verify_url(url, timeout=5):
+        def verify_url(url, timeout=10):
             try:
                 import urllib.request
                 req = urllib.request.Request(url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-verify/1.0')
                 urllib.request.urlopen(req, timeout=timeout)
                 return True
-            except:
+            except Exception as e:
+                print(f"[Tunnel] URL验证异常: {e}")
                 return False
         
         def send_heartbeat():
@@ -4511,18 +4534,19 @@ if __name__ == '__main__':
                 import urllib.request
                 req = urllib.request.Request(tunnel_url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-heartbeat/1.0')
-                urllib.request.urlopen(req, timeout=5)
+                urllib.request.urlopen(req, timeout=10)
                 tunnel_last_heartbeat = time.time()
                 tunnel_heartbeat_failed = False
                 return True
-            except:
+            except Exception as e:
                 tunnel_heartbeat_failed = True
+                print(f"[Tunnel] 心跳检测异常: {e}")
                 return False
         
         def heartbeat_loop():
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             consecutive_failures = 0
-            max_consecutive_failures = 2
+            max_consecutive_failures = 5
             while tunnel_auto_restart:
                 is_tunnel_running = tunnel_process and tunnel_process.poll() is None
                 if not is_tunnel_running and tunnel_url:
@@ -4600,6 +4624,18 @@ if __name__ == '__main__':
                     except:
                         pass
 
+                # 清理所有旧的hostc/node进程
+                try:
+                    if Environment.IS_WINDOWS:
+                        subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
+                        print("[Tunnel] 已清理所有旧的node.exe进程")
+                    else:
+                        subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
+                        print("[Tunnel] 已清理所有旧的hostc进程")
+                    time.sleep(2)  # 等待进程完全清理
+                except Exception as e:
+                    print(f"[Tunnel] 清理旧进程失败: {e}")
+
                 tunnel_process = subprocess.Popen(
                     f'npx hostc@latest {port} --local-host 127.0.0.1',
                     stdout=subprocess.PIPE,
@@ -4630,6 +4666,8 @@ if __name__ == '__main__':
                                                     url_ready = True
                                                     tunnel_consecutive_failures = 0
                                                     print(f"[Tunnel] 找到公网URL: {tunnel_url}")
+                                                    
+                                                    # 发送邮件通知（在更新old_tunnel_url之前）
                                                     send_tunnel_notification(tunnel_url, 'new')
                                                     
                                                     # 更新 tunnel_url.txt 文件
@@ -4645,6 +4683,7 @@ if __name__ == '__main__':
                                                     except Exception as e:
                                                         print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
                                                     
+                                                    # 在邮件发送后再更新old_tunnel_url
                                                     old_tunnel_url = clean_url
                                                     break
                         except:
@@ -4771,6 +4810,10 @@ if __name__ == '__main__':
         def restart_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay
             
+            consecutive_restart_attempts = 0
+            max_consecutive_restarts = 3
+            restart_cooldown = 60
+            
             while tunnel_auto_restart:
                 is_internal_running = tunnel_process and tunnel_process.poll() is None
                 is_external_running = False
@@ -4786,14 +4829,23 @@ if __name__ == '__main__':
                         pass
                 
                 if (is_internal_running or is_external_running) and not tunnel_need_restart:
+                    consecutive_restart_attempts = 0
                     time.sleep(1)
                     continue
                 
                 if not tunnel_auto_restart:
                     break
                 
+                consecutive_restart_attempts += 1
+                
+                if consecutive_restart_attempts >= max_consecutive_restarts:
+                    print(f"[Tunnel] 连续重启尝试次数过多 ({consecutive_restart_attempts}次)，延长等待时间...")
+                    delay = min(restart_cooldown * (consecutive_restart_attempts - max_consecutive_restarts + 1), 300)
+                    print(f"[Tunnel] 等待 {delay} 秒后重试...")
+                    time.sleep(delay)
+                
                 tunnel_restart_count += 1
-                print(f"[Tunnel] 检测到隧道断开，正在尝试重启 ({tunnel_restart_count}次)...")
+                print(f"[Tunnel] 检测到隧道断开，正在尝试重启 ({tunnel_restart_count}次，本次连续尝试{consecutive_restart_attempts}次)...")
                 
                 if tunnel_consecutive_failures >= tunnel_max_consecutive_failures:
                     print(f"[Tunnel] 连续失败次数过多 ({tunnel_consecutive_failures}次)，延长等待时间...")
@@ -4809,6 +4861,18 @@ if __name__ == '__main__':
                     break
                 
                 old_url = tunnel_url
+                
+                # 清理所有旧的hostc/node进程
+                try:
+                    if Environment.IS_WINDOWS:
+                        subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
+                        print("[Tunnel] 已清理所有旧的node.exe进程")
+                    else:
+                        subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
+                        print("[Tunnel] 已清理所有旧的hostc进程")
+                    time.sleep(2)  # 等待进程完全清理
+                except Exception as e:
+                    print(f"[Tunnel] 清理旧进程失败: {e}")
                 
                 if tunnel_process:
                     try:
@@ -4854,6 +4918,7 @@ if __name__ == '__main__':
                         tunnel_last_error = None
                         tunnel_need_restart = False
                         tunnel_consecutive_failures = 0
+                        consecutive_restart_attempts = 0
                         print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
                     else:
                         tunnel_last_error = result.get('error', '启动失败')
