@@ -4585,6 +4585,7 @@ if __name__ == '__main__':
                 tunnel_file = PathManager.get_tunnel_url_file()
                 
                 print("[Tunnel] 使用 hostc 隧道")
+                sys.stdout.flush()
                 tunnel_type = 'hostc'
                 
                 if os.path.exists(tunnel_file):
@@ -4607,6 +4608,7 @@ if __name__ == '__main__':
                                         
                                         if is_running and verify_url(existing_url):
                                             print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
+                                            sys.stdout.flush()
                                             tunnel_url = existing_url
                                             url_ready = True
                                             send_tunnel_notification(tunnel_url, 'new')
@@ -4617,8 +4619,10 @@ if __name__ == '__main__':
                                             }
                                         elif is_running and not verify_url(existing_url):
                                             print(f"[Tunnel] 已有进程运行但URL不可用，将清理并重新启动: {existing_url}")
+                                            sys.stdout.flush()
                                         else:
                                             print(f"[Tunnel] 旧URL存在但无进程运行，将启动新隧道: {existing_url}")
+                                            sys.stdout.flush()
                                     except:
                                         pass
                     except:
@@ -4627,8 +4631,9 @@ if __name__ == '__main__':
                 # 清理所有旧的hostc/node进程
                 try:
                     if Environment.IS_WINDOWS:
-                        subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
-                        print("[Tunnel] 已清理所有旧的node.exe进程")
+                        subprocess.run('taskkill /F /FI "IMAGENAME eq node.exe" /FI "WINDOWTITLE eq npx*hostc*" /T', shell=True, capture_output=True, timeout=10)
+                        subprocess.run('taskkill /F /FI "IMAGENAME eq node.exe" /FI "COMMANDLINE like %hostc%" /T', shell=True, capture_output=True, timeout=10)
+                        print("[Tunnel] 已清理所有旧的hostc进程")
                     else:
                         subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
                         print("[Tunnel] 已清理所有旧的hostc进程")
@@ -4655,6 +4660,7 @@ if __name__ == '__main__':
                             line = tunnel_process.stdout.readline()
                             if line:
                                 print(f"[Tunnel] {line.strip()}")
+                                sys.stdout.flush()
                                 if 'https://' in line or 'http://' in line:
                                     urls = re.findall(r'https?://[^\s<>"\']+', line)
                                     for url in urls:
@@ -4666,6 +4672,7 @@ if __name__ == '__main__':
                                                     url_ready = True
                                                     tunnel_consecutive_failures = 0
                                                     print(f"[Tunnel] 找到公网URL: {tunnel_url}")
+                                                    sys.stdout.flush()
                                                     
                                                     # 发送邮件通知（在更新old_tunnel_url之前）
                                                     send_tunnel_notification(tunnel_url, 'new')
@@ -4680,8 +4687,10 @@ if __name__ == '__main__':
                                                                 f.write(f'  Public URL: {clean_url}\n')
                                                                 f.write(f'  Local:      http://127.0.0.1:{port}/\n')
                                                         print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
+                                                        sys.stdout.flush()
                                                     except Exception as e:
                                                         print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
+                                                        sys.stdout.flush()
                                                     
                                                     # 在邮件发送后再更新old_tunnel_url
                                                     old_tunnel_url = clean_url
@@ -4703,6 +4712,10 @@ if __name__ == '__main__':
                 while not url_ready and waited < max_wait:
                     time.sleep(0.5)
                     waited += 0.5
+
+                if not url_ready:
+                    print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL")
+                    return {'success': False, 'error': '启动超时，未获取到URL'}
 
                 return {
                     'success': True,
@@ -4840,23 +4853,29 @@ if __name__ == '__main__':
                 
                 if consecutive_restart_attempts >= max_consecutive_restarts:
                     print(f"[Tunnel] 连续重启尝试次数过多 ({consecutive_restart_attempts}次)，延长等待时间...")
+                    sys.stdout.flush()
                     delay = min(restart_cooldown * (consecutive_restart_attempts - max_consecutive_restarts + 1), 300)
                     print(f"[Tunnel] 等待 {delay} 秒后重试...")
+                    sys.stdout.flush()
                     time.sleep(delay)
                 
                 tunnel_restart_count += 1
                 print(f"[Tunnel] 检测到隧道断开，正在尝试重启 ({tunnel_restart_count}次，本次连续尝试{consecutive_restart_attempts}次)...")
+                sys.stdout.flush()
                 
                 if tunnel_consecutive_failures >= tunnel_max_consecutive_failures:
                     print(f"[Tunnel] 连续失败次数过多 ({tunnel_consecutive_failures}次)，延长等待时间...")
+                    sys.stdout.flush()
                     delay = min(tunnel_backoff_delay * (tunnel_consecutive_failures - tunnel_max_consecutive_failures + 1), 60)
                     print(f"[Tunnel] 等待 {delay} 秒后重试...")
+                    sys.stdout.flush()
                     time.sleep(delay)
                 
                 tunnel_consecutive_failures += 1
                 
                 if tunnel_consecutive_failures > tunnel_max_consecutive_failures + 10:
                     print(f"[Tunnel] 连续失败次数过多 ({tunnel_consecutive_failures}次)，停止自动重启")
+                    sys.stdout.flush()
                     tunnel_auto_restart = False
                     break
                 
@@ -4913,6 +4932,7 @@ if __name__ == '__main__':
                         new_url = result['url']
                         if old_url and old_url != new_url:
                             print(f"[Tunnel] 隧道URL已变化: {old_url} -> {new_url}")
+                            sys.stdout.flush()
                             send_tunnel_notification(new_url, 'update')
                         
                         tunnel_last_error = None
@@ -4920,13 +4940,16 @@ if __name__ == '__main__':
                         tunnel_consecutive_failures = 0
                         consecutive_restart_attempts = 0
                         print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
+                        sys.stdout.flush()
                     else:
                         tunnel_last_error = result.get('error', '启动失败')
                         print(f"[Tunnel] 重启失败: {tunnel_last_error}")
+                        sys.stdout.flush()
                         
                 except Exception as e:
                     tunnel_last_error = str(e)
                     print(f"[Tunnel] 重启失败: {e}")
+                    sys.stdout.flush()
         
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
