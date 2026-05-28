@@ -4667,16 +4667,20 @@ if __name__ == '__main__':
                                         pass
                                 time.sleep(1)
                         
-                        # 再清理所有node.exe进程（更彻底）
-                        node_result = subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
-                        # 统计node.exe进程数量
-                        if node_result.returncode == 0:
-                            node_count = node_result.stdout.count('成功')
-                            success_count += node_count
-                            total_count += node_count
-                        else:
-                            node_count = 0
-                            fail_count += 1
+                        # 检查是否还有node.exe进程，如果有才清理
+                        node_check = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=5)
+                        if 'node.exe' in node_check.stdout:
+                            # 再清理所有node.exe进程（更彻底）
+                            node_result = subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
+                            # 统计node.exe进程数量
+                            if node_result.returncode == 0:
+                                node_count = node_result.stdout.count('成功')
+                                success_count += node_count
+                                total_count += node_count
+                                print(f"[Tunnel] 已清理{node_count}个node.exe进程")
+                            else:
+                                fail_count += 1
+                                print(f"[Tunnel] 清理node.exe进程失败")
                         
                         print(f"[Tunnel] 进程清理统计: 总共{total_count}个，成功{success_count}个，失败{fail_count}个")
                     else:
@@ -4960,6 +4964,10 @@ if __name__ == '__main__':
                 
                 # 清理所有旧的hostc/node进程
                 try:
+                    success_count = 0
+                    fail_count = 0
+                    total_count = 0
+                    
                     if Environment.IS_WINDOWS:
                         # 先尝试精确匹配hostc进程
                         result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', shell=True, capture_output=True, text=True, timeout=10)
@@ -4971,22 +4979,45 @@ if __name__ == '__main__':
                                     pids.append(line)
                             if pids:
                                 for pid in pids:
+                                    total_count += 1
                                     try:
                                         subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True, timeout=3)
+                                        success_count += 1
                                         print(f"[Tunnel] 已终止hostc进程: {pid}")
                                     except:
+                                        fail_count += 1
                                         pass
                                 time.sleep(1)
                         
-                        # 再清理所有node.exe进程（更彻底）
-                        subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
-                        print("[Tunnel] 已清理所有旧的hostc/node进程")
+                        # 检查是否还有node.exe进程，如果有才清理
+                        node_check = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=5)
+                        if 'node.exe' in node_check.stdout:
+                            # 再清理所有node.exe进程（更彻底）
+                            node_result = subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
+                            # 统计node.exe进程数量
+                            if node_result.returncode == 0:
+                                node_count = node_result.stdout.count('成功')
+                                success_count += node_count
+                                total_count += node_count
+                                print(f"[Tunnel] 已清理{node_count}个node.exe进程")
+                            else:
+                                fail_count += 1
+                                print(f"[Tunnel] 清理node.exe进程失败")
+                        
+                        print(f"[Tunnel] 进程清理统计: 总共{total_count}个，成功{success_count}个，失败{fail_count}个")
                     else:
-                        subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
-                        print("[Tunnel] 已清理所有旧的hostc进程")
+                        result = subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
+                        if result.returncode == 0:
+                            success_count = 1
+                            total_count = 1
+                        else:
+                            fail_count = 1
+                            total_count = 1
+                        print(f"[Tunnel] 进程清理统计: 总共{total_count}个，成功{success_count}个，失败{fail_count}个")
                     time.sleep(2)  # 等待进程完全清理
                 except Exception as e:
                     print(f"[Tunnel] 清理旧进程失败: {e}")
+                    print(f"[Tunnel] 进程清理统计: 总共0个，成功0个，失败1个")
                 
                 if tunnel_process:
                     try:
