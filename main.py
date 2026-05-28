@@ -1192,6 +1192,11 @@ class PathManager:
         return os.path.join(PathManager.get_file_dir(), 'tunnel_url.txt')
     
     @staticmethod
+    def get_web_output_file():
+        """获取Web输出日志文件路径"""
+        return os.path.join(PathManager.get_file_dir(), 'web_output.log')
+    
+    @staticmethod
     def ensure_dirs_exist():
         """确保所有必要的目录存在"""
         dirs = [PathManager.get_config_dir(), PathManager.get_file_dir()]
@@ -4637,6 +4642,10 @@ if __name__ == '__main__':
 
                 # 清理所有旧的hostc/node进程
                 try:
+                    success_count = 0
+                    fail_count = 0
+                    total_count = 0
+                    
                     if Environment.IS_WINDOWS:
                         # 先尝试精确匹配hostc进程
                         result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', shell=True, capture_output=True, text=True, timeout=10)
@@ -4648,22 +4657,42 @@ if __name__ == '__main__':
                                     pids.append(line)
                             if pids:
                                 for pid in pids:
+                                    total_count += 1
                                     try:
                                         subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True, timeout=3)
+                                        success_count += 1
                                         print(f"[Tunnel] 已终止hostc进程: {pid}")
                                     except:
+                                        fail_count += 1
                                         pass
                                 time.sleep(1)
                         
                         # 再清理所有node.exe进程（更彻底）
-                        subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
-                        print("[Tunnel] 已清理所有旧的hostc/node进程")
+                        node_result = subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
+                        # 统计node.exe进程数量
+                        if node_result.returncode == 0:
+                            node_count = node_result.stdout.count('成功')
+                            success_count += node_count
+                            total_count += node_count
+                        else:
+                            node_count = 0
+                            fail_count += 1
+                        
+                        print(f"[Tunnel] 进程清理统计: 总共{total_count}个，成功{success_count}个，失败{fail_count}个")
                     else:
-                        subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
+                        result = subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
+                        if result.returncode == 0:
+                            success_count = 1
+                            total_count = 1
+                        else:
+                            fail_count = 1
+                            total_count = 1
+                        print(f"[Tunnel] 进程清理统计: 总共{total_count}个，成功{success_count}个，失败{fail_count}个")
                         print("[Tunnel] 已清理所有旧的hostc进程")
                     time.sleep(2)  # 等待进程完全清理
                 except Exception as e:
                     print(f"[Tunnel] 清理旧进程失败: {e}")
+                    print(f"[Tunnel] 进程清理统计: 总共0个，成功0个，失败1个")
 
                 tunnel_process = subprocess.Popen(
                     f'npx hostc@latest {port} --local-host 127.0.0.1',
@@ -5145,6 +5174,17 @@ if __name__ == '__main__':
         
         # 自动启动隧道
         print("[Tunnel] 正在自动启动隧道...")
+        
+        # 清空web_output.log日志文件
+        try:
+            web_log_file = PathManager.get_web_output_file()
+            if os.path.exists(web_log_file):
+                with open(web_log_file, 'w', encoding='utf-8') as f:
+                    f.write('')
+                print(f"[System] 已清空日志文件: {web_log_file}")
+        except Exception as e:
+            print(f"[System] 清空日志文件失败: {e}")
+        
         tunnel_result = auto_start_tunnel()
         if tunnel_result['success']:
             print(f"[Tunnel] 隧道启动成功: {tunnel_result.get('url', 'URL正在获取中...')}")
