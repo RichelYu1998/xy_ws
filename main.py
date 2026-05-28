@@ -4598,10 +4598,13 @@ if __name__ == '__main__':
                                 existing_url = match.group(1).rstrip('/')
                                 if existing_url and len(existing_url) > 10:
                                     try:
+                                        # 更精确的hostc进程检测
                                         if Environment.IS_WINDOWS:
-                                            result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
-                                                                  capture_output=True, text=True, shell=True, timeout=3)
-                                            is_running = result.returncode == 0 and 'node.exe' in result.stdout
+                                            # 使用wmic精确匹配hostc进程
+                                            result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', 
+                                                                  capture_output=True, text=True, shell=True, timeout=5)
+                                            # 检查是否有hostc进程在运行
+                                            is_running = result.returncode == 0 and any(line.strip().isdigit() for line in result.stdout.split('\n') if line.strip())
                                         else:
                                             result = subprocess.run('pgrep -f "hostc"', 
                                                                   capture_output=True, text=True, timeout=3)
@@ -4620,18 +4623,12 @@ if __name__ == '__main__':
                                                 'message': f'复用已有隧道，URL: {tunnel_url}'
                                             }
                                         elif is_running and not verify_url(existing_url):
-                                            print(f"[Tunnel] 已有进程运行但URL不可用，将清理并重新启动: {existing_url}")
+                                            print(f"[Tunnel] 已有hostc进程运行但URL不可用，将清理进程并重新启动: {existing_url}")
                                             sys.stdout.flush()
-                                            # 清理无效的URL文件
-                                            try:
-                                                with file_write_lock:
-                                                    with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                                        f.write('')
-                                                print(f"[Tunnel] 已清理无效URL文件")
-                                            except Exception as e:
-                                                print(f"[Tunnel] 清理URL文件失败: {e}")
+                                            # 不清空URL文件，保留旧URL用于参考
+                                            print(f"[Tunnel] 保留旧URL文件，清理进程后重新启动")
                                         else:
-                                            print(f"[Tunnel] 旧URL存在但无进程运行，将启动新隧道: {existing_url}")
+                                            print(f"[Tunnel] 无hostc进程运行，将启动新隧道")
                                             sys.stdout.flush()
                                     except:
                                         pass
@@ -4722,6 +4719,7 @@ if __name__ == '__main__':
                                                                 f.write(f'  Type:       hostc\n')
                                                                 f.write(f'  Public URL: {clean_url}\n')
                                                                 f.write(f'  Local:      http://127.0.0.1:{port}/\n')
+                                                                f.flush()  # 确保写入磁盘
                                                         print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
                                                         sys.stdout.flush()
                                                     except Exception as e:
