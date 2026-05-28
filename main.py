@@ -4795,41 +4795,10 @@ if __name__ == '__main__':
 
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
-
-                def cleanup_tunnel_file():
-                    """定期清理 tunnel_url.txt 文件，确保只包含最新URL"""
-                    while True:
-                        time.sleep(5)  # 每5秒检查一次
-                        if tunnel_url and url_ready:
-                            try:
-                                tunnel_file = PathManager.get_tunnel_url_file()
-                                with open(tunnel_file, 'r', encoding='utf-8') as f:
-                                    content = f.read()
-                                
-                                # 检查文件是否包含多个 "Success  Tunnel ready" 或多个URL
-                                success_count = content.count('Success  Tunnel ready')
-                                url_matches = re.findall(r'Public URL:\s*(https?://[^\s]+)', content)
-                                
-                                if success_count > 1 or len(url_matches) > 1:
-                                    # 只保留最新的URL（最后一个）
-                                    with file_write_lock:
-                                        with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                            f.write(f'Success  Tunnel ready\n')
-                                            f.write(f'  Type:       hostc\n')
-                                            f.write(f'  Public URL: {tunnel_url}\n')
-                                            f.write(f'  Local:      http://127.0.0.1:{port}/\n')
-                                            f.flush()
-                                    print(f"[Tunnel] 已清理 tunnel_url.txt，保留最新URL: {tunnel_url}")
-                                    sys.stdout.flush()
-                                    
-                                    # 同步更新 web_output.log（从 tunnel_url.txt 读取）
-                                    PathManager.sync_web_output_from_tunnel_url()
-                            except Exception as e:
-                                pass  # 忽略清理错误
-
-                cleanup_thread = threading.Thread(target=cleanup_tunnel_file, daemon=True)
-                cleanup_thread.start()
-
+                
+                # 定期清理和同步逻辑已移除
+                # tunnel_url.txt 由 hostc 自动管理，只在 URL 变化时同步 web_output.log
+                
                 tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
                 tunnel_restart_thread.start()
                 

@@ -104,8 +104,8 @@ bash run.sh
 
 - **隧道服务日志管理优化**
   - 新增统一函数 `sync_web_output_from_tunnel_url()`，web_output.log 统一从 tunnel_url.txt 读取
-  - 移除清空 tunnel_url.txt 的代码，tunnel_url.txt 作为唯一数据源
-  - 简化代码，减少43行冗余代码
+  - 移除定期清理 tunnel_url.txt 的逻辑，由 hostc 自动管理
+  - 简化代码，减少70+行冗余代码
 
 ### v3.3.6 (2026-05-28)
 - **日志管理和通知优化**
