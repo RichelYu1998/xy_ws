@@ -7,7 +7,6 @@
 
 # Data files
 file/*.json
-!file/*_cache.json
 
 # Tunnel URL
 file/tunnel_url.txt
