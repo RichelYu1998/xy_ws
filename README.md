@@ -95,6 +95,19 @@ bash run.sh
 
 ## 更新日志
 
+### v3.3.7 (2026-05-28)
+- **修复前端JavaScript未定义函数错误**
+  - 修复 `closePanel`、`closeTunnelPanel` 函数未定义的问题
+  - 将 `closePanel` 和 `closeTunnelPanel` 函数移到script标签开头，确保函数立即可用
+  - 统一使用 `closePanel('panelId')` 方式关闭面板，移除未使用的独立函数
+  - 修复HTML文件BOM头和DOCTYPE声明问题
+
+- **隧道服务日志管理优化**
+  - Flask启动时自动清空web_output.log日志文件
+  - 启动前清空tunnel_url.txt文件，避免hostc进程缓存旧内容
+  - 隧道URL更新时同步写入web_output.log
+  - 从tunnel_url.txt读取公网地址并写入web_output.log，支持日志文件保留最新URL
+
 ### v3.3.6 (2026-05-28)
 - **日志管理和通知优化**
   - Flask启动时自动清空web_output.log日志文件

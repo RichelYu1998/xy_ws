@@ -4698,6 +4698,17 @@ if __name__ == '__main__':
                     print(f"[Tunnel] 清理旧进程失败: {e}")
                     print(f"[Tunnel] 进程清理统计: 总共0个，成功0个，失败1个")
 
+                # 清空 tunnel_url.txt 文件，避免 hostc 进程追加内容
+                try:
+                    tunnel_file = PathManager.get_tunnel_url_file()
+                    with open(tunnel_file, 'w', encoding='utf-8') as f:
+                        f.write('')
+                    print(f"[Tunnel] 已清空 tunnel_url.txt 文件")
+                    sys.stdout.flush()
+                except Exception as e:
+                    print(f"[Tunnel] 清空 tunnel_url.txt 失败: {e}")
+                    sys.stdout.flush()
+
                 tunnel_process = subprocess.Popen(
                     f'npx hostc@latest {port} --local-host 127.0.0.1',
                     stdout=subprocess.PIPE,
@@ -4759,6 +4770,17 @@ if __name__ == '__main__':
                                                                 f.flush()  # 确保写入磁盘
                                                         print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
                                                         sys.stdout.flush()
+                                                        
+                                                        # 同步更新 web_output.log
+                                                        try:
+                                                            web_log_file = PathManager.get_web_output_file()
+                                                            with open(web_log_file, 'w', encoding='utf-8') as f:
+                                                                f.write(f"[Tunnel] 公网地址: {clean_url}\n")
+                                                            print(f"[Tunnel] 已更新 web_output.log: {clean_url}")
+                                                            sys.stdout.flush()
+                                                        except Exception as e:
+                                                            print(f"[Tunnel] 更新 web_output.log 失败: {e}")
+                                                            sys.stdout.flush()
                                                     except Exception as e:
                                                         print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
                                                         sys.stdout.flush()
@@ -4777,6 +4799,47 @@ if __name__ == '__main__':
 
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
+
+                def cleanup_tunnel_file():
+                    """定期清理 tunnel_url.txt 文件，确保只包含最新URL"""
+                    while True:
+                        time.sleep(5)  # 每5秒检查一次
+                        if tunnel_url and url_ready:
+                            try:
+                                tunnel_file = PathManager.get_tunnel_url_file()
+                                with open(tunnel_file, 'r', encoding='utf-8') as f:
+                                    content = f.read()
+                                
+                                # 检查文件是否包含多个 "Success  Tunnel ready" 或多个URL
+                                success_count = content.count('Success  Tunnel ready')
+                                url_matches = re.findall(r'Public URL:\s*(https?://[^\s]+)', content)
+                                
+                                if success_count > 1 or len(url_matches) > 1:
+                                    # 只保留最新的URL（最后一个）
+                                    with file_write_lock:
+                                        with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                            f.write(f'Success  Tunnel ready\n')
+                                            f.write(f'  Type:       hostc\n')
+                                            f.write(f'  Public URL: {tunnel_url}\n')
+                                            f.write(f'  Local:      http://127.0.0.1:{port}/\n')
+                                            f.flush()
+                                    print(f"[Tunnel] 已清理 tunnel_url.txt，保留最新URL: {tunnel_url}")
+                                    sys.stdout.flush()
+                                    
+                                    # 同步更新 web_output.log
+                                    try:
+                                        web_log_file = PathManager.get_web_output_file()
+                                        with open(web_log_file, 'w', encoding='utf-8') as f:
+                                            f.write(f"[Tunnel] 公网地址: {tunnel_url}\n")
+                                        print(f"[Tunnel] 已同步更新 web_output.log: {tunnel_url}")
+                                        sys.stdout.flush()
+                                    except Exception as e:
+                                        pass  # 忽略清理错误
+                            except Exception as e:
+                                pass  # 忽略清理错误
+
+                cleanup_thread = threading.Thread(target=cleanup_tunnel_file, daemon=True)
+                cleanup_thread.start()
 
                 tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
                 tunnel_restart_thread.start()
@@ -4805,101 +4868,6 @@ if __name__ == '__main__':
                 }
             except Exception as e:
                 return {'success': False, 'error': str(e)}
-        
-        def start_cloudflare_tunnel(port):
-            global tunnel_url, tunnel_process
-            
-            tunnel_file = os.path.join(os.path.dirname(os.path.abspath(__file__), 'file', 'cloudflare_tunnel.txt'))
-            
-            # 检查是否已配置 Cloudflare Tunnel
-            tunnel_id = None
-            tunnel_name = None
-            account_id = None
-            
-            if os.path.exists(tunnel_file):
-                try:
-                    with open(tunnel_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        tunnel_id_match = re.search(r'Tunnel ID:\s*([^\s\n]+)', content)
-                        tunnel_name_match = re.search(r'Tunnel Name:\s*([^\s\n]+)', content)
-                        account_id_match = re.search(r'Account ID:\s*([^\s\n]+)', content)
-                        
-                        if tunnel_id_match:
-                            tunnel_id = tunnel_id_match.group(1)
-                        if tunnel_name_match:
-                            tunnel_name = tunnel_name_match.group(1)
-                        if account_id_match:
-                            account_id = account_id_match.group(1)
-                except:
-                    pass
-            
-            if not tunnel_id or not account_id:
-                print("[Cloudflare] 未找到 Cloudflare Tunnel 配置，请先运行 cloudflared tunnel login")
-                return None, None
-            
-            # 启动 Cloudflare Tunnel
-            try:
-                config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'file', 'cloudflare_config.yml')
-                cloudflared_cmd = 'cloudflared tunnel --url http://127.0.0.1:{} --config {} run {}'.format(
-                    port, 
-                    config_path,
-                    tunnel_id
-                )
-                
-                process = subprocess.Popen(
-                    cloudflared_cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=0,
-                    shell=True,
-                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
-                )
-                
-                # 等待并解析输出中的 URL
-                url_ready = False
-                tunnel_url = None
-                wait_start = time.time()
-                
-                while not url_ready and time.time() - wait_start < 30:
-                    try:
-                        line = process.stdout.readline()
-                        if line:
-                            print(f"[Cloudflare] {line.strip()}")
-                            # Cloudflare Tunnel 通常会显示访问 URL
-                            url_match = re.search(r'https?://[^\s<>"\']+', line)
-                            if url_match:
-                                tunnel_url = url_match.group(0).rstrip('/')
-                                url_ready = True
-                                print(f"[Cloudflare] 找到公网URL: {tunnel_url}")
-                                send_tunnel_notification(tunnel_url, 'new')
-                                break
-                    except:
-                        pass
-                    time.sleep(0.5)
-                
-                if url_ready:
-                    # 更新 tunnel_url.txt 文件
-                    try:
-                        tunnel_file = PathManager.get_tunnel_url_file()
-                        with file_write_lock:
-                            with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                f.write(f'Success  Tunnel ready\n')
-                                f.write(f'  Type:       Cloudflare Tunnel\n')
-                                f.write(f'  Public URL: {tunnel_url}\n')
-                                f.write(f'  Local:      http://127.0.0.1:{port}/\n')
-                        print(f"[Cloudflare] 已更新 tunnel_url.txt: {tunnel_url}")
-                    except Exception as e:
-                        print(f"[Cloudflare] 更新 tunnel_url.txt 失败: {e}")
-                    
-                    return process, tunnel_url
-                else:
-                    process.terminate()
-                    return None, None
-                    
-            except Exception as e:
-                print(f"[Cloudflare] 启动失败: {e}")
-                return None, None
         
         def restart_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay
@@ -5219,7 +5187,31 @@ if __name__ == '__main__':
         
         tunnel_result = auto_start_tunnel()
         if tunnel_result['success']:
-            print(f"[Tunnel] 隧道启动成功: {tunnel_result.get('url', 'URL正在获取中...')}")
+            # 从 tunnel_url.txt 读取公网地址并写入 web_output.log
+            public_url = None
+            try:
+                tunnel_file = PathManager.get_tunnel_url_file()
+                if os.path.exists(tunnel_file):
+                    with open(tunnel_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                        if match:
+                            public_url = match.group(1).rstrip('/')
+            except Exception as e:
+                print(f"[Tunnel] 读取 tunnel_url.txt 失败: {e}")
+            
+            if public_url:
+                print(f"[Tunnel] 隧道启动成功: {public_url}")
+                # 将公网地址写入 web_output.log（覆盖模式，只保留最新地址）
+                try:
+                    web_log_file = PathManager.get_web_output_file()
+                    with open(web_log_file, 'w', encoding='utf-8') as f:
+                        f.write(f"[Tunnel] 公网地址: {public_url}\n")
+                    print(f"[Tunnel] 已将公网地址写入 web_output.log")
+                except Exception as e:
+                    print(f"[Tunnel] 写入 web_output.log 失败: {e}")
+            else:
+                print(f"[Tunnel] 隧道启动成功: {tunnel_result.get('url', 'URL正在获取中...')}")
         else:
             print(f"[Tunnel] 隧道启动失败: {tunnel_result.get('error', '未知错误')}")
         
