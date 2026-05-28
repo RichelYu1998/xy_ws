@@ -1195,6 +1195,21 @@ class PathManager:
     def get_web_output_file():
         """获取Web输出日志文件路径"""
         return os.path.join(PathManager.get_file_dir(), 'web_output.log')
+    @staticmethod
+    def sync_web_output_from_tunnel_url():
+        """从 tunnel_url.txt 同步公网地址到 web_output.log（统一入口）"""
+        try:
+            tunnel_file = PathManager.get_tunnel_url_file()
+            web_log_file = PathManager.get_web_output_file()
+            if os.path.exists(tunnel_file):
+                with open(tunnel_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                with open(web_log_file, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                return True
+        except Exception as e:
+            print(f"[Tunnel] 同步 web_output.log 失败: {e}")
+        return False
     
     @staticmethod
     def ensure_dirs_exist():
@@ -4698,17 +4713,6 @@ if __name__ == '__main__':
                     print(f"[Tunnel] 清理旧进程失败: {e}")
                     print(f"[Tunnel] 进程清理统计: 总共0个，成功0个，失败1个")
 
-                # 清空 tunnel_url.txt 文件，避免 hostc 进程追加内容
-                try:
-                    tunnel_file = PathManager.get_tunnel_url_file()
-                    with open(tunnel_file, 'w', encoding='utf-8') as f:
-                        f.write('')
-                    print(f"[Tunnel] 已清空 tunnel_url.txt 文件")
-                    sys.stdout.flush()
-                except Exception as e:
-                    print(f"[Tunnel] 清空 tunnel_url.txt 失败: {e}")
-                    sys.stdout.flush()
-
                 tunnel_process = subprocess.Popen(
                     f'npx hostc@latest {port} --local-host 127.0.0.1',
                     stdout=subprocess.PIPE,
@@ -4771,16 +4775,8 @@ if __name__ == '__main__':
                                                         print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
                                                         sys.stdout.flush()
                                                         
-                                                        # 同步更新 web_output.log
-                                                        try:
-                                                            web_log_file = PathManager.get_web_output_file()
-                                                            with open(web_log_file, 'w', encoding='utf-8') as f:
-                                                                f.write(f"[Tunnel] 公网地址: {clean_url}\n")
-                                                            print(f"[Tunnel] 已更新 web_output.log: {clean_url}")
-                                                            sys.stdout.flush()
-                                                        except Exception as e:
-                                                            print(f"[Tunnel] 更新 web_output.log 失败: {e}")
-                                                            sys.stdout.flush()
+                                                        # 同步更新 web_output.log（从 tunnel_url.txt 读取）
+                                                        PathManager.sync_web_output_from_tunnel_url()
                                                     except Exception as e:
                                                         print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
                                                         sys.stdout.flush()
@@ -4826,15 +4822,8 @@ if __name__ == '__main__':
                                     print(f"[Tunnel] 已清理 tunnel_url.txt，保留最新URL: {tunnel_url}")
                                     sys.stdout.flush()
                                     
-                                    # 同步更新 web_output.log
-                                    try:
-                                        web_log_file = PathManager.get_web_output_file()
-                                        with open(web_log_file, 'w', encoding='utf-8') as f:
-                                            f.write(f"[Tunnel] 公网地址: {tunnel_url}\n")
-                                        print(f"[Tunnel] 已同步更新 web_output.log: {tunnel_url}")
-                                        sys.stdout.flush()
-                                    except Exception as e:
-                                        pass  # 忽略清理错误
+                                    # 同步更新 web_output.log（从 tunnel_url.txt 读取）
+                                    PathManager.sync_web_output_from_tunnel_url()
                             except Exception as e:
                                 pass  # 忽略清理错误
 
@@ -5175,43 +5164,11 @@ if __name__ == '__main__':
         # 自动启动隧道
         print("[Tunnel] 正在自动启动隧道...")
         
-        # 清空web_output.log日志文件
-        try:
-            web_log_file = PathManager.get_web_output_file()
-            if os.path.exists(web_log_file):
-                with open(web_log_file, 'w', encoding='utf-8') as f:
-                    f.write('')
-                print(f"[System] 已清空日志文件: {web_log_file}")
-        except Exception as e:
-            print(f"[System] 清空日志文件失败: {e}")
-        
         tunnel_result = auto_start_tunnel()
         if tunnel_result['success']:
-            # 从 tunnel_url.txt 读取公网地址并写入 web_output.log
-            public_url = None
-            try:
-                tunnel_file = PathManager.get_tunnel_url_file()
-                if os.path.exists(tunnel_file):
-                    with open(tunnel_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                        if match:
-                            public_url = match.group(1).rstrip('/')
-            except Exception as e:
-                print(f"[Tunnel] 读取 tunnel_url.txt 失败: {e}")
-            
-            if public_url:
-                print(f"[Tunnel] 隧道启动成功: {public_url}")
-                # 将公网地址写入 web_output.log（覆盖模式，只保留最新地址）
-                try:
-                    web_log_file = PathManager.get_web_output_file()
-                    with open(web_log_file, 'w', encoding='utf-8') as f:
-                        f.write(f"[Tunnel] 公网地址: {public_url}\n")
-                    print(f"[Tunnel] 已将公网地址写入 web_output.log")
-                except Exception as e:
-                    print(f"[Tunnel] 写入 web_output.log 失败: {e}")
-            else:
-                print(f"[Tunnel] 隧道启动成功: {tunnel_result.get('url', 'URL正在获取中...')}")
+            # 从 tunnel_url.txt 同步公网地址到 web_output.log
+            PathManager.sync_web_output_from_tunnel_url()
+            print(f"[Tunnel] 隧道启动成功，已同步 web_output.log")
         else:
             print(f"[Tunnel] 隧道启动失败: {tunnel_result.get('error', '未知错误')}")
         

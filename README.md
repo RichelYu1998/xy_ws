@@ -103,10 +103,9 @@ bash run.sh
   - 修复HTML文件BOM头和DOCTYPE声明问题
 
 - **隧道服务日志管理优化**
-  - Flask启动时自动清空web_output.log日志文件
-  - 启动前清空tunnel_url.txt文件，避免hostc进程缓存旧内容
-  - 隧道URL更新时同步写入web_output.log
-  - 从tunnel_url.txt读取公网地址并写入web_output.log，支持日志文件保留最新URL
+  - 新增统一函数 `sync_web_output_from_tunnel_url()`，web_output.log 统一从 tunnel_url.txt 读取
+  - 移除清空 tunnel_url.txt 的代码，tunnel_url.txt 作为唯一数据源
+  - 简化代码，减少43行冗余代码
 
 ### v3.3.6 (2026-05-28)
 - **日志管理和通知优化**
