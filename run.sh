@@ -190,9 +190,6 @@ cleanup_exit() {
     if [ -n "$PYTHON_PID" ]; then
         kill -15 $PYTHON_PID 2>/dev/null
     fi
-    if [ -n "$TUNNEL_PID" ]; then
-        kill -15 $TUNNEL_PID 2>/dev/null
-    fi
     pkill -f "python main.py" >/dev/null 2>&1
     pkill -f "hostc" >/dev/null 2>&1
     echo "清理完成"

@@ -95,11 +95,16 @@ bash run.sh
 
 ## 更新日志
 
+### v3.3.9 (2026-05-28)
+- **修复 tunnel_url 和前端显示不一致问题**
+  - 增加备用正则表达式 `https://[a-zA-Z0-9_-]+\.hostc\.dev` 匹配 hostc 原始输出格式
+  - `/api/tunnel/status` API 优先从 `tunnel_url.txt` 读取 URL，确保前端显示一致
+  - 移除 `web_output.log` 同步逻辑（因 Flask 输出重定向导致权限冲突）
+  - 外部 hostc 进程启动时，main.py 自动复用已有 URL，不再启动新进程
+
 ### v3.3.8 (2026-05-28)
 - **隧道服务日志管理优化**
-  - 新增统一函数 `sync_web_output_from_tunnel_url()`，web_output.log 统一从 tunnel_url.txt 读取
-  - 新增监控线程：当 tunnel_url.txt 变化时自动同步到 web_output.log
-  - 移除定期清理逻辑，tunnel_url.txt 由 hostc 自动管理
+  - 新增监控线程：当 tunnel_url.txt 变化时自动记录日志
   - 前端隧道状态轮询间隔从5秒改为2秒，更快同步URL变化
 
 ### v3.3.7 (2026-05-28)
