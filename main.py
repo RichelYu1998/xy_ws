@@ -4514,7 +4514,7 @@ if __name__ == '__main__':
             
             threading.Thread(target=send_with_retry, daemon=True).start()
         
-        def verify_url(url, timeout=10):
+        def verify_url(url, timeout=15):
             try:
                 import urllib.request
                 req = urllib.request.Request(url, method='HEAD')
@@ -4534,7 +4534,7 @@ if __name__ == '__main__':
                 import urllib.request
                 req = urllib.request.Request(tunnel_url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-heartbeat/1.0')
-                urllib.request.urlopen(req, timeout=10)
+                urllib.request.urlopen(req, timeout=15)
                 tunnel_last_heartbeat = time.time()
                 tunnel_heartbeat_failed = False
                 return True
@@ -4546,7 +4546,8 @@ if __name__ == '__main__':
         def heartbeat_loop():
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             consecutive_failures = 0
-            max_consecutive_failures = 5
+            max_consecutive_failures = 10
+            heartbeat_interval = 60  # 心跳间隔60秒
             while tunnel_auto_restart:
                 is_tunnel_running = tunnel_process and tunnel_process.poll() is None
                 if not is_tunnel_running and tunnel_url:
@@ -4556,7 +4557,7 @@ if __name__ == '__main__':
                         print(f"[Tunnel] URL验证失败，标记需要重启: {tunnel_url}")
                         tunnel_need_restart = True
                         tunnel_consecutive_failures += 1
-                        time.sleep(30)
+                        time.sleep(heartbeat_interval)
                         continue
                 if is_tunnel_running:
                     success = send_heartbeat()
@@ -4567,7 +4568,7 @@ if __name__ == '__main__':
                             tunnel_need_restart = True
                     else:
                         consecutive_failures = 0
-                time.sleep(30)
+                time.sleep(heartbeat_interval)
         
         def auto_start_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
@@ -4611,7 +4612,8 @@ if __name__ == '__main__':
                                             sys.stdout.flush()
                                             tunnel_url = existing_url
                                             url_ready = True
-                                            send_tunnel_notification(tunnel_url, 'new')
+                                            old_tunnel_url = existing_url
+                                            # 复用URL时不发送通知
                                             return {
                                                 'success': True,
                                                 'url': tunnel_url,
@@ -4620,6 +4622,14 @@ if __name__ == '__main__':
                                         elif is_running and not verify_url(existing_url):
                                             print(f"[Tunnel] 已有进程运行但URL不可用，将清理并重新启动: {existing_url}")
                                             sys.stdout.flush()
+                                            # 清理无效的URL文件
+                                            try:
+                                                with file_write_lock:
+                                                    with open(tunnel_file, 'w', encoding='utf-8') as f:
+                                                        f.write('')
+                                                print(f"[Tunnel] 已清理无效URL文件")
+                                            except Exception as e:
+                                                print(f"[Tunnel] 清理URL文件失败: {e}")
                                         else:
                                             print(f"[Tunnel] 旧URL存在但无进程运行，将启动新隧道: {existing_url}")
                                             sys.stdout.flush()
@@ -4631,9 +4641,26 @@ if __name__ == '__main__':
                 # 清理所有旧的hostc/node进程
                 try:
                     if Environment.IS_WINDOWS:
-                        subprocess.run('taskkill /F /FI "IMAGENAME eq node.exe" /FI "WINDOWTITLE eq npx*hostc*" /T', shell=True, capture_output=True, timeout=10)
-                        subprocess.run('taskkill /F /FI "IMAGENAME eq node.exe" /FI "COMMANDLINE like %hostc%" /T', shell=True, capture_output=True, timeout=10)
-                        print("[Tunnel] 已清理所有旧的hostc进程")
+                        # 先尝试精确匹配hostc进程
+                        result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', shell=True, capture_output=True, text=True, timeout=10)
+                        if result.returncode == 0:
+                            pids = []
+                            for line in result.stdout.split('\n'):
+                                line = line.strip()
+                                if line and line.isdigit():
+                                    pids.append(line)
+                            if pids:
+                                for pid in pids:
+                                    try:
+                                        subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True, timeout=3)
+                                        print(f"[Tunnel] 已终止hostc进程: {pid}")
+                                    except:
+                                        pass
+                                time.sleep(1)
+                        
+                        # 再清理所有node.exe进程（更彻底）
+                        subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
+                        print("[Tunnel] 已清理所有旧的hostc/node进程")
                     else:
                         subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
                         print("[Tunnel] 已清理所有旧的hostc进程")
@@ -4655,6 +4682,8 @@ if __name__ == '__main__':
                     global tunnel_url, url_ready, old_tunnel_url, tunnel_consecutive_failures
                     while True:
                         if tunnel_process and tunnel_process.poll() is not None:
+                            print(f"[Tunnel] hostc进程已退出")
+                            sys.stdout.flush()
                             break
                         try:
                             line = tunnel_process.stdout.readline()
@@ -4663,10 +4692,16 @@ if __name__ == '__main__':
                                 sys.stdout.flush()
                                 if 'https://' in line or 'http://' in line:
                                     urls = re.findall(r'https?://[^\s<>"\']+', line)
+                                    print(f"[Tunnel] 解析到URL: {urls}")
+                                    sys.stdout.flush()
                                     for url in urls:
                                         clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
+                                        print(f"[Tunnel] 清理后URL: {clean_url}, 长度: {len(clean_url)}")
+                                        sys.stdout.flush()
                                         if len(clean_url) > 10 and '.' in clean_url:
                                             if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
+                                                print(f"[Tunnel] URL验证通过，old_url: {old_tunnel_url}, new_url: {clean_url}")
+                                                sys.stdout.flush()
                                                 if old_tunnel_url != clean_url:
                                                     tunnel_url = clean_url
                                                     url_ready = True
@@ -4674,7 +4709,7 @@ if __name__ == '__main__':
                                                     print(f"[Tunnel] 找到公网URL: {tunnel_url}")
                                                     sys.stdout.flush()
                                                     
-                                                    # 发送邮件通知（在更新old_tunnel_url之前）
+                                                    # URL变化时发送通知（包括首次启动和重启）
                                                     send_tunnel_notification(tunnel_url, 'new')
                                                     
                                                     # 更新 tunnel_url.txt 文件
@@ -4692,11 +4727,23 @@ if __name__ == '__main__':
                                                         print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
                                                         sys.stdout.flush()
                                                     
-                                                    # 在邮件发送后再更新old_tunnel_url
+                                                    # 更新old_tunnel_url
                                                     old_tunnel_url = clean_url
+                                                    print(f"[Tunnel] URL已就绪，退出等待循环")
+                                                    sys.stdout.flush()
                                                     break
-                        except:
-                            pass
+                                                else:
+                                                    print(f"[Tunnel] URL与旧URL相同，直接使用: {clean_url}")
+                                                    sys.stdout.flush()
+                                                    tunnel_url = clean_url
+                                                    url_ready = True
+                                                    tunnel_consecutive_failures = 0
+                                                    print(f"[Tunnel] URL已就绪，退出等待循环")
+                                                    sys.stdout.flush()
+                                                    break
+                        except Exception as e:
+                            print(f"[Tunnel] 读取输出异常: {e}")
+                            sys.stdout.flush()
 
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
@@ -4707,15 +4754,19 @@ if __name__ == '__main__':
                 tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
                 tunnel_heartbeat_thread.start()
 
-                max_wait = 15
+                max_wait = 20
                 waited = 0
                 while not url_ready and waited < max_wait:
                     time.sleep(0.5)
                     waited += 0.5
+                    if waited % 5 == 0:
+                        print(f"[Tunnel] 等待URL... {waited}/{max_wait}秒")
+                        sys.stdout.flush()
 
                 if not url_ready:
-                    print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL")
-                    return {'success': False, 'error': '启动超时，未获取到URL'}
+                    print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL，但进程可能正在运行")
+                    print(f"[Tunnel] 请稍后检查状态或查看 tunnel_url.txt 文件")
+                    return {'success': True, 'url': tunnel_url, 'message': '隧道已启动，URL正在获取中...'}
 
                 return {
                     'success': True,
@@ -4884,8 +4935,26 @@ if __name__ == '__main__':
                 # 清理所有旧的hostc/node进程
                 try:
                     if Environment.IS_WINDOWS:
+                        # 先尝试精确匹配hostc进程
+                        result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', shell=True, capture_output=True, text=True, timeout=10)
+                        if result.returncode == 0:
+                            pids = []
+                            for line in result.stdout.split('\n'):
+                                line = line.strip()
+                                if line and line.isdigit():
+                                    pids.append(line)
+                            if pids:
+                                for pid in pids:
+                                    try:
+                                        subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True, timeout=3)
+                                        print(f"[Tunnel] 已终止hostc进程: {pid}")
+                                    except:
+                                        pass
+                                time.sleep(1)
+                        
+                        # 再清理所有node.exe进程（更彻底）
                         subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
-                        print("[Tunnel] 已清理所有旧的node.exe进程")
+                        print("[Tunnel] 已清理所有旧的hostc/node进程")
                     else:
                         subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
                         print("[Tunnel] 已清理所有旧的hostc进程")
@@ -4920,6 +4989,9 @@ if __name__ == '__main__':
                     except Exception as e:
                         print(f"[Tunnel] 清理URL失败: {e}")
                 
+                # 重置old_tunnel_url，避免URL复用逻辑误判
+                old_tunnel_url = None
+                
                 time.sleep(tunnel_restart_delay)
                 
                 if not tunnel_auto_restart:
@@ -4928,19 +5000,25 @@ if __name__ == '__main__':
                 try:
                     result = auto_start_tunnel()
                     
-                    if result['success'] and result.get('url'):
-                        new_url = result['url']
-                        if old_url and old_url != new_url:
-                            print(f"[Tunnel] 隧道URL已变化: {old_url} -> {new_url}")
+                    if result['success']:
+                        new_url = result.get('url')
+                        if new_url:
+                            # URL变化时发送通知，让用户知道新地址
+                            if old_url and old_url != new_url:
+                                print(f"[Tunnel] 隧道URL已变化: {old_url} -> {new_url}")
+                                sys.stdout.flush()
+                                send_tunnel_notification(new_url, 'update')
+                            
+                            tunnel_last_error = None
+                            tunnel_need_restart = False
+                            tunnel_consecutive_failures = 0
+                            consecutive_restart_attempts = 0
+                            tunnel_restart_count = 0
+                            print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
                             sys.stdout.flush()
-                            send_tunnel_notification(new_url, 'update')
-                        
-                        tunnel_last_error = None
-                        tunnel_need_restart = False
-                        tunnel_consecutive_failures = 0
-                        consecutive_restart_attempts = 0
-                        print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
-                        sys.stdout.flush()
+                        else:
+                            print(f"[Tunnel] 隧道启动成功但URL未就绪，继续等待...")
+                            sys.stdout.flush()
                     else:
                         tunnel_last_error = result.get('error', '启动失败')
                         print(f"[Tunnel] 重启失败: {tunnel_last_error}")
@@ -4978,22 +5056,28 @@ if __name__ == '__main__':
             
             tunnel_type = 'hostc'
             
-            # 优先使用内部 URL，否则从 tunnel_url.txt 读取
-            if not current_url:
-                try:
-                    tunnel_file = PathManager.get_tunnel_url_file()
-                    if os.path.exists(tunnel_file):
-                        with open(tunnel_file, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                            if match:
-                                current_url = match.group(1).rstrip('/')
-                                tunnel_url = current_url
-                except:
-                    pass
+            # 始终优先从 tunnel_url.txt 读取最新URL
+            try:
+                tunnel_file = PathManager.get_tunnel_url_file()
+                if os.path.exists(tunnel_file):
+                    with open(tunnel_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                        if match:
+                            file_url = match.group(1).rstrip('/')
+                            # 如果文件中的URL与内存中的不同，更新内存中的URL
+                            if file_url != current_url:
+                                print(f"[Tunnel] 从 tunnel_url.txt 读取到更新的URL: {file_url} (内存中: {current_url})")
+                                tunnel_url = file_url
+                                current_url = file_url
+                            else:
+                                print(f"[Tunnel] 从 tunnel_url.txt 读取到URL: {current_url}")
+            except Exception as e:
+                print(f"[Tunnel] 读取 tunnel_url.txt 失败: {e}")
             
             # 检测是否有 hostc 隧道在运行（内部或外部）
-            if is_running or current_url:
+            process_running = tunnel_process and tunnel_process.poll() is None
+            if process_running or current_url:
                 is_running = True
             else:
                 try:
@@ -5007,6 +5091,11 @@ if __name__ == '__main__':
                         is_running = result.returncode == 0
                 except:
                     pass
+            
+            # 如果有URL但进程检测失败，仍然认为隧道在运行
+            if current_url and not is_running:
+                print(f"[Tunnel] 检测到URL但进程状态未知，认为隧道在运行: {current_url}")
+                is_running = True
             
             # 如果检测到外部隧道但守护线程未启动，则启动守护线程
             if is_running and current_url and not tunnel_daemon_started:
