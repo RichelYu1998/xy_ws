@@ -1601,7 +1601,7 @@ playwright install chromium</pre>
                     <div id="output-panel" class="output-panel" style="display: none;">
                         <div class="output-header">
                             <span><i class="fa fa-terminal"></i> 运行结果</span>
-                            <button class="output-close" onclick="closeOutputPanel()"><i class="fa fa-times"></i></button>
+                            <button class="output-close" onclick="console.log('[按钮点击] 关闭输出面板'); closePanel('output-panel')"><i class="fa fa-times"></i></button>
                         </div>
                         <div class="output-content" id="output-content"></div>
                         <div class="output-status" id="output-status"></div>
@@ -1610,7 +1610,7 @@ playwright install chromium</pre>
                     <div id="sku-input-panel" class="output-panel" style="display: none;">
                         <div class="output-header">
                             <span><i class="fa fa-barcode"></i> 货号对比</span>
-                            <button class="output-close" onclick="closeSkuInputPanel()"><i class="fa fa-times"></i></button>
+                            <button class="output-close" onclick="console.log('[按钮点击] 关闭货号对比面板'); closePanel('sku-input-panel')"><i class="fa fa-times"></i></button>
                         </div>
                         <div id="sku-input-content"></div>
                     </div>
@@ -1618,7 +1618,7 @@ playwright install chromium</pre>
                     <div id="cleaner-panel" class="output-panel" style="display: none;">
                         <div class="output-header">
                             <span><i class="fa fa-trash"></i> 文件清理</span>
-                            <button class="output-close" onclick="closeCleanerPanel()"><i class="fa fa-times"></i></button>
+                            <button class="output-close" onclick="console.log('[按钮点击] 关闭文件清理面板'); closePanel('cleaner-panel')"><i class="fa fa-times"></i></button>
                         </div>
                         <div id="cleaner-content"></div>
                     </div>
@@ -1626,7 +1626,7 @@ playwright install chromium</pre>
                     <div id="tunnel-panel" class="output-panel" style="display: none;">
                         <div class="output-header">
                             <span><i class="fa fa-external-link"></i> 隧道共享</span>
-                            <button class="output-close" onclick="closeTunnelPanel()"><i class="fa fa-times"></i></button>
+                            <button class="output-close" onclick="console.log('[按钮点击] 关闭隧道面板'); closeTunnelPanel()"><i class="fa fa-times"></i></button>
                         </div>
                         <div id="tunnel-content"></div>
                     </div>
@@ -1634,7 +1634,7 @@ playwright install chromium</pre>
                     <div id="products-panel" class="output-panel" style="display: none;">
                         <div class="output-header">
                             <span><i class="fa fa-list"></i> 商品数据</span>
-                            <button class="output-close" onclick="closeProductsPanel()"><i class="fa fa-times"></i></button>
+                            <button class="output-close" onclick="console.log('[按钮点击] 关闭商品面板'); closePanel('products-panel')"><i class="fa fa-times"></i></button>
                         </div>
                         <div id="products-content"></div>
                     </div>
@@ -1642,7 +1642,7 @@ playwright install chromium</pre>
                     <div id="spider-output-panel" class="output-panel" style="display: none;">
                         <div class="output-header">
                             <span><i class="fa fa-terminal"></i> 爬虫运行结果</span>
-                            <button class="output-close" onclick="closeSpiderOutputPanel()"><i class="fa fa-times"></i></button>
+                            <button class="output-close" onclick="console.log('[按钮点击] 关闭爬虫输出面板'); closePanel('spider-output-panel')"><i class="fa fa-times"></i></button>
                         </div>
                         <div id="spider-output-content"></div>
                     </div>
@@ -1687,6 +1687,36 @@ playwright install chromium</pre>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
     
     <script>// 全局设备检测和响应式适配
+        function closePanel(panelId) {
+            console.log('[关闭面板] 关闭面板:', panelId);
+            const panel = document.getElementById(panelId);
+            if (panel) {
+                panel.style.display = 'none';
+                if (panelId === 'output-panel') {
+                    if (typeof pollingInterval !== 'undefined' && pollingInterval) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                    }
+                    currentTaskId = null;
+                } else if (panelId === 'tunnel-panel' && typeof tunnelPollInterval !== 'undefined' && tunnelPollInterval) {
+                    clearInterval(tunnelPollInterval);
+                    tunnelPollInterval = null;
+                }
+            }
+        }
+        
+        function closeTunnelPanel() {
+            console.log('[按钮点击] 关闭隧道面板');
+            const panel = document.getElementById('tunnel-panel');
+            if (panel) {
+                panel.style.display = 'none';
+                if (typeof tunnelPollInterval !== 'undefined' && tunnelPollInterval) {
+                    clearInterval(tunnelPollInterval);
+                    tunnelPollInterval = null;
+                }
+            }
+        }
+        
         function detectDevice() {
             const ua = navigator.userAgent.toLowerCase();
             const width = window.innerWidth;
@@ -2446,7 +2476,7 @@ playwright install chromium</pre>
                                     <tbody>
                                         ${skuData.newHighPriceProducts.map((p, idx) => `<tr>
                                             <td>${idx + 1}</td>
-                                            <td><a href="javascript:void(0)" onclick="showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
+                                            <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 查看商品详情:', '${p.sku}'); showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
@@ -2469,7 +2499,7 @@ playwright install chromium</pre>
             }
         }
         
-         function showAllProducts() {
+        function showAllProducts() {
             const productsPanel = document.getElementById('products-panel');
             const productsContent = document.getElementById('products-content');
             if (!productsPanel || !productsContent) {
@@ -2522,7 +2552,7 @@ playwright install chromium</pre>
                         else if (isAdded) rowStyle = 'background: #e3f2fd;';
                         tableHtml += `<tr data-sku="${sku}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
                             <td>${i + 1}</td>
-                            <td><a href="javascript:void(0)" onclick="highlightRow('${sku}'); scrollToSku('${sku}'); searchProductBySku('${sku}')">${sku || '-'}</a></td>
+                            <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 高亮并定位货号:', '${sku}'); highlightRow('${sku}'); scrollToSku('${sku}'); searchProductBySku('${sku}')">${sku || '-'}</a></td>
                             <td>${(p.商品描述 || '').substring(0, 20)}${(p.商品描述 || '').length > 20 ? '...' : ''}</td>
                             <td style="font-weight: bold;">${p.售价 || '-'}</td>
                             <td>${p.员工 || '-'}</td>
@@ -2596,47 +2626,6 @@ playwright install chromium</pre>
                 console.error('获取商品失败:', error);
                  alert('获取商品失败: ' + error.message + '\n详情请查看控制台');
             });
-        }
-        
-        function closeOutputPanel() {
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-                pollingInterval = null;
-            }
-            const outputPanel = document.getElementById('output-panel');
-            if (outputPanel) outputPanel.style.display = 'none';
-            const outputInputArea = document.getElementById('output-input-area');
-            if (outputInputArea) outputInputArea.style.display = 'none';
-            currentTaskId = null;
-        }
-        
-        function closeSkuInputPanel() {
-            const skuPanel = document.getElementById('sku-input-panel');
-            if (skuPanel) skuPanel.style.display = 'none';
-        }
-        
-        function closeCleanerPanel() {
-            const cleanerPanel = document.getElementById('cleaner-panel');
-            if (cleanerPanel) cleanerPanel.style.display = 'none';
-        }
-        
-        function closeTunnelPanel() {
-            if (tunnelPollInterval) {
-                clearInterval(tunnelPollInterval);
-                tunnelPollInterval = null;
-            }
-            const tunnelPanel = document.getElementById('tunnel-panel');
-            if (tunnelPanel) tunnelPanel.style.display = 'none';
-        }
-        
-        function closeProductsPanel() {
-            const productsPanel = document.getElementById('products-panel');
-            if (productsPanel) productsPanel.style.display = 'none';
-        }
-        
-        function closeSpiderOutputPanel() {
-            const spiderPanel = document.getElementById('spider-output-panel');
-            if (spiderPanel) spiderPanel.style.display = 'none';
         }
         
         function runFunction(choice) {
@@ -2876,6 +2865,7 @@ playwright install chromium</pre>
                                 const newCopyBtn = document.getElementById('btn-copy-tunnel-url');
                                 if (newCopyBtn) {
                                     newCopyBtn.onclick = function() {
+                                        console.log('[按钮点击] 复制隧道URL:', this.dataset.url);
                                         copyToClipboard(this.dataset.url);
                                         this.innerHTML = '<i class="fa fa-check"></i> 已复制';
                                         setTimeout(() => {
@@ -2885,17 +2875,19 @@ playwright install chromium</pre>
                                 }
                             }
                         } else if (retryCount >= maxRetries) {
+                            console.log('[隧道共享] 达到最大重试次数，停止轮询');
                             clearInterval(tunnelPollInterval);
                             tunnelPollInterval = null;
                             const pubUrl = document.getElementById('tunnel-public-url');
                             if (pubUrl) pubUrl.textContent = '获取失败，请检查网络连接';
                         }
                     } catch (e) {
-                        console.error('获取状态失败:', e);
+                        console.error('[隧道共享] 获取状态失败:', e);
                     }
                 }, 1000);
 
                 if (!startData.success) {
+                    console.log('[隧道共享] 启动失败:', startData.error);
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert alert-danger mt-3';
                     alertDiv.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>启动失败:</strong> ' + (startData.error || '未知错误');
@@ -2903,6 +2895,7 @@ playwright install chromium</pre>
                 }
 
             } catch (e) {
+                console.error('[隧道共享] 操作失败:', e);
                 alert('操作失败: ' + e.message);
             } finally {
                 if (btn) {
@@ -3095,7 +3088,7 @@ playwright install chromium</pre>
                         }
                         
                         if (data.extra_in_json && data.extra_in_json.length > 0) {
-                            const items = data.extra_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            const items = data.extra_in_json.map(sku => `<span class="sku-tag" onclick="console.log('[按钮点击] 查看商品详情:', '${sku}'); showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
                                     <div class="missing-title" style="color: #f57c00;">JSON多余货号(所有价格):</div>
@@ -3105,7 +3098,7 @@ playwright install chromium</pre>
                         }
                         
                         if (data.high_price_extra_in_json && data.high_price_extra_in_json.length > 0) {
-                            const items = data.high_price_extra_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            const items = data.high_price_extra_in_json.map(sku => `<span class="sku-tag" onclick="console.log('[按钮点击] 查看商品详情:', '${sku}'); showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #ffebee; border-color: #ef9a9a;">
                                     <div class="missing-title" style="color: #c62828;">JSON多余货号(高价商品≥599):</div>
@@ -3341,7 +3334,7 @@ playwright install chromium</pre>
             }
             
             if (data.common && data.common.length > 0) {
-                const items = data.common.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                const items = data.common.map(sku => `<span class="sku-tag" onclick="console.log('[按钮点击] 查看商品详情:', '${sku}'); showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
                 cardHtml += `
                     <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
                         <div class="missing-title" style="color: #388e3c;">共同货号:</div>
@@ -3639,6 +3632,7 @@ playwright install chromium</pre>
         }
 
         function showTunnelSection() {
+            console.log('[隧道管理] 显示隧道管理面板');
             const tunnelPanel = document.getElementById('tunnel-panel');
             const tunnelContent = document.getElementById('tunnel-content');
             if (!tunnelPanel || !tunnelContent) return;
@@ -3646,6 +3640,7 @@ playwright install chromium</pre>
             tunnelPanel.style.display = 'block';
             tunnelPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
             
+            console.log('[隧道管理] 渲染隧道管理界面');
             tunnelContent.innerHTML = `
                 <div class="card">
                     <div class="card-header bg-primary text-white">
@@ -3688,7 +3683,7 @@ playwright install chromium</pre>
                         </div>
                         <hr>
                         <div class="text-center">
-                            <button id="btn-toggle-tunnel" class="btn btn-success btn-lg" onclick="toggleTunnel()">
+                            <button id="btn-toggle-tunnel" class="btn btn-success btn-lg" onclick="console.log('[按钮点击] 切换隧道状态'); toggleTunnel()">
                                 <i class="fa fa-play"></i> 启动隧道
                             </button>
                         </div>
