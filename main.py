@@ -5107,10 +5107,11 @@ if __name__ == '__main__':
                 is_running = True
             else:
                 try:
+                    # 更精确的hostc进程检测（跨系统兼容）
                     if Environment.IS_WINDOWS:
-                        result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH', 
+                        result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', 
                                               capture_output=True, text=True, shell=True, timeout=3)
-                        is_running = result.returncode == 0 and 'node.exe' in result.stdout
+                        is_running = result.returncode == 0 and any(line.strip().isdigit() for line in result.stdout.split('\n') if line.strip())
                     else:
                         result = subprocess.run('pgrep -f "hostc"', 
                                               capture_output=True, text=True, timeout=3)
