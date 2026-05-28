@@ -145,6 +145,7 @@ run_web() {
     echo "正在启动 Web 服务..."
     echo ""
 
+    > file/web_output.log  # 清空日志文件
     python main.py --web 2>&1 | tee file/web_output.log &
     PYTHON_PID=$!
 

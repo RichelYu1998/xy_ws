@@ -4678,7 +4678,11 @@ if __name__ == '__main__':
                 def read_output():
                     global tunnel_url, url_ready, old_tunnel_url, tunnel_consecutive_failures
                     while True:
-                        if tunnel_process and tunnel_process.poll() is not None:
+                        if tunnel_process is None:
+                            print(f"[Tunnel] tunnel_process为None，退出读取循环")
+                            sys.stdout.flush()
+                            break
+                        if tunnel_process.poll() is not None:
                             print(f"[Tunnel] hostc进程已退出")
                             sys.stdout.flush()
                             break
