@@ -174,6 +174,7 @@ echo 正在启动 Web 服务...
 echo.
 
 set PYTHON_LOG_FILE=%CD%\file\web_output.log
+echo. > %PYTHON_LOG_FILE%
 start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web > %PYTHON_LOG_FILE% 2>&1"
 
 echo 等待 Web 服务启动完成...
