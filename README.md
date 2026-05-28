@@ -95,17 +95,19 @@ bash run.sh
 
 ## 更新日志
 
+### v3.3.8 (2026-05-28)
+- **隧道服务日志管理优化**
+  - 新增统一函数 `sync_web_output_from_tunnel_url()`，web_output.log 统一从 tunnel_url.txt 读取
+  - 新增监控线程：当 tunnel_url.txt 变化时自动同步到 web_output.log
+  - 移除定期清理逻辑，tunnel_url.txt 由 hostc 自动管理
+  - 前端隧道状态轮询间隔从5秒改为2秒，更快同步URL变化
+
 ### v3.3.7 (2026-05-28)
 - **修复前端JavaScript未定义函数错误**
   - 修复 `closePanel`、`closeTunnelPanel` 函数未定义的问题
   - 将 `closePanel` 和 `closeTunnelPanel` 函数移到script标签开头，确保函数立即可用
   - 统一使用 `closePanel('panelId')` 方式关闭面板，移除未使用的独立函数
   - 修复HTML文件BOM头和DOCTYPE声明问题
-
-- **隧道服务日志管理优化**
-  - 新增统一函数 `sync_web_output_from_tunnel_url()`，web_output.log 统一从 tunnel_url.txt 读取
-  - 新增监控线程：当 tunnel_url.txt 变化时自动同步到 web_output.log
-  - 移除定期清理逻辑，tunnel_url.txt 由 hostc 自动管理
 
 ### v3.3.6 (2026-05-28)
 - **日志管理和通知优化**
