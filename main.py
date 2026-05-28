@@ -4702,6 +4702,7 @@ if __name__ == '__main__':
                                             if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
                                                 print(f"[Tunnel] URL验证通过，old_url: {old_tunnel_url}, new_url: {clean_url}")
                                                 sys.stdout.flush()
+                                                # 只使用与旧URL不同的新URL
                                                 if old_tunnel_url != clean_url:
                                                     tunnel_url = clean_url
                                                     url_ready = True
@@ -4733,14 +4734,8 @@ if __name__ == '__main__':
                                                     sys.stdout.flush()
                                                     break
                                                 else:
-                                                    print(f"[Tunnel] URL与旧URL相同，直接使用: {clean_url}")
+                                                    print(f"[Tunnel] URL与旧URL相同，跳过: {clean_url}")
                                                     sys.stdout.flush()
-                                                    tunnel_url = clean_url
-                                                    url_ready = True
-                                                    tunnel_consecutive_failures = 0
-                                                    print(f"[Tunnel] URL已就绪，退出等待循环")
-                                                    sys.stdout.flush()
-                                                    break
                         except Exception as e:
                             print(f"[Tunnel] 读取输出异常: {e}")
                             sys.stdout.flush()
