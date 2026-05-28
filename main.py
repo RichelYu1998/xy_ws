@@ -4613,45 +4613,52 @@ if __name__ == '__main__':
                     try:
                         with open(tunnel_file, 'r', encoding='utf-8') as f:
                             content = f.read()
-                            match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                            if match:
-                                existing_url = match.group(1).rstrip('/')
-                                if existing_url and len(existing_url) > 10:
-                                    try:
-                                        # 更精确的hostc进程检测
-                                        if Environment.IS_WINDOWS:
-                                            # 使用wmic精确匹配hostc进程
-                                            result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', 
-                                                                  capture_output=True, text=True, shell=True, timeout=5)
-                                            # 检查是否有hostc进程在运行
-                                            is_running = result.returncode == 0 and any(line.strip().isdigit() for line in result.stdout.split('\n') if line.strip())
-                                        else:
-                                            result = subprocess.run('pgrep -f "hostc"', 
-                                                                  capture_output=True, text=True, timeout=3)
-                                            is_running = result.returncode == 0
-                                        
-                                        if is_running and verify_url(existing_url):
+                        match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                        if not match:
+                            match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
+                        if match:
+                            existing_url = match.group(1) if match.lastindex == 1 else match.group(0)
+                            existing_url = existing_url.rstrip('/')
+                            if existing_url and len(existing_url) > 10:
+                                try:
+                                    if Environment.IS_WINDOWS:
+                                        result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH',
+                                                              capture_output=True, text=True, shell=True, timeout=3)
+                                        is_running = result.returncode == 0 and 'node.exe' in result.stdout
+                                    else:
+                                        result = subprocess.run('pgrep -f "hostc"',
+                                                              capture_output=True, text=True, timeout=3)
+                                        is_running = result.returncode == 0
+                                    
+                                    if is_running:
+                                        if verify_url(existing_url):
                                             print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
                                             sys.stdout.flush()
                                             tunnel_url = existing_url
                                             url_ready = True
                                             old_tunnel_url = existing_url
-                                            # 复用URL时不发送通知
                                             return {
                                                 'success': True,
                                                 'url': tunnel_url,
                                                 'message': f'复用已有隧道，URL: {tunnel_url}'
                                             }
-                                        elif is_running and not verify_url(existing_url):
-                                            print(f"[Tunnel] 已有hostc进程运行但URL不可用，将清理进程并重新启动: {existing_url}")
-                                            sys.stdout.flush()
-                                            # 不清空URL文件，保留旧URL用于参考
-                                            print(f"[Tunnel] 保留旧URL文件，清理进程后重新启动")
                                         else:
-                                            print(f"[Tunnel] 无hostc进程运行，将启动新隧道")
+                                            print(f"[Tunnel] 已有hostc进程运行但URL不可用，将等待进程自行恢复: {existing_url}")
                                             sys.stdout.flush()
-                                    except:
-                                        pass
+                                            time.sleep(3)
+                                            tunnel_url = existing_url
+                                            url_ready = True
+                                            old_tunnel_url = existing_url
+                                            return {
+                                                'success': True,
+                                                'url': tunnel_url,
+                                                'message': f'复用已有隧道，URL: {tunnel_url}'
+                                            }
+                                    else:
+                                        print(f"[Tunnel] 无hostc进程运行，将启动新隧道")
+                                        sys.stdout.flush()
+                                except:
+                                    pass
                     except:
                         pass
 
@@ -4774,9 +4781,6 @@ if __name__ == '__main__':
                                                                 f.flush()  # 确保写入磁盘
                                                         print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
                                                         sys.stdout.flush()
-                                                        
-                                                        # 同步更新 web_output.log（从 tunnel_url.txt 读取）
-                                                        PathManager.sync_web_output_from_tunnel_url()
                                                     except Exception as e:
                                                         print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
                                                         sys.stdout.flush()
@@ -4844,8 +4848,7 @@ if __name__ == '__main__':
                             with open(tunnel_file, 'r', encoding='utf-8') as f:
                                 content = f.read()
                             if last_content is not None and content != last_content:
-                                print(f"[Tunnel] 检测到 tunnel_url.txt 变化，同步 web_output.log")
-                                PathManager.sync_web_output_from_tunnel_url()
+                                print(f"[Tunnel] 检测到 tunnel_url.txt 变化: {content[:100]}")
                             last_content = content
                     except:
                         pass
@@ -5065,16 +5068,19 @@ if __name__ == '__main__':
                 if os.path.exists(tunnel_file):
                     with open(tunnel_file, 'r', encoding='utf-8') as f:
                         content = f.read()
-                        match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                        if match:
-                            file_url = match.group(1).rstrip('/')
-                            # 如果文件中的URL与内存中的不同，更新内存中的URL
-                            if file_url != current_url:
-                                print(f"[Tunnel] 从 tunnel_url.txt 读取到更新的URL: {file_url} (内存中: {current_url})")
-                                tunnel_url = file_url
-                                current_url = file_url
-                            else:
-                                print(f"[Tunnel] 从 tunnel_url.txt 读取到URL: {current_url}")
+                    match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                    if not match:
+                        match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
+                    if match:
+                        file_url = match.group(1) if match.lastindex == 1 else match.group(0)
+                        file_url = file_url.rstrip('/')
+                        # 如果文件中的URL与内存中的不同，更新内存中的URL
+                        if file_url != current_url:
+                            print(f"[Tunnel] 从 tunnel_url.txt 读取到更新的URL: {file_url} (内存中: {current_url})")
+                            tunnel_url = file_url
+                            current_url = file_url
+                        else:
+                            print(f"[Tunnel] 从 tunnel_url.txt 读取到URL: {current_url}")
             except Exception as e:
                 print(f"[Tunnel] 读取 tunnel_url.txt 失败: {e}")
             
@@ -5155,9 +5161,7 @@ if __name__ == '__main__':
         
         tunnel_result = auto_start_tunnel()
         if tunnel_result['success']:
-            # 从 tunnel_url.txt 同步公网地址到 web_output.log
-            PathManager.sync_web_output_from_tunnel_url()
-            print(f"[Tunnel] 隧道启动成功，已同步 web_output.log")
+            print(f"[Tunnel] 隧道启动成功: {tunnel_result.get('url', '')}")
         else:
             print(f"[Tunnel] 隧道启动失败: {tunnel_result.get('error', '未知错误')}")
         
