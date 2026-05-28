@@ -4796,8 +4796,8 @@ if __name__ == '__main__':
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
                 
-                # 定期清理和同步逻辑已移除
-                # tunnel_url.txt 由 hostc 自动管理，只在 URL 变化时同步 web_output.log
+                # tunnel_url.txt 监控线程已移到 restart_tunnel() 中
+                # 定期清理逻辑已移除，tunnel_url.txt 由 hostc 自动管理
                 
                 tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
                 tunnel_restart_thread.start()
@@ -4833,6 +4833,26 @@ if __name__ == '__main__':
             consecutive_restart_attempts = 0
             max_consecutive_restarts = 3
             restart_cooldown = 60
+            
+            # 监控 tunnel_url.txt 变化，同步到 web_output.log
+            def watch_tunnel_url_file():
+                last_content = None
+                while tunnel_auto_restart:
+                    try:
+                        tunnel_file = PathManager.get_tunnel_url_file()
+                        if os.path.exists(tunnel_file):
+                            with open(tunnel_file, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                            if last_content is not None and content != last_content:
+                                print(f"[Tunnel] 检测到 tunnel_url.txt 变化，同步 web_output.log")
+                                PathManager.sync_web_output_from_tunnel_url()
+                            last_content = content
+                    except:
+                        pass
+                    time.sleep(2)
+            
+            watch_thread = threading.Thread(target=watch_tunnel_url_file, daemon=True)
+            watch_thread.start()
             
             while tunnel_auto_restart:
                 is_internal_running = tunnel_process and tunnel_process.poll() is None
