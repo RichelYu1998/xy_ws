@@ -117,6 +117,12 @@ bash run.sh
   - 添加日志频率限制，每 60 秒最多打印一次同类日志
   - 心跳恢复时输出提示信息
 
+### v3.4.7 (2026-05-29)
+- **修复 tunnel_url.txt 为空时误杀正在启动的 hostc 进程**
+  - 检测到 tunnel_url.txt 为空时，先检查是否有 hostc 进程在运行
+  - 如果有进程在运行，给它更多时间生成 URL，避免误杀正在启动的进程
+  - 只有当 tunnel_url.txt 为空且无 hostc 进程时才立即重启
+
 ### v3.4.6 (2026-05-29)
 - **修复 tunnel_url.txt 为空时无法重启问题**
   - auto_start_tunnel() 增加 tunnel_url.txt 为空检测
