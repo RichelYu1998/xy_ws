@@ -4951,8 +4951,8 @@ if __name__ == '__main__':
                         new_url = result.get('url')
                         if new_url:
                             # URL变化时发送通知，让用户知道新地址
-                            if old_url and old_url != new_url:
-                                print(f"[Tunnel] 隧道URL已变化: {old_url} -> {new_url}")
+                            if old_tunnel_url and old_tunnel_url != new_url:
+                                print(f"[Tunnel] 隧道URL已变化: {old_tunnel_url} -> {new_url}")
                                 sys.stdout.flush()
                                 send_tunnel_notification(new_url, 'update')
                             
