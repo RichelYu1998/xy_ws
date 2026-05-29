@@ -4903,10 +4903,24 @@ if __name__ == '__main__':
                     if waited % 5 == 0:
                         print(f"[Tunnel] 等待URL... {waited}/{max_wait}秒")
                         sys.stdout.flush()
+                    
+                    if waited >= 5:
+                        tunnel_file = PathManager.get_tunnel_url_file()
+                        if os.path.exists(tunnel_file):
+                            with open(tunnel_file, 'r', encoding='utf-8') as f:
+                                content = f.read().strip()
+                            if not content:
+                                print(f"[Tunnel] tunnel_url.txt 为空，立即重启本地服务器")
+                                tunnel_need_restart = True
+                                sys.stdout.flush()
+                                break
 
                 if not url_ready:
-                    print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL")
-                    print(f"[Tunnel] 请稍后检查状态或查看 tunnel_url.txt 文件")
+                    if tunnel_need_restart:
+                        print(f"[Tunnel] tunnel_url.txt 为空，正在重启...")
+                    else:
+                        print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL")
+                        print(f"[Tunnel] 请稍后检查状态或查看 tunnel_url.txt 文件")
                     return {'success': False, 'url': None, 'error': '启动超时，未获取到URL'}
 
                 return {
