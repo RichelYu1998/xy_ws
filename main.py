@@ -18,6 +18,8 @@ import select
 import argparse
 import socket
 import smtplib
+import io
+import urllib.request
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
@@ -25,20 +27,455 @@ from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
+from functools import wraps
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    from playwright.async_api import async_playwright
+except ImportError:
+    async_playwright = None
+
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if not hasattr(subprocess, 'CREATE_NO_WINDOW'):
     subprocess.CREATE_NO_WINDOW = 0x08000000 if platform.system() == 'Windows' else 0
 
+
+class AppException(Exception):
+    """统一异常类 - 所有业务异常都使用此类"""
+    
+    CATEGORY_FILE = 'FILE'
+    CATEGORY_NETWORK = 'NETWORK'
+    CATEGORY_AUTH = 'AUTH'
+    CATEGORY_BROWSER = 'BROWSER'
+    CATEGORY_PARSE = 'PARSE'
+    CATEGORY_CONFIG = 'CONFIG'
+    CATEGORY_EXCEL = 'EXCEL'
+    CATEGORY_EMAIL = 'EMAIL'
+    CATEGORY_PERMISSION = 'PERMISSION'
+    CATEGORY_RESOURCE = 'RESOURCE'
+    CATEGORY_VALIDATION = 'VALIDATION'
+    CATEGORY_DATABASE = 'DATABASE'
+    
+    _CATEGORY_CODES = {
+        CATEGORY_FILE: 'FILE_ERROR',
+        CATEGORY_NETWORK: 'NETWORK_ERROR',
+        CATEGORY_AUTH: 'AUTH_ERROR',
+        CATEGORY_BROWSER: 'BROWSER_ERROR',
+        CATEGORY_PARSE: 'PARSE_ERROR',
+        CATEGORY_CONFIG: 'CONFIG_ERROR',
+        CATEGORY_EXCEL: 'EXCEL_ERROR',
+        CATEGORY_EMAIL: 'EMAIL_ERROR',
+        CATEGORY_PERMISSION: 'PERMISSION_ERROR',
+        CATEGORY_RESOURCE: 'RESOURCE_ERROR',
+        CATEGORY_VALIDATION: 'VALIDATION_ERROR',
+        CATEGORY_DATABASE: 'DATABASE_ERROR',
+    }
+    
+    def __init__(self, message: str, category: str = None, code: str = None, details: Any = None):
+        self.message = message
+        self.category = category or 'APP'
+        self.code = code or self._CATEGORY_CODES.get(self.category, 'APP_ERROR')
+        self.details = details or {}
+        super().__init__(self.message)
+    
+    @classmethod
+    def file_error(cls, message: str, file_path: str = None, operation: str = None, **kwargs):
+        """文件操作异常"""
+        details = {'file_path': file_path, 'operation': operation}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_FILE, details=details)
+    
+    @classmethod
+    def network_error(cls, message: str, url: str = None, status_code: int = None, **kwargs):
+        """网络请求异常"""
+        details = {'url': url, 'status_code': status_code}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_NETWORK, details=details)
+    
+    @classmethod
+    def auth_error(cls, message: str, cookie_file: str = None, **kwargs):
+        """认证异常"""
+        details = {'cookie_file': cookie_file}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_AUTH, details=details)
+    
+    @classmethod
+    def browser_error(cls, message: str, browser_error: str = None, **kwargs):
+        """浏览器操作异常"""
+        details = {'browser_error': browser_error}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_BROWSER, details=details)
+    
+    @classmethod
+    def parse_error(cls, message: str, data_type: str = None, raw_data: Any = None, **kwargs):
+        """数据解析异常"""
+        details = {'data_type': data_type, 'raw_data': str(raw_data)[:200] if raw_data else None}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_PARSE, details=details)
+    
+    @classmethod
+    def config_error(cls, message: str, config_key: str = None, **kwargs):
+        """配置异常"""
+        details = {'config_key': config_key}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_CONFIG, details=details)
+    
+    @classmethod
+    def excel_error(cls, message: str, excel_file: str = None, sheet_name: str = None, **kwargs):
+        """Excel操作异常"""
+        details = {'excel_file': excel_file, 'sheet_name': sheet_name}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_EXCEL, details=details)
+    
+    @classmethod
+    def email_error(cls, message: str, smtp_host: str = None, recipient: str = None, **kwargs):
+        """邮件发送异常"""
+        details = {'smtp_host': smtp_host, 'recipient': recipient}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_EMAIL, details=details)
+    
+    @classmethod
+    def permission_error(cls, message: str, path: str = None, operation: str = None, **kwargs):
+        """权限异常"""
+        details = {'path': path, 'operation': operation}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_PERMISSION, details=details)
+    
+    @classmethod
+    def resource_error(cls, message: str, resource_type: str = None, resource_id: str = None, **kwargs):
+        """资源异常"""
+        details = {'resource_type': resource_type, 'resource_id': resource_id}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_RESOURCE, details=details)
+    
+    @classmethod
+    def validation_error(cls, message: str, field: str = None, **kwargs):
+        """数据验证异常"""
+        details = {'field': field}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_VALIDATION, details=details)
+    
+    @classmethod
+    def database_error(cls, message: str, table: str = None, query: str = None, **kwargs):
+        """数据库异常"""
+        details = {'table': table, 'query': query}
+        details.update(kwargs)
+        return cls(message, category=cls.CATEGORY_DATABASE, details=details)
+    
+    def to_dict(self) -> dict:
+        return {
+            'error': self.__class__.__name__,
+            'category': self.category,
+            'code': self.code,
+            'message': self.message,
+            'details': self.details
+        }
+
+
+class ExceptionHandler:
+    """统一异常处理器"""
+    
+    _instance = None
+    _logger = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
+        self._setup_logger()
+        self._error_counts = {}
+        self._error_history = []
+        self._max_history = 100
+    
+    def _setup_logger(self):
+        """设置日志记录器"""
+        if self._logger is None:
+            self._logger = logging.getLogger('ExceptionHandler')
+            self._logger.setLevel(logging.ERROR)
+            if not self._logger.handlers:
+                handler = logging.StreamHandler()
+                handler.setFormatter(logging.Formatter(
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S'
+                ))
+                self._logger.addHandler(handler)
+    
+    def handle(self, error: Exception, context: str = '', show_traceback: bool = True) -> str:
+        """处理异常并返回错误信息"""
+        error_type = type(error).__name__
+        error_msg = str(error)
+        
+        self._error_counts[error_type] = self._error_counts.get(error_type, 0) + 1
+        
+        error_record = {
+            'timestamp': datetime.now().isoformat(),
+            'type': error_type,
+            'message': error_msg,
+            'context': context
+        }
+        self._error_history.append(error_record)
+        if len(self._error_history) > self._max_history:
+            self._error_history.pop(0)
+        
+        if isinstance(error, AppException):
+            full_msg = f"[{error.code}] {error.message}"
+        else:
+            full_msg = f"[{error_type}] {error_msg}"
+        
+        if context:
+            full_msg = f"{context}: {full_msg}"
+        
+        print(f'错误: {full_msg}')
+        if show_traceback:
+            traceback.print_exc()
+        
+        self._logger.error(full_msg, exc_info=show_traceback)
+        
+        return full_msg
+    
+    def try_execute(self, func: Callable, default: Any = None, context: str = '') -> Any:
+        """统一异常处理包装器 - 用于需要捕获异常并返回默认值的场景"""
+        try:
+            return func()
+        except Exception as e:
+            self.handle(e, context)
+            return default
+    
+    def try_execute_with_error(self, func: Callable, context: str = '') -> Tuple[Any, str]:
+        """统一异常处理包装器 - 用于需要获取错误信息的场景"""
+        try:
+            return func(), None
+        except Exception as e:
+            error_msg = self.handle(e, context)
+            return None, error_msg
+    
+    def get_error_counts(self) -> dict:
+        """获取错误统计"""
+        return self._error_counts.copy()
+    
+    def get_error_history(self, limit: int = 10) -> List[dict]:
+        """获取错误历史"""
+        return self._error_history[-limit:]
+
+
+class ExceptionContext:
+    """异常处理上下文管理器"""
+    
+    def __init__(self, context: str = '', default: Any = None, show_traceback: bool = True):
+        self.context = context
+        self.default = default
+        self.show_traceback = show_traceback
+        self.handler = ExceptionHandler()
+        self.result = None
+        self.error = None
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.error = self.handler.handle(exc_val, self.context, self.show_traceback)
+            self.result = self.default
+            return True
+        return False
+    
+    def get_result(self) -> Tuple[Any, str]:
+        """获取结果和错误信息"""
+        return self.result, self.error
+
+
+T = TypeVar('T')
+
+
+def safe_call(func: Callable[..., T], *args, default: T = None, context: str = '', **kwargs) -> T:
+    """安全调用函数，返回默认值"""
+    handler = ExceptionHandler()
+    return handler.try_execute(lambda: func(*args, **kwargs), default, context)
+
+
+def safe_call_with_error(func: Callable[..., T], *args, context: str = '', **kwargs) -> Tuple[T, str]:
+    """安全调用函数，返回(结果, 错误信息)"""
+    handler = ExceptionHandler()
+    return handler.try_execute_with_error(lambda: func(*args, **kwargs), context)
+
+
+def handle_error(error: Exception, context: str = '') -> str:
+    """处理已捕获的异常"""
+    handler = ExceptionHandler()
+    return handler.handle(error, context)
+
+
+def safe_execute_func(func: Callable, default: Any = None, context: str = '') -> Any:
+    """统一异常处理包装器 - 用于需要捕获异常并返回默认值的场景"""
+    handler = ExceptionHandler()
+    return handler.try_execute(func, default, context)
+
+
+def safe_execute_with_error(func: Callable, context: str = '') -> Tuple[Any, str]:
+    """统一异常处理包装器 - 用于需要获取错误信息的场景"""
+    handler = ExceptionHandler()
+    return handler.try_execute_with_error(func, context)
+
+
+def handle_exception(e: Exception, context: str = '') -> str:
+    """统一异常处理函数 - 用于已捕获异常的场景"""
+    handler = ExceptionHandler()
+    return handler.handle(e, context)
+
+
+def exception_handler(context: str = '', default: Any = None, reraise: bool = False, custom_exc: type = None):
+    """统一异常处理装饰器
+    
+    Args:
+        context: 错误上下文描述
+        default: 异常时返回的默认值
+        reraise: 是否在异常时重新抛出统一的自定义异常
+        custom_exc: 自定义异常类型（如果reraise=True）
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except AppException:
+                raise
+            except Exception as e:
+                handler = ExceptionHandler()
+                handler.handle(e, context)
+                if reraise and custom_exc:
+                    raise custom_exc(str(e)) from e
+                return default
+        return wrapper
+    return decorator
+
+
+def file_operation_handler(operation: str):
+    """文件操作异常处理装饰器"""
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except PermissionError as e:
+                raise AppException.permission_error(
+                    f"文件操作{operation}失败（权限不足）",
+                    path=str(args[0]) if args else kwargs.get('path'),
+                    operation=operation
+                ) from e
+            except FileNotFoundError as e:
+                raise AppException.file_error(
+                    f"文件操作{operation}失败（文件不存在）",
+                    file_path=str(args[0]) if args else kwargs.get('path'),
+                    operation=operation
+                ) from e
+            except OSError as e:
+                raise AppException.file_error(
+                    f"文件操作{operation}失败（系统错误）: {e}",
+                    file_path=str(args[0]) if args else kwargs.get('path'),
+                    operation=operation
+                ) from e
+        return wrapper
+    return decorator
+
+
+def network_handler(url: str = None):
+    """网络请求异常处理装饰器"""
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except urllib.error.HTTPError as e:
+                raise AppException.network_error(
+                    f"网络请求失败（HTTP {e.code}）",
+                    url=url or str(args[0]) if args else None,
+                    status_code=e.code
+                ) from e
+            except urllib.error.URLError as e:
+                raise AppException.network_error(
+                    f"网络请求失败（连接错误）: {e.reason}",
+                    url=url or str(args[0]) if args else None
+                ) from e
+            except Exception as e:
+                raise AppException.network_error(
+                    f"网络请求失败: {e}",
+                    url=url or str(args[0]) if args else None
+                ) from e
+        return wrapper
+    return decorator
+
+
+def json_handler(context: str = ''):
+    """JSON解析异常处理装饰器"""
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except json.JSONDecodeError as e:
+                raise AppException.parse_error(
+                    f"JSON解析失败: {e}",
+                    data_type='json',
+                    raw_data=str(e)
+                ) from e
+        return wrapper
+    return decorator
+
+
+def excel_handler(operation: str = '操作'):
+    """Excel操作异常处理装饰器"""
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except PermissionError as e:
+                if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e):
+                    raise AppException.excel_error(
+                        f"Excel文件{operation}失败（共享违规）",
+                        excel_file=str(args[0]) if args else kwargs.get('excel_file')
+                    ) from e
+                raise AppException.excel_error(
+                    f"Excel文件{operation}失败（权限不足）",
+                    excel_file=str(args[0]) if args else kwargs.get('excel_file')
+                ) from e
+            except Exception as e:
+                raise AppException.excel_error(
+                    f"Excel文件{operation}失败: {e}",
+                    excel_file=str(args[0]) if args else kwargs.get('excel_file')
+                ) from e
+        return wrapper
+    return decorator
+
+
 from flask import Flask, request, jsonify, send_file, Response
 
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
+if pd is None:
     print("警告: pandas未安装，Excel对比功能将不可用")
+
+if async_playwright is None:
+    print("警告: playwright未安装，浏览器自动化功能将不可用")
+    print("请运行: pip install playwright && playwright install chromium")
+
+if openpyxl is None:
+    print("警告: openpyxl未安装，Excel功能将不可用")
 
 # 文件写入锁，防止多线程同时写入同一文件
 file_write_lock = threading.Lock()
@@ -53,34 +490,33 @@ class TeeOutput:
         self.log_file_path = log_file_path
         self.file = None
         if log_file_path:
-            try:
-                self.file = open(log_file_path, 'a', encoding='utf-8')
-            except:
-                pass
+            safe_execute_func(
+                lambda: setattr(self, 'file', open(log_file_path, 'a', encoding='utf-8')),
+                context='TeeOutput初始化'
+            )
     
     def write(self, text):
         self.original.write(text)
         if self.file:
-            try:
-                self.file.write(text)
-                self.file.flush()
-            except:
-                pass
+            safe_execute_func(
+                lambda: (self.file.write(text), self.file.flush()),
+                context='TeeOutput写入'
+            )
     
     def flush(self):
         self.original.flush()
         if self.file:
-            try:
-                self.file.flush()
-            except:
-                pass
+            safe_execute_func(
+                lambda: self.file.flush(),
+                context='TeeOutput刷新'
+            )
     
     def close(self):
         if self.file:
-            try:
-                self.file.close()
-            except:
-                pass
+            safe_execute_func(
+                lambda: self.file.close(),
+                context='TeeOutput关闭'
+            )
     
     def isatty(self):
         return False
@@ -89,13 +525,10 @@ def setup_web_logging():
     """设置Web模式下的日志输出"""
     global web_log_file
     web_log_file = PathManager.get_web_output_file()
-    try:
-        with open(web_log_file, 'w', encoding='utf-8') as f:
-            f.write("=" * 50 + "\n")
-            f.write("Szwego商品爬虫 - Web服务\n")
-            f.write("=" * 50 + "\n")
-    except:
-        pass
+    safe_execute_func(
+        lambda: open(web_log_file, 'w', encoding='utf-8').write("=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n"),
+        context='setup_web_logging'
+    )
     sys.stdout = TeeOutput(sys.stdout, web_log_file)
     sys.stderr = TeeOutput(sys.stderr, web_log_file)
 
@@ -105,11 +538,10 @@ def log_print(*args, **kwargs):
     msg = ' '.join(str(a) for a in args)
     print(msg, **kwargs)
     if web_log_file:
-        try:
-            with open(web_log_file, 'a', encoding='utf-8') as f:
-                f.write(msg + '\n')
-        except:
-            pass
+        safe_execute_func(
+            lambda: open(web_log_file, 'a', encoding='utf-8').write(msg + '\n'),
+            context='log_print'
+        )
 
 def format_size(size_bytes: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
@@ -132,10 +564,14 @@ def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, 
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     if log_file:
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
-        file_handler.setLevel(log_level)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+        safe_execute_func(
+            lambda: logger.addHandler(logging.FileHandler(log_file, encoding='utf-8')),
+            context='setup_logger'
+        )
+        for h in logger.handlers:
+            if isinstance(h, logging.FileHandler):
+                h.setLevel(log_level)
+                h.setFormatter(formatter)
     return logger
 
 
@@ -179,26 +615,24 @@ def clean_old_files(
         if file.is_file():
             ext = file.suffix.lower()
             if ext in MEDIA_EXTENSIONS:
-                file_stat = file.stat()
-                mtime = file_stat.st_mtime
-                download_time = datetime.fromtimestamp(mtime)
+                with ExceptionContext(f"clean_old_files扫描 {file.name}", default=None) as ctx:
+                    file_stat = file.stat()
+                    mtime = file_stat.st_mtime
+                    download_time = datetime.fromtimestamp(mtime)
 
-                name_without_ext = file.stem
-                if '_' in name_without_ext:
-                    group_key = name_without_ext.split('_')[0]
-                else:
-                    group_key = name_without_ext
+                    name_without_ext = file.stem
+                    group_key = name_without_ext.split('_')[0] if '_' in name_without_ext else name_without_ext
 
-                matched_files.append({
-                    'file': file,
-                    'group_key': group_key,
-                    'ext': ext,
-                    'is_image': ext in IMAGE_EXTENSIONS,
-                    'is_video': ext in VIDEO_EXTENSIONS,
-                    'mtime': mtime,
-                    'size': file_stat.st_size,
-                    'download_time': download_time
-                })
+                    matched_files.append({
+                        'file': file,
+                        'group_key': group_key,
+                        'ext': ext,
+                        'is_image': ext in IMAGE_EXTENSIONS,
+                        'is_video': ext in VIDEO_EXTENSIONS,
+                        'mtime': mtime,
+                        'size': file_stat.st_size,
+                        'download_time': download_time
+                    })
 
     if not matched_files:
         logger.warning("没有找到图片或视频文件")
@@ -291,20 +725,13 @@ def clean_old_files(
     deleted_size = 0
 
     for file_info in files_to_delete:
-        try:
+        with ExceptionContext(f"删除文件 {file_info['file'].name}", default=False) as ctx:
             file_info['file'].unlink()
             deleted_count += 1
             deleted_size += file_info['size']
             logger.info(f"已删除: {file_info['file'].name} ({format_size(file_info['size'])})")
-        except PermissionError:
-            logger.error(f"删除失败（权限不足）: {file_info['file'].name}")
-            failed_count += 1
-        except FileNotFoundError:
-            logger.warning(f"文件不存在（可能已被删除）: {file_info['file'].name}")
-            failed_count += 1
-        except Exception as e:
-            logger.error(f"删除失败 {file_info['file'].name}: {e}")
-            failed_count += 1
+            if ctx.error:
+                failed_count += 1
 
     logger.info("\n" + "=" * 60)
     logger.info("清理完成")
@@ -350,19 +777,20 @@ def clean_old_files_by_time(
         if file.is_file():
             ext = file.suffix.lower()
             if ext in MEDIA_EXTENSIONS:
-                file_stat = file.stat()
-                mtime = file_stat.st_mtime
-                download_time = datetime.fromtimestamp(mtime)
+                with ExceptionContext(f"clean_old_files_by_time扫描 {file.name}", default=None) as ctx:
+                    file_stat = file.stat()
+                    mtime = file_stat.st_mtime
+                    download_time = datetime.fromtimestamp(mtime)
 
-                matched_files.append({
-                    'file': file,
-                    'ext': ext,
-                    'is_image': ext in IMAGE_EXTENSIONS,
-                    'is_video': ext in VIDEO_EXTENSIONS,
-                    'mtime': mtime,
-                    'size': file_stat.st_size,
-                    'download_time': download_time
-                })
+                    matched_files.append({
+                        'file': file,
+                        'ext': ext,
+                        'is_image': ext in IMAGE_EXTENSIONS,
+                        'is_video': ext in VIDEO_EXTENSIONS,
+                        'mtime': mtime,
+                        'size': file_stat.st_size,
+                        'download_time': download_time
+                    })
 
     if not matched_files:
         logger.warning("没有找到图片或视频文件")
@@ -419,20 +847,13 @@ def clean_old_files_by_time(
     deleted_size = 0
 
     for file_info in files_to_delete:
-        try:
+        with ExceptionContext(f"删除文件 {file_info['file'].name}", default=False) as ctx:
             file_info['file'].unlink()
             deleted_count += 1
             deleted_size += file_info['size']
             logger.info(f"已删除: {file_info['file'].name} ({format_size(file_info['size'])})")
-        except PermissionError:
-            logger.error(f"删除失败（权限不足）: {file_info['file'].name}")
-            failed_count += 1
-        except FileNotFoundError:
-            logger.warning(f"文件不存在（可能已被删除）: {file_info['file'].name}")
-            failed_count += 1
-        except Exception as e:
-            logger.error(f"删除失败 {file_info['file'].name}: {e}")
-            failed_count += 1
+            if ctx.error:
+                failed_count += 1
 
     logger.info("\n" + "=" * 60)
     logger.info("清理完成")
@@ -474,7 +895,7 @@ def list_files(
             file_path = root_path / file
             ext = Path(file).suffix.lower()
             if ext in MEDIA_EXTENSIONS:
-                try:
+                with ExceptionContext(f"list_files扫描 {file_path}", default=None) as ctx:
                     file_stat = file_path.stat()
                     mtime = file_stat.st_mtime
                     download_time = datetime.fromtimestamp(mtime)
@@ -489,8 +910,6 @@ def list_files(
                         'size': file_stat.st_size,
                         'download_time': download_time
                     })
-                except Exception as e:
-                    logger.warning(f"无法访问文件 {file_path}: {e}")
 
     if not matched_files:
         logger.warning("没有找到图片或视频文件")
@@ -565,7 +984,10 @@ def clean_all_files(
 
     total_files = len(files_to_delete)
     total_folders = len(folders_to_delete)
-    total_size = sum(file.stat().st_size for file in files_to_delete)
+    total_size = sum(
+        safe_call(lambda f=f: f.stat().st_size(), default=0, context='clean_all_files获取文件大小') 
+        for file in files_to_delete
+    )
 
     logger.info(f"找到 {total_files} 个文件和 {total_folders} 个文件夹")
     logger.info(f"  - 总大小: {format_size(total_size)}")
@@ -580,7 +1002,7 @@ def clean_all_files(
     if files_to_delete:
         logger.info("\n将要删除的文件列表：")
         for i, file in enumerate(files_to_delete, 1):
-            file_size = file.stat().st_size
+            file_size = safe_call(lambda f=file: f.stat().st_size(), default=0, context='clean_all_files显示文件')
             logger.info(f"{i:3d}. {file.name} ({format_size(file_size)})")
 
     if folders_to_delete:
@@ -600,36 +1022,22 @@ def clean_all_files(
     failed_count = 0
 
     for file in files_to_delete:
-        try:
+        with ExceptionContext(f"删除文件 {file.name}", default=False) as ctx:
             file_size = file.stat().st_size
             file.unlink()
             deleted_files_count += 1
             deleted_size += file_size
             logger.info(f"已删除文件: {file.name} ({format_size(file_size)})")
-        except PermissionError:
-            logger.error(f"删除文件失败（权限不足）: {file.name}")
-            failed_count += 1
-        except FileNotFoundError:
-            logger.warning(f"文件不存在（可能已被删除）: {file.name}")
-            failed_count += 1
-        except Exception as e:
-            logger.error(f"删除文件失败 {file.name}: {e}")
-            failed_count += 1
+            if ctx.error:
+                failed_count += 1
 
     for folder in folders_to_delete:
-        try:
+        with ExceptionContext(f"删除文件夹 {folder.name}", default=False) as ctx:
             shutil.rmtree(folder)
             deleted_folders_count += 1
             logger.info(f"已删除文件夹: {folder.name}")
-        except PermissionError:
-            logger.error(f"删除文件夹失败（权限不足）: {folder.name}")
-            failed_count += 1
-        except FileNotFoundError:
-            logger.warning(f"文件夹不存在（可能已被删除）: {folder.name}")
-            failed_count += 1
-        except Exception as e:
-            logger.error(f"删除文件夹失败 {folder.name}: {e}")
-            failed_count += 1
+            if ctx.error:
+                failed_count += 1
 
     logger.info("\n" + "=" * 60)
     logger.info("清理完成")
@@ -716,20 +1124,13 @@ def clean_png_files(
     deleted_size = 0
 
     for file_info in matched_files:
-        try:
+        with ExceptionContext(f"删除PNG文件 {file_info['file'].name}", default=False) as ctx:
             file_info['file'].unlink()
             deleted_count += 1
             deleted_size += file_info['size']
             logger.info(f"已删除: {file_info['file'].name} ({format_size(file_info['size'])})")
-        except PermissionError:
-            logger.error(f"删除失败（权限不足）: {file_info['file'].name}")
-            failed_count += 1
-        except FileNotFoundError:
-            logger.warning(f"文件不存在（可能已被删除）: {file_info['file'].name}")
-            failed_count += 1
-        except Exception as e:
-            logger.error(f"删除失败 {file_info['file'].name}: {e}")
-            failed_count += 1
+            if ctx.error:
+                failed_count += 1
 
     logger.info("\n" + "=" * 60)
     logger.info("清理完成")
@@ -838,7 +1239,7 @@ def clean_media_files(
     deleted_size = 0
 
     for file_info in matched_files:
-        try:
+        with ExceptionContext(f"删除媒体文件 {file_info['file'].name}", default=False) as ctx:
             file_info['file'].unlink()
             deleted_count += 1
             deleted_size += file_info['size']
@@ -851,15 +1252,8 @@ def clean_media_files(
             else:
                 file_type = "MP4视频"
             logger.info(f"已删除: {file_info['file'].name} ({file_type}, {format_size(file_info['size'])})")
-        except PermissionError:
-            logger.error(f"删除失败（权限不足）: {file_info['file'].name}")
-            failed_count += 1
-        except FileNotFoundError:
-            logger.warning(f"文件不存在（可能已被删除）: {file_info['file'].name}")
-            failed_count += 1
-        except Exception as e:
-            logger.error(f"删除失败 {file_info['file'].name}: {e}")
-            failed_count += 1
+            if ctx.error:
+                failed_count += 1
 
     logger.info("\n" + "=" * 60)
     logger.info("清理完成")
@@ -1089,6 +1483,12 @@ VENV_PYTHON = get_python_executable()
 
 app = Flask(__name__, template_folder='.', static_folder=None)
 
+@app.errorhandler(Exception)
+def handle_api_exception(e):
+    """Flask全局异常处理器 - 统一处理所有未捕获的异常"""
+    error_msg = handle_exception(e, 'Flask API')
+    return jsonify({'error': error_msg, 'success': False, 'code': getattr(e, 'code', 'UNKNOWN')}), 500
+
 processes = {}
 tasks = {}
 
@@ -1149,7 +1549,6 @@ def run_command_background(task_id, command):
             try:
                 if Environment.IS_WINDOWS:
                     # Windows不支持select，使用超时读取
-                    import time
                     time.sleep(0.1)
                     line = process.stdout.readline()
                     if line:
@@ -1162,8 +1561,7 @@ def run_command_background(task_id, command):
                         if line:
                             stdout_lines.append(line)
             except Exception as e:
-                # 读取出错，继续
-                pass
+                handle_exception(e, 'run_command_background读取输出')
             
             # 更新输出
             tasks[task_id]['output'] = ''.join(stdout_lines)
@@ -1173,22 +1571,9 @@ def run_command_background(task_id, command):
         tasks[task_id]['output'] = ''.join(stdout_lines)
         tasks[task_id]['status'] = 'completed'
     except Exception as e:
+        handle_exception(e, 'run_command_background')
         tasks[task_id]['error'] = str(e)
         tasks[task_id]['status'] = 'error'
-
-
-try:
-    from playwright.async_api import async_playwright
-except ImportError:
-    print("请安装playwright: pip install playwright")
-    print("然后运行: playwright install chromium")
-    sys.exit(1)
-
-try:
-    import openpyxl
-except ImportError:
-    print("请安装openpyxl: pip install openpyxl")
-    sys.exit(1)
 
 
 class PathManager:
@@ -1278,7 +1663,7 @@ class PathManager:
                 if match:
                     return match.group(1).rstrip('/')
         except Exception as e:
-            pass
+            handle_exception(e, 'get_public_url_from_web_log')
         return None
     
     @staticmethod
@@ -1291,7 +1676,6 @@ class PathManager:
                 with open(tunnel_file, 'r', encoding='utf-8') as f:
                     tunnel_content = f.read()
                 
-                import re
                 tunnel_match = re.search(r'Public URL:\s*(https://[^\s]+)', tunnel_content)
                 if not tunnel_match:
                     # 如果 tunnel_url.txt 没有 Public URL，尝试直接匹配 hostc.dev URL
@@ -1328,11 +1712,11 @@ Szwego商品爬虫 - Web服务
                             f.write(header)
                             f.write(f"  Public URL: {new_url}\n")
                     except Exception as e2:
-                        print(f"[Tunnel] 重建 web_output.log 失败: {e2}")
+                        handle_exception(e2, 'sync_web_output_from_tunnel_url重建web_output')
                         return False
                     return True
         except Exception as e:
-            print(f"[Tunnel] 同步 web_output.log 失败: {e}")
+            handle_exception(e, 'sync_web_output_from_tunnel_url同步')
         return False
     
     @staticmethod
@@ -1424,14 +1808,26 @@ class EmailNotifier:
             print(f"[Email] 已成功发送邮件通知到 {config['to_email']}")
             return True
         except smtplib.SMTPAuthenticationError as e:
-            print(f"[Email] SMTP认证失败: {e}")
-            return False
+            handle_exception(e, 'Email SMTP认证')
+            raise AppException.email_error(
+                f"SMTP认证失败: {e}",
+                smtp_host=config['smtp_host'],
+                recipient=config['to_email']
+            )
         except smtplib.SMTPException as e:
-            print(f"[Email] SMTP错误: {e}")
-            return False
+            handle_exception(e, 'Email SMTP错误')
+            raise AppException.email_error(
+                f"SMTP错误: {e}",
+                smtp_host=config['smtp_host'],
+                recipient=config['to_email']
+            )
         except Exception as e:
-            print(f"[Email] 发送邮件失败: {e}")
-            return False
+            handle_exception(e, 'Email发送失败')
+            raise AppException.email_error(
+                f"发送邮件失败: {e}",
+                smtp_host=config['smtp_host'],
+                recipient=config['to_email']
+            )
     
     def save_email_config(self, smtp_host, smtp_port, smtp_user, smtp_password, from_name, to_email):
         """保存邮件配置"""
@@ -1460,9 +1856,20 @@ class ConfigManager:
         try:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except Exception as e:
-            print(f'加载配置文件失败: {e}')
+        except FileNotFoundError:
             return {}
+        except json.JSONDecodeError as e:
+            handle_exception(e, 'ConfigManager JSON解析')
+            raise AppException.config_error(
+                f"配置文件格式错误: {e}",
+                config_key=self.config_path
+            )
+        except Exception as e:
+            handle_exception(e, 'ConfigManager加载配置')
+            raise AppException.config_error(
+                f"加载配置文件失败: {e}",
+                config_key=self.config_path
+            )
 
     def save_config(self):
         if self._config:
@@ -1470,8 +1877,19 @@ class ConfigManager:
                 with open(self.config_path, 'w', encoding='utf-8') as f:
                     json.dump(self._config, f, ensure_ascii=False, indent=2)
                 return True
+            except PermissionError as e:
+                handle_exception(e, 'ConfigManager保存配置权限')
+                raise AppException.permission_error(
+                    f"保存配置文件失败（权限不足）: {e}",
+                    path=self.config_path,
+                    operation='write'
+                )
             except Exception as e:
-                print(f'保存配置文件失败: {e}')
+                handle_exception(e, 'ConfigManager保存配置')
+                raise AppException.config_error(
+                    f"保存配置文件失败: {e}",
+                    config_key=self.config_path
+                )
         return False
 
     def get(self, key, default=None):
@@ -1656,43 +2074,31 @@ class CookieValidator:
 class FileManager:
     @staticmethod
     def read_json(file_path):
-        try:
+        with ExceptionContext(f"FileManager.read_json({file_path})", default=None) as ctx:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except Exception as e:
-            print(f'读取JSON文件失败 {file_path}: {e}')
-            return None
 
     @staticmethod
     def write_json(file_path, data, indent=2):
-        try:
+        with ExceptionContext(f"FileManager.write_json({file_path})", default=False) as ctx:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=indent)
             return True
-        except Exception as e:
-            print(f'写入JSON文件失败 {file_path}: {e}')
-            return False
 
     @staticmethod
     def read_text(file_path):
-        try:
+        with ExceptionContext(f"FileManager.read_text({file_path})", default=None) as ctx:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
-        except Exception as e:
-            print(f'读取文本文件失败 {file_path}: {e}')
-            return None
 
     @staticmethod
     def write_text(file_path, content):
-        try:
+        with ExceptionContext(f"FileManager.write_text({file_path})", default=False) as ctx:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             return True
-        except Exception as e:
-            print(f'写入文本文件失败 {file_path}: {e}')
-            return False
 
     @staticmethod
     def file_exists(file_path):
@@ -1700,7 +2106,7 @@ class FileManager:
 
     @staticmethod
     def get_latest_json_file(directory=None, pattern='微购相册'):
-        try:
+        with ExceptionContext(f"FileManager.get_latest_json_file", default=None) as ctx:
             directory = directory or PathManager.get_file_dir()
             if not os.path.exists(directory):
                 print(f'目录 {directory} 不存在')
@@ -1720,9 +2126,6 @@ class FileManager:
             latest_file = json_files[0][0]
             print(f'找到最新的JSON文件: {latest_file}')
             return latest_file
-        except Exception as e:
-            print(f'获取最新JSON文件失败: {e}')
-            return None
 
     @staticmethod
     def get_today_json_files(directory=None, pattern='微购相册'):
@@ -1733,7 +2136,7 @@ class FileManager:
         2. 当天的最新文件和前一天的文件
         3. 最新的两个文件
         """
-        try:
+        with ExceptionContext("FileManager.get_today_json_files", default=(None, None)) as ctx:
             directory = directory or PathManager.get_file_dir()
             if not os.path.exists(directory):
                 print(f'目录 {directory} 不存在')
@@ -1741,7 +2144,6 @@ class FileManager:
             
             today = datetime.now().strftime('%Y%m%d')
             
-            # 获取所有符合条件的JSON文件
             all_json_files = []
             for file in os.listdir(directory):
                 if file.endswith('.json') and pattern in file and '_cache' not in file:
@@ -1752,18 +2154,15 @@ class FileManager:
                 print(f'未找到包含"{pattern}"的JSON文件')
                 return None, None
             
-            # 按修改时间排序（最新的在前）
             all_json_files.sort(key=lambda x: x[1], reverse=True)
             latest_file = all_json_files[0][0]
             
-            # 检查是否存在当天的缓存文件
             cache_file = PathManager.get_cache_file_path(today)
             if os.path.exists(cache_file):
                 print(f'找到当天缓存文件: {cache_file}')
                 print(f'找到当天最新文件: {latest_file}')
                 return latest_file, cache_file
             
-            # 如果没有缓存文件，检查当天是否有多个文件
             today_files = []
             for file in os.listdir(directory):
                 if file.endswith('.json') and pattern in file and today in file and '_cache' not in file:
@@ -1776,7 +2175,6 @@ class FileManager:
                 print(f'找到当天次新文件: {today_files[1][0]}')
                 return today_files[0][0], today_files[1][0]
             
-            # 如果当天只有一个文件，尝试找前一天的文件
             if len(all_json_files) >= 2:
                 print(f'当天只有一个文件，使用最新文件和次新文件对比')
                 print(f'最新文件: {latest_file}')
@@ -1785,14 +2183,10 @@ class FileManager:
             
             print(f'只找到一个文件: {latest_file}')
             return latest_file, None
-            
-        except Exception as e:
-            print(f'获取JSON文件失败: {e}')
-            return None, None
 
     @staticmethod
     def list_files(directory=None, pattern=None):
-        try:
+        with ExceptionContext("FileManager.list_files", default=[]) as ctx:
             directory = directory or PathManager.get_file_dir()
             if not os.path.exists(directory):
                 return []
@@ -1801,9 +2195,6 @@ class FileManager:
             if pattern:
                 files = [f for f in files if pattern in f]
             return files
-        except Exception as e:
-            print(f'列出文件失败: {e}')
-            return []
 
     @staticmethod
     def safe_read_excel(excel_file, max_retries=3, retry_delay=0.5):
@@ -1823,7 +2214,7 @@ class FileManager:
             return None
         
         temp_file = None
-        try:
+        with ExceptionContext(f"FileManager.safe_read_excel({excel_file})", default=None) as ctx:
             for attempt in range(max_retries):
                 try:
                     temp_dir = os.path.join(PROJECT_DIR, 'temp')
@@ -1832,7 +2223,7 @@ class FileManager:
                     shutil.copy2(excel_file, temp_file)
                     
                     with file_write_lock:
-                        xls = pd.ExcelFile(temp_file, engine='openpyxl', read_only=True)
+                        xls = pd.ExcelFile(temp_file, engine='openpyxl')
                         dfs = {}
                         for sheet in xls.sheet_names:
                             dfs[sheet] = xls.parse(sheet)
@@ -1844,19 +2235,17 @@ class FileManager:
                             print(f'Excel文件被占用，正在等待重试 ({attempt + 1}/{max_retries}): {excel_file}')
                             time.sleep(retry_delay)
                         else:
-                            print(f'Excel文件读取失败（共享违规）: {excel_file}')
-                            raise
+                            raise AppException.excel_error(f'Excel文件读取失败（共享违规）', excel_file=excel_file)
                     else:
                         raise
                 except Exception as e:
-                    print(f'读取Excel文件失败: {e}')
-                    raise
-        finally:
-            if temp_file and os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except:
-                    pass
+                    raise AppException.parse_error(f'读取Excel文件失败', data_type='excel', raw_data=str(e))
+        
+        if temp_file and os.path.exists(temp_file):
+            safe_execute_func(
+                lambda: os.remove(temp_file),
+                context='清理临时Excel文件'
+            )
         
         return None
 
@@ -1904,14 +2293,17 @@ class WegoScraper:
         ]
         
         for selector in popup_selectors[:close_limit]:
-            try:
-                close_button = await page.query_selector(selector, timeout=1000)
-                if close_button:
-                    await close_button.click(timeout=1000)
-                    print(f'关闭了弹窗: {selector}')
-                    await asyncio.sleep(wait_time)
-            except Exception:
-                pass
+            safe_execute_func(
+                lambda: self._close_popup_impl(page, selector, wait_time),
+                context=f'close_popups({selector})'
+            )
+    
+    async def _close_popup_impl(self, page, selector, wait_time):
+        close_button = await page.query_selector(selector, timeout=1000)
+        if close_button:
+            await close_button.click(timeout=1000)
+            print(f'关闭了弹窗: {selector}')
+            await asyncio.sleep(wait_time)
 
     async def scroll_to_load_all(self, page):
         print('开始滚动加载所有商品...')
@@ -1932,7 +2324,7 @@ class WegoScraper:
         dynamic_adjust = config.get('dynamic_adjust', True)
         
         for scroll_attempts in range(max_attempts):
-            try:
+            with ExceptionContext(f"scroll_to_load_all第{scroll_attempts + 1}次滚动", default=None) as ctx:
                 start_time = time.time()
                 
                 current_height = await asyncio.wait_for(
@@ -1956,13 +2348,13 @@ class WegoScraper:
                     last_height = current_height
                 
                 scroll_distance = current_height * 0.3 if scroll_attempts < 10 else current_height
-                try:
-                    await asyncio.wait_for(
+                safe_execute_func(
+                    lambda: asyncio.wait_for(
                         page.evaluate(f'window.scrollBy(0, {scroll_distance})' if scroll_attempts < 10 else 'window.scrollTo(0, document.body.scrollHeight)'),
                         timeout=3.0
-                    )
-                except asyncio.TimeoutError:
-                    print('滚动操作超时，尝试继续...')
+                    ),
+                    context='scroll操作'
+                )
                 
                 await asyncio.sleep(scroll_wait_time)
                 
@@ -1982,11 +2374,9 @@ class WegoScraper:
                 
                 if (scroll_attempts + 1) % popup_close_interval == 0:
                     await self.close_popups(page, popup_close_limit, popup_close_wait)
-            except Exception as e:
-                print(f'滚动时出错: {e}')
-                import traceback
-                traceback.print_exc()
-                break
+                
+                if ctx.error:
+                    break
         
         print('滚动完成')
 
@@ -2189,7 +2579,7 @@ class WegoScraper:
                     cookies = json.load(f)
                 print(f'读取到 {len(cookies)} 个cookie')
             except Exception as e:
-                print(f'读取cookie失败: {e}')
+                handle_exception(e, 'fetch_cost_prices_via_api读取Cookie')
                 return
         
         cookie_str = '; '.join([f'{c["name"]}={c["value"]}' for c in cookies])
@@ -2262,13 +2652,13 @@ class WegoScraper:
                         else:
                             break
                     except Exception as e:
-                        print(f'  解析失败: {e}')
+                        handle_exception(e, 'fetch_cost_prices_via_api解析响应')
                         break
                 else:
                     print(f'  请求失败: {response.status}')
                     break
             except Exception as e:
-                print(f'  请求异常: {e}')
+                handle_exception(e, 'fetch_cost_prices_via_api请求')
                 break
         
         print(f'共获取 {len(all_goods_data)} 个商品数据')
@@ -2572,7 +2962,8 @@ class WegoScraper:
             
             return f"对比 {old_data.get('生成日期', 'N/A')} 新增 {len(added)} 个，删除 {len(removed)} 个\n【新增商品】({len(added)}个):\n{format_json_array(added_details)}\n【删除商品】({len(removed)}个):\n{format_json_array(removed_details)}"
         except Exception as e:
-            return f"对比分析失败: {str(e)}"
+                handle_exception(e, 'analyze_data_changes对比分析')
+                return f"对比分析失败: {str(e)}"
 
     def save_data(self, data, filename=None):
         today = datetime.now().strftime('%Y%m%d')
@@ -2859,15 +3250,11 @@ class StockNumberComparator:
             workbook.close()
             return stock_numbers
         except Exception as e:
-            print(f'读取Excel文件失败: {e}')
-            traceback.print_exc()
-            return None
+                handle_exception(e, 'load_excel_data读取Excel')
+                return None
         finally:
             if temp_file and os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                except:
-                    pass
+                safe_execute_func(lambda: os.remove(temp_file), context='load_excel_data清理临时文件')
 
     def load_all_excel_data(self, remove_duplicates=True):
         all_stock_numbers = []
@@ -2917,15 +3304,11 @@ class StockNumberComparator:
                 workbook.close()
                 
             except Exception as e:
-                print(f'读取Excel文件失败 {excel_file}: {e}')
-                traceback.print_exc()
+                handle_exception(e, f'load_all_excel_data读取Excel {excel_file}')
                 continue
             finally:
                 if temp_file and os.path.exists(temp_file):
-                    try:
-                        os.remove(temp_file)
-                    except:
-                        pass
+                    safe_execute_func(lambda: os.remove(temp_file), context='load_all_excel_data清理临时文件')
         
         if remove_duplicates:
             all_stock_numbers = list(set(all_stock_numbers))
@@ -2993,8 +3376,8 @@ class StockNumberComparator:
             print(f'重复序列号日志已保存到 {log_file}')
             return True
         except Exception as e:
-            print(f'保存重复日志失败: {e}')
-            return False
+                handle_exception(e, 'save_duplicate_log保存重复日志')
+                return False
 
     def compare_json_files(self):
         """
@@ -3156,8 +3539,7 @@ class StockNumberComparator:
             
             return True
         except Exception as e:
-            print(f'对比失败: {e}')
-            traceback.print_exc()
+            handle_exception(e, 'compare_json_files对比JSON文件')
             return False
 
     def compare_excel_with_json(self):
@@ -3568,8 +3950,7 @@ def run_scraper():
         scraper = WegoScraper()
         asyncio.run(scraper.run())
     except Exception as e:
-        print(f'运行爬虫时出错: {e}')
-        traceback.print_exc()
+        handle_exception(e, 'run_scraper运行爬虫')
         input('按回车键继续...')
 
 
@@ -3584,149 +3965,139 @@ def update_cookie():
     print('  - 完成后自动保存到配置文件')
     print_separator()
     
-    # 清空现有的Cookie文件，确保获取最新的Cookie
+    if async_playwright is None:
+        print("错误: 请先安装playwright")
+        print("运行: pip install playwright && playwright install chromium")
+        return
+    
     cookie_file = PathManager.get_cookie_file()
     if FileManager.file_exists(cookie_file):
         print(f'清空现有Cookie文件: {cookie_file}')
         FileManager.write_json(cookie_file, [])
         print('✓ Cookie文件已清空')
     
-    try:
-        from playwright.async_api import async_playwright
-        
-        async def get_cookie():
-            async with async_playwright() as p:
-                browser_args = WegoScraper.get_browser_args()
-                chrome_path = WegoScraper.get_chrome_path()
-                
-                print(f'检测到系统: {Environment.SYSTEM}')
-                if chrome_path:
-                    print(f'使用系统Chrome: {chrome_path}')
-                else:
-                    print(f'使用Playwright内置Chromium')
-                
-                browser = await p.chromium.launch(
-                    headless=False, 
-                    args=browser_args, 
-                    executable_path=chrome_path
-                )
-                
-                context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent=WegoScraper.get_user_agent()
-                )
-                
-                # 加载现有Cookie
-                existing_cookies = []
-                cookie_file = PathManager.get_cookie_file()
-                if FileManager.file_exists(cookie_file):
-                    existing_cookies = FileManager.read_json(cookie_file)
-                    if existing_cookies:
-                        print(f'已加载 {len(existing_cookies)} 个现有Cookie')
-                        await context.add_cookies(existing_cookies)
-                
-                page = await context.new_page()
-                await page.goto('https://www.szwego.com', wait_until='networkidle')
-                
-                print('浏览器已打开，正在获取Cookie...')
-                print('请稍候，系统会自动处理...')
-                
-                # 等待页面加载完成
+    async def get_cookie():
+        async with async_playwright() as p:
+            browser_args = WegoScraper.get_browser_args()
+            chrome_path = WegoScraper.get_chrome_path()
+            
+            print(f'检测到系统: {Environment.SYSTEM}')
+            if chrome_path:
+                print(f'使用系统Chrome: {chrome_path}')
+            else:
+                print(f'使用Playwright内置Chromium')
+            
+            browser = await p.chromium.launch(
+                headless=False, 
+                args=browser_args, 
+                executable_path=chrome_path
+            )
+            
+            context = await browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent=WegoScraper.get_user_agent()
+            )
+            
+            existing_cookies = []
+            cookie_file = PathManager.get_cookie_file()
+            if FileManager.file_exists(cookie_file):
+                existing_cookies = FileManager.read_json(cookie_file)
+                if existing_cookies:
+                    print(f'已加载 {len(existing_cookies)} 个现有Cookie')
+                    await context.add_cookies(existing_cookies)
+            
+            page = await context.new_page()
+            await page.goto('https://www.szwego.com', wait_until='networkidle')
+            
+            print('浏览器已打开，正在获取Cookie...')
+            print('请稍候，系统会自动处理...')
+            
+            try:
+                await page.wait_for_load_state('networkidle', timeout=10000)
+                print('页面加载完成')
+            except Exception as e:
+                print(f'页面加载超时，继续获取Cookie: {e}')
+            
+            print_separator()
+            print('浏览器已打开')
+            print('请在浏览器中完成以下操作：')
+            print('1. 如果需要登录，请完成登录')
+            print('2. 登录后刷新一下页面')
+            print('3. 程序会自动检测登录状态并关闭浏览器')
+            print_separator()
+            print('自动检测登录状态...')
+            print_separator()
+            
+            start_time = time.time()
+            timeout = 300
+            login_detected = False
+            
+            while time.time() - start_time < timeout:
                 try:
-                    await page.wait_for_load_state('networkidle', timeout=10000)
-                    print('页面加载完成')
-                except Exception as e:
-                    print(f'页面加载超时，继续获取Cookie: {e}')
-                
-                print_separator()
-                print('浏览器已打开')
-                print('请在浏览器中完成以下操作：')
-                print('1. 如果需要登录，请完成登录')
-                print('2. 登录后刷新一下页面')
-                print('3. 程序会自动检测登录状态并关闭浏览器')
-                print_separator()
-                print('自动检测登录状态...')
-                print_separator()
-                
-                # 自动检测登录状态
-                start_time = time.time()
-                timeout = 300  # 5分钟超时
-                login_detected = False
-                
-                while time.time() - start_time < timeout:
-                    # 检查是否已登录
-                    try:
-                        # 检查Cookie中是否有认证信息
-                        cookies = await context.cookies()
-                        auth_cookies = [c for c in cookies if 'token' in c['name'].lower() or 'session' in c['name'].lower() or 'auth' in c['name'].lower()]
-                        
-                        if auth_cookies:
-                            print('✓ 检测到登录成功，自动关闭浏览器...')
-                            login_detected = True
-                            break
-                    except:
-                        pass
+                    cookies = await context.cookies()
+                    auth_cookies = [c for c in cookies if 'token' in c['name'].lower() or 'session' in c['name'].lower() or 'auth' in c['name'].lower()]
                     
-                    # 如果未检测到登录状态，继续等待
-                    await asyncio.sleep(5)
-                    elapsed = int(time.time() - start_time)
-                    print(f'等待登录中... ({elapsed}秒)')
+                    if auth_cookies:
+                        print('✓ 检测到登录成功，自动关闭浏览器...')
+                        login_detected = True
+                        break
+                except:
+                    pass
                 
-                if not login_detected:
-                    print('⚠️ 登录超时，尝试获取当前Cookie')
+                await asyncio.sleep(5)
+                elapsed = int(time.time() - start_time)
+                print(f'等待登录中... ({elapsed}秒)')
+            
+            if not login_detected:
+                print('⚠️ 登录超时，尝试获取当前Cookie')
+            
+            cookies = await context.cookies()
+            szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+            
+            for cookie in szwego_cookies:
+                if cookie['domain'] == 'www.szwego.com':
+                    cookie['domain'] = '.szwego.com'
+            
+            FileManager.write_json(cookie_file, szwego_cookies)
+            
+            print(f'✓ Cookie已保存到 {cookie_file}')
+            print(f'✓ 共保存 {len(szwego_cookies)} 个Cookie')
+            
+            print_separator()
+            print('Cookie有效期信息：')
+            token_cookie = next((c for c in szwego_cookies if c['name'] == 'token'), None)
+            if token_cookie and 'expires' in token_cookie and token_cookie['expires']:
+                expiry_time = datetime.fromtimestamp(token_cookie['expires'])
+                expiry_str = expiry_time.strftime('%Y-%m-%d')
+                print(f'Token有效期: {expiry_str}')
+            else:
+                print('未找到Token Cookie')
+            print_separator()
+            
+            config_file = PathManager.get_config_file()
+            if FileManager.file_exists(config_file):
+                config_data = FileManager.read_json(config_file)
                 
-                # 获取Cookie
-                cookies = await context.cookies()
-                szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+                cookie_header = '; '.join([f'{c["name"]}={c["value"]}' for c in szwego_cookies])
                 
-                # 统一domain格式，将所有cookie的domain改为.szwego.com
-                for cookie in szwego_cookies:
-                    if cookie['domain'] == 'www.szwego.com':
-                        cookie['domain'] = '.szwego.com'
+                if 'headers' not in config_data:
+                    config_data['headers'] = {}
+                config_data['headers']['cookie'] = cookie_header
+                config_data['cookies'] = szwego_cookies
                 
-                FileManager.write_json(cookie_file, szwego_cookies)
-                
-                print(f'✓ Cookie已保存到 {cookie_file}')
-                print(f'✓ 共保存 {len(szwego_cookies)} 个Cookie')
-                
-                # 显示Cookie有效期
-                print_separator()
-                print('Cookie有效期信息：')
-                token_cookie = next((c for c in szwego_cookies if c['name'] == 'token'), None)
-                if token_cookie and 'expires' in token_cookie and token_cookie['expires']:
-                    from datetime import datetime
-                    expiry_time = datetime.fromtimestamp(token_cookie['expires'])
-                    expiry_str = expiry_time.strftime('%Y-%m-%d')
-                    print(f'Token有效期: {expiry_str}')
-                else:
-                    print('未找到Token Cookie')
-                print_separator()
-                
-                config_file = PathManager.get_config_file()
-                if FileManager.file_exists(config_file):
-                    config_data = FileManager.read_json(config_file)
-                    
-                    cookie_header = '; '.join([f'{c["name"]}={c["value"]}' for c in szwego_cookies])
-                    
-                    if 'headers' not in config_data:
-                        config_data['headers'] = {}
-                    config_data['headers']['cookie'] = cookie_header
-                    config_data['cookies'] = szwego_cookies
-                    
-                    FileManager.write_json(config_file, config_data)
-                    print('✓ config.json中的Cookie已更新')
-                
-                await browser.close()
-                print('✓ 浏览器已自动关闭')
-                
-                return True
-        
+                FileManager.write_json(config_file, config_data)
+                print('✓ config.json中的Cookie已更新')
+            
+            await browser.close()
+            print('✓ 浏览器已自动关闭')
+            
+            return True
+    
+    try:
         asyncio.run(get_cookie())
         print('\n✓ Cookie更新完成')
-        
     except Exception as e:
-        print(f'✗ Cookie更新失败: {e}')
-        traceback.print_exc()
+        handle_exception(e, 'update_cookie更新Cookie')
 
 
 if __name__ == '__main__':
@@ -3764,8 +4135,6 @@ if __name__ == '__main__':
         os.makedirs("config", exist_ok=True)
 
         async def get_cookie():
-            from playwright.async_api import async_playwright
-
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=False)
                 context = await browser.new_context(
@@ -3812,9 +4181,7 @@ if __name__ == '__main__':
                 await browser.close()
                 return szwego_cookies
 
-        try:
-            from playwright.async_api import async_playwright
-        except ImportError:
+        if async_playwright is None:
             print("错误: 请先安装playwright")
             print("运行: pip install playwright && playwright install chromium")
             sys.exit(1)
@@ -3892,8 +4259,7 @@ if __name__ == '__main__':
                 run_cleaner()
             print('任务完成')
         except Exception as e:
-            print(f'任务执行失败: {e}')
-            traceback.print_exc()
+            handle_exception(e, f'任务{args.task}执行')
         sys.exit(0)
     
     if args.web:
@@ -4258,7 +4624,8 @@ if __name__ == '__main__':
                                 sku = p.get('货号', '')
                                 if sku:
                                     high_price_stock_numbers.append(str(sku))
-                        except:
+                        except Exception as e:
+                            handle_exception(e, '/api/compare解析商品价格')
                             pass
                 
                 # 高价商品与已存在货号的对比
@@ -4375,7 +4742,6 @@ if __name__ == '__main__':
                 total_fee = 0
                 valid_price_count = 0
                 
-                import sys
                 def safe_print(*args, **kwargs):
                     try:
                         print(*args, **kwargs)
@@ -4518,7 +4884,6 @@ if __name__ == '__main__':
         @app.route('/api/clean/list', methods=['POST'])
         def api_clean_list():
             try:
-                import io
                 data = request.get_json()
                 directory = data.get('directory', '')
                 
@@ -4542,7 +4907,6 @@ if __name__ == '__main__':
         @app.route('/api/clean/group', methods=['POST'])
         def api_clean_group():
             try:
-                import io
                 data = request.get_json()
                 directory = data.get('directory', PROJECT_DIR)
                 dry_run = data.get('dry_run', False)
@@ -4558,7 +4922,6 @@ if __name__ == '__main__':
         @app.route('/api/clean/time', methods=['POST'])
         def api_clean_time():
             try:
-                import io
                 data = request.get_json()
                 directory = data.get('directory', PROJECT_DIR)
                 minutes = data.get('minutes', 5)
@@ -4575,7 +4938,6 @@ if __name__ == '__main__':
         @app.route('/api/clean/all', methods=['POST'])
         def api_clean_all():
             try:
-                import io
                 data = request.get_json()
                 directory = data.get('directory', PROJECT_DIR)
                 dry_run = data.get('dry_run', False)
@@ -4591,7 +4953,6 @@ if __name__ == '__main__':
         @app.route('/api/clean/png', methods=['POST'])
         def api_clean_png():
             try:
-                import io
                 data = request.get_json()
                 directory = data.get('directory', PROJECT_DIR)
                 dry_run = data.get('dry_run', False)
@@ -4607,7 +4968,6 @@ if __name__ == '__main__':
         @app.route('/api/clean/media', methods=['POST'])
         def api_clean_media():
             try:
-                import io
                 data = request.get_json()
                 directory = data.get('directory', PROJECT_DIR)
                 dry_run = data.get('dry_run', False)
@@ -4754,7 +5114,6 @@ if __name__ == '__main__':
         
         def verify_url(url, timeout=10):
             try:
-                import urllib.request
                 req = urllib.request.Request(url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-verify/1.0')
                 urllib.request.urlopen(req, timeout=timeout)
@@ -4769,7 +5128,6 @@ if __name__ == '__main__':
                 tunnel_heartbeat_failed = True
                 return False
             try:
-                import urllib.request
                 req = urllib.request.Request(web_url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-heartbeat/1.0')
                 urllib.request.urlopen(req, timeout=15)
