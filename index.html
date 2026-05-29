@@ -2599,21 +2599,44 @@ playwright install chromium</pre>
                 // 添加表格滚动联动功能
                 setTimeout(() => {
                     const tableContainers = productsContent.querySelectorAll('.change-table-container');
+                    let isScrolling = false;
                     
-                    // 为每个表格容器添加滚动事件
+                    // 统一的滚动同步函数
+                    function syncScroll(sourceContainer, sourceIndex) {
+                        if (isScrolling) return;
+                        isScrolling = true;
+                        
+                        const scrollTop = sourceContainer.scrollTop;
+                        const scrollLeft = sourceContainer.scrollLeft;
+                        
+                        tableContainers.forEach((otherContainer, otherIndex) => {
+                            if (otherIndex !== sourceIndex) {
+                                otherContainer.scrollTop = scrollTop;
+                                otherContainer.scrollLeft = scrollLeft;
+                            }
+                        });
+                        
+                        setTimeout(() => { isScrolling = false; }, 10);
+                    }
+                    
+                    // 为每个表格容器添加滚动事件（桌面端）
                     tableContainers.forEach((container, index) => {
                         container.addEventListener('scroll', function(e) {
-                            const scrollTop = e.target.scrollTop;
-                            const scrollLeft = e.target.scrollLeft;
-                            
-                            // 同步所有其他表格的滚动位置
-                            tableContainers.forEach((otherContainer, otherIndex) => {
-                                if (otherIndex !== index) {
-                                    otherContainer.scrollTop = scrollTop;
-                                    otherContainer.scrollLeft = scrollLeft;
-                                }
-                            });
+                            syncScroll(e.target, index);
                         });
+                        
+                        // 移动端触摸滚动支持
+                        let touchStartY = 0;
+                        let touchStartX = 0;
+                        
+                        container.addEventListener('touchstart', function(e) {
+                            touchStartY = e.touches[0].clientY;
+                            touchStartX = e.touches[0].clientX;
+                        }, { passive: true });
+                        
+                        container.addEventListener('touchmove', function(e) {
+                            syncScroll(e.target, index);
+                        }, { passive: true });
                     });
                     
                     const isMobile = window.innerWidth < 576;
