@@ -4826,6 +4826,8 @@ if __name__ == '__main__':
                                         try:
                                             with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
                                                 tf.write(f"Public URL: {file_url}\n")
+                                                tf.write(f"Local URL: http://127.0.0.1:{port}/\n")
+                                                tf.write(f"Tunnel: {file_url.split('//')[1].split('.')[0]}\n")
                                             print(f"[Tunnel] 已写入 tunnel_url.txt")
                                         except Exception as e:
                                             print(f"[Tunnel] 写入 tunnel_url.txt 失败: {e}")
