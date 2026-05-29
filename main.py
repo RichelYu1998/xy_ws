@@ -4962,8 +4962,18 @@ if __name__ == '__main__':
                 is_internal_running = tunnel_process and tunnel_process.poll() is None
                 is_external_running = False
                 
+                # 检查 tunnel_url.txt 是否为空或URL不可用
+                tunnel_file = PathManager.get_tunnel_url_file()
+                tunnel_url_empty = False
+                if os.path.exists(tunnel_file):
+                    with open(tunnel_file, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                    if not content:
+                        tunnel_url_empty = True
+                        tunnel_need_restart = True
+                
                 # 无论进程是否在运行，都要检查 URL 是否可用
-                if tunnel_url:
+                if tunnel_url and not tunnel_url_empty:
                     try:
                         if verify_url(tunnel_url):
                             is_external_running = True
