@@ -95,6 +95,12 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.25 (2026-05-29)
+- **彻底解决 Excel 文件读取时的 Windows 共享违规问题**
+  - 所有 Excel 读取改为"复制到临时文件再读取"方案
+  - 原文件被复制到 `temp/` 目录，读取临时文件后立即删除
+  - 彻底避免直接锁定原文件，Excel 保存时不再报共享违规
+
 ### v3.4.24 (2026-05-29)
 - **修复 Excel 文件读取时的 Windows 共享违规问题**
   - 所有 `openpyxl.load_workbook()` 改为 `read_only=True, data_only=True`
