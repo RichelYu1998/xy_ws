@@ -95,6 +95,11 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.21 (2026-05-29)
+- **确保 tunnel_url.txt 与 web_output.log 持久一致**
+  - 在 heartbeat_loop 心跳成功后，同步 tunnel_url.txt
+  - 每 60 秒检查一次并覆盖 hostc 可能写入的旧 URL
+
 ### v3.4.20 (2026-05-29)
 - **优化 tunnel_url.txt 写入格式**
   - 写入与 hostc 原格式一致的内容
