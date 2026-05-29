@@ -95,6 +95,22 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.26 (2026-05-29)
+- **重构统一异常处理系统**
+  - 新增 `AppException` 基类：统一所有业务异常（file_error、network_error、auth_error、browser_error、parse_error、config_error、excel_error、email_error、permission_error、resource_error、validation_error、database_error）
+  - 新增 `ExceptionHandler` 单例：统一异常处理、错误日志记录、错误历史追踪
+  - 新增 `ExceptionContext` 上下文管理器：`with ExceptionContext('操作描述'):` 自动捕获异常
+  - 新增全局函数：`safe_call()`、`safe_call_with_error()`、`safe_execute_func()`、`safe_execute_with_error()`、`handle_exception()`
+  - 新增 `@handle_exceptions` 装饰器：自动将各类异常转换为 AppException 子类
+  - 所有内置异常（FileNotFoundError、OSError、HTTPError 等）自动转换为对应的 AppException
+
+- **增强 tunnel_status API 的 URL 验证和自动重启**
+  - `/api/tunnel/status` 增加实时 URL 可用性验证（超时5秒）
+  - URL 验证失败时自动触发重启，避免前端获取到无效地址
+  - 添加进程运行状态检测（Windows: tasklist, Linux: pgrep）
+  - 统一使用 web_url 作为返回地址，无效 URL 不再返回给前端
+  - 添加 `last_url_invalid_log_time` 避免日志刷屏（60秒间隔）
+
 ### v3.4.25 (2026-05-29)
 - **彻底解决 Excel 文件读取时的 Windows 共享违规问题**
   - 所有 Excel 读取改为"复制到临时文件再读取"方案
