@@ -43,6 +43,74 @@ except ImportError:
 # 文件写入锁，防止多线程同时写入同一文件
 file_write_lock = threading.Lock()
 
+# Web日志文件路径
+web_log_file = None
+
+class TeeOutput:
+    """同时输出到控制台和文件"""
+    def __init__(self, original, log_file_path=None):
+        self.original = original
+        self.log_file_path = log_file_path
+        self.file = None
+        if log_file_path:
+            try:
+                self.file = open(log_file_path, 'a', encoding='utf-8')
+            except:
+                pass
+    
+    def write(self, text):
+        self.original.write(text)
+        if self.file:
+            try:
+                self.file.write(text)
+                self.file.flush()
+            except:
+                pass
+    
+    def flush(self):
+        self.original.flush()
+        if self.file:
+            try:
+                self.file.flush()
+            except:
+                pass
+    
+    def close(self):
+        if self.file:
+            try:
+                self.file.close()
+            except:
+                pass
+    
+    def isatty(self):
+        return False
+
+def setup_web_logging():
+    """设置Web模式下的日志输出"""
+    global web_log_file
+    web_log_file = PathManager.get_web_output_file()
+    try:
+        with open(web_log_file, 'w', encoding='utf-8') as f:
+            f.write("=" * 50 + "\n")
+            f.write("Szwego商品爬虫 - Web服务\n")
+            f.write("=" * 50 + "\n")
+    except:
+        pass
+    sys.stdout = TeeOutput(sys.stdout, web_log_file)
+    sys.stderr = TeeOutput(sys.stderr, web_log_file)
+
+def log_print(*args, **kwargs):
+    """同时输出到控制台和 web_output.log"""
+    global web_log_file
+    msg = ' '.join(str(a) for a in args)
+    print(msg, **kwargs)
+    if web_log_file:
+        try:
+            with open(web_log_file, 'a', encoding='utf-8') as f:
+                f.write(msg + '\n')
+        except:
+            pass
+
 def format_size(size_bytes: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size_bytes < 1024.0:
@@ -1203,9 +1271,45 @@ class PathManager:
             web_log_file = PathManager.get_web_output_file()
             if os.path.exists(tunnel_file):
                 with open(tunnel_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                with open(web_log_file, 'w', encoding='utf-8') as f:
-                    f.write(content)
+                    tunnel_content = f.read()
+                
+                import re
+                tunnel_match = re.search(r'Public URL:\s*(https://[^\s]+)', tunnel_content)
+                if not tunnel_match:
+                    return False
+                new_url = tunnel_match.group(1)
+                
+                try:
+                    if os.path.exists(web_log_file):
+                        with open(web_log_file, 'r', encoding='utf-8') as f:
+                            lines = f.readlines()
+                        
+                        updated = False
+                        for i, line in enumerate(lines):
+                            if 'Public URL:' in line and 'hostc.dev' in line:
+                                lines[i] = f"  Public URL: {new_url}\n"
+                                updated = True
+                        
+                        if updated:
+                            with open(web_log_file, 'w', encoding='utf-8') as f:
+                                f.writelines(lines)
+                            return True
+                except Exception as e:
+                    print(f"[Tunnel] 更新 web_output.log 失败: {e}")
+                
+                try:
+                    header = """==================================================
+Szwego商品爬虫 - Web服务
+==================================================
+访问地址: http://localhost:8888
+局域网地址: http://192.168.31.36:8888
+"""
+                    with open(web_log_file, 'w', encoding='utf-8') as f:
+                        f.write(header)
+                        f.write(tunnel_content)
+                except Exception as e2:
+                    print(f"[Tunnel] 重建 web_output.log 失败: {e2}")
+                    return False
                 return True
         except Exception as e:
             print(f"[Tunnel] 同步 web_output.log 失败: {e}")
@@ -5156,6 +5260,9 @@ if __name__ == '__main__':
                     'tunnel_type': tunnel_type
                 })
 
+        # 初始化日志输出到 web_output.log
+        setup_web_logging()
+        
         # 启动前获取一次局域网 IP 用于显示
         lan_ip_startup = None
         try:
@@ -5165,14 +5272,12 @@ if __name__ == '__main__':
             s.close()
         except:
             pass
-
+        
         print("=" * 50)
         print("Szwego商品爬虫 - Web服务")
         print("=" * 50)
         print(f"访问地址: http://localhost:{args.port}")
         print(f"局域网地址: http://{lan_ip_startup}:{args.port}" if lan_ip_startup else "")
-        
-        # 自动启动隧道
         print("[Tunnel] 正在自动启动隧道...")
         
         tunnel_result = auto_start_tunnel()
@@ -5183,6 +5288,7 @@ if __name__ == '__main__':
         
         print("按 Ctrl+C 停止服务")
         print("=" * 50)
+        
         app.run(host='0.0.0.0', port=args.port, debug=False)
     else:
         main()
