@@ -95,15 +95,13 @@ bash run.sh
 
 ## 更新日志
 
-### v3.4.23 (2026-05-29)
+### v3.4.24 (2026-05-29)
 - **修复 Excel 文件读取时的 Windows 共享违规问题**
-  - 在 `FileManager` 类中新增 `safe_read_excel()` 方法
-  - 读取 Excel 文件时增加重试机制（默认重试3次，每次间隔1秒）
-  - 自动捕获 `PermissionError` 共享违规异常
-  - 支持识别中文 Windows 错误提示（"另一个程序"、"正在使用"）
-  - `/api/sku/compare/excel` API 在文件被占用时返回 HTTP 423 状态码，提示用户关闭文件后再试
+  - 所有 `openpyxl.load_workbook()` 改为 `read_only=True, data_only=True`
+  - 所有 `pd.ExcelFile()` 改为 `read_only=True, engine='openpyxl'`
+  - 只读模式允许多个进程同时读取同一个文件
 
-### v3.4.22 (2026-05-29)
+### v3.4.23 (2026-05-29)
 - **优化心跳检测间隔**
   - 将心跳间隔从 60 秒缩短到 5 秒
   - 提高隧道故障检测速度（最多5秒检测到故障 vs 之前60秒）
