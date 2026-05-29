@@ -95,6 +95,11 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.20 (2026-05-29)
+- **优化 tunnel_url.txt 写入格式**
+  - 写入与 hostc 原格式一致的内容
+  - 包含 Public URL、Local URL 和 Tunnel 字段
+
 ### v3.4.19 (2026-05-29)
 - **同步写入 tunnel_url.txt**
   - `read_output` 获取到 URL 后，同时写入 `web_output.log` 和 `tunnel_url.txt`
