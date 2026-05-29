@@ -3536,7 +3536,7 @@ playwright install chromium</pre>
             }
             
             if (btn) {
-                if (running) {
+                if (running && url) {
                     btn.className = 'btn btn-secondary';
                     btn.innerHTML = '<i class="fa fa-check"></i> 隧道运行中';
                     btn.disabled = true;
@@ -3548,7 +3548,7 @@ playwright install chromium</pre>
             }
             
             if (status) {
-                if (running) {
+                if (running && url) {
                     status.innerHTML = '<span class="badge badge-success"><i class="fa fa-circle"></i> 已连接</span>';
                 } else {
                     if (restartCount > 0) {
