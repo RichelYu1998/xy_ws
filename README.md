@@ -95,6 +95,13 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.13 (2026-05-29)
+- **完全移除 tunnel_url.txt 读取逻辑，全部从 web_output.log**
+  - read_output 线程改为直接检查 web_output.log，不再读取 tunnel_url.txt
+  - 移除所有 sync_web_output_from_tunnel_url() 调用
+  - 所有公网地址统一从 web_output.log 读取
+  - 简化代码，减少文件操作
+
 ### v3.4.12 (2026-05-29)
 - **修复等待 URL 逻辑：直接检查 web_output.log**
   - 等待循环直接检查 web_output.log 是否有 URL，而不是等待 read_output 线程
