@@ -985,8 +985,8 @@ def clean_all_files(
     total_files = len(files_to_delete)
     total_folders = len(folders_to_delete)
     total_size = sum(
-        safe_call(lambda f=f: f.stat().st_size(), default=0, context='clean_all_files获取文件大小') 
-        for file in files_to_delete
+        safe_call(lambda f=item: f.stat().st_size(), default=0, context='clean_all_files获取文件大小') 
+        for item in files_to_delete
     )
 
     logger.info(f"找到 {total_files} 个文件和 {total_folders} 个文件夹")
@@ -1001,9 +1001,9 @@ def clean_all_files(
 
     if files_to_delete:
         logger.info("\n将要删除的文件列表：")
-        for i, file in enumerate(files_to_delete, 1):
-            file_size = safe_call(lambda f=file: f.stat().st_size(), default=0, context='clean_all_files显示文件')
-            logger.info(f"{i:3d}. {file.name} ({format_size(file_size)})")
+        for i, item in enumerate(files_to_delete, 1):
+            file_size = safe_call(lambda f=item: f.stat().st_size(), default=0, context='clean_all_files显示文件')
+            logger.info(f"{i:3d}. {item.name} ({format_size(file_size)})")
 
     if folders_to_delete:
         logger.info("\n将要删除的文件夹列表：")
