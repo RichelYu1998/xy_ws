@@ -4813,14 +4813,22 @@ if __name__ == '__main__':
                                     if file_url and file_url != tunnel_url:
                                         print(f"[Tunnel] 从 hostc 输出获取到URL: {file_url}")
                                         
-                                        # 直接写入 web_output.log
+                                        # 同时写入 web_output.log 和 tunnel_url.txt
                                         web_output_file = PathManager.get_web_output_file()
+                                        tunnel_url_file = PathManager.get_tunnel_url_file()
                                         try:
                                             with open(web_output_file, 'w', encoding='utf-8') as wf:
                                                 wf.write(f"Public URL: {file_url}\n")
                                             print(f"[Tunnel] 已写入 web_output.log")
                                         except Exception as e:
                                             print(f"[Tunnel] 写入 web_output.log 失败: {e}")
+                                        
+                                        try:
+                                            with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
+                                                tf.write(f"Public URL: {file_url}\n")
+                                            print(f"[Tunnel] 已写入 tunnel_url.txt")
+                                        except Exception as e:
+                                            print(f"[Tunnel] 写入 tunnel_url.txt 失败: {e}")
                                         
                                         tunnel_url = file_url
                                         url_ready = True
@@ -5030,9 +5038,6 @@ if __name__ == '__main__':
                 try:
                     if verify_url(web_url, timeout=5):
                         url_valid = True
-                        if web_url != tunnel_url:
-                            print(f"[Tunnel] 从 web_output.log 读取到可用的URL: {web_url}")
-                            tunnel_url = web_url
                     else:
                         # URL不可用，触发自动重启
                         if time.time() - last_url_invalid_log_time > 60:
