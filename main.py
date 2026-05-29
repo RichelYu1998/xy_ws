@@ -4669,13 +4669,14 @@ if __name__ == '__main__':
                 return False
         
         def send_heartbeat():
-            global tunnel_url, tunnel_last_heartbeat, tunnel_heartbeat_failed
-            if not tunnel_url:
+            global tunnel_last_heartbeat, tunnel_heartbeat_failed
+            web_url = PathManager.get_public_url_from_web_log()
+            if not web_url:
                 tunnel_heartbeat_failed = True
                 return False
             try:
                 import urllib.request
-                req = urllib.request.Request(tunnel_url, method='HEAD')
+                req = urllib.request.Request(web_url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-heartbeat/1.0')
                 urllib.request.urlopen(req, timeout=15)
                 tunnel_last_heartbeat = time.time()
@@ -4700,8 +4701,6 @@ if __name__ == '__main__':
                     try:
                         if verify_url(web_url, timeout=5):
                             is_tunnel_running = True
-                            if web_url != tunnel_url:
-                                tunnel_url = web_url
                         else:
                             if time.time() - last_log_time > 60:
                                 print(f"[Tunnel] URL验证失败: {web_url}")
@@ -4885,7 +4884,6 @@ if __name__ == '__main__':
                     try:
                         if verify_url(web_url):
                             is_url_valid = True
-                            tunnel_url = web_url
                     except:
                         pass
                 
