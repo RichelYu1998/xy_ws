@@ -1809,6 +1809,7 @@ class FileManager:
     def safe_read_excel(excel_file, max_retries=3, retry_delay=0.5):
         """
         安全读取Excel文件，处理Windows共享违规问题
+        通过复制到临时文件再读取，确保原文件不被锁定
         
         Args:
             excel_file: Excel文件路径
@@ -1816,32 +1817,46 @@ class FileManager:
             retry_delay: 重试间隔（秒）
             
         Returns:
-            pandas.DataFrame 或 None
+            dict: {sheet_name: DataFrame} 或 None
         """
         if pd is None:
             return None
         
-        for attempt in range(max_retries):
-            try:
-                with file_write_lock:
-                    xls = pd.ExcelFile(excel_file, engine='openpyxl', read_only=True)
-                    dfs = {}
-                    for sheet in xls.sheet_names:
-                        dfs[sheet] = xls.parse(sheet)
+        temp_file = None
+        try:
+            for attempt in range(max_retries):
+                try:
+                    temp_dir = os.path.join(PROJECT_DIR, 'temp')
+                    os.makedirs(temp_dir, exist_ok=True)
+                    temp_file = os.path.join(temp_dir, f'_temp_excel_{uuid.uuid4().hex}.xlsx')
+                    shutil.copy2(excel_file, temp_file)
+                    
+                    with file_write_lock:
+                        xls = pd.ExcelFile(temp_file, engine='openpyxl', read_only=True)
+                        dfs = {}
+                        for sheet in xls.sheet_names:
+                            dfs[sheet] = xls.parse(sheet)
+                        xls.close()
                     return dfs
-            except PermissionError as e:
-                if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e) or "Permission" in str(e):
-                    if attempt < max_retries - 1:
-                        print(f'Excel文件被占用，正在等待重试 ({attempt + 1}/{max_retries}): {excel_file}')
-                        time.sleep(retry_delay)
+                except PermissionError as e:
+                    if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e) or "Permission" in str(e):
+                        if attempt < max_retries - 1:
+                            print(f'Excel文件被占用，正在等待重试 ({attempt + 1}/{max_retries}): {excel_file}')
+                            time.sleep(retry_delay)
+                        else:
+                            print(f'Excel文件读取失败（共享违规）: {excel_file}')
+                            raise
                     else:
-                        print(f'Excel文件读取失败（共享违规）: {excel_file}')
                         raise
-                else:
+                except Exception as e:
+                    print(f'读取Excel文件失败: {e}')
                     raise
-            except Exception as e:
-                print(f'读取Excel文件失败: {e}')
-                raise
+        finally:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
         
         return None
 
@@ -2809,12 +2824,18 @@ class StockNumberComparator:
         if not excel_file:
             return None
         
+        temp_file = None
         try:
             if not FileManager.file_exists(excel_file):
                 return None
             
+            temp_dir = os.path.join(PROJECT_DIR, 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+            temp_file = os.path.join(temp_dir, f'_temp_excel_{uuid.uuid4().hex}.xlsx')
+            shutil.copy2(excel_file, temp_file)
+            
             print(f'正在读取Excel文件: {excel_file}')
-            workbook = openpyxl.load_workbook(excel_file, read_only=True, data_only=True)
+            workbook = openpyxl.load_workbook(temp_file, read_only=True, data_only=True)
             
             sheet = next((workbook[sheet_name] for sheet_name in workbook.sheetnames if '闲鱼' in sheet_name), None)
             
@@ -2835,11 +2856,18 @@ class StockNumberComparator:
             
             stock_numbers = list(set(stock_numbers)) if remove_duplicates else stock_numbers
             print(f'从Excel文件的E列中读取到 {len(stock_numbers)} 个货号')
+            workbook.close()
             return stock_numbers
         except Exception as e:
             print(f'读取Excel文件失败: {e}')
             traceback.print_exc()
             return None
+        finally:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except:
+                    pass
 
     def load_all_excel_data(self, remove_duplicates=True):
         all_stock_numbers = []
@@ -2854,12 +2882,18 @@ class StockNumberComparator:
         print(f'找到 {len(excel_files)} 个Excel文件')
         
         for excel_file in excel_files:
+            temp_file = None
             try:
                 if not FileManager.file_exists(excel_file):
                     continue
                 
+                temp_dir = os.path.join(PROJECT_DIR, 'temp')
+                os.makedirs(temp_dir, exist_ok=True)
+                temp_file = os.path.join(temp_dir, f'_temp_excel_{uuid.uuid4().hex}.xlsx')
+                shutil.copy2(excel_file, temp_file)
+                
                 print(f'正在读取Excel文件: {excel_file}')
-                workbook = openpyxl.load_workbook(excel_file, read_only=True, data_only=True)
+                workbook = openpyxl.load_workbook(temp_file, read_only=True, data_only=True)
                 
                 sheet = next((workbook[sheet_name] for sheet_name in workbook.sheetnames if '闲鱼' in sheet_name), None)
                 
@@ -2880,11 +2914,18 @@ class StockNumberComparator:
                 
                 print(f'从 {os.path.basename(excel_file)} 的E列中读取到 {len(file_stock_numbers)} 个货号')
                 all_stock_numbers.extend(file_stock_numbers)
+                workbook.close()
                 
             except Exception as e:
                 print(f'读取Excel文件失败 {excel_file}: {e}')
                 traceback.print_exc()
                 continue
+            finally:
+                if temp_file and os.path.exists(temp_file):
+                    try:
+                        os.remove(temp_file)
+                    except:
+                        pass
         
         if remove_duplicates:
             all_stock_numbers = list(set(all_stock_numbers))
