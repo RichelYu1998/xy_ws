@@ -4778,8 +4778,10 @@ if __name__ == '__main__':
                                                                 f.write(f'  Type:       hostc\n')
                                                                 f.write(f'  Public URL: {clean_url}\n')
                                                                 f.write(f'  Local:      http://127.0.0.1:{port}/\n')
-                                                                f.flush()  # 确保写入磁盘
+                                                                f.flush()
                                                         print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
+                                                        # 同步到 web_output.log
+                                                        PathManager.sync_web_output_from_tunnel_url()
                                                         sys.stdout.flush()
                                                     except Exception as e:
                                                         print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
@@ -4849,6 +4851,7 @@ if __name__ == '__main__':
                                 content = f.read()
                             if last_content is not None and content != last_content:
                                 print(f"[Tunnel] 检测到 tunnel_url.txt 变化: {content[:100]}")
+                                PathManager.sync_web_output_from_tunnel_url()
                             last_content = content
                     except:
                         pass
@@ -5063,6 +5066,7 @@ if __name__ == '__main__':
             tunnel_type = 'hostc'
             
             # 始终优先从 tunnel_url.txt 读取最新URL
+            file_url = None
             try:
                 tunnel_file = PathManager.get_tunnel_url_file()
                 if os.path.exists(tunnel_file):
@@ -5079,16 +5083,28 @@ if __name__ == '__main__':
                             print(f"[Tunnel] 从 tunnel_url.txt 读取到更新的URL: {file_url} (内存中: {current_url})")
                             tunnel_url = file_url
                             current_url = file_url
-                        else:
-                            print(f"[Tunnel] 从 tunnel_url.txt 读取到URL: {current_url}")
+                            # 确保 web_output.log 与 tunnel_url.txt 一致
+                            PathManager.sync_web_output_from_tunnel_url()
+                        # URL 没变化时不打印日志，避免日志刷屏
+                    else:
+                        # 文件存在但没有有效的URL，清空内存中的URL
+                        if current_url and not content.strip():
+                            print(f"[Tunnel] tunnel_url.txt 为空，清空内存中的URL")
+                            tunnel_url = None
+                            current_url = None
             except Exception as e:
                 print(f"[Tunnel] 读取 tunnel_url.txt 失败: {e}")
             
             # 检测是否有 hostc 隧道在运行（内部或外部）
             process_running = tunnel_process and tunnel_process.poll() is None
-            if process_running or current_url:
+            
+            # 只有当文件中有有效URL时才认为隧道在运行
+            if file_url:
+                is_running = True
+            elif process_running:
                 is_running = True
             else:
+                is_running = False
                 try:
                     # 更精确的hostc进程检测（跨系统兼容）
                     if Environment.IS_WINDOWS:
@@ -5102,13 +5118,13 @@ if __name__ == '__main__':
                 except:
                     pass
             
-            # 如果有URL但进程检测失败，仍然认为隧道在运行
-            if current_url and not is_running:
-                print(f"[Tunnel] 检测到URL但进程状态未知，认为隧道在运行: {current_url}")
+            # 如果文件中有URL但进程检测失败，仍然认为隧道在运行
+            if file_url and not is_running:
+                print(f"[Tunnel] 检测到URL但进程状态未知，认为隧道在运行: {file_url}")
                 is_running = True
             
             # 如果检测到外部隧道但守护线程未启动，则启动守护线程
-            if is_running and current_url and not tunnel_daemon_started:
+            if is_running and file_url and not tunnel_daemon_started:
                 tunnel_daemon_started = True
                 if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
                     tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)

@@ -95,6 +95,16 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.0 (2026-05-29)
+- **修复隧道状态显示和日志同步问题**
+  - `tunnel_url.txt` 为唯一基准：前端、API、web_output.log 都以此为准
+  - API 读取 tunnel_url.txt 时同步到 web_output.log，确保日志一致性
+  - 监控线程检测到 tunnel_url.txt 变化时自动同步到 web_output.log
+  - 启动隧道写入 tunnel_url.txt 后立即同步到 web_output.log
+  - 修复前端显示"已连接"但无公网地址的问题：只有 `running && url` 同时为真才显示已连接
+  - 修复 hostc 进程被终止后前端仍显示"已连接"的误判问题
+  - URL 无变化时不打印读取日志，避免日志刷屏
+
 ### v3.3.9 (2026-05-28)
 - **修复 tunnel_url 和前端显示不一致问题**
   - 增加备用正则表达式 `https://[a-zA-Z0-9_-]+\.hostc\.dev` 匹配 hostc 原始输出格式
