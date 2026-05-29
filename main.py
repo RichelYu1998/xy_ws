@@ -1818,21 +1818,19 @@ class FileManager:
         Returns:
             pandas.DataFrame 或 None
         """
-        import io
-        
         if pd is None:
             return None
         
         for attempt in range(max_retries):
             try:
                 with file_write_lock:
-                    xls = pd.ExcelFile(excel_file)
+                    xls = pd.ExcelFile(excel_file, engine='openpyxl', read_only=True)
                     dfs = {}
                     for sheet in xls.sheet_names:
                         dfs[sheet] = xls.parse(sheet)
                     return dfs
             except PermissionError as e:
-                if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e):
+                if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e) or "Permission" in str(e):
                     if attempt < max_retries - 1:
                         print(f'Excel文件被占用，正在等待重试 ({attempt + 1}/{max_retries}): {excel_file}')
                         time.sleep(retry_delay)
@@ -2816,7 +2814,7 @@ class StockNumberComparator:
                 return None
             
             print(f'正在读取Excel文件: {excel_file}')
-            workbook = openpyxl.load_workbook(excel_file)
+            workbook = openpyxl.load_workbook(excel_file, read_only=True, data_only=True)
             
             sheet = next((workbook[sheet_name] for sheet_name in workbook.sheetnames if '闲鱼' in sheet_name), None)
             
@@ -2861,7 +2859,7 @@ class StockNumberComparator:
                     continue
                 
                 print(f'正在读取Excel文件: {excel_file}')
-                workbook = openpyxl.load_workbook(excel_file)
+                workbook = openpyxl.load_workbook(excel_file, read_only=True, data_only=True)
                 
                 sheet = next((workbook[sheet_name] for sheet_name in workbook.sheetnames if '闲鱼' in sheet_name), None)
                 
