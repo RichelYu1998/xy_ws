@@ -4743,56 +4743,11 @@ if __name__ == '__main__':
             # 如果有 hostc 进程在运行且 web_output.log 有有效 URL，复用现有隧道
             if has_hostc_process and web_url and not force_restart:
                 if verify_url(web_url):
-                    print(f"[Tunnel] hostc进程正在运行且 web_output.log 有有效URL，复用现有隧道: {web_url}")
+                    print(f"[Tunnel] 复用已有隧道: {web_url}")
                     sys.stdout.flush()
                     tunnel_url = web_url
                     old_tunnel_url = web_url
                     return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
-                else:
-                    # URL 不可用，触发重启
-                    print(f"[Tunnel] web_output.log 中的URL不可用，将重启: {web_url}")
-                    tunnel_need_restart = True
-            
-            # 如果有 hostc 进程在运行但没有有效 URL，给它更多时间
-            if has_hostc_process and not web_url and not force_restart:
-                print(f"[Tunnel] hostc进程正在运行但URL未就绪，等待生成URL...")
-                return {'success': False, 'url': None, 'error': 'hostc进程正在启动，等待中'}
-            
-            # 强制重启，清理旧进程并启动新隧道
-            if force_restart or (not web_url and not has_hostc_process):
-                print(f"[Tunnel] {'强制重启' if force_restart else '无可用URL'}，启动新隧道...")
-                try:
-                    if Environment.IS_WINDOWS:
-                        result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', shell=True, capture_output=True, text=True, timeout=10)
-                        if result.returncode == 0:
-                            pids = [line.strip() for line in result.stdout.split('\n') if line.strip().isdigit()]
-                            for pid in pids:
-                                try:
-                                    subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True, timeout=3)
-                                    print(f"[Tunnel] 已终止hostc进程: {pid}")
-                                except:
-                                    pass
-                        node_check = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=5)
-                        if 'node.exe' in node_check.stdout:
-                            subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
-                    else:
-                        subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
-                    time.sleep(2)
-                except:
-                    pass
-                
-                if tunnel_process:
-                    try:
-                        tunnel_process.terminate()
-                        tunnel_process.wait(timeout=2)
-                    except:
-                        try:
-                            tunnel_process.kill()
-                        except:
-                            pass
-                tunnel_process = None
-                tunnel_url = None
-                old_tunnel_url = None
             
             try:
                 port = args.port
@@ -4801,68 +4756,20 @@ if __name__ == '__main__':
                 tunnel_last_error = None
                 tunnel_auto_restart = True
                 
-                print("[Tunnel] 使用 hostc 隧道")
+                print("[Tunnel] 启动 hostc 隧道")
                 sys.stdout.flush()
                 tunnel_type = 'hostc'
                 
-                # 清理所有旧的hostc/node进程
-                try:
-                    success_count = 0
-                    fail_count = 0
-                    total_count = 0
-                    
-                    if Environment.IS_WINDOWS:
-                        # 先尝试精确匹配hostc进程
-                        result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', shell=True, capture_output=True, text=True, timeout=10)
-                        if result.returncode == 0:
-                            pids = []
-                            for line in result.stdout.split('\n'):
-                                line = line.strip()
-                                if line and line.isdigit():
-                                    pids.append(line)
-                            if pids:
-                                for pid in pids:
-                                    total_count += 1
-                                    try:
-                                        subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True, timeout=3)
-                                        success_count += 1
-                                        print(f"[Tunnel] 已终止hostc进程: {pid}")
-                                    except:
-                                        fail_count += 1
-                                        pass
-                                time.sleep(1)
-                        
-                        # 检查是否还有node.exe进程，如果有才清理
-                        node_check = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=5)
-                        if 'node.exe' in node_check.stdout:
-                            # 再清理所有node.exe进程（更彻底）
-                            node_result = subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
-                            # 统计node.exe进程数量
-                            if node_result.returncode == 0:
-                                node_count = node_result.stdout.count('成功')
-                                success_count += node_count
-                                total_count += node_count
-                                print(f"[Tunnel] 已清理{node_count}个node.exe进程")
-                            else:
-                                fail_count += 1
-                                print(f"[Tunnel] 清理node.exe进程失败")
-                        
-                        print(f"[Tunnel] 进程清理统计: 总共{total_count}个，成功{success_count}个，失败{fail_count}个")
-                    else:
-                        result = subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
-                        if result.returncode == 0:
-                            success_count = 1
-                            total_count = 1
-                        else:
-                            fail_count = 1
-                            total_count = 1
-                        print(f"[Tunnel] 进程清理统计: 总共{total_count}个，成功{success_count}个，失败{fail_count}个")
-                        print("[Tunnel] 已清理所有旧的hostc进程")
-                    time.sleep(2)  # 等待进程完全清理
-                except Exception as e:
-                    print(f"[Tunnel] 清理旧进程失败: {e}")
-                    print(f"[Tunnel] 进程清理统计: 总共0个，成功0个，失败1个")
-
+                # 清理所有旧的 node.exe 进程
+                if Environment.IS_WINDOWS:
+                    try:
+                        subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
+                        time.sleep(1)
+                    except:
+                        pass
+                else:
+                    subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
+                
                 tunnel_process = subprocess.Popen(
                     f'npx hostc@latest {port} --local-host 127.0.0.1',
                     stdout=subprocess.PIPE,
@@ -4932,46 +4839,18 @@ if __name__ == '__main__':
                 tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
                 tunnel_heartbeat_thread.start()
 
-                max_wait = 20
+                max_wait = 30
                 waited = 0
                 while not url_ready and waited < max_wait:
-                    time.sleep(0.5)
-                    waited += 0.5
-                    if waited % 5 == 0:
+                    time.sleep(1)
+                    waited += 1
+                    # 每 10 秒打印一次
+                    if waited <= 10 or waited % 10 == 0:
                         print(f"[Tunnel] 等待URL... {waited}/{max_wait}秒")
                         sys.stdout.flush()
-                    
-                    # 检查是否有 hostc 进程在运行
-                    if waited >= 5:
-                        has_hostc_process = False
-                        try:
-                            if Environment.IS_WINDOWS:
-                                result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=3)
-                                has_hostc_process = 'node.exe' in result.stdout
-                            else:
-                                result = subprocess.run('pgrep -f "hostc"', shell=True, capture_output=True, text=True, timeout=3)
-                                has_hostc_process = result.returncode == 0
-                        except:
-                            pass
-                        
-                        # 从 web_output.log 检查是否有 URL
-                        web_url = PathManager.get_public_url_from_web_log()
-                        if web_url:
-                            # web_output.log 有 URL，等待 read_output 线程处理
-                            continue
-                        elif not has_hostc_process:
-                            # 没有进程在运行也没有 URL，触发重启
-                            print(f"[Tunnel] 无 hostc 进程且无有效 URL，触发重启")
-                            tunnel_need_restart = True
-                            sys.stdout.flush()
-                            break
-                        # 有进程在运行但没有 URL，继续等待
 
                 if not url_ready:
-                    if tunnel_need_restart:
-                        print(f"[Tunnel] 触发重启...")
-                    else:
-                        print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL")
+                    print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL")
                     return {'success': False, 'url': None, 'error': '启动超时，未获取到URL'}
 
                 return {
@@ -4988,26 +4867,7 @@ if __name__ == '__main__':
             consecutive_restart_attempts = 0
             max_consecutive_restarts = 3
             restart_cooldown = 60
-            
-            # 监控 tunnel_url.txt 变化，同步到 web_output.log
-            def watch_tunnel_url_file():
-                last_content = None
-                while tunnel_auto_restart:
-                    try:
-                        tunnel_file = PathManager.get_tunnel_url_file()
-                        if os.path.exists(tunnel_file):
-                            with open(tunnel_file, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                            if last_content is not None and content != last_content:
-                                print(f"[Tunnel] 检测到 tunnel_url.txt 变化: {content[:100]}")
-                                PathManager.sync_web_output_from_tunnel_url()
-                            last_content = content
-                    except:
-                        pass
-                    time.sleep(2)
-            
-            watch_thread = threading.Thread(target=watch_tunnel_url_file, daemon=True)
-            watch_thread.start()
+            restart_wait_start = None  # 重启等待开始时间
             
             while tunnel_auto_restart:
                 # 从 web_output.log 获取公网地址（统一入口）
@@ -5032,145 +4892,54 @@ if __name__ == '__main__':
                         if verify_url(web_url):
                             is_url_valid = True
                             tunnel_url = web_url
-                        else:
-                            # URL 验证失败，不立即重启，给 hostc 更多时间恢复
-                            if time.time() - last_url_invalid_log_time > 60:
-                                print(f"[Tunnel] URL验证失败，等待 hostc 自行恢复: {web_url}")
-                                last_url_invalid_log_time = time.time()
                     except:
                         pass
                 
-                # 如果有进程运行且 URL 有效，隧道正常
-                if has_hostc_process and is_url_valid and not tunnel_need_restart:
-                    consecutive_restart_attempts = 0
-                    tunnel_need_restart = False  # 重置重启标记
+                # 状态判断
+                if has_hostc_process and is_url_valid:
+                    # 一切正常
+                    restart_wait_start = None  # 重置等待状态
+                    tunnel_need_restart = False
                     time.sleep(1)
                     continue
                 
-                # 如果有进程运行但 URL 无效，给它更多时间恢复（最多等待 60 秒）
-                if has_hostc_process and web_url and not is_url_valid and not tunnel_need_restart:
-                    if not hasattr(restart_tunnel, 'url_invalid_start_time'):
-                        restart_tunnel.url_invalid_start_time = time.time()
-                    
-                    elapsed = time.time() - restart_tunnel.url_invalid_start_time
-                    if elapsed < 60:
-                        # 等待期间不打印日志，避免刷屏
-                        time.sleep(2)
-                        continue
-                    else:
-                        # 超过 60 秒才触发重启
-                        print(f"[Tunnel] URL持续无效超过60秒，触发重启")
-                        restart_tunnel.url_invalid_start_time = None
-                        tunnel_need_restart = True
+                # 需要等待或重启
+                if restart_wait_start is None:
+                    restart_wait_start = time.time()
+                    elapsed = 0
+                else:
+                    elapsed = time.time() - restart_wait_start
                 
-                # 如果有进程运行但没有 URL，给它更多时间
-                if has_hostc_process and not web_url and not tunnel_need_restart:
-                    if not hasattr(restart_tunnel, 'url_missing_start_time'):
-                        restart_tunnel.url_missing_start_time = time.time()
-                    
-                    elapsed = time.time() - restart_tunnel.url_missing_start_time
-                    if elapsed < 60:
-                        if elapsed < 10 or int(elapsed) % 10 == 0:
-                            print(f"[Tunnel] hostc进程正在运行，等待生成URL... ({int(elapsed)}/60秒)")
-                        time.sleep(2)
-                        continue
-                    else:
-                        print(f"[Tunnel] URL持续为空超过60秒，触发重启")
-                        restart_tunnel.url_missing_start_time = None
-                        tunnel_need_restart = True
+                # 等待时间阈值：首次等待 30 秒，之后等待 60 秒
+                wait_threshold = 30 if elapsed < 60 else 60
                 
-                if not tunnel_auto_restart:
-                    break
+                if elapsed < wait_threshold:
+                    # 等待期间，不打印日志避免刷屏
+                    time.sleep(2)
+                    continue
                 
-                consecutive_restart_attempts += 1
-                
-                if consecutive_restart_attempts >= max_consecutive_restarts:
-                    print(f"[Tunnel] 连续重启尝试次数过多 ({consecutive_restart_attempts}次)，延长等待时间...")
-                    sys.stdout.flush()
-                    delay = min(restart_cooldown * (consecutive_restart_attempts - max_consecutive_restarts + 1), 300)
-                    print(f"[Tunnel] 等待 {delay} 秒后重试...")
-                    sys.stdout.flush()
-                    time.sleep(delay)
-                
+                # 超过等待时间，触发重启
+                restart_wait_start = None
                 tunnel_restart_count += 1
-                print(f"[Tunnel] 检测到隧道断开，正在尝试重启 ({tunnel_restart_count}次，本次连续尝试{consecutive_restart_attempts}次)...")
+                print(f"[Tunnel] 检测到问题，尝试重启 (第{tunnel_restart_count}次)")
+                print(f"[Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
+                print(f"[Tunnel] - 公网URL: {web_url if web_url else '无'}")
+                print(f"[Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
                 sys.stdout.flush()
                 
-                if tunnel_consecutive_failures >= tunnel_max_consecutive_failures:
-                    print(f"[Tunnel] 连续失败次数过多 ({tunnel_consecutive_failures}次)，延长等待时间...")
-                    sys.stdout.flush()
-                    delay = min(tunnel_backoff_delay * (tunnel_consecutive_failures - tunnel_max_consecutive_failures + 1), 60)
-                    print(f"[Tunnel] 等待 {delay} 秒后重试...")
-                    sys.stdout.flush()
-                    time.sleep(delay)
+                # 清理所有 hostc/node 进程
+                if Environment.IS_WINDOWS:
+                    # 清理 node.exe 进程
+                    try:
+                        result = subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, text=True, timeout=10)
+                        print(f"[Tunnel] 已清理 node.exe 进程")
+                    except Exception as e:
+                        print(f"[Tunnel] 清理 node.exe 失败: {e}")
+                    time.sleep(1)
+                else:
+                    subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
                 
-                tunnel_consecutive_failures += 1
-                
-                if tunnel_consecutive_failures > tunnel_max_consecutive_failures + 10:
-                    print(f"[Tunnel] 连续失败次数过多 ({tunnel_consecutive_failures}次)，停止自动重启")
-                    sys.stdout.flush()
-                    tunnel_auto_restart = False
-                    break
-                
-                old_url = tunnel_url
-                
-                # 清理所有旧的hostc/node进程
-                try:
-                    success_count = 0
-                    fail_count = 0
-                    total_count = 0
-                    
-                    if Environment.IS_WINDOWS:
-                        # 先尝试精确匹配hostc进程
-                        result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', shell=True, capture_output=True, text=True, timeout=10)
-                        if result.returncode == 0:
-                            pids = []
-                            for line in result.stdout.split('\n'):
-                                line = line.strip()
-                                if line and line.isdigit():
-                                    pids.append(line)
-                            if pids:
-                                for pid in pids:
-                                    total_count += 1
-                                    try:
-                                        subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True, timeout=3)
-                                        success_count += 1
-                                        print(f"[Tunnel] 已终止hostc进程: {pid}")
-                                    except:
-                                        fail_count += 1
-                                        pass
-                                time.sleep(1)
-                        
-                        # 检查是否还有node.exe进程，如果有才清理
-                        node_check = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=5)
-                        if 'node.exe' in node_check.stdout:
-                            # 再清理所有node.exe进程（更彻底）
-                            node_result = subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
-                            # 统计node.exe进程数量
-                            if node_result.returncode == 0:
-                                node_count = node_result.stdout.count('成功')
-                                success_count += node_count
-                                total_count += node_count
-                                print(f"[Tunnel] 已清理{node_count}个node.exe进程")
-                            else:
-                                fail_count += 1
-                                print(f"[Tunnel] 清理node.exe进程失败")
-                        
-                        print(f"[Tunnel] 进程清理统计: 总共{total_count}个，成功{success_count}个，失败{fail_count}个")
-                    else:
-                        result = subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
-                        if result.returncode == 0:
-                            success_count = 1
-                            total_count = 1
-                        else:
-                            fail_count = 1
-                            total_count = 1
-                        print(f"[Tunnel] 进程清理统计: 总共{total_count}个，成功{success_count}个，失败{fail_count}个")
-                    time.sleep(2)  # 等待进程完全清理
-                except Exception as e:
-                    print(f"[Tunnel] 清理旧进程失败: {e}")
-                    print(f"[Tunnel] 进程清理统计: 总共0个，成功0个，失败1个")
-                
+                # 重置状态
                 if tunnel_process:
                     try:
                         tunnel_process.terminate()
@@ -5183,22 +4952,6 @@ if __name__ == '__main__':
                 
                 tunnel_process = None
                 tunnel_url = None
-                
-                if old_url:
-                    try:
-                        tunnel_file = PathManager.get_tunnel_url_file()
-                        if os.path.exists(tunnel_file):
-                            with open(tunnel_file, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                                if old_url in content:
-                                    print(f"[Tunnel] 清理无效URL: {old_url}")
-                                    with file_write_lock:
-                                        with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                            f.write('')
-                    except Exception as e:
-                        print(f"[Tunnel] 清理URL失败: {e}")
-                
-                # 重置old_tunnel_url，避免URL复用逻辑误判
                 old_tunnel_url = None
                 
                 time.sleep(tunnel_restart_delay)
