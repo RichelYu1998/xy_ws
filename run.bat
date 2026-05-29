@@ -175,7 +175,7 @@ echo.
 
 set PYTHON_LOG_FILE=%CD%\file\web_output.log
 echo. > %PYTHON_LOG_FILE%
-start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web > %PYTHON_LOG_FILE% 2>&1"
+start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web"
 
 echo 等待 Web 服务启动完成...
 timeout /t 5 /nobreak >nul

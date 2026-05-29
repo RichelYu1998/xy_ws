@@ -95,6 +95,14 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.1 (2026-05-29)
+- **修复 web_output.log 日志同步和完整性问题**
+  - 添加 `TeeOutput` 类实现实时日志同步：所有 print 输出同时写入控制台和 web_output.log
+  - 修改 run.bat 移除 `>` 重定向，避免文件锁定导致的权限问题
+  - 程序启动时自动初始化日志文件，记录完整启动流程
+  - 优化 `sync_web_output_from_tunnel_url()` 方法：优先修改文件中已有 URL 行，避免删除重建
+  - 三个公网地址来源完全一致：`tunnel_url.txt`、`web_output.log`、`/api/tunnel/status` API
+
 ### v3.4.0 (2026-05-29)
 - **修复隧道状态显示和日志同步问题**
   - `tunnel_url.txt` 为唯一基准：前端、API、web_output.log 都以此为准
