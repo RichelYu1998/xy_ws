@@ -2854,7 +2854,9 @@ playwright install chromium</pre>
                             tunnelPollInterval = null;
                             const urlContainer = document.getElementById('tunnel-public-url-container');
                             if (urlContainer) {
+                                urlContainer.className = 'p-2 bg-success text-white rounded';
                                 urlContainer.innerHTML = `
+                                    <i class="fa fa-check-circle"></i>
                                     <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
                                         <i class="fa fa-external-link"></i> ${statusData.url}
                                     </a>
