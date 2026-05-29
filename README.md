@@ -95,6 +95,12 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.17 (2026-05-29)
+- **统一所有模块从 web_output.log 获取公网地址**
+  - `tunnel_status` API 统一使用 web_url 返回
+  - `heartbeat_loop` 改为从 web_output.log 获取 URL
+  - 移除对 tunnel_url 全局变量的不一致更新
+
 ### v3.4.16 (2026-05-29)
 - **修复变量名错误**
   - 修复 `old_url` 未定义错误，改为 `old_tunnel_url`

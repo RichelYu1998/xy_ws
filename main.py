@@ -4692,18 +4692,27 @@ if __name__ == '__main__':
             heartbeat_interval = 60  # 心跳间隔60秒
             last_log_time = 0
             while tunnel_auto_restart:
-                is_tunnel_running = tunnel_process and tunnel_process.poll() is None
-                if not is_tunnel_running and tunnel_url:
-                    if verify_url(tunnel_url):
-                        is_tunnel_running = True
-                    else:
+                # 从 web_output.log 获取 URL（唯一来源）
+                web_url = PathManager.get_public_url_from_web_log()
+                is_tunnel_running = False
+                
+                if web_url:
+                    try:
+                        if verify_url(web_url, timeout=5):
+                            is_tunnel_running = True
+                            if web_url != tunnel_url:
+                                tunnel_url = web_url
+                        else:
+                            if time.time() - last_log_time > 60:
+                                print(f"[Tunnel] URL验证失败: {web_url}")
+                                last_log_time = time.time()
+                            tunnel_need_restart = True
+                    except Exception as e:
                         if time.time() - last_log_time > 60:
-                            print(f"[Tunnel] URL验证失败，标记需要重启: {tunnel_url}")
+                            print(f"[Tunnel] URL验证异常: {e}")
                             last_log_time = time.time()
                         tunnel_need_restart = True
-                        tunnel_consecutive_failures += 1
-                        time.sleep(heartbeat_interval)
-                        continue
+                
                 if is_tunnel_running:
                     success = send_heartbeat()
                     if not success:
@@ -5002,9 +5011,9 @@ if __name__ == '__main__':
             
             tunnel_type = 'hostc'
             
-            # 从 web_output.log 读取公网地址（统一入口）
+            # 从 web_output.log 读取公网地址（唯一来源）
             web_url = PathManager.get_public_url_from_web_log()
-            file_url_valid = False
+            url_valid = False
             
             # 检测是否有 hostc 进程在运行
             process_running = False
@@ -5022,7 +5031,7 @@ if __name__ == '__main__':
             if web_url:
                 try:
                     if verify_url(web_url, timeout=5):
-                        file_url_valid = True
+                        url_valid = True
                         if web_url != tunnel_url:
                             print(f"[Tunnel] 从 web_output.log 读取到可用的URL: {web_url}")
                             tunnel_url = web_url
@@ -5032,14 +5041,12 @@ if __name__ == '__main__':
                             print(f"[Tunnel] 检测到URL不可用，触发自动重启: {web_url}")
                             last_url_invalid_log_time = time.time()
                         tunnel_need_restart = True
-                        tunnel_url = None
                 except Exception as e:
                     print(f"[Tunnel] 验证URL失败: {e}")
                     tunnel_need_restart = True
-                    tunnel_url = None
             
             # 判断隧道是否在运行
-            is_running = process_running and file_url_valid
+            is_running = process_running and url_valid
             
             # 确保守护线程在运行
             if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
@@ -5053,29 +5060,17 @@ if __name__ == '__main__':
                 tunnel_heartbeat_thread.start()
                 print("[Tunnel] 启动心跳守护进程")
             
-            # 返回状态
-            if is_running and tunnel_url:
-                return jsonify({
-                    'running': True,
-                    'url': tunnel_url,
-                    'url_valid': True,
-                    'auto_restart': tunnel_auto_restart,
-                    'restart_count': tunnel_restart_count,
-                    'last_error': tunnel_last_error,
-                    'last_heartbeat': heartbeat_str,
-                    'tunnel_type': tunnel_type
-                })
-            else:
-                return jsonify({
-                    'running': False,
-                    'url': None,
-                    'url_valid': False,
-                    'auto_restart': tunnel_auto_restart,
-                    'restart_count': tunnel_restart_count,
-                    'last_error': tunnel_last_error or ('URL无效，正在重启...' if tunnel_need_restart else None),
-                    'last_heartbeat': heartbeat_str,
-                    'tunnel_type': tunnel_type
-                })
+            # 返回状态 - 统一使用 web_url
+            return jsonify({
+                'running': is_running,
+                'url': web_url if url_valid else None,
+                'url_valid': url_valid,
+                'auto_restart': tunnel_auto_restart,
+                'restart_count': tunnel_restart_count,
+                'last_error': tunnel_last_error or ('URL无效，正在重启...' if tunnel_need_restart else None),
+                'last_heartbeat': heartbeat_str,
+                'tunnel_type': tunnel_type
+            })
 
         # 初始化日志输出到 web_output.log
         setup_web_logging()
