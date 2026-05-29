@@ -95,6 +95,11 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.27 (2026-05-29)
+- **修复文件清理工具"删除所有文件和文件夹"功能报错**
+  - 修复 lambda 闭包变量捕获错误导致的 `name 'f' is not defined` 错误
+  - 统一循环变量命名，避免与 lambda 默认参数冲突
+
 ### v3.4.26 (2026-05-29)
 - **重构统一异常处理系统**
   - 新增 `AppException` 基类：统一所有业务异常（file_error、network_error、auth_error、browser_error、parse_error、config_error、excel_error、email_error、permission_error、resource_error、validation_error、database_error）
