@@ -4952,16 +4952,33 @@ if __name__ == '__main__':
                         print(f"[Tunnel] 等待URL... {waited}/{max_wait}秒")
                         sys.stdout.flush()
                     
+                    # 检查是否有 hostc 进程在运行，如果有则等待更长时间
                     if waited >= 5:
+                        has_hostc_process = False
+                        try:
+                            if Environment.IS_WINDOWS:
+                                result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=3)
+                                has_hostc_process = 'node.exe' in result.stdout
+                            else:
+                                result = subprocess.run('pgrep -f "hostc"', shell=True, capture_output=True, text=True, timeout=3)
+                                has_hostc_process = result.returncode == 0
+                        except:
+                            pass
+                        
                         tunnel_file = PathManager.get_tunnel_url_file()
                         if os.path.exists(tunnel_file):
                             with open(tunnel_file, 'r', encoding='utf-8') as f:
                                 content = f.read().strip()
                             if not content:
-                                print(f"[Tunnel] tunnel_url.txt 为空，立即重启本地服务器")
-                                tunnel_need_restart = True
-                                sys.stdout.flush()
-                                break
+                                if has_hostc_process:
+                                    # 有 hostc 进程在运行，给它更多时间生成 URL
+                                    print(f"[Tunnel] hostc进程正在运行，等待生成URL...")
+                                    continue
+                                else:
+                                    print(f"[Tunnel] tunnel_url.txt 为空且无hostc进程，立即重启本地服务器")
+                                    tunnel_need_restart = True
+                                    sys.stdout.flush()
+                                    break
 
                 if not url_ready:
                     if tunnel_need_restart:
