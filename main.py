@@ -5033,22 +5033,51 @@ if __name__ == '__main__':
                             is_url_valid = True
                             tunnel_url = web_url
                         else:
-                            print(f"[Tunnel] URL验证失败，需要重启: {web_url}")
-                            tunnel_need_restart = True
+                            # URL 验证失败，不立即重启，给 hostc 更多时间恢复
+                            if time.time() - last_url_invalid_log_time > 60:
+                                print(f"[Tunnel] URL验证失败，等待 hostc 自行恢复: {web_url}")
+                                last_url_invalid_log_time = time.time()
                     except:
                         pass
                 
                 # 如果有进程运行且 URL 有效，隧道正常
                 if has_hostc_process and is_url_valid and not tunnel_need_restart:
                     consecutive_restart_attempts = 0
+                    tunnel_need_restart = False  # 重置重启标记
                     time.sleep(1)
                     continue
                 
+                # 如果有进程运行但 URL 无效，给它更多时间恢复（最多等待 60 秒）
+                if has_hostc_process and web_url and not is_url_valid and not tunnel_need_restart:
+                    if not hasattr(restart_tunnel, 'url_invalid_start_time'):
+                        restart_tunnel.url_invalid_start_time = time.time()
+                    
+                    elapsed = time.time() - restart_tunnel.url_invalid_start_time
+                    if elapsed < 60:
+                        # 等待期间不打印日志，避免刷屏
+                        time.sleep(2)
+                        continue
+                    else:
+                        # 超过 60 秒才触发重启
+                        print(f"[Tunnel] URL持续无效超过60秒，触发重启")
+                        restart_tunnel.url_invalid_start_time = None
+                        tunnel_need_restart = True
+                
                 # 如果有进程运行但没有 URL，给它更多时间
                 if has_hostc_process and not web_url and not tunnel_need_restart:
-                    print(f"[Tunnel] hostc进程正在运行，等待生成URL...")
-                    time.sleep(2)
-                    continue
+                    if not hasattr(restart_tunnel, 'url_missing_start_time'):
+                        restart_tunnel.url_missing_start_time = time.time()
+                    
+                    elapsed = time.time() - restart_tunnel.url_missing_start_time
+                    if elapsed < 60:
+                        if elapsed < 10 or int(elapsed) % 10 == 0:
+                            print(f"[Tunnel] hostc进程正在运行，等待生成URL... ({int(elapsed)}/60秒)")
+                        time.sleep(2)
+                        continue
+                    else:
+                        print(f"[Tunnel] URL持续为空超过60秒，触发重启")
+                        restart_tunnel.url_missing_start_time = None
+                        tunnel_need_restart = True
                 
                 if not tunnel_auto_restart:
                     break
