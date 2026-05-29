@@ -4638,7 +4638,7 @@ if __name__ == '__main__':
             
             threading.Thread(target=send_with_retry, daemon=True).start()
         
-        def verify_url(url, timeout=15):
+        def verify_url(url, timeout=10):
             try:
                 import urllib.request
                 req = urllib.request.Request(url, method='HEAD')
@@ -4646,7 +4646,6 @@ if __name__ == '__main__':
                 urllib.request.urlopen(req, timeout=timeout)
                 return True
             except Exception as e:
-                print(f"[Tunnel] URL验证异常: {e}")
                 return False
         
         def send_heartbeat():
@@ -4664,7 +4663,6 @@ if __name__ == '__main__':
                 return True
             except Exception as e:
                 tunnel_heartbeat_failed = True
-                print(f"[Tunnel] 心跳检测异常: {e}")
                 return False
         
         def heartbeat_loop():
@@ -4672,13 +4670,16 @@ if __name__ == '__main__':
             consecutive_failures = 0
             max_consecutive_failures = 10
             heartbeat_interval = 60  # 心跳间隔60秒
+            last_log_time = 0
             while tunnel_auto_restart:
                 is_tunnel_running = tunnel_process and tunnel_process.poll() is None
                 if not is_tunnel_running and tunnel_url:
                     if verify_url(tunnel_url):
                         is_tunnel_running = True
                     else:
-                        print(f"[Tunnel] URL验证失败，标记需要重启: {tunnel_url}")
+                        if time.time() - last_log_time > 60:
+                            print(f"[Tunnel] URL验证失败，标记需要重启: {tunnel_url}")
+                            last_log_time = time.time()
                         tunnel_need_restart = True
                         tunnel_consecutive_failures += 1
                         time.sleep(heartbeat_interval)
@@ -4690,7 +4691,14 @@ if __name__ == '__main__':
                         if consecutive_failures >= max_consecutive_failures:
                             print(f"[Tunnel] 心跳连续失败 {consecutive_failures} 次，标记需要重启")
                             tunnel_need_restart = True
+                            last_log_time = time.time()
+                        elif consecutive_failures == 1 and time.time() - last_log_time > 60:
+                            print(f"[Tunnel] 心跳检测异常: 网络连接不稳定 ({consecutive_failures}/{max_consecutive_failures})")
+                            last_log_time = time.time()
                     else:
+                        if consecutive_failures > 0:
+                            print(f"[Tunnel] 心跳恢复，当前连续失败次数: {consecutive_failures}")
+                            last_log_time = time.time()
                         consecutive_failures = 0
                 time.sleep(heartbeat_interval)
         
@@ -5171,6 +5179,7 @@ if __name__ == '__main__':
             
             # 始终优先从 tunnel_url.txt 读取最新URL
             file_url = None
+            file_url_valid = False  # 标识文件中的URL是否可用
             try:
                 tunnel_file = PathManager.get_tunnel_url_file()
                 if os.path.exists(tunnel_file):
@@ -5182,18 +5191,22 @@ if __name__ == '__main__':
                     if match:
                         file_url = match.group(1) if match.lastindex == 1 else match.group(0)
                         file_url = file_url.rstrip('/')
-                        # 如果文件中的URL与内存中的不同，更新内存中的URL
-                        if file_url != current_url:
-                            print(f"[Tunnel] 从 tunnel_url.txt 读取到更新的URL: {file_url} (内存中: {current_url})")
-                            tunnel_url = file_url
-                            current_url = file_url
-                            # 确保 web_output.log 与 tunnel_url.txt 一致
-                            PathManager.sync_web_output_from_tunnel_url()
-                        # URL 没变化时不打印日志，避免日志刷屏
+                        # 验证URL是否真正可用
+                        if verify_url(file_url, timeout=5):
+                            file_url_valid = True
+                            if file_url != current_url:
+                                print(f"[Tunnel] 从 tunnel_url.txt 读取到可用的URL: {file_url}")
+                                tunnel_url = file_url
+                                current_url = file_url
+                                PathManager.sync_web_output_from_tunnel_url()
+                        else:
+                            # URL不可用，不更新内存中的URL
+                            # 守护线程会通过 verify_url 检测到这个问题并触发重启
+                            print(f"[Tunnel] 文件中的URL不可用: {file_url}")
+                            # 注意：不清空 tunnel_url，让 restart_tunnel 处理
                     else:
-                        # 文件存在但没有有效的URL，清空内存中的URL
                         if current_url and not content.strip():
-                            print(f"[Tunnel] tunnel_url.txt 为空，清空内存中的URL")
+                            print(f"[Tunnel] tunnel_url.txt 为空")
                             tunnel_url = None
                             current_url = None
             except Exception as e:
@@ -5202,15 +5215,14 @@ if __name__ == '__main__':
             # 检测是否有 hostc 隧道在运行（内部或外部）
             process_running = tunnel_process and tunnel_process.poll() is None
             
-            # 只有当文件中有有效URL时才认为隧道在运行
-            if file_url:
+            # 只有当URL可用时才认为隧道在运行
+            if file_url_valid:
                 is_running = True
-            elif process_running:
+            elif process_running and current_url:
                 is_running = True
             else:
                 is_running = False
                 try:
-                    # 更精确的hostc进程检测（跨系统兼容）
                     if Environment.IS_WINDOWS:
                         result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', 
                                               capture_output=True, text=True, shell=True, timeout=3)
@@ -5222,24 +5234,18 @@ if __name__ == '__main__':
                 except:
                     pass
             
-            # 如果文件中有URL但进程检测失败，仍然认为隧道在运行
-            if file_url and not is_running:
-                print(f"[Tunnel] 检测到URL但进程状态未知，认为隧道在运行: {file_url}")
-                is_running = True
-            
-            # 如果检测到外部隧道但守护线程未启动，则启动守护线程
-            if is_running and file_url and not tunnel_daemon_started:
+            # 无论隧道是否在运行，都要确保守护线程在运行
+            if not tunnel_daemon_started or tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
                 tunnel_daemon_started = True
-                if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
-                    tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
-                    tunnel_restart_thread.start()
-                    print("[Tunnel] 检测到外部隧道，启动自动重启守护进程")
-                if tunnel_heartbeat_thread is None or not tunnel_heartbeat_thread.is_alive():
-                    tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
-                    tunnel_heartbeat_thread.start()
-                    print("[Tunnel] 检测到外部隧道，启动心跳守护进程")
+                tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
+                tunnel_restart_thread.start()
+                print("[Tunnel] 启动自动重启守护进程")
+            if tunnel_heartbeat_thread is None or not tunnel_heartbeat_thread.is_alive():
+                tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+                tunnel_heartbeat_thread.start()
+                print("[Tunnel] 启动心跳守护进程")
             
-            if is_running:
+            if is_running and current_url:
                 return jsonify({
                     'running': True,
                     'url': current_url,
