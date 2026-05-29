@@ -95,6 +95,12 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.9 (2026-05-29)
+- **统一使用 web_output.log 作为公网地址唯一来源**
+  - 移除所有 tunnel_url.txt 为空时的"清理旧进程"逻辑
+  - 所有函数都从 web_output.log 获取公网地址，不再检查 tunnel_url.txt 是否为空
+  - 简化判断逻辑：有进程运行且 URL 有效则正常，否则给更多时间或重启
+
 ### v3.4.8 (2026-05-29)
 - **统一公网地址来源：全部从 web_output.log 获取**
   - 新增 `get_public_url_from_web_log()` 方法，从 web_output.log 读取公网地址
