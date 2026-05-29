@@ -4737,45 +4737,30 @@ if __name__ == '__main__':
             except:
                 pass
             
-            # 检查 tunnel_url.txt 是否有有效 URL
-            tunnel_file = PathManager.get_tunnel_url_file()
-            has_valid_url = False
-            if os.path.exists(tunnel_file):
-                try:
-                    with open(tunnel_file, 'r', encoding='utf-8') as f:
-                        content = f.read().strip()
-                    match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
-                    if match:
-                        has_valid_url = True
-                except:
-                    pass
+            # 从 web_output.log 检查是否有有效 URL（统一入口）
+            web_url = PathManager.get_public_url_from_web_log()
             
-            # 如果有 hostc 进程在运行且有有效 URL，复用现有隧道
-            if has_hostc_process and has_valid_url and not force_restart:
-                print(f"[Tunnel] hostc进程正在运行且有有效URL，复用现有隧道")
-                try:
-                    with open(tunnel_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
-                    if match:
-                        existing_url = match.group(0).rstrip('/')
-                        if verify_url(existing_url):
-                            print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
-                            sys.stdout.flush()
-                            tunnel_url = existing_url
-                            old_tunnel_url = existing_url
-                            return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
-                except:
-                    pass
+            # 如果有 hostc 进程在运行且 web_output.log 有有效 URL，复用现有隧道
+            if has_hostc_process and web_url and not force_restart:
+                if verify_url(web_url):
+                    print(f"[Tunnel] hostc进程正在运行且 web_output.log 有有效URL，复用现有隧道: {web_url}")
+                    sys.stdout.flush()
+                    tunnel_url = web_url
+                    old_tunnel_url = web_url
+                    return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
+                else:
+                    # URL 不可用，触发重启
+                    print(f"[Tunnel] web_output.log 中的URL不可用，将重启: {web_url}")
+                    tunnel_need_restart = True
             
             # 如果有 hostc 进程在运行但没有有效 URL，给它更多时间
-            if has_hostc_process and not has_valid_url and not force_restart:
+            if has_hostc_process and not web_url and not force_restart:
                 print(f"[Tunnel] hostc进程正在运行但URL未就绪，等待生成URL...")
                 return {'success': False, 'url': None, 'error': 'hostc进程正在启动，等待中'}
             
-            # tunnel_url.txt 为空或强制重启，清理旧进程并启动新隧道
-            if force_restart or not has_valid_url:
-                print(f"[Tunnel] {'强制重启' if force_restart else 'tunnel_url.txt 为空'}，清理旧进程...")
+            # 强制重启，清理旧进程并启动新隧道
+            if force_restart or (not web_url and not has_hostc_process):
+                print(f"[Tunnel] {'强制重启' if force_restart else '无可用URL'}，启动新隧道...")
                 try:
                     if Environment.IS_WINDOWS:
                         result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', shell=True, capture_output=True, text=True, timeout=10)
@@ -4956,7 +4941,7 @@ if __name__ == '__main__':
                         print(f"[Tunnel] 等待URL... {waited}/{max_wait}秒")
                         sys.stdout.flush()
                     
-                    # 检查是否有 hostc 进程在运行，如果有则等待更长时间
+                    # 检查是否有 hostc 进程在运行
                     if waited >= 5:
                         has_hostc_process = False
                         try:
@@ -4969,27 +4954,24 @@ if __name__ == '__main__':
                         except:
                             pass
                         
-                        tunnel_file = PathManager.get_tunnel_url_file()
-                        if os.path.exists(tunnel_file):
-                            with open(tunnel_file, 'r', encoding='utf-8') as f:
-                                content = f.read().strip()
-                            if not content:
-                                if has_hostc_process:
-                                    # 有 hostc 进程在运行，给它更多时间生成 URL
-                                    print(f"[Tunnel] hostc进程正在运行，等待生成URL...")
-                                    continue
-                                else:
-                                    print(f"[Tunnel] tunnel_url.txt 为空且无hostc进程，立即重启本地服务器")
-                                    tunnel_need_restart = True
-                                    sys.stdout.flush()
-                                    break
+                        # 从 web_output.log 检查是否有 URL
+                        web_url = PathManager.get_public_url_from_web_log()
+                        if web_url:
+                            # web_output.log 有 URL，等待 read_output 线程处理
+                            continue
+                        elif not has_hostc_process:
+                            # 没有进程在运行也没有 URL，触发重启
+                            print(f"[Tunnel] 无 hostc 进程且无有效 URL，触发重启")
+                            tunnel_need_restart = True
+                            sys.stdout.flush()
+                            break
+                        # 有进程在运行但没有 URL，继续等待
 
                 if not url_ready:
                     if tunnel_need_restart:
-                        print(f"[Tunnel] tunnel_url.txt 为空，正在重启...")
+                        print(f"[Tunnel] 触发重启...")
                     else:
                         print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL")
-                        print(f"[Tunnel] 请稍后检查状态或查看 tunnel_url.txt 文件")
                     return {'success': False, 'url': None, 'error': '启动超时，未获取到URL'}
 
                 return {
@@ -5028,33 +5010,44 @@ if __name__ == '__main__':
             watch_thread.start()
             
             while tunnel_auto_restart:
-                is_internal_running = tunnel_process and tunnel_process.poll() is None
-                is_external_running = False
+                # 从 web_output.log 获取公网地址（统一入口）
+                web_url = PathManager.get_public_url_from_web_log()
                 
-                # 检查 tunnel_url.txt 是否为空或URL不可用
-                tunnel_file = PathManager.get_tunnel_url_file()
-                tunnel_url_empty = False
-                if os.path.exists(tunnel_file):
-                    with open(tunnel_file, 'r', encoding='utf-8') as f:
-                        content = f.read().strip()
-                    if not content:
-                        tunnel_url_empty = True
-                        tunnel_need_restart = True
+                # 检查是否有 hostc 进程在运行
+                has_hostc_process = False
+                try:
+                    if Environment.IS_WINDOWS:
+                        result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=3)
+                        has_hostc_process = 'node.exe' in result.stdout
+                    else:
+                        result = subprocess.run('pgrep -f "hostc"', shell=True, capture_output=True, text=True, timeout=3)
+                        has_hostc_process = result.returncode == 0
+                except:
+                    pass
                 
-                # 无论进程是否在运行，都要检查 URL 是否可用
-                if tunnel_url and not tunnel_url_empty:
+                # 检查 URL 是否可用
+                is_url_valid = False
+                if web_url:
                     try:
-                        if verify_url(tunnel_url):
-                            is_external_running = True
+                        if verify_url(web_url):
+                            is_url_valid = True
+                            tunnel_url = web_url
                         else:
-                            print(f"[Tunnel] URL验证失败，需要重启: {tunnel_url}")
+                            print(f"[Tunnel] URL验证失败，需要重启: {web_url}")
                             tunnel_need_restart = True
                     except:
                         pass
                 
-                if (is_internal_running or is_external_running) and not tunnel_need_restart:
+                # 如果有进程运行且 URL 有效，隧道正常
+                if has_hostc_process and is_url_valid and not tunnel_need_restart:
                     consecutive_restart_attempts = 0
                     time.sleep(1)
+                    continue
+                
+                # 如果有进程运行但没有 URL，给它更多时间
+                if has_hostc_process and not web_url and not tunnel_need_restart:
+                    print(f"[Tunnel] hostc进程正在运行，等待生成URL...")
+                    time.sleep(2)
                     continue
                 
                 if not tunnel_auto_restart:
