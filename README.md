@@ -95,6 +95,12 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.15 (2026-05-29)
+- **简化启动流程，移除冗余等待逻辑**
+  - 使用 `read_thread.join(timeout=30)` 等待 URL 获取完成
+  - 移除 while 等待循环，不再打印"等待URL..."
+  - 获取到 URL 后立即返回启动成功
+
 ### v3.4.14 (2026-05-29)
 - **修改 read_output 为读取 hostc stdout 输出**
   - 直接读取 hostc 进程的 stdout，解析 URL
