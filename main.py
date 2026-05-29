@@ -4702,9 +4702,57 @@ if __name__ == '__main__':
                         consecutive_failures = 0
                 time.sleep(heartbeat_interval)
         
-        def auto_start_tunnel():
+        def auto_start_tunnel(force_restart=False):
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
 
+            # 检查 tunnel_url.txt 是否为空
+            tunnel_file = PathManager.get_tunnel_url_file()
+            tunnel_url_empty = False
+            if os.path.exists(tunnel_file):
+                try:
+                    with open(tunnel_file, 'r', encoding='utf-8') as f:
+                        content = f.read().strip()
+                    if not content:
+                        tunnel_url_empty = True
+                except:
+                    pass
+            
+            # 如果 tunnel_url.txt 为空或强制重启，先清理旧进程
+            if force_restart or tunnel_url_empty:
+                print(f"[Tunnel] {'强制重启' if force_restart else 'tunnel_url.txt 为空'}，清理旧进程...")
+                try:
+                    if Environment.IS_WINDOWS:
+                        result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', shell=True, capture_output=True, text=True, timeout=10)
+                        if result.returncode == 0:
+                            pids = [line.strip() for line in result.stdout.split('\n') if line.strip().isdigit()]
+                            for pid in pids:
+                                try:
+                                    subprocess.run(f'taskkill /F /PID {pid}', shell=True, capture_output=True, timeout=3)
+                                    print(f"[Tunnel] 已终止hostc进程: {pid}")
+                                except:
+                                    pass
+                        node_check = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=5)
+                        if 'node.exe' in node_check.stdout:
+                            subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
+                    else:
+                        subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
+                    time.sleep(2)
+                except:
+                    pass
+                
+                if tunnel_process:
+                    try:
+                        tunnel_process.terminate()
+                        tunnel_process.wait(timeout=2)
+                    except:
+                        try:
+                            tunnel_process.kill()
+                        except:
+                            pass
+                tunnel_process = None
+                tunnel_url = None
+                old_tunnel_url = None
+            
             if tunnel_process and tunnel_process.poll() is None:
                 return {'success': True, 'url': tunnel_url, 'message': '隧道已在运行'}
 
