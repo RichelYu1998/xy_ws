@@ -4811,15 +4811,21 @@ if __name__ == '__main__':
                                         if file_url and len(file_url) > 10 and '.' in file_url:
                                             if '0.0.0.0' not in file_url and '127.0.0.1' not in file_url and 'localhost' not in file_url.lower():
                                                 if file_url != tunnel_url:
-                                                    print(f"[Tunnel] 从文件检测到URL: {file_url}")
+                                                    print(f"[Tunnel] 获取到URL: {file_url}")
                                                     tunnel_url = file_url
                                                     url_ready = True
                                                     tunnel_consecutive_failures = 0
                                                     old_tunnel_url = file_url
-                                                    # 同步到 web_output.log
-                                                    PathManager.sync_web_output_from_tunnel_url()
+                                                    # 直接写入 web_output.log
+                                                    web_output_file = PathManager.get_web_output_file()
+                                                    try:
+                                                        with open(web_output_file, 'w', encoding='utf-8') as f:
+                                                            f.write(f"Public URL: {file_url}\n")
+                                                        print(f"[Tunnel] 已写入 web_output.log")
+                                                    except Exception as e:
+                                                        print(f"[Tunnel] 写入 web_output.log 失败: {e}")
                                                     send_tunnel_notification(tunnel_url, 'new')
-                                                    print(f"[Tunnel] URL已就绪，退出读取循环")
+                                                    print(f"[Tunnel] URL已就绪")
                                                     sys.stdout.flush()
                                                     break
                             except Exception as e:
@@ -4844,6 +4850,20 @@ if __name__ == '__main__':
                 while not url_ready and waited < max_wait:
                     time.sleep(1)
                     waited += 1
+                    
+                    # 直接检查 web_output.log 是否有 URL
+                    web_url = PathManager.get_public_url_from_web_log()
+                    if web_url:
+                        try:
+                            if verify_url(web_url):
+                                print(f"[Tunnel] 从 web_output.log 获取到有效URL: {web_url}")
+                                tunnel_url = web_url
+                                url_ready = True
+                                sys.stdout.flush()
+                                break
+                        except:
+                            pass
+                    
                     # 每 10 秒打印一次
                     if waited <= 10 or waited % 10 == 0:
                         print(f"[Tunnel] 等待URL... {waited}/{max_wait}秒")

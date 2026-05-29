@@ -95,6 +95,12 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.12 (2026-05-29)
+- **修复等待 URL 逻辑：直接检查 web_output.log**
+  - 等待循环直接检查 web_output.log 是否有 URL，而不是等待 read_output 线程
+  - read_output 获取到 URL 后直接写入 web_output.log
+  - 不再依赖 tunnel_url.txt 的同步
+
 ### v3.4.11 (2026-05-29)
 - **大幅简化 tunnel 重启逻辑**
   - 移除多处重复的重启触发逻辑，只保留 restart_tunnel 中的统一管理
