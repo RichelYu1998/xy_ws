@@ -1264,6 +1264,24 @@ class PathManager:
         """获取Web输出日志文件路径"""
         return os.path.join(PathManager.get_file_dir(), 'web_output.log')
     @staticmethod
+    def get_public_url_from_web_log():
+        """从 web_output.log 读取公网地址（统一入口）"""
+        try:
+            web_log_file = PathManager.get_web_output_file()
+            if os.path.exists(web_log_file):
+                with open(web_log_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                if match:
+                    return match.group(1).rstrip('/')
+                match = re.search(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', content)
+                if match:
+                    return match.group(1).rstrip('/')
+        except Exception as e:
+            pass
+        return None
+    
+    @staticmethod
     def sync_web_output_from_tunnel_url():
         """从 tunnel_url.txt 同步公网地址到 web_output.log（统一入口）"""
         try:
@@ -1276,41 +1294,43 @@ class PathManager:
                 import re
                 tunnel_match = re.search(r'Public URL:\s*(https://[^\s]+)', tunnel_content)
                 if not tunnel_match:
-                    return False
-                new_url = tunnel_match.group(1)
-                
-                try:
-                    if os.path.exists(web_log_file):
-                        with open(web_log_file, 'r', encoding='utf-8') as f:
-                            lines = f.readlines()
-                        
-                        updated = False
-                        for i, line in enumerate(lines):
-                            if 'Public URL:' in line and 'hostc.dev' in line:
-                                lines[i] = f"  Public URL: {new_url}\n"
-                                updated = True
-                        
-                        if updated:
-                            with open(web_log_file, 'w', encoding='utf-8') as f:
-                                f.writelines(lines)
-                            return True
-                except Exception as e:
-                    print(f"[Tunnel] 更新 web_output.log 失败: {e}")
-                
-                try:
-                    header = """==================================================
+                    # 如果 tunnel_url.txt 没有 Public URL，尝试直接匹配 hostc.dev URL
+                    tunnel_match = re.search(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', tunnel_content)
+                if tunnel_match:
+                    new_url = tunnel_match.group(1)
+                    
+                    try:
+                        if os.path.exists(web_log_file):
+                            with open(web_log_file, 'r', encoding='utf-8') as f:
+                                lines = f.readlines()
+                            
+                            updated = False
+                            for i, line in enumerate(lines):
+                                if 'Public URL:' in line and 'hostc.dev' in line:
+                                    lines[i] = f"  Public URL: {new_url}\n"
+                                    updated = True
+                            
+                            if updated:
+                                with open(web_log_file, 'w', encoding='utf-8') as f:
+                                    f.writelines(lines)
+                                return True
+                    except Exception as e:
+                        print(f"[Tunnel] 更新 web_output.log 失败: {e}")
+                    
+                    try:
+                        header = """==================================================
 Szwego商品爬虫 - Web服务
 ==================================================
 访问地址: http://localhost:8888
 局域网地址: http://192.168.31.36:8888
 """
-                    with open(web_log_file, 'w', encoding='utf-8') as f:
-                        f.write(header)
-                        f.write(tunnel_content)
-                except Exception as e2:
-                    print(f"[Tunnel] 重建 web_output.log 失败: {e2}")
-                    return False
-                return True
+                        with open(web_log_file, 'w', encoding='utf-8') as f:
+                            f.write(header)
+                            f.write(f"  Public URL: {new_url}\n")
+                    except Exception as e2:
+                        print(f"[Tunnel] 重建 web_output.log 失败: {e2}")
+                        return False
+                    return True
         except Exception as e:
             print(f"[Tunnel] 同步 web_output.log 失败: {e}")
         return False
@@ -4904,6 +4924,8 @@ if __name__ == '__main__':
                                                     url_ready = True
                                                     tunnel_consecutive_failures = 0
                                                     old_tunnel_url = file_url
+                                                    # 同步到 web_output.log
+                                                    PathManager.sync_web_output_from_tunnel_url()
                                                     send_tunnel_notification(tunnel_url, 'new')
                                                     print(f"[Tunnel] URL已就绪，退出读取循环")
                                                     sys.stdout.flush()
@@ -5218,76 +5240,47 @@ if __name__ == '__main__':
             
             heartbeat_str = datetime.fromtimestamp(tunnel_last_heartbeat).strftime('%Y-%m-%d %H:%M:%S') if tunnel_last_heartbeat > 0 else None
             
-            is_running = tunnel_process and tunnel_process.poll() is None
-            current_url = tunnel_url
-            
             tunnel_type = 'hostc'
             
-            # 始终优先从 tunnel_url.txt 读取最新URL
-            file_url = None
-            file_url_valid = False  # 标识文件中的URL是否可用
+            # 从 web_output.log 读取公网地址（统一入口）
+            web_url = PathManager.get_public_url_from_web_log()
+            file_url_valid = False
+            
+            # 检测是否有 hostc 进程在运行
+            process_running = False
             try:
-                tunnel_file = PathManager.get_tunnel_url_file()
-                if os.path.exists(tunnel_file):
-                    with open(tunnel_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                    if not match:
-                        match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
-                    if match:
-                        file_url = match.group(1) if match.lastindex == 1 else match.group(0)
-                        file_url = file_url.rstrip('/')
-                        # 验证URL是否真正可用
-                        if verify_url(file_url, timeout=5):
-                            file_url_valid = True
-                            if file_url != current_url:
-                                print(f"[Tunnel] 从 tunnel_url.txt 读取到可用的URL: {file_url}")
-                                tunnel_url = file_url
-                                current_url = file_url
-                                PathManager.sync_web_output_from_tunnel_url()
-                        else:
-                            # URL不可用，触发自动重启
-                            if time.time() - last_url_invalid_log_time > 60:
-                                print(f"[Tunnel] 检测到URL不可用，触发自动重启: {file_url}")
-                                last_url_invalid_log_time = time.time()
-                            # 触发重启，但不返回无效URL
-                            tunnel_need_restart = True
-                            tunnel_url = None
-                            current_url = None
-                            file_url = None
-                    else:
-                        if current_url and not content.strip():
-                            if time.time() - last_url_invalid_log_time > 60:
-                                print(f"[Tunnel] tunnel_url.txt 为空，触发自动重启")
-                                last_url_invalid_log_time = time.time()
-                            # 文件为空，触发重启
-                            tunnel_need_restart = True
-                            tunnel_url = None
-                            current_url = None
-            except Exception as e:
-                print(f"[Tunnel] 读取 tunnel_url.txt 失败: {e}")
+                if Environment.IS_WINDOWS:
+                    result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=3)
+                    process_running = 'node.exe' in result.stdout
+                else:
+                    result = subprocess.run('pgrep -f "hostc"', shell=True, capture_output=True, text=True, timeout=3)
+                    process_running = result.returncode == 0
+            except:
+                pass
             
-            # 检测是否有 hostc 隧道在运行（内部或外部）
-            process_running = tunnel_process and tunnel_process.poll() is None
-            
-            # 只有当URL可用时才认为隧道在运行
-            if file_url_valid:
-                is_running = True
-            elif process_running and current_url:
-                is_running = True
-            else:
-                is_running = False
+            # 验证 URL 是否可用
+            if web_url:
                 try:
-                    if Environment.IS_WINDOWS:
-                        result = subprocess.run('wmic process where "commandline like \'%hostc%\'" get processid', 
-                                              capture_output=True, text=True, shell=True, timeout=3)
-                        is_running = result.returncode == 0 and any(line.strip().isdigit() for line in result.stdout.split('\n') if line.strip())
+                    if verify_url(web_url, timeout=5):
+                        file_url_valid = True
+                        if web_url != tunnel_url:
+                            print(f"[Tunnel] 从 web_output.log 读取到可用的URL: {web_url}")
+                            tunnel_url = web_url
+                            PathManager.sync_web_output_from_tunnel_url()
                     else:
-                        result = subprocess.run('pgrep -f "hostc"', 
-                                              capture_output=True, text=True, timeout=3)
-                        is_running = result.returncode == 0
-                except:
-                    pass
+                        # URL不可用，触发自动重启
+                        if time.time() - last_url_invalid_log_time > 60:
+                            print(f"[Tunnel] 检测到URL不可用，触发自动重启: {web_url}")
+                            last_url_invalid_log_time = time.time()
+                        tunnel_need_restart = True
+                        tunnel_url = None
+                except Exception as e:
+                    print(f"[Tunnel] 验证URL失败: {e}")
+                    tunnel_need_restart = True
+                    tunnel_url = None
+            
+            # 判断隧道是否在运行
+            is_running = process_running and file_url_valid
             
             # 确保守护线程在运行
             if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
@@ -5301,11 +5294,11 @@ if __name__ == '__main__':
                 tunnel_heartbeat_thread.start()
                 print("[Tunnel] 启动心跳守护进程")
             
-            # 只有当URL可用时才返回URL，无效URL不返回
-            if is_running and current_url and file_url_valid:
+            # 返回状态
+            if is_running and tunnel_url:
                 return jsonify({
                     'running': True,
-                    'url': current_url,
+                    'url': tunnel_url,
                     'url_valid': True,
                     'auto_restart': tunnel_auto_restart,
                     'restart_count': tunnel_restart_count,
@@ -5314,7 +5307,6 @@ if __name__ == '__main__':
                     'tunnel_type': tunnel_type
                 })
             else:
-                # URL无效或不存在，返回None让前端继续轮询
                 return jsonify({
                     'running': False,
                     'url': None,

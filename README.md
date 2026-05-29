@@ -95,6 +95,13 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.8 (2026-05-29)
+- **统一公网地址来源：全部从 web_output.log 获取**
+  - 新增 `get_public_url_from_web_log()` 方法，从 web_output.log 读取公网地址
+  - API `/api/tunnel/status` 从 web_output.log 获取公网地址，不再依赖 tunnel_url.txt
+  - 启动隧道时检测到 URL 后立即同步到 web_output.log
+  - 确保 tunnel_url.txt、web_output.log、API 三个来源完全一致
+
 ### v3.4.7 (2026-05-29)
 - **修复 tunnel_url.txt 为空时误杀正在启动的 hostc 进程**
   - 检测到 tunnel_url.txt 为空时，先检查是否有 hostc 进程在运行
