@@ -95,6 +95,11 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.19 (2026-05-29)
+- **同步写入 tunnel_url.txt**
+  - `read_output` 获取到 URL 后，同时写入 `web_output.log` 和 `tunnel_url.txt`
+  - 保证两个文件的公网地址一致
+
 ### v3.4.18 (2026-05-29)
 - **完全移除 tunnel_url 全局变量的更新逻辑**
   - `send_heartbeat` 改为从 web_output.log 读取 URL
