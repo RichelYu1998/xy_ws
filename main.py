@@ -4834,45 +4834,15 @@ if __name__ == '__main__':
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
                 
-                tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
-                tunnel_restart_thread.start()
+                # 等待 read_output 线程完成（获取到 URL 或超时）
+                read_thread.join(timeout=30)
                 
-                tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
-                tunnel_heartbeat_thread.start()
-
-                max_wait = 30
-                waited = 0
-                while not url_ready and waited < max_wait:
-                    time.sleep(1)
-                    waited += 1
-                    
-                    # 直接检查 web_output.log 是否有 URL
-                    web_url = PathManager.get_public_url_from_web_log()
-                    if web_url:
-                        try:
-                            if verify_url(web_url):
-                                print(f"[Tunnel] 从 web_output.log 获取到有效URL: {web_url}")
-                                tunnel_url = web_url
-                                url_ready = True
-                                sys.stdout.flush()
-                                break
-                        except:
-                            pass
-                    
-                    # 每 10 秒打印一次
-                    if waited <= 10 or waited % 10 == 0:
-                        print(f"[Tunnel] 等待URL... {waited}/{max_wait}秒")
-                        sys.stdout.flush()
-
-                if not url_ready:
-                    print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL")
+                if tunnel_url:
+                    print(f"[Tunnel] 隧道启动成功: {tunnel_url}")
+                    return {'success': True, 'url': tunnel_url, 'message': f'隧道已启动，URL: {tunnel_url}'}
+                else:
+                    print(f"[Tunnel] 启动超时，未获取到URL")
                     return {'success': False, 'url': None, 'error': '启动超时，未获取到URL'}
-
-                return {
-                    'success': True,
-                    'url': tunnel_url or '',
-                    'message': f'隧道已启动{"，URL: " + tunnel_url if tunnel_url else "，URL 正在获取中..."}'
-                }
             except Exception as e:
                 return {'success': False, 'error': str(e)}
         
