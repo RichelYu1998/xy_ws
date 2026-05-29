@@ -4755,16 +4755,12 @@ if __name__ == '__main__':
                                                 'message': f'复用已有隧道，URL: {tunnel_url}'
                                             }
                                         else:
-                                            print(f"[Tunnel] 已有hostc进程运行但URL不可用，将等待进程自行恢复: {existing_url}")
+                                            # URL不可用，返回失败，让 restart_tunnel 清理并重启
+                                            print(f"[Tunnel] 已有hostc进程运行但URL不可用，将重启: {existing_url}")
                                             sys.stdout.flush()
-                                            time.sleep(3)
-                                            tunnel_url = existing_url
-                                            url_ready = True
-                                            old_tunnel_url = existing_url
                                             return {
-                                                'success': True,
-                                                'url': tunnel_url,
-                                                'message': f'复用已有隧道，URL: {tunnel_url}'
+                                                'success': False,
+                                                'error': 'URL不可用，需要重启'
                                             }
                                     else:
                                         print(f"[Tunnel] 无hostc进程运行，将启动新隧道")
@@ -4844,6 +4840,7 @@ if __name__ == '__main__':
 
                 def read_output():
                     global tunnel_url, url_ready, old_tunnel_url, tunnel_consecutive_failures
+                    last_check_time = 0
                     while True:
                         if tunnel_process is None:
                             print(f"[Tunnel] tunnel_process为None，退出读取循环")
@@ -4853,63 +4850,38 @@ if __name__ == '__main__':
                             print(f"[Tunnel] hostc进程已退出")
                             sys.stdout.flush()
                             break
-                        try:
-                            line = tunnel_process.stdout.readline()
-                            if line:
-                                print(f"[Tunnel] {line.strip()}")
-                                sys.stdout.flush()
-                                if 'https://' in line or 'http://' in line:
-                                    urls = re.findall(r'https?://[^\s<>"\']+', line)
-                                    print(f"[Tunnel] 解析到URL: {urls}")
-                                    sys.stdout.flush()
-                                    for url in urls:
-                                        clean_url = url.rstrip('/').split(' ')[-1].split('\n')[0]
-                                        print(f"[Tunnel] 清理后URL: {clean_url}, 长度: {len(clean_url)}")
-                                        sys.stdout.flush()
-                                        if len(clean_url) > 10 and '.' in clean_url:
-                                            if '0.0.0.0' not in clean_url and '127.0.0.1' not in clean_url and 'localhost' not in clean_url.lower():
-                                                print(f"[Tunnel] URL验证通过，old_url: {old_tunnel_url}, new_url: {clean_url}")
-                                                sys.stdout.flush()
-                                                # 只使用与旧URL不同的新URL
-                                                if old_tunnel_url != clean_url:
-                                                    tunnel_url = clean_url
+                        
+                        # 每 0.5 秒检查一次 tunnel_url.txt 文件
+                        current_time = time.time()
+                        if current_time - last_check_time >= 0.5:
+                            last_check_time = current_time
+                            try:
+                                tunnel_file = PathManager.get_tunnel_url_file()
+                                if os.path.exists(tunnel_file):
+                                    with open(tunnel_file, 'r', encoding='utf-8') as f:
+                                        content = f.read()
+                                    match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
+                                    if not match:
+                                        match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
+                                    if match:
+                                        file_url = match.group(1) if match.lastindex == 1 else match.group(0)
+                                        file_url = file_url.rstrip('/')
+                                        if file_url and len(file_url) > 10 and '.' in file_url:
+                                            if '0.0.0.0' not in file_url and '127.0.0.1' not in file_url and 'localhost' not in file_url.lower():
+                                                if file_url != tunnel_url:
+                                                    print(f"[Tunnel] 从文件检测到URL: {file_url}")
+                                                    tunnel_url = file_url
                                                     url_ready = True
                                                     tunnel_consecutive_failures = 0
-                                                    print(f"[Tunnel] 找到公网URL: {tunnel_url}")
-                                                    sys.stdout.flush()
-                                                    
-                                                    # URL变化时发送通知（包括首次启动和重启）
+                                                    old_tunnel_url = file_url
                                                     send_tunnel_notification(tunnel_url, 'new')
-                                                    
-                                                    # 更新 tunnel_url.txt 文件
-                                                    try:
-                                                        tunnel_file = PathManager.get_tunnel_url_file()
-                                                        with file_write_lock:
-                                                            with open(tunnel_file, 'w', encoding='utf-8') as f:
-                                                                f.write(f'Success  Tunnel ready\n')
-                                                                f.write(f'  Type:       hostc\n')
-                                                                f.write(f'  Public URL: {clean_url}\n')
-                                                                f.write(f'  Local:      http://127.0.0.1:{port}/\n')
-                                                                f.flush()
-                                                        print(f"[Tunnel] 已更新 tunnel_url.txt: {clean_url}")
-                                                        # 同步到 web_output.log
-                                                        PathManager.sync_web_output_from_tunnel_url()
-                                                        sys.stdout.flush()
-                                                    except Exception as e:
-                                                        print(f"[Tunnel] 更新 tunnel_url.txt 失败: {e}")
-                                                        sys.stdout.flush()
-                                                    
-                                                    # 更新old_tunnel_url
-                                                    old_tunnel_url = clean_url
-                                                    print(f"[Tunnel] URL已就绪，退出等待循环")
+                                                    print(f"[Tunnel] URL已就绪，退出读取循环")
                                                     sys.stdout.flush()
                                                     break
-                                                else:
-                                                    print(f"[Tunnel] URL与旧URL相同，跳过: {clean_url}")
-                                                    sys.stdout.flush()
-                        except Exception as e:
-                            print(f"[Tunnel] 读取输出异常: {e}")
-                            sys.stdout.flush()
+                            except Exception as e:
+                                pass
+                        
+                        time.sleep(0.1)
 
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
@@ -4933,9 +4905,9 @@ if __name__ == '__main__':
                         sys.stdout.flush()
 
                 if not url_ready:
-                    print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL，但进程可能正在运行")
+                    print(f"[Tunnel] 启动超时，{max_wait}秒内未获取到URL")
                     print(f"[Tunnel] 请稍后检查状态或查看 tunnel_url.txt 文件")
-                    return {'success': True, 'url': tunnel_url, 'message': '隧道已启动，URL正在获取中...'}
+                    return {'success': False, 'url': None, 'error': '启动超时，未获取到URL'}
 
                 return {
                     'success': True,
@@ -4976,7 +4948,8 @@ if __name__ == '__main__':
                 is_internal_running = tunnel_process and tunnel_process.poll() is None
                 is_external_running = False
                 
-                if not is_internal_running and tunnel_url:
+                # 无论进程是否在运行，都要检查 URL 是否可用
+                if tunnel_url:
                     try:
                         if verify_url(tunnel_url):
                             is_external_running = True
@@ -5166,9 +5139,11 @@ if __name__ == '__main__':
             else:
                 return jsonify({'success': False, 'error': result.get('error', '启动失败')})
 
+        last_url_invalid_log_time = 0  # 上次打印URL不可用日志的时间
+        
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat, tunnel_daemon_started, tunnel_restart_thread, tunnel_heartbeat_thread
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat, tunnel_daemon_started, tunnel_restart_thread, tunnel_heartbeat_thread, tunnel_need_restart, last_url_invalid_log_time
             
             heartbeat_str = datetime.fromtimestamp(tunnel_last_heartbeat).strftime('%Y-%m-%d %H:%M:%S') if tunnel_last_heartbeat > 0 else None
             
@@ -5200,13 +5175,22 @@ if __name__ == '__main__':
                                 current_url = file_url
                                 PathManager.sync_web_output_from_tunnel_url()
                         else:
-                            # URL不可用，不更新内存中的URL
-                            # 守护线程会通过 verify_url 检测到这个问题并触发重启
-                            print(f"[Tunnel] 文件中的URL不可用: {file_url}")
-                            # 注意：不清空 tunnel_url，让 restart_tunnel 处理
+                            # URL不可用，触发自动重启
+                            if time.time() - last_url_invalid_log_time > 60:
+                                print(f"[Tunnel] 检测到URL不可用，触发自动重启: {file_url}")
+                                last_url_invalid_log_time = time.time()
+                            # 触发重启，但不返回无效URL
+                            tunnel_need_restart = True
+                            tunnel_url = None
+                            current_url = None
+                            file_url = None
                     else:
                         if current_url and not content.strip():
-                            print(f"[Tunnel] tunnel_url.txt 为空")
+                            if time.time() - last_url_invalid_log_time > 60:
+                                print(f"[Tunnel] tunnel_url.txt 为空，触发自动重启")
+                                last_url_invalid_log_time = time.time()
+                            # 文件为空，触发重启
+                            tunnel_need_restart = True
                             tunnel_url = None
                             current_url = None
             except Exception as e:
@@ -5234,21 +5218,24 @@ if __name__ == '__main__':
                 except:
                     pass
             
-            # 无论隧道是否在运行，都要确保守护线程在运行
-            if not tunnel_daemon_started or tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
-                tunnel_daemon_started = True
+            # 确保守护线程在运行
+            if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
+                if not tunnel_daemon_started:
+                    tunnel_daemon_started = True
+                    print("[Tunnel] 启动自动重启守护进程")
                 tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
                 tunnel_restart_thread.start()
-                print("[Tunnel] 启动自动重启守护进程")
             if tunnel_heartbeat_thread is None or not tunnel_heartbeat_thread.is_alive():
                 tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
                 tunnel_heartbeat_thread.start()
                 print("[Tunnel] 启动心跳守护进程")
             
-            if is_running and current_url:
+            # 只有当URL可用时才返回URL，无效URL不返回
+            if is_running and current_url and file_url_valid:
                 return jsonify({
                     'running': True,
                     'url': current_url,
+                    'url_valid': True,
                     'auto_restart': tunnel_auto_restart,
                     'restart_count': tunnel_restart_count,
                     'last_error': tunnel_last_error,
@@ -5256,12 +5243,14 @@ if __name__ == '__main__':
                     'tunnel_type': tunnel_type
                 })
             else:
+                # URL无效或不存在，返回None让前端继续轮询
                 return jsonify({
                     'running': False,
                     'url': None,
+                    'url_valid': False,
                     'auto_restart': tunnel_auto_restart,
                     'restart_count': tunnel_restart_count,
-                    'last_error': tunnel_last_error,
+                    'last_error': tunnel_last_error or ('URL无效，正在重启...' if tunnel_need_restart else None),
                     'last_heartbeat': heartbeat_str,
                     'tunnel_type': tunnel_type
                 })
