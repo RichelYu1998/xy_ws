@@ -4705,20 +4705,56 @@ if __name__ == '__main__':
         def auto_start_tunnel(force_restart=False):
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
 
-            # 检查 tunnel_url.txt 是否为空
+            # 检查是否有 hostc 进程在运行
+            has_hostc_process = False
+            try:
+                if Environment.IS_WINDOWS:
+                    result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=3)
+                    has_hostc_process = 'node.exe' in result.stdout
+                else:
+                    result = subprocess.run('pgrep -f "hostc"', shell=True, capture_output=True, text=True, timeout=3)
+                    has_hostc_process = result.returncode == 0
+            except:
+                pass
+            
+            # 检查 tunnel_url.txt 是否有有效 URL
             tunnel_file = PathManager.get_tunnel_url_file()
-            tunnel_url_empty = False
+            has_valid_url = False
             if os.path.exists(tunnel_file):
                 try:
                     with open(tunnel_file, 'r', encoding='utf-8') as f:
                         content = f.read().strip()
-                    if not content:
-                        tunnel_url_empty = True
+                    match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
+                    if match:
+                        has_valid_url = True
                 except:
                     pass
             
-            # 如果 tunnel_url.txt 为空或强制重启，先清理旧进程
-            if force_restart or tunnel_url_empty:
+            # 如果有 hostc 进程在运行且有有效 URL，复用现有隧道
+            if has_hostc_process and has_valid_url and not force_restart:
+                print(f"[Tunnel] hostc进程正在运行且有有效URL，复用现有隧道")
+                try:
+                    with open(tunnel_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
+                    if match:
+                        existing_url = match.group(0).rstrip('/')
+                        if verify_url(existing_url):
+                            print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
+                            sys.stdout.flush()
+                            tunnel_url = existing_url
+                            old_tunnel_url = existing_url
+                            return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
+                except:
+                    pass
+            
+            # 如果有 hostc 进程在运行但没有有效 URL，给它更多时间
+            if has_hostc_process and not has_valid_url and not force_restart:
+                print(f"[Tunnel] hostc进程正在运行但URL未就绪，等待生成URL...")
+                return {'success': False, 'url': None, 'error': 'hostc进程正在启动，等待中'}
+            
+            # tunnel_url.txt 为空或强制重启，清理旧进程并启动新隧道
+            if force_restart or not has_valid_url:
                 print(f"[Tunnel] {'强制重启' if force_restart else 'tunnel_url.txt 为空'}，清理旧进程...")
                 try:
                     if Environment.IS_WINDOWS:
@@ -4753,71 +4789,17 @@ if __name__ == '__main__':
                 tunnel_url = None
                 old_tunnel_url = None
             
-            if tunnel_process and tunnel_process.poll() is None:
-                return {'success': True, 'url': tunnel_url, 'message': '隧道已在运行'}
-
             try:
                 port = args.port
                 tunnel_url = None
                 url_ready = False
                 tunnel_last_error = None
                 tunnel_auto_restart = True
-
-                tunnel_file = PathManager.get_tunnel_url_file()
                 
                 print("[Tunnel] 使用 hostc 隧道")
                 sys.stdout.flush()
                 tunnel_type = 'hostc'
                 
-                if os.path.exists(tunnel_file):
-                    try:
-                        with open(tunnel_file, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                        match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                        if not match:
-                            match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
-                        if match:
-                            existing_url = match.group(1) if match.lastindex == 1 else match.group(0)
-                            existing_url = existing_url.rstrip('/')
-                            if existing_url and len(existing_url) > 10:
-                                try:
-                                    if Environment.IS_WINDOWS:
-                                        result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe" /FO CSV /NH',
-                                                              capture_output=True, text=True, shell=True, timeout=3)
-                                        is_running = result.returncode == 0 and 'node.exe' in result.stdout
-                                    else:
-                                        result = subprocess.run('pgrep -f "hostc"',
-                                                              capture_output=True, text=True, timeout=3)
-                                        is_running = result.returncode == 0
-                                    
-                                    if is_running:
-                                        if verify_url(existing_url):
-                                            print(f"[Tunnel] 复用已有的公网URL: {existing_url}")
-                                            sys.stdout.flush()
-                                            tunnel_url = existing_url
-                                            url_ready = True
-                                            old_tunnel_url = existing_url
-                                            return {
-                                                'success': True,
-                                                'url': tunnel_url,
-                                                'message': f'复用已有隧道，URL: {tunnel_url}'
-                                            }
-                                        else:
-                                            # URL不可用，返回失败，让 restart_tunnel 清理并重启
-                                            print(f"[Tunnel] 已有hostc进程运行但URL不可用，将重启: {existing_url}")
-                                            sys.stdout.flush()
-                                            return {
-                                                'success': False,
-                                                'error': 'URL不可用，需要重启'
-                                            }
-                                    else:
-                                        print(f"[Tunnel] 无hostc进程运行，将启动新隧道")
-                                        sys.stdout.flush()
-                                except:
-                                    pass
-                    except:
-                        pass
-
                 # 清理所有旧的hostc/node进程
                 try:
                     success_count = 0
