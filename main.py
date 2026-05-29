@@ -1805,6 +1805,48 @@ class FileManager:
             print(f'列出文件失败: {e}')
             return []
 
+    @staticmethod
+    def safe_read_excel(excel_file, max_retries=3, retry_delay=0.5):
+        """
+        安全读取Excel文件，处理Windows共享违规问题
+        
+        Args:
+            excel_file: Excel文件路径
+            max_retries: 最大重试次数
+            retry_delay: 重试间隔（秒）
+            
+        Returns:
+            pandas.DataFrame 或 None
+        """
+        import io
+        
+        if pd is None:
+            return None
+        
+        for attempt in range(max_retries):
+            try:
+                with file_write_lock:
+                    xls = pd.ExcelFile(excel_file)
+                    dfs = {}
+                    for sheet in xls.sheet_names:
+                        dfs[sheet] = xls.parse(sheet)
+                    return dfs
+            except PermissionError as e:
+                if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e):
+                    if attempt < max_retries - 1:
+                        print(f'Excel文件被占用，正在等待重试 ({attempt + 1}/{max_retries}): {excel_file}')
+                        time.sleep(retry_delay)
+                    else:
+                        print(f'Excel文件读取失败（共享违规）: {excel_file}')
+                        raise
+                else:
+                    raise
+            except Exception as e:
+                print(f'读取Excel文件失败: {e}')
+                raise
+        
+        return None
+
 
 class WegoScraper:
     def __init__(self, config_path=None):
@@ -4099,42 +4141,55 @@ if __name__ == '__main__':
                 excel_stock_numbers = []
                 for excel_file in excel_files_list:
                     if os.path.exists(excel_file):
-                        xls = pd.ExcelFile(excel_file)
-                        
-                        df = None
-                        sheet_name = None
-                        sku_column = None
-                        
-                        for sheet in xls.sheet_names:
-                            temp_df = xls.parse(sheet)
+                        try:
+                            excel_dfs = FileManager.safe_read_excel(excel_file, max_retries=3, retry_delay=1.0)
+                            if excel_dfs is None:
+                                print(f'无法读取Excel文件: {excel_file}')
+                                continue
                             
-                            if '货号' in temp_df.columns:
-                                df = temp_df
-                                sheet_name = sheet
-                                sku_column = '货号'
-                                break
-                            elif '序列号' in temp_df.columns:
-                                df = temp_df
-                                sheet_name = sheet
-                                sku_column = '序列号'
-                                break
-                            elif '闲鱼' in sheet:
-                                if len(temp_df.columns) > 4:
-                                    second_row = temp_df.iloc[1].tolist()
-                                    if '序列号' in second_row:
-                                        col_idx = second_row.index('序列号')
-                                        temp_df.columns = second_row
-                                        temp_df = temp_df.drop([0, 1]).reset_index(drop=True)
-                                        df = temp_df
-                                        sheet_name = sheet
-                                        sku_column = '序列号'
-                                        break
-                        
-                        if df is not None and sku_column is not None:
-                            file_stock_numbers = [str(int(x)) if isinstance(x, float) and x == int(x) else str(x).strip() 
-                                                         for x in df[sku_column].dropna() 
-                                                         if str(x).strip() and str(x).strip() != 'nan' and str(x).strip() != '序列号']
-                            excel_stock_numbers.extend(file_stock_numbers)
+                            df = None
+                            sheet_name = None
+                            sku_column = None
+                            
+                            for sheet, temp_df in excel_dfs.items():
+                                if '货号' in temp_df.columns:
+                                    df = temp_df
+                                    sheet_name = sheet
+                                    sku_column = '货号'
+                                    break
+                                elif '序列号' in temp_df.columns:
+                                    df = temp_df
+                                    sheet_name = sheet
+                                    sku_column = '序列号'
+                                    break
+                                elif '闲鱼' in sheet:
+                                    if len(temp_df.columns) > 4:
+                                        second_row = temp_df.iloc[1].tolist()
+                                        if '序列号' in second_row:
+                                            col_idx = second_row.index('序列号')
+                                            temp_df.columns = second_row
+                                            temp_df = temp_df.drop([0, 1]).reset_index(drop=True)
+                                            df = temp_df
+                                            sheet_name = sheet
+                                            sku_column = '序列号'
+                                            break
+                            
+                            if df is not None and sku_column is not None:
+                                file_stock_numbers = [str(int(x)) if isinstance(x, float) and x == int(x) else str(x).strip() 
+                                                             for x in df[sku_column].dropna() 
+                                                             if str(x).strip() and str(x).strip() != 'nan' and str(x).strip() != '序列号']
+                                excel_stock_numbers.extend(file_stock_numbers)
+                        except PermissionError as e:
+                            if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e):
+                                return jsonify({
+                                    'error': f'Excel文件被其他程序占用，请关闭后再试',
+                                    'detail': f'文件: {os.path.basename(excel_file)}',
+                                    'path': excel_file
+                                }), 423
+                            raise
+                        except Exception as e:
+                            print(f'读取Excel文件失败: {excel_file} - {e}')
+                            continue
                 
                 if not excel_stock_numbers:
                     return jsonify({'error': f'Excel文件中未找到"货号"或"序列号"列'}), 404
