@@ -4690,7 +4690,7 @@ if __name__ == '__main__':
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             consecutive_failures = 0
             max_consecutive_failures = 10
-            heartbeat_interval = 60  # 心跳间隔60秒
+            heartbeat_interval = 5  # 心跳间隔5秒
             last_log_time = 0
             while tunnel_auto_restart:
                 # 从 web_output.log 获取 URL（唯一来源）

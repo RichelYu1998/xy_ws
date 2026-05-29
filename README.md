@@ -95,6 +95,12 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.22 (2026-05-29)
+- **优化心跳检测间隔**
+  - 将心跳间隔从 60 秒缩短到 5 秒
+  - 提高隧道故障检测速度（最多5秒检测到故障 vs 之前60秒）
+  - 更及时同步 tunnel_url.txt
+
 ### v3.4.21 (2026-05-29)
 - **确保 tunnel_url.txt 与 web_output.log 持久一致**
   - 在 heartbeat_loop 心跳成功后，同步 tunnel_url.txt
