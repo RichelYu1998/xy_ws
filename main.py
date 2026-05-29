@@ -4728,6 +4728,19 @@ if __name__ == '__main__':
                             print(f"[Tunnel] 心跳恢复，当前连续失败次数: {consecutive_failures}")
                             last_log_time = time.time()
                         consecutive_failures = 0
+                        
+                        # 确保 tunnel_url.txt 和 web_output.log 一致
+                        if web_url:
+                            tunnel_url_file = PathManager.get_tunnel_url_file()
+                            try:
+                                with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
+                                    port_match = re.search(r'--port\s+(\d+)', ' '.join(sys.argv))
+                                    local_port = port_match.group(1) if port_match else '8888'
+                                    tf.write(f"Public URL: {web_url}\n")
+                                    tf.write(f"Local URL: http://127.0.0.1:{local_port}/\n")
+                                    tf.write(f"Tunnel: {web_url.split('//')[1].split('.')[0]}\n")
+                            except Exception as e:
+                                pass
                 time.sleep(heartbeat_interval)
         
         def auto_start_tunnel(force_restart=False):
