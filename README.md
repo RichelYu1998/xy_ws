@@ -95,6 +95,13 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.14 (2026-05-29)
+- **修改 read_output 为读取 hostc stdout 输出**
+  - 直接读取 hostc 进程的 stdout，解析 URL
+  - 获取到 URL 后直接写入 web_output.log
+  - 简化等待循环，直接从 web_output.log 检查 URL
+  - 移除对 tunnel_url.txt 的依赖
+
 ### v3.4.13 (2026-05-29)
 - **完全移除 tunnel_url.txt 读取逻辑，全部从 web_output.log**
   - read_output 线程改为直接检查 web_output.log，不再读取 tunnel_url.txt
