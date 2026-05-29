@@ -4785,59 +4785,37 @@ if __name__ == '__main__':
                     last_check_time = 0
                     while True:
                         if tunnel_process is None:
-                            print(f"[Tunnel] tunnel_process为None，退出读取循环")
-                            sys.stdout.flush()
                             break
                         if tunnel_process.poll() is not None:
                             print(f"[Tunnel] hostc进程已退出")
                             sys.stdout.flush()
                             break
                         
-                        # 每 0.5 秒检查一次 tunnel_url.txt 文件
+                        # 每秒检查一次 web_output.log
                         current_time = time.time()
-                        if current_time - last_check_time >= 0.5:
+                        if current_time - last_check_time >= 1:
                             last_check_time = current_time
-                            try:
-                                tunnel_file = PathManager.get_tunnel_url_file()
-                                if os.path.exists(tunnel_file):
-                                    with open(tunnel_file, 'r', encoding='utf-8') as f:
-                                        content = f.read()
-                                    match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-                                    if not match:
-                                        match = re.search(r'https://[a-zA-Z0-9_-]+\.hostc\.dev', content)
-                                    if match:
-                                        file_url = match.group(1) if match.lastindex == 1 else match.group(0)
-                                        file_url = file_url.rstrip('/')
-                                        if file_url and len(file_url) > 10 and '.' in file_url:
-                                            if '0.0.0.0' not in file_url and '127.0.0.1' not in file_url and 'localhost' not in file_url.lower():
-                                                if file_url != tunnel_url:
-                                                    print(f"[Tunnel] 获取到URL: {file_url}")
-                                                    tunnel_url = file_url
-                                                    url_ready = True
-                                                    tunnel_consecutive_failures = 0
-                                                    old_tunnel_url = file_url
-                                                    # 直接写入 web_output.log
-                                                    web_output_file = PathManager.get_web_output_file()
-                                                    try:
-                                                        with open(web_output_file, 'w', encoding='utf-8') as f:
-                                                            f.write(f"Public URL: {file_url}\n")
-                                                        print(f"[Tunnel] 已写入 web_output.log")
-                                                    except Exception as e:
-                                                        print(f"[Tunnel] 写入 web_output.log 失败: {e}")
-                                                    send_tunnel_notification(tunnel_url, 'new')
-                                                    print(f"[Tunnel] URL已就绪")
-                                                    sys.stdout.flush()
-                                                    break
-                            except Exception as e:
-                                pass
+                            # 直接从 web_output.log 检查 URL
+                            web_url = PathManager.get_public_url_from_web_log()
+                            if web_url and web_url != tunnel_url:
+                                try:
+                                    if verify_url(web_url):
+                                        print(f"[Tunnel] 获取到URL: {web_url}")
+                                        tunnel_url = web_url
+                                        url_ready = True
+                                        tunnel_consecutive_failures = 0
+                                        old_tunnel_url = web_url
+                                        send_tunnel_notification(tunnel_url, 'new')
+                                        print(f"[Tunnel] URL已就绪")
+                                        sys.stdout.flush()
+                                        break
+                                except:
+                                    pass
                         
-                        time.sleep(0.1)
+                        time.sleep(0.5)
 
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
-                
-                # tunnel_url.txt 监控线程已移到 restart_tunnel() 中
-                # 定期清理逻辑已移除，tunnel_url.txt 由 hostc 自动管理
                 
                 tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
                 tunnel_restart_thread.start()
@@ -5061,7 +5039,6 @@ if __name__ == '__main__':
                         if web_url != tunnel_url:
                             print(f"[Tunnel] 从 web_output.log 读取到可用的URL: {web_url}")
                             tunnel_url = web_url
-                            PathManager.sync_web_output_from_tunnel_url()
                     else:
                         # URL不可用，触发自动重启
                         if time.time() - last_url_invalid_log_time > 60:
