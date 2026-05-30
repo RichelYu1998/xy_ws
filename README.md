@@ -101,6 +101,15 @@ bash run.sh
   - 添加 `/favicon.ico` 专门路由，解决浏览器请求 favicon 时的 404 错误
   - 提升单页应用体验，未定义路径不再返回 404
 
+- **修复 favicon 路由报错**
+  - 添加 `send_from_directory` 到 Flask 导入语句
+  - 解决 `NameError: name 'send_from_directory' is not defined` 错误
+
+- **优化版本号实时同步**
+  - `run.bat` 和 `run.sh` 启动时自动从 README.md 解析版本号
+  - 版本号显示与前端页面、Python 脚本保持一致
+  - 统一使用 `### vX.X.X` 格式匹配
+
 - **优化隧道邮件通知机制：冷却期补发邮件**
   - 隧道 URL 在冷却期内变化时，记录待发送 URL
   - 心跳检测到冷却期到期时自动补发新 URL 的邮件通知
