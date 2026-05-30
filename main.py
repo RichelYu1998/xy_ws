@@ -4908,7 +4908,11 @@ if __name__ == '__main__':
         def api_clean_group():
             try:
                 data = request.get_json()
-                directory = data.get('directory', PROJECT_DIR)
+                directory = data.get('directory', '')
+                if not directory or directory.strip() == '':
+                    directory = PROJECT_DIR
+                elif not os.path.isabs(directory):
+                    directory = os.path.join(PROJECT_DIR, directory)
                 dry_run = data.get('dry_run', False)
                 log_file = os.path.join(directory, 'clean_files.log')
                 
@@ -4923,7 +4927,11 @@ if __name__ == '__main__':
         def api_clean_time():
             try:
                 data = request.get_json()
-                directory = data.get('directory', PROJECT_DIR)
+                directory = data.get('directory', '')
+                if not directory or directory.strip() == '':
+                    directory = PROJECT_DIR
+                elif not os.path.isabs(directory):
+                    directory = os.path.join(PROJECT_DIR, directory)
                 minutes = data.get('minutes', 5)
                 dry_run = data.get('dry_run', False)
                 log_file = os.path.join(directory, 'clean_files.log')
@@ -4939,13 +4947,17 @@ if __name__ == '__main__':
         def api_clean_all():
             try:
                 data = request.get_json()
-                directory = data.get('directory', PROJECT_DIR)
+                directory = data.get('directory', '')
+                if not directory or directory.strip() == '':
+                    directory = PROJECT_DIR
+                elif not os.path.isabs(directory):
+                    directory = os.path.join(PROJECT_DIR, directory)
                 dry_run = data.get('dry_run', False)
                 log_file = os.path.join(directory, 'clean_files.log')
-                
+
                 log_stream = io.StringIO()
                 clean_all_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
-                
+
                 return jsonify({'success': True, 'output': log_stream.getvalue()})
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
@@ -4954,7 +4966,11 @@ if __name__ == '__main__':
         def api_clean_png():
             try:
                 data = request.get_json()
-                directory = data.get('directory', PROJECT_DIR)
+                directory = data.get('directory', '')
+                if not directory or directory.strip() == '':
+                    directory = PROJECT_DIR
+                elif not os.path.isabs(directory):
+                    directory = os.path.join(PROJECT_DIR, directory)
                 dry_run = data.get('dry_run', False)
                 log_file = os.path.join(directory, 'clean_files.log')
                 
@@ -4969,7 +4985,11 @@ if __name__ == '__main__':
         def api_clean_media():
             try:
                 data = request.get_json()
-                directory = data.get('directory', PROJECT_DIR)
+                directory = data.get('directory', '')
+                if not directory or directory.strip() == '':
+                    directory = PROJECT_DIR
+                elif not os.path.isabs(directory):
+                    directory = os.path.join(PROJECT_DIR, directory)
                 dry_run = data.get('dry_run', False)
                 log_file = os.path.join(directory, 'clean_files.log')
                 
