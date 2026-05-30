@@ -3,7 +3,8 @@ chcp 65001 > nul 2>&1
 set PYTHONIOENCODING=utf-8
 title Szwego Crawler Tool
 
-for /f "delims=" %%i in ('python -c "import re; m=re.search(r'###\s+v(\d+\.\d+\.\d+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')"') do set VERSION=%%i
+for /f "delims=" %%i in ('py -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')"') do set VERSION=%%i
+if not defined VERSION set VERSION=0.0.0
 
 echo ========================================
 echo Szwego商品爬虫和货号对比工具 - v%VERSION%
