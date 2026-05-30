@@ -95,6 +95,12 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.29 (2026-05-30)
+- **修复 run.bat 版本号解析失败问题**
+  - 将 `python` 命令改为 `py` 命令（兼容 Windows py launcher）
+  - 添加 VERSION 未定义时的默认值 fallback
+  - 解决部分 Windows 系统上无法正确获取版本号的问题
+
 ### v3.4.28 (2026-05-30)
 - **优化 Flask 404 错误处理**
   - 添加 fallback 路由捕获所有未定义路径，返回 index.html
