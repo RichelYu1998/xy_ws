@@ -465,7 +465,7 @@ def excel_handler(operation: str = '操作'):
     return decorator
 
 
-from flask import Flask, request, jsonify, send_file, Response
+from flask import Flask, request, jsonify, send_file, send_from_directory, Response
 
 if pd is None:
     print("警告: pandas未安装，Excel对比功能将不可用")
