@@ -5076,9 +5076,11 @@ if __name__ == '__main__':
         email_fail_count = 0
         email_max_fail_count = 3
         email_fail_cooldown = 300
+        last_email_sent_url = None
+        pending_email_url = None
         
         def send_tunnel_notification(new_url, event_type='new'):
-            global last_email_sent_time, email_fail_count
+            global last_email_sent_time, email_fail_count, last_email_sent_url, pending_email_url
             
             current_time = time.time()
             
@@ -5090,18 +5092,28 @@ if __name__ == '__main__':
                     print(f"[Email] 邮件发送失败冷却期已过，重置失败计数")
                     email_fail_count = 0
             
+            remaining_cooldown = email_cooldown - (current_time - last_email_sent_time)
+            
             if current_time - last_email_sent_time < email_cooldown:
-                print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒")
+                if new_url != last_email_sent_url:
+                    pending_email_url = new_url
+                    print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒，已记录待发送URL: {new_url}")
+                else:
+                    print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒")
                 return
             
+            last_email_sent_url = new_url
+            pending_email_url = None
+            
             def send_with_retry():
-                global last_email_sent_time, email_fail_count
+                global last_email_sent_time, email_fail_count, last_email_sent_url
                 try:
                     print(f"[Email] 准备发送邮件通知: {new_url} (事件类型: {event_type})")
                     success = email_notifier.send_tunnel_notification(new_url, event_type)
                     if success:
                         last_email_sent_time = time.time()
                         email_fail_count = 0
+                        last_email_sent_url = new_url
                         print(f"[Email] 邮件发送成功")
                     else:
                         email_fail_count += 1
@@ -5111,6 +5123,32 @@ if __name__ == '__main__':
                     print(f"[Email] 发送邮件异常: {e}，当前失败次数: {email_fail_count}")
             
             threading.Thread(target=send_with_retry, daemon=True).start()
+        
+        def check_and_send_pending_email():
+            global pending_email_url, last_email_sent_time, email_fail_count, last_email_sent_url
+            current_time = time.time()
+            if pending_email_url and (current_time - last_email_sent_time) >= email_cooldown:
+                url_to_send = pending_email_url
+                pending_email_url = None
+                last_email_sent_url = url_to_send
+                print(f"[Email] 冷却期已过，发送待发邮件: {url_to_send}")
+                def send_pending():
+                    global last_email_sent_time, email_fail_count, last_email_sent_url
+                    try:
+                        success = email_notifier.send_tunnel_notification(url_to_send, 'pending')
+                        if success:
+                            last_email_sent_time = time.time()
+                            email_fail_count = 0
+                            last_email_sent_url = url_to_send
+                            print(f"[Email] 待发邮件发送成功")
+                        else:
+                            email_fail_count += 1
+                            pending_email_url = url_to_send
+                    except Exception as e:
+                        email_fail_count += 1
+                        pending_email_url = url_to_send
+                        print(f"[Email] 待发邮件发送异常: {e}")
+                threading.Thread(target=send_pending, daemon=True).start()
         
         def verify_url(url, timeout=10):
             try:
@@ -5180,6 +5218,8 @@ if __name__ == '__main__':
                             print(f"[Tunnel] 心跳恢复，当前连续失败次数: {consecutive_failures}")
                             last_log_time = time.time()
                         consecutive_failures = 0
+                        
+                        check_and_send_pending_email()
                         
                         # 确保 tunnel_url.txt 和 web_output.log 一致
                         if web_url:
@@ -5570,6 +5610,16 @@ if __name__ == '__main__':
         
         print("按 Ctrl+C 停止服务")
         print("=" * 50)
+        
+        @app.route('/<path:invalid_path>')
+        def handle_invalid_path(invalid_path):
+            if request.path.startswith('/dist/'):
+                return "File not found", 404
+            return index()
+        
+        @app.route('/favicon.ico')
+        def favicon():
+            return send_from_directory(os.path.join(PROJECT_DIR, 'dist', 'favicon'), 'favicon.ico')
         
         app.run(host='0.0.0.0', port=args.port, debug=False)
     else:

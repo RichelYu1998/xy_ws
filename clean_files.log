@@ -1,0 +1,369 @@
+2026-05-29 18:35:50 - FileCleaner - INFO - ============================================================
+2026-05-29 18:35:50 - FileCleaner - INFO - 扫描文件列表
+2026-05-29 18:35:50 - FileCleaner - INFO - 扫描目录: D:\ws\xy_ws
+2026-05-29 18:35:50 - FileCleaner - INFO - 排序方式: 按文件下载到本地的毫秒时间
+2026-05-29 18:35:50 - FileCleaner - INFO - 扫描模式: 递归扫描所有子目录
+2026-05-29 18:35:50 - FileCleaner - INFO - ============================================================
+2026-05-29 18:35:50 - FileCleaner - INFO - 扫描文件中...
+2026-05-29 18:35:51 - FileCleaner - INFO - 扫描了 1281 个目录
+2026-05-29 18:35:51 - FileCleaner - INFO - 找到 50 个符合条件的文件
+2026-05-29 18:35:51 - FileCleaner - INFO -   - 图片: 50 个
+2026-05-29 18:35:51 - FileCleaner - INFO -   - 视频: 0 个
+2026-05-29 18:35:51 - FileCleaner - INFO -   - 总大小: 5.81 MB
+2026-05-29 18:35:51 - FileCleaner - INFO - 
+文件列表：
+2026-05-29 18:35:51 - FileCleaner - INFO -   1. .venv\Lib\site-packages\playwright\driver\package\lib\vite\traceViewer\playwright-logo.svg (图片, 4.92 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:35:51 - FileCleaner - INFO -   2. .venv\Lib\site-packages\playwright\driver\package\lib\vite\recorder\playwright-logo.svg (图片, 4.92 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:35:51 - FileCleaner - INFO -   3. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\assets\safari-na3_-uQk.svg (图片, 5.13 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:35:51 - FileCleaner - INFO -   4. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\assets\firefox-nightly-Cp5nfeDT.svg (图片, 8.93 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:35:51 - FileCleaner - INFO -   5. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\assets\firefox-beta-k3eOH_eK.svg (图片, 9.06 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:35:51 - FileCleaner - INFO -   6. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\assets\firefox-1bWoP6pv.svg (图片, 7.31 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:35:51 - FileCleaner - INFO -   7. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\playwright-logo.svg (图片, 5.51 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:35:51 - FileCleaner - INFO -   8. .venv\Lib\site-packages\playwright\driver\package\lib\tools\dashboard\appIcon.png (图片, 18.50 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:35:51 - FileCleaner - INFO -   9. .venv\Lib\site-packages\playwright\driver\package\lib\server\chromium\appIcon.png (图片, 16.18 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:35:51 - FileCleaner - INFO -  10. .venv\Lib\site-packages\werkzeug\debug\shared\more.png (图片, 200.00 B, 下载时间: 2026-05-25 10:15:27)
+2026-05-29 18:35:51 - FileCleaner - INFO -  11. .venv\Lib\site-packages\werkzeug\debug\shared\less.png (图片, 191.00 B, 下载时间: 2026-05-25 10:15:27)
+2026-05-29 18:35:51 - FileCleaner - INFO -  12. .venv\Lib\site-packages\werkzeug\debug\shared\console.png (图片, 507.00 B, 下载时间: 2026-05-25 10:15:27)
+2026-05-29 18:35:51 - FileCleaner - INFO -  13. dist\weather-icons\thunderstorms-night-rain.svg (图片, 3.24 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  14. dist\weather-icons\thunderstorms-day-rain.svg (图片, 3.17 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  15. dist\weather-icons\sleet.svg (图片, 3.76 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  16. dist\weather-icons\snow.svg (图片, 3.13 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  17. dist\weather-icons\rain.svg (图片, 2.00 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  18. dist\weather-icons\partly-cloudy-night-snow.svg (图片, 3.74 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  19. dist\weather-icons\partly-cloudy-night.svg (图片, 1.28 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  20. dist\weather-icons\partly-cloudy-night-rain.svg (图片, 2.76 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  21. dist\weather-icons\partly-cloudy-day.svg (图片, 1.21 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  22. dist\weather-icons\partly-cloudy-day-snow.svg (图片, 3.81 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  23. dist\weather-icons\partly-cloudy-day-rain.svg (图片, 2.69 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  24. dist\weather-icons\overcast.svg (图片, 1.27 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  25. dist\weather-icons\not-available.svg (图片, 1.29 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  26. dist\weather-icons\fog-night.svg (图片, 1.70 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  27. dist\weather-icons\fog-day.svg (图片, 1.64 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  28. dist\weather-icons\clear-night.svg (图片, 813.00 B, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  29. dist\weather-icons\drizzle.svg (图片, 1.98 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  30. dist\weather-icons\clear-day.svg (图片, 783.00 B, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  31. dist\screenshots\6.png (图片, 274.88 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  32. dist\screenshots\5.png (图片, 103.59 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  33. dist\screenshots\4.gif (图片, 2.75 MB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  34. dist\screenshots\2.png (图片, 381.12 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  35. dist\screenshots\1.png (图片, 281.96 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  36. dist\screenshots\0.png (图片, 304.79 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  37. dist\favicon\web-app-manifest-maskable-512x512.png (图片, 158.84 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  38. dist\favicon\web-app-manifest-maskable-192x192.png (图片, 29.34 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  39. dist\favicon\web-app-manifest-512x512.png (图片, 324.29 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  40. dist\favicon\web-app-manifest-192x192.png (图片, 45.88 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  41. dist\favicon\favicon.svg (图片, 605.30 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  42. dist\favicon\favicon-96x96.png (图片, 10.89 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  43. dist\favicon\apple-touch-icon.png (图片, 40.54 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  44. dist\buy-me-a-coffee.png (图片, 209.98 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:35:51 - FileCleaner - INFO -  45. dist\hostc\web\client\og-image.svg (图片, 1.78 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:35:51 - FileCleaner - INFO -  46. dist\web\client\og-image.svg (图片, 1.78 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:35:51 - FileCleaner - INFO -  47. dist\hostc\web\client\og-image.png (图片, 119.06 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:35:51 - FileCleaner - INFO -  48. dist\web\client\og-image.png (图片, 119.06 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:35:51 - FileCleaner - INFO -  49. dist\hostc\web\client\favicon.svg (图片, 1.03 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:35:51 - FileCleaner - INFO -  50. dist\web\client\favicon.svg (图片, 1.03 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:35:51 - FileCleaner - INFO - 
+扫描完成
+2026-05-29 18:55:31 - FileCleaner - INFO - ============================================================
+2026-05-29 18:55:31 - FileCleaner - INFO - 扫描文件列表
+2026-05-29 18:55:31 - FileCleaner - INFO - 扫描目录: D:\ws\xy_ws
+2026-05-29 18:55:31 - FileCleaner - INFO - 排序方式: 按文件下载到本地的毫秒时间
+2026-05-29 18:55:31 - FileCleaner - INFO - 扫描模式: 递归扫描所有子目录
+2026-05-29 18:55:31 - FileCleaner - INFO - ============================================================
+2026-05-29 18:55:31 - FileCleaner - INFO - 扫描文件中...
+2026-05-29 18:55:32 - FileCleaner - INFO - 扫描了 1281 个目录
+2026-05-29 18:55:32 - FileCleaner - INFO - 找到 50 个符合条件的文件
+2026-05-29 18:55:32 - FileCleaner - INFO -   - 图片: 50 个
+2026-05-29 18:55:32 - FileCleaner - INFO -   - 视频: 0 个
+2026-05-29 18:55:32 - FileCleaner - INFO -   - 总大小: 5.81 MB
+2026-05-29 18:55:32 - FileCleaner - INFO - 
+文件列表：
+2026-05-29 18:55:32 - FileCleaner - INFO -   1. .venv\Lib\site-packages\playwright\driver\package\lib\vite\traceViewer\playwright-logo.svg (图片, 4.92 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:55:32 - FileCleaner - INFO -   2. .venv\Lib\site-packages\playwright\driver\package\lib\vite\recorder\playwright-logo.svg (图片, 4.92 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:55:32 - FileCleaner - INFO -   3. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\assets\safari-na3_-uQk.svg (图片, 5.13 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:55:32 - FileCleaner - INFO -   4. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\assets\firefox-nightly-Cp5nfeDT.svg (图片, 8.93 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:55:32 - FileCleaner - INFO -   5. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\assets\firefox-beta-k3eOH_eK.svg (图片, 9.06 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:55:32 - FileCleaner - INFO -   6. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\assets\firefox-1bWoP6pv.svg (图片, 7.31 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:55:32 - FileCleaner - INFO -   7. .venv\Lib\site-packages\playwright\driver\package\lib\vite\dashboard\playwright-logo.svg (图片, 5.51 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:55:32 - FileCleaner - INFO -   8. .venv\Lib\site-packages\playwright\driver\package\lib\tools\dashboard\appIcon.png (图片, 18.50 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:55:32 - FileCleaner - INFO -   9. .venv\Lib\site-packages\playwright\driver\package\lib\server\chromium\appIcon.png (图片, 16.18 KB, 下载时间: 2026-05-25 10:15:31)
+2026-05-29 18:55:32 - FileCleaner - INFO -  10. .venv\Lib\site-packages\werkzeug\debug\shared\more.png (图片, 200.00 B, 下载时间: 2026-05-25 10:15:27)
+2026-05-29 18:55:32 - FileCleaner - INFO -  11. .venv\Lib\site-packages\werkzeug\debug\shared\less.png (图片, 191.00 B, 下载时间: 2026-05-25 10:15:27)
+2026-05-29 18:55:32 - FileCleaner - INFO -  12. .venv\Lib\site-packages\werkzeug\debug\shared\console.png (图片, 507.00 B, 下载时间: 2026-05-25 10:15:27)
+2026-05-29 18:55:32 - FileCleaner - INFO -  13. dist\weather-icons\thunderstorms-night-rain.svg (图片, 3.24 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  14. dist\weather-icons\thunderstorms-day-rain.svg (图片, 3.17 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  15. dist\weather-icons\sleet.svg (图片, 3.76 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  16. dist\weather-icons\snow.svg (图片, 3.13 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  17. dist\weather-icons\rain.svg (图片, 2.00 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  18. dist\weather-icons\partly-cloudy-night-snow.svg (图片, 3.74 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  19. dist\weather-icons\partly-cloudy-night.svg (图片, 1.28 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  20. dist\weather-icons\partly-cloudy-night-rain.svg (图片, 2.76 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  21. dist\weather-icons\partly-cloudy-day.svg (图片, 1.21 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  22. dist\weather-icons\partly-cloudy-day-snow.svg (图片, 3.81 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  23. dist\weather-icons\partly-cloudy-day-rain.svg (图片, 2.69 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  24. dist\weather-icons\overcast.svg (图片, 1.27 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  25. dist\weather-icons\not-available.svg (图片, 1.29 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  26. dist\weather-icons\fog-night.svg (图片, 1.70 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  27. dist\weather-icons\fog-day.svg (图片, 1.64 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  28. dist\weather-icons\clear-night.svg (图片, 813.00 B, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  29. dist\weather-icons\drizzle.svg (图片, 1.98 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  30. dist\weather-icons\clear-day.svg (图片, 783.00 B, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  31. dist\screenshots\6.png (图片, 274.88 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  32. dist\screenshots\5.png (图片, 103.59 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  33. dist\screenshots\4.gif (图片, 2.75 MB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  34. dist\screenshots\2.png (图片, 381.12 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  35. dist\screenshots\1.png (图片, 281.96 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  36. dist\screenshots\0.png (图片, 304.79 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  37. dist\favicon\web-app-manifest-maskable-512x512.png (图片, 158.84 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  38. dist\favicon\web-app-manifest-maskable-192x192.png (图片, 29.34 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  39. dist\favicon\web-app-manifest-512x512.png (图片, 324.29 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  40. dist\favicon\web-app-manifest-192x192.png (图片, 45.88 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  41. dist\favicon\favicon.svg (图片, 605.30 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  42. dist\favicon\favicon-96x96.png (图片, 10.89 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  43. dist\favicon\apple-touch-icon.png (图片, 40.54 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  44. dist\buy-me-a-coffee.png (图片, 209.98 KB, 下载时间: 2026-05-17 18:51:48)
+2026-05-29 18:55:32 - FileCleaner - INFO -  45. dist\hostc\web\client\og-image.svg (图片, 1.78 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:55:32 - FileCleaner - INFO -  46. dist\web\client\og-image.svg (图片, 1.78 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:55:32 - FileCleaner - INFO -  47. dist\hostc\web\client\og-image.png (图片, 119.06 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:55:32 - FileCleaner - INFO -  48. dist\web\client\og-image.png (图片, 119.06 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:55:32 - FileCleaner - INFO -  49. dist\hostc\web\client\favicon.svg (图片, 1.03 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:55:32 - FileCleaner - INFO -  50. dist\web\client\favicon.svg (图片, 1.03 KB, 下载时间: 2026-05-17 18:04:11)
+2026-05-29 18:55:32 - FileCleaner - INFO - 
+扫描完成
+2026-05-29 19:05:45 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:45 - FileCleaner - INFO - 开始删除所有文件和文件夹
+2026-05-29 19:05:45 - FileCleaner - INFO - 清理目录: 
+2026-05-29 19:05:45 - FileCleaner - INFO - 删除规则: 删除所有文件和文件夹，除了 log, sh, py, bat 格式的文件
+2026-05-29 19:05:45 - FileCleaner - INFO - 测试模式: 是
+2026-05-29 19:05:45 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:45 - FileCleaner - INFO - 扫描文件和文件夹中...
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: .DS_Store
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件夹: .git
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: .gitignore
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件夹: .idea
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件夹: .venv
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: clean_files.log
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件夹: config
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件夹: file
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: find_bug.py
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: index.html
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: main.py
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: README.md
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: requirements.txt
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: run.bat
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件: run.sh
+2026-05-29 19:05:45 - FileCleaner - INFO - 保留文件夹: __pycache__
+2026-05-29 19:05:45 - FileCleaner - INFO - 找到 0 个文件和 2 个文件夹
+2026-05-29 19:05:45 - FileCleaner - INFO -   - 总大小: 0.00 B
+2026-05-29 19:05:45 - FileCleaner - INFO - 
+将删除 0 个文件和 2 个文件夹
+2026-05-29 19:05:45 - FileCleaner - INFO - 
+将要删除的文件夹列表：
+2026-05-29 19:05:45 - FileCleaner - INFO -   1. dist
+2026-05-29 19:05:45 - FileCleaner - INFO -   2. temp
+2026-05-29 19:05:45 - FileCleaner - INFO - 
+[测试模式] 未实际删除文件和文件夹
+2026-05-29 19:05:45 - FileCleaner - INFO - 清理完成（测试模式）
+2026-05-29 19:05:48 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:48 - FileCleaner - INFO - 开始删除所有文件和文件夹
+2026-05-29 19:05:48 - FileCleaner - INFO - 清理目录: 
+2026-05-29 19:05:48 - FileCleaner - INFO - 删除规则: 删除所有文件和文件夹，除了 log, sh, py, bat 格式的文件
+2026-05-29 19:05:48 - FileCleaner - INFO - 测试模式: 是
+2026-05-29 19:05:48 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:48 - FileCleaner - INFO - 扫描文件和文件夹中...
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: .DS_Store
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件夹: .git
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: .gitignore
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件夹: .idea
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件夹: .venv
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: clean_files.log
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件夹: config
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件夹: file
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: find_bug.py
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: index.html
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: main.py
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: README.md
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: requirements.txt
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: run.bat
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件: run.sh
+2026-05-29 19:05:48 - FileCleaner - INFO - 保留文件夹: __pycache__
+2026-05-29 19:05:48 - FileCleaner - INFO - 找到 0 个文件和 2 个文件夹
+2026-05-29 19:05:48 - FileCleaner - INFO -   - 总大小: 0.00 B
+2026-05-29 19:05:48 - FileCleaner - INFO - 
+将删除 0 个文件和 2 个文件夹
+2026-05-29 19:05:48 - FileCleaner - INFO - 
+将要删除的文件夹列表：
+2026-05-29 19:05:48 - FileCleaner - INFO -   1. dist
+2026-05-29 19:05:48 - FileCleaner - INFO -   2. temp
+2026-05-29 19:05:48 - FileCleaner - INFO - 
+[测试模式] 未实际删除文件和文件夹
+2026-05-29 19:05:48 - FileCleaner - INFO - 清理完成（测试模式）
+2026-05-29 19:05:50 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:50 - FileCleaner - INFO - 开始删除所有文件和文件夹
+2026-05-29 19:05:50 - FileCleaner - INFO - 清理目录: 
+2026-05-29 19:05:50 - FileCleaner - INFO - 删除规则: 删除所有文件和文件夹，除了 log, sh, py, bat 格式的文件
+2026-05-29 19:05:50 - FileCleaner - INFO - 测试模式: 是
+2026-05-29 19:05:50 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:50 - FileCleaner - INFO - 扫描文件和文件夹中...
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: .DS_Store
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件夹: .git
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: .gitignore
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件夹: .idea
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件夹: .venv
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: clean_files.log
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件夹: config
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件夹: file
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: find_bug.py
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: index.html
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: main.py
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: README.md
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: requirements.txt
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: run.bat
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件: run.sh
+2026-05-29 19:05:50 - FileCleaner - INFO - 保留文件夹: __pycache__
+2026-05-29 19:05:50 - FileCleaner - INFO - 找到 0 个文件和 2 个文件夹
+2026-05-29 19:05:50 - FileCleaner - INFO -   - 总大小: 0.00 B
+2026-05-29 19:05:50 - FileCleaner - INFO - 
+将删除 0 个文件和 2 个文件夹
+2026-05-29 19:05:50 - FileCleaner - INFO - 
+将要删除的文件夹列表：
+2026-05-29 19:05:50 - FileCleaner - INFO -   1. dist
+2026-05-29 19:05:50 - FileCleaner - INFO -   2. temp
+2026-05-29 19:05:50 - FileCleaner - INFO - 
+[测试模式] 未实际删除文件和文件夹
+2026-05-29 19:05:50 - FileCleaner - INFO - 清理完成（测试模式）
+2026-05-29 19:05:51 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:51 - FileCleaner - INFO - 开始删除所有文件和文件夹
+2026-05-29 19:05:51 - FileCleaner - INFO - 清理目录: 
+2026-05-29 19:05:51 - FileCleaner - INFO - 删除规则: 删除所有文件和文件夹，除了 log, sh, py, bat 格式的文件
+2026-05-29 19:05:51 - FileCleaner - INFO - 测试模式: 是
+2026-05-29 19:05:51 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:51 - FileCleaner - INFO - 扫描文件和文件夹中...
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: .DS_Store
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: .git
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: .gitignore
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: .idea
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: .venv
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: clean_files.log
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: config
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: file
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: find_bug.py
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: index.html
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: main.py
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: README.md
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: requirements.txt
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: run.bat
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: run.sh
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: __pycache__
+2026-05-29 19:05:51 - FileCleaner - INFO - 找到 0 个文件和 2 个文件夹
+2026-05-29 19:05:51 - FileCleaner - INFO -   - 总大小: 0.00 B
+2026-05-29 19:05:51 - FileCleaner - INFO - 
+将删除 0 个文件和 2 个文件夹
+2026-05-29 19:05:51 - FileCleaner - INFO - 
+将要删除的文件夹列表：
+2026-05-29 19:05:51 - FileCleaner - INFO -   1. dist
+2026-05-29 19:05:51 - FileCleaner - INFO -   2. temp
+2026-05-29 19:05:51 - FileCleaner - INFO - 
+[测试模式] 未实际删除文件和文件夹
+2026-05-29 19:05:51 - FileCleaner - INFO - 清理完成（测试模式）
+2026-05-29 19:05:51 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:51 - FileCleaner - INFO - 开始删除所有文件和文件夹
+2026-05-29 19:05:51 - FileCleaner - INFO - 清理目录: 
+2026-05-29 19:05:51 - FileCleaner - INFO - 删除规则: 删除所有文件和文件夹，除了 log, sh, py, bat 格式的文件
+2026-05-29 19:05:51 - FileCleaner - INFO - 测试模式: 是
+2026-05-29 19:05:51 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:51 - FileCleaner - INFO - 扫描文件和文件夹中...
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: .DS_Store
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: .git
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: .gitignore
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: .idea
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: .venv
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: clean_files.log
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: config
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: file
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: find_bug.py
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: index.html
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: main.py
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: README.md
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: requirements.txt
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: run.bat
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件: run.sh
+2026-05-29 19:05:51 - FileCleaner - INFO - 保留文件夹: __pycache__
+2026-05-29 19:05:51 - FileCleaner - INFO - 找到 0 个文件和 2 个文件夹
+2026-05-29 19:05:51 - FileCleaner - INFO -   - 总大小: 0.00 B
+2026-05-29 19:05:51 - FileCleaner - INFO - 
+将删除 0 个文件和 2 个文件夹
+2026-05-29 19:05:51 - FileCleaner - INFO - 
+将要删除的文件夹列表：
+2026-05-29 19:05:51 - FileCleaner - INFO -   1. dist
+2026-05-29 19:05:51 - FileCleaner - INFO -   2. temp
+2026-05-29 19:05:51 - FileCleaner - INFO - 
+[测试模式] 未实际删除文件和文件夹
+2026-05-29 19:05:51 - FileCleaner - INFO - 清理完成（测试模式）
+2026-05-29 19:05:59 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:59 - FileCleaner - INFO - 开始删除所有文件和文件夹
+2026-05-29 19:05:59 - FileCleaner - INFO - 清理目录: 
+2026-05-29 19:05:59 - FileCleaner - INFO - 删除规则: 删除所有文件和文件夹，除了 log, sh, py, bat 格式的文件
+2026-05-29 19:05:59 - FileCleaner - INFO - 测试模式: 是
+2026-05-29 19:05:59 - FileCleaner - INFO - ============================================================
+2026-05-29 19:05:59 - FileCleaner - INFO - 扫描文件和文件夹中...
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: .DS_Store
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件夹: .git
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: .gitignore
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件夹: .idea
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件夹: .venv
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: clean_files.log
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件夹: config
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件夹: file
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: find_bug.py
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: index.html
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: main.py
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: README.md
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: requirements.txt
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: run.bat
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件: run.sh
+2026-05-29 19:05:59 - FileCleaner - INFO - 保留文件夹: __pycache__
+2026-05-29 19:05:59 - FileCleaner - INFO - 找到 0 个文件和 2 个文件夹
+2026-05-29 19:05:59 - FileCleaner - INFO -   - 总大小: 0.00 B
+2026-05-29 19:05:59 - FileCleaner - INFO - 
+将删除 0 个文件和 2 个文件夹
+2026-05-29 19:05:59 - FileCleaner - INFO - 
+将要删除的文件夹列表：
+2026-05-29 19:05:59 - FileCleaner - INFO -   1. dist
+2026-05-29 19:05:59 - FileCleaner - INFO -   2. temp
+2026-05-29 19:05:59 - FileCleaner - INFO - 
+[测试模式] 未实际删除文件和文件夹
+2026-05-29 19:05:59 - FileCleaner - INFO - 清理完成（测试模式）
+2026-05-30 13:36:26 - FileCleaner - INFO - ============================================================
+2026-05-30 13:36:26 - FileCleaner - INFO - 开始删除所有文件和文件夹
+2026-05-30 13:36:26 - FileCleaner - INFO - 清理目录: 
+2026-05-30 13:36:26 - FileCleaner - INFO - 删除规则: 删除所有文件和文件夹，除了 log, sh, py, bat 格式的文件
+2026-05-30 13:36:26 - FileCleaner - INFO - 测试模式: 是
+2026-05-30 13:36:26 - FileCleaner - INFO - ============================================================
+2026-05-30 13:36:26 - FileCleaner - INFO - 扫描文件和文件夹中...
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件: .DS_Store
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件夹: .git
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件: .gitignore
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件夹: .idea
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件夹: .venv
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件: clean_files.log
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件夹: config
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件夹: file
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件: index.html
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件: main.py
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件: README.md
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件: requirements.txt
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件: run.bat
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件: run.sh
+2026-05-30 13:36:26 - FileCleaner - INFO - 保留文件夹: __pycache__
+2026-05-30 13:36:26 - FileCleaner - INFO - 找到 0 个文件和 2 个文件夹
+2026-05-30 13:36:26 - FileCleaner - INFO -   - 总大小: 0.00 B
+2026-05-30 13:36:26 - FileCleaner - INFO - 
+将删除 0 个文件和 2 个文件夹
+2026-05-30 13:36:26 - FileCleaner - INFO - 
+将要删除的文件夹列表：
+2026-05-30 13:36:26 - FileCleaner - INFO -   1. dist
+2026-05-30 13:36:26 - FileCleaner - INFO -   2. temp
+2026-05-30 13:36:26 - FileCleaner - INFO - 
+[测试模式] 未实际删除文件和文件夹
+2026-05-30 13:36:26 - FileCleaner - INFO - 清理完成（测试模式）
