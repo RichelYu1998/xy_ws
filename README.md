@@ -95,6 +95,12 @@ bash run.sh
 
 ## 更新日志
 
+### v3.4.31 (2026-06-01)
+- **修复文件清理工具获取文件大小错误**
+  - 修复 `f.stat().st_size()` 调用错误，`st_size` 是属性不是方法
+  - 修复位置：main.py:988 和 main.py:1005
+  - 解决 TypeError: 'int' object is not callable 错误
+
 ### v3.4.30 (2026-05-30)
 - **修复清理工具 API 空目录检测问题**
   - 统一所有清理 API 的 `directory` 参数处理逻辑

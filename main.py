@@ -985,7 +985,7 @@ def clean_all_files(
     total_files = len(files_to_delete)
     total_folders = len(folders_to_delete)
     total_size = sum(
-        safe_call(lambda f=item: f.stat().st_size(), default=0, context='clean_all_files获取文件大小') 
+        safe_call(lambda f=item: f.stat().st_size, default=0, context='clean_all_files获取文件大小')
         for item in files_to_delete
     )
 
@@ -1002,7 +1002,7 @@ def clean_all_files(
     if files_to_delete:
         logger.info("\n将要删除的文件列表：")
         for i, item in enumerate(files_to_delete, 1):
-            file_size = safe_call(lambda f=item: f.stat().st_size(), default=0, context='clean_all_files显示文件')
+            file_size = safe_call(lambda f=item: f.stat().st_size, default=0, context='clean_all_files显示文件')
             logger.info(f"{i:3d}. {item.name} ({format_size(file_size)})")
 
     if folders_to_delete:
@@ -1792,10 +1792,11 @@ class EmailNotifier:
             msg.attach(MIMEText(html_body, 'html', 'utf-8'))
             
             print(f"[Email] 正在连接SMTP服务器...")
+            timeout = 30
             if config['smtp_port'] == 465:
-                server = smtplib.SMTP_SSL(config['smtp_host'], config['smtp_port'])
+                server = smtplib.SMTP_SSL(config['smtp_host'], config['smtp_port'], timeout=timeout)
             else:
-                server = smtplib.SMTP(config['smtp_host'], config['smtp_port'])
+                server = smtplib.SMTP(config['smtp_host'], config['smtp_port'], timeout=timeout)
                 server.starttls()
             
             print(f"[Email] 正在登录SMTP服务器...")
@@ -1807,10 +1808,17 @@ class EmailNotifier:
             
             print(f"[Email] 已成功发送邮件通知到 {config['to_email']}")
             return True
+        except smtplib.SMTPServerDisconnected as e:
+            handle_exception(e, 'Email SMTP连接断开')
+            raise AppException.email_error(
+                f"SMTP连接断开: {e}。请检查网络连接或SMTP服务器配置",
+                smtp_host=config['smtp_host'],
+                recipient=config['to_email']
+            )
         except smtplib.SMTPAuthenticationError as e:
             handle_exception(e, 'Email SMTP认证')
             raise AppException.email_error(
-                f"SMTP认证失败: {e}",
+                f"SMTP认证失败: {e}。请检查邮箱账号和授权码",
                 smtp_host=config['smtp_host'],
                 recipient=config['to_email']
             )
