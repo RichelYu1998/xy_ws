@@ -176,7 +176,7 @@ if exist requirements.txt (
             )
         )
 
-        echo [*] 最终选择最快镜像源: %FASTEST_MIRROR% (%MIN_TIME%秒)
+        echo [*] 最终选择最快镜像源: !FASTEST_MIRROR! (!MIN_TIME!秒)
         (
             echo [global]
             echo index-url = %FASTEST_MIRROR%
