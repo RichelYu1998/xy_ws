@@ -18,7 +18,8 @@ bash run.sh
 
 **程序会自动：**
 - ✅ 检测/创建虚拟环境
-- ✅ 自动配置阿里云pip镜像加速（国内用户）
+- ✅ 智能选择最快的pip镜像源（支持5个国内镜像）
+- ✅ 配置Playwright CDN加速
 - ✅ 安装依赖
 - ✅ 检测配置文件（首次使用自动从模板复制）
 - ✅ 启动 Web 服务
@@ -75,12 +76,22 @@ bash run.sh
 
 ### 支持的操作系统
 
-- ✅ Windows
-- ✅ macOS
-- ✅ Linux
+- ✅ Windows (10/11)
+- ✅ macOS (10.15+)
+- ✅ Linux (Ubuntu/Debian/CentOS等)
 
-### 路径处理机制
+### 跨平台特性
 
+#### 1. 智能环境检测
+```python
+class Environment:
+    SYSTEM = platform.system()  # 自动检测操作系统
+    IS_WINDOWS = SYSTEM == 'Windows'
+    IS_MAC = SYSTEM == 'Darwin'
+    IS_LINUX = SYSTEM == 'Linux'
+```
+
+#### 2. 路径处理机制
 程序使用 `os.path.abspath(__file__)` 自动获取项目根目录，所有配置文件路径都是相对于 `main.py` 的位置计算的。
 
 | 操作系统 | 配置文件路径示例 |
@@ -89,15 +100,85 @@ bash run.sh
 | macOS | `/Users/username/project/config/config.json` |
 | Linux | `/home/username/project/config/config.json` |
 
-### 项目迁移
+#### 3. 虚拟环境管理
+- Windows: `.venv/Scripts/python.exe`
+- macOS/Linux: `.venv/bin/python`
 
+#### 4. 进程管理
+- Windows: 使用 `taskkill` 命令
+- macOS/Linux: 使用 `pkill` 命令
+
+#### 5. 浏览器配置
+- Windows: 优先使用Playwright内置Chromium（避免权限问题）
+- macOS/Linux: 支持系统Chrome浏览器
+
+#### 6. pip镜像源智能选择
+自动测试5个国内镜像源，选择当前网络环境下最快的：
+- 阿里云镜像
+- 清华大学镜像
+- 腾讯云镜像
+- 中科大镜像
+- 豆瓣镜像
+
+### 项目迁移
 将整个项目文件夹复制到任何操作系统上即可直接运行，无需修改任何代码或配置。
 
+### 依赖安装
+程序会自动处理不同操作系统的依赖安装：
+- Playwright浏览器自动下载（配置CDN加速）
+- 系统库自动检测和安装
+- Python包自动安装（使用最优镜像源）
+
 ## 更新日志
+
+### v3.4.33 (2026-06-03)
+- **代码优化和精简**
+  - 移除重复的 `from functools import wraps` 导入
+  - 优化代码结构，提高可维护性
+  - 增强跨系统兼容性测试
+
+- **跨系统支持增强**
+  - 统一环境检测类 `Environment` 提供完整的系统信息
+  - 所有文件操作使用 `os.path.join()` 确保跨平台兼容
+  - 进程管理方法统一支持 Windows/macOS/Linux
+  - 浏览器启动参数根据系统类型自动优化
+
+- **性能优化**
+  - pip镜像源智能选择，显著提升依赖安装速度
+  - Playwright CDN加速，加快浏览器下载
+  - 临时文件自动清理，避免磁盘空间占用
+
+- **稳定性改进**
+  - 统一异常处理系统，提供详细的错误信息
+  - Excel文件读取优化，解决Windows共享违规问题
+  - 隧道服务自动重启和故障恢复
 
 ### v3.4.32 (2026-06-03)
 - **全面跨系统支持优化**
   - **pip 镜像源智能轮询**: 自动测试 5 个国内镜像源（阿里云、清华、腾讯云、中科大、豆瓣），选择当前网络环境下最快的镜像源
+  - **Playwright CDN 加速**: 配置 npmmirror.com CDN 加速浏览器下载，大幅提升安装速度
+  - **统一进程管理**: 新增 `Environment.kill_process_by_name()` 和 `Environment.check_process_running()` 方法，跨系统统一进程操作
+  - **Chrome 浏览器路径优化**: Windows 使用 Playwright 内置浏览器避免权限问题，Mac/Linux 支持系统 Chrome
+  - **浏览器启动参数优化**: 根据系统类型自动配置最佳启动参数
+  - **用户代理字符串适配**: 自动适配 Windows/Mac/Linux 的 UA 字符串
+  - **跨平台路径处理**: 所有文件路径使用 `os.path.join()`，确保三平台兼容
+  - **启动脚本优化**: run.bat 和 run.sh 完全支持跨系统，自动配置镜像源和 CDN
+
+- **修复 Windows Playwright 权限问题**
+  - Windows 系统优先使用 Playwright 内置 Chromium 浏览器
+  - 避免使用系统 Chrome 导致的权限拒绝错误
+  - 自动安装 Playwright 浏览器及其依赖
+
+- **pip 镜像源速度测试**
+  - Windows: 使用 Python 测试每个镜像源响应时间，选择最快的
+  - Linux/Mac: 使用 bash 和 Python 联合测试，记录每个镜像源速度
+  - 显示测试过程和最终选择的镜像源及响应时间
+  - 修复 run.bat 中最终镜像源显示问题（使用延迟变量扩展）
+  - 优化 run.sh 镜像源测试逻辑，与 run.bat 保持一致
+
+- **临时文件自动清理**
+  - 启动脚本自动清理 temp 目录下超过 7 天的临时文件
+  - 避免临时文件占用过多磁盘空间
   - **Playwright CDN 加速**: 配置 npmmirror.com CDN 加速浏览器下载，大幅提升安装速度
   - **统一进程管理**: 新增 `Environment.kill_process_by_name()` 和 `Environment.check_process_running()` 方法，跨系统统一进程操作
   - **Chrome 浏览器路径优化**: Windows 使用 Playwright 内置浏览器避免权限问题，Mac/Linux 支持系统 Chrome

@@ -1074,6 +1074,87 @@
                 font-size: 10px !important;
                 line-height: 1.3 !important;
             }
+
+            #productModal {
+                padding: 10px !important;
+            }
+
+            #productModal > div {
+                max-width: 100% !important;
+                width: 100% !important;
+                padding: 15px !important;
+                margin: 0 !important;
+                max-height: 85vh !important;
+            }
+
+            #productModal h3 {
+                font-size: 18px !important;
+                padding-right: 30px !important;
+            }
+
+            #productModal button:first-child {
+                font-size: 28px !important;
+                top: 8px !important;
+                right: 10px !important;
+            }
+
+            #productModal div[style*="margin-bottom"] {
+                font-size: 13px !important;
+                line-height: 1.5 !important;
+            }
+
+            #productModal img,
+            #productModal video {
+                width: 100px !important;
+                height: 100px !important;
+            }
+
+            #imagePreview {
+                padding: 10px !important;
+            }
+
+            #imagePreview img {
+                max-width: 100% !important;
+                max-height: 85vh !important;
+            }
+
+            #imagePreview button {
+                top: 10px !important;
+                right: 10px !important;
+                font-size: 28px !important;
+                width: 36px !important;
+                height: 36px !important;
+            }
+
+            .sku-container {
+                flex-direction: column !important;
+                align-items: center !important;
+            }
+
+            .sku-tag {
+                font-size: 11px !important;
+                padding: 4px 8px !important;
+                width: calc(100% - 20px) !important;
+                text-align: center !important;
+            }
+
+            .change-table {
+                font-size: 11px !important;
+            }
+
+            .change-table th,
+            .change-table td {
+                padding: 5px 3px !important;
+            }
+
+            .summary-badge {
+                font-size: 12px !important;
+                padding: 6px 12px !important;
+            }
+
+            .summary-value {
+                font-size: 20px !important;
+            }
         }
         
         /* 小屏幕平板 (576px - 767px) */
@@ -1899,14 +1980,102 @@ playwright install chromium</pre>
             });
         }
         
+        const DEBUG = true;
+        const log = DEBUG ? console.log.bind(console, '[调试]') : () => {};
+        const logError = DEBUG ? console.error.bind(console, '[错误]') : () => {};
+        
+        function handleVideoError(videoElement, videoUrl, isPreview = false) {
+            const url = videoUrl || videoElement.src;
+            logError('视频加载失败:', url.substring(0, 50) + '...');
+            
+            const errorStyle = isPreview 
+                ? 'max-width:95%;max-height:90%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;color:white;font-size:16px;text-align:center;padding:20px;border-radius:8px;cursor:pointer;'
+                : 'width:150px;height:150px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#999;font-size:12px;text-align:center;padding:5px;border-radius:4px;cursor:pointer;';
+            
+            const errorContent = isPreview
+                ? `<div style="font-size:48px;margin-bottom:10px;">⚠️</div><div>视频加载失败</div><div style="font-size:14px;margin-top:10px;opacity:0.8;">可能是网络问题，点击重试</div>`
+                : `视频加载失败<br>点击重试`;
+            
+            const errorMsg = `<div style="${errorStyle}" onclick="retryVideoLoad(this, '${url.replace(/'/g, "\\'")}', ${isPreview})">${errorContent}</div>`;
+            
+            if (isPreview) {
+                videoElement.outerHTML = errorMsg;
+            } else {
+                videoElement.parentElement.innerHTML = errorMsg;
+            }
+        }
+        
+        function retryVideoLoad(errorDiv, videoUrl, isPreview = false) {
+            const videoStyle = isPreview
+                ? 'max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;'
+                : 'width:150px;height:150px;object-fit:cover;background:#000;';
+            
+            const videoPreload = isPreview ? 'auto' : 'metadata';
+            const videoAutoplay = isPreview ? 'autoplay' : '';
+            const loadingText = isPreview ? '' : '<div class="video-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:12px;">重新加载中...</div>';
+            
+            const videoHtml = `
+                <video id="previewImage" src="${videoUrl}" controls ${videoAutoplay} preload="${videoPreload}" style="${videoStyle}" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${videoUrl.replace(/'/g, "\\'")}', ${isPreview})" onloadeddata="handleVideoLoad(this)">
+                    您的浏览器不支持视频播放
+                </video>
+                ${loadingText}
+            `;
+            
+            if (isPreview) {
+                const preview = document.getElementById('imagePreview');
+                const oldContent = preview?.querySelector('div[style*="max-width:95%"]');
+                if (oldContent) {
+                    oldContent.outerHTML = videoHtml;
+                }
+            } else {
+                errorDiv.parentElement.innerHTML = videoHtml;
+            }
+        }
+        
+        function handleVideoLoad(videoElement) {
+            const loadingDiv = videoElement.parentElement?.querySelector('.video-loading');
+            if (loadingDiv) {
+                loadingDiv.style.display = 'none';
+            }
+        }
+        
+        function decodeBase64Url(url) {
+            if (!url) return url;
+            try {
+                if (url.startsWith('http://') || url.startsWith('https://')) {
+                    log('URL已是HTTP格式:', url.substring(0, 50) + '...');
+                    return url;
+                }
+                const decoded = atob(url);
+                if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+                    log('Base64解码成功:', decoded.substring(0, 50) + '...');
+                    return decoded;
+                }
+                log('解码后非HTTP格式，返回原始URL');
+                return url;
+            } catch (e) {
+                logError('Base64解码失败:', e.message);
+                return url;
+            }
+        }
+        
         function showProductModal(p) {
             const images = p.图片;
             const imageList = images ? (Array.isArray(images) ? images : [images]) : [];
             const validImages = imageList.filter(img => img);
+            const decodedImages = validImages.map(img => decodeBase64Url(img));
+            
+            if (DEBUG && decodedImages.length > 0) {
+                log('商品图片数量:', decodedImages.length);
+                log('首个URL:', decodedImages[0].substring(0, 50) + '...');
+            }
+            
+            window.currentProductImages = decodedImages;
+            window.currentImageIndex = 0;
             
             let modalHtml = `
-                <div id="productModal" onclick="if(event.target === this) this.remove()" style="position:fixed;z-index:9999;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;">
-                    <div style="background:#fff;padding:20px;border-radius:8px;max-width:90%;max-height:90%;overflow:auto;position:relative;">
+                <div id="productModal" onclick="if(event.target === this) this.remove()" style="position:fixed;z-index:9999;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
+                    <div style="background:#fff;padding:20px;border-radius:8px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;position:relative;">
                         <button onclick="this.parentElement.parentElement.remove()" style="position:absolute;top:10px;right:15px;font-size:24px;border:none;background:none;cursor:pointer;">&times;</button>
                         <h3 style="margin:0 0 15px 0;color:#e4393c;">商品详情</h3>
                         <div style="margin-bottom:10px;"><strong>货号:</strong> ${p.货号 || '-'}</div>
@@ -1919,14 +2088,20 @@ playwright install chromium</pre>
             
             if (validImages.length > 0) {
                 modalHtml += `<div style="margin-top:15px;"><strong>图片/视频 (${validImages.length}个):</strong></div>`;
-                modalHtml += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;">`;
+                modalHtml += `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;justify-content:center;">`;
                 
                 validImages.forEach((img, i) => {
-                    const isVideo = img.toLowerCase().includes('.mp4') || img.toLowerCase().includes('video');
+                    const decodedUrl = decodeBase64Url(img);
+                    const isVideo = decodedUrl.includes('/pvod/') || /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp)(\?|$)/i.test(decodedUrl);
                     if (isVideo) {
-                        modalHtml += `<video src="${img}" controls style="width:200px;height:150px;object-fit:cover;">您的浏览器不支持视频</video>`;
+                        modalHtml += `<div style="position:relative;width:150px;height:150px;">
+                            <video src="${decodedUrl}" controls preload="metadata" style="width:150px;height:150px;object-fit:cover;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${decodedUrl.replace(/'/g, "\\'")}', false)" onloadeddata="handleVideoLoad(this)">
+                                您的浏览器不支持视频播放
+                            </video>
+                            <div class="video-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:12px;">加载中...</div>
+                        </div>`;
                     } else {
-                        modalHtml += `<a href="${img}" target="_blank"><img src="${img}" style="width:150px;height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;"></a>`;
+                        modalHtml += `<img src="${decodedUrl}" onclick="showImagePreview('${decodedUrl.replace(/'/g, "\\'")}', ${i})" style="width:150px;height:150px;object-fit:cover;border-radius:4px;border:1px solid #ddd;cursor:pointer;" title="点击预览大图" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjE0Ij7nmoTlm77niYHmraLlvTwvdGV4dD48L3N2Zz4='">`;
                     }
                 });
                 modalHtml += `</div>`;
@@ -1937,8 +2112,148 @@ playwright install chromium</pre>
             document.body.insertAdjacentHTML('beforeend', modalHtml);
         }
         
+        function showImagePreview(imageUrl, index) {
+            if (typeof index === 'undefined') {
+                index = 0;
+            }
+            window.currentImageIndex = index;
+            
+            const decodedUrl = decodeBase64Url(imageUrl);
+            const isVideo = decodedUrl.includes('/pvod/') || /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp|m4a)(\?|$)/i.test(decodedUrl);
+            
+            let mediaContent;
+            if (isVideo) {
+                mediaContent = `<video id="previewImage" src="${decodedUrl}" controls autoplay preload="auto" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${decodedUrl.replace(/'/g, "\\'")}', true)">
+                    您的浏览器不支持视频播放
+                </video>`;
+            } else {
+                mediaContent = `<img id="previewImage" src="${decodedUrl}" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;" onclick="event.stopPropagation()">`;
+            }
+            
+            const previewHtml = `
+                <div id="imagePreview" onclick="if(event.target === this) this.remove()" style="position:fixed;z-index:10000;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;cursor:zoom-out;overflow:auto;">
+                    <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);display:flex;justify-content:space-between;padding:0 10px;pointer-events:none;">
+                        <button onclick="prevImage()" style="pointer-events:auto;font-size:36px;border:none;background:rgba(255,255,255,0.2);cursor:pointer;color:white;width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;">❮</button>
+                        <button onclick="nextImage()" style="pointer-events:auto;font-size:36px;border:none;background:rgba(255,255,255,0.2);cursor:pointer;color:white;width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;">❯</button>
+                    </div>
+                    <div style="text-align:center;position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:white;font-size:14px;background:rgba(0,0,0,0.5);padding:8px 16px;border-radius:20px;">
+                        <span id="imageCounter">${window.currentImageIndex + 1} / ${window.currentProductImages.length}</span>
+                    </div>
+                    ${mediaContent}
+                    <button onclick="this.parentElement.remove()" style="position:absolute;top:15px;right:20px;font-size:32px;border:none;background:rgba(255,255,255,0.2);cursor:pointer;color:white;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;">&times;</button>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', previewHtml);
+            
+            const preview = document.getElementById('imagePreview');
+            let touchStartX = 0;
+            let touchEndX = 0;
+            
+            preview.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, false);
+            
+            preview.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, false);
+            
+            function handleSwipe() {
+                const swipeThreshold = 50;
+                const diff = touchStartX - touchEndX;
+                
+                if (Math.abs(diff) > swipeThreshold) {
+                    if (diff > 0) {
+                        nextImage();
+                    } else {
+                        prevImage();
+                    }
+                }
+            }
+            
+            document.addEventListener('keydown', handleKeyDown);
+        }
+        
+        function handleKeyDown(e) {
+            const preview = document.getElementById('imagePreview');
+            if (!preview) {
+                document.removeEventListener('keydown', handleKeyDown);
+                return;
+            }
+            
+            if (e.key === 'ArrowLeft') {
+                prevImage();
+                e.preventDefault();
+            } else if (e.key === 'ArrowRight') {
+                nextImage();
+                e.preventDefault();
+            } else if (e.key === 'Escape') {
+                preview.remove();
+                document.removeEventListener('keydown', handleKeyDown);
+            }
+        }
+        
+        function prevImage() {
+            if (!window.currentProductImages || window.currentProductImages.length === 0) return;
+            window.currentImageIndex = (window.currentImageIndex - 1 + window.currentProductImages.length) % window.currentProductImages.length;
+            updatePreviewImage();
+        }
+        
+        function nextImage() {
+            if (!window.currentProductImages || window.currentProductImages.length === 0) return;
+            window.currentImageIndex = (window.currentImageIndex + 1) % window.currentProductImages.length;
+            updatePreviewImage();
+        }
+        
+        function updatePreviewImage() {
+            const previewImg = document.getElementById('previewImage');
+            const counter = document.getElementById('imageCounter');
+            if (previewImg && window.currentProductImages && window.currentProductImages.length > 0) {
+                const newUrl = window.currentProductImages[window.currentImageIndex];
+                const decodedUrl = decodeBase64Url(newUrl);
+                const isVideo = decodedUrl.includes('/pvod/') || /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp|m4a)(\?|$)/i.test(decodedUrl);
+                
+                if (isVideo) {
+                    const parent = previewImg.parentElement;
+                    const videoHtml = `<video id="previewImage" src="${decodedUrl}" controls autoplay preload="auto" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${decodedUrl.replace(/'/g, "\\'")}', true)">
+                        您的浏览器不支持视频播放
+                    </video>`;
+                    previewImg.outerHTML = videoHtml;
+                } else {
+                    if (previewImg.tagName === 'VIDEO') {
+                        const parent = previewImg.parentElement;
+                        const imgHtml = `<img id="previewImage" src="${decodedUrl}" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;" onclick="event.stopPropagation()">`;
+                        previewImg.outerHTML = imgHtml;
+                    } else {
+                        previewImg.src = decodedUrl;
+                    }
+                }
+                
+                if (counter) {
+                    counter.textContent = `${window.currentImageIndex + 1} / ${window.currentProductImages.length}`;
+                }
+            }
+        }
+        
         function showProductDetail(sku) {
             fetch(`/api/product?sku=${encodeURIComponent(sku)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.found) {
+                        const p = data.product;
+                        showProductModal(p);
+                    } else {
+                        alert(data.error || '未找到该商品');
+                    }
+                })
+                .catch(error => {
+                    console.error('查询失败:', error);
+                    alert('查询失败: ' + error.message);
+                });
+        }
+        
+        function showProductByDescription(description) {
+            fetch(`/api/product/by-description?description=${encodeURIComponent(description)}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.found) {
@@ -2544,16 +2859,18 @@ playwright install chromium</pre>
                     `;
                     products.forEach((p, i) => {
                         const sku = p.货号 || '';
+                        const desc = p.商品描述 || '';
                         const isHighPrice = parseFloat((p.售价 || '¥0').replace('¥', '').replace(',', '')) >= 599;
                         const isAdded = data.addedProducts && data.addedProducts.some(ap => ap.货号 === sku);
                         let rowStyle = '';
                         if (isHighPrice && isAdded) rowStyle = 'background: #e8f5e9;';
                         else if (isHighPrice) rowStyle = 'background: #fff3e0;';
                         else if (isAdded) rowStyle = 'background: #e3f2fd;';
+                        const descDisplay = desc.length > 20 ? desc.substring(0, 20) + '...' : desc;
                         tableHtml += `<tr data-sku="${sku}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 高亮并定位货号:', '${sku}'); highlightRow('${sku}'); scrollToSku('${sku}'); searchProductBySku('${sku}')">${sku || '-'}</a></td>
-                            <td>${(p.商品描述 || '').substring(0, 20)}${(p.商品描述 || '').length > 20 ? '...' : ''}</td>
+                            <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 查看商品详情:', '${desc.replace(/'/g, "\\'")}'); showProductByDescription('${desc.replace(/'/g, "\\'")}')" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${descDisplay}</a></td>
                             <td style="font-weight: bold;">${p.售价 || '-'}</td>
                             <td>${p.员工 || '-'}</td>
                         </tr>`;
