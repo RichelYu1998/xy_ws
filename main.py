@@ -28,7 +28,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
-from functools import wraps
 
 try:
     import pandas as pd
@@ -4948,6 +4947,48 @@ if __name__ == '__main__':
                 return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
+
+        @app.route('/api/product/by-description', methods=['GET'])
+        def get_product_by_description():
+            description = request.args.get('description', '').strip()
+            if not description:
+                return jsonify({'error': '请提供商品描述'}), 400
+            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+            if not json_files:
+                return jsonify({'found': False, 'error': '没有找到JSON文件'})
+            latest_file = max(json_files, key=os.path.getmtime)
+            try:
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                products = data.get('商品列表', []) if isinstance(data, dict) else data
+                for p in products:
+                    stored_desc = p.get('商品描述', '')
+                    if stored_desc.replace(' ', '') == description.replace(' ', ''):
+                        images = p.get('图片', [])
+                        if images:
+                            if isinstance(images, list):
+                                decoded_images = []
+                                for img in images:
+                                    try:
+                                        decoded = base64.b64decode(img).decode('utf-8')
+                                        decoded_images.append(decoded)
+                                    except:
+                                        decoded_images.append(img)
+                                p['图片'] = decoded_images
+                            elif isinstance(images, str):
+                                try:
+                                    decoded = base64.b64decode(images).decode('utf-8')
+                                    p['图片'] = [decoded]
+                                except:
+                                    p['图片'] = [images]
+                            else:
+                                p['图片'] = []
+                        else:
+                            p['图片'] = []
+                        return jsonify({'found': True, 'product': p})
+                return jsonify({'found': False, 'error': '未找到该商品'})
+            except Exception as e:
+                return jsonify({'found': False, 'error': str(e)})
 
         @app.route('/api/clean/list', methods=['POST'])
         def api_clean_list():

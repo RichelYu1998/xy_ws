@@ -21,3 +21,11 @@ config/config.json
 # OS files
 .DS_Store
 Thumbs.db
+
+# Temporary files
+temp/
+*.tmp
+
+# Log files
+*.log
+clean_files.log
