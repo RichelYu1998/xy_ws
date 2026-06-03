@@ -112,25 +112,66 @@ if exist requirements.txt (
         set FASTEST_HOST=mirrors.aliyun.com
         set MIN_TIME=999999
 
-        for %%M in (
-            https://mirrors.aliyun.com/pypi/simple/|mirrors.aliyun.com
-            https://pypi.tuna.tsinghua.edu.cn/simple/|pypi.tuna.tsinghua.edu.cn
-            https://mirrors.cloud.tencent.com/pypi/simple/|mirrors.cloud.tencent.com
-            https://mirrors.ustc.edu.cn/pypi/simple/|mirrors.ustc.edu.cn
-            https://pypi.douban.com/simple/|pypi.douban.com
-        ) do (
-            for /f "tokens=1,2 delims=|" %%A in ("%%M") do (
-                echo [*] 测试镜像源: %%A
-                for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('%%A', timeout=3); print(time.time()-start)" 2^>nul') do (
-                    if not "%%T"=="" (
-                        set CURRENT_TIME=%%T
-                        if !CURRENT_TIME! lss !MIN_TIME! (
-                            set MIN_TIME=!CURRENT_TIME!
-                            set FASTEST_MIRROR=%%A
-                            set FASTEST_HOST=%%B
-                            echo [*] 更新最快镜像源: %%A (!CURRENT_TIME!秒)
-                        )
-                    )
+        echo [*] 测试镜像源 1/5: 阿里云
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+            if not "%%T"=="" (
+                set MIN_TIME=%%T
+                echo [*] 阿里云速度: %%T秒
+            )
+        )
+
+        echo [*] 测试镜像源 2/5: 清华
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://pypi.tuna.tsinghua.edu.cn/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+            if not "%%T"=="" (
+                if %%T lss !MIN_TIME! (
+                    set MIN_TIME=%%T
+                    set FASTEST_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple/
+                    set FASTEST_HOST=pypi.tuna.tsinghua.edu.cn
+                    echo [*] 清华速度: %%T秒 (新最快)
+                ) else (
+                    echo [*] 清华速度: %%T秒
+                )
+            )
+        )
+
+        echo [*] 测试镜像源 3/5: 腾讯云
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.cloud.tencent.com/pypi/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+            if not "%%T"=="" (
+                if %%T lss !MIN_TIME! (
+                    set MIN_TIME=%%T
+                    set FASTEST_MIRROR=https://mirrors.cloud.tencent.com/pypi/simple/
+                    set FASTEST_HOST=mirrors.cloud.tencent.com
+                    echo [*] 腾讯云速度: %%T秒 (新最快)
+                ) else (
+                    echo [*] 腾讯云速度: %%T秒
+                )
+            )
+        )
+
+        echo [*] 测试镜像源 4/5: 中科大
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.ustc.edu.cn/pypi/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+            if not "%%T"=="" (
+                if %%T lss !MIN_TIME! (
+                    set MIN_TIME=%%T
+                    set FASTEST_MIRROR=https://mirrors.ustc.edu.cn/pypi/simple/
+                    set FASTEST_HOST=mirrors.ustc.edu.cn
+                    echo [*] 中科大速度: %%T秒 (新最快)
+                ) else (
+                    echo [*] 中科大速度: %%T秒
+                )
+            )
+        )
+
+        echo [*] 测试镜像源 5/5: 豆瓣
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://pypi.douban.com/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+            if not "%%T"=="" (
+                if %%T lss !MIN_TIME! (
+                    set MIN_TIME=%%T
+                    set FASTEST_MIRROR=https://pypi.douban.com/simple/
+                    set FASTEST_HOST=pypi.douban.com
+                    echo [*] 豆瓣速度: %%T秒 (新最快)
+                ) else (
+                    echo [*] 豆瓣速度: %%T秒
                 )
             )
         )
