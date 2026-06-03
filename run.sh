@@ -6,6 +6,19 @@ echo "========================================"
 echo "Szwego商品爬虫和货号对比工具 - v${VERSION}"
 echo "========================================"
 
+echo ""
+echo "[*] 清理临时文件..."
+if [ -d "temp" ]; then
+    find temp -type f -mtime +7 -delete 2>/dev/null
+    if [ $? -eq 0 ]; then
+        echo "[*] 已清理超过7天的临时文件"
+    else
+        echo "[*] 未找到超过7天的临时文件"
+    fi
+else
+    echo "[*] temp目录不存在，跳过清理"
+fi
+
 detect_python() {
     echo ""
     echo "========================================"
