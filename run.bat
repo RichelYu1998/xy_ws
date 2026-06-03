@@ -11,6 +11,19 @@ echo ========================================
 echo Szwego商品爬虫和货号对比工具 - v%VERSION%
 echo ========================================
 
+echo.
+echo [*] 清理临时文件...
+if exist temp (
+    forfiles /P temp /D -7 /C "cmd /c del @path" 2>nul
+    if errorlevel 1 (
+        echo [*] 未找到超过7天的临时文件
+    ) else (
+        echo [*] 已清理超过7天的临时文件
+    )
+) else (
+    echo [*] temp目录不存在，跳过清理
+)
+
 call :cleanup_exit >nul 2>&1
 
 goto detect_python
