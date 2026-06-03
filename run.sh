@@ -57,27 +57,62 @@ setup_venv() {
     if [ -f "requirements.txt" ]; then
         echo "正在安装依赖..."
 
-        ALIYUN_MIRROR="https://mirrors.aliyun.com/pypi/simple/"
-        USE_ALIYUN=0
-
-        if [ -f "$VENV_PATH/pip.conf" ]; then
-            if grep -q "aliyun" "$VENV_PATH/pip.conf" 2>/dev/null; then
-                USE_ALIYUN=1
-            fi
-        fi
-
-        if [ "$USE_ALIYUN" -eq 0 ]; then
-            echo "[*] 检测到未配置pip镜像源，启用阿里云加速..."
+        if [ ! -f "$VENV_PATH/pip.conf" ]; then
+            echo "[*] 检测到未配置pip镜像源，正在测试镜像源速度..."
             mkdir -p "$VENV_PATH/pip_config"
+
+            MIRRORS=(
+                "https://mirrors.aliyun.com/pypi/simple/|mirrors.aliyun.com"
+                "https://pypi.tuna.tsinghua.edu.cn/simple/|pypi.tuna.tsinghua.edu.cn"
+                "https://mirrors.cloud.tencent.com/pypi/simple/|mirrors.cloud.tencent.com"
+                "https://mirrors.ustc.edu.cn/pypi/simple/|mirrors.ustc.edu.cn"
+                "https://pypi.douban.com/simple/|pypi.douban.com"
+            )
+
+            FASTEST_MIRROR="https://mirrors.aliyun.com/pypi/simple/"
+            FASTEST_HOST="mirrors.aliyun.com"
+            MIN_TIME=999
+
+            for mirror in "${MIRRORS[@]}"; do
+                IFS='|' read -r url host <<< "$mirror"
+                echo "[*] 测试镜像源: $url"
+                start_time=$(python3 -c "import time; print(time.time())" 2>/dev/null || python -c "import time; print(time.time())")
+                python3 -c "import urllib.request; urllib.request.urlopen('$url', timeout=3)" 2>/dev/null || python -c "import urllib.request; urllib.request.urlopen('$url', timeout=3)" 2>/dev/null
+                if [ $? -eq 0 ]; then
+                    end_time=$(python3 -c "import time; print(time.time())" 2>/dev/null || python -c "import time; print(time.time())")
+                    elapsed=$(python3 -c "print($end_time - $start_time)" 2>/dev/null || python -c "print($end_time - $start_time)")
+                    if (( $(echo "$elapsed < $MIN_TIME" | bc -l) )); then
+                        MIN_TIME=$elapsed
+                        FASTEST_MIRROR=$url
+                        FASTEST_HOST=$host
+                        echo "[*] 更新最快镜像源: $url ($elapsed秒)"
+                    else
+                        echo "[*] 镜像源速度: $url ($elapsed秒)"
+                    fi
+                else
+                    echo "[*] 镜像源不可用: $url"
+                fi
+            done
+
+            echo "[*] 最终选择最快镜像源: $FASTEST_MIRROR ($MIN_TIME秒)"
             echo "[global]" > "$VENV_PATH/pip_config/pip.conf"
-            echo "index-url = $ALIYUN_MIRROR" >> "$VENV_PATH/pip_config/pip.conf"
+            echo "index-url = $FASTEST_MIRROR" >> "$VENV_PATH/pip_config/pip.conf"
             echo "[install]" >> "$VENV_PATH/pip_config/pip.conf"
-            echo "trusted-host = mirrors.aliyun.com" >> "$VENV_PATH/pip_config/pip.conf"
+            echo "trusted-host = $FASTEST_HOST" >> "$VENV_PATH/pip_config/pip.conf"
 
             export PIP_CONFIG_FILE="$VENV_PATH/pip_config/pip.conf"
         fi
 
         pip install -r requirements.txt -q
+
+        echo "[*] 配置Playwright CDN加速..."
+        export PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright/
+
+        echo "[*] 安装Playwright浏览器..."
+        python3 -m playwright install chromium --with-deps 2>/dev/null || python -m playwright install chromium --with-deps 2>/dev/null
+        if [ $? -ne 0 ]; then
+            echo "[WARNING] Playwright浏览器安装失败，将在首次运行时自动安装"
+        fi
     fi
 
     echo "虚拟环境设置完成"

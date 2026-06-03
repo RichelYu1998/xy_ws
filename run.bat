@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 chcp 65001 > nul 2>&1
 set PYTHONIOENCODING=utf-8
 title Szwego Crawler Tool
@@ -91,17 +92,56 @@ if exist requirements.txt (
     set PIP_CONFIG_FILE=%VENV_PATH%\pip_config\pip.ini
 
     if not exist "%VENV_PATH%\pip_config\pip.ini" (
-        echo [*] 检测到未配置pip镜像源，启用阿里云加速...
+        echo [*] 检测到未配置pip镜像源，正在测试镜像源速度...
         if not exist "%VENV_PATH%\pip_config" mkdir "%VENV_PATH%\pip_config"
+
+        set FASTEST_MIRROR=https://mirrors.aliyun.com/pypi/simple/
+        set FASTEST_HOST=mirrors.aliyun.com
+        set MIN_TIME=999999
+
+        for %%M in (
+            https://mirrors.aliyun.com/pypi/simple/|mirrors.aliyun.com
+            https://pypi.tuna.tsinghua.edu.cn/simple/|pypi.tuna.tsinghua.edu.cn
+            https://mirrors.cloud.tencent.com/pypi/simple/|mirrors.cloud.tencent.com
+            https://mirrors.ustc.edu.cn/pypi/simple/|mirrors.ustc.edu.cn
+            https://pypi.douban.com/simple/|pypi.douban.com
+        ) do (
+            for /f "tokens=1,2 delims=|" %%A in ("%%M") do (
+                echo [*] 测试镜像源: %%A
+                for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('%%A', timeout=3); print(time.time()-start)" 2^>nul') do (
+                    if not "%%T"=="" (
+                        set CURRENT_TIME=%%T
+                        if !CURRENT_TIME! lss !MIN_TIME! (
+                            set MIN_TIME=!CURRENT_TIME!
+                            set FASTEST_MIRROR=%%A
+                            set FASTEST_HOST=%%B
+                            echo [*] 更新最快镜像源: %%A (!CURRENT_TIME!秒)
+                        )
+                    )
+                )
+            )
+        )
+
+        echo [*] 最终选择最快镜像源: %FASTEST_MIRROR% (%MIN_TIME%秒)
         (
             echo [global]
-            echo index-url = https://mirrors.aliyun.com/pypi/simple/
+            echo index-url = %FASTEST_MIRROR%
             echo [install]
-            echo trusted-host = mirrors.aliyun.com
+            echo trusted-host = %FASTEST_HOST%
         ) > "%VENV_PATH%\pip_config\pip.ini"
     )
 
     %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check -q
+
+    echo [*] 配置Playwright CDN加速...
+    set PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright/
+    setx PLAYWRIGHT_DOWNLOAD_HOST %PLAYWRIGHT_DOWNLOAD_HOST% >nul 2>&1
+
+    echo [*] 安装Playwright浏览器...
+    %VENV_PATH%\Scripts\python.exe -m playwright install chromium --with-deps 2>nul
+    if errorlevel 1 (
+        echo [WARNING] Playwright浏览器安装失败，将在首次运行时自动安装
+    )
 )
 
 echo 虚拟环境设置完成
