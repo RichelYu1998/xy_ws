@@ -1,4 +1,26 @@
 # Szwego商品爬虫和货号对比工具
+
+### v3.4.32 (2026-06-03)
+- **全面跨系统支持优化**
+  - **pip 镜像源智能轮询**: 自动测试 5 个国内镜像源（阿里云、清华、腾讯云、中科大、豆瓣），选择当前网络环境下最快的镜像源
+  - **Playwright CDN 加速**: 配置 npmmirror.com CDN 加速浏览器下载，大幅提升安装速度
+  - **统一进程管理**: 新增 `Environment.kill_process_by_name()` 和 `Environment.check_process_running()` 方法，跨系统统一进程操作
+  - **Chrome 浏览器路径优化**: Windows 使用 Playwright 内置浏览器避免权限问题，Mac/Linux 支持系统 Chrome
+  - **浏览器启动参数优化**: 根据系统类型自动配置最佳启动参数
+  - **用户代理字符串适配**: 自动适配 Windows/Mac/Linux 的 UA 字符串
+  - **跨平台路径处理**: 所有文件路径使用 `os.path.join()`，确保三平台兼容
+  - **启动脚本优化**: run.bat 和 run.sh 完全支持跨系统，自动配置镜像源和 CDN
+
+- **修复 Windows Playwright 权限问题**
+  - Windows 系统优先使用 Playwright 内置 Chromium 浏览器
+  - 避免使用系统 Chrome 导致的权限拒绝错误
+  - 自动安装 Playwright 浏览器及其依赖
+
+- **pip 镜像源速度测试**
+  - Windows: 使用 Python 测试每个镜像源响应时间，选择最快的
+  - Linux/Mac: 使用 bash 和 Python 联合测试，记录每个镜像源速度
+  - 显示测试过程和最终选择的镜像源及响应时间
+
 ## 快速开始
 
 ### 1. 克隆仓库

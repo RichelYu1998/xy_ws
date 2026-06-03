@@ -47,6 +47,9 @@ except ImportError:
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# 配置 Playwright CDN 加速
+os.environ.setdefault('PLAYWRIGHT_DOWNLOAD_HOST', 'https://npmmirror.com/mirrors/playwright/')
+
 if not hasattr(subprocess, 'CREATE_NO_WINDOW'):
     subprocess.CREATE_NO_WINDOW = 0x08000000 if platform.system() == 'Windows' else 0
 
@@ -1374,8 +1377,8 @@ class Environment:
         chrome_path = None
         
         if Environment.IS_WINDOWS:
-            if os.path.exists(r'C:\Program Files\Google\Chrome\Application\chrome.exe'):
-                chrome_path = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
+            # Windows上使用Playwright内置浏览器，避免权限问题
+            chrome_path = None
         elif Environment.IS_MAC:
             if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
                 chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
@@ -1424,6 +1427,63 @@ class Environment:
             'venv_python': Environment.get_venv_python(),
             'project_dir': PROJECT_DIR
         }
+    
+    @staticmethod
+    def test_pip_mirror(mirror_url, timeout=3):
+        """测试pip镜像源速度"""
+        try:
+            start_time = time.time()
+            urllib.request.urlopen(mirror_url, timeout=timeout)
+            elapsed_time = time.time() - start_time
+            return elapsed_time
+        except:
+            return None
+    
+    @staticmethod
+    def get_fastest_pip_mirror():
+        """获取最快的pip镜像源"""
+        mirrors = [
+            ('https://mirrors.aliyun.com/pypi/simple/', 'mirrors.aliyun.com'),
+            ('https://pypi.tuna.tsinghua.edu.cn/simple/', 'pypi.tuna.tsinghua.edu.cn'),
+            ('https://mirrors.cloud.tencent.com/pypi/simple/', 'mirrors.cloud.tencent.com'),
+            ('https://mirrors.ustc.edu.cn/pypi/simple/', 'mirrors.ustc.edu.cn'),
+            ('https://pypi.douban.com/simple/', 'pypi.douban.com')
+        ]
+        
+        fastest_mirror = mirrors[0]
+        min_time = float('inf')
+        
+        for mirror_url, host in mirrors:
+            elapsed = Environment.test_pip_mirror(mirror_url)
+            if elapsed is not None and elapsed < min_time:
+                min_time = elapsed
+                fastest_mirror = (mirror_url, host)
+        
+        return fastest_mirror
+    
+    @staticmethod
+    def kill_process_by_name(process_name):
+        """跨系统终止进程"""
+        try:
+            if Environment.IS_WINDOWS:
+                subprocess.run(f'taskkill /F /IM {process_name}', shell=True, capture_output=True, timeout=10)
+            else:
+                subprocess.run(f'pkill -f "{process_name}"', shell=True, capture_output=True, timeout=10)
+        except:
+            pass
+    
+    @staticmethod
+    def check_process_running(process_name):
+        """跨系统检查进程是否运行"""
+        try:
+            if Environment.IS_WINDOWS:
+                result = subprocess.run(f'tasklist /FI "IMAGENAME eq {process_name}"', shell=True, capture_output=True, text=True, timeout=3)
+                return process_name in result.stdout
+            else:
+                result = subprocess.run(f'pgrep -f "{process_name}"', shell=True, capture_output=True, text=True, timeout=3)
+                return result.returncode == 0
+        except:
+            return False
 
 # Windows上的emoji安全打印
 def safe_print(*args, **kwargs):
@@ -5267,16 +5327,7 @@ if __name__ == '__main__':
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
 
             # 检查是否有 hostc 进程在运行
-            has_hostc_process = False
-            try:
-                if Environment.IS_WINDOWS:
-                    result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=3)
-                    has_hostc_process = 'node.exe' in result.stdout
-                else:
-                    result = subprocess.run('pgrep -f "hostc"', shell=True, capture_output=True, text=True, timeout=3)
-                    has_hostc_process = result.returncode == 0
-            except:
-                pass
+            has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
             
             # 从 web_output.log 检查是否有有效 URL（统一入口）
             web_url = PathManager.get_public_url_from_web_log()
@@ -5302,14 +5353,7 @@ if __name__ == '__main__':
                 tunnel_type = 'hostc'
                 
                 # 清理所有旧的 node.exe 进程
-                if Environment.IS_WINDOWS:
-                    try:
-                        subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, timeout=10)
-                        time.sleep(1)
-                    except:
-                        pass
-                else:
-                    subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
+                Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
                 
                 tunnel_process = subprocess.Popen(
                     f'npx hostc@latest {port} --local-host 127.0.0.1',
@@ -5410,16 +5454,7 @@ if __name__ == '__main__':
                 web_url = PathManager.get_public_url_from_web_log()
                 
                 # 检查是否有 hostc 进程在运行
-                has_hostc_process = False
-                try:
-                    if Environment.IS_WINDOWS:
-                        result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=3)
-                        has_hostc_process = 'node.exe' in result.stdout
-                    else:
-                        result = subprocess.run('pgrep -f "hostc"', shell=True, capture_output=True, text=True, timeout=3)
-                        has_hostc_process = result.returncode == 0
-                except:
-                    pass
+                has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
                 
                 # 检查 URL 是否可用
                 is_url_valid = False
@@ -5463,16 +5498,7 @@ if __name__ == '__main__':
                 sys.stdout.flush()
                 
                 # 清理所有 hostc/node 进程
-                if Environment.IS_WINDOWS:
-                    # 清理 node.exe 进程
-                    try:
-                        result = subprocess.run('taskkill /F /IM node.exe', shell=True, capture_output=True, text=True, timeout=10)
-                        print(f"[Tunnel] 已清理 node.exe 进程")
-                    except Exception as e:
-                        print(f"[Tunnel] 清理 node.exe 失败: {e}")
-                    time.sleep(1)
-                else:
-                    subprocess.run('pkill -f "hostc"', shell=True, capture_output=True, timeout=10)
+                Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
                 
                 # 重置状态
                 if tunnel_process:
@@ -5557,16 +5583,7 @@ if __name__ == '__main__':
             url_valid = False
             
             # 检测是否有 hostc 进程在运行
-            process_running = False
-            try:
-                if Environment.IS_WINDOWS:
-                    result = subprocess.run('tasklist /FI "IMAGENAME eq node.exe"', shell=True, capture_output=True, text=True, timeout=3)
-                    process_running = 'node.exe' in result.stdout
-                else:
-                    result = subprocess.run('pgrep -f "hostc"', shell=True, capture_output=True, text=True, timeout=3)
-                    process_running = result.returncode == 0
-            except:
-                pass
+            process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
             
             # 验证 URL 是否可用
             if web_url:
