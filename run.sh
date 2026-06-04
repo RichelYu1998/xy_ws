@@ -148,12 +148,8 @@ setup_venv() {
             if [ -z "$FASTEST_NAME" ]; then
                 FASTEST_NAME="阿里云"
             fi
-            if [ -z "$MIN_TIME" ] || [ "$MIN_TIME" = "999" ]; then
-                echo "[*] 警告: 所有镜像源测试失败，使用默认阿里云镜像"
-                echo "[*] 最终选择最快镜像源: $FASTEST_NAME (默认)"
-            else
-                echo "[*] 最终选择最快镜像源: $FASTEST_NAME ($MIN_TIME秒)"
-            fi
+
+            echo "[*] 最终选择最快镜像源: $FASTEST_NAME"
             echo "[global]" > "$VENV_PATH/pip_config/pip.conf"
             echo "index-url = $FASTEST_MIRROR" >> "$VENV_PATH/pip_config/pip.conf"
             echo "[install]" >> "$VENV_PATH/pip_config/pip.conf"
