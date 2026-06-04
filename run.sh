@@ -78,22 +78,25 @@ setup_venv() {
 
             FASTEST_MIRROR="https://mirrors.aliyun.com/pypi/simple/"
             FASTEST_HOST="mirrors.aliyun.com"
+            FASTEST_NAME="阿里云"
             MIN_TIME=999
 
             echo "[*] 测试镜像源 1/5: 阿里云"
-            ALIYUN_TIME=$($PYTHON_CMD -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(time.time()-start)" 2>/dev/null)
+            ALIYUN_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
             if [ ! -z "$ALIYUN_TIME" ]; then
                 MIN_TIME=$ALIYUN_TIME
+                FASTEST_NAME="阿里云"
                 echo "[*] 阿里云速度: $ALIYUN_TIME秒"
             fi
 
             echo "[*] 测试镜像源 2/5: 清华"
-            TSINGHUA_TIME=$($PYTHON_CMD -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://pypi.tuna.tsinghua.edu.cn/simple/', timeout=3); print(time.time()-start)" 2>/dev/null)
+            TSINGHUA_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.tuna.tsinghua.edu.cn/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
             if [ ! -z "$TSINGHUA_TIME" ]; then
                 if (( $(echo "$TSINGHUA_TIME < $MIN_TIME" | bc -l) )); then
                     MIN_TIME=$TSINGHUA_TIME
                     FASTEST_MIRROR="https://pypi.tuna.tsinghua.edu.cn/simple/"
                     FASTEST_HOST="pypi.tuna.tsinghua.edu.cn"
+                    FASTEST_NAME="清华"
                     echo "[*] 清华速度: $TSINGHUA_TIME秒 (新最快)"
                 else
                     echo "[*] 清华速度: $TSINGHUA_TIME秒"
@@ -101,12 +104,13 @@ setup_venv() {
             fi
 
             echo "[*] 测试镜像源 3/5: 腾讯云"
-            TENCENT_TIME=$($PYTHON_CMD -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.cloud.tencent.com/pypi/simple/', timeout=3); print(time.time()-start)" 2>/dev/null)
+            TENCENT_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.cloud.tencent.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
             if [ ! -z "$TENCENT_TIME" ]; then
                 if (( $(echo "$TENCENT_TIME < $MIN_TIME" | bc -l) )); then
                     MIN_TIME=$TENCENT_TIME
                     FASTEST_MIRROR="https://mirrors.cloud.tencent.com/pypi/simple/"
                     FASTEST_HOST="mirrors.cloud.tencent.com"
+                    FASTEST_NAME="腾讯云"
                     echo "[*] 腾讯云速度: $TENCENT_TIME秒 (新最快)"
                 else
                     echo "[*] 腾讯云速度: $TENCENT_TIME秒"
@@ -114,12 +118,13 @@ setup_venv() {
             fi
 
             echo "[*] 测试镜像源 4/5: 中科大"
-            USTC_TIME=$($PYTHON_CMD -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.ustc.edu.cn/pypi/simple/', timeout=3); print(time.time()-start)" 2>/dev/null)
+            USTC_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.ustc.edu.cn/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
             if [ ! -z "$USTC_TIME" ]; then
                 if (( $(echo "$USTC_TIME < $MIN_TIME" | bc -l) )); then
                     MIN_TIME=$USTC_TIME
                     FASTEST_MIRROR="https://mirrors.ustc.edu.cn/pypi/simple/"
                     FASTEST_HOST="mirrors.ustc.edu.cn"
+                    FASTEST_NAME="中科大"
                     echo "[*] 中科大速度: $USTC_TIME秒 (新最快)"
                 else
                     echo "[*] 中科大速度: $USTC_TIME秒"
@@ -127,19 +132,27 @@ setup_venv() {
             fi
 
             echo "[*] 测试镜像源 5/5: 豆瓣"
-            DOUBAN_TIME=$($PYTHON_CMD -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://pypi.douban.com/simple/', timeout=3); print(time.time()-start)" 2>/dev/null)
+            DOUBAN_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.douban.com/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
             if [ ! -z "$DOUBAN_TIME" ]; then
                 if (( $(echo "$DOUBAN_TIME < $MIN_TIME" | bc -l) )); then
                     MIN_TIME=$DOUBAN_TIME
                     FASTEST_MIRROR="https://pypi.douban.com/simple/"
                     FASTEST_HOST="pypi.douban.com"
+                    FASTEST_NAME="豆瓣"
                     echo "[*] 豆瓣速度: $DOUBAN_TIME秒 (新最快)"
                 else
                     echo "[*] 豆瓣速度: $DOUBAN_TIME秒"
                 fi
             fi
 
-            echo "[*] 最终选择最快镜像源: $FASTEST_MIRROR ($MIN_TIME秒)"
+            if [ -z "$FASTEST_NAME" ]; then
+                FASTEST_NAME="阿里云"
+            fi
+            if [ -z "$MIN_TIME" ] || [ "$MIN_TIME" = "999" ]; then
+                MIN_TIME="测试失败"
+            fi
+
+            echo "[*] 最终选择最快镜像源: $FASTEST_NAME ($MIN_TIME秒)"
             echo "[global]" > "$VENV_PATH/pip_config/pip.conf"
             echo "index-url = $FASTEST_MIRROR" >> "$VENV_PATH/pip_config/pip.conf"
             echo "[install]" >> "$VENV_PATH/pip_config/pip.conf"

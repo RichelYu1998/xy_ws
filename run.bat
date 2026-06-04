@@ -118,12 +118,14 @@ if exist requirements.txt (
 
         set FASTEST_MIRROR=https://mirrors.aliyun.com/pypi/simple/
         set FASTEST_HOST=mirrors.aliyun.com
+        set FASTEST_NAME=阿里云
         set MIN_TIME=999999
 
         echo [*] 测试镜像源 1/5: 阿里云
         for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 set "MIN_TIME=%%T"
+                set "FASTEST_NAME=阿里云"
                 echo [*] 阿里云速度: %%T秒
             )
         )
@@ -135,6 +137,7 @@ if exist requirements.txt (
                     set "MIN_TIME=%%T"
                     set "FASTEST_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple/"
                     set "FASTEST_HOST=pypi.tuna.tsinghua.edu.cn"
+                    set "FASTEST_NAME=清华"
                     echo [*] 清华速度: %%T秒 (新最快)
                 ) else (
                     echo [*] 清华速度: %%T秒
@@ -149,6 +152,7 @@ if exist requirements.txt (
                     set "MIN_TIME=%%T"
                     set "FASTEST_MIRROR=https://mirrors.cloud.tencent.com/pypi/simple/"
                     set "FASTEST_HOST=mirrors.cloud.tencent.com"
+                    set "FASTEST_NAME=腾讯云"
                     echo [*] 腾讯云速度: %%T秒 (新最快)
                 ) else (
                     echo [*] 腾讯云速度: %%T秒
@@ -163,6 +167,7 @@ if exist requirements.txt (
                     set "MIN_TIME=%%T"
                     set "FASTEST_MIRROR=https://mirrors.ustc.edu.cn/pypi/simple/"
                     set "FASTEST_HOST=mirrors.ustc.edu.cn"
+                    set "FASTEST_NAME=中科大"
                     echo [*] 中科大速度: %%T秒 (新最快)
                 ) else (
                     echo [*] 中科大速度: %%T秒
@@ -177,6 +182,7 @@ if exist requirements.txt (
                     set "MIN_TIME=%%T"
                     set "FASTEST_MIRROR=https://pypi.douban.com/simple/"
                     set "FASTEST_HOST=pypi.douban.com"
+                    set "FASTEST_NAME=豆瓣"
                     echo [*] 豆瓣速度: %%T秒 (新最快)
                 ) else (
                     echo [*] 豆瓣速度: %%T秒
@@ -186,9 +192,10 @@ if exist requirements.txt (
 
         if not defined FASTEST_MIRROR set "FASTEST_MIRROR=https://mirrors.aliyun.com/pypi/simple/"
         if not defined FASTEST_HOST set "FASTEST_HOST=mirrors.aliyun.com"
-        if not defined MIN_TIME set "MIN_TIME=N/A"
+        if not defined FASTEST_NAME set "FASTEST_NAME=阿里云"
+        if not defined MIN_TIME set "MIN_TIME=测试失败"
 
-        echo [*] 最终选择最快镜像源: !FASTEST_MIRROR! (!MIN_TIME!秒)
+        echo [*] 最终选择最快镜像源: !FASTEST_NAME! (!MIN_TIME!秒)
         (
             echo [global]
             echo index-url = %FASTEST_MIRROR%
