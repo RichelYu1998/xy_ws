@@ -14,11 +14,14 @@ echo ========================================
 echo.
 echo [*] 清理临时文件...
 if exist temp (
-    forfiles /P temp /D -7 /C "cmd /c del @path" 2>nul
-    if errorlevel 1 (
-        echo [*] 未找到超过7天的临时文件
+    for /f "tokens=3" %%a in ('dir /s /-c temp ^| findstr /i "bytes"') do set "TOTAL_SIZE=%%a"
+    if not defined TOTAL_SIZE set "TOTAL_SIZE=0"
+    set "LIMIT_SIZE=3145728"
+    if %TOTAL_SIZE% gtr %LIMIT_SIZE% (
+        del /f /s /q temp\*.* >nul 2>&1
+        echo [*] temp目录超过3MB，已清理所有文件
     ) else (
-        echo [*] 已清理超过7天的临时文件
+        echo [*] temp目录未超过3MB，跳过清理
     )
 ) else (
     echo [*] temp目录不存在，跳过清理
@@ -301,6 +304,26 @@ echo.
 echo 按 Ctrl+C 停止服务，或关闭此窗口
 echo.
 
+set "CHECK_INTERVAL=60"
+set "CHECK_COUNTER=0"
+
 :wait_loop
 timeout /t 1 /nobreak >nul
+set /a CHECK_COUNTER+=1
+if %CHECK_COUNTER% geq %CHECK_INTERVAL% (
+    set "CHECK_COUNTER=0"
+    call :check_temp_size
+)
 goto wait_loop
+
+:check_temp_size
+if exist temp (
+    for /f "tokens=3" %%a in ('dir /s /-c temp ^| findstr /i "bytes"') do set "TOTAL_SIZE=%%a"
+    if not defined TOTAL_SIZE set "TOTAL_SIZE=0"
+    set "LIMIT_SIZE=3145728"
+    if %TOTAL_SIZE% gtr %LIMIT_SIZE% (
+        del /f /s /q temp\*.* >nul 2>&1
+        echo [*] 定时检查: temp目录超过3MB，已清理所有文件
+    )
+)
+goto :eof

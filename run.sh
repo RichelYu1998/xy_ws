@@ -9,11 +9,13 @@ echo "========================================"
 echo ""
 echo "[*] 清理临时文件..."
 if [ -d "temp" ]; then
-    find temp -type f -mtime +7 -delete 2>/dev/null
-    if [ $? -eq 0 ]; then
-        echo "[*] 已清理超过7天的临时文件"
+    TOTAL_SIZE=$(du -sb temp | awk '{print $1}')
+    LIMIT_SIZE=3145728
+    if [ "$TOTAL_SIZE" -gt "$LIMIT_SIZE" ]; then
+        rm -rf temp/*
+        echo "[*] temp目录超过3MB，已清理所有文件"
     else
-        echo "[*] 未找到超过7天的临时文件"
+        echo "[*] temp目录未超过3MB，跳过清理"
     fi
 else
     echo "[*] temp目录不存在，跳过清理"
@@ -261,6 +263,17 @@ run_web() {
     echo "关闭此窗口可停止服务，或使用 Ctrl+C"
     echo ""
 
+    while true; do
+        sleep 60
+        if [ -d "temp" ]; then
+            TOTAL_SIZE=$(du -sb temp | awk '{print $1}')
+            LIMIT_SIZE=3145728
+            if [ "$TOTAL_SIZE" -gt "$LIMIT_SIZE" ]; then
+                rm -rf temp/*
+                echo "[*] 定时检查: temp目录超过3MB，已清理所有文件"
+            fi
+        fi
+    done &
     wait $PYTHON_PID $TUNNEL_PID
 }
 
