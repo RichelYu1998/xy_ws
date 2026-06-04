@@ -193,9 +193,12 @@ if exist requirements.txt (
         if not defined FASTEST_MIRROR set "FASTEST_MIRROR=https://mirrors.aliyun.com/pypi/simple/"
         if not defined FASTEST_HOST set "FASTEST_HOST=mirrors.aliyun.com"
         if not defined FASTEST_NAME set "FASTEST_NAME=阿里云"
-        if not defined MIN_TIME set "MIN_TIME=测试失败"
-
-        echo [*] 最终选择最快镜像源: !FASTEST_NAME! (!MIN_TIME!秒)
+        if not defined MIN_TIME (
+            echo [*] 警告: 所有镜像源测试失败，使用默认阿里云镜像
+            echo [*] 最终选择最快镜像源: !FASTEST_NAME! (默认)
+        ) else (
+            echo [*] 最终选择最快镜像源: !FASTEST_NAME! (!MIN_TIME!秒)
+        )
         (
             echo [global]
             echo index-url = %FASTEST_MIRROR%
