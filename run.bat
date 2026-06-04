@@ -123,7 +123,7 @@ if exist requirements.txt (
         echo [*] 测试镜像源 1/5: 阿里云
         for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
             if not "%%T"=="" (
-                set MIN_TIME=%%T
+                set "MIN_TIME=%%T"
                 echo [*] 阿里云速度: %%T秒
             )
         )
@@ -132,9 +132,9 @@ if exist requirements.txt (
         for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://pypi.tuna.tsinghua.edu.cn/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
-                    set MIN_TIME=%%T
-                    set FASTEST_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple/
-                    set FASTEST_HOST=pypi.tuna.tsinghua.edu.cn
+                    set "MIN_TIME=%%T"
+                    set "FASTEST_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple/"
+                    set "FASTEST_HOST=pypi.tuna.tsinghua.edu.cn"
                     echo [*] 清华速度: %%T秒 (新最快)
                 ) else (
                     echo [*] 清华速度: %%T秒
@@ -146,9 +146,9 @@ if exist requirements.txt (
         for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.cloud.tencent.com/pypi/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
-                    set MIN_TIME=%%T
-                    set FASTEST_MIRROR=https://mirrors.cloud.tencent.com/pypi/simple/
-                    set FASTEST_HOST=mirrors.cloud.tencent.com
+                    set "MIN_TIME=%%T"
+                    set "FASTEST_MIRROR=https://mirrors.cloud.tencent.com/pypi/simple/"
+                    set "FASTEST_HOST=mirrors.cloud.tencent.com"
                     echo [*] 腾讯云速度: %%T秒 (新最快)
                 ) else (
                     echo [*] 腾讯云速度: %%T秒
@@ -160,9 +160,9 @@ if exist requirements.txt (
         for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.ustc.edu.cn/pypi/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
-                    set MIN_TIME=%%T
-                    set FASTEST_MIRROR=https://mirrors.ustc.edu.cn/pypi/simple/
-                    set FASTEST_HOST=mirrors.ustc.edu.cn
+                    set "MIN_TIME=%%T"
+                    set "FASTEST_MIRROR=https://mirrors.ustc.edu.cn/pypi/simple/"
+                    set "FASTEST_HOST=mirrors.ustc.edu.cn"
                     echo [*] 中科大速度: %%T秒 (新最快)
                 ) else (
                     echo [*] 中科大速度: %%T秒
@@ -174,9 +174,9 @@ if exist requirements.txt (
         for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://pypi.douban.com/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
-                    set MIN_TIME=%%T
-                    set FASTEST_MIRROR=https://pypi.douban.com/simple/
-                    set FASTEST_HOST=pypi.douban.com
+                    set "MIN_TIME=%%T"
+                    set "FASTEST_MIRROR=https://pypi.douban.com/simple/"
+                    set "FASTEST_HOST=pypi.douban.com"
                     echo [*] 豆瓣速度: %%T秒 (新最快)
                 ) else (
                     echo [*] 豆瓣速度: %%T秒
