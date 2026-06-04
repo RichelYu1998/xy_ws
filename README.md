@@ -131,6 +131,14 @@ class Environment:
 
 ## 更新日志
 
+### v3.4.34 (2026-06-04)
+- **修复文件清理 API JSON 解析错误**
+  - 修复清理文件时返回大文本导致的 "Unterminated string in JSON at position 65536" 错误
+  - 优化 JSON 编码方式，使用 `json.dumps()` 配合 `ensure_ascii=False` 参数
+  - 确保中文字符正确编码，避免字符编码问题
+  - 修复的 API 路由：`/api/clean/list`、`/api/clean/group`、`/api/clean/time`、`/api/clean/all`、`/api/clean/png`、`/api/clean/media`
+  - 提升跨系统兼容性，确保所有平台（Windows/macOS/Linux）都能正常处理大文本响应
+
 ### v3.4.33 (2026-06-03)
 - **代码优化和精简**
   - 移除重复的 `from functools import wraps` 导入
