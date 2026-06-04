@@ -263,18 +263,23 @@ run_web() {
     echo "关闭此窗口可停止服务，或使用 Ctrl+C"
     echo ""
 
-    while true; do
-        sleep 60
-        if [ -d "temp" ]; then
-            TOTAL_SIZE=$(du -sb temp | awk '{print $1}')
-            LIMIT_SIZE=3145728
-            if [ "$TOTAL_SIZE" -gt "$LIMIT_SIZE" ]; then
-                rm -rf temp/*
-                echo "[*] 定时检查: temp目录超过3MB，已清理所有文件"
+    (
+        while true; do
+            sleep 60
+            if [ -d "temp" ]; then
+                TOTAL_SIZE=$(du -sb temp 2>/dev/null | awk '{print $1}')
+                LIMIT_SIZE=3145728
+                if [ "$TOTAL_SIZE" -gt "$LIMIT_SIZE" ]; then
+                    rm -rf temp/*
+                    echo "[*] 定时检查: temp目录超过3MB，已清理所有文件"
+                fi
             fi
-        fi
-    done &
+        done
+    ) &
+    CLEANUP_PID=$!
+
     wait $PYTHON_PID $TUNNEL_PID
+    kill $CLEANUP_PID 2>/dev/null
 }
 
 cleanup_exit() {

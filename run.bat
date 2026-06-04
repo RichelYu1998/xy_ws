@@ -14,10 +14,15 @@ echo ========================================
 echo.
 echo [*] 清理临时文件...
 if exist temp (
-    for /f "tokens=3" %%a in ('dir /s /-c temp ^| findstr /i "bytes"') do set "TOTAL_SIZE=%%a"
+    set "TOTAL_SIZE=0"
+    for /f "tokens=3" %%a in ('dir /s /-c temp ^| findstr /i "bytes"') do (
+        set "SIZE_STR=%%a"
+        set "SIZE_STR=!SIZE_STR:,=!"
+        set "TOTAL_SIZE=!SIZE_STR!"
+    )
     if not defined TOTAL_SIZE set "TOTAL_SIZE=0"
     set "LIMIT_SIZE=3145728"
-    if %TOTAL_SIZE% gtr %LIMIT_SIZE% (
+    if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
         del /f /s /q temp\*.* >nul 2>&1
         echo [*] temp目录超过3MB，已清理所有文件
     ) else (
@@ -318,10 +323,15 @@ goto wait_loop
 
 :check_temp_size
 if exist temp (
-    for /f "tokens=3" %%a in ('dir /s /-c temp ^| findstr /i "bytes"') do set "TOTAL_SIZE=%%a"
+    set "TOTAL_SIZE=0"
+    for /f "tokens=3" %%a in ('dir /s /-c temp ^| findstr /i "bytes"') do (
+        set "SIZE_STR=%%a"
+        set "SIZE_STR=!SIZE_STR:,=!"
+        set "TOTAL_SIZE=!SIZE_STR!"
+    )
     if not defined TOTAL_SIZE set "TOTAL_SIZE=0"
     set "LIMIT_SIZE=3145728"
-    if %TOTAL_SIZE% gtr %LIMIT_SIZE% (
+    if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
         del /f /s /q temp\*.* >nul 2>&1
         echo [*] 定时检查: temp目录超过3MB，已清理所有文件
     )
