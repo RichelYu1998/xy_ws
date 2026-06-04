@@ -5067,7 +5067,9 @@ if __name__ == '__main__':
                 log_stream = io.StringIO()
                 clean_all_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
 
-                return jsonify({'success': True, 'output': log_stream.getvalue()})
+                output = log_stream.getvalue()
+                response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
+                return Response(response_data, mimetype='application/json')
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
@@ -5086,7 +5088,9 @@ if __name__ == '__main__':
                 log_stream = io.StringIO()
                 clean_png_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
                 
-                return jsonify({'success': True, 'output': log_stream.getvalue()})
+                output = log_stream.getvalue()
+                response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
+                return Response(response_data, mimetype='application/json')
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
@@ -5105,7 +5109,9 @@ if __name__ == '__main__':
                 log_stream = io.StringIO()
                 clean_media_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
                 
-                return jsonify({'success': True, 'output': log_stream.getvalue()})
+                output = log_stream.getvalue()
+                response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
+                return Response(response_data, mimetype='application/json')
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
