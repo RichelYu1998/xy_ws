@@ -121,7 +121,7 @@ if exist requirements.txt (
         set MIN_TIME=999999
 
         echo [*] 测试镜像源 1/5: 阿里云
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 set "MIN_TIME=%%T"
                 echo [*] 阿里云速度: %%T秒
@@ -129,7 +129,7 @@ if exist requirements.txt (
         )
 
         echo [*] 测试镜像源 2/5: 清华
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://pypi.tuna.tsinghua.edu.cn/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.tuna.tsinghua.edu.cn/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
                     set "MIN_TIME=%%T"
@@ -143,7 +143,7 @@ if exist requirements.txt (
         )
 
         echo [*] 测试镜像源 3/5: 腾讯云
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.cloud.tencent.com/pypi/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.cloud.tencent.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
                     set "MIN_TIME=%%T"
@@ -157,7 +157,7 @@ if exist requirements.txt (
         )
 
         echo [*] 测试镜像源 4/5: 中科大
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://mirrors.ustc.edu.cn/pypi/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.ustc.edu.cn/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
                     set "MIN_TIME=%%T"
@@ -171,7 +171,7 @@ if exist requirements.txt (
         )
 
         echo [*] 测试镜像源 5/5: 豆瓣
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request; import time; start=time.time(); urllib.request.urlopen('https://pypi.douban.com/simple/', timeout=3); print(time.time()-start)" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.douban.com/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
                     set "MIN_TIME=%%T"
@@ -183,6 +183,10 @@ if exist requirements.txt (
                 )
             )
         )
+
+        if not defined FASTEST_MIRROR set "FASTEST_MIRROR=https://mirrors.aliyun.com/pypi/simple/"
+        if not defined FASTEST_HOST set "FASTEST_HOST=mirrors.aliyun.com"
+        if not defined MIN_TIME set "MIN_TIME=N/A"
 
         echo [*] 最终选择最快镜像源: !FASTEST_MIRROR! (!MIN_TIME!秒)
         (
