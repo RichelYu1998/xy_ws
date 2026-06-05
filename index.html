@@ -1737,6 +1737,7 @@ playwright install chromium</pre>
         <button class="btn btn-primary btn-lg m-1 btn-sku-api" data-api="/api/sku/compare/excel" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-file-excel-o"></i> 3. Excel与JSON对比</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cookie" data-func="4" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-refresh"></i> 4. 更新Cookie</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-view-products" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-list"></i> 查看所有商品</span></button>
+        <button class="btn btn-primary btn-lg m-1" id="btn-daily-profit" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-chart-line"></i> 每日利润报表</span></button>
         <button class="btn btn-primary btn-lg m-1 btn-run" id="btn-run-cleaner" data-func="6" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-trash"></i> 6. 文件清理工具</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-run-tunnel" style="min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-external-link"></i> 7. 隧道共享</span></button>
         <button class="btn btn-primary btn-lg m-1" id="btn-stop-task" style="display: none; min-width: 160px; height: 48px; line-height: 32px;"><span style="font-size: 14px;"><i class="fa fa-stop"></i> 停止</span></button>
@@ -3204,6 +3205,139 @@ playwright install chromium</pre>
                 console.log('[按钮点击] 查看所有商品');
                 showAllProducts();
             };
+        }
+
+        const dailyProfitBtn = document.getElementById('btn-daily-profit');
+        if (dailyProfitBtn) {
+            dailyProfitBtn.onclick = function() {
+                console.log('[按钮点击] 每日利润报表');
+                showDailyProfitReport();
+            };
+        }
+
+        function showDailyProfitReport() {
+            fetch('/api/daily-profit')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showToast('获取报表失败: ' + data.error, 'error');
+                        return;
+                    }
+                    
+                    showOutputPanel();
+                    const outputPanel = document.getElementById('output-panel');
+                    const existingCard = outputPanel.querySelector('.daily-profit-card, .comparison-card, .products-card');
+                    if (existingCard) existingCard.remove();
+                    
+                    let cardHtml = `
+                    <div class="daily-profit-card">
+                        <div class="comparison-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <i class="fa fa-chart-line"></i> 每日利润报表
+                        </div>
+                        <div class="comparison-body" style="padding: 0;">
+                    `;
+                    
+                    if (data.daily_profit_report) {
+                        cardHtml += `
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; margin-bottom: 0;">
+                                <div style="color: white; font-size: 14px; line-height: 1.8; white-space: pre-wrap;">${data.daily_profit_report}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (data.table_data && data.table_data.length > 0) {
+                        cardHtml += `
+                            <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
+                                <table class="table table-bordered table-sm" style="margin: 0; font-size: 12px;">
+                        `;
+                        
+                        function formatDate(value) {
+                            if (value === null || value === undefined) return '';
+                            const str = String(value);
+                            if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+                            if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(str)) {
+                                const parts = str.split('/');
+                                return parts[0] + '-' + parts[1].padStart(2, '0') + '-' + parts[2].padStart(2, '0');
+                            }
+                            if (/^\d{8}$/.test(str)) {
+                                return str.substring(0, 4) + '-' + str.substring(4, 6) + '-' + str.substring(6, 8);
+                            }
+                            if (str.includes('GMT') || str.includes('UTC') || /^\w{3}, \d{2} \w{3} \d{4}/.test(str)) {
+                                try {
+                                    const date = new Date(str);
+                                    if (!isNaN(date.getTime())) {
+                                        const year = date.getFullYear();
+                                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                                        const day = String(date.getDate()).padStart(2, '0');
+                                        return year + '-' + month + '-' + day;
+                                    }
+                                } catch (e) {}
+                            }
+                            return str;
+                        }
+                        
+                        function formatNumber(value) {
+                            if (value === null || value === undefined) return '';
+                            if (typeof value === 'number') {
+                                return value.toFixed(2);
+                            }
+                            const str = String(value);
+                            if (/^-?\d+\.\d+$/.test(str)) {
+                                return parseFloat(str).toFixed(2);
+                            }
+                            return str;
+                        }
+                        
+                        let dateColIndex = -1;
+                        if (data.table_data[0]) {
+                            data.table_data[0].forEach((header, idx) => {
+                                if (header && String(header).includes('日期')) {
+                                    dateColIndex = idx;
+                                }
+                            });
+                        }
+                        
+                        data.table_data.forEach((row, rowIndex) => {
+                            cardHtml += `<tr>`;
+                            row.forEach((cell, colIndex) => {
+                                let cellValue = cell !== null && cell !== undefined ? cell : '';
+                                const isHeader = rowIndex === 0;
+                                const tag = isHeader ? 'th' : 'td';
+                                let style = 'text-align: center; vertical-align: middle;';
+                                if (isHeader) {
+                                    style += ' background: #f5f5f5; font-weight: bold; position: sticky; top: 0; z-index: 10;';
+                                }
+                                if (!isHeader && colIndex === dateColIndex) {
+                                    cellValue = formatDate(cellValue);
+                                } else if (!isHeader && typeof cell === 'number' || (typeof cellValue === 'string' && /^-?\d+\.\d+$/.test(cellValue))) {
+                                    cellValue = formatNumber(cellValue);
+                                }
+                                cardHtml += `<${tag} style="${style}">${cellValue}</${tag}>`;
+                            });
+                            cardHtml += `</tr>`;
+                        });
+                        
+                        cardHtml += `
+                                </table>
+                            </div>
+                        `;
+                    }
+                    
+                    if (data.excel_file) {
+                        cardHtml += `
+                            <div style="color: #888; font-size: 12px; padding: 10px; border-top: 1px solid #eee; background: #fafafa;">
+                                <i class="fa fa-file-excel-o"></i> 数据来源: ${data.excel_file}
+                            </div>
+                        `;
+                    }
+                    
+                    cardHtml += `</div></div>`;
+                    
+                    outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+                })
+                .catch(error => {
+                    showToast('请求失败: ' + error.message, 'error');
+                });
         }
 
         const tunnelBtn = document.getElementById('btn-run-tunnel');
