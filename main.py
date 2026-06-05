@@ -5146,7 +5146,8 @@ if __name__ == '__main__':
                     'excel_file': os.path.basename(excel_files_list[0]) if excel_files_list else None,
                     'summary': summary_list,
                     'group_by': group_by,
-                    'total_records': len(all_records)
+                    'total_records': len(all_records),
+                    'all_records': all_records
                 }
                 return jsonify(result)
             except Exception as e:
