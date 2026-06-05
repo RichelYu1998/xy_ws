@@ -3215,8 +3215,12 @@ playwright install chromium</pre>
             };
         }
 
-        function showDailyProfitReport() {
-            fetch('/api/daily-profit')
+        function showDailyProfitReport(groupBy = 'day', startDate = '', endDate = '') {
+            let url = '/api/daily-profit?group_by=' + groupBy;
+            if (startDate) url += '&start_date=' + startDate;
+            if (endDate) url += '&end_date=' + endDate;
+            
+            fetch(url)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -3235,12 +3239,82 @@ playwright install chromium</pre>
                             <i class="fa fa-chart-line"></i> 每日利润报表
                         </div>
                         <div class="comparison-body" style="padding: 0;">
+                            <div style="background: #f8f9fa; padding: 15px; border-bottom: 1px solid #dee2e6;">
+                                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;">
+                                    <span style="font-weight: 600; color: #333;">汇总视图：</span>
+                                    <button class="btn btn-sm ${groupBy === 'day' ? 'btn-primary' : 'btn-outline-primary'}" onclick="showDailyProfitReport('day')">按天</button>
+                                    <button class="btn btn-sm ${groupBy === 'month' ? 'btn-primary' : 'btn-outline-primary'}" onclick="showDailyProfitReport('month')">按月</button>
+                                    <button class="btn btn-sm ${groupBy === 'year' ? 'btn-primary' : 'btn-outline-primary'}" onclick="showDailyProfitReport('year')">按年</button>
+                                    <button class="btn btn-sm ${groupBy === 'all' ? 'btn-primary' : 'btn-outline-primary'}" onclick="showDailyProfitReport('all')">全部</button>
+                                </div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+                                    <span style="font-weight: 600; color: #333;">自定义时间：</span>
+                                    <input type="date" id="profit-start-date" class="form-control form-control-sm" style="width: 150px;" value="${startDate}">
+                                    <span>至</span>
+                                    <input type="date" id="profit-end-date" class="form-control form-control-sm" style="width: 150px;" value="${endDate}">
+                                    <button class="btn btn-sm btn-success" onclick="applyDateFilter()"><i class="fa fa-filter"></i> 筛选</button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="clearDateFilter()"><i class="fa fa-times"></i> 清除</button>
+                                </div>
+                            </div>
                     `;
                     
                     if (data.daily_profit_report) {
                         cardHtml += `
                             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; margin-bottom: 0;">
                                 <div style="color: white; font-size: 14px; line-height: 1.8; white-space: pre-wrap;">${data.daily_profit_report}</div>
+                            </div>
+                        `;
+                    }
+                    
+                    if (data.summary && data.summary.length > 0) {
+                        cardHtml += `
+                            <div style="padding: 15px; background: #e8f4f8; border-bottom: 2px solid #667eea;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <span style="font-weight: 600; color: #333;">📊 汇总数据（共 ${data.total_records} 条记录）</span>
+                                </div>
+                                <div style="overflow-x: auto;">
+                                    <table class="table table-bordered table-sm" style="margin: 0; font-size: 13px; background: white;">
+                                        <thead style="background: #667eea; color: white;">
+                                            <tr>
+                                                <th style="text-align: center; vertical-align: middle;">${groupBy === 'day' ? '日期' : groupBy === 'month' ? '月份' : groupBy === 'year' ? '年份' : '总计'}</th>
+                                                <th style="text-align: center;">笔数</th>
+                                                <th style="text-align: center;">金额合计</th>
+                                                <th style="text-align: center;">成本合计</th>
+                                                <th style="text-align: center;">纯利合计</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                        `;
+                        
+                        data.summary.forEach(item => {
+                            const profitRate = item.成本 > 0 ? ((item.纯利 / item.成本) * 100).toFixed(1) : '0';
+                            cardHtml += `
+                                <tr style="cursor: pointer;" onclick="showDailyProfitDetail('${item.日期}', '${groupBy}')">
+                                    <td style="text-align: center; font-weight: 600;">${item.日期}</td>
+                                    <td style="text-align: center;">${item.数量}笔</td>
+                                    <td style="text-align: right; color: #e6a23c; font-weight: 600;">¥${item.金额.toFixed(2)}</td>
+                                    <td style="text-align: right; color: #909399;">¥${item.成本.toFixed(2)}</td>
+                                    <td style="text-align: right; color: #67c23a; font-weight: 600;">¥${item.纯利.toFixed(2)}</td>
+                                </tr>
+                            `;
+                        });
+                        
+                        const totalAmount = data.summary.reduce((sum, item) => sum + item.金额, 0);
+                        const totalCost = data.summary.reduce((sum, item) => sum + item.成本, 0);
+                        const totalProfit = data.summary.reduce((sum, item) => sum + item.纯利, 0);
+                        const totalCount = data.summary.reduce((sum, item) => sum + item.数量, 0);
+                        
+                        cardHtml += `
+                                            <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold;">
+                                                <td style="text-align: center;">合计</td>
+                                                <td style="text-align: center;">${totalCount}笔</td>
+                                                <td style="text-align: right;">¥${totalAmount.toFixed(2)}</td>
+                                                <td style="text-align: right;">¥${totalCost.toFixed(2)}</td>
+                                                <td style="text-align: right;">¥${totalProfit.toFixed(2)}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         `;
                     }
@@ -3390,6 +3464,37 @@ playwright install chromium</pre>
                 .catch(error => {
                     showToast('请求失败: ' + error.message, 'error');
                 });
+        }
+        
+        function applyDateFilter() {
+            const startDate = document.getElementById('profit-start-date').value;
+            const endDate = document.getElementById('profit-end-date').value;
+            showDailyProfitReport('day', startDate, endDate);
+        }
+        
+        function clearDateFilter() {
+            document.getElementById('profit-start-date').value = '';
+            document.getElementById('profit-end-date').value = '';
+            showDailyProfitReport('day', '', '');
+        }
+        
+        function showDailyProfitDetail(dateKey, groupBy) {
+            let startDate = dateKey;
+            let endDate = dateKey;
+            
+            if (groupBy === 'month') {
+                startDate = dateKey + '-01';
+                const parts = dateKey.split('-');
+                const year = parseInt(parts[0]);
+                const month = parseInt(parts[1]);
+                const lastDay = new Date(year, month, 0).getDate();
+                endDate = dateKey + '-' + lastDay.toString().padStart(2, '0');
+            } else if (groupBy === 'year') {
+                startDate = dateKey + '-01-01';
+                endDate = dateKey + '-12-31';
+            }
+            
+            showDailyProfitReport('day', startDate, endDate);
         }
 
         const tunnelBtn = document.getElementById('btn-run-tunnel');
