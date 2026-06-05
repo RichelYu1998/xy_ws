@@ -25,7 +25,7 @@ from email.mime.multipart import MIMEMultipart
 from email.header import Header
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
 
@@ -1745,7 +1745,7 @@ class PathManager:
         try:
             web_log_file = PathManager.get_web_output_file()
             if os.path.exists(web_log_file):
-                with open(web_log_file, 'r', encoding='utf-8') as f:
+                with open(web_log_file, 'r', encoding='utf-8', errors='replace') as f:
                     content = f.read()
                 match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
                 if match:
@@ -4676,7 +4676,10 @@ if __name__ == '__main__':
                 }
                 return jsonify(result)
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                import traceback
+                error_detail = str(e) + '\n' + traceback.format_exc()
+                print(f'get_daily_profit错误: {error_detail}')
+                return jsonify({'error': str(e), 'detail': error_detail}), 500
 
         @app.route('/api/sku/compare/txt', methods=['GET', 'POST'])
         def compare_sku_txt():
@@ -5074,10 +5077,57 @@ if __name__ == '__main__':
                                         remark = row_data[5] if len(row_data) > 5 else ''
                                         
                                         if isinstance(date_val, datetime):
-                                            record_date = date_val
+                                            record_date_str = date_val.strftime('%Y-%m-%d')
                                         elif isinstance(date_val, str):
+                                            date_str = date_val.strip()
+                                            record_date_str = None
+                                            for fmt in ['%Y-%m-%d', '%Y/%m/%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y年%m月%d日', '%Y.%m.%d']:
+                                                try:
+                                                    record_date = datetime.strptime(date_str.split()[0], fmt)
+                                                    record_date_str = record_date.strftime('%Y-%m-%d')
+                                                    break
+                                                except:
+                                                    continue
+                                            if record_date_str is None:
+                                                parts = date_str.split()
+                                                if len(parts) >= 2:
+                                                    try:
+                                                        day_part = parts[1].rstrip('日号号日.')
+                                                        record_date = datetime.strptime(day_part, '%d')
+                                                        record_date = record_date.replace(year=datetime.now().year)
+                                                        if 'Dec' in date_str or 'De' in date_str:
+                                                            record_date = record_date.replace(month=12)
+                                                        elif 'Jan' in date_str:
+                                                            record_date = record_date.replace(month=1)
+                                                        elif 'Feb' in date_str:
+                                                            record_date = record_date.replace(month=2)
+                                                        elif 'Mar' in date_str:
+                                                            record_date = record_date.replace(month=3)
+                                                        elif 'Apr' in date_str:
+                                                            record_date = record_date.replace(month=4)
+                                                        elif 'May' in date_str:
+                                                            record_date = record_date.replace(month=5)
+                                                        elif 'Jun' in date_str:
+                                                            record_date = record_date.replace(month=6)
+                                                        elif 'Jul' in date_str:
+                                                            record_date = record_date.replace(month=7)
+                                                        elif 'Aug' in date_str:
+                                                            record_date = record_date.replace(month=8)
+                                                        elif 'Sep' in date_str:
+                                                            record_date = record_date.replace(month=9)
+                                                        elif 'Oct' in date_str:
+                                                            record_date = record_date.replace(month=10)
+                                                        elif 'Nov' in date_str:
+                                                            record_date = record_date.replace(month=11)
+                                                        record_date_str = record_date.strftime('%Y-%m-%d')
+                                                    except:
+                                                        pass
+                                                if record_date_str is None:
+                                                    continue
+                                        elif isinstance(date_val, (int, float)):
                                             try:
-                                                record_date = datetime.strptime(date_val.split()[0], '%Y-%m-%d')
+                                                record_date = datetime(1899, 12, 30) + timedelta(days=int(date_val))
+                                                record_date_str = record_date.strftime('%Y-%m-%d')
                                             except:
                                                 continue
                                         else:
@@ -5088,7 +5138,7 @@ if __name__ == '__main__':
                                             '金额': amount,
                                             '成本': cost,
                                             '纯利': profit,
-                                            '日期': record_date.strftime('%Y-%m-%d'),
+                                            '日期': record_date_str,
                                             '备注': remark
                                         })
                                     except (ValueError, TypeError, IndexError):
@@ -5105,38 +5155,39 @@ if __name__ == '__main__':
                 
                 if start_date:
                     try:
-                        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-                        all_records = [r for r in all_records if r['日期'] >= start_dt]
+                        all_records = [r for r in all_records if r['日期'] >= start_date]
                     except:
                         pass
                 
                 if end_date:
                     try:
-                        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-                        all_records = [r for r in all_records if r['日期'] <= end_dt]
+                        all_records = [r for r in all_records if r['日期'] <= end_date]
                     except:
                         pass
                 
                 summary = {}
                 for record in all_records:
                     date_key = record['日期']
+                    project_name = record.get('项目', '未分类')
                     
                     if group_by == 'month':
-                        key = date_key.strftime('%Y-%m')
+                        key = date_key[:7]
                     elif group_by == 'year':
-                        key = date_key.strftime('%Y')
+                        key = date_key[:4]
                     elif group_by == 'all':
                         key = '总计'
                     else:
-                        key = date_key.strftime('%Y-%m-%d')
+                        key = date_key
                     
-                    if key not in summary:
-                        summary[key] = {'金额': 0, '成本': 0, '纯利': 0, '数量': 0, '日期': key}
+                    composite_key = key + '|' + project_name
                     
-                    summary[key]['金额'] += record['金额']
-                    summary[key]['成本'] += record['成本']
-                    summary[key]['纯利'] += record['纯利']
-                    summary[key]['数量'] += 1
+                    if composite_key not in summary:
+                        summary[composite_key] = {'日期': key, '项目': project_name, '金额': 0, '成本': 0, '纯利': 0, '数量': 0}
+                    
+                    summary[composite_key]['金额'] += record['金额']
+                    summary[composite_key]['成本'] += record['成本']
+                    summary[composite_key]['纯利'] += record['纯利']
+                    summary[composite_key]['数量'] += 1
                 
                 summary_list = sorted(summary.values(), key=lambda x: x['日期'])
                 
@@ -5151,7 +5202,11 @@ if __name__ == '__main__':
                 }
                 return jsonify(result)
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                import traceback
+                error_detail = str(e) + '\n' + traceback.format_exc()
+                print(f'get_daily_profit错误: {error_detail}')
+                return jsonify({'error': str(e), 'detail': error_detail}), 500
+
         def get_all_products():
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
