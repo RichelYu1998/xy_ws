@@ -3540,21 +3540,33 @@ playwright install chromium</pre>
                     const recordDate = record['日期'];
                     let dateStr = '';
                     if (typeof recordDate === 'string') {
-                        dateStr = recordDate;
+                        dateStr = recordDate.substring(0, 10);
                     } else if (recordDate instanceof Date) {
                         dateStr = recordDate.toISOString().split('T')[0];
                     }
                     
+                   let match = false;
                     if (dateKey.length === 7) {
-                        return dateStr.startsWith(dateKey);
+                        match = dateStr.startsWith(dateKey);
                     } else if (dateKey.length === 4) {
-                        return dateStr.startsWith(dateKey);
+                        match = dateStr.startsWith(dateKey);
+                    } else {
+                        match = dateStr === dateKey;
                     }
-                    return dateStr === dateKey;
+                    return match;
                 });
                 
                 if (filteredRecords.length === 0) {
-                    detailContent.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">该日期暂无数据</div>';
+                    console.log('日期过滤调试:', {
+                        dateKey: dateKey,
+                        dateKeyLength: dateKey.length,
+                        allRecordsCount: allRecords.length,
+                        sampleDates: allRecords.slice(0, 3).map(r => ({
+                            original: r['日期'],
+                            type: typeof r['日期']
+                        }))
+                    });
+                    detailContent.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">该日期暂无数据（请查看控制台日志）</div>';
                     return;
                 }
                 
