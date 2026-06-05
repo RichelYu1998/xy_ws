@@ -5088,7 +5088,7 @@ if __name__ == '__main__':
                                             '金额': amount,
                                             '成本': cost,
                                             '纯利': profit,
-                                            '日期': record_date,
+                                            '日期': record_date.strftime('%Y-%m-%d'),
                                             '备注': remark
                                         })
                                     except (ValueError, TypeError, IndexError):
