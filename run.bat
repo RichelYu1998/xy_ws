@@ -119,43 +119,6 @@ if exist requirements.txt (
 
     %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check -q
 
-    echo [*] 测试Playwright CDN速度...
-
-    set FASTEST_PW_CDN=
-    set FASTEST_PW_CDN_NAME=
-    set MIN_PW_TIME=999999
-
-    set PW_CDN_1=npmmirror
-    set PW_URL_1=https://npmmirror.com/mirrors/playwright/
-    set PW_CDN_2=azureedge
-    set PW_URL_2=https://playwright.azureedge.net/builds/
-    set PW_CDN_3=cdn
-    set PW_URL_3=https://cdn.playwright.dev/
-
-    for %%A in (1,2,3) do (
-        set CDN_NAME=!PW_CDN_%%A!
-        set CDN_URL=!PW_URL_%%A!
-        echo     测试 !CDN_NAME!...
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('\''!CDN_URL!'\'', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
-            if not "%%T"=="" (
-                echo     !CDN_NAME!: %%T秒
-                if %%T lss !MIN_PW_TIME! (
-                    set "MIN_PW_TIME=%%T"
-                    set "FASTEST_PW_CDN=!CDN_URL!"
-                    set "FASTEST_PW_CDN_NAME=!CDN_NAME!"
-                )
-            ) else (
-                echo     !CDN_NAME!: 失败
-            )
-        )
-    )
-
-    if not defined FASTEST_PW_CDN (
-        echo [WARNING] 所有Playwright CDN均无法访问，将尝试默认安装
-    ) else (
-        echo [*] 最终选择最快Playwright CDN: !FASTEST_PW_CDN_NAME! ^(!MIN_PW_TIME!秒^)
-    )
-
     echo [*] 安装Playwright浏览器...
     %VENV_PATH%\Scripts\python.exe main.py --install-playwright
 )
