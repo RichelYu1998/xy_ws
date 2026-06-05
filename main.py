@@ -4166,6 +4166,60 @@ def update_cookie():
         handle_exception(e, 'update_cookie更新Cookie')
 
 
+def select_pip_mirror(venv_path: str):
+    """pip镜像智能测速+写入配置"""
+    MIRRORS = [
+        ("阿里云", "https://mirrors.aliyun.com/pypi/simple/", "mirrors.aliyun.com"),
+        ("清华", "https://pypi.tuna.tsinghua.edu.cn/simple/", "pypi.tuna.tsinghua.edu.cn"),
+        ("腾讯云", "https://mirrors.cloud.tencent.com/pypi/simple/", "mirrors.cloud.tencent.com"),
+        ("中科大", "https://mirrors.ustc.edu.cn/pypi/simple/", "mirrors.ustc.edu.cn"),
+        ("豆瓣", "https://pypi.douban.com/simple/", "pypi.douban.com"),
+    ]
+
+    def test_mirror(name, url):
+        try:
+            start = time.time()
+            urllib.request.urlopen(url, timeout=3)
+            return round(time.time() - start, 3)
+        except Exception:
+            return None
+
+    print("[*] 检测到未配置pip镜像源，正在测试镜像源速度...")
+    os.makedirs(os.path.join(venv_path, "pip_config"), exist_ok=True)
+
+    results = []
+    for i, (name, url, host) in enumerate(MIRRORS, 1):
+        print(f"[*] 测试镜像源 {i}/5: {name}...", end="", flush=True)
+        elapsed = test_mirror(name, url)
+        if elapsed is not None:
+            print(f" {elapsed}秒")
+            results.append((name, url, host, elapsed))
+        else:
+            print(" 失败")
+
+    if results:
+        results.sort(key=lambda x: x[3])
+        fastest_name, fastest_mirror, fastest_host, fastest_time = results[0]
+        print(f"[*] 最终选择最快镜像源: {fastest_name} ({fastest_time}秒)")
+    else:
+        fastest_name, fastest_mirror, fastest_host = "阿里云", "https://mirrors.aliyun.com/pypi/simple/", "mirrors.aliyun.com"
+        print(f"[WARNING] 所有镜像源均失败，使用默认阿里云")
+
+    conf_path = os.path.join(venv_path, "pip_config", "pip.conf" if platform.system() != "Windows" else "pip.ini")
+    with open(conf_path, "w", encoding="utf-8") as f:
+        if platform.system() != "Windows":
+            f.write("[global]\n")
+            f.write(f"index-url = {fastest_mirror}\n")
+            f.write("[install]\n")
+            f.write(f"trusted-host = {fastest_host}\n")
+        else:
+            f.write("[global]\r\n")
+            f.write(f"index-url = {fastest_mirror}\r\n")
+            f.write("[install]\r\n")
+            f.write(f"trusted-host = {fastest_host}\r\n")
+    print(f"[*] pip配置已写入: {conf_path}")
+
+
 def install_playwright_cdn():
     """Playwright CDN智能测速+安装"""
     CDNS = [
@@ -4233,7 +4287,13 @@ if __name__ == '__main__':
     parser.add_argument('--excel', '-e', help='Excel文件路径')
     parser.add_argument('--task', type=int, choices=[1, 2, 3, 4, 6], help='直接执行指定任务后退出 (1:爬虫, 2:货号对比, 3:Excel对比, 4:更新Cookie, 6:文件清理)')
     parser.add_argument('--install-playwright', action='store_true', help='Playwright CDN智能测速+安装浏览器')
+    parser.add_argument('--select-pip-mirror', action='store_true', help='pip镜像智能测速并写入配置')
     args = parser.parse_args()
+
+    if args.select_pip_mirror:
+        venv_path = os.environ.get('VIRTUAL_ENV') or os.path.join(PROJECT_DIR, '.venv')
+        select_pip_mirror(venv_path)
+        sys.exit(0)
 
     if args.install_playwright:
         install_playwright_cdn()
