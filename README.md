@@ -137,7 +137,13 @@ class Environment:
 - **Bug 修复**
   - 修复 `/api/products` 路由缺少函数实现的问题，解决"商品数据加载成功, 总数: undefined"错误
 
-- **每日利润报表读取优化**
+- **每日利润报表汇总功能**
+  - 支持按天/月/年/全部汇总视图切换
+  - 支持自定义时间范围筛选
+  - 汇总展示：笔数、金额合计、成本合计、纯利合计
+  - 点击汇总行可查看该时间段内的详细数据
+  - API 新增参数：`group_by`（day/month/year/all）、`start_date`、`end_date`
+  - API 返回 `summary` 汇总数据和 `total_records` 记录总数
   - 新增公共函数 `get_daily_profit_report_from_excel()`：从Excel的"每日利润"sheet的A列中搜索以"截止"开头的报表文本
   - 行号不固定，自动在A列全列搜索，适应Excel结构变化
   - `/api/sku/compare/excel` 和 `/api/daily-profit` 统一使用公共函数，代码逻辑一致

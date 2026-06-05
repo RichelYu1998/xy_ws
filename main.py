@@ -5022,7 +5022,10 @@ if __name__ == '__main__':
                 if pd is None or openpyxl is None:
                     return jsonify({'error': 'pandas或openpyxl未安装，每日利润报表功能不可用'}), 500
                 
-                # 读取Excel文件配置
+                group_by = request.args.get('group_by', 'day')
+                start_date = request.args.get('start_date', None)
+                end_date = request.args.get('end_date', None)
+                
                 excel_files_list = []
                 config_file = os.path.join(PROJECT_DIR, 'config', 'config.json')
                 if os.path.exists(config_file):
@@ -5041,15 +5044,14 @@ if __name__ == '__main__':
                 
                 daily_profit_report = None
                 table_data = []
+                all_records = []
                 
                 for excel_file in excel_files_list:
                     if os.path.exists(excel_file):
                         try:
-                            # 使用公共函数读取每日利润报表
                             if daily_profit_report is None:
                                 daily_profit_report = get_daily_profit_report_from_excel(excel_file)
                             
-                            # 读取整个表格数据（从'每日利润'sheet）
                             wb = openpyxl.load_workbook(excel_file, data_only=True)
                             sheet_name = '每日利润'
                             if sheet_name in wb.sheetnames:
@@ -5057,14 +5059,43 @@ if __name__ == '__main__':
                             else:
                                 ws = wb.active
                             
-                            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column, values_only=False):
+                            for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column, values_only=False)):
                                 row_data = []
                                 for cell in row:
                                     row_data.append(cell.value)
                                 table_data.append(row_data)
+                                
+                                if row_idx > 0:
+                                    try:
+                                        amount = float(str(row_data[1] or 0).replace('¥', '').replace(',', '').strip()) if row_data[1] else 0
+                                        cost = float(str(row_data[2] or 0).replace('¥', '').replace(',', '').strip()) if row_data[2] else 0
+                                        profit = float(str(row_data[3] or 0).replace('¥', '').replace(',', '').strip()) if row_data[3] else 0
+                                        date_val = row_data[4]
+                                        remark = row_data[5] if len(row_data) > 5 else ''
+                                        
+                                        if isinstance(date_val, datetime):
+                                            record_date = date_val
+                                        elif isinstance(date_val, str):
+                                            try:
+                                                record_date = datetime.strptime(date_val.split()[0], '%Y-%m-%d')
+                                            except:
+                                                continue
+                                        else:
+                                            continue
+                                        
+                                        all_records.append({
+                                            '项目': row_data[0],
+                                            '金额': amount,
+                                            '成本': cost,
+                                            '纯利': profit,
+                                            '日期': record_date,
+                                            '备注': remark
+                                        })
+                                    except (ValueError, TypeError, IndexError):
+                                        pass
                             
                             wb.close()
-                            break  # 只读取第一个Excel文件
+                            break
                         except Exception as e:
                             print(f'读取Excel文件失败: {excel_file} - {e}')
                             continue
@@ -5072,10 +5103,50 @@ if __name__ == '__main__':
                 if not table_data:
                     return jsonify({'error': '未找到Excel数据'}), 404
                 
+                if start_date:
+                    try:
+                        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                        all_records = [r for r in all_records if r['日期'] >= start_dt]
+                    except:
+                        pass
+                
+                if end_date:
+                    try:
+                        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                        all_records = [r for r in all_records if r['日期'] <= end_dt]
+                    except:
+                        pass
+                
+                summary = {}
+                for record in all_records:
+                    date_key = record['日期']
+                    
+                    if group_by == 'month':
+                        key = date_key.strftime('%Y-%m')
+                    elif group_by == 'year':
+                        key = date_key.strftime('%Y')
+                    elif group_by == 'all':
+                        key = '总计'
+                    else:
+                        key = date_key.strftime('%Y-%m-%d')
+                    
+                    if key not in summary:
+                        summary[key] = {'金额': 0, '成本': 0, '纯利': 0, '数量': 0, '日期': key}
+                    
+                    summary[key]['金额'] += record['金额']
+                    summary[key]['成本'] += record['成本']
+                    summary[key]['纯利'] += record['纯利']
+                    summary[key]['数量'] += 1
+                
+                summary_list = sorted(summary.values(), key=lambda x: x['日期'])
+                
                 result = {
                     'daily_profit_report': daily_profit_report,
                     'table_data': table_data,
-                    'excel_file': os.path.basename(excel_files_list[0]) if excel_files_list else None
+                    'excel_file': os.path.basename(excel_files_list[0]) if excel_files_list else None,
+                    'summary': summary_list,
+                    'group_by': group_by,
+                    'total_records': len(all_records)
                 }
                 return jsonify(result)
             except Exception as e:
