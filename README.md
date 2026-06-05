@@ -146,7 +146,7 @@ class Environment:
   - 修复超时/网络失败时速度显示为空的问题，超时时显示"失败"
 
 - **Playwright CDN智能测速+失败自动切换**
-  - 新增 `install_playwright.py` 脚本处理 CDN 测速和浏览器安装
+  - Playwright CDN测速和浏览器安装逻辑已合并到 `main.py`（`--install-playwright` 参数）
   - 测试3个 CDN（npmmirror、azureedge、cdn.playwright.dev），选择最快的一个
   - 安装时按测速顺序逐个尝试，第一个成功为止，失败自动切换下一个
   - 彻底解决 bash 环境变量传递导致 CDN URL 被截断的问题

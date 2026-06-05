@@ -208,7 +208,7 @@ setup_venv() {
         fi
 
         echo "[*] 安装Playwright浏览器..."
-        $PYTHON_CMD install_playwright.py
+        $PYTHON_CMD main.py --install-playwright
     fi
 
     echo "虚拟环境设置完成"

@@ -248,7 +248,7 @@ if exist requirements.txt (
     )
 
     echo [*] 安装Playwright浏览器...
-    %VENV_PATH%\Scripts\python.exe install_playwright.py
+    %VENV_PATH%\Scripts\python.exe main.py --install-playwright
 )
 
 echo 虚拟环境设置完成
