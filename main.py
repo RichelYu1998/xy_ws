@@ -46,8 +46,7 @@ except ImportError:
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 配置 Playwright CDN 加速
-os.environ.setdefault('PLAYWRIGHT_DOWNLOAD_HOST', 'https://npmmirror.com/mirrors/playwright/')
+# 配置 Playwright CDN 加速（如 run.sh 已设置则使用其值）
 
 if not hasattr(subprocess, 'CREATE_NO_WINDOW'):
     subprocess.CREATE_NO_WINDOW = 0x08000000 if platform.system() == 'Windows' else 0

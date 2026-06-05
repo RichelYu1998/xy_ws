@@ -81,71 +81,82 @@ setup_venv() {
             FASTEST_NAME="阿里云"
             MIN_TIME=999
 
-            echo "[*] 测试镜像源 1/5: 阿里云"
-            ALIYUN_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
-            if [ ! -z "$ALIYUN_TIME" ]; then
+            ALIYUN_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null || echo "999")
+            if [ "$ALIYUN_TIME" != "999" ]; then
                 MIN_TIME=$ALIYUN_TIME
                 FASTEST_NAME="阿里云"
-                echo "[*] 阿里云速度: $ALIYUN_TIME秒"
+                echo "[*] 阿里云速度: ${ALIYUN_TIME}秒"
+            else
+                echo "[*] 阿里云速度: 失败"
             fi
 
             echo "[*] 测试镜像源 2/5: 清华"
-            TSINGHUA_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.tuna.tsinghua.edu.cn/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
-            if [ ! -z "$TSINGHUA_TIME" ]; then
+            TSINGHUA_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.tuna.tsinghua.edu.cn/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null || echo "999")
+            if [ "$TSINGHUA_TIME" != "999" ]; then
                 if (( $(echo "$TSINGHUA_TIME < $MIN_TIME" | bc -l) )); then
                     MIN_TIME=$TSINGHUA_TIME
                     FASTEST_MIRROR="https://pypi.tuna.tsinghua.edu.cn/simple/"
                     FASTEST_HOST="pypi.tuna.tsinghua.edu.cn"
                     FASTEST_NAME="清华"
-                    echo "[*] 清华速度: $TSINGHUA_TIME秒 (新最快)"
+                    echo "[*] 清华速度: ${TSINGHUA_TIME}秒 (新最快)"
                 else
-                    echo "[*] 清华速度: $TSINGHUA_TIME秒"
+                    echo "[*] 清华速度: ${TSINGHUA_TIME}秒"
                 fi
+            else
+                echo "[*] 清华速度: 失败"
             fi
 
             echo "[*] 测试镜像源 3/5: 腾讯云"
-            TENCENT_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.cloud.tencent.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
-            if [ ! -z "$TENCENT_TIME" ]; then
+            TENCENT_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.cloud.tencent.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null || echo "999")
+            if [ "$TENCENT_TIME" != "999" ]; then
                 if (( $(echo "$TENCENT_TIME < $MIN_TIME" | bc -l) )); then
                     MIN_TIME=$TENCENT_TIME
                     FASTEST_MIRROR="https://mirrors.cloud.tencent.com/pypi/simple/"
                     FASTEST_HOST="mirrors.cloud.tencent.com"
                     FASTEST_NAME="腾讯云"
-                    echo "[*] 腾讯云速度: $TENCENT_TIME秒 (新最快)"
+                    echo "[*] 腾讯云速度: ${TENCENT_TIME}秒 (新最快)"
                 else
-                    echo "[*] 腾讯云速度: $TENCENT_TIME秒"
+                    echo "[*] 腾讯云速度: ${TENCENT_TIME}秒"
                 fi
+            else
+                echo "[*] 腾讯云速度: 失败"
             fi
 
             echo "[*] 测试镜像源 4/5: 中科大"
-            USTC_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.ustc.edu.cn/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
-            if [ ! -z "$USTC_TIME" ]; then
+            USTC_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.ustc.edu.cn/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null || echo "999")
+            if [ "$USTC_TIME" != "999" ]; then
                 if (( $(echo "$USTC_TIME < $MIN_TIME" | bc -l) )); then
                     MIN_TIME=$USTC_TIME
                     FASTEST_MIRROR="https://mirrors.ustc.edu.cn/pypi/simple/"
                     FASTEST_HOST="mirrors.ustc.edu.cn"
                     FASTEST_NAME="中科大"
-                    echo "[*] 中科大速度: $USTC_TIME秒 (新最快)"
+                    echo "[*] 中科大速度: ${USTC_TIME}秒 (新最快)"
                 else
-                    echo "[*] 中科大速度: $USTC_TIME秒"
+                    echo "[*] 中科大速度: ${USTC_TIME}秒"
                 fi
+            else
+                echo "[*] 中科大速度: 失败"
             fi
 
             echo "[*] 测试镜像源 5/5: 豆瓣"
-            DOUBAN_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.douban.com/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null)
-            if [ ! -z "$DOUBAN_TIME" ]; then
+            DOUBAN_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.douban.com/simple/', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null || echo "999")
+            if [ "$DOUBAN_TIME" != "999" ]; then
                 if (( $(echo "$DOUBAN_TIME < $MIN_TIME" | bc -l) )); then
                     MIN_TIME=$DOUBAN_TIME
                     FASTEST_MIRROR="https://pypi.douban.com/simple/"
                     FASTEST_HOST="pypi.douban.com"
                     FASTEST_NAME="豆瓣"
-                    echo "[*] 豆瓣速度: $DOUBAN_TIME秒 (新最快)"
+                    echo "[*] 豆瓣速度: ${DOUBAN_TIME}秒 (新最快)"
                 else
-                    echo "[*] 豆瓣速度: $DOUBAN_TIME秒"
+                    echo "[*] 豆瓣速度: ${DOUBAN_TIME}秒"
                 fi
+            else
+                echo "[*] 豆瓣速度: 失败"
             fi
 
-            if [ -z "$FASTEST_NAME" ]; then
+            if [ "$MIN_TIME" = "999" ]; then
+                FASTEST_MIRROR="https://mirrors.aliyun.com/pypi/simple/"
+                FASTEST_HOST="mirrors.aliyun.com"
                 FASTEST_NAME="阿里云"
             fi
 
@@ -160,12 +171,57 @@ setup_venv() {
 
         pip install -r requirements.txt -q
 
-        echo "[*] 配置Playwright CDN加速..."
-        export PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright/
+        echo "[*] 测试Playwright CDN速度..."
+        mkdir -p "$VENV_PATH/pw_cdn_test"
+        FASTEST_PW_CDN=""
+        FASTEST_PW_CDN_NAME=""
+        MIN_PW_TIME=999
+
+        PW_CDNS=(
+            "npmmirror:https://npmmirror.com/mirrors/playwright/:npmmirror"
+            "azureedge:https://playwright.azureedge.net/builds/:微软azure"
+            "cdn:https://cdn.playwright.dev/:官方CDN"
+        )
+
+        for entry in "${PW_CDNS[@]}"; do
+            IFS=':' read -r cdn_key cdn_url cdn_name <<< "$entry"
+            echo "    测试 $cdn_name..."
+            CDN_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('${cdn_url}', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null || echo "999")
+            if [ "$CDN_TIME" != "999" ]; then
+                echo "    $cdn_name: ${CDN_TIME}秒"
+                if (( $(echo "$CDN_TIME < $MIN_PW_TIME" | bc -l) )); then
+                    MIN_PW_TIME=$CDN_TIME
+                    FASTEST_PW_CDN="$cdn_url"
+                    FASTEST_PW_CDN_NAME="$cdn_name"
+                fi
+            else
+                echo "    $cdn_name: 失败"
+            fi
+        done
+
+        if [ -z "$FASTEST_PW_CDN" ]; then
+            echo "[WARNING] 所有Playwright CDN均无法访问，将尝试默认安装"
+            unset PLAYWRIGHT_DOWNLOAD_HOST
+        else
+            echo "[*] 最终选择最快Playwright CDN: $FASTEST_PW_CDN_NAME (${MIN_PW_TIME}秒)"
+            export PLAYWRIGHT_DOWNLOAD_HOST="$FASTEST_PW_CDN"
+        fi
 
         echo "[*] 安装Playwright浏览器..."
-        python3 -m playwright install chromium --with-deps 2>/dev/null || python -m playwright install chromium --with-deps 2>/dev/null
-        if [ $? -ne 0 ]; then
+        PLAYWRIGHT_INSTALL_SUCCESS=0
+        for entry in "${PW_CDNS[@]}"; do
+            IFS=':' read -r cdn_key cdn_url cdn_name <<< "$entry"
+            echo "    尝试从 $cdn_name 下载..."
+            export PLAYWRIGHT_DOWNLOAD_HOST="$cdn_url"
+            if python3 -m playwright install chromium --with-deps 2>/dev/null; then
+                PLAYWRIGHT_INSTALL_SUCCESS=1
+                echo "[*] Playwright浏览器安装成功 (来源: $cdn_name)"
+                break
+            fi
+            echo "    $cdn_name 下载失败，尝试下一个CDN..."
+        done
+
+        if [ $PLAYWRIGHT_INSTALL_SUCCESS -eq 0 ]; then
             echo "[WARNING] Playwright浏览器安装失败，将在首次运行时自动安装"
         fi
     fi
