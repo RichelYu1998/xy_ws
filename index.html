@@ -3221,10 +3221,19 @@ playwright install chromium</pre>
             if (endDate) url += '&end_date=' + endDate;
             
             fetch(url)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error('HTTP ' + response.status + ': ' + text);
+                        });
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.error) {
-                        showToast('获取报表失败: ' + data.error, 'error');
+                        const errorMsg = data.detail || data.error;
+                        showToast('获取报表失败: ' + errorMsg, 'error');
+                        console.error('API Error:', data);
                         return;
                     }
                     
@@ -3275,16 +3284,17 @@ playwright install chromium</pre>
                                     <span style="font-weight: 600; color: #333;">📊 汇总数据（共 ${data.total_records} 条记录）</span>
                                     <span style="font-size: 12px; color: #666;">点击日期查看明细</span>
                                 </div>
-                                <div style="overflow-x: auto;">
+                                <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                                     <table class="table table-bordered table-sm" style="margin: 0; font-size: 13px; background: white;">
-                                        <thead style="background: #667eea; color: white;">
+                                        <thead style="background: #667eea; color: white; position: sticky; top: 0; z-index: 10;">
                                             <tr>
                                                 <th style="text-align: center; vertical-align: middle; width: 50px;">操作</th>
                                                 <th style="text-align: center; vertical-align: middle;">${groupBy === 'day' ? '日期' : groupBy === 'month' ? '月份' : groupBy === 'year' ? '年份' : '总计'}</th>
+                                                <th style="text-align: center; vertical-align: middle;">项目</th>
                                                 <th style="text-align: center;">笔数</th>
-                                                <th style="text-align: center;">金额合计</th>
-                                                <th style="text-align: center;">成本合计</th>
-                                                <th style="text-align: center;">纯利合计</th>
+                                                <th style="text-align: center;">金额</th>
+                                                <th style="text-align: center;">成本</th>
+                                                <th style="text-align: center;">纯利</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -3298,13 +3308,14 @@ playwright install chromium</pre>
                                         <i class="fa fa-plus-circle" style="color: #667eea; cursor: pointer;" id="detail-icon-${dateKey}"></i>
                                     </td>
                                     <td style="text-align: center; font-weight: 600;">${item.日期}</td>
+                                    <td style="text-align: center; color: #409eff;">${item.项目 || '未分类'}</td>
                                     <td style="text-align: center;">${item.数量}笔</td>
                                     <td style="text-align: right; color: #e6a23c; font-weight: 600;">¥${item.金额.toFixed(2)}</td>
                                     <td style="text-align: right; color: #909399;">¥${item.成本.toFixed(2)}</td>
                                     <td style="text-align: right; color: #67c23a; font-weight: 600;">¥${item.纯利.toFixed(2)}</td>
                                 </tr>
                                 <tr id="detail-row-${dateKey}" style="display: none; background: #fafafa;">
-                                    <td colspan="6" style="padding: 0;">
+                                    <td colspan="7" style="padding: 0;">
                                         <div id="detail-content-${dateKey}" style="padding: 10px; max-height: 300px; overflow-y: auto;">
                                             <div style="text-align: center; color: #999;"><i class="fa fa-spinner fa-spin"></i> 加载中...</div>
                                         </div>
@@ -3320,7 +3331,7 @@ playwright install chromium</pre>
                         
                         cardHtml += `
                                             <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold;">
-                                                <td colspan="2" style="text-align: center;">合计</td>
+                                                <td colspan="3" style="text-align: center;">合计</td>
                                                 <td style="text-align: center;">${totalCount}笔</td>
                                                 <td style="text-align: right;">¥${totalAmount.toFixed(2)}</td>
                                                 <td style="text-align: right;">¥${totalCost.toFixed(2)}</td>
@@ -3539,14 +3550,13 @@ playwright install chromium</pre>
                 let filteredRecords = allRecords.filter(record => {
                     const recordDate = record['日期'];
                     let dateStr = '';
-                    
                     if (typeof recordDate === 'string') {
                         dateStr = recordDate.substring(0, 10);
                     } else if (recordDate instanceof Date) {
                         dateStr = recordDate.toISOString().split('T')[0];
                     }
                     
-                    let match = false;
+                   let match = false;
                     if (dateKey.length === 7) {
                         match = dateStr.startsWith(dateKey);
                     } else if (dateKey.length === 4) {
@@ -3558,8 +3568,21 @@ playwright install chromium</pre>
                 });
                 
                 if (filteredRecords.length === 0) {
-                    const sampleDates = allRecords.slice(0, 5).map(r => r['日期']);
-                    detailContent.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">该日期暂无数据（查询: ' + dateKey + '，样本: ' + sampleDates.join(', ') + '）</div>';
+                    const sampleRecords = allRecords.slice(0, 5);
+                    let debugInfo = '<div style="background: #fff3cd; padding: 10px; margin: 10px; border-radius: 5px; font-size: 12px;">';
+                    debugInfo += '<strong>调试信息：</strong><br>';
+                    debugInfo += '查询日期: ' + dateKey + ' (长度:' + dateKey.length + ')<br>';
+                    debugInfo += '总记录数: ' + allRecords.length + '<br>';
+                    debugInfo += '样本日期: ' + sampleRecords.map(r => {
+                        const d = r['日期'];
+                        let ds = '';
+                        if (typeof d === 'string') ds = d.substring(0, 10);
+                        else if (d instanceof Date) ds = d.toISOString().split('T')[0];
+                        else ds = String(d);
+                        return ds;
+                    }).join(', ');
+                    debugInfo += '</div>';
+                    detailContent.innerHTML = debugInfo + '<div style="text-align: center; color: #999; padding: 20px;">该日期暂无数据</div>';
                     return;
                 }
                 
@@ -3567,10 +3590,11 @@ playwright install chromium</pre>
                     <table class="table table-bordered table-condensed" style="margin: 0; font-size: 12px; background: white;">
                         <thead style="background: #f5f5f5;">
                             <tr>
-                                <th style="text-align: center; width: 15%;">日期</th>
-                                <th style="text-align: center; width: 15%;">金额</th>
-                                <th style="text-align: center; width: 15%;">成本</th>
-                                <th style="text-align: center; width: 15%;">纯利</th>
+                                <th style="text-align: center;">日期</th>
+                                <th style="text-align: center;">项目</th>
+                                <th style="text-align: center;">金额</th>
+                                <th style="text-align: center;">成本</th>
+                                <th style="text-align: center;">纯利</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -3581,6 +3605,7 @@ playwright install chromium</pre>
                     detailHtml += `
                         <tr>
                             <td style="text-align: center;">${dateStr}</td>
+                            <td style="text-align: center; color: #409eff;">${record['项目'] || '未分类'}</td>
                             <td style="text-align: right; color: #e6a23c;">¥${(record['金额'] || 0).toFixed(2)}</td>
                             <td style="text-align: right; color: #909399;">¥${(record['成本'] || 0).toFixed(2)}</td>
                             <td style="text-align: right; color: #67c23a;">¥${(record['纯利'] || 0).toFixed(2)}</td>
@@ -3595,6 +3620,7 @@ playwright install chromium</pre>
                 detailHtml += `
                             <tr style="background: #667eea; color: white; font-weight: bold;">
                                 <td style="text-align: center;">小计</td>
+                                <td style="text-align: center;">${filteredRecords.length}笔</td>
                                 <td style="text-align: right;">¥${subAmount.toFixed(2)}</td>
                                 <td style="text-align: right;">¥${subCost.toFixed(2)}</td>
                                 <td style="text-align: right;">¥${subProfit.toFixed(2)}</td>
