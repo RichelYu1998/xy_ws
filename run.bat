@@ -248,24 +248,7 @@ if exist requirements.txt (
     )
 
     echo [*] 安装Playwright浏览器...
-    set PW_SUCCESS=0
-    for %%A in (1,2,3) do (
-        set CDN_NAME=!PW_CDN_%%A!
-        set CDN_URL=!PW_URL_%%A!
-        echo     尝试从 !CDN_NAME! 下载...
-        set PLAYWRIGHT_DOWNLOAD_HOST=!CDN_URL!
-        %VENV_PATH%\Scripts\python.exe -m playwright install chromium --with-deps 2>nul
-        if not errorlevel 1 (
-            set PW_SUCCESS=1
-            echo [*] Playwright浏览器安装成功 ^(来源: !CDN_NAME!^)
-            goto pw_install_done
-        )
-        echo     !CDN_NAME! 下载失败，尝试下一个CDN...
-    )
-    :pw_install_done
-    if !PW_SUCCESS!==0 (
-        echo [WARNING] Playwright浏览器安装失败，将在首次运行时自动安装
-    )
+    %VENV_PATH%\Scripts\python.exe install_playwright.py
 )
 
 echo 虚拟环境设置完成
