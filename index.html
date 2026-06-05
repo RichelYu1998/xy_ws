@@ -3557,16 +3557,21 @@ playwright install chromium</pre>
                 });
                 
                 if (filteredRecords.length === 0) {
-                    console.log('日期过滤调试:', {
-                        dateKey: dateKey,
-                        dateKeyLength: dateKey.length,
-                        allRecordsCount: allRecords.length,
-                        sampleDates: allRecords.slice(0, 3).map(r => ({
-                            original: r['日期'],
-                            type: typeof r['日期']
-                        }))
-                    });
-                    detailContent.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">该日期暂无数据（请查看控制台日志）</div>';
+                    const sampleRecords = allRecords.slice(0, 5);
+                    let debugInfo = '<div style="background: #fff3cd; padding: 10px; margin: 10px; border-radius: 5px; font-size: 12px;">';
+                    debugInfo += '<strong>调试信息：</strong><br>';
+                    debugInfo += '查询日期: ' + dateKey + ' (长度:' + dateKey.length + ')<br>';
+                    debugInfo += '总记录数: ' + allRecords.length + '<br>';
+                    debugInfo += '样本日期: ' + sampleRecords.map(r => {
+                        const d = r['日期'];
+                        let ds = '';
+                        if (typeof d === 'string') ds = d.substring(0, 10);
+                        else if (d instanceof Date) ds = d.toISOString().split('T')[0];
+                        else ds = String(d);
+                        return ds;
+                    }).join(', ');
+                    debugInfo += '</div>';
+                    detailContent.innerHTML = debugInfo + '<div style="text-align: center; color: #999; padding: 20px;">该日期暂无数据</div>';
                     return;
                 }
                 
