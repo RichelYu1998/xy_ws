@@ -3539,13 +3539,30 @@ playwright install chromium</pre>
                 let filteredRecords = allRecords.filter(record => {
                     const recordDate = record['日期'];
                     let dateStr = '';
+                    
                     if (typeof recordDate === 'string') {
-                        dateStr = recordDate.substring(0, 10);
+                        if (recordDate.includes('GMT') || recordDate.includes('UTC')) {
+                            const months = {'Jan':'01','Feb':'02','Mar':'03','Apr':'04','May':'05','Jun':'06',
+                                           'Jul':'07','Aug':'08','Sep':'09','Oct':'10','Nov':'11','Dec':'12'};
+                            const parts = recordDate.split(' ');
+                            if (parts.length >= 4) {
+                                const day = parts[1].padStart(2, '0');
+                                const month = months[parts[2]] || '01';
+                                const year = parts[3];
+                                dateStr = year + '-' + month + '-' + day;
+                            }
+                        } else if (recordDate.includes('T')) {
+                            dateStr = recordDate.split('T')[0];
+                        } else if (recordDate.length >= 10) {
+                            dateStr = recordDate.substring(0, 10);
+                        } else {
+                            dateStr = recordDate;
+                        }
                     } else if (recordDate instanceof Date) {
                         dateStr = recordDate.toISOString().split('T')[0];
                     }
                     
-                   let match = false;
+                    let match = false;
                     if (dateKey.length === 7) {
                         match = dateStr.startsWith(dateKey);
                     } else if (dateKey.length === 4) {
