@@ -2814,6 +2814,65 @@ playwright install chromium</pre>
             }
         }
         
+        function filterProducts(searchTerm) {
+            const searchInput = document.getElementById('product-search-input');
+            const searchResultsCount = document.getElementById('search-results-count');
+            const matchCount = document.getElementById('match-count');
+            
+            if (!searchInput || !searchResultsCount) return;
+            
+            const allRows = document.querySelectorAll('#products-content tbody tr');
+            
+            if (!searchTerm || searchTerm.trim() === '') {
+                searchResultsCount.style.display = 'none';
+                allRows.forEach(row => {
+                    row.style.display = '';
+                    row.style.background = row.getAttribute('data-original-bg') || '';
+                });
+                return;
+            }
+            
+            const searchLower = searchTerm.toLowerCase().trim();
+            let matchCountNum = 0;
+            
+            allRows.forEach(row => {
+                const sku = (row.getAttribute('data-sku') || '').toLowerCase();
+                const desc = (row.getAttribute('data-desc') || '').toLowerCase();
+                
+                const skuMatch = sku.includes(searchLower);
+                const descMatch = desc.includes(searchLower);
+                
+                if (skuMatch || descMatch) {
+                    row.style.display = '';
+                    matchCountNum++;
+                    
+                    if (skuMatch && descMatch) {
+                        row.style.background = 'rgba(64, 158, 255, 0.2)';
+                    } else if (skuMatch) {
+                        row.style.background = 'rgba(103, 194, 58, 0.2)';
+                    } else {
+                        row.style.background = 'rgba(230, 162, 60, 0.2)';
+                    }
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            searchResultsCount.style.display = 'block';
+            if (matchCount) {
+                matchCount.textContent = `找到 ${matchCountNum} 个匹配`;
+                
+                if (matchCountNum > 0) {
+                    matchCount.style.background = '#67c23a';
+                } else {
+                    matchCount.style.background = '#f56c6c';
+                    matchCount.textContent = '未找到匹配结果';
+                }
+            }
+            
+            console.log('[搜索] 搜索词:', searchTerm, '匹配数量:', matchCountNum);
+        }
+        
         function showAllProducts() {
             const productsPanel = document.getElementById('products-panel');
             const productsContent = document.getElementById('products-content');
@@ -2867,7 +2926,7 @@ playwright install chromium</pre>
                         else if (isHighPrice) rowStyle = 'background: #fff3e0;';
                         else if (isAdded) rowStyle = 'background: #e3f2fd;';
                         const descDisplay = desc.length > 20 ? desc.substring(0, 20) + '...' : desc;
-                        tableHtml += `<tr data-sku="${sku}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
+                        tableHtml += `<tr data-sku="${sku}" data-desc="${desc.replace(/"/g, '&quot;')}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 高亮并定位货号:', '${sku}'); highlightRow('${sku}'); scrollToSku('${sku}'); searchProductBySku('${sku}')">${sku || '-'}</a></td>
                             <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 查看商品详情:', '${desc.replace(/'/g, "\\'")}'); showProductByDescription('${desc.replace(/'/g, "\\'")}')" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${descDisplay}</a></td>
@@ -2905,6 +2964,28 @@ playwright install chromium</pre>
                             <span class="summary-badge" style="background: #67c23a;">新增: ${data.addedCount || 0}个</span>
                             <span class="summary-badge" style="background: #e8f5e9; color: #2e7d32;">↔ 高价+新增</span>
                         </div>
+                        <div class="info-box" style="margin-bottom: 20px; padding: 15px;">
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text" style="background: #409EFF; color: white; border-color: #409EFF;">
+                                        <i class="fa fa-search"></i> 搜索商品
+                                    </span>
+                                </div>
+                                <input type="text" id="product-search-input" class="form-control" placeholder="输入货号或商品描述进行搜索..." 
+                                    style="border-color: #409EFF;">
+                                <div class="input-group-append">
+                                    <button class="btn btn-outline-secondary" type="button" id="clear-search-btn" style="border-color: #409EFF; color: #409EFF;">
+                                        <i class="fa fa-times"></i> 清除
+                                    </button>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted" style="margin-top: 8px;">
+                                <i class="fa fa-info-circle"></i> 支持模糊搜索,可输入货号(如: A001)或商品描述关键词
+                            </small>
+                            <div id="search-results-count" style="margin-top: 10px; display: none;">
+                                <span class="summary-badge" style="background: #409EFF;" id="match-count">找到 0 个匹配</span>
+                            </div>
+                        </div>
                         ${renderTable(data.products, '总商品列表 (' + data.total + '个)', '#409EFF', 'table-all')}
                         ${renderTable(data.highPriceProducts, '高价商品 (≥599元, ' + (data.highPriceCount || 0) + '个)', '#E6A23C', 'table-highprice')}
                         ${renderTable(data.highPriceNewProducts, '高价新增 (≥599元且不在之前Excel, ' + (data.highPriceNewCount || 0) + '个)', '#f56c6c', 'table-highprice-new')}
@@ -2913,8 +2994,25 @@ playwright install chromium</pre>
                 </div>`;
                 productsContent.insertAdjacentHTML('beforeend', html);
                 
-                // 添加表格滚动联动功能
                 setTimeout(() => {
+                    const searchInput = document.getElementById('product-search-input');
+                    const clearBtn = document.getElementById('clear-search-btn');
+                    
+                    if (searchInput) {
+                        searchInput.addEventListener('input', function() {
+                            filterProducts(this.value);
+                        });
+                    }
+                    
+                    if (clearBtn) {
+                        clearBtn.addEventListener('click', function() {
+                            if (searchInput) {
+                                searchInput.value = '';
+                                filterProducts('');
+                            }
+                        });
+                    }
+                    
                     const tableContainers = productsContent.querySelectorAll('.change-table-container');
                     let isScrolling = false;
                     
