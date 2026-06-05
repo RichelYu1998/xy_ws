@@ -122,23 +122,28 @@ if exist requirements.txt (
         set MIN_TIME=999999
 
         echo [*] 测试镜像源 1/5: 阿里云
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.aliyun.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('\''https://mirrors.aliyun.com/pypi/simple/'\'', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 set "MIN_TIME=%%T"
                 set "FASTEST_NAME=阿里云"
                 echo [*] 阿里云速度: %%T秒
             )
         )
+        if "!MIN_TIME!"=="999999" (
+            set "FASTEST_MIRROR=https://mirrors.aliyun.com/pypi/simple/"
+            set "FASTEST_HOST=mirrors.aliyun.com"
+            set "FASTEST_NAME=阿里云"
+        )
 
         echo [*] 测试镜像源 2/5: 清华
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.tuna.tsinghua.edu.cn/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('\''https://pypi.tuna.tsinghua.edu.cn/simple/'\'', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
                     set "MIN_TIME=%%T"
                     set "FASTEST_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple/"
                     set "FASTEST_HOST=pypi.tuna.tsinghua.edu.cn"
                     set "FASTEST_NAME=清华"
-                    echo [*] 清华速度: %%T秒 (新最快)
+                    echo [*] 清华速度: %%T秒 ^(新最快^)
                 ) else (
                     echo [*] 清华速度: %%T秒
                 )
@@ -146,14 +151,14 @@ if exist requirements.txt (
         )
 
         echo [*] 测试镜像源 3/5: 腾讯云
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.cloud.tencent.com/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('\''https://mirrors.cloud.tencent.com/pypi/simple/'\'', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
                     set "MIN_TIME=%%T"
                     set "FASTEST_MIRROR=https://mirrors.cloud.tencent.com/pypi/simple/"
                     set "FASTEST_HOST=mirrors.cloud.tencent.com"
                     set "FASTEST_NAME=腾讯云"
-                    echo [*] 腾讯云速度: %%T秒 (新最快)
+                    echo [*] 腾讯云速度: %%T秒 ^(新最快^)
                 ) else (
                     echo [*] 腾讯云速度: %%T秒
                 )
@@ -161,14 +166,14 @@ if exist requirements.txt (
         )
 
         echo [*] 测试镜像源 4/5: 中科大
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://mirrors.ustc.edu.cn/pypi/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('\''https://mirrors.ustc.edu.cn/pypi/simple/'\'', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
                     set "MIN_TIME=%%T"
                     set "FASTEST_MIRROR=https://mirrors.ustc.edu.cn/pypi/simple/"
                     set "FASTEST_HOST=mirrors.ustc.edu.cn"
                     set "FASTEST_NAME=中科大"
-                    echo [*] 中科大速度: %%T秒 (新最快)
+                    echo [*] 中科大速度: %%T秒 ^(新最快^)
                 ) else (
                     echo [*] 中科大速度: %%T秒
                 )
@@ -176,14 +181,14 @@ if exist requirements.txt (
         )
 
         echo [*] 测试镜像源 5/5: 豆瓣
-        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('https://pypi.douban.com/simple/', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('\''https://pypi.douban.com/simple/'\'', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
             if not "%%T"=="" (
                 if %%T lss !MIN_TIME! (
                     set "MIN_TIME=%%T"
                     set "FASTEST_MIRROR=https://pypi.douban.com/simple/"
                     set "FASTEST_HOST=pypi.douban.com"
                     set "FASTEST_NAME=豆瓣"
-                    echo [*] 豆瓣速度: %%T秒 (新最快)
+                    echo [*] 豆瓣速度: %%T秒 ^(新最快^)
                 ) else (
                     echo [*] 豆瓣速度: %%T秒
                 )
@@ -205,13 +210,60 @@ if exist requirements.txt (
 
     %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check -q
 
-    echo [*] 配置Playwright CDN加速...
-    set PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright/
-    setx PLAYWRIGHT_DOWNLOAD_HOST %PLAYWRIGHT_DOWNLOAD_HOST% >nul 2>&1
+    echo [*] 测试Playwright CDN速度...
+
+    set FASTEST_PW_CDN=
+    set FASTEST_PW_CDN_NAME=
+    set MIN_PW_TIME=999999
+
+    set PW_CDN_1=npmmirror
+    set PW_URL_1=https://npmmirror.com/mirrors/playwright/
+    set PW_CDN_2=azureedge
+    set PW_URL_2=https://playwright.azureedge.net/builds/
+    set PW_CDN_3=cdn
+    set PW_URL_3=https://cdn.playwright.dev/
+
+    for %%A in (1,2,3) do (
+        set CDN_NAME=!PW_CDN_%%A!
+        set CDN_URL=!PW_URL_%%A!
+        echo     测试 !CDN_NAME!...
+        for /f "delims=" %%T in ('%VENV_PATH%\Scripts\python.exe -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('\''!CDN_URL!'\'', timeout=3); print(round(time.time()-start, 3))" 2^>nul') do (
+            if not "%%T"=="" (
+                echo     !CDN_NAME!: %%T秒
+                if %%T lss !MIN_PW_TIME! (
+                    set "MIN_PW_TIME=%%T"
+                    set "FASTEST_PW_CDN=!CDN_URL!"
+                    set "FASTEST_PW_CDN_NAME=!CDN_NAME!"
+                )
+            ) else (
+                echo     !CDN_NAME!: 失败
+            )
+        )
+    )
+
+    if not defined FASTEST_PW_CDN (
+        echo [WARNING] 所有Playwright CDN均无法访问，将尝试默认安装
+    ) else (
+        echo [*] 最终选择最快Playwright CDN: !FASTEST_PW_CDN_NAME! ^(!MIN_PW_TIME!秒^)
+    )
 
     echo [*] 安装Playwright浏览器...
-    %VENV_PATH%\Scripts\python.exe -m playwright install chromium --with-deps 2>nul
-    if errorlevel 1 (
+    set PW_SUCCESS=0
+    for %%A in (1,2,3) do (
+        set CDN_NAME=!PW_CDN_%%A!
+        set CDN_URL=!PW_URL_%%A!
+        echo     尝试从 !CDN_NAME! 下载...
+        set PLAYWRIGHT_DOWNLOAD_HOST=!CDN_URL!
+        %VENV_PATH%\Scripts\python.exe -m playwright install chromium --with-deps 2>nul
+        if not errorlevel 1 (
+            set PW_SUCCESS=1
+            echo [*] Playwright浏览器安装成功 ^(来源: !CDN_NAME!^)
+            goto pw_install_done
+        )
+        echo     !CDN_NAME! 下载失败，尝试下一个CDN...
+    )
+    :pw_install_done
+    if !PW_SUCCESS!==0 (
         echo [WARNING] Playwright浏览器安装失败，将在首次运行时自动安装
     )
 )
