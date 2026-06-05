@@ -172,19 +172,17 @@ setup_venv() {
         pip install -r requirements.txt -q
 
         echo "[*] 测试Playwright CDN速度..."
-        mkdir -p "$VENV_PATH/pw_cdn_test"
         FASTEST_PW_CDN=""
         FASTEST_PW_CDN_NAME=""
         MIN_PW_TIME=999
 
-        PW_CDNS=(
-            "npmmirror:https://npmmirror.com/mirrors/playwright/:npmmirror"
-            "azureedge:https://playwright.azureedge.net/builds/:微软azure"
-            "cdn:https://cdn.playwright.dev/:官方CDN"
-        )
-
-        for entry in "${PW_CDNS[@]}"; do
-            IFS=':' read -r cdn_key cdn_url cdn_name <<< "$entry"
+        for cdn_entry in \
+            "npmmirror https://npmmirror.com/mirrors/playwright/ npmmirror" \
+            "azureedge https://playwright.azureedge.net/builds/ azureedge" \
+            "cdn https://cdn.playwright.dev/ cdn"; do
+            cdn_key=$(echo "$cdn_entry" | cut -d' ' -f1)
+            cdn_url=$(echo "$cdn_entry" | cut -d' ' -f2)
+            cdn_name=$(echo "$cdn_entry" | cut -d' ' -f3)
             echo "    测试 $cdn_name..."
             CDN_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('${cdn_url}', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null || echo "999")
             if [ "$CDN_TIME" != "999" ]; then
