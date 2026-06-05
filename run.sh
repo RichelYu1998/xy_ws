@@ -208,22 +208,7 @@ setup_venv() {
         fi
 
         echo "[*] 安装Playwright浏览器..."
-        PLAYWRIGHT_INSTALL_SUCCESS=0
-        for entry in "${PW_CDNS[@]}"; do
-            IFS=':' read -r cdn_key cdn_url cdn_name <<< "$entry"
-            echo "    尝试从 $cdn_name 下载..."
-            export PLAYWRIGHT_DOWNLOAD_HOST="$cdn_url"
-            if python3 -m playwright install chromium --with-deps 2>/dev/null; then
-                PLAYWRIGHT_INSTALL_SUCCESS=1
-                echo "[*] Playwright浏览器安装成功 (来源: $cdn_name)"
-                break
-            fi
-            echo "    $cdn_name 下载失败，尝试下一个CDN..."
-        done
-
-        if [ $PLAYWRIGHT_INSTALL_SUCCESS -eq 0 ]; then
-            echo "[WARNING] Playwright浏览器安装失败，将在首次运行时自动安装"
-        fi
+        $PYTHON_CMD install_playwright.py
     fi
 
     echo "虚拟环境设置完成"
