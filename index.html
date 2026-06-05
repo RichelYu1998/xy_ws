@@ -3538,8 +3538,18 @@ playwright install chromium</pre>
                 
                 let filteredRecords = allRecords.filter(record => {
                     const recordDate = record['日期'];
-                    const dateStr = typeof recordDate === 'string' ? recordDate : 
-                                    recordDate instanceof Date ? recordDate.toISOString().split('T')[0] : '';
+                    let dateStr = '';
+                    if (typeof recordDate === 'string') {
+                        dateStr = recordDate;
+                    } else if (recordDate instanceof Date) {
+                        dateStr = recordDate.toISOString().split('T')[0];
+                    }
+                    
+                    if (dateKey.length === 7) {
+                        return dateStr.startsWith(dateKey);
+                    } else if (dateKey.length === 4) {
+                        return dateStr.startsWith(dateKey);
+                    }
                     return dateStr === dateKey;
                 });
                 
