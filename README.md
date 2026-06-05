@@ -133,6 +133,18 @@ class Environment:
 
 ## 更新日志
 
+### v3.5.2 (2026-06-05)
+- **每日利润报表读取优化**
+  - 新增公共函数 `get_daily_profit_report_from_excel()`：从Excel的"每日利润"sheet的A列中搜索以"截止"开头的报表文本
+  - 行号不固定，自动在A列全列搜索，适应Excel结构变化
+  - `/api/sku/compare/excel` 和 `/api/daily-profit` 统一使用公共函数，代码逻辑一致
+  - `/api/sku/compare/excel` 返回结果新增 `report_text` 字段，值与 `/api/daily-profit` 的 `daily_profit_report` 一致
+  
+- **前端展示优化**
+  - "Excel与JSON对比"按钮点击后，对比结果顶部新增"每日利润报表"展示区域
+  - 使用渐变紫色背景，醒目展示报表内容
+  - 保留原有换行格式（`white-space: pre-wrap`）
+
 ### v3.5.1 (2026-06-05)
 - **优化虚拟环境创建流程**
   - 先使用全局Python测速pip镜像源，再创建虚拟环境

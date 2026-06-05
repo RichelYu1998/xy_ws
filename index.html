@@ -3418,6 +3418,18 @@ playwright install chromium</pre>
                                 <i class="fa fa-barcode"></i> 货号对比结果
                             </div>
                             <div class="comparison-body">
+                        `;
+                        
+                        if (data.report_text) {
+                            cardHtml += `
+                                <div class="missing-skus" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-color: #667eea; margin-bottom: 15px;">
+                                    <div class="missing-title" style="color: white; font-weight: bold; font-size: 14px;">📊 每日利润报表</div>
+                                    <div style="color: white; font-size: 13px; line-height: 1.6; white-space: pre-wrap; padding: 10px 0;">${data.report_text}</div>
+                                </div>
+                            `;
+                        }
+                        
+                        cardHtml += `
                                 <div class="comparison-stats">
                                     <div class="stat-item ${data.txt_count > 0 ? 'stat-info' : ''}">
                                         <span class="stat-value">${data.txt_count || 0}</span>

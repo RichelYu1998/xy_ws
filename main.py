@@ -1,4 +1,4 @@
-import json
+﻿import json
 import time
 import asyncio
 import os
@@ -1540,6 +1540,39 @@ def get_python_executable():
 VENV_PYTHON = get_python_executable()
 
 app = Flask(__name__, template_folder='.', static_folder=None)
+
+def get_daily_profit_report_from_excel(excel_file):
+    """从Excel的'每日利润'sheet的A列中查找以'截止'开头的报表文本
+    
+    Args:
+        excel_file: Excel文件路径
+        
+    Returns:
+        str: 报表文本，如果未找到则返回None
+    """
+    if openpyxl is None:
+        return None
+    try:
+        wb = openpyxl.load_workbook(excel_file, data_only=True)
+        sheet_name = '每日利润'
+        if sheet_name not in wb.sheetnames:
+            wb.close()
+            return None
+        ws = wb[sheet_name]
+        report_text = None
+        # 在A列中搜索以"截止"开头的单元格
+        for row in ws.iter_rows(min_col=1, max_col=1, min_row=1, max_row=ws.max_row):
+            for cell in row:
+                if cell.value and isinstance(cell.value, str) and cell.value.strip().startswith('截止'):
+                    report_text = cell.value.strip()
+                    break
+            if report_text:
+                break
+        wb.close()
+        return report_text
+    except Exception as e:
+        print(f"读取每日利润报表失败: {e}")
+        return None
 
 @app.errorhandler(Exception)
 def handle_api_exception(e):
@@ -4731,9 +4764,14 @@ if __name__ == '__main__':
                 excel_files_list = list(dict.fromkeys(os.path.abspath(f) for f in excel_files_list))
                 
                 excel_stock_numbers = []
+                daily_profit_report = None  # 存储每日利润报表A317内容
+                
                 for excel_file in excel_files_list:
                     if os.path.exists(excel_file):
                         try:
+                            if daily_profit_report is None:
+                                daily_profit_report = get_daily_profit_report_from_excel(excel_file)
+                            
                             excel_dfs = FileManager.safe_read_excel(excel_file, max_retries=3, retry_delay=1.0)
                             if excel_dfs is None:
                                 print(f'无法读取Excel文件: {excel_file}')
@@ -4887,13 +4925,80 @@ if __name__ == '__main__':
                     'added_products': sorted(added_products_all)[:100],
                     'added_products_count': len(added_products_all),
                     'removed_products': removed_products[:100],
-                    'removed_products_count': len(removed_products)
+                    'removed_products_count': len(removed_products),
+                    'daily_profit_report': daily_profit_report,
+                    'report_text': daily_profit_report
                 }
                 return jsonify(result)
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
         @app.route('/api/products', methods=['GET'])
+
+        @app.route('/api/daily-profit', methods=['GET'])
+        def get_daily_profit():
+            try:
+                if pd is None or openpyxl is None:
+                    return jsonify({'error': 'pandas或openpyxl未安装，每日利润报表功能不可用'}), 500
+                
+                # 读取Excel文件配置
+                excel_files_list = []
+                config_file = os.path.join(PROJECT_DIR, 'config', 'config.json')
+                if os.path.exists(config_file):
+                    with open(config_file, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                    excel_files = config.get('excel_files', [])
+                    for path in excel_files:
+                        expanded_path = os.path.expanduser(path)
+                        if os.path.exists(expanded_path):
+                            excel_files_list.append(expanded_path)
+                
+                if not excel_files_list:
+                    excel_files_list = [os.path.join(PROJECT_DIR, 'config', '本地商品表格.xlsx')]
+                
+                excel_files_list = list(dict.fromkeys(os.path.abspath(f) for f in excel_files_list))
+                
+                daily_profit_report = None
+                table_data = []
+                
+                for excel_file in excel_files_list:
+                    if os.path.exists(excel_file):
+                        try:
+                            # 使用公共函数读取每日利润报表
+                            if daily_profit_report is None:
+                                daily_profit_report = get_daily_profit_report_from_excel(excel_file)
+                            
+                            # 读取整个表格数据（从'每日利润'sheet）
+                            wb = openpyxl.load_workbook(excel_file, data_only=True)
+                            sheet_name = '每日利润'
+                            if sheet_name in wb.sheetnames:
+                                ws = wb[sheet_name]
+                            else:
+                                ws = wb.active
+                            
+                            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column, values_only=False):
+                                row_data = []
+                                for cell in row:
+                                    row_data.append(cell.value)
+                                table_data.append(row_data)
+                            
+                            wb.close()
+                            break  # 只读取第一个Excel文件
+                        except Exception as e:
+                            print(f'读取Excel文件失败: {excel_file} - {e}')
+                            continue
+                
+                if not table_data:
+                    return jsonify({'error': '未找到Excel数据'}), 404
+                
+                result = {
+                    'daily_profit_report': daily_profit_report,
+                    'table_data': table_data,
+                    'excel_file': os.path.basename(excel_files_list[0]) if excel_files_list else None
+                }
+                return jsonify(result)
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
         def get_all_products():
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
