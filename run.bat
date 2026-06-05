@@ -41,7 +41,7 @@ if exist playwright-browsers (
     echo [*] playwright-browsers目录不存在，跳过清理
 )
 
-goto detect_python
+goto detect_pip_mirror
 
 :cleanup_exit
 echo.
@@ -51,7 +51,7 @@ taskkill /f /im node.exe >nul 2>&1
 echo 清理完成
 goto :eof
 
-:detect_python
+:detect_pip_mirror
 echo.
 echo ========================================
 echo 环境检测与配置
@@ -70,10 +70,14 @@ if errorlevel 1 (
 
 echo Python版本：
 py --version
+
+echo [2/5] 测速pip镜像源...
+py main.py --select-pip-mirror
+
 goto detect_venv
 
 :detect_venv
-echo [2/5] 检测虚拟环境...
+echo [3/5] 检测虚拟环境...
 
 if exist venv\Scripts\activate.bat (
     echo 检测到虚拟环境：venv
@@ -91,7 +95,7 @@ if exist venv\Scripts\activate.bat (
 goto setup_venv
 
 :setup_venv
-echo [3/5] 设置虚拟环境...
+echo [4/5] 设置虚拟环境...
 
 if %VENV_EXISTS%==0 (
     echo 正在创建虚拟环境...
@@ -114,9 +118,8 @@ if not exist %VENV_PATH% (
 call %VENV_PATH%\Scripts\activate.bat
 
 if exist requirements.txt (
-    echo 正在安装依赖...
+    echo 正在配置pip镜像源...
 
-    echo [*] 检测pip镜像源配置...
     set PIP_CONFIG_FILE=%VENV_PATH%\pip_config\pip.ini
 
     if not exist "%VENV_PATH%\pip_config\pip.ini" (
@@ -124,7 +127,14 @@ if exist requirements.txt (
         %VENV_PATH%\Scripts\python.exe main.py --select-pip-mirror
     )
 
-    %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check -q
+    echo 正在安装依赖...
+    %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check
+
+    if errorlevel 1 (
+        echo ERROR: 依赖安装失败，虚拟环境创建未完成
+        pause
+        exit /b 1
+    )
 
     echo [*] 安装Playwright浏览器...
     %VENV_PATH%\Scripts\python.exe main.py --install-playwright
@@ -134,7 +144,7 @@ echo 虚拟环境设置完成
 goto check_config
 
 :check_config
-echo [4/5] 检测配置文件...
+echo [5/5] 检测配置文件...
 
 if not exist config mkdir config
 
