@@ -47,10 +47,13 @@ detect_python() {
         echo "ERROR: Python环境检测失败"
         return 1
     fi
+
+    echo "[2/5] 测速pip镜像源..."
+    $PYTHON_CMD main.py --select-pip-mirror
 }
 
 detect_venv() {
-    echo "[2/5] 检测虚拟环境..."
+    echo "[3/5] 检测虚拟环境..."
 
     if [ -d "venv" ] && [ -f "venv/bin/activate" ]; then
         echo "检测到虚拟环境：venv"
@@ -68,7 +71,7 @@ detect_venv() {
 }
 
 setup_venv() {
-    echo "[3/5] 设置虚拟环境..."
+    echo "[4/5] 设置虚拟环境..."
 
     if [ "$VENV_EXISTS" -eq 0 ]; then
         echo "正在创建虚拟环境..."
@@ -80,15 +83,12 @@ setup_venv() {
 
     if [ -f "requirements.txt" ]; then
         echo "正在安装依赖..."
+        pip install -r requirements.txt
 
-        if [ ! -f "$VENV_PATH/pip.conf" ]; then
-            echo "[*] 检测到未配置pip镜像源，调用Python测速..."
-            VIRTUAL_ENV="$VENV_PATH" $PYTHON_CMD main.py --select-pip-mirror
+        if [ $? -ne 0 ]; then
+            echo "ERROR: 依赖安装失败，虚拟环境创建未完成"
+            exit 1
         fi
-
-        export PIP_CONFIG_FILE="$VENV_PATH/pip.conf"
-
-        pip install -r requirements.txt -q
 
         echo "[*] 测试Playwright CDN速度..."
         FASTEST_PW_CDN=""
@@ -167,7 +167,7 @@ setup_venv() {
 }
 
 check_config() {
-    echo "[4/5] 检测配置文件..."
+    echo "[5/5] 检测配置文件..."
 
     mkdir -p config
 
