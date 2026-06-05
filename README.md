@@ -134,6 +134,9 @@ class Environment:
 ## 更新日志
 
 ### v3.5.2 (2026-06-05)
+- **Bug 修复**
+  - 修复 `/api/products` 路由缺少函数实现的问题，解决"商品数据加载成功, 总数: undefined"错误
+
 - **每日利润报表读取优化**
   - 新增公共函数 `get_daily_profit_report_from_excel()`：从Excel的"每日利润"sheet的A列中搜索以"截止"开头的报表文本
   - 行号不固定，自动在A列全列搜索，适应Excel结构变化
