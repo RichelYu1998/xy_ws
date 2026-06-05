@@ -3246,10 +3246,34 @@ playwright install chromium</pre>
                     }
                     
                     if (data.table_data && data.table_data.length > 0) {
-                        cardHtml += `
-                            <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
-                                <table class="table table-bordered table-sm" style="margin: 0; font-size: 12px;">
-                        `;
+                        let headerRow = data.table_data[0];
+                        let totalRowIndex = -1;
+                        for (let i = 1; i < data.table_data.length; i++) {
+                            const row = data.table_data[i];
+                            if (row && row.some(cell => cell && String(cell).includes('总计'))) {
+                                totalRowIndex = i;
+                                break;
+                            }
+                        }
+                        
+                        let moneyColIndexes = [];
+                        if (headerRow) {
+                            headerRow.forEach((header, idx) => {
+                                const h = String(header);
+                                if (h.includes('金额') || h.includes('成本') || h.includes('纯利')) {
+                                    moneyColIndexes.push(idx);
+                                }
+                            });
+                        }
+                        
+                        let dateColIndex = -1;
+                        if (headerRow) {
+                            headerRow.forEach((header, idx) => {
+                                if (header && String(header).includes('日期')) {
+                                    dateColIndex = idx;
+                                }
+                            });
+                        }
                         
                         function formatDate(value) {
                             if (value === null || value === undefined) return '';
@@ -3276,51 +3300,79 @@ playwright install chromium</pre>
                             return str;
                         }
                         
-                        function formatNumber(value) {
+                        function formatNumber(value, isMoney) {
                             if (value === null || value === undefined) return '';
                             if (typeof value === 'number') {
-                                return value.toFixed(2);
+                                return isMoney ? '¥' + value.toFixed(2) : value.toFixed(2);
                             }
                             const str = String(value);
                             if (/^-?\d+\.\d+$/.test(str)) {
-                                return parseFloat(str).toFixed(2);
+                                const num = parseFloat(str).toFixed(2);
+                                return isMoney ? '¥' + num : num;
                             }
                             return str;
                         }
                         
-                        let dateColIndex = -1;
-                        if (data.table_data[0]) {
-                            data.table_data[0].forEach((header, idx) => {
-                                if (header && String(header).includes('日期')) {
-                                    dateColIndex = idx;
-                                }
-                            });
-                        }
+                        const rowsToRender = totalRowIndex >= 0 ? data.table_data.slice(0, totalRowIndex + 1) : data.table_data;
                         
-                        data.table_data.forEach((row, rowIndex) => {
-                            cardHtml += `<tr>`;
-                            row.forEach((cell, colIndex) => {
-                                let cellValue = cell !== null && cell !== undefined ? cell : '';
+                        if (rowsToRender.length > 0) {
+                            cardHtml += `
+                            <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
+                                <table class="table table-bordered table-sm" style="margin: 0; font-size: 12px;">
+                            `;
+                            
+                            rowsToRender.forEach((row, rowIndex) => {
                                 const isHeader = rowIndex === 0;
-                                const tag = isHeader ? 'th' : 'td';
-                                let style = 'text-align: center; vertical-align: middle;';
-                                if (isHeader) {
-                                    style += ' background: #f5f5f5; font-weight: bold; position: sticky; top: 0; z-index: 10;';
+                                const isTotal = rowIndex === totalRowIndex;
+                                let rowStyle = '';
+                                if (isTotal) {
+                                    rowStyle = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);';
                                 }
-                                if (!isHeader && colIndex === dateColIndex) {
-                                    cellValue = formatDate(cellValue);
-                                } else if (!isHeader && typeof cell === 'number' || (typeof cellValue === 'string' && /^-?\d+\.\d+$/.test(cellValue))) {
-                                    cellValue = formatNumber(cellValue);
-                                }
-                                cardHtml += `<${tag} style="${style}">${cellValue}</${tag}>`;
+                                cardHtml += `<tr style="${rowStyle}">`;
+                                row.forEach((cell, colIndex) => {
+                                    let cellValue = cell !== null && cell !== undefined ? cell : '';
+                                    const tag = isHeader ? 'th' : 'td';
+                                    let style = 'text-align: center; vertical-align: middle;';
+                                    if (isHeader) {
+                                        style += ' background: #f5f5f5; font-weight: bold; position: sticky; top: 0; z-index: 10;';
+                                    }
+                                    if (isTotal) {
+                                        style += ' color: white; font-weight: bold;';
+                                    }
+                                    
+                                    const isMoneyCol = moneyColIndexes.includes(colIndex);
+                                    if (!isHeader && colIndex === dateColIndex) {
+                                        cellValue = formatDate(cellValue);
+                                    } else if (!isHeader) {
+                                        if (isTotal && (colIndex === row.length - 1 || colIndex === row.length - 2)) {
+                                            if (typeof cell === 'number') {
+                                                cellValue = Math.round(cell);
+                                            } else if (/^-?\d+\.\d+$/.test(String(cell))) {
+                                                cellValue = Math.round(parseFloat(String(cell)));
+                                            }
+                                        } else {
+                                            cellValue = formatNumber(cellValue, isMoneyCol);
+                                        }
+                                    }
+                                    
+                                    if (isTotal) {
+                                        if (colIndex === row.length - 1) {
+                                            cellValue = cellValue + '个';
+                                        } else if (colIndex === row.length - 2) {
+                                            cellValue = cellValue + '天';
+                                        }
+                                    }
+                                    
+                                    cardHtml += `<${tag} style="${style}">${cellValue}</${tag}>`;
+                                });
+                                cardHtml += `</tr>`;
                             });
-                            cardHtml += `</tr>`;
-                        });
-                        
-                        cardHtml += `
+                            
+                            cardHtml += `
                                 </table>
                             </div>
-                        `;
+                            `;
+                        }
                     }
                     
                     if (data.excel_file) {
