@@ -4934,6 +4934,87 @@ if __name__ == '__main__':
                 return jsonify({'error': str(e)}), 500
 
         @app.route('/api/products', methods=['GET'])
+        def get_all_products():
+            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+            if not json_files:
+                return jsonify({'error': '没有找到JSON文件'}), 404
+            latest_file = max(json_files, key=os.path.getmtime)
+            try:
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                products = data.get('商品列表', []) if isinstance(data, dict) else data
+                
+                for p in products:
+                    media_result = []
+                    img_data = p.get('图片', '')
+                    if img_data:
+                        try:
+                            if isinstance(img_data, list):
+                                for b64_str in img_data:
+                                    try:
+                                        media_result.append(base64.b64decode(b64_str).decode('utf-8'))
+                                    except:
+                                        media_result.append(b64_str)
+                            else:
+                                try:
+                                    media_result = base64.b64decode(img_data).decode('utf-8')
+                                except:
+                                    media_result = img_data
+                        except:
+                            media_result = img_data
+                    p['图片'] = media_result if media_result else img_data
+                
+                high_price_products = []
+                total_price = 0
+                total_fee = 0
+                valid_price_count = 0
+                
+                def safe_print(*args, **kwargs):
+                    try:
+                        print(*args, **kwargs)
+                    except (IOError, OSError):
+                        pass
+                
+                safe_print(f'开始处理 {len(products)} 个商品...')
+                
+                for p in products:
+                    try:
+                        price_str = p.get('售价', '')
+                        if not price_str or not price_str.strip():
+                            continue
+                        
+                        price_clean = price_str.replace('¥', '').replace(',', '').strip()
+                        price = float(price_clean)
+                        
+                        if price >= 599:
+                            high_price_products.append(p)
+                        
+                        if price > 0:
+                            total_price += price
+                            fee = price * 0.016
+                            total_fee += fee
+                            valid_price_count += 1
+                    except Exception as e:
+                        safe_print(f'处理商品时出错: {e}, price_str: {p.get("售价", "")}')
+                        pass
+                
+                safe_print(f'统计结果: valid_price_count={valid_price_count}, total_price={total_price}, high_price_count={len(high_price_products)}')
+                
+                avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
+                
+                return jsonify({
+                    'filename': os.path.basename(latest_file), 
+                    'total': len(products), 
+                    'products': products[:100], 
+                    'highPriceProducts': high_price_products[:500], 
+                    'highPriceCount': len(high_price_products),
+                    'totalPrice': f'¥{total_price:,.2f}',
+                    'avgPrice': f'¥{avg_price:,.2f}',
+                    'fee': f'¥{total_fee:,.2f}',
+                    'system': Environment.SYSTEM
+                })
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
 
         @app.route('/api/daily-profit', methods=['GET'])
         def get_daily_profit():
