@@ -3466,16 +3466,16 @@ playwright install chromium</pre>
                 });
         }
         
-        function applyDateFilter() {
+        window.applyDateFilter = function() {
             const startDate = document.getElementById('profit-start-date').value;
             const endDate = document.getElementById('profit-end-date').value;
-            showDailyProfitReport('day', startDate, endDate);
+            window.showDailyProfitReport('day', startDate, endDate);
         }
         
-        function clearDateFilter() {
+        window.clearDateFilter = function() {
             document.getElementById('profit-start-date').value = '';
             document.getElementById('profit-end-date').value = '';
-            showDailyProfitReport('day', '', '');
+            window.showDailyProfitReport('day', '', '');
         }
         
         window.showDailyProfitDetail = function(dateKey, groupBy) {
