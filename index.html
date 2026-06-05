@@ -481,8 +481,7 @@
         
         .change-table th {
             background: #f5f5f5;
-            padding: 8px;
-            text-align: left;
+            padding: 8px;text-align: center;
             font-weight: bold;
             position: sticky;
             top: 0;
@@ -491,6 +490,7 @@
         .change-table td {
             padding: 6px 8px;
             border-bottom: 1px solid #eee;
+            text-align: center;
         }
         
         .change-table tr:hover {
@@ -918,11 +918,13 @@
             
             .change-table {
                 font-size: 10px;
+                text-align: center;
             }
             
             .change-table th,
             .change-table td {
                 padding: 4px 2px;
+                text-align: center;
             }
             
             .change-table-container {
@@ -1139,12 +1141,13 @@
             }
 
             .change-table {
-                font-size: 11px !important;
+                font-size: 11px !important;text-align: center !important;
             }
 
             .change-table th,
             .change-table td {
                 padding: 5px 3px !important;
+                text-align: center !important;
             }
 
             .summary-badge {
@@ -1408,7 +1411,63 @@
                 height: 560px;
             }
         }
-</style></head>
+
+        /* 下拉刷新功能样式 - 移动端专用 */
+        .pull-refresh-container {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pull-refresh-indicator {
+            position: absolute;
+            top: -60px;
+            left: 0;
+            right: 0;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            transition: top 0.3s ease;
+            z-index: 100;
+        }
+
+        .pull-refresh-indicator.pulling {
+            top: 0;
+        }
+
+        .pull-refresh-indicator.refreshing {
+            top: 0;
+        }
+
+        .pull-refresh-indicator .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 仅在移动端启用下拉刷新 */
+        @media (min-width: 576px) {
+            .pull-refresh-container {
+                overflow: visible;
+            }
+            .pull-refresh-indicator {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
         <div class="container">
@@ -1892,7 +1951,127 @@ playwright install chromium</pre>
                 applyDeviceStyles();
             }, 250);
         });
-        
+
+        // 下拉刷新功能 - 移动端专用
+        (function initPullRefresh() {
+            if (window.innerWidth >= 576) return;
+
+            let touchStartY = 0;
+            let touchCurrentY = 0;
+            let isPulling = false;
+            let isRefreshing = false;
+            let indicatorEl = null;
+            let containerEl = null;
+
+            function createIndicator() {
+                indicatorEl = document.createElement('div');
+                indicatorEl.className = 'pull-refresh-indicator';
+                indicatorEl.innerHTML = '<div class="spinner"></div><span>下拉刷新</span>';
+                return indicatorEl;
+            }
+
+            function findScrollableContainer() {
+                const candidates = [
+                    document.getElementById('output-panel'),
+                    document.querySelector('.output-panel'),
+                    document.querySelector('.container'),
+                    document.body
+                ];
+                for (const el of candidates) {
+                    if (el && el.scrollHeight > el.clientHeight) {
+                        return el;
+                    }
+                }
+                return null;
+            }
+
+            function init() {
+                containerEl = findScrollableContainer();
+                if (!containerEl) return;
+
+                const parent = containerEl.parentElement || document.body;
+                const indicator = createIndicator();
+                parent.style.position = 'relative';
+                parent.insertBefore(indicator, parent.firstChild);
+
+                containerEl.addEventListener('touchstart', handleTouchStart, { passive: true });
+                containerEl.addEventListener('touchmove', handleTouchMove, { passive: true });
+                containerEl.addEventListener('touchend', handleTouchEnd, { passive: true });
+            }
+
+            function handleTouchStart(e) {
+                if (isRefreshing) return;
+                if (containerEl.scrollTop > 0) return;
+                touchStartY = e.touches[0].clientY;
+            }
+
+            function handleTouchMove(e) {
+                if (isRefreshing) return;
+                if (containerEl.scrollTop > 0) return;
+
+                touchCurrentY = e.touches[0].clientY;
+                const pullDistance = touchCurrentY - touchStartY;
+
+                if (pullDistance > 0) {
+                    e.preventDefault();
+                    const distance = Math.min(pullDistance, 100);
+                    indicatorEl.style.top = (distance - 60) + 'px';
+                    isPulling = true;
+
+                    if (distance >= 50) {
+                        indicatorEl.classList.add('pulling');
+                        indicatorEl.innerHTML = '<div class="spinner"></div><span>释放刷新</span>';
+                    } else {
+                        indicatorEl.classList.remove('pulling');
+                        indicatorEl.innerHTML = '<div class="spinner"></div><span>下拉刷新</span>';
+                    }
+                }
+            }
+
+            function handleTouchEnd() {
+                if (!isPulling) return;
+
+                const pullDistance = touchCurrentY - touchStartY;
+                if (pullDistance >= 50) {
+                    performRefresh();
+                } else {
+                    resetIndicator();
+                }
+                isPulling = false;
+            }
+
+            function performRefresh() {
+                isRefreshing = true;
+                indicatorEl.classList.remove('pulling');
+                indicatorEl.classList.add('refreshing');
+                indicatorEl.innerHTML = '<div class="spinner"></div><span>正在刷新...</span>';
+
+                showToast('正在刷新...');
+
+                setTimeout(() => {
+                    resetIndicator();
+                    if (typeof refreshProducts === 'function') {
+                        refreshProducts();
+                    } else {
+                        fetchProducts();
+                    }
+                    showToast('刷新完成');
+                    isRefreshing = false;
+                }, 800);
+            }
+
+            function resetIndicator() {
+                indicatorEl.style.top = '-60px';
+                indicatorEl.classList.remove('pulling', 'refreshing');
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                setTimeout(init, 300);
+            }
+        })();
+
         // 全局定时器管理
         let tunnelPollInterval = null;
         let tunnelRetryInterval = null;
@@ -3310,9 +3489,9 @@ playwright install chromium</pre>
                                     <td style="text-align: center; font-weight: 600;">${item.日期}</td>
                                     <td style="text-align: center; color: #409eff;">${item.项目 || '未分类'}</td>
                                     <td style="text-align: center;">${item.数量}笔</td>
-                                    <td style="text-align: right; color: #e6a23c; font-weight: 600;">¥${item.金额.toFixed(2)}</td>
-                                    <td style="text-align: right; color: #909399;">¥${item.成本.toFixed(2)}</td>
-                                    <td style="text-align: right; color: #67c23a; font-weight: 600;">¥${item.纯利.toFixed(2)}</td>
+                                    <td style="text-align: center; color: #e6a23c; font-weight: 600;">¥${item.金额.toFixed(2)}</td>
+                                    <td style="text-align: center; color: #909399;">¥${item.成本.toFixed(2)}</td>
+                                    <td style="text-align: center; color: #67c23a; font-weight: 600;">¥${item.纯利.toFixed(2)}</td>
                                 </tr>
                                 <tr id="detail-row-${dateKey}" style="display: none; background: #fafafa;">
                                     <td colspan="7" style="padding: 0;">
@@ -3333,9 +3512,9 @@ playwright install chromium</pre>
                                             <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold;">
                                                 <td colspan="3" style="text-align: center;">合计</td>
                                                 <td style="text-align: center;">${totalCount}笔</td>
-                                                <td style="text-align: right;">¥${totalAmount.toFixed(2)}</td>
-                                                <td style="text-align: right;">¥${totalCost.toFixed(2)}</td>
-                                                <td style="text-align: right;">¥${totalProfit.toFixed(2)}</td>
+                                                <td style="text-align: center;">¥${totalAmount.toFixed(2)}</td>
+                                                <td style="text-align: center;">¥${totalCost.toFixed(2)}</td>
+                                                <td style="text-align: center;">¥${totalProfit.toFixed(2)}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -3587,7 +3766,7 @@ playwright install chromium</pre>
                 }
                 
                 let detailHtml = `
-                    <table class="table table-bordered table-condensed" style="margin: 0; font-size: 12px; background: white;">
+                    <table class="table table-bordered table-condensed" style="margin: 0; font-size: 12px; background: white; text-align: center;">
                         <thead style="background: #f5f5f5;">
                             <tr>
                                 <th style="text-align: center;">日期</th>
@@ -3606,9 +3785,9 @@ playwright install chromium</pre>
                         <tr>
                             <td style="text-align: center;">${dateStr}</td>
                             <td style="text-align: center; color: #409eff;">${record['项目'] || '未分类'}</td>
-                            <td style="text-align: right; color: #e6a23c;">¥${(record['金额'] || 0).toFixed(2)}</td>
-                            <td style="text-align: right; color: #909399;">¥${(record['成本'] || 0).toFixed(2)}</td>
-                            <td style="text-align: right; color: #67c23a;">¥${(record['纯利'] || 0).toFixed(2)}</td>
+                            <td style="text-align: center; color: #e6a23c;">¥${(record['金额'] || 0).toFixed(2)}</td>
+                            <td style="text-align: center; color: #909399;">¥${(record['成本'] || 0).toFixed(2)}</td>
+                            <td style="text-align: center; color: #67c23a;">¥${(record['纯利'] || 0).toFixed(2)}</td>
                         </tr>
                     `;
                 });
@@ -3621,9 +3800,9 @@ playwright install chromium</pre>
                             <tr style="background: #667eea; color: white; font-weight: bold;">
                                 <td style="text-align: center;">小计</td>
                                 <td style="text-align: center;">${filteredRecords.length}笔</td>
-                                <td style="text-align: right;">¥${subAmount.toFixed(2)}</td>
-                                <td style="text-align: right;">¥${subCost.toFixed(2)}</td>
-                                <td style="text-align: right;">¥${subProfit.toFixed(2)}</td>
+                                <td style="text-align: center;">¥${subAmount.toFixed(2)}</td>
+                                <td style="text-align: center;">¥${subCost.toFixed(2)}</td>
+                                <td style="text-align: center;">¥${subProfit.toFixed(2)}</td>
                             </tr>
                         </tbody>
                     </table>
