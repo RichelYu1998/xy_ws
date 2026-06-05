@@ -2874,7 +2874,7 @@ playwright install chromium</pre>
             console.log('[搜索] 搜索词:', searchTerm, '匹配数量:', matchCountNum);
         }
         
-        function showAllProducts() {
+        window.showAllProducts = function() {
             const productsPanel = document.getElementById('products-panel');
             const productsContent = document.getElementById('products-content');
             if (!productsPanel || !productsContent) {
@@ -3206,7 +3206,7 @@ playwright install chromium</pre>
                 showAllProducts();
             };
         }
-
+        
         const dailyProfitBtn = document.getElementById('btn-daily-profit');
         if (dailyProfitBtn) {
             dailyProfitBtn.onclick = function() {
@@ -3215,7 +3215,7 @@ playwright install chromium</pre>
             };
         }
 
-        function showDailyProfitReport(groupBy = 'day', startDate = '', endDate = '') {
+        window.showDailyProfitReport = function(groupBy = 'day', startDate = '', endDate = '') {
             let url = '/api/daily-profit?group_by=' + groupBy;
             if (startDate) url += '&start_date=' + startDate;
             if (endDate) url += '&end_date=' + endDate;
@@ -3478,7 +3478,7 @@ playwright install chromium</pre>
             showDailyProfitReport('day', '', '');
         }
         
-        function showDailyProfitDetail(dateKey, groupBy) {
+        window.showDailyProfitDetail = function(dateKey, groupBy) {
             let startDate = dateKey;
             let endDate = dateKey;
             
