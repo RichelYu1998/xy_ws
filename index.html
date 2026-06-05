@@ -3228,6 +3228,8 @@ playwright install chromium</pre>
                         return;
                     }
                     
+                    window.dailyProfitAllRecords = data.all_records || [];
+                    
                     showOutputPanel();
                     const outputPanel = document.getElementById('output-panel');
                     const existingCard = outputPanel.querySelector('.daily-profit-card, .comparison-card, .products-card');
@@ -3271,11 +3273,13 @@ playwright install chromium</pre>
                             <div style="padding: 15px; background: #e8f4f8; border-bottom: 2px solid #667eea;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                     <span style="font-weight: 600; color: #333;">📊 汇总数据（共 ${data.total_records} 条记录）</span>
+                                    <span style="font-size: 12px; color: #666;">点击日期查看明细</span>
                                 </div>
                                 <div style="overflow-x: auto;">
                                     <table class="table table-bordered table-sm" style="margin: 0; font-size: 13px; background: white;">
                                         <thead style="background: #667eea; color: white;">
                                             <tr>
+                                                <th style="text-align: center; vertical-align: middle; width: 50px;">操作</th>
                                                 <th style="text-align: center; vertical-align: middle;">${groupBy === 'day' ? '日期' : groupBy === 'month' ? '月份' : groupBy === 'year' ? '年份' : '总计'}</th>
                                                 <th style="text-align: center;">笔数</th>
                                                 <th style="text-align: center;">金额合计</th>
@@ -3286,15 +3290,25 @@ playwright install chromium</pre>
                                         <tbody>
                         `;
                         
-                        data.summary.forEach(item => {
-                            const profitRate = item.成本 > 0 ? ((item.纯利 / item.成本) * 100).toFixed(1) : '0';
+                        data.summary.forEach((item, idx) => {
+                            const dateKey = item.日期.replace(/-/g, '');
                             cardHtml += `
-                                <tr style="cursor: pointer;" onclick="showDailyProfitDetail('${item.日期}', '${groupBy}')">
+                                <tr class="summary-row" data-date="${item.日期}" onclick="window.toggleProfitDetail('${item.日期}', this)">
+                                    <td style="text-align: center; width: 50px;">
+                                        <i class="fa fa-plus-circle" style="color: #667eea; cursor: pointer;" id="detail-icon-${dateKey}"></i>
+                                    </td>
                                     <td style="text-align: center; font-weight: 600;">${item.日期}</td>
                                     <td style="text-align: center;">${item.数量}笔</td>
                                     <td style="text-align: right; color: #e6a23c; font-weight: 600;">¥${item.金额.toFixed(2)}</td>
                                     <td style="text-align: right; color: #909399;">¥${item.成本.toFixed(2)}</td>
                                     <td style="text-align: right; color: #67c23a; font-weight: 600;">¥${item.纯利.toFixed(2)}</td>
+                                </tr>
+                                <tr id="detail-row-${dateKey}" style="display: none; background: #fafafa;">
+                                    <td colspan="6" style="padding: 0;">
+                                        <div id="detail-content-${dateKey}" style="padding: 10px; max-height: 300px; overflow-y: auto;">
+                                            <div style="text-align: center; color: #999;"><i class="fa fa-spinner fa-spin"></i> 加载中...</div>
+                                        </div>
+                                    </td>
                                 </tr>
                             `;
                         });
@@ -3306,7 +3320,7 @@ playwright install chromium</pre>
                         
                         cardHtml += `
                                             <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold;">
-                                                <td style="text-align: center;">合计</td>
+                                                <td colspan="2" style="text-align: center;">合计</td>
                                                 <td style="text-align: center;">${totalCount}笔</td>
                                                 <td style="text-align: right;">¥${totalAmount.toFixed(2)}</td>
                                                 <td style="text-align: right;">¥${totalCost.toFixed(2)}</td>
@@ -3494,7 +3508,88 @@ playwright install chromium</pre>
                 endDate = dateKey + '-12-31';
             }
             
-            showDailyProfitReport('day', startDate, endDate);
+            window.showDailyProfitReport('day', startDate, endDate);
+        }
+        
+        window.toggleProfitDetail = function(dateKey, rowElement) {
+            const dateId = dateKey.replace(/-/g, '');
+            const detailRow = document.getElementById('detail-row-' + dateId);
+            const detailContent = document.getElementById('detail-content-' + dateId);
+            const icon = document.getElementById('detail-icon-' + dateId);
+            
+            if (!detailRow || !detailContent) return;
+            
+            const isVisible = detailRow.style.display !== 'none';
+            
+            if (isVisible) {
+                detailRow.style.display = 'none';
+                if (icon) icon.className = 'fa fa-plus-circle';
+                if (rowElement) rowElement.style.background = '';
+            } else {
+                detailRow.style.display = 'table-row';
+                if (icon) icon.className = 'fa fa-minus-circle';
+                if (rowElement) rowElement.style.background = '#e6f0ff';
+                
+                const allRecords = window.dailyProfitAllRecords || [];
+                if (allRecords.length === 0) {
+                    detailContent.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无数据</div>';
+                    return;
+                }
+                
+                let filteredRecords = allRecords.filter(record => {
+                    const recordDate = record['日期'];
+                    const dateStr = typeof recordDate === 'string' ? recordDate : 
+                                    recordDate instanceof Date ? recordDate.toISOString().split('T')[0] : '';
+                    return dateStr === dateKey;
+                });
+                
+                if (filteredRecords.length === 0) {
+                    detailContent.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">该日期暂无数据</div>';
+                    return;
+                }
+                
+                let detailHtml = `
+                    <table class="table table-bordered table-condensed" style="margin: 0; font-size: 12px; background: white;">
+                        <thead style="background: #f5f5f5;">
+                            <tr>
+                                <th style="text-align: center; width: 15%;">日期</th>
+                                <th style="text-align: center; width: 15%;">金额</th>
+                                <th style="text-align: center; width: 15%;">成本</th>
+                                <th style="text-align: center; width: 15%;">纯利</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                filteredRecords.forEach(record => {
+                    const dateStr = record['日期'] instanceof Date ? record['日期'].toISOString().split('T')[0] : record['日期'];
+                    detailHtml += `
+                        <tr>
+                            <td style="text-align: center;">${dateStr}</td>
+                            <td style="text-align: right; color: #e6a23c;">¥${(record['金额'] || 0).toFixed(2)}</td>
+                            <td style="text-align: right; color: #909399;">¥${(record['成本'] || 0).toFixed(2)}</td>
+                            <td style="text-align: right; color: #67c23a;">¥${(record['纯利'] || 0).toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+                
+                const subAmount = filteredRecords.reduce((sum, r) => sum + (r['金额'] || 0), 0);
+                const subCost = filteredRecords.reduce((sum, r) => sum + (r['成本'] || 0), 0);
+                const subProfit = filteredRecords.reduce((sum, r) => sum + (r['纯利'] || 0), 0);
+                
+                detailHtml += `
+                            <tr style="background: #667eea; color: white; font-weight: bold;">
+                                <td style="text-align: center;">小计</td>
+                                <td style="text-align: right;">¥${subAmount.toFixed(2)}</td>
+                                <td style="text-align: right;">¥${subCost.toFixed(2)}</td>
+                                <td style="text-align: right;">¥${subProfit.toFixed(2)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                `;
+                
+                detailContent.innerHTML = detailHtml;
+            }
         }
 
         const tunnelBtn = document.getElementById('btn-run-tunnel');
