@@ -21,6 +21,15 @@ else
     echo "[*] temp目录不存在，跳过清理"
 fi
 
+echo "[*] 清理浏览器临时文件..."
+if [ -d "playwright-browsers" ]; then
+    echo "[*] 删除playwright-browsers目录中的临时zip文件..."
+    rm -f playwright-browsers/*.zip
+    echo "[*] 浏览器临时文件清理完成"
+else
+    echo "[*] playwright-browsers目录不存在，跳过清理"
+fi
+
 detect_python() {
     echo ""
     echo "========================================"
@@ -116,6 +125,41 @@ setup_venv() {
         fi
 
         echo "[*] 安装Playwright浏览器..."
+        
+        # 创建浏览器目录
+        BROWSER_DIR="playwright-browsers"
+        mkdir -p "$BROWSER_DIR"
+        
+        # 下载Playwright浏览器zip
+        echo "[*] 下载Playwright Chromium浏览器..."
+        PW_VERSION="1.59.0"
+        BROWSER_URL="${FASTEST_PW_CDN}builds/chromium/1200/chromium-linux.zip"
+        BROWSER_ZIP="$BROWSER_DIR/chromium-linux.zip"
+        
+        if [ ! -f "$BROWSER_DIR/chrome-linux64/chrome" ]; then
+            echo "[*] 从 $FASTEST_PW_CDN_NAME 下载浏览器..."
+            curl -L -o "$BROWSER_ZIP" "$BROWSER_URL" || wget -O "$BROWSER_ZIP" "$BROWSER_URL"
+            
+            if [ -f "$BROWSER_ZIP" ]; then
+                echo "[*] 解压浏览器到 $BROWSER_DIR..."
+                unzip -o "$BROWSER_ZIP" -d "$BROWSER_DIR"
+                
+                if [ -d "$BROWSER_DIR/chrome-linux64" ]; then
+                    echo "[*] 浏览器解压成功: $BROWSER_DIR/chrome-linux64/chrome"
+                    chmod +x "$BROWSER_DIR/chrome-linux64/chrome" 2>/dev/null
+                    echo "[*] 删除临时zip文件..."
+                    rm -f "$BROWSER_ZIP"
+                else
+                    echo "[WARNING] 浏览器解压失败，目录结构不正确"
+                fi
+            else
+                echo "[WARNING] 浏览器下载失败"
+            fi
+        else
+            echo "[*] 浏览器已存在，跳过下载"
+        fi
+        
+        # 安装Python playwright包
         $PYTHON_CMD main.py --install-playwright
     fi
 

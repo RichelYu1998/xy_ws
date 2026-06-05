@@ -37,3 +37,6 @@ temp/
 # Log files
 *.log
 clean_files.log
+
+# Playwright browsers (large files, should be downloaded on first run)
+playwright-browsers/

@@ -32,7 +32,14 @@ if exist temp (
     echo [*] temp目录不存在，跳过清理
 )
 
-call :cleanup_exit >nul 2>&1
+echo [*] 清理浏览器临时文件...
+if exist playwright-browsers (
+    echo [*] 删除playwright-browsers目录中的临时zip文件...
+    del /f /q playwright-browsers\*.zip >nul 2>&1
+    echo [*] 浏览器临时文件清理完成
+) else (
+    echo [*] playwright-browsers目录不存在，跳过清理
+)
 
 goto detect_python
 
