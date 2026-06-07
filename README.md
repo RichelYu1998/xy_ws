@@ -165,6 +165,39 @@ class Environment:
   - 前端显示详细的错误信息和堆栈跟踪
   - 改进 fetch 请求的错误处理，支持显示 HTTP 错误详情
 
+### v3.5.7 (2026-06-07)
+- **代码重构优化**
+  - 新增公共函数 `get_excel_files_with_report()` 获取Excel文件列表和每日利润报表
+  - `/api/sku/compare/excel` 和 `/api/daily-profit` 统一使用公共函数
+  - 消除约 40 行重复代码，提高代码可维护性
+
+- **跨系统支持完整性确认**
+  - ✅ Windows (10/11) - 完全支持
+  - ✅ macOS (10.15+) - 完全支持
+  - ✅ Linux (Ubuntu/Debian/CentOS等) - 完全支持
+  - 智能环境检测 (`Environment` 类)
+  - 跨平台路径处理 (`os.path.join`)
+  - 虚拟环境管理（Windows: `.venv/Scripts/python.exe`，Mac/Linux: `.venv/bin/python`)
+  - 进程管理（Windows: `taskkill`，Mac/Linux: `pkill`）
+  - 浏览器配置（Windows 使用 Playwright 内置 Chromium，Mac/Linux 支持系统 Chrome）
+  - pip 镜像源智能测速选择
+  - 用户代理字符串自动适配
+
+- **移动端适配完整性确认（符合 v3.5.0 标准）**
+  - ✅ 超小屏幕手机 (< 576px) - 完全适配
+  - ✅ 小屏幕平板 (576px - 767px) - 完全适配
+  - ✅ 平板和笔记本 (768px - 991px) - 完全适配
+  - ✅ 大屏幕 (992px - 1199px) - 完全适配
+  - ✅ 超大屏幕 (>= 1200px) - 完全适配
+  - ✅ 横屏模式适配 - 完全支持
+  - ✅ 触摸友好按钮 (min-height: 44px，符合 Apple HIG 标准)
+  - ✅ 下拉刷新功能 - 完整实现
+  - ✅ Toast 提示系统 - 替代所有 alert()
+  - ✅ 搜索框固定顶部 - 滚动时始终可见
+  - ✅ 表格行点击展开详情 - 移动端专属
+  - ✅ 输入框字体 16px - 防止 iOS 自动缩放
+  - ✅ 设备检测和样式自动适配
+
 ### v3.5.6 (2026-06-06)
 - **完善移动端适配功能**
   - **下拉刷新功能增强**

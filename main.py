@@ -1574,6 +1574,37 @@ def get_daily_profit_report_from_excel(excel_file):
         print(f"读取每日利润报表失败: {e}")
         return None
 
+def get_excel_files_with_report():
+    """获取Excel文件列表和每日利润报表
+    
+    Returns:
+        tuple: (excel_files_list, daily_profit_report)
+    """
+    excel_files_list = []
+    config_file = os.path.join(PROJECT_DIR, 'config', 'config.json')
+    if os.path.exists(config_file):
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        excel_files = config.get('excel_files', [])
+        for path in excel_files:
+            expanded_path = os.path.expanduser(path)
+            if os.path.exists(expanded_path):
+                excel_files_list.append(expanded_path)
+    
+    if not excel_files_list:
+        excel_files_list = [os.path.join(PROJECT_DIR, 'config', '本地商品表格.xlsx')]
+    
+    excel_files_list = list(dict.fromkeys(os.path.abspath(f) for f in excel_files_list))
+    
+    daily_profit_report = None
+    for excel_file in excel_files_list:
+        if os.path.exists(excel_file):
+            if daily_profit_report is None:
+                daily_profit_report = get_daily_profit_report_from_excel(excel_file)
+            break
+    
+    return excel_files_list, daily_profit_report
+
 @app.errorhandler(Exception)
 def handle_api_exception(e):
     """Flask全局异常处理器 - 统一处理所有未捕获的异常"""
@@ -4750,30 +4781,13 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
                 
-                excel_files_list = []
-                config_file = os.path.join(PROJECT_DIR, 'config', 'config.json')
-                if os.path.exists(config_file):
-                    with open(config_file, 'r', encoding='utf-8') as f:
-                        config = json.load(f)
-                    excel_files = config.get('excel_files', [])
-                    for path in excel_files:
-                        expanded_path = os.path.expanduser(path)
-                        if os.path.exists(expanded_path):
-                            excel_files_list.append(expanded_path)
-                
-                if not excel_files_list:
-                    excel_files_list = [os.path.join(PROJECT_DIR, 'config', '本地商品表格.xlsx')]
-                
-                excel_files_list = list(dict.fromkeys(os.path.abspath(f) for f in excel_files_list))
+                excel_files_list, daily_profit_report = get_excel_files_with_report()
                 
                 excel_stock_numbers = []
-                daily_profit_report = None  # 存储每日利润报表A317内容
                 
                 for excel_file in excel_files_list:
                     if os.path.exists(excel_file):
                         try:
-                            if daily_profit_report is None:
-                                daily_profit_report = get_daily_profit_report_from_excel(excel_file)
                             
                             excel_dfs = FileManager.safe_read_excel(excel_file, max_retries=3, retry_delay=1.0)
                             if excel_dfs is None:
@@ -5029,31 +5043,14 @@ if __name__ == '__main__':
                 start_date = request.args.get('start_date', None)
                 end_date = request.args.get('end_date', None)
                 
-                excel_files_list = []
-                config_file = os.path.join(PROJECT_DIR, 'config', 'config.json')
-                if os.path.exists(config_file):
-                    with open(config_file, 'r', encoding='utf-8') as f:
-                        config = json.load(f)
-                    excel_files = config.get('excel_files', [])
-                    for path in excel_files:
-                        expanded_path = os.path.expanduser(path)
-                        if os.path.exists(expanded_path):
-                            excel_files_list.append(expanded_path)
+                excel_files_list, daily_profit_report = get_excel_files_with_report()
                 
-                if not excel_files_list:
-                    excel_files_list = [os.path.join(PROJECT_DIR, 'config', '本地商品表格.xlsx')]
-                
-                excel_files_list = list(dict.fromkeys(os.path.abspath(f) for f in excel_files_list))
-                
-                daily_profit_report = None
                 table_data = []
                 all_records = []
                 
                 for excel_file in excel_files_list:
                     if os.path.exists(excel_file):
                         try:
-                            if daily_profit_report is None:
-                                daily_profit_report = get_daily_profit_report_from_excel(excel_file)
                             
                             wb = openpyxl.load_workbook(excel_file, data_only=True)
                             sheet_name = '每日利润'
