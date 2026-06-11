@@ -5571,6 +5571,9 @@ if __name__ == '__main__':
                     version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.strip())
                     if version_match:
                         if current_version:
+                            if current_item:
+                                current_items.append(current_item)
+                                current_item = None
                             changelog.append({
                                 'version': current_version,
                                 'date': current_date,
