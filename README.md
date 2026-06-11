@@ -131,7 +131,19 @@ class Environment:
 - 系统库自动检测和安装
 - Python包自动安装（使用最优镜像源）
 
-## 最新更新（3-5）
+## 最新更新
+### v3.5.8 (2026-06-11)
+- **代码规范文档**
+  - 新增 `skill.md` 项目代码规范与二开模版文档
+  - 新增 `skill.docx` Word 格式规范文档
+  - 涵盖统一异常体系、跨平台环境类、路径管理、配置管理、API 路由、前端规范等完整规范
+  - 包含 5 个二开示例（新增 API、配置项、异常分类、跨平台路径、前端区块）
+  - README 新增"代码规范与二开模版"章节
+
+- **dist 目录恢复**
+  - 从 git 历史恢复 `dist/` 文件夹（天气时钟看板 + hostc 隧道服务）
+  - 修复天气时钟看板 "File not found" 问题
+
 ### v3.5.7 (2026-06-07)
 - **代码重构优化**
   - 新增公共函数 `get_excel_files_with_report()` 获取Excel文件列表和每日利润报表
@@ -768,6 +780,26 @@ pip install openpyxl
 3. **数据备份**：定期备份 `file/output.json` 数据
 4. **网络连接**：确保网络连接稳定
 5. **浏览器窗口**：爬虫运行时会打开浏览器窗口，请勿关闭
+
+## 代码规范与二开模版
+
+详细代码规范请参阅 [skill.md](skill.md)（同时提供 [skill.docx](skill.docx) 下载）。
+
+核心规范摘要：
+
+- **统一异常体系**：所有业务异常使用 `AppException`，按分类工厂方法创建（`file_error`、`network_error` 等）
+- **异常处理装饰器**：`@file_operation_handler`、`@network_handler`、`@excel_handler`、`@json_handler`
+- **安全调用**：`safe_call()`、`safe_call_with_error()`、`ExceptionContext` 上下文管理器
+- **跨平台环境类**：`Environment` 静态类统一管理系统差异，禁止散落 `platform.system()` 判断
+- **路径管理类**：`PathManager` 静态方法获取所有路径，禁止硬编码
+- **配置管理类**：`ConfigManager` 懒加载 + 自动保存，`get/set` 接口
+- **文件操作类**：`FileManager` 统一读写，内建异常上下文
+- **API 路由规范**：`/api/<模块>/<操作>`，成功 `{'success': True}`，失败 `{'error': '...'}`
+- **前端规范**：原生 JS + Bootstrap 4 + Font Awesome 4，`showToast()` 替代 `alert()`
+- **响应式设计**：5 断点全覆盖，按钮最小 44px，输入框 16px 防缩放
+- **版本号**：唯一来源 README.md，格式 `### v3.5.7 (2026-06-07)`
+- **启动脚本**：`run.bat` / `run.sh` 五步流程保持一致
+- **敏感信息**：配置模板用占位符，API 返回时脱敏
 
 ## 技术特点
 
