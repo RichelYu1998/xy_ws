@@ -5597,6 +5597,93 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)}), 500
 
+        @app.route('/api/readme-sections', methods=['GET'])
+        def get_readme_sections():
+            try:
+                readme_path = os.path.join(PROJECT_DIR, 'README.md')
+                with open(readme_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                lines = content.split('\n')
+                sections = {}
+                current_h2 = None
+                current_h3 = None
+                current_lines = []
+                for line in lines:
+                    h2_match = re.match(r'^##\s+(.+)', line)
+                    h3_match = re.match(r'^###\s+(.+)', line)
+                    if h2_match:
+                        if current_h2:
+                            key = current_h2
+                            sections[key] = {
+                                'title': current_h2,
+                                'content': '\n'.join(current_lines).strip(),
+                                'subsections': {}
+                            }
+                        current_h2 = h2_match.group(1).strip()
+                        current_h3 = None
+                        current_lines = []
+                        continue
+                    if h3_match:
+                        if current_h3 and current_h2:
+                            sub_key = current_h3
+                            if 'subsections' not in sections.get(current_h2, {}):
+                                sections[current_h2]['subsections'] = {}
+                            sections[current_h2]['subsections'][sub_key] = '\n'.join(current_lines).strip()
+                        current_h3 = h3_match.group(1).strip()
+                        current_lines = []
+                        continue
+                    current_lines.append(line)
+                if current_h2:
+                    if current_h2 not in sections:
+                        sections[current_h2] = {
+                            'title': current_h2,
+                            'content': '\n'.join(current_lines).strip(),
+                            'subsections': {}
+                        }
+                    elif current_h3:
+                        sections[current_h2]['subsections'][current_h3] = '\n'.join(current_lines).strip()
+                features = []
+                feat_section = sections.get('功能特性', {})
+                if feat_section:
+                    for sub_title, sub_content in feat_section.get('subsections', {}).items():
+                        items = []
+                        for l in sub_content.split('\n'):
+                            m = re.match(r'-\s+\*\*(.+?)\*\*[:：]?\s*(.*)', l.strip())
+                            if m:
+                                items.append({'title': m.group(1), 'desc': m.group(2).strip()})
+                            elif l.strip().startswith('- '):
+                                items.append({'title': l.strip()[2:], 'desc': ''})
+                        clean_title = re.sub(r'^\d+\.\s*', '', sub_title)
+                        features.append({'title': clean_title, 'items': items})
+                tech_features = []
+                tech_section = sections.get('技术特点', {})
+                if tech_section:
+                    for l in tech_section.get('content', '').split('\n'):
+                        m = re.match(r'-\s+\*\*(.+?)\*\*[:：]?\s*(.*)', l.strip())
+                        if m:
+                            tech_features.append({'title': m.group(1), 'desc': m.group(2).strip()})
+                usage_steps = []
+                usage_section = sections.get('使用方法', {})
+                if usage_section:
+                    for sub_title, sub_content in usage_section.get('subsections', {}).items():
+                        clean_title = re.sub(r'^方法\d+[：:]\s*', '', sub_title)
+                        usage_steps.append({'title': clean_title, 'content': sub_content})
+                install_section = sections.get('安装和配置', {})
+                install_steps = []
+                if install_section:
+                    for sub_title, sub_content in install_section.get('subsections', {}).items():
+                        clean_title = re.sub(r'^\d+\.\s*', '', sub_title)
+                        install_steps.append({'title': clean_title, 'content': sub_content})
+                return jsonify({
+                    'success': True,
+                    'features': features,
+                    'tech_features': tech_features,
+                    'usage_steps': usage_steps,
+                    'install_steps': install_steps
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)}), 500
+
         @app.route('/api/email/config', methods=['GET'])
         def get_email_config():
             notifier = EmailNotifier()
