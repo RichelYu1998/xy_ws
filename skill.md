@@ -876,3 +876,31 @@ function exportData(format) {
 | 依赖管理 | `requirements.txt`，虚拟环境 `.venv` |
 | 进程管理 | Windows: `taskkill`，Linux/Mac: `pkill` |
 | 敏感信息 | 配置模板用占位符，API 返回时脱敏 |
+
+---
+
+## 九、skill.docx 生成规范
+
+### 9.1 字体要求
+
+| 类型 | 字体 | XML 属性 |
+|------|------|----------|
+| 西文（代码/英文） | Consolas | `w:ascii` / `w:hAnsi` |
+| 东亚（中文） | 微软雅黑 | `w:eastAsia` |
+
+**关键**：每个 `w:rPr` 下的 `w:rFonts` 必须同时设置 `w:eastAsia`，否则中文显示时字体缺失。
+
+### 9.2 生成流程
+
+1. 从 `skill.md` 逐行解析 Markdown
+2. 代码块（` ``` `）用 Consolas 9pt，左缩进 0.3 英寸
+3. 表格（`| ... |`）解析为 Word Table Grid，首行加粗
+4. 列表项（`- ` / `  - `）用 `•` / `◦` 符号，支持 `**粗体**` 混排
+5. 引用（`> `）用斜体灰色
+6. 所有 run 都通过 `set_run_font()` 统一设置字体
+
+### 9.3 同步规则
+
+- `skill.md` 是唯一源文件
+- 修改 `skill.md` 后必须重新生成 `skill.docx`
+- 两个文件一起提交到 git
