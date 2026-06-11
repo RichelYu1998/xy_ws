@@ -5549,6 +5549,54 @@ if __name__ == '__main__':
         def get_version():
             return jsonify({'version': get_version_from_readme()})
 
+        @app.route('/api/changelog', methods=['GET'])
+        def get_changelog():
+            try:
+                readme_path = os.path.join(PROJECT_DIR, 'README.md')
+                with open(readme_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                lines = content.split('\n')
+                changelog = []
+                current_version = None
+                current_date = None
+                current_items = []
+                in_changelog = False
+                for line in lines:
+                    if line.strip() == '## 最新更新':
+                        in_changelog = True
+                        continue
+                    if not in_changelog:
+                        continue
+                    version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.strip())
+                    if version_match:
+                        if current_version:
+                            changelog.append({
+                                'version': current_version,
+                                'date': current_date,
+                                'items': current_items
+                            })
+                        current_version = version_match.group(1)
+                        current_date = version_match.group(2)
+                        current_items = []
+                        continue
+                    if line.strip().startswith('## ') and in_changelog and current_version:
+                        break
+                    item_match = re.match(r'-\s+\*\*(.+?)\*\*\s*[-–]?\s*(.*)', line.strip())
+                    if item_match and current_version:
+                        current_items.append({
+                            'title': item_match.group(1),
+                            'desc': item_match.group(2).strip()
+                        })
+                if current_version:
+                    changelog.append({
+                        'version': current_version,
+                        'date': current_date,
+                        'items': current_items
+                    })
+                return jsonify({'success': True, 'changelog': changelog})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)}), 500
+
         @app.route('/api/email/config', methods=['GET'])
         def get_email_config():
             notifier = EmailNotifier()
