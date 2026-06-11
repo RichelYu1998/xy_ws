@@ -5560,6 +5560,7 @@ if __name__ == '__main__':
                 current_version = None
                 current_date = None
                 current_items = []
+                current_item = None
                 in_changelog = False
                 for line in lines:
                     if line.strip() == '## 最新更新':
@@ -5578,15 +5579,28 @@ if __name__ == '__main__':
                         current_version = version_match.group(1)
                         current_date = version_match.group(2)
                         current_items = []
+                        current_item = None
                         continue
                     if line.strip().startswith('## ') and in_changelog and current_version:
                         break
-                    item_match = re.match(r'-\s+\*\*(.+?)\*\*\s*[-–]?\s*(.*)', line.strip())
+                    if not line.strip():
+                        continue
+                    item_match = re.match(r'^-\s+\*\*(.+?)\*\*\s*[-–]?\s*(.*)', line.strip())
                     if item_match and current_version:
-                        current_items.append({
+                        if current_item:
+                            current_items.append(current_item)
+                        current_item = {
                             'title': item_match.group(1),
-                            'desc': item_match.group(2).strip()
-                        })
+                            'desc': item_match.group(2).strip(),
+                            'sub_items': []
+                        }
+                        continue
+                    sub_match = re.match(r'^-\s+(.*)', line.strip())
+                    if sub_match and current_item and (line.startswith('  ') or line.startswith('\t')):
+                        current_item['sub_items'].append(sub_match.group(1).strip())
+                        continue
+                if current_item:
+                    current_items.append(current_item)
                 if current_version:
                     changelog.append({
                         'version': current_version,
