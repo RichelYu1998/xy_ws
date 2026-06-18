@@ -1789,6 +1789,18 @@ class PathManager:
         return None
     
     @staticmethod
+    def get_lan_ip():
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(2)
+            s.connect(('8.8.8.8', 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return ''
+
+    @staticmethod
     def sync_web_output_from_tunnel_url():
         """从 tunnel_url.txt 同步公网地址到 web_output.log（统一入口）"""
         try:
@@ -1824,12 +1836,15 @@ class PathManager:
                         print(f"[Tunnel] 更新 web_output.log 失败: {e}")
                     
                     try:
-                        header = """==================================================
+                        port = 8888
+                        lan_ip = TunnelManager.get_lan_ip()
+                        header = f"""==================================================
 Szwego商品爬虫 - Web服务
 ==================================================
-访问地址: http://localhost:8888
-局域网地址: http://192.168.31.36:8888
+访问地址: http://localhost:{port}
 """
+                        if lan_ip:
+                            header += f"局域网地址: http://{lan_ip}:{port}\n"
                         with open(web_log_file, 'w', encoding='utf-8') as f:
                             f.write(header)
                             f.write(f"  Public URL: {new_url}\n")
@@ -4047,7 +4062,7 @@ def main():
         
         def start_web():
             print('\n正在启动Web服务...')
-            print('访问地址: http://localhost:8888')
+            print('访问地址: http://localhost:8888 (默认端口)')
             print('按 Ctrl+C 停止服务\n')
             
             os.system(f'"{VENV_PYTHON}" main.py --web')
@@ -4467,13 +4482,13 @@ if __name__ == '__main__':
                 "host": "www.szwego.com",
                 "sec-ch-ua": "\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"",
                 "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-ch-ua-platform": f"\"{Environment.SYSTEM}\"",
                 "sec-fetch-dest": "document",
                 "sec-fetch-mode": "navigate",
                 "sec-fetch-site": "none",
                 "sec-fetch-user": "?1",
                 "upgrade-insecure-requests": "1",
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+                "user-agent": Environment.get_user_agent()
             },
             "cookies": cookies,
             "output_file": "file/output.json",
@@ -4729,20 +4744,79 @@ if __name__ == '__main__':
                 if request.method == 'POST':
                     req_data = request.get_json()
                     input_skus = req_data.get('skus', '')
-                    txt_stock_numbers_raw = re.findall(r'\d+', input_skus)
+                    txt_stock_numbers_raw = [s.strip() for s in re.split(r'[\s,\n\r\t]+', input_skus) if s.strip()]
                 else:
                     input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
                     if os.path.exists(input_file):
                         with open(input_file, 'r', encoding='utf-8') as f:
                             content = f.read()
-                            txt_stock_numbers_raw = re.findall(r'\d+', content)
+                            txt_stock_numbers_raw = [s.strip() for s in content.split() if s.strip()]
                 
                 txt_stock_numbers = sorted(set(txt_stock_numbers_raw))
                 duplicates = StockNumberComparator.find_duplicate_stock_numbers(txt_stock_numbers_raw)
+
+                today = datetime.now().strftime('%Y%m%d')
+                diff_log_file = os.path.join(PROJECT_DIR, 'file', f'diff_log_{today}.json')
                 
                 json_set = set(json_stock_numbers)
                 txt_set = set(txt_stock_numbers)
-                
+
+                high_price_count = 0
+                high_price_stock_numbers = []
+                for p in products:
+                    price = p.get('售价', '')
+                    if price:
+                        try:
+                            price_val = float(price.replace('¥', '').replace(',', ''))
+                            if price_val >= 599:
+                                high_price_count += 1
+                                sku = p.get('货号', '')
+                                if sku:
+                                    high_price_stock_numbers.append(str(sku))
+                        except Exception as e:
+                            handle_exception(e, '/api/sku/compare/txt解析商品价格')
+                            pass
+
+                high_price_set = set(high_price_stock_numbers)
+                high_price_existing = sorted(list(high_price_set & txt_set))
+                high_price_extra_in_json = sorted(list(high_price_set - txt_set))
+
+                xiaoji_records = data.get('小计', []) if isinstance(data, dict) else []
+                today_xiaoji = None
+                for record in reversed(xiaoji_records):
+                    if record.get('timestamp', '').startswith(today):
+                        today_xiaoji = record
+                        break
+
+                added_products_all = []
+                removed_products = []
+                added_high_price = []
+
+                if os.path.exists(diff_log_file):
+                    with open(diff_log_file, 'r', encoding='utf-8') as f:
+                        diff_data = json.load(f)
+                    if diff_data.get('logs'):
+                        last_log = diff_data['logs'][-1]
+                        added_products_all = last_log.get('added', [])
+                        removed_products = last_log.get('removed', [])
+
+                if today_xiaoji:
+                    added_products_all = today_xiaoji.get('added', [])
+                    removed_products = today_xiaoji.get('removed', [])
+                    for sku in added_products_all:
+                        for p in products:
+                            if str(p.get('货号', '')) == str(sku):
+                                price = p.get('售价', '')
+                                try:
+                                    price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
+                                    if price_val >= 599:
+                                        added_high_price.append(sku)
+                                except:
+                                    pass
+                                break
+
+                added_high_price = sorted(list(set(added_high_price)))
+
                 result = {
                     'type': 'txt',
                     'json_file': os.path.basename(latest_json),
@@ -4755,7 +4829,16 @@ if __name__ == '__main__':
                     'extra_count': len(json_set - txt_set),
                     'common_count': len(txt_set & json_set),
                     'duplicate_count': len(duplicates),
-                    'duplicates': duplicates
+                    'duplicates': duplicates,
+                    'high_price_count': high_price_count,
+                    'high_price_extra_in_json': high_price_extra_in_json,
+                    'high_price_existing': high_price_existing,
+                    'added_high_price': added_high_price,
+                    'added_high_price_count': len(added_high_price),
+                    'added_products': sorted(added_products_all)[:100],
+                    'added_products_count': len(added_products_all),
+                    'removed_products': removed_products[:100],
+                    'removed_products_count': len(removed_products)
                 }
                 return jsonify(result)
             except Exception as e:
