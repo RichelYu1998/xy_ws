@@ -132,6 +132,49 @@ class Environment:
 - Python包自动安装（使用最优镜像源）
 
 ## 最新更新
+### v3.7.3 (2026-06-18)
+- **DOMContentLoaded 闭合修复（关键 Bug）**
+  - 修复 v3.7.1 中误删的 3 行闭合括号（`};` + `});` + `});`），导致 `DOMContentLoaded` 回调未闭合
+  - 该 Bug 导致：所有按钮失效、版本号不显示、Szwego爬虫/同行内容为空、天气时钟看板空白、隧道功能不可用
+  - 闭合位置：`.btn-sku-api` 的 `.forEach` + `onclick` 闭合后，接 `DOMContentLoaded` 回调闭合
+  - 教训：修改代码时必须确保所有花括号/圆括号成对闭合，可用 `new Function(code)` 验证
+
+- **功能按钮样式统一**
+  - `.func-btn` 从 `min-width` 改为固定 `width`，8 个按钮大小完全一致
+  - 删除 `text-overflow: ellipsis`，所有按钮文字完整显示不截断
+  - 新增 `display: inline-flex; align-items: center; justify-content: center;` 居中布局
+  - 统一 `font-size: 14px`（桌面端）/ `13px`（移动端），文字大小一致
+  - `.func-btn span` 新增 `gap: 4px`，图标与文字间距统一
+  - 桌面端宽度 `12.5rem`，移动端 `10rem`，确保"3. Excel与JSON对比"完整显示
+
+- **跨系统支持确认**
+  - ✅ 所有路径使用 `os.path.join()`，无硬编码路径分隔符
+  - ✅ `Environment.SYSTEM` 动态获取操作系统，无硬编码平台字符串
+  - ✅ `Environment.get_user_agent()` 动态适配 UA，无硬编码 Windows UA
+  - ✅ `TunnelManager.get_lan_ip()` 动态获取局域网 IP，无硬编码 IP 地址
+  - ✅ 前端使用 `window.location.origin`，标准浏览器 API 三平台通用
+  - ✅ 进程管理 Windows `taskkill` / Linux-Mac `pkill` 自动适配
+
+- **移动端适配确认（符合 v3.5.0 规范）**
+  - ✅ viewport meta 标签正确设置
+  - ✅ 5 个响应式断点全覆盖（<576px / 576-767px / 768-991px / 992-1199px / ≥1200px）
+  - ✅ 触摸友好按钮 min-height: 44px（符合 Apple HIG）
+  - ✅ 输入框 font-size: 16px（防止 iOS 自动缩放）
+  - ✅ 下拉刷新功能（移动端专用）
+  - ✅ Toast 提示系统替代所有 alert()
+  - ✅ 设备检测和样式自动适配
+  - ✅ 横屏模式适配
+  - ✅ 搜索框固定顶部
+  - ✅ 表格行点击展开详情（移动端专属）
+  - ✅ 功能按钮 flex 居中布局，文字完整显示
+
+- **skill.md / skill.docx 同步更新**
+  - skill.md §3.3 Toast 示例更新为多类型版本（success/error/warning/info）
+  - skill.md §3.4 新增功能按钮 `.func-btn` 统一样式规范
+  - skill.md §3.7 新增 JavaScript 括号闭合规范
+  - skill.md 编码风格速查表新增：括号闭合验证、按钮统一样式
+  - skill.docx 重新生成（符合 v3.6.0 字体规范：Consolas + 微软雅黑）
+
 ### v3.7.2 (2026-06-18)
 - **index.html 标签闭合修复**
   - 修复第5197行 `<code>hostc</code>` 后多余的 `</code>` 闭合标签
