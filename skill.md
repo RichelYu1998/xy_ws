@@ -665,6 +665,80 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 - 遇到下一个 `## ` 标题或文件结束则停止解析
 - 前端"最新更新"区域仅展示最新版本的完整更新详情
 
+### 3.9 动态展开行规范
+
+表格中点击某行展开详情时，必须使用动态 DOM 操作，确保详情展开在被点击行的正下方。
+
+**核心原则**：
+- **禁止预创建 detail-row**：不在模板中为每个日期预创建展开行（避免同日期多项目行产生重复ID）
+- **点击时动态创建**：首次点击时 `document.createElement` 创建 detail-row
+- **`rowElement.after()` 定位**：将 detail-row 插入到被点击行的正下方
+- **class 替代 ID 选择图标**：同日期多行使用 `querySelectorAll('.detail-toggle-icon')` 统一切换图标
+
+**模板代码**（只生成数据行，不预创建 detail-row）：
+```javascript
+data.summary.forEach((item, idx) => {
+    cardHtml += `
+        <tr class="summary-row" data-date="${item.日期}"
+            onclick="window.toggleProfitDetail('${item.日期}', this)">
+            <td class="action-col">
+                <i class="fa fa-plus-circle detail-toggle-icon"
+                   style="color: #667eea; cursor: pointer;"></i>
+            </td>
+            <td>...</td>
+        </tr>
+    `;
+});
+```
+
+**展开逻辑**（动态创建 + 定位）：
+```javascript
+window.toggleProfitDetail = function(dateKey, rowElement) {
+    const dateId = dateKey.replace(/-/g, '');
+    let detailRow = document.getElementById('detail-row-' + dateId);
+    let detailContent = document.getElementById('detail-content-' + dateId);
+
+    const wasVisible = detailRow && detailRow.style.display !== 'none';
+    const allRows = document.querySelectorAll(
+        '.summary-row[data-date="' + dateKey + '"]'
+    );
+
+    if (wasVisible) {
+        detailRow.style.display = 'none';
+        allRows.forEach(function(row) {
+            var icon = row.querySelector('.detail-toggle-icon');
+            if (icon) icon.className = 'fa fa-plus-circle detail-toggle-icon';
+            row.style.background = '';
+        });
+    } else {
+        if (!detailRow) {
+            detailRow = document.createElement('tr');
+            detailRow.id = 'detail-row-' + dateId;
+            detailRow.style.background = '#fafafa';
+            detailRow.innerHTML = '<td colspan="7" style="padding: 0;">'
+                + '<div id="detail-content-' + dateId + '" '
+                + 'style="padding: 10px; max-height: 300px; overflow-y: auto;">'
+                + '</div></td>';
+        }
+        rowElement.after(detailRow);
+        detailContent = document.getElementById('detail-content-' + dateId);
+        detailRow.style.display = 'table-row';
+        allRows.forEach(function(row) {
+            var icon = row.querySelector('.detail-toggle-icon');
+            if (icon) icon.className = 'fa fa-minus-circle detail-toggle-icon';
+            row.style.background = '#e6f0ff';
+        });
+        // ... 填充 detailContent ...
+    }
+};
+```
+
+**聚合级别一致性**：
+- 按天点击 → 显示月度聚合（`dateKey.substring(0, 7)` + ' 月度聚合'）
+- 按月点击 → 显示月度聚合（`dateKey` + ' 月度聚合'，使用 `filteredRecords`）
+- 按年点击 → 显示年度聚合（`dateKey` + ' 年度聚合'，使用 `filteredRecords`）
+- 聚合数据直接使用当前行的 `filteredRecords`，不重新过滤，确保数据一致性
+
 ---
 
 ## 四、启动脚本规范
@@ -1000,9 +1074,12 @@ function exportData(format) {
 | HTML 标签 | `<code>` 等行内标签必须成对闭合，禁止多余 `</code>` |
 | JS 括号闭合 | 所有 `{}` `()` 必须成对，修改后用 `new Function(code)` 验证 |
 | 功能按钮 | `.func-btn` 固定 `width`，`inline-flex` 居中，禁止 `text-overflow: ellipsis` |
+| 动态展开行 | 点击时 `createElement` + `rowElement.after()`，禁止预创建 detail-row |
+| 聚合级别 | 按天→月度聚合，按月→月度聚合，按年→年度聚合，使用 `filteredRecords` |
+| 图标切换 | 同组多行用 `querySelectorAll('.class')` 统一切换，禁止重复 ID |
 | CSS 变量 | 使用 `:root` 定义主题色 |
 | 移动端适配 | 5 个断点全覆盖，按钮最小 44px，flex 居中布局 |
-| 版本号 | 唯一来源 `README.md`，格式 `### v3.7.3 (2026-06-18)` |
+| 版本号 | 唯一来源 `README.md`，格式 `### v3.7.4 (2026-06-18)` |
 | 依赖管理 | `requirements.txt`，虚拟环境 `.venv` |
 | 进程管理 | Windows: `taskkill`，Linux/Mac: `pkill` |
 | 敏感信息 | 配置模板用占位符，API 返回时脱敏 |

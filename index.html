@@ -697,6 +697,12 @@
             box-shadow: 0 8px 32px rgba(0,0,0,0.2);
         }
         
+        .profit-floating-panel .drag-handle {
+            cursor: move;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        
         @media (max-width: 575.98px) {
             .profit-fab-btn {
                 right: 1rem;
@@ -3645,6 +3651,7 @@ SzwegoSpider/
                     }
                     
                     window.dailyProfitAllRecords = data.all_records || [];
+                    window._currentGroupBy = groupBy;
                     
                     showOutputPanel();
                     const outputPanel = document.getElementById('output-panel');
@@ -3699,7 +3706,7 @@ SzwegoSpider/
                             <div style="padding: 15px; background: #e8f4f8; border-bottom: 2px solid #667eea;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                     <span style="font-weight: 600; color: #333;">📊 汇总数据（共 ${data.total_records} 条记录）</span>
-                                    <span style="font-size: 12px; color: #666;">点击日期查看明细</span>
+                                    <span style="font-size: 12px; color: #666;">点击日期查看明细及聚合统计</span>
                                 </div>
                                 <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                                     <table class="table table-bordered table-sm" style="margin: 0; font-size: 13px; background: white;">
@@ -3722,7 +3729,7 @@ SzwegoSpider/
                             cardHtml += `
                                 <tr class="summary-row" data-date="${item.日期}" onclick="window.toggleProfitDetail('${item.日期}', this)">
                                     <td class="action-col">
-                                        <i class="fa fa-plus-circle" style="color: #667eea; cursor: pointer;" id="detail-icon-${dateKey}"></i>
+                                        <i class="fa fa-plus-circle detail-toggle-icon" style="color: #667eea; cursor: pointer;"></i>
                                     </td>
                                     <td style="text-align: center; font-weight: 600;">${item.日期}</td>
                                     <td style="text-align: center; color: #409eff;">${item.项目 || '未分类'}</td>
@@ -3730,13 +3737,6 @@ SzwegoSpider/
                                     <td style="text-align: center; color: #e6a23c; font-weight: 600;">¥${item.金额.toFixed(2)}</td>
                                     <td style="text-align: center; color: #909399;">¥${item.成本.toFixed(2)}</td>
                                     <td style="text-align: center; color: #67c23a; font-weight: 600;">¥${item.纯利.toFixed(2)}</td>
-                                </tr>
-                                <tr id="detail-row-${dateKey}" style="display: none; background: #fafafa;">
-                                    <td colspan="7" style="padding: 0;">
-                                        <div id="detail-content-${dateKey}" style="padding: 10px; max-height: 300px; overflow-y: auto;">
-                                            <div style="text-align: center; color: #999;"><i class="fa fa-spinner fa-spin"></i> 加载中...</div>
-                                        </div>
-                                    </td>
                                 </tr>
                             `;
                         });
@@ -3941,24 +3941,37 @@ SzwegoSpider/
         
         window.toggleProfitDetail = function(dateKey, rowElement) {
             const dateId = dateKey.replace(/-/g, '');
-            const detailRow = document.getElementById('detail-row-' + dateId);
-            const detailContent = document.getElementById('detail-content-' + dateId);
-            const icon = document.getElementById('detail-icon-' + dateId);
+            let detailRow = document.getElementById('detail-row-' + dateId);
+            let detailContent = document.getElementById('detail-content-' + dateId);
             
-            if (!detailRow || !detailContent) return;
+            const wasVisible = detailRow && detailRow.style.display !== 'none';
+            const allRows = document.querySelectorAll('.summary-row[data-date="' + dateKey + '"]');
             
-            const isVisible = detailRow.style.display !== 'none';
-            
-            if (isVisible) {
+            if (wasVisible) {
                 detailRow.style.display = 'none';
-                if (icon) icon.className = 'fa fa-plus-circle';
-                if (rowElement) rowElement.style.background = '';
+                allRows.forEach(function(row) {
+                    var icon = row.querySelector('.detail-toggle-icon');
+                    if (icon) icon.className = 'fa fa-plus-circle detail-toggle-icon';
+                    row.style.background = '';
+                });
             } else {
+                if (!detailRow) {
+                    detailRow = document.createElement('tr');
+                    detailRow.id = 'detail-row-' + dateId;
+                    detailRow.style.background = '#fafafa';
+                    detailRow.innerHTML = '<td colspan="7" style="padding: 0;"><div id="detail-content-' + dateId + '" style="padding: 10px; max-height: 300px; overflow-y: auto;"></div></td>';
+                }
+                rowElement.after(detailRow);
+                detailContent = document.getElementById('detail-content-' + dateId);
                 detailRow.style.display = 'table-row';
-                if (icon) icon.className = 'fa fa-minus-circle';
-                if (rowElement) rowElement.style.background = '#e6f0ff';
+                allRows.forEach(function(row) {
+                    var icon = row.querySelector('.detail-toggle-icon');
+                    if (icon) icon.className = 'fa fa-minus-circle detail-toggle-icon';
+                    row.style.background = '#e6f0ff';
+                });
                 
                 const allRecords = window.dailyProfitAllRecords || [];
+                const currentGroupBy = window._currentGroupBy || 'day';
                 if (allRecords.length === 0) {
                     detailContent.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">暂无数据</div>';
                     return;
@@ -3973,7 +3986,7 @@ SzwegoSpider/
                         dateStr = recordDate.toISOString().split('T')[0];
                     }
                     
-                   let match = false;
+                    let match = false;
                     if (dateKey.length === 7) {
                         match = dateStr.startsWith(dateKey);
                     } else if (dateKey.length === 4) {
@@ -3985,25 +3998,96 @@ SzwegoSpider/
                 });
                 
                 if (filteredRecords.length === 0) {
-                    const sampleRecords = allRecords.slice(0, 5);
-                    let debugInfo = '<div style="background: #fff3cd; padding: 10px; margin: 10px; border-radius: 5px; font-size: 12px;">';
-                    debugInfo += '<strong>调试信息：</strong><br>';
-                    debugInfo += '查询日期: ' + dateKey + ' (长度:' + dateKey.length + ')<br>';
-                    debugInfo += '总记录数: ' + allRecords.length + '<br>';
-                    debugInfo += '样本日期: ' + sampleRecords.map(r => {
-                        const d = r['日期'];
-                        let ds = '';
-                        if (typeof d === 'string') ds = d.substring(0, 10);
-                        else if (d instanceof Date) ds = d.toISOString().split('T')[0];
-                        else ds = String(d);
-                        return ds;
-                    }).join(', ');
-                    debugInfo += '</div>';
-                    detailContent.innerHTML = debugInfo + '<div style="text-align: center; color: #999; padding: 20px;">该日期暂无数据</div>';
+                    detailContent.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">该日期暂无数据</div>';
                     return;
                 }
                 
-                let detailHtml = `
+                let parentLabel = '';
+                let parentRecords = [];
+                if (currentGroupBy === 'day') {
+                    const monthKey = dateKey.substring(0, 7);
+                    parentLabel = monthKey + ' 月度聚合';
+                    parentRecords = allRecords.filter(record => {
+                        const recordDate = record['日期'];
+                        let dateStr = '';
+                        if (typeof recordDate === 'string') {
+                            dateStr = recordDate.substring(0, 10);
+                        } else if (recordDate instanceof Date) {
+                            dateStr = recordDate.toISOString().split('T')[0];
+                        }
+                        return dateStr.startsWith(monthKey);
+                    });
+                } else if (currentGroupBy === 'month') {
+                    parentLabel = dateKey + ' 月度聚合';
+                    parentRecords = filteredRecords;
+                } else if (currentGroupBy === 'year') {
+                    parentLabel = dateKey + ' 年度聚合';
+                    parentRecords = filteredRecords;
+                }
+                
+                let detailHtml = '';
+                
+                if (parentRecords.length > 0 && currentGroupBy !== 'all') {
+                    const parentByProject = {};
+                    parentRecords.forEach(record => {
+                        const project = record['项目'] || '未分类';
+                        if (!parentByProject[project]) {
+                            parentByProject[project] = { 金额: 0, 成本: 0, 纯利: 0, 数量: 0 };
+                        }
+                        parentByProject[project]['金额'] += record['金额'] || 0;
+                        parentByProject[project]['成本'] += record['成本'] || 0;
+                        parentByProject[project]['纯利'] += record['纯利'] || 0;
+                        parentByProject[project]['数量'] += 1;
+                    });
+                    
+                    const parentTotalAmount = parentRecords.reduce((sum, r) => sum + (r['金额'] || 0), 0);
+                    const parentTotalCost = parentRecords.reduce((sum, r) => sum + (r['成本'] || 0), 0);
+                    const parentTotalProfit = parentRecords.reduce((sum, r) => sum + (r['纯利'] || 0), 0);
+                    
+                    detailHtml += `
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 10px 15px; border-radius: 8px; margin-bottom: 10px;">
+                            <div style="color: white; font-weight: 600; font-size: 14px; margin-bottom: 8px;"><i class="fa fa-pie-chart"></i> ${parentLabel}</div>
+                            <table class="table table-bordered table-condensed" style="margin: 0; font-size: 12px; background: white; text-align: center;">
+                                <thead style="background: rgba(255,255,255,0.2); color: white;">
+                                    <tr>
+                                        <th style="text-align: center;">项目</th>
+                                        <th style="text-align: center;">笔数</th>
+                                        <th style="text-align: center;">金额</th>
+                                        <th style="text-align: center;">成本</th>
+                                        <th style="text-align: center;">纯利</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    Object.keys(parentByProject).sort().forEach(project => {
+                        const p = parentByProject[project];
+                        detailHtml += `
+                            <tr>
+                                <td style="text-align: center; color: #409eff;">${project}</td>
+                                <td style="text-align: center;">${p.数量}笔</td>
+                                <td style="text-align: center; color: #e6a23c; font-weight: 600;">¥${p.金额.toFixed(2)}</td>
+                                <td style="text-align: center; color: #909399;">¥${p.成本.toFixed(2)}</td>
+                                <td style="text-align: center; color: #67c23a; font-weight: 600;">¥${p.纯利.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    detailHtml += `
+                                <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold;">
+                                    <td style="text-align: center;">合计</td>
+                                    <td style="text-align: center;">${parentRecords.length}笔</td>
+                                    <td style="text-align: center;">¥${parentTotalAmount.toFixed(2)}</td>
+                                    <td style="text-align: center;">¥${parentTotalCost.toFixed(2)}</td>
+                                    <td style="text-align: center;">¥${parentTotalProfit.toFixed(2)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    `;
+                }
+                
+                detailHtml += `
                     <table class="table table-bordered table-condensed" style="margin: 0; font-size: 12px; background: white; text-align: center;">
                         <thead style="background: #f5f5f5;">
                             <tr>
@@ -4076,8 +4160,8 @@ SzwegoSpider/
             if (!reportText && summary.length === 0) return;
             
             let html = `
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 12px 16px; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: white; font-weight: 600; font-size: 15px;"><i class="fa fa-chart-line"></i> 汇总统计</span>
+                <div class="drag-handle" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 12px 16px; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: white; font-weight: 600; font-size: 15px;"><i class="fa fa-grip-lines" style="margin-right: 6px; opacity: 0.6;"></i><i class="fa fa-chart-line"></i> 汇总统计</span>
                     <span onclick="document.getElementById('profit-floating-panel').style.display='none'" style="color: white; cursor: pointer; font-size: 18px; padding: 0 4px;"><i class="fa fa-times"></i></span>
                 </div>
             `;
@@ -4177,6 +4261,71 @@ SzwegoSpider/
                 panel.style.top = top + 'px';
             }
             panel.style.display = 'block';
+            
+            var dragHandle = panel.querySelector('.drag-handle');
+            if (dragHandle) {
+                var isDragging = false;
+                var dragStartX = 0, dragStartY = 0;
+                var panelStartX = 0, panelStartY = 0;
+                
+                function onDragStart(clientX, clientY) {
+                    isDragging = true;
+                    dragStartX = clientX;
+                    dragStartY = clientY;
+                    panelStartX = parseInt(panel.style.left) || 0;
+                    panelStartY = parseInt(panel.style.top) || 0;
+                    panel.style.right = '';
+                    panel.style.transition = 'none';
+                }
+                
+                function onDragMove(clientX, clientY) {
+                    if (!isDragging) return;
+                    var dx = clientX - dragStartX;
+                    var dy = clientY - dragStartY;
+                    var newLeft = panelStartX + dx;
+                    var newTop = panelStartY + dy;
+                    var vw = window.innerWidth;
+                    var vh = window.innerHeight;
+                    var pw = panel.offsetWidth;
+                    var ph = panel.offsetHeight;
+                    if (newLeft < 0) newLeft = 0;
+                    if (newTop < 0) newTop = 0;
+                    if (newLeft + pw > vw) newLeft = vw - pw;
+                    if (newTop + ph > vh) newTop = vh - ph;
+                    panel.style.left = newLeft + 'px';
+                    panel.style.top = newTop + 'px';
+                }
+                
+                function onDragEnd() {
+                    isDragging = false;
+                    panel.style.transition = '';
+                }
+                
+                dragHandle.onmousedown = function(e) {
+                    if (e.target.closest('span[onclick]')) return;
+                    e.preventDefault();
+                    onDragStart(e.clientX, e.clientY);
+                };
+                dragHandle.ontouchstart = function(e) {
+                    if (e.target.closest('span[onclick]')) return;
+                    var touch = e.touches[0];
+                    onDragStart(touch.clientX, touch.clientY);
+                };
+                
+                document.removeEventListener('mousemove', window._profitPanelDragMove);
+                document.removeEventListener('mouseup', window._profitPanelDragEnd);
+                document.removeEventListener('touchmove', window._profitPanelDragMoveTouch);
+                document.removeEventListener('touchend', window._profitPanelDragEnd);
+                
+                window._profitPanelDragMove = function(e) { onDragMove(e.clientX, e.clientY); };
+                window._profitPanelDragEnd = onDragEnd;
+                window._profitPanelDragMoveTouch = function(e) { var t = e.touches[0]; onDragMove(t.clientX, t.clientY); };
+                
+                document.addEventListener('mousemove', window._profitPanelDragMove);
+                document.addEventListener('mouseup', window._profitPanelDragEnd);
+                document.addEventListener('touchmove', window._profitPanelDragMoveTouch, { passive: false });
+                document.addEventListener('touchend', window._profitPanelDragEnd);
+            }
         };
 
         document.addEventListener('click', function(e) {
@@ -4188,6 +4337,12 @@ SzwegoSpider/
                 }
             }
         });
+
+        document.addEventListener('touchmove', function(e) {
+            if (window._profitPanelDragMoveTouch && e.target.closest && e.target.closest('.drag-handle')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
 
         // 一键启动隧道并显示结果
         async function startTunnelAndShow() {
@@ -4704,12 +4859,12 @@ SzwegoSpider/
             });
         }
         
-        function closeSkuPanel() {
+         function showComparisonResult(data) {
             const skuPanel = document.getElementById('sku-input-panel');
             const skuContent = document.getElementById('sku-input-content');
             if (!skuPanel || !skuContent) return;
             
-            skuPanel.style.display = 'none';
+            skuPanel.style.display = 'block';
             skuPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
             
             const existingCard = skuContent.querySelector('.comparison-card');
@@ -4719,6 +4874,7 @@ SzwegoSpider/
             <div class="comparison-card">
                 <div class="comparison-header" style="background: #E6A23C;">
                     <i class="fa fa-barcode"></i> 货号对比结果
+                    <button onclick="showSkuInputPanel()" style="float:right;background:none;border:none;color:white;cursor:pointer;font-size:14px;"><i class="fa fa-edit"></i> 重新输入</button>
                 </div>
                 <div class="comparison-body">
                     <div class="comparison-stats">
@@ -4851,7 +5007,14 @@ SzwegoSpider/
             
             cardHtml += `</div></div>`;
             
-            skuContent.insertAdjacentHTML('beforeend', cardHtml);
+            skuContent.innerHTML = cardHtml;
+        }
+        
+        function closeSkuPanel() {
+            const skuPanel = document.getElementById('sku-input-panel');
+            if (skuPanel) {
+                skuPanel.style.display = 'none';
+            }
         }
         
         function showCleanerPanel() {

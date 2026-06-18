@@ -132,6 +132,45 @@ class Environment:
 - Python包自动安装（使用最优镜像源）
 
 ## 最新更新
+### v3.7.4 (2026-06-18)
+- **利润报表汇总行点击展开位置修复**
+  - 点击任意汇总行（日期/月份/年份），详情直接在该行正下方展开，而非固定在分组最后一行下方
+  - 修复按月/按年模式下同日期多项目行生成重复ID的detail-row，导致HTML无效、点击展开位置错误
+  - detail-row改为点击时动态创建，通过`rowElement.after()`插入到被点击行正下方
+  - 同日期多行图标统一切换（使用class选择器替代重复ID）
+
+- **聚合级别修正**
+  - 按天点击 → 显示月度聚合（不变）
+  - 按月点击 → 显示月度聚合（原来错误地显示年度聚合）
+  - 按年点击 → 显示年度聚合（原来错误地显示全部数据聚合）
+  - 聚合数据使用`filteredRecords`而非重新过滤，确保与当前行数据一致
+
+- **跨系统支持确认**
+  - ✅ 所有路径使用 `os.path.join()`，无硬编码路径分隔符
+  - ✅ `Environment.SYSTEM` 动态获取操作系统，无硬编码平台字符串
+  - ✅ `Environment.get_user_agent()` 动态适配 UA，无硬编码 Windows UA
+  - ✅ `TunnelManager.get_lan_ip()` 动态获取局域网 IP，无硬编码 IP 地址
+  - ✅ 前端使用 `window.location.origin`，标准浏览器 API 三平台通用
+  - ✅ 进程管理 Windows `taskkill` / Linux-Mac `pkill` 自动适配
+
+- **移动端适配确认（符合 v3.5.0 规范）**
+  - ✅ viewport meta 标签正确设置
+  - ✅ 5 个响应式断点全覆盖（<576px / 576-767px / 768-991px / 992-1199px / ≥1200px）
+  - ✅ 触摸友好按钮 min-height: 44px（符合 Apple HIG）
+  - ✅ 输入框 font-size: 16px（防止 iOS 自动缩放）
+  - ✅ 下拉刷新功能（移动端专用）
+  - ✅ Toast 提示系统替代所有 alert()
+  - ✅ 设备检测和样式自动适配
+  - ✅ 横屏模式适配
+  - ✅ 搜索框固定顶部
+  - ✅ 表格行点击展开详情（移动端专属）
+  - ✅ 功能按钮 flex 居中布局，文字完整显示
+
+- **skill.md / skill.docx 同步更新**
+  - skill.md §3.9 新增动态展开行规范（`rowElement.after()` 模式）
+  - skill.md 编码风格速查表新增：动态展开行、聚合级别一致性
+  - skill.docx 重新生成（符合 v3.6.0 字体规范：Consolas + 微软雅黑）
+
 ### v3.7.3 (2026-06-18)
 - **DOMContentLoaded 闭合修复（关键 Bug）**
   - 修复 v3.7.1 中误删的 3 行闭合括号（`};` + `});` + `});`），导致 `DOMContentLoaded` 回调未闭合
