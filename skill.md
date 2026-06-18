@@ -500,6 +500,47 @@ input, textarea, select { font-size: 16px; }
 body { padding-top: 56px; }
 ```
 
+### 3.4.1 功能按钮统一样式规范
+
+所有 `.func-btn` 按钮必须大小一致、文字完整显示、内容居中：
+
+```css
+/* 桌面端 */
+.func-btn {
+    width: 12.5rem;          /* 固定宽度，不用 min-width */
+    height: 3rem;
+    line-height: 2rem;
+    font-size: 14px;         /* 统一字号 */
+    text-align: center;
+    display: inline-flex;    /* flex 居中 */
+    align-items: center;
+    justify-content: center;
+}
+.func-btn span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;                /* 图标与文字间距统一 */
+}
+
+/* 移动端 <576px */
+@media (max-width: 575.98px) {
+    .func-btn {
+        width: 10rem;
+        height: 2.75rem;
+        line-height: 1.75rem;
+        font-size: 13px;
+    }
+}
+```
+
+**关键规则**：
+- 使用固定 `width` 而非 `min-width`，确保所有按钮等宽
+- 禁止 `text-overflow: ellipsis`，按钮文字必须完整显示
+- 使用 `inline-flex` + `align-items/justify-content: center` 居中
+- 统一 `font-size` 确保文字大小一致
+- 宽度需容纳最长按钮文字（如"3. Excel与JSON对比"）
+
 ### 3.5 iframe 懒加载模式
 
 ```html
@@ -554,6 +595,28 @@ function clearAllPollingIntervals() {
 ```html
 <li>默认使用 <code>hostc</code> 隧道服务</li>
 ```
+
+### 3.7.1 JavaScript 括号闭合规范
+
+修改代码时必须确保所有花括号 `{}` 和圆括号 `()` 成对闭合。`DOMContentLoaded` 回调闭合错误会导致整个脚本解析失败，所有功能不可用。
+
+**验证方法**：用 `new Function(code)` 检查脚本语法是否合法。
+
+**典型结构**：
+```javascript
+document.addEventListener('DOMContentLoaded', function() {   // 第1层
+    // ... 所有初始化代码 ...
+    document.querySelectorAll('.btn-sku-api').forEach(function(btn) {  // 第2层
+        btn.onclick = function() {  // 第3层
+            if (apiUrl) {  // 第4层
+                // ...
+            }  // 闭合 if
+        };  // 闭合 onclick ← 这3行必须保留！
+    });  // 闭合 forEach
+});  // 闭合 DOMContentLoaded
+```
+
+**v3.7.3 修复的 Bug**：v3.7.1 中 `onclick` 和 `forEach` 的闭合行被误删，导致 `DOMContentLoaded` 回调未闭合，整个页面功能失效。
 
 ### 3.8 更新日志 API 规范
 
@@ -935,9 +998,11 @@ function exportData(format) {
 | API 响应 | 成功 `{'success': True, ...}`，失败 `{'error': '...'}` |
 | 前端提示 | 使用 `showToast()`，禁止 `alert()` |
 | HTML 标签 | `<code>` 等行内标签必须成对闭合，禁止多余 `</code>` |
+| JS 括号闭合 | 所有 `{}` `()` 必须成对，修改后用 `new Function(code)` 验证 |
+| 功能按钮 | `.func-btn` 固定 `width`，`inline-flex` 居中，禁止 `text-overflow: ellipsis` |
 | CSS 变量 | 使用 `:root` 定义主题色 |
-| 移动端适配 | 5 个断点全覆盖，按钮最小 44px |
-| 版本号 | 唯一来源 `README.md`，格式 `### v3.7.1 (2026-06-18)` |
+| 移动端适配 | 5 个断点全覆盖，按钮最小 44px，flex 居中布局 |
+| 版本号 | 唯一来源 `README.md`，格式 `### v3.7.3 (2026-06-18)` |
 | 依赖管理 | `requirements.txt`，虚拟环境 `.venv` |
 | 进程管理 | Windows: `taskkill`，Linux/Mac: `pkill` |
 | 敏感信息 | 配置模板用占位符，API 返回时脱敏 |

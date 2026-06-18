@@ -645,9 +645,20 @@
         }
 
         .func-btn {
-            min-width: 10rem;
+            width: 12.5rem;
             height: 3rem;
             line-height: 2rem;
+            font-size: 14px;
+            text-align: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .func-btn span {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
         }
         
         .profit-fab-btn {
@@ -748,9 +759,14 @@
             }
 
             .func-btn {
-                min-width: 8.75rem;
+                width: 10rem;
                 height: 2.75rem;
                 line-height: 1.75rem;
+                font-size: 13px;
+                text-align: center;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
             }
 
             .action-col {
@@ -4553,6 +4569,10 @@ SzwegoSpider/
                         showToast('请求失败: ' + error.message, 'error');
                     });
                 }
+            };
+        });
+        
+        });
 
         // 全局函数定义
         function formatOutput(text) {
