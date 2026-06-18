@@ -430,7 +430,7 @@ fetch('/api/products?t=' + Date.now())
     .then(response => response.json())
     .then(data => {
         if (data.error) {
-            alert('加载失败: ' + data.error);
+            showToast('加载失败: ' + data.error, 'error');
             return;
         }
         // 处理数据

@@ -132,6 +132,50 @@ class Environment:
 - Python包自动安装（使用最优镜像源）
 
 ## 最新更新
+### v3.7.1 (2026-06-18)
+- **跨系统硬编码彻底消除**
+  - `main.py` 中 `sec-ch-ua-platform` 从硬编码 `"Windows"` 改为 `Environment.SYSTEM` 动态获取
+  - `main.py` 中 `user-agent` 从硬编码 Windows UA 改为 `Environment.get_user_agent()` 动态适配
+  - `skill.md` 示例代码中 `alert()` 替换为 `showToast()`，与实际代码保持一致
+  - `window.location.origin` 是标准浏览器 API，Windows/macOS/Linux 三平台均支持（确认无问题）
+
+- **V3.5.0 移动端规范全面复查**
+  - ✅ viewport meta 标签正确设置
+  - ✅ 5 个响应式断点全覆盖（<576px / 576-767px / 768-991px / 992-1199px / ≥1200px）
+  - ✅ 触摸友好按钮 min-height: 44px（符合 Apple HIG）
+  - ✅ 输入框 font-size: 16px（防止 iOS 自动缩放）
+  - ✅ 下拉刷新功能（移动端专用）
+  - ✅ Toast 提示系统替代所有 alert()（39 处 showToast 调用）
+  - ✅ 设备检测和样式自动适配
+  - ✅ 横屏模式适配
+  - ✅ 搜索框固定顶部
+  - ✅ 表格行点击展开详情（移动端专属）
+
+### v3.7.0 (2026-06-18)
+- **货号对比(txt)修复**
+  - 修复 `/api/sku/compare/txt` 使用 `re.findall(r'\d+')` 导致含字母货号被拆碎的问题
+  - 改为按空白/逗号/换行分割，保留完整货号（含字母如 `9km0m9ywk7`）
+  - 补齐高价商品分析（≥599）、新增/删除商品追踪等与 Excel 端一致的功能
+  - 前端展示面板与 Excel 端统一：多余货号分类、高价商品、新增商品等
+
+- **每日利润报表悬浮汇总**
+  - 新增右下角悬浮按钮，点击在当前位置弹出汇总统计面板
+  - 按月/按年查看时无需滚回顶部即可查看汇总数据
+  - 面板支持移动端全宽适配
+
+- **移动端适配优化（符合 v3.5.0 规范）**
+  - 所有 `input`/`textarea`/`select` 统一 `font-size: 16px`，防止 iOS 自动缩放
+  - 利润悬浮按钮使用 CSS 类 + 响应式断点，移动端自动缩小
+  - 浮动面板移动端全宽（90vw），平板 80vw，桌面端居中弹窗
+  - 日期输入框宽度改为响应式 `min-width/max-width`
+  - FAB 按钮和浮动面板全部使用 `rem/vw` 单位，无硬编码像素值
+
+- **跨系统硬编码消除**
+  - 移除 `main.py` 中硬编码的局域网 IP `192.168.31.36`
+  - 新增 `TunnelManager.get_lan_ip()` 动态获取局域网 IP
+  - 前端隧道地址回退改为 `window.location.origin`，不再硬编码 `127.0.0.1:8888`
+  - 所有路径使用 `os.path.join()`，无平台特定分隔符
+
 ### v3.6.0 (2026-06-11)
 - **更新日志详情展示**
   - `/api/changelog` 接口重构，支持解析子条目（缩进列表项）
