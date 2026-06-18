@@ -132,6 +132,24 @@ class Environment:
 - Python包自动安装（使用最优镜像源）
 
 ## 最新更新
+### v3.7.2 (2026-06-18)
+- **index.html 标签闭合修复**
+  - 修复第5197行 `<code>hostc</code>` 后多余的 `</code>` 闭合标签
+  - 模板字符串中 HTML 标签必须正确成对闭合
+
+- **skill.md 规范更新**
+  - 新增 §3.7 HTML 标签闭合规范（自闭合标签、行内代码成对闭合、模板字符串检查）
+  - 新增 §3.8 更新日志 API 规范（`/api/changelog` 解析规则、子条目支持、前端展示规则）
+  - 编码风格速查表新增：HTTP 请求头动态获取、HTML 标签闭合、版本号格式更新
+  - 版本号格式更新为 `### v3.7.1 (2026-06-18)`
+
+- **skill.docx 重新生成（符合 v3.6.0 字体规范）**
+  - 西文字体 Consolas，中文字体微软雅黑
+  - 每个 `w:rFonts` 同时设置 `w:eastAsia`，修复中文显示异常
+  - Markdown 表格正确渲染为 Word Table Grid，首行加粗
+  - 代码块 Consolas 9pt，左缩进 0.3 英寸
+  - 行内格式支持 `**粗体**` 和 `` `代码` `` 混排
+
 ### v3.7.1 (2026-06-18)
 - **跨系统硬编码彻底消除**
   - `main.py` 中 `sec-ch-ua-platform` 从硬编码 `"Windows"` 改为 `Environment.SYSTEM` 动态获取

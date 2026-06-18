@@ -539,6 +539,69 @@ function clearAllPollingIntervals() {
 }
 ```
 
+### 3.7 HTML 标签闭合规范
+
+- **自闭合标签**：`<br>`, `<hr>`, `<img>`, `<input>`, `<meta>`, `<link>` 无需 `/>`
+- **行内代码**：`<code>` 必须成对闭合，禁止嵌套多余的 `</code>`
+- **模板字符串中的 HTML**：innerHTML 赋值时，所有标签必须正确闭合
+
+**错误示例**：
+```html
+<li>默认使用 <code>hostc</code> 隧道服务</code></li>
+```
+
+**正确示例**：
+```html
+<li>默认使用 <code>hostc</code> 隧道服务</li>
+```
+
+### 3.8 更新日志 API 规范
+
+`/api/changelog` 接口解析 README "最新更新"章节，返回结构化 JSON，支持子条目：
+
+**README 格式**：
+```markdown
+### v3.6.0 (2026-06-11)
+- **分类标题**
+  - 子条目1
+  - 子条目2
+- **另一个分类**
+  - 子条目3
+```
+
+**API 返回结构**：
+```json
+{
+  "success": true,
+  "changelog": [
+    {
+      "version": "3.6.0",
+      "date": "2026-06-11",
+      "items": [
+        {
+          "title": "分类标题",
+          "desc": "",
+          "sub_items": ["子条目1", "子条目2"]
+        },
+        {
+          "title": "另一个分类",
+          "desc": "",
+          "sub_items": ["子条目3"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**解析规则**：
+- `## 最新更新` 标记章节开始
+- `### v版本号 (日期)` 标记版本边界
+- `- **标题**` 匹配顶层条目（支持可选的 ` - 描述` 后缀）
+- 缩进的 `- 子条目` 匹配子条目（行首有2+空格或制表符）
+- 遇到下一个 `## ` 标题或文件结束则停止解析
+- 前端"最新更新"区域仅展示最新版本的完整更新详情
+
 ---
 
 ## 四、启动脚本规范
@@ -868,11 +931,13 @@ function exportData(format) {
 | 异常处理 | 禁止裸 `except`，使用 `AppException` 体系 |
 | 路径拼接 | 使用 `os.path.join()`，禁止字符串拼接 |
 | 跨平台判断 | 使用 `Environment.IS_WINDOWS` 等，禁止 `platform.system()` 散落 |
+| HTTP 请求头 | `user-agent` 和 `sec-ch-ua-platform` 使用 `Environment` 动态获取，禁止硬编码 |
 | API 响应 | 成功 `{'success': True, ...}`，失败 `{'error': '...'}` |
 | 前端提示 | 使用 `showToast()`，禁止 `alert()` |
+| HTML 标签 | `<code>` 等行内标签必须成对闭合，禁止多余 `</code>` |
 | CSS 变量 | 使用 `:root` 定义主题色 |
 | 移动端适配 | 5 个断点全覆盖，按钮最小 44px |
-| 版本号 | 唯一来源 `README.md`，格式 `### v3.6.0 (2026-06-11)` |
+| 版本号 | 唯一来源 `README.md`，格式 `### v3.7.1 (2026-06-18)` |
 | 依赖管理 | `requirements.txt`，虚拟环境 `.venv` |
 | 进程管理 | Windows: `taskkill`，Linux/Mac: `pkill` |
 | 敏感信息 | 配置模板用占位符，API 返回时脱敏 |
