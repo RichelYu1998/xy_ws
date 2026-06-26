@@ -809,20 +809,65 @@ window.highlightChartPoint = function(dateKey) {
 `formatDate` 函数必须处理所有可能的日期输入格式，特别是 Excel 日期序列号。
 
 **处理优先级**：
-1. `YYYY-MM-DD` 标准格式 → 直接返回
-2. `YYYY/M/D` 斜杠格式 → 补零转换
-3. `YYYYMMDD` 紧凑格式 → 插入连字符
-4. GMT/UTC/HTTP 日期格式 → `new Date()` 解析
-5. **Excel 日期序列号**（40000-100000 范围的纯数字）→ Excel epoch 转换
-6. 其他 → 原样返回
+1. `Date` 对象 → 直接格式化
+2. `YYYY-MM-DD` 标准格式 → 直接返回
+3. `YYYY-MM-DDTHH:mm:ss` ISO格式 → 截取前10位
+4. `YYYY/M/D` 斜杠格式 → 补零转换
+5. `YYYYMMDD` 紧凑格式 → 插入连字符
+6. **数字类型 Excel 日期序列号**（typeof === 'number'，40000-100000）→ Excel epoch 转换
+7. **字符串类型 Excel 日期序列号**（纯数字字符串，40000-100000）→ Excel epoch 转换
+8. GMT/UTC/HTTP 日期格式 → `new Date()` 解析
+9. 其他 → 原样返回
 
-**Excel 日期序列号转换**（必须在 `return str` 之前执行）：
+**后端日期预处理**（`table_data` 发送前必须转换）：
+```python
+for row_data in table_data:
+    for col_idx, cell_val in enumerate(row_data):
+        if isinstance(cell_val, datetime):
+            row_data[col_idx] = cell_val.strftime('%Y-%m-%d')
+        elif isinstance(cell_val, (int, float)) and not isinstance(cell_val, bool):
+            if cell_val > 40000 and cell_val < 100000:
+                try:
+                    converted = datetime(1899, 12, 30) + timedelta(days=int(cell_val))
+                    if converted.year >= 2000:
+                        row_data[col_idx] = converted.strftime('%Y-%m-%d')
+                except:
+                    pass
+```
+
+**后端 `all_records` 年份验证**：
+```python
+elif isinstance(date_val, (int, float)):
+    try:
+        record_date = datetime(1899, 12, 30) + timedelta(days=int(date_val))
+        if record_date.year < 2000:
+            continue  # 拒绝2000年以前的日期
+        record_date_str = record_date.strftime('%Y-%m-%d')
+    except:
+        continue
+```
+
+**前端 Excel 日期序列号转换**（必须在 `return str` 之前执行）：
 ```javascript
+// 数字类型优先处理（避免String()转换丢失精度）
+if (typeof value === 'number' && value > 40000 && value < 100000) {
+    try {
+        const excelEpoch = new Date(1899, 11, 30);
+        const jsDate = new Date(excelEpoch.getTime() + value * 86400000);
+        if (jsDate.getFullYear() >= 2000) {
+            const y = jsDate.getFullYear();
+            const m = String(jsDate.getMonth() + 1).padStart(2, '0');
+            const d = String(jsDate.getDate()).padStart(2, '0');
+            return y + '-' + m + '-' + d;
+        }
+    } catch(e) {}
+}
+// 字符串类型处理
 if (/^\d+$/.test(str) && parseInt(str) > 40000 && parseInt(str) < 100000) {
     try {
         const excelEpoch = new Date(1899, 11, 30);
         const jsDate = new Date(excelEpoch.getTime() + parseInt(str) * 86400000);
-        if (jsDate.getFullYear() > 2000) {
+        if (jsDate.getFullYear() >= 2000) {
             const y = jsDate.getFullYear();
             const m = String(jsDate.getMonth() + 1).padStart(2, '0');
             const d = String(jsDate.getDate()).padStart(2, '0');
@@ -836,7 +881,10 @@ return str;
 **注意事项**：
 - 正则表达式必须使用 `/^\d+$/`（带反斜杠），而非 `/^d+$/`
 - Excel 日期处理代码必须放在 `return str` 之前，否则永远不会执行
-- `padStart` 第二个参数为 `'0'`（单个零），而非 `'00'`
+- `padStart` 第二个参数为 `'0'（单个零），而非 `'00'`
+- 年份验证阈值 `>= 2000`，拒绝2000年以前的Excel序列号日期
+- 后端 `table_data` 必须在 `jsonify` 前预处理日期，避免前端收到datetime对象或原始序列号
+- 图表渲染使用 `requestAnimationFrame` 替代 `setTimeout`，确保DOM就绪
 
 ---
 

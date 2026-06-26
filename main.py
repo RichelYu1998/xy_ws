@@ -5207,6 +5207,8 @@ if __name__ == '__main__':
                                         elif isinstance(date_val, (int, float)):
                                             try:
                                                 record_date = datetime(1899, 12, 30) + timedelta(days=int(date_val))
+                                                if record_date.year < 2000:
+                                                    continue
                                                 record_date_str = record_date.strftime('%Y-%m-%d')
                                             except:
                                                 continue
@@ -5270,6 +5272,19 @@ if __name__ == '__main__':
                     summary[composite_key]['数量'] += 1
                 
                 summary_list = sorted(summary.values(), key=lambda x: x['日期'])
+                
+                for row_data in table_data:
+                    for col_idx, cell_val in enumerate(row_data):
+                        if isinstance(cell_val, datetime):
+                            row_data[col_idx] = cell_val.strftime('%Y-%m-%d')
+                        elif isinstance(cell_val, (int, float)) and not isinstance(cell_val, bool):
+                            if cell_val > 40000 and cell_val < 100000:
+                                try:
+                                    converted = datetime(1899, 12, 30) + timedelta(days=int(cell_val))
+                                    if converted.year >= 2000:
+                                        row_data[col_idx] = converted.strftime('%Y-%m-%d')
+                                except:
+                                    pass
                 
                 result = {
                     'daily_profit_report': daily_profit_report,
