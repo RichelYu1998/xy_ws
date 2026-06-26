@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -4005,18 +4005,8 @@ SzwegoSpider/
                 let parentLabel = '';
                 let parentRecords = [];
                 if (currentGroupBy === 'day') {
-                    const monthKey = dateKey.substring(0, 7);
-                    parentLabel = monthKey + ' 月度聚合';
-                    parentRecords = allRecords.filter(record => {
-                        const recordDate = record['日期'];
-                        let dateStr = '';
-                        if (typeof recordDate === 'string') {
-                            dateStr = recordDate.substring(0, 10);
-                        } else if (recordDate instanceof Date) {
-                            dateStr = recordDate.toISOString().split('T')[0];
-                        }
-                        return dateStr.startsWith(monthKey);
-                    });
+                    parentLabel = dateKey + ' 按天统计';
+                    parentRecords = filteredRecords;
                 } else if (currentGroupBy === 'month') {
                     parentLabel = dateKey + ' 月度聚合';
                     parentRecords = filteredRecords;
@@ -4992,15 +4982,6 @@ SzwegoSpider/
                 cardHtml += `
                     <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
                         <div class="missing-title" style="color: #388e3c;">高价商品中已存在于输入的货号:</div>
-                        <div class="sku-container">${items}</div>
-                    </div>`;
-            }
-            
-            if (data.common && data.common.length > 0) {
-                const items = data.common.map(sku => `<span class="sku-tag" onclick="console.log('[按钮点击] 查看商品详情:', '${sku}'); showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
-                cardHtml += `
-                    <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
-                        <div class="missing-title" style="color: #388e3c;">共同货号:</div>
                         <div class="sku-container">${items}</div>
                     </div>`;
             }
