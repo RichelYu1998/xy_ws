@@ -1583,6 +1583,10 @@
             #weather iframe {
                 height: 280px;
             }
+
+            #profit-chart {
+                height: 300px !important;
+            }
         }
 
         @media (max-width: 375px) {
@@ -1670,6 +1674,7 @@
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
@@ -3693,6 +3698,15 @@ SzwegoSpider/
                             </div>
                             <button id="profit-fab-btn" class="profit-fab-btn" onclick="window.showFloatingProfitReport(event)"><i class="fa fa-chart-line"></i></button>
                             <div id="profit-floating-panel" class="profit-floating-panel"></div>
+                            <div id="profit-chart-container" style="padding: 15px; background: #fff; border-bottom: 2px solid #667eea;">
+                                <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;">
+                                    <span style="font-weight: 600; color: #333;"><i class="fa fa-bar-chart"></i> 利润趋势图</span>
+                                    <button class="btn btn-sm btn-primary" onclick="renderProfitChart('day')">按天</button>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="renderProfitChart('month')">按月</button>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="renderProfitChart('year')">按年</button>
+                                </div>
+                                <div id="profit-chart" style="width: 100%; height: 400px;"></div>
+                            </div>
                         `;
                     } else {
                         const fabBtn = document.getElementById('profit-fab-btn');
@@ -3902,6 +3916,7 @@ SzwegoSpider/
                     cardHtml += `</div></div>`;
                     
                     outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+                    setTimeout(() => renderProfitChart(window._currentGroupBy || 'day'), 100);
                 })
                 .catch(error => {
                     showToast('请求失败: ' + error.message, 'error');
@@ -3919,6 +3934,118 @@ SzwegoSpider/
             document.getElementById('profit-end-date').value = '';
             window.showDailyProfitReport('day', '', '');
         }
+
+        window.renderProfitChart = function(groupBy = 'day') {
+            const chartDom = document.getElementById('profit-chart');
+            if (!chartDom) return;
+
+            const allRecords = window.dailyProfitAllRecords || [];
+            if (!allRecords || allRecords.length === 0) {
+                chartDom.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">暂无数据</div>';
+                return;
+            }
+
+            const container = document.getElementById('profit-chart-container');
+            if (container) {
+                container.querySelectorAll('button').forEach(btn => {
+                    btn.className = 'btn btn-sm btn-outline-primary';
+                });
+                const activeBtn = container.querySelector(`button[onclick*="'\'"]`);
+                if (activeBtn) activeBtn.className = 'btn btn-sm btn-primary';
+            }
+
+            const grouped = {};
+            allRecords.forEach(record => {
+                const dateStr = record['\u65E5\u671F'] || '';
+                let key;
+                if (groupBy === 'year') {
+                    key = dateStr.substring(0, 4);
+                } else if (groupBy === 'month') {
+                    key = dateStr.substring(0, 7);
+                } else {
+                    key = dateStr;
+                }
+                if (!grouped[key]) {
+                    grouped[key] = { amount: 0, cost: 0, profit: 0, count: 0 };
+                }
+                grouped[key].amount += record['\u91D1\u989D'] || 0;
+                grouped[key].cost += record['\u6210\u672C'] || 0;
+                grouped[key].profit += record['\u7EAF\u5229'] || 0;
+                grouped[key].count += 1;
+            });
+
+            const sortedKeys = Object.keys(grouped).sort();
+            const amounts = sortedKeys.map(k => grouped[k].amount);
+            const costs = sortedKeys.map(k => grouped[k].cost);
+            const profits = sortedKeys.map(k => grouped[k].profit);
+
+            if (window._profitChartInstance) {
+                window._profitChartInstance.dispose();
+            }
+            const chart = echarts.init(chartDom);
+            window._profitChartInstance = chart;
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    formatter: function(params) {
+                        let result = params[0].axisValue + '<br/>';
+                        params.forEach(p => {
+                            result += p.marker + ' ' + p.seriesName + ': \xA5' + p.value.toFixed(2) + '<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: {
+                    data: ['\u91D1\u989D', '\u6210\u672C', '\u7EAF\u5229']
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '15%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: sortedKeys,
+                    axisLabel: { rotate: groupBy === 'day' ? 45 : 0, fontSize: 11 }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: { formatter: '\xA5{value}' }
+                },
+                dataZoom: [
+                    { type: 'inside', start: 0, end: 100 },
+                    { type: 'slider', start: 0, end: 100 }
+                ],
+                series: [
+                    {
+                        name: '\u91D1\u989D',
+                        type: 'bar',
+                        data: amounts,
+                        itemStyle: { color: '#E6A23C' }
+                    },
+                    {
+                        name: '\u6210\u672C',
+                        type: 'bar',
+                        data: costs,
+                        itemStyle: { color: '#909399' }
+                    },
+                    {
+                        name: '\u7EAF\u5229',
+                        type: 'line',
+                        data: profits,
+                        itemStyle: { color: '#67C23A' },
+                        lineStyle: { width: 2 },
+                        smooth: true
+                    }
+                ]
+            };
+
+            chart.setOption(option);
+            window.addEventListener('resize', () => chart.resize());
+        };
         
         window.showDailyProfitDetail = function(dateKey, groupBy) {
             let startDate = dateKey;
