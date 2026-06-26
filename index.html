@@ -3647,14 +3647,47 @@ SzwegoSpider/
                         
                         function formatDate(value) {
                             if (value === null || value === undefined) return '';
+                            if (value instanceof Date) {
+                                const y = value.getFullYear();
+                                const m = String(value.getMonth() + 1).padStart(2, '0');
+                                const d = String(value.getDate()).padStart(2, '0');
+                                return y + '-' + m + '-' + d;
+                            }
                             const str = String(value);
                             if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+                            if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+                                return str.substring(0, 10);
+                            }
                             if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(str)) {
                                 const parts = str.split('/');
                                 return parts[0] + '-' + parts[1].padStart(2, '0') + '-' + parts[2].padStart(2, '0');
                             }
                             if (/^\d{8}$/.test(str)) {
                                 return str.substring(0, 4) + '-' + str.substring(4, 6) + '-' + str.substring(6, 8);
+                            }
+                            if (typeof value === 'number' && value > 40000 && value < 100000) {
+                                try {
+                                    const excelEpoch = new Date(1899, 11, 30);
+                                    const jsDate = new Date(excelEpoch.getTime() + value * 86400000);
+                                    if (jsDate.getFullYear() >= 2000) {
+                                        const y = jsDate.getFullYear();
+                                        const m = String(jsDate.getMonth() + 1).padStart(2, '0');
+                                        const d = String(jsDate.getDate()).padStart(2, '0');
+                                        return y + '-' + m + '-' + d;
+                                    }
+                                } catch(e) {}
+                            }
+                            if (/^\d+$/.test(str) && parseInt(str) > 40000 && parseInt(str) < 100000) {
+                                try {
+                                    const excelEpoch = new Date(1899, 11, 30);
+                                    const jsDate = new Date(excelEpoch.getTime() + parseInt(str) * 86400000);
+                                    if (jsDate.getFullYear() >= 2000) {
+                                        const y = jsDate.getFullYear();
+                                        const m = String(jsDate.getMonth() + 1).padStart(2, '0');
+                                        const d = String(jsDate.getDate()).padStart(2, '0');
+                                        return y + '-' + m + '-' + d;
+                                    }
+                                } catch(e) {}
                             }
                             if (str.includes('GMT') || str.includes('UTC') || /^\w{3}, \d{2} \w{3} \d{4}/.test(str)) {
                                 try {
@@ -3666,18 +3699,6 @@ SzwegoSpider/
                                         return year + '-' + month + '-' + day;
                                     }
                                 } catch (e) {}
-                            }
-                            if (/^\d+$/.test(str) && parseInt(str) > 40000 && parseInt(str) < 100000) {
-                                try {
-                                    const excelEpoch = new Date(1899, 11, 30);
-                                    const jsDate = new Date(excelEpoch.getTime() + parseInt(str) * 86400000);
-                                    if (jsDate.getFullYear() > 2000) {
-                                        const y = jsDate.getFullYear();
-                                        const m = String(jsDate.getMonth() + 1).padStart(2, '0');
-                                        const d = String(jsDate.getDate()).padStart(2, '0');
-                                        return y + '-' + m + '-' + d;
-                                    }
-                                } catch(e) {}
                             }
                             return str;
                         }
@@ -3768,7 +3789,11 @@ SzwegoSpider/
                     cardHtml += `</div></div>`;
                     
                     outputPanel.insertAdjacentHTML('beforeend', cardHtml);
-                    setTimeout(() => renderProfitChart(window._currentGroupBy || 'day'), 100);
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            renderProfitChart(window._currentGroupBy || 'day');
+                        });
+                    });
                 })
                 .catch(error => {
                     showToast('请求失败: ' + error.message, 'error');
