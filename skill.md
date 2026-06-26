@@ -739,6 +739,105 @@ window.toggleProfitDetail = function(dateKey, rowElement) {
 - 按年点击 → 显示年度聚合（`dateKey` + ' 年度聚合'，使用 `filteredRecords`）
 - 聚合数据直接使用当前行的 `filteredRecords`，不重新过滤，确保数据一致性
 
+### 3.10 ECharts 图表与表格联动规范
+
+利润趋势图必须与汇总视图按钮联动，禁止独立按钮控制。
+
+**核心原则**：
+- **按钮合并**：利润趋势图不设独立年/月/日按钮，通过汇总视图按钮同步控制图表维度
+- **联动提示**：图表标题区域显示"（随汇总视图联动）"提示文字
+- **双向联动**：点击图表数据点高亮表格行，点击表格行高亮图表数据点
+
+**模板代码**（图表容器，无独立按钮）：
+```html
+<div id="profit-chart-container" style="padding: 15px; background: #fff; border-bottom: 2px solid #667eea;">
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;">
+        <span style="font-weight: 600; color: #333;"><i class="fa fa-bar-chart"></i> 利润趋势图</span>
+        <span style="font-size: 12px; color: #999;">（随汇总视图联动）</span>
+    </div>
+    <div id="profit-chart" style="width: 100%; height: 400px;"></div>
+</div>
+```
+
+**Y轴动态缩放**：根据数据范围自动调整，不同维度显示合理范围：
+```javascript
+yAxis: {
+    type: 'value',
+    axisLabel: {
+        formatter: function(v) {
+            if (v >= 10000) return (v / 10000).toFixed(1) + '万';
+            return v.toFixed(0);
+        }
+    },
+    min: function(value) { return Math.max(0, Math.floor(value.min * 0.9)); },
+    max: function(value) { return Math.ceil(value.max * 1.1); }
+}
+```
+
+**图表高亮联动**（点击表格行 → 高亮图表数据点）：
+```javascript
+window.highlightChartPoint = function(dateKey) {
+    const chart = window._profitChartInstance;
+    if (!chart) return;
+    const option = chart.getOption();
+    const categories = option.xAxis[0].data;
+    const currentGroupBy = window._currentGroupBy || 'day';
+    let chartKey = dateKey;
+    if (currentGroupBy === 'year') chartKey = dateKey.substring(0, 4);
+    else if (currentGroupBy === 'month') chartKey = dateKey.substring(0, 7);
+    const dataIndex = categories.indexOf(chartKey);
+    if (dataIndex === -1) return;
+    chart.dispatchAction({ type: 'downplay', seriesIndex: 0 });
+    chart.dispatchAction({ type: 'downplay', seriesIndex: 1 });
+    chart.dispatchAction({ type: 'downplay', seriesIndex: 2 });
+    chart.dispatchAction({ type: 'highlight', seriesIndex: 0, dataIndex: dataIndex });
+    chart.dispatchAction({ type: 'highlight', seriesIndex: 1, dataIndex: dataIndex });
+    chart.dispatchAction({ type: 'highlight', seriesIndex: 2, dataIndex: dataIndex });
+    chart.dispatchAction({ type: 'showTip', seriesIndex: 0, dataIndex: dataIndex });
+};
+```
+
+**表格行点击事件**（同时触发展开和高亮）：
+```javascript
+<tr class="summary-row" data-date="${item.日期}"
+    onclick="window.toggleProfitDetail('${item.日期}', this);
+             window.highlightChartPoint('${item.日期}')">
+```
+
+### 3.11 日期格式化规范
+
+`formatDate` 函数必须处理所有可能的日期输入格式，特别是 Excel 日期序列号。
+
+**处理优先级**：
+1. `YYYY-MM-DD` 标准格式 → 直接返回
+2. `YYYY/M/D` 斜杠格式 → 补零转换
+3. `YYYYMMDD` 紧凑格式 → 插入连字符
+4. GMT/UTC/HTTP 日期格式 → `new Date()` 解析
+5. **Excel 日期序列号**（40000-100000 范围的纯数字）→ Excel epoch 转换
+6. 其他 → 原样返回
+
+**Excel 日期序列号转换**（必须在 `return str` 之前执行）：
+```javascript
+if (/^\d+$/.test(str) && parseInt(str) > 40000 && parseInt(str) < 100000) {
+    try {
+        const excelEpoch = new Date(1899, 11, 30);
+        const jsDate = new Date(excelEpoch.getTime() + parseInt(str) * 86400000);
+        if (jsDate.getFullYear() > 2000) {
+            const y = jsDate.getFullYear();
+            const m = String(jsDate.getMonth() + 1).padStart(2, '0');
+            const d = String(jsDate.getDate()).padStart(2, '0');
+            return y + '-' + m + '-' + d;
+        }
+    } catch(e) {}
+}
+return str;
+```
+
+**注意事项**：
+- 正则表达式必须使用 `/^\d+$/`（带反斜杠），而非 `/^d+$/`
+- Excel 日期处理代码必须放在 `return str` 之前，否则永远不会执行
+- `padStart` 第二个参数为 `'0'`（单个零），而非 `'00'`
+
 ---
 
 ## 四、启动脚本规范
