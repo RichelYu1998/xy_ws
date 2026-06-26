@@ -1225,8 +1225,13 @@ function exportData(format) {
 | 聚合级别 | 按天→月度聚合，按月→月度聚合，按年→年度聚合，使用 `filteredRecords` |
 | 图标切换 | 同组多行用 `querySelectorAll('.class')` 统一切换，禁止重复 ID |
 | CSS 变量 | 使用 `:root` 定义主题色 |
-| 移动端适配 | 5 个断点全覆盖，按钮最小 44px，flex 居中布局 |
-| 版本号 | 唯一来源 `README.md`，格式 `### v3.7.4 (2026-06-18)` |
+| 移动端适配 | 5 个断点全覆盖，按钮最小 44px，flex 居中布局，图表高度自适应 |
+| 图表联动 | 利润趋势图随汇总视图按钮联动，禁止独立按钮，双向高亮 |
+| 日期格式化 | `formatDate` 处理9种格式，数字类型Excel序列号优先于字符串类型 |
+| 后端日期预处理 | `table_data` 在 `jsonify` 前转换 datetime 和 Excel 序列号为 `YYYY-MM-DD` |
+| 图表渲染 | 使用 `requestAnimationFrame` 替代 `setTimeout`，确保 DOM 就绪 |
+| 跨系统兼容 | 所有路径 `os.path.join()`，前端 `window.location.origin`，无硬编码 |
+| 版本号 | 唯一来源 `README.md`，格式 `### v3.7.5 (2026-06-26)` |
 | 依赖管理 | `requirements.txt`，虚拟环境 `.venv` |
 | 进程管理 | Windows: `taskkill`，Linux/Mac: `pkill` |
 | 敏感信息 | 配置模板用占位符，API 返回时脱敏 |
