@@ -3741,7 +3741,7 @@ SzwegoSpider/
                         data.summary.forEach((item, idx) => {
                             const dateKey = item.日期.replace(/-/g, '');
                             cardHtml += `
-                                <tr class="summary-row" data-date="${item.日期}" onclick="window.toggleProfitDetail('${item.日期}', this)">
+                                <tr class="summary-row" data-date="${item.日期}" onclick="window.toggleProfitDetail('${item.日期}', this); window.highlightChartPoint('${item.日期}')">
                                     <td class="action-col">
                                         <i class="fa fa-plus-circle detail-toggle-icon" style="color: #667eea; cursor: pointer;"></i>
                                     </td>
@@ -4044,6 +4044,21 @@ SzwegoSpider/
             };
 
             chart.setOption(option);
+
+            chart.on('click', function(params) {
+                const clickedDate = params.name;
+                const rows = document.querySelectorAll('.summary-row');
+                rows.forEach(row => {
+                    row.style.background = '';
+                    row.style.transition = 'background 0.3s';
+                });
+                const targetRow = document.querySelector(`.summary-row[data-date=""]`);
+                if (targetRow) {
+                    targetRow.style.background = 'rgba(102, 126, 234, 0.15)';
+                    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+
             window.addEventListener('resize', () => chart.resize());
         };
         
