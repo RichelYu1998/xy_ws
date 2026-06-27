@@ -290,16 +290,19 @@ class Environment:
   - ✅ 前端按钮编号删除（`1.` `2.` `3.` 等数字前缀全部移除）
   - ✅ 前端版权年份动态获取（`new Date().getFullYear()`）
   - ✅ 前端页面标题动态设置（从 API 获取版本号）
-  - ✅ 前端按钮容器改为 flex 自适应布局（修复 Mac 14寸换行问题）
+  - ✅ 前端按钮容器改为 CSS Grid 自适应布局（修复 Mac 14寸换行 + 移动端末行偏移问题）
 
 - **前端响应式优化（符合 v3.5.0 移动端规范）**
-  - ✅ 功能按钮自适应宽度（移除固定 `width: 12.5rem`，改为 `padding` 自适应）
-  - ✅ 按钮容器 flex 布局（`display:flex;flex-wrap:wrap;justify-content:center;gap:6px`）
+  - ✅ 功能按钮 CSS Grid 布局（`display:grid;grid-template-columns:repeat(N,1fr)`，按屏幕宽度自适应列数）
+  - ✅ 桌面端 8 列网格（8 个按钮一行等宽对齐）
+  - ✅ 平板端 4 列网格（4×2 严格对齐，最后一行不偏移）
+  - ✅ 手机端 2 列网格（2×4 严格对齐，最后一行不偏移）
+  - ✅ 移除功能按钮的 `btn-lg` 类（消除 Bootstrap `padding`/`font-size`/`min-height` 冲突）
+  - ✅ 移除 `.btn-run` 的 `margin-left: 8px`（消除部分按钮偏移）
+  - ✅ 触摸设备 `.func-btn` 覆盖 `min-height: unset; min-width: unset`（防止 `.btn-lg` 48px 覆盖）
   - ✅ 5 个断点全覆盖（超小屏/小屏/平板/大屏/超大屏）
-  - ✅ 触摸友好按钮最小高度 44px（Apple HIG）
   - ✅ 输入框字体 16px（防止 iOS 自动缩放）
   - ✅ 导航栏固定顶部 z-index: 9999
-  - ✅ 中等屏幕按钮适配（`min-width:0; font-size:12px; padding:0 6px`）
   - ✅ 横屏模式适配（`max-height:500px + landscape`）
 
 - **临时环境隔离机制**

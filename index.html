@@ -254,11 +254,8 @@
             background: #409EFF;
             border: 1px solid #409EFF;
             color: #fff;
-            padding: 4px 10px;
-            font-size: 12px;
             border-radius: 4px;
             cursor: pointer;
-            margin-left: 8px;
             transition: all 0.3s;
         }
         
@@ -636,16 +633,26 @@
             text-align: center;
             vertical-align: middle;
         }
+        .func-btn-container {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 6px;
+            padding: 0 12px;
+        }
         .func-btn {
             height: 2.5rem;
+            min-height: unset;
             line-height: 1.5rem;
             font-size: 13px;
             text-align: center;
-            display: inline-flex;
+            display: flex;
             align-items: center;
             justify-content: center;
             padding: 0 8px;
+            margin: 0;
             white-space: nowrap;
+            width: 100%;
+            border-radius: 4px;
         }
         .func-btn span {
             display: flex;
@@ -752,15 +759,23 @@
                 min-width: 6rem;
                 max-width: 8rem;
             }
+            .func-btn-container {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 6px;
+                padding: 0 8px;
+            }
             .func-btn {
-                width: 10rem;
                 height: 2.75rem;
+                min-height: unset;
                 line-height: 1.75rem;
                 font-size: 13px;
                 text-align: center;
-                display: inline-flex;
+                display: flex;
                 align-items: center;
                 justify-content: center;
+                padding: 0 8px;
+                margin: 0;
+                width: 100%;
             }
             .action-col {
                 width: 2.5rem;
@@ -1285,11 +1300,17 @@
                 font-size: 2.2rem;
             }
             
-            .text-center.mt-4.mb-4 .btn {
-                min-width: 0;
+            .func-btn-container {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 6px;
+            }
+            
+            .func-btn {
                 height: 36px;
+                min-height: unset;
                 font-size: 12px;
                 padding: 0 6px;
+                margin: 0;
             }
             
             .footer {
@@ -1313,11 +1334,17 @@
                 font-size: 2.5rem;
             }
             
-            .text-center.mt-4.mb-4 .btn {
-                min-width: 0;
+            .func-btn-container {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 6px;
+            }
+            
+            .func-btn {
                 height: 36px;
+                min-height: unset;
                 font-size: 12px;
                 padding: 0 6px;
+                margin: 0;
             }
             
             #output-panel {
@@ -1389,6 +1416,11 @@
             
             .btn-lg {
                 min-height: 48px;
+            }
+            
+            .func-btn {
+                min-height: unset;
+                min-width: unset;
             }
             
             a, button, .clickable {
@@ -1777,15 +1809,15 @@ SzwegoSpider/
         </div>
     </section>
     
-    <div class="text-center mt-4 mb-4" style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;"><button class="btn btn-primary btn-lg btn-run func-btn" id="btn-run-spider" data-func="1"><span><i class="fa fa-spider"></i> 运行爬虫</span></button>
-        <button class="btn btn-primary btn-lg btn-sku-api func-btn" data-api="/api/sku/compare/txt"><span><i class="fa fa-exchange"></i> 货号对比</span></button>
-        <button class="btn btn-primary btn-lg btn-sku-api func-btn" data-api="/api/sku/compare/excel"><span><i class="fa fa-file-excel-o"></i> Excel与JSON对比</span></button>
-        <button class="btn btn-primary btn-lg btn-run func-btn" id="btn-run-cookie" data-func="4"><span><i class="fa fa-refresh"></i> 更新Cookie</span></button>
-        <button class="btn btn-primary btn-lg func-btn" id="btn-view-products"><span><i class="fa fa-list"></i> 查看所有商品</span></button>
-        <button class="btn btn-primary btn-lg func-btn" id="btn-daily-profit"><span><i class="fa fa-chart-line"></i> 每日利润报表</span></button>
-        <button class="btn btn-primary btn-lg btn-run func-btn" id="btn-run-cleaner" data-func="6"><span><i class="fa fa-trash"></i> 文件清理工具</span></button>
-        <button class="btn btn-primary btn-lg func-btn" id="btn-run-tunnel"><span><i class="fa fa-external-link"></i> 隧道共享</span></button>
-        <button class="btn btn-primary btn-lg func-btn" id="btn-stop-task" style="display: none;"><span><i class="fa fa-stop"></i> 停止</span></button>
+    <div class="text-center mt-4 mb-4 func-btn-container"><button class="btn btn-primary btn-run func-btn" id="btn-run-spider" data-func="1"><span><i class="fa fa-spider"></i> 运行爬虫</span></button>
+        <button class="btn btn-primary btn-sku-api func-btn" data-api="/api/sku/compare/txt"><span><i class="fa fa-exchange"></i> 货号对比</span></button>
+        <button class="btn btn-primary btn-sku-api func-btn" data-api="/api/sku/compare/excel"><span><i class="fa fa-file-excel-o"></i> Excel与JSON对比</span></button>
+        <button class="btn btn-primary btn-run func-btn" id="btn-run-cookie" data-func="4"><span><i class="fa fa-refresh"></i> 更新Cookie</span></button>
+        <button class="btn btn-primary func-btn" id="btn-view-products"><span><i class="fa fa-list"></i> 查看所有商品</span></button>
+        <button class="btn btn-primary func-btn" id="btn-daily-profit"><span><i class="fa fa-chart-line"></i> 每日利润报表</span></button>
+        <button class="btn btn-primary btn-run func-btn" id="btn-run-cleaner" data-func="6"><span><i class="fa fa-trash"></i> 文件清理工具</span></button>
+        <button class="btn btn-primary func-btn" id="btn-run-tunnel"><span><i class="fa fa-external-link"></i> 隧道共享</span></button>
+        <button class="btn btn-primary func-btn" id="btn-stop-task" style="display: none;"><span><i class="fa fa-stop"></i> 停止</span></button>
     </div>
     <footer class="footer">
         <div class="container">
