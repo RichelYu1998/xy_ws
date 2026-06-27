@@ -184,7 +184,246 @@ class Environment:
             subprocess.run(f'taskkill /F /IM {process_name}', shell=True, capture_output=True, timeout=10)
         else:
             subprocess.run(f'pkill -f "{process_name}"', shell=True, capture_output=True, timeout=10)
+
+### 2.4.1 启动脚本环境检测规范
+
+启动脚本（`run.bat` / `run.sh`）必须实现6步环境检测流程，确保零配置启动：
+
+#### 检测流程
+
 ```
+[1/6] Python 环境检测 → [2/6] Node.js/NVM 检测 → [3/6] PIP 镜像源测速
+→ [4/6] NPM 镜像源测速 → [5/6] 虚拟环境管理 → [6/6] 依赖安装
+```
+
+#### Python 环境检测（跨平台）
+
+**Windows (BAT)**:
+```batch
+:: 1. PATH 搜索（优先级最高）
+where py >nul 2>&1 && set "PYTHON_CMD=py"
+where python3 >nul 2>&1 && set "PYTHON_CMD=python3"
+where python >nul 2>&1 && set "PYTHON_CMD=python"
+
+:: 2. 常见安装路径搜索（PATH 找不到时）
+if not defined PYTHON_CMD (
+    if exist "C:\Python3*\python.exe" (
+        for /d %%p in ("C:\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
+    ) else if exist "C:\Program Files\Python3*\python.exe" (
+        for /d %%p in ("C:\Program Files\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
+    ) else if exist "C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*\python.exe" (
+        for /d %%p in ("C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
+    )
+)
+
+:: 3. 虚拟环境状态检测
+if defined VIRTUAL_ENV (
+    echo [*] 已在虚拟环境中: %VIRTUAL_ENV%
+) else (
+    echo [*] 未在虚拟环境中，将自动创建 .venv
+)
+```
+
+**Unix (SH)**:
+```bash
+# 1. PATH 搜索（优先级最高）
+if command -v python3 &>/dev/null; then
+    PYTHON_CMD="python3"
+elif command -v python &>/dev/null; then
+    PYTHON_CMD="python"
+fi
+
+# 2. 常见安装路径搜索（PATH 找不到时）
+if [ -z "$PYTHON_CMD" ]; then
+    COMMON_PYTHON_PATHS=(
+        "/usr/bin/python3"
+        "/usr/local/bin/python3"
+        "/opt/homebrew/bin/python3"
+        "$HOME/.pyenv/shims/python3"
+        "/usr/bin/python"
+        "/usr/local/bin/python"
+    )
+    for py_path in "${COMMON_PYTHON_PATHS[@]}"; do
+        if [ -x "$py_path" ]; then
+            PYTHON_CMD="$py_path"
+            break
+        fi
+    done
+fi
+
+# 3. 虚拟环境状态检测
+if [ -n "$VIRTUAL_ENV" ]; then
+    echo "[*] 已在虚拟环境中: $VIRTUAL_ENV"
+else
+    echo "[*] 未在虚拟环境中，将自动创建 .venv"
+fi
+```
+
+#### Node.js/NVM 检测（跨平台）
+
+**Windows (BAT)**:
+```batch
+:: 1. PATH 搜索
+where node >nul 2>&1
+
+:: 2. NVM 检测与自动安装 LTS
+if errorlevel 1 (
+    if exist "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" (
+        call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" install lts
+        call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use lts
+    ) else (
+        :: 3. MSI 下载安装到临时目录
+        echo [*] 正在下载 Node.js...
+        curl -L -o node.msi https://nodejs.org/dist/v20.11.0/node-v20.11.0-x64.msi
+        msiexec /i node.msi INSTALLDIR="%CD%\.node_env" /quiet /norestart
+        set "PATH=%CD%\.node_env;%PATH%"
+    )
+)
+```
+
+**Unix (SH)**:
+```bash
+# 1. PATH 搜索
+if ! command -v node &>/dev/null; then
+    # 2. NVM 检测与自动安装 LTS
+    if [ -s "$HOME/.nvm/nvm.sh" ]; then
+        source "$HOME/.nvm/nvm.sh"
+        nvm install --lts
+        nvm use --lts
+    else
+        # 3. 包管理器自动安装
+        case "$(uname -s)" in
+            Darwin)
+                brew install node
+                ;;
+            Linux)
+                if command -v apt-get &>/dev/null; then
+                    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+                    sudo apt-get install -y nodejs
+                elif command -v yum &>/dev/null; then
+                    curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+                    sudo yum install -y nodejs
+                fi
+                ;;
+        esac
+    fi
+fi
+```
+
+**关键规则**：
+- ✅ 所有路径使用动态变量（`%USERNAME%`, `$HOME`, `%CD%`, `$(pwd)`），禁止硬编码用户名或绝对路径
+- ✅ 操作系统检测使用标准 API（`platform.system()`, `uname -s`），禁止硬编码平台字符串
+- ✅ 进程管理自动适配（Windows: `taskkill`, Unix: `pkill`）
+- ✅ 虚拟环境路径动态获取（Windows: `Scripts\activate.bat`, Unix: `bin/activate`）
+- ✅ pip 配置文件格式自适应（Windows: `.ini`, Unix: `.conf`）
+
+### 2.4.2 镜像源测速规范
+
+PIP 和 NPM 镜像源必须通过轮询测速选择最优源，禁止硬编码单一镜像。
+
+#### PIP 镜像源列表
+
+| 镜像名称 | URL | 适用场景 |
+|----------|-----|----------|
+| 清华源 | `https://pypi.tuna.tsinghua.edu.cn/simple` | 教育网 |
+| 阿里云 | `https://mirrors.aliyun.com/pypi/simple/` | 全国 CDN |
+| 豆瓣 | `https://pypi.douban.com/simple/` | 稳定可靠 |
+| 中科大 | `https://pypi.mirrors.ustc.edu.cn/simple/` | 华南地区 |
+
+#### 测速方法（毫秒级精度）
+
+**使用 curl 测试 TCP 连接时间**（推荐，速度快10倍以上）：
+
+```batch
+:: Windows BAT
+curl -s -o nul -w "%%{time_connect}" --connect-timeout 1.5 --max-time 2 "!MIRROR_URL!" > temp_time.txt
+set /p TEST_TIME=<temp_time.txt
+
+:: 转换为毫秒整数（修复 delims=.0 的 bug）
+for /f "tokens=* delims=" %%t in ('%PYTHON_CMD% -c "print(int(float('!TEST_TIME!')*1000))"') do set "INT_TIME=%%t"
+
+:: 选择最小值
+if !INT_TIME! LSS !MIN_TIME! (
+    set "MIN_TIME=!INT_TIME!"
+    set "BEST_MIRROR=!MIRROR_URL!"
+)
+```
+
+```bash
+# Unix SH
+TEST_TIME=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 1.5 --max-time 2 "$MIRROR_URL")
+
+# 转换为毫秒整数
+INT_TIME=${TEST_TIME%%.*}
+INT_TIME=${INT_TIME#0}  # 去掉前导零
+
+# 选择最小值
+if [ "$INT_TIME" -lt "$MIN_TIME" ]; then
+    MIN_TIME=$INT_TIME
+    BEST_MIRROR="$MIRROR_URL"
+fi
+```
+
+**❌ 禁止使用的旧方法**（Python urllib，速度慢）：
+```python
+# 错误示例：速度慢（每个镜像需要3秒+）
+import urllib.request, time
+start = time.time()
+urllib.request.urlopen(mirror_url, timeout=3)
+elapsed = time.time() - start
+```
+
+#### NPM 镜像源列表
+
+| 镜像名称 | URL | 特点 |
+|----------|-----|------|
+| npmmirror淘宝 | `https://registry.npmmirror.com` | 国内同步快 |
+| 官方源 | `https://registry.npmjs.org` | 全球 CDN |
+
+#### 配置文件生成
+
+**Windows**: `.venv/pip_config/pip.ini`
+```ini
+[global]
+index-url = https://pypi.tuna.tsinghua.edu.cn/simple
+trusted-host = pypi.tuna.tsinghua.edu.cn
+timeout = 120
+```
+
+**Unix**: `.venv/pip_config/pip.conf`
+```ini
+[global]
+index-url = https://pypi.tuna.tsinghua.edu.cn/simple
+trusted-host = pypi.tuna.tsinghua.edu.cn
+timeout = 120
+```
+
+**NPM 设置**：
+```bash
+npm config set registry https://registry.npmmirror.com
+```
+
+#### 回退机制
+
+所有镜像测试失败时，回退到官方源：
+
+```batch
+if "!BEST_MIRROR!"=="" (
+    echo [WARNING] 所有镜像测试失败，使用默认PyPI源
+    set "FASTEST_MIRROR=https://pypi.org/simple/"
+) else (
+    set "FASTEST_MIRROR=!BEST_MIRROR!"
+    echo [*] 最快镜像: !BEST_NAME! (!MIN_TIME!毫秒)
+)
+```
+
+#### 性能要求
+
+- **连接超时**: 1.5秒（`--connect-timeout 1.5`）
+- **总超时**: 2秒（`--max-time 2`）
+- **总测速时间**: <8秒（4个 PIP 镜像 + 2个 NPM 镜像）
+- **显示精度**: 毫秒级（如"中科大 29ms"）
+- **测速方法**: 必须使用 `curl %{time_connect}`（TCP连接时间），禁止使用完整HTTP请求
 
 ### 2.5 路径管理类
 
@@ -1001,6 +1240,58 @@ fi
 - 支持 SMTP SSL/TLS
 - 敏感字段 API 返回时脱敏
 - 邮件发送有冷却时间（60秒）和失败熔断（连续3次失败后冷却5分钟）
+
+---
+
+## 编码风格速查表
+
+### 跨平台规范
+
+| 规范项 | ✅ 正确做法 | ❌ 错误做法 |
+|--------|------------|------------|
+| 用户目录 | `%USERNAME%` (BAT) / `$HOME` (SH) | `C:\Users\Administrator` / `/home/user` |
+| 当前目录 | `%CD%` (BAT) / `$(pwd)` (SH) | `D:\ws\xy_ws` / `/home/user/project` |
+| 操作系统检测 | `platform.system()` / `uname -s` | 硬编码 `"Windows"` / `"Linux"` |
+| 进程管理 | `taskkill` (Win) / `pkill` (Unix) | 只支持单一平台命令 |
+| 虚拟环境激活 | `Scripts\activate.bat` (Win) / `bin/activate` (Unix) | 硬编码单一激活脚本 |
+| pip 配置格式 | `.ini` (Win) / `.conf` (Unix) | 硬编码 `.ini` 或 `.conf` |
+| 路径分隔符 | `os.path.join()` / 动态变量 | 硬编码 `\` 或 `/` |
+
+### 镜像源测速规范
+
+| 规范项 | ✅ 正确做法 | ❌ 错误做法 |
+|--------|------------|------------|
+| 测速方法 | `curl %{time_connect}` (TCP连接时间) | Python urllib (完整HTTP请求，慢10倍+) |
+| 连接超时 | 1.5秒 (`--connect-timeout 1.5`) | 3秒+ |
+| 显示精度 | 毫秒级（如"29ms"） | 秒级（模糊） |
+| 字符串解析 | `python -c "print(int(float(t)*1000))"` | `delims=.0` (bug: 删掉所有0和点) |
+| 回退机制 | 所有镜像失败时回退官方 PyPI | 直接报错退出 |
+| 配置生成 | 写入 `.venv/pip_config/pip.ini或.conf` | 修改全局 pip 配置 |
+
+### 临时环境隔离规范
+
+| 环境 | 目录 | 用途 |
+|------|------|------|
+| Python 虚拟环境 | `.venv/` | 隔离 Python 包依赖 |
+| Node.js 临时环境 | `.node_env/` (仅Windows无NVM时) | 隔离 Node.js 运行时 |
+| PIP 配置 | `.venv/pip_config/pip.ini或.conf` | 项目级镜像源配置 |
+
+**关键规则**：
+- ❌ 禁止修改系统全局 Python/Node.js/NPM 设置
+- ✅ 所有配置文件必须放在项目目录内（`.venv/`, `.node_env/`）
+- ✅ 启动脚本结束后，临时环境不影响系统全局配置
+- ✅ git 忽略规则：`.venv/`, `.node_env/`, `node_modules/`
+
+### 性能要求
+
+| 指标 | 要求 | 说明 |
+|------|------|------|
+| PIP 测速总时间 | <6秒 | 4个镜像 × 1.5秒超时 |
+| NPM 测速总时间 | <3秒 | 2个镜像 × 1.5秒超时 |
+| 总测速时间 | <8秒 | PIP + NPM 合计 |
+| 连接超时 | 1.5秒 | `--connect-timeout 1.5` |
+| 总超时 | 2秒 | `--max-time 2` |
+| 显示精度 | 毫秒级 | 如"中科大 29ms" |
 
 ---
 

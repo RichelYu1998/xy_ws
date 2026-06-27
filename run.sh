@@ -30,12 +30,17 @@ else
     echo "[*] playwright-browsers目录不存在，跳过清理"
 fi
 
-detect_python() {
+VENV_PATH=".venv"
+NODE_ENV_PATH=".node_env"
+FASTEST_PIP_MIRROR=""
+FASTEST_NPM_MIRROR=""
+
+detect_python_env() {
     echo ""
     echo "========================================"
-    echo "环境检测与配置"
+    echo "综合环境检测与配置"
     echo "========================================"
-    echo "[1/5] 检测Python环境..."
+    echo "[1/6] 检测Python环境..."
 
     if command -v python3 &> /dev/null; then
         PYTHON_CMD="python3"
@@ -44,16 +49,209 @@ detect_python() {
         PYTHON_CMD="python"
         echo "Python版本：$(python --version 2>&1)"
     else
-        echo "ERROR: Python环境检测失败"
+        echo "ERROR: Python未在PATH中找到"
+        
+        COMMON_PYTHON_PATHS=(
+            "/usr/bin/python3"
+            "/usr/local/bin/python3"
+            "/opt/homebrew/bin/python3"
+            "$HOME/.pyenv/shims/python3"
+            "/usr/bin/python"
+            "/usr/local/bin/python"
+        )
+        
+        for py_path in "${COMMON_PYTHON_PATHS[@]}"; do
+            if [ -x "$py_path" ]; then
+                echo "发现Python: $py_path"
+                export PATH="$py_path:$(dirname $py_path):$PATH"
+                PYTHON_CMD="$py_path"
+                break
+            fi
+        done
+        
+        if [ -z "$PYTHON_CMD" ]; then
+            echo "ERROR: 无法找到Python安装"
+            echo "请通过以下方式之一安装："
+            echo "  macOS: brew install python"
+            echo "  Ubuntu/Debian: sudo apt install python3 python3-venv"
+            echo "  CentOS/RHEL: sudo yum install python3"
+            return 1
+        fi
+    fi
+    
+    echo "[*] 检测虚拟环境状态..."
+    if [ -n "$VIRTUAL_ENV" ]; then
+        echo "当前已在虚拟环境中: $VIRTUAL_ENV"
+        IN_VENV=1
+    else
+        echo "未在虚拟环境中"
+        IN_VENV=0
+    fi
+    
+    return 0
+}
+
+detect_node_env() {
+    echo "[2/6] 检测Node.js环境..."
+
+    if command -v node &> /dev/null; then
+        echo "Node.js版本: $(node --version 2>&1)"
+        echo "NPM版本: $(npm --version 2>&1)"
+        return 0
+    fi
+    
+    echo "Node.js未在PATH中"
+    
+    if command -v nvm &> /dev/null || [ -s "$HOME/.nvm/nvm.sh" ]; then
+        echo "发现NVM，正在使用NVM管理Node.js..."
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        
+        nvm use default &>/dev/null || nvm use lts &>/dev/null
+        
+        if ! command -v node &> /dev/null; then
+            echo "NVM中未安装Node.js，正在安装LTS版本..."
+            nvm install lts
+            nvm use lts
+            nvm alias default lts
+        fi
+        
+        echo "Node.js已就绪: $(node --version 2>&1)"
+        return 0
+    fi
+    
+    case "$(uname -s)" in
+        Darwin)
+            if command -v brew &> /dev/null; then
+                echo "使用Homebrew安装Node.js..."
+                brew install node
+            elif [ -f "/opt/homebrew/bin/brew" ]; then
+                /opt/homebrew/bin/brew install node
+            else
+                echo "[WARNING] 未检测到Homebrew，无法自动安装Node.js"
+                echo "请手动安装: https://nodejs.org/"
+                return 1
+            fi
+            ;;
+        Linux)
+            if command -v apt-get &> /dev/null; then
+                echo "使用apt安装Node.js..."
+                curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+                sudo apt-get install -y nodejs
+            elif command -v yum &> /dev/null; then
+                echo "使用yum安装Node.js..."
+                curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+                sudo yum install -y nodejs
+            else
+                echo "[WARNING] 无法识别包管理器，请手动安装Node.js"
+                return 1
+            fi
+            ;;
+        *)
+            echo "[WARNING] 不支持的操作系统用于自动Node.js安装"
+            return 1
+            ;;
+    esac
+    
+    if command -v node &> /dev/null; then
+        echo "Node.js安装成功: $(node --version 2>&1)"
+    else
+        echo "[ERROR] Node.js安装失败"
         return 1
     fi
+    
+    return 0
+}
 
-    echo "[2/5] 测速pip镜像源..."
-    $PYTHON_CMD main.py --select-pip-mirror
+test_pip_mirrors() {
+    echo "[3/6] 测试PIP加速镜像源..."
+
+    declare -a MIRRORS=(
+        "https://pypi.tuna.tsinghua.edu.cn/simple|清华源"
+        "https://mirrors.aliyun.com/pypi/simple/|阿里云"
+        "https://pypi.douban.com/simple/|豆瓣"
+        "https://pypi.mirrors.ustc.edu.cn/simple/|中科大"
+    )
+
+    MIN_TIME=9999
+    BEST_MIRROR=""
+    BEST_NAME=""
+
+    for mirror_entry in "${MIRRORS[@]}"; do
+        IFS='|' read -r MIRROR_URL MIRROR_NAME <<< "$mirror_entry"
+        echo "    测试 $MIRROR_NAME..."
+        
+        TEST_TIME=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 1.5 --max-time 2 "$MIRROR_URL" 2>/dev/null)
+
+        if [ -z "$TEST_TIME" ] || [ "$TEST_TIME" = "0.000" ]; then
+            echo "        $MIRROR_NAME: 超时/失败"
+        else
+            PIP_INT_TIME=${TEST_TIME%%.*}
+            PIP_INT_TIME=${PIP_INT_TIME#0}
+            echo "        $MIRROR_NAME: ${TEST_TIME}秒"
+            if [ "$PIP_INT_TIME" -lt "$MIN_TIME" ]; then
+                MIN_TIME=$PIP_INT_TIME
+                BEST_MIRROR="$MIRROR_URL"
+                BEST_NAME="$MIRROR_NAME"
+            fi
+        fi
+    done
+
+    if [ -n "$BEST_MIRROR" ]; then
+        FASTEST_PIP_MIRROR="$BEST_MIRROR"
+        echo "[*] 最快PIP镜像: $BEST_NAME (${MIN_TIME}毫秒)"
+    else
+        echo "[WARNING] 所有镜像测试失败，使用默认PyPI源"
+        FASTEST_PIP_MIRROR="https://pypi.org/simple/"
+    fi
+}
+
+test_npm_mirrors() {
+    echo "[4/6] 测试NPM加速镜像源..."
+
+    declare -a NPM_MIRRORS=(
+        "https://registry.npmmirror.com|npmmirror淘宝"
+        "https://registry.npmjs.org|官方源"
+    )
+
+    NPM_MIN_TIME=9999
+    NPM_BEST_MIRROR=""
+    NPM_BEST_NAME=""
+
+    for npm_mirror_entry in "${NPM_MIRRORS[@]}"; do
+        IFS='|' read -r NPM_URL NPM_NAME <<< "$npm_mirror_entry"
+        echo "    测试 $NPM_NAME..."
+        
+        NPM_TEST_TIME=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 "$NPM_URL" 2>/dev/null)
+
+        if [ -z "$NPM_TEST_TIME" ] || [ "$NPM_TEST_TIME" = "0.000" ]; then
+            echo "        $NPM_NAME: 超时/失败"
+        else
+            NPM_INT_TIME=${NPM_TEST_TIME%%.*}
+            echo "        $NPM_NAME: ${NPM_TEST_TIME}秒"
+            if [ "$NPM_INT_TIME" -lt "$NPM_MIN_TIME" ]; then
+                NPM_MIN_TIME=$NPM_INT_TIME
+                NPM_BEST_MIRROR="$NPM_URL"
+                NPM_BEST_NAME="$NPM_NAME"
+            fi
+        fi
+    done
+
+    if [ -n "$NPM_BEST_MIRROR" ]; then
+        FASTEST_NPM_MIRROR="$NPM_BEST_MIRROR"
+        echo "[*] 最快NPM镜像: $NPM_BEST_NAME (${NPM_MIN_TIME}秒)"
+        
+        if command -v npm &> /dev/null; then
+            npm config set registry "$NPM_BEST_MIRROR"
+            echo "[*] NPM镜像已设置为: $NPM_BEST_MIRROR"
+        fi
+    else
+        echo "[WARNING] NPM镜像测试失败"
+    fi
 }
 
 detect_venv() {
-    echo "[3/5] 检测虚拟环境..."
+    echo "[5/6] 检测Python虚拟环境..."
 
     if [ -d "venv" ] && [ -f "venv/bin/activate" ]; then
         echo "检测到虚拟环境：venv"
@@ -66,108 +264,71 @@ detect_venv() {
     else
         echo "未检测到虚拟环境"
         VENV_EXISTS=0
-        VENV_PATH=""
     fi
 }
 
 setup_venv() {
-    echo "[4/5] 设置虚拟环境..."
+    echo "[6/6] 设置Python虚拟环境并安装依赖..."
 
     if [ "$VENV_EXISTS" -eq 0 ]; then
-        echo "正在创建虚拟环境..."
-        $PYTHON_CMD -m venv .venv
-        VENV_PATH=".venv"
+        echo "正在创建虚拟环境到 $VENV_PATH..."
+        $PYTHON_CMD -m venv $VENV_PATH
+        
+        if [ $? -ne 0 ]; then
+            echo "ERROR: 创建虚拟环境失败"
+            exit 1
+        fi
+        VENV_EXISTS=1
     fi
 
     source "$VENV_PATH/bin/activate"
 
+    if [ -n "$FASTEST_PIP_MIRROR" ]; then
+        echo "[*] 配置PIP镜像源为: $FASTEST_PIP_MIRROR"
+        
+        mkdir -p "$VENV_PATH/pip_config"
+        
+        cat > "$VENV_PATH/pip_config/pip.conf" << EOF
+[global]
+index-url=$FASTEST_PIP_MIRROR
+trusted-host=${FASTEST_PIP_MIRROR#https://}
+trusted-host=${FASTEST_PIP_MIRROR#http://}
+[install]
+trusted-host=${FASTEST_PIP_MIRROR#https://}
+trusted-host=${FASTEST_PIP_MIRROR#http://}
+EOF
+        
+        export PIP_CONFIG_FILE="$VENV_PATH/pip_config/pip.conf"
+    fi
+
     if [ -f "requirements.txt" ]; then
-        echo "正在安装依赖..."
-        pip install -r requirements.txt
+        echo "正在安装Python依赖..."
+        
+        if [ -n "$FASTEST_PIP_MIRROR" ]; then
+            pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --disable-pip-version-check
+            
+            if [ $? -ne 0 ]; then
+                echo "WARNING: 使用镜像源安装失败，尝试默认源..."
+                pip install -r requirements.txt --disable-pip-version-check
+            fi
+        else
+            pip install -r requirements.txt --disable-pip-version-check
+        fi
 
         if [ $? -ne 0 ]; then
             echo "ERROR: 依赖安装失败，虚拟环境创建未完成"
             exit 1
         fi
 
-        echo "[*] 测试Playwright CDN速度..."
-        FASTEST_PW_CDN=""
-        FASTEST_PW_CDN_NAME=""
-        MIN_PW_TIME=999
-
-        for cdn_entry in \
-            "npmmirror https://npmmirror.com/mirrors/playwright/ npmmirror" \
-            "azureedge https://playwright.azureedge.net/builds/ azureedge" \
-            "cdn https://cdn.playwright.dev/ cdn"; do
-            cdn_key=$(echo "$cdn_entry" | cut -d' ' -f1)
-            cdn_url=$(echo "$cdn_entry" | cut -d' ' -f2)
-            cdn_name=$(echo "$cdn_entry" | cut -d' ' -f3)
-            echo "    测试 $cdn_name..."
-            CDN_TIME=$($PYTHON_CMD -c "import urllib.request, time; start=time.time(); urllib.request.urlopen('${cdn_url}', timeout=3); print(round(time.time()-start, 3))" 2>/dev/null || echo "999")
-            if [ "$CDN_TIME" != "999" ]; then
-                echo "    $cdn_name: ${CDN_TIME}秒"
-                if (( $(echo "$CDN_TIME < $MIN_PW_TIME" | bc -l) )); then
-                    MIN_PW_TIME=$CDN_TIME
-                    FASTEST_PW_CDN="$cdn_url"
-                    FASTEST_PW_CDN_NAME="$cdn_name"
-                fi
-            else
-                echo "    $cdn_name: 失败"
-            fi
-        done
-
-        if [ -z "$FASTEST_PW_CDN" ]; then
-            echo "[WARNING] 所有Playwright CDN均无法访问，将尝试默认安装"
-            unset PLAYWRIGHT_DOWNLOAD_HOST
-        else
-            echo "[*] 最终选择最快Playwright CDN: $FASTEST_PW_CDN_NAME (${MIN_PW_TIME}秒)"
-            export PLAYWRIGHT_DOWNLOAD_HOST="$FASTEST_PW_CDN"
-        fi
-
         echo "[*] 安装Playwright浏览器..."
-        
-        # 创建浏览器目录
-        BROWSER_DIR="playwright-browsers"
-        mkdir -p "$BROWSER_DIR"
-        
-        # 下载Playwright浏览器zip
-        echo "[*] 下载Playwright Chromium浏览器..."
-        PW_VERSION="1.59.0"
-        BROWSER_URL="${FASTEST_PW_CDN}builds/chromium/1200/chromium-linux.zip"
-        BROWSER_ZIP="$BROWSER_DIR/chromium-linux.zip"
-        
-        if [ ! -f "$BROWSER_DIR/chrome-linux64/chrome" ]; then
-            echo "[*] 从 $FASTEST_PW_CDN_NAME 下载浏览器..."
-            curl -L -o "$BROWSER_ZIP" "$BROWSER_URL" || wget -O "$BROWSER_ZIP" "$BROWSER_URL"
-            
-            if [ -f "$BROWSER_ZIP" ]; then
-                echo "[*] 解压浏览器到 $BROWSER_DIR..."
-                unzip -o "$BROWSER_ZIP" -d "$BROWSER_DIR"
-                
-                if [ -d "$BROWSER_DIR/chrome-linux64" ]; then
-                    echo "[*] 浏览器解压成功: $BROWSER_DIR/chrome-linux64/chrome"
-                    chmod +x "$BROWSER_DIR/chrome-linux64/chrome" 2>/dev/null
-                    echo "[*] 删除临时zip文件..."
-                    rm -f "$BROWSER_ZIP"
-                else
-                    echo "[WARNING] 浏览器解压失败，目录结构不正确"
-                fi
-            else
-                echo "[WARNING] 浏览器下载失败"
-            fi
-        else
-            echo "[*] 浏览器已存在，跳过下载"
-        fi
-        
-        # 安装Python playwright包
         $PYTHON_CMD main.py --install-playwright
     fi
 
-    echo "虚拟环境设置完成"
+    echo "Python虚拟环境设置完成"
 }
 
 check_config() {
-    echo "[5/5] 检测配置文件..."
+    echo "[*] 检测配置文件..."
 
     mkdir -p config
 
@@ -298,7 +459,10 @@ cleanup_exit() {
 }
 
 main() {
-    detect_python || exit 1
+    detect_python_env || exit 1
+    detect_node_env || echo "[WARNING] Node.js环境配置失败"
+    test_pip_mirrors
+    test_npm_mirrors
     detect_venv
     setup_venv
     check_config
