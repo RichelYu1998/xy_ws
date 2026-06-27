@@ -41,7 +41,7 @@ if exist playwright-browsers (
     echo [*] playwright-browsers目录不存在，跳过清理
 )
 
-goto detect_pip_mirror
+goto detect_environments
 
 :cleanup_exit
 echo.
@@ -51,33 +51,229 @@ taskkill /f /im node.exe >nul 2>&1
 echo 清理完成
 goto :eof
 
-:detect_pip_mirror
+:detect_environments
 echo.
 echo ========================================
-echo 环境检测与配置
+echo 综合环境检测与配置
 echo ========================================
-echo [1/5] 检测Python环境...
 
-where py >nul 2>&1
+set "VENV_PATH=.venv"
+set "NODE_ENV_PATH=.node_env"
+set "FASTEST_PIP_MIRROR="
+set "FASTEST_NPM_MIRROR="
+
+call :detect_python_env
 if errorlevel 1 (
-    echo ERROR: Python环境检测失败
-    echo.
-    echo 请先安装Python 3.10或更高版本：
-    echo   下载地址: https://www.python.org/downloads/
     pause
     exit /b 1
 )
 
-echo Python版本：
-py --version
+call :detect_node_env
+if errorlevel 1 (
+    echo [WARNING] Node.js环境配置失败，部分功能可能不可用
+)
 
-echo [2/5] 测速pip镜像源...
-py main.py --select-pip-mirror
+call :test_pip_mirrors
+call :test_npm_mirrors
 
 goto detect_venv
 
+:detect_python_env
+echo [1/6] 检测Python环境...
+
+where py >nul 2>&1
+if errorlevel 1 (
+    where python >nul 2>&1
+    if errorlevel 1 (
+        echo ERROR: Python未在PATH中找到
+        echo.
+        echo 正在尝试查找系统中的Python...
+        if exist "C:\Python3*\python.exe" (
+            for /d %%p in ("C:\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
+        ) else if exist "C:\Program Files\Python3*\python.exe" (
+            for /d %%p in ("C:\Program Files\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
+        ) else if exist "C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*\python.exe" (
+            for /d %%p in ("C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
+        )
+        
+        if defined PYTHON_PATH (
+            echo 找到Python: %PYTHON_PATH%
+            for %%P in ("%PYTHON_PATH%") do set "PYTHON_DIR=%%~dpP"
+            set "PATH=%PATH%;%PYTHON_DIR%"
+        ) else (
+            echo ERROR: 无法找到Python安装，请手动安装
+            echo   下载地址: https://www.python.org/downloads/
+            exit /b 1
+        )
+    ) else (
+        set PYTHON_CMD=python
+    )
+) else (
+    set PYTHON_CMD=py
+)
+
+echo Python版本：
+%PYTHON_CMD% --version
+
+echo [*] 检测虚拟环境状态...
+if defined VIRTUAL_ENV (
+    echo 当前已在虚拟环境中: %VIRTUAL_ENV%
+    set IN_VENV=1
+) else (
+    echo 未在虚拟环境中
+    set IN_VENV=0
+)
+exit /b 0
+
+:detect_node_env
+echo [2/6] 检测Node.js环境...
+
+where node >nul 2>&1
+if errorlevel 1 (
+    echo Node.js未在PATH中
+    
+    where nvm >nul 2>&1
+    if errorlevel 1 (
+        if exist "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" (
+            echo 发现NVM，正在使用NVM管理Node.js...
+            call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use latest
+            if errorlevel 1 (
+                echo NVM中未安装Node.js版本，正在安装...
+                call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" install lts
+                call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use lts
+            )
+        ) else (
+            echo 未发现Node.js和NVM
+            echo 正在创建临时Node.js环境到 %NODE_ENV_PATH%...
+            
+            if not exist "%NODE_ENV_PATH%" mkdir "%NODE_ENV_PATH%"
+            
+            echo 下载Node.js安装程序...
+            curl -L -o "%NODE_ENV_PATH%\node-installer.msi" https://nodejs.org/dist/v20.11.1/node-v20.11.1-x64.msi
+            
+            if exist "%NODE_ENV_PATH%\node-installer.msi" (
+                msiexec /i "%NODE_ENV_PATH%\node-installer.msi" INSTALLDIR="%CD%\%NODE_ENV_PATH%" /quiet /norestart
+                set "PATH=%CD%\%NODE_ENV_PATH%;%PATH%"
+                del "%NODE_ENV_PATH%\node-installer.msi"
+                echo 临时Node.js环境已创建
+            ) else (
+                echo [WARNING] Node.js下载失败，跳过Node.js相关功能
+                exit /b 1
+            )
+        )
+    ) else (
+        echo 使用NVM管理Node.js
+        nvm list
+    )
+) else (
+    echo Node.js版本:
+    node --version
+    npm --version
+)
+exit /b 0
+
+:test_pip_mirrors
+echo [3/6] 测试PIP加速镜像源...
+
+set "MIRRORS[0]=https://pypi.tuna.tsinghua.edu.cn/simple|清华源"
+set "MIRRORS[1]=https://mirrors.aliyun.com/pypi/simple/|阿里云"
+set "MIRRORS[2]=https://pypi.douban.com/simple/|豆瓣"
+set "MIRRORS[3]=https://pypi.mirrors.ustc.edu.cn/simple/|中科大"
+
+set "MIN_TIME=9999"
+set "BEST_MIRROR="
+set "BEST_NAME="
+
+for /L %%i in (0,1,3) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!MIRRORS[%%i]!") do (
+        set "MIRROR_URL=%%a"
+        set "MIRROR_NAME=%%b"
+        echo     测试 !MIRROR_NAME!...
+        
+        curl -s -o nul -w "%%{time_connect}" --connect-timeout 1.5 --max-time 2 "!MIRROR_URL!" > temp_pip_time.txt 2>&1
+        set /p TEST_TIME=<temp_pip_time.txt
+        del temp_pip_time.txt 2>nul
+        
+        if not defined TEST_TIME set "TEST_TIME=9999"
+        
+        if "!TEST_TIME!"=="0" (
+            echo         !MIRROR_NAME!: 超时/失败
+            set "TEST_TIME=9999"
+        ) else (
+            for /f "tokens=* delims=" %%t in ('%PYTHON_CMD% -c "print(int(float('!TEST_TIME!')*1000))"') do set "PIP_INT_TIME=%%t"
+            echo         !MIRROR_NAME!: !TEST_TIME!秒 (!PIP_INT_TIME!ms)
+            if !PIP_INT_TIME! LSS !MIN_TIME! (
+                set "MIN_TIME=!PIP_INT_TIME!"
+                set "BEST_MIRROR=!MIRROR_URL!"
+                set "BEST_NAME=!MIRROR_NAME!"
+            )
+        )
+    )
+)
+
+if "!BEST_MIRROR!"=="" (
+    echo [WARNING] 所有镜像测试失败，使用默认PyPI源
+    set "FASTEST_PIP_MIRROR=https://pypi.org/simple/"
+) else (
+    set "FASTEST_PIP_MIRROR=!BEST_MIRROR!"
+    echo.
+    echo [*] 最快PIP镜像: !BEST_NAME! (!MIN_TIME!毫秒)
+)
+exit /b 0
+
+:test_npm_mirrors
+echo [4/6] 测试NPM加速镜像源...
+
+set "NPM_MIRRORS[0]=https://registry.npmmirror.com|npmmirror淘宝"
+set "NPM_MIRRORS[1]=https://registry.npmjs.org|官方源"
+
+set "NPM_MIN_TIME=9999"
+set "NPM_BEST_MIRROR="
+set "NPM_BEST_NAME="
+
+for /L %%i in (0,1,1) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!NPM_MIRRORS[%%i]!") do (
+        set "NPM_URL=%%a"
+        set "NPM_NAME=%%b"
+        echo     测试 !NPM_NAME!...
+        
+        curl -s -o nul -w "%%{time_total}" --connect-timeout 3 "!NPM_URL!" > temp_npm_time.txt 2>&1
+        set /p NPM_TEST_TIME=<temp_npm_time.txt
+        del temp_npm_time.txt 2>nul
+        
+        if not defined NPM_TEST_TIME set "NPM_TEST_TIME=9999"
+        
+        if "!NPM_TEST_TIME!"=="0" (
+            echo         !NPM_NAME!: 超时/失败
+        ) else (
+            for /f "tokens=* delims=" %%t in ('%PYTHON_CMD% -c "print(int(float('!NPM_TEST_TIME!')*1000))"') do set "NPM_INT_TIME=%%t"
+            echo         !NPM_NAME!: !NPM_TEST_TIME!秒 (!NPM_INT_TIME!ms)
+            if !NPM_INT_TIME! LSS !NPM_MIN_TIME! (
+                set "NPM_MIN_TIME=!NPM_INT_TIME!"
+                set "NPM_BEST_MIRROR=!NPM_URL!"
+                set "NPM_BEST_NAME=!NPM_NAME!"
+            )
+        )
+    )
+)
+
+if "!NPM_BEST_MIRROR!"=="" (
+    echo [WARNING] NPM镜像测试失败
+) else (
+    set "FASTEST_NPM_MIRROR=!NPM_BEST_MIRROR!"
+    echo.
+    echo [*] 最快NPM镜像: !NPM_BEST_NAME! (!NPM_MIN_TIME!毫秒)
+    
+    where npm >nul 2>&1
+    if not errorlevel 1 (
+        npm config set registry "!NPM_BEST_MIRROR!"
+        echo [*] NPM镜像已设置为: !NPM_BEST_MIRROR!
+    )
+)
+exit /b 0
+
 :detect_venv
-echo [3/5] 检测虚拟环境...
+echo [5/6] 检测Python虚拟环境...
 
 if exist venv\Scripts\activate.bat (
     echo 检测到虚拟环境：venv
@@ -90,22 +286,20 @@ if exist venv\Scripts\activate.bat (
 ) else (
     echo 未检测到虚拟环境
     set VENV_EXISTS=0
-    set VENV_PATH=
 )
 goto setup_venv
 
 :setup_venv
-echo [4/5] 设置虚拟环境...
+echo [6/6] 设置Python虚拟环境并安装依赖...
 
 if %VENV_EXISTS%==0 (
-    echo 正在创建虚拟环境...
-    py -m venv .venv
+    echo 正在创建虚拟环境到 %VENV_PATH%...
+    %PYTHON_CMD% -m venv %VENV_PATH%
     if errorlevel 1 (
         echo ERROR: 创建虚拟环境失败
         pause
         exit /b 1
     )
-    set VENV_PATH=.venv
     set VENV_EXISTS=1
 )
 
@@ -117,30 +311,40 @@ if not exist %VENV_PATH% (
 
 call %VENV_PATH%\Scripts\activate.bat
 
-if exist requirements.txt (
-    echo 正在配置pip镜像源...
-
+if defined FASTEST_PIP_MIRROR (
+    echo [*] 配置PIP镜像源为: %FASTEST_PIP_MIRROR%
+    
+    if not exist "%VENV_PATH%\pip_config" mkdir "%VENV_PATH%\pip_config"
+    
+    echo [global]> "%VENV_PATH%\pip_config\pip.ini"
+    echo index-url=%FASTEST_PIP_MIRROR%>> "%VENV_PATH%\pip_config\pip.ini"
+    echo trusted-host=%FASTEST_PIP_MIRROR:~8,-7%>> "%VENV_PATH%\pip_config\pip.ini"
+    echo [install]>> "%VENV_PATH%\pip_config\pip.ini"
+    echo trusted-host=%FASTEST_PIP_MIRROR:~8,-7%>> "%VENV_PATH%\pip_config\pip.ini"
+    
     set PIP_CONFIG_FILE=%VENV_PATH%\pip_config\pip.ini
+)
 
-    if not exist "%VENV_PATH%\pip_config\pip.ini" (
-        echo [*] 检测到未配置pip镜像源，调用Python测速...
-        %VENV_PATH%\Scripts\python.exe main.py --select-pip-mirror
-    )
-
-    echo 正在安装依赖...
-    %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check
+if exist requirements.txt (
+    echo 正在安装Python依赖...
+    %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check -i %FASTEST_PIP_MIRROR%
 
     if errorlevel 1 (
-        echo ERROR: 依赖安装失败，虚拟环境创建未完成
-        pause
-        exit /b 1
+        echo ERROR: 依赖安装失败，尝试使用默认源重试...
+        %VENV_PATH%\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check
+        
+        if errorlevel 1 (
+            echo ERROR: 依赖安装完全失败
+            pause
+            exit /b 1
+        )
     )
 
     echo [*] 安装Playwright浏览器...
     %VENV_PATH%\Scripts\python.exe main.py --install-playwright
 )
 
-echo 虚拟环境设置完成
+echo Python虚拟环境设置完成
 goto check_config
 
 :check_config
