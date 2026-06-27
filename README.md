@@ -278,6 +278,15 @@ class Environment:
   - ✅ 进程管理自动适配（Windows: `taskkill`, Unix: `pkill`）
   - ✅ 虚拟环境路径动态获取（Windows: `Scripts\activate.bat`, Unix: `bin/activate`）
   - ✅ pip 配置文件格式自适应（Windows: `.ini`, Unix: `.conf`）
+  - ✅ Python/Node.js 安装版本动态获取（从官方 API 查询最新 LTS/稳定版）
+  - ✅ User-Agent 动态生成（Chrome 版本号随机轮换，跨平台 UA 自动适配）
+  - ✅ 浏览器视口大小动态获取（根据系统屏幕分辨率自适应）
+  - ✅ Web 服务端口支持环境变量 `WEB_PORT`（默认 8888）
+  - ✅ Flask 绑定地址支持环境变量 `FLASK_HOST`（默认 0.0.0.0）
+  - ✅ 局域网 IP 检测地址支持环境变量 `LAN_IP_DETECT_HOST`/`LAN_IP_DETECT_PORT`
+  - ✅ 版本号替换使用正则匹配（`re.sub`），不再硬编码旧版本号
+  - ✅ 所有 `127.0.0.1` 替换为 `localhost`（跨平台统一）
+  - ✅ 导入精简（`random`、`ctypes` 移至顶部，消除内联 import）
 
 - **临时环境隔离机制**
   - Python 虚拟环境：`.venv/` 目录（含 `pip_config/` 子目录）

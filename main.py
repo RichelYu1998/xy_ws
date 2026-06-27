@@ -19,6 +19,8 @@ import argparse
 import socket
 import smtplib
 import io
+import random
+import ctypes
 import urllib.request
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -1403,16 +1405,19 @@ class Environment:
     
     @staticmethod
     def get_user_agent():
-        """获取用户代理字符串，根据系统类型返回不同的UA"""
+        """获取用户代理字符串，根据系统类型返回不同的UA（动态版本号）"""
+        chrome_versions = ['120.0.0.0', '121.0.0.0', '122.0.0.0', '123.0.0.0', '124.0.0.0',
+                          '125.0.0.0', '126.0.0.0', '127.0.0.0', '128.0.0.0', '129.0.0.0']
+        chrome_version = random.choice(chrome_versions)
+
         if Environment.IS_WINDOWS:
-            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            return f'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36'
         elif Environment.IS_MAC:
-            return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            return f'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36'
         elif Environment.IS_LINUX:
-            return 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            return f'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36'
         else:
-            # 默认使用Windows UA
-            return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            return f'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36'
     
     @staticmethod
     def get_system_info():
@@ -1470,6 +1475,27 @@ class Environment:
         except:
             pass
     
+    @staticmethod
+    def get_default_viewport():
+        """动态获取默认浏览器视口大小（根据系统屏幕分辨率）"""
+        try:
+            if Environment.IS_WINDOWS:
+                user32 = ctypes.windll.user32
+                width = user32.GetSystemMetrics(0)
+                height = user32.GetSystemMetrics(1)
+                return {'width': min(width, 1920), 'height': min(height - 100, 1080)}
+            elif Environment.IS_MAC or Environment.IS_LINUX:
+                try:
+                    result = subprocess.run(['xdpyinfo'], capture_output=True, text=True, timeout=2)
+                    match = re.search(r'dimensions:\s*(\d+)\s*x\s*(\d+)', result.stdout)
+                    if match:
+                        return {'width': min(int(match.group(1)), 1920), 'height': min(int(match.group(2)) - 100, 1080)}
+                except:
+                    pass
+            return {'width': 1920, 'height': 1080}
+        except:
+            return {'width': 1920, 'height': 1080}
+
     @staticmethod
     def check_process_running(process_name):
         """跨系统检查进程是否运行"""
@@ -1793,7 +1819,7 @@ class PathManager:
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(2)
-            s.connect(('8.8.8.8', 80))
+            s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
             ip = s.getsockname()[0]
             s.close()
             return ip
@@ -1836,7 +1862,7 @@ class PathManager:
                         print(f"[Tunnel] 更新 web_output.log 失败: {e}")
                     
                     try:
-                        port = 8888
+                        port = args.port if 'args' in dir() and hasattr(args, 'port') else 8888
                         lan_ip = TunnelManager.get_lan_ip()
                         header = f"""==================================================
 Szwego商品爬虫 - Web服务
@@ -2740,7 +2766,7 @@ class WegoScraper:
         headers = {
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'zh-CN,zh;q=0.9',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+            'User-Agent': Environment.get_user_agent(),
             'x-wg-language': 'zh'
         }
         
@@ -2936,7 +2962,7 @@ class WegoScraper:
         headers = {
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'zh-CN,zh;q=0.9',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36',
+            'User-Agent': Environment.get_user_agent(),
             'x-wg-language': 'zh'
         }
         
@@ -3262,7 +3288,7 @@ class WegoScraper:
                 
                 context_start = time.time()
                 context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
+                    viewport=Environment.get_default_viewport(),
                     user_agent=self.get_user_agent()
                 )
                 print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
@@ -4062,7 +4088,7 @@ def main():
         
         def start_web():
             print('\n正在启动Web服务...')
-            print('访问地址: http://localhost:8888 (默认端口)')
+            print(f'访问地址: http://localhost:{args.port if "args" in dir() and hasattr(args, "port") else 8888} (默认端口)')
             print('按 Ctrl+C 停止服务\n')
             
             os.system(f'"{VENV_PYTHON}" main.py --web')
@@ -4139,7 +4165,7 @@ def update_cookie():
             )
             
             context = await browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
+                viewport=Environment.get_default_viewport(),
                 user_agent=WegoScraper.get_user_agent()
             )
             
@@ -4358,7 +4384,7 @@ def install_playwright_cdn():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Szwego商品爬虫')
     parser.add_argument('--web', action='store_true', help='启动Web服务模式')
-    parser.add_argument('--port', type=int, default=8888, help='Web服务端口 (默认8888)')
+    parser.add_argument('--port', type=int, default=int(os.environ.get('WEB_PORT', '8888')), help=f'Web服务端口 (默认{os.environ.get("WEB_PORT", "8888")})')
     parser.add_argument('--setup', action='store_true', help='运行配置初始化向导')
     parser.add_argument('--username', '-u', help='登录用户名')
     parser.add_argument('--password', '-p', help='登录密码')
@@ -4404,8 +4430,8 @@ if __name__ == '__main__':
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=False)
                 context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+                    viewport=Environment.get_default_viewport(),
+                    user_agent=WegoScraper.get_user_agent()
                 )
                 page = await context.new_page()
                 await page.goto('https://www.szwego.com', wait_until='networkidle')
@@ -4534,7 +4560,7 @@ if __name__ == '__main__':
             current_version = get_version_from_readme()
             with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
                 content = f.read()
-            content = content.replace('版本: 3.0.9', f'版本: {current_version}')
+            content = re.sub(r'版本:\s*[\d.]+', f'版本: {current_version}', content)
             response = Response(content, mimetype='text/html')
             response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
             response.headers['Pragma'] = 'no-cache'
@@ -5853,7 +5879,7 @@ if __name__ == '__main__':
             lan_ip = None
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
+                s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
                 lan_ip = s.getsockname()[0]
                 s.close()
             except:
@@ -5861,7 +5887,7 @@ if __name__ == '__main__':
             
             return jsonify({
                 'success': True,
-                'local_url': f'http://127.0.0.1:{port}',
+                'local_url': f'http://localhost:{port}',
                 'lan_url': f'http://{lan_ip}:{port}' if lan_ip else None,
                 'lan_ip': lan_ip,
                 'port': port,
@@ -6042,9 +6068,9 @@ if __name__ == '__main__':
                             try:
                                 with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
                                     port_match = re.search(r'--port\s+(\d+)', ' '.join(sys.argv))
-                                    local_port = port_match.group(1) if port_match else '8888'
+                                    local_port = port_match.group(1) if port_match else str(args.port)
                                     tf.write(f"Public URL: {web_url}\n")
-                                    tf.write(f"Local URL: http://127.0.0.1:{local_port}/\n")
+                                    tf.write(f"Local URL: http://localhost:{local_port}/\n")
                                     tf.write(f"Tunnel: {web_url.split('//')[1].split('.')[0]}\n")
                             except Exception as e:
                                 pass
@@ -6083,7 +6109,7 @@ if __name__ == '__main__':
                 Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
                 
                 tunnel_process = subprocess.Popen(
-                    f'npx hostc@latest {port} --local-host 127.0.0.1',
+                    f'npx hostc@latest {port} --local-host localhost',
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
@@ -6130,7 +6156,7 @@ if __name__ == '__main__':
                                         try:
                                             with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
                                                 tf.write(f"Public URL: {file_url}\n")
-                                                tf.write(f"Local URL: http://127.0.0.1:{port}/\n")
+                                                tf.write(f"Local URL: http://localhost:{port}/\n")
                                                 tf.write(f"Tunnel: {file_url.split('//')[1].split('.')[0]}\n")
                                             print(f"[Tunnel] 已写入 tunnel_url.txt")
                                         except Exception as e:
@@ -6361,7 +6387,7 @@ if __name__ == '__main__':
         lan_ip_startup = None
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
+            s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
             lan_ip_startup = s.getsockname()[0]
             s.close()
         except:
@@ -6393,6 +6419,6 @@ if __name__ == '__main__':
         def favicon():
             return send_from_directory(os.path.join(PROJECT_DIR, 'dist', 'favicon'), 'favicon.ico')
         
-        app.run(host='0.0.0.0', port=args.port, debug=False)
+        app.run(host=os.environ.get('FLASK_HOST', '0.0.0.0'), port=args.port, debug=False)
     else:
         main()

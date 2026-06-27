@@ -233,8 +233,12 @@ if not defined PYTHON_CMD (
         scoop install python
     )
     
-    :: 方式4：直接下载 MSI（最终回退，安装到 _python/ 临时目录）
-    curl -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
+    :: 方式4：动态获取最新版本并下载（最终回退，安装到 _python/ 临时目录）
+    for /f "delims=" %%v in ('curl -s https://www.python.org/ftp/python/ ^| findstr /r "^3\.[0-9]*\.[0-9]*/$" ^| sort /r ^| findstr /n "^" ^| findstr "^[1]:"') do (
+        for /f "tokens=1 delims=/" %%a in ("%%v") do set "PYTHON_LATEST_VERSION=%%a"
+    )
+    if not defined PYTHON_LATEST_VERSION set "PYTHON_LATEST_VERSION=3.11.9"
+    curl -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/%PYTHON_LATEST_VERSION%/python-%PYTHON_LATEST_VERSION%-amd64.exe
     "%TEMP%\python_installer.exe" /quiet InstallAllUsers=0 PrependPath=0 Include_pip=1 TargetDir="%CD%\_python"
 )
 
@@ -332,8 +336,12 @@ if not defined NODE_CMD (
         scoop install nodejs-lts
     )
     
-    :: 方式4：直接下载 MSI（最终回退，安装到 .node_env/ 目录）
-    curl -L -o ".node_env/node-installer.msi" https://nodejs.org/dist/v20.11.1/node-v20.11.1-x64.msi
+    :: 方式4：动态获取最新LTS版本并下载（最终回退，安装到 .node_env/ 目录）
+    for /f "delims=" %%v in ('curl -s https://nodejs.org/dist/index.tab ^| findstr /i "LTS" ^| findstr /v "headers" ^| findstr /v "src" ^| findstr /r "^[v]?[0-9]" ^| sort /r ^| findstr /n "^" ^| findstr "^[1]:"') do (
+        for /f "tokens=1 delims= " %%a in ("%%v") do set "NODE_LTS_VERSION=%%a"
+    )
+    if not defined NODE_LTS_VERSION set "NODE_LTS_VERSION=v20.11.1"
+    curl -L -o ".node_env/node-installer.msi" https://nodejs.org/dist/%NODE_LTS_VERSION%/node-%NODE_LTS_VERSION%-x64.msi
     msiexec /i ".node_env/node-installer.msi" INSTALLDIR="%CD%\.node_env" /quiet /norestart
 )
 
@@ -1336,6 +1344,15 @@ fi
 | 虚拟环境激活 | `Scripts\activate.bat` (Win) / `bin/activate` (Unix) | 硬编码单一激活脚本 |
 | pip 配置格式 | `.ini` (Win) / `.conf` (Unix) | 硬编码 `.ini` 或 `.conf` |
 | 路径分隔符 | `os.path.join()` / 动态变量 | 硬编码 `\` 或 `/` |
+| Python/Node 版本 | 从官方 API 动态获取最新 LTS | 硬编码 `3.11.9` / `v20.11.1` |
+| User-Agent | `Environment.get_user_agent()` 动态生成 | 硬编码 `Chrome/120.0.0.0` |
+| 浏览器视口 | `Environment.get_default_viewport()` 动态获取 | 硬编码 `1920x1080` |
+| Web 端口 | `os.environ.get('WEB_PORT', '8888')` | 硬编码 `8888` |
+| Flask 绑定地址 | `os.environ.get('FLASK_HOST', '0.0.0.0')` | 硬编码 `0.0.0.0` |
+| 局域网 IP 检测 | `os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8')` | 硬编码 `8.8.8.8` |
+| 本地回环地址 | `localhost`（跨平台统一） | 硬编码 `127.0.0.1` |
+| 版本号替换 | `re.sub(r'版本:\s*[\d.]+', ...)` | 硬编码 `'版本: 3.0.9'` |
+| Python 导入 | 顶部统一导入，消除内联 import | 函数内 `import random` |
 
 ### 镜像源测速规范
 
