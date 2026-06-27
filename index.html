@@ -759,26 +759,6 @@
                 min-width: 6rem;
                 max-width: 8rem;
             }
-            .func-btn-container {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 8px;
-                padding: 0 16px;
-                max-width: 600px;
-                margin: 0 auto;
-            }
-            .func-btn {
-                height: 2.5rem;
-                min-height: unset;
-                line-height: 1.5rem;
-                font-size: 12px;
-                text-align: center;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 0 6px;
-                margin: 0;
-                width: 100%;
-            }
             .action-col {
                 width: 2.5rem;
             }
@@ -829,24 +809,35 @@
                 font-size: 1rem;
             }
             
-            .text-center.mt-4.mb-4 {
-                display: flex;
-                flex-wrap: wrap;
-                justify-content: center;
+            .func-btn-container {
+                grid-template-columns: repeat(4, 1fr);
                 gap: 8px;
-                padding: 10px 5px;
+                padding: 0 12px;
             }
-            
-            .text-center.mt-4.mb-4 .btn {
-                min-width: 0 !important;
-                height: 44px !important;
-                font-size: 13px !important;
-                padding: 6px 10px !important;
-                flex: 0 0 auto;
+            .func-btn {
+                height: auto;
+                min-height: unset;
+                line-height: 1.2;
+                font-size: 10px;
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 6px 2px;
+                margin: 0;
+                width: 100%;
+                gap: 2px;
             }
-            
-            .text-center.mt-4.mb-4 .btn span {
-                font-size: 12px !important;
+            .func-btn span {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 2px;
+            }
+            .func-btn span i {
+                font-size: 14px;
             }
             
             .footer {
@@ -1429,6 +1420,12 @@
                 min-height: 44px;
                 min-width: 44px;
             }
+            
+            .func-btn,
+            .func-btn-container .btn {
+                min-height: unset;
+                min-width: unset;
+            }
         }
         
         /* 横屏模式适配 */
@@ -1442,14 +1439,15 @@
                 margin-bottom: 10px;
             }
             
-            .text-center.mt-4.mb-4 {
-                flex-wrap: wrap;
+            .func-btn-container {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 6px;
             }
             
-            .text-center.mt-4.mb-4 .btn {
-                flex: 0 0 auto;
-                min-width: 120px;
-                height: 40px;
+            .func-btn {
+                height: 36px;
+                font-size: 12px;
+                padding: 0 6px;
             }
         }
         /* 手机端功能特性卡片 */
@@ -1811,15 +1809,17 @@ SzwegoSpider/
         </div>
     </section>
     
-    <div class="text-center mt-4 mb-4 func-btn-container"><button class="btn btn-primary btn-run func-btn" id="btn-run-spider" data-func="1"><span><i class="fa fa-spider"></i> 运行爬虫</span></button>
+    <div class="text-center mt-4 mb-4 func-btn-container"><button class="btn btn-primary btn-run func-btn" id="btn-run-spider" data-func="1"><span><i class="fa fa-bug"></i> 运行爬虫</span></button>
         <button class="btn btn-primary btn-sku-api func-btn" data-api="/api/sku/compare/txt"><span><i class="fa fa-exchange"></i> 货号对比</span></button>
         <button class="btn btn-primary btn-sku-api func-btn" data-api="/api/sku/compare/excel"><span><i class="fa fa-file-excel-o"></i> Excel与JSON对比</span></button>
         <button class="btn btn-primary btn-run func-btn" id="btn-run-cookie" data-func="4"><span><i class="fa fa-refresh"></i> 更新Cookie</span></button>
         <button class="btn btn-primary func-btn" id="btn-view-products"><span><i class="fa fa-list"></i> 查看所有商品</span></button>
-        <button class="btn btn-primary func-btn" id="btn-daily-profit"><span><i class="fa fa-chart-line"></i> 每日利润报表</span></button>
+        <button class="btn btn-primary func-btn" id="btn-daily-profit"><span><i class="fa fa-bar-chart"></i> 每日利润报表</span></button>
         <button class="btn btn-primary btn-run func-btn" id="btn-run-cleaner" data-func="6"><span><i class="fa fa-trash"></i> 文件清理工具</span></button>
         <button class="btn btn-primary func-btn" id="btn-run-tunnel"><span><i class="fa fa-external-link"></i> 隧道共享</span></button>
-        <button class="btn btn-primary func-btn" id="btn-stop-task" style="display: none;"><span><i class="fa fa-stop"></i> 停止</span></button>
+    </div>
+    <div id="stop-task-bar" style="display:none;text-align:center;margin-top:-4px;margin-bottom:8px;">
+        <button class="btn btn-danger" id="btn-stop-task" onclick="stopTask()" style="border-radius:20px;padding:4px 24px;font-size:13px;"><i class="fa fa-stop"></i> 停止运行</button>
     </div>
     <footer class="footer">
         <div class="container">
@@ -1953,11 +1953,6 @@ SzwegoSpider/
                 document.body.classList.add('is-desktop-device');
             }
             
-            const btnContainer = document.querySelector('.text-center.mt-4.mb-4');
-            if (btnContainer && device.isPhone) {
-                btnContainer.style.padding = '10px 5px';
-            }
-            
             return device;
         }
         
@@ -2071,6 +2066,10 @@ SzwegoSpider/
             }
         })();
         // 全局定时器管理
+        let pollingInterval = null;
+        let currentTaskId = null;
+        let currentChoice = null;
+        let activeAbortController = null;
         let tunnelPollInterval = null;
         let tunnelRetryInterval = null;
         let tunnelStatusInterval = null;
@@ -2413,7 +2412,7 @@ SzwegoSpider/
             }
         }
         
-        function showProductDetail(sku) {
+        window.showProductDetail = function(sku) {
             fetch(`/api/product?sku=${encodeURIComponent(sku)}`)
                 .then(response => response.json())
                 .then(data => {
@@ -2430,7 +2429,7 @@ SzwegoSpider/
                 });
         }
         
-        function showProductByDescription(description) {
+        window.showProductByDescription = function(description) {
             fetch(`/api/product/by-description?description=${encodeURIComponent(description)}`)
                 .then(response => response.json())
                 .then(data => {
@@ -2648,9 +2647,6 @@ SzwegoSpider/
             document.body.removeChild(textarea);
         }
         
-        let pollingInterval = null;
-        let currentTaskId = null;
-        let currentChoice = null;
         let VENV_PYTHON = 'python';
          const btnIds = {'1': 'btn-run-spider', '4': 'btn-run-cookie', '6': 'btn-run-cleaner'};
         function checkCookieStatus() {
@@ -2691,14 +2687,25 @@ SzwegoSpider/
                 b.disabled = false;
                 b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
             });
-            const stopBtn = document.getElementById('btn-stop-task');
-            if (stopBtn) stopBtn.style.display = 'none';
+            document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+            const tunnelBtn = document.getElementById('btn-run-tunnel');
+            if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+            const viewProductsBtn = document.getElementById('btn-view-products');
+            if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+            const dailyProfitBtn = document.getElementById('btn-daily-profit');
+            if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+            const stopTaskBar = document.getElementById('stop-task-bar');
+            if (stopTaskBar) stopTaskBar.style.display = 'none';
         }
         
         function runCommand(cmd, btn) {
             if (!btn) return;
+            document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
+            
+            const stopTaskBar = document.getElementById('stop-task-bar');
+            if (stopTaskBar) stopTaskBar.style.display = 'block';
             
             const outputContent = document.getElementById('output-content');
             
@@ -3014,7 +3021,7 @@ SzwegoSpider/
                 let cardHtml = `
                 <div class="comparison-card">
                     <div class="comparison-header" style="background: #67c23a;">
-                        <i class="fa fa-spider"></i> 爬虫执行结果
+                        <i class="fa fa-bug"></i> 爬虫执行结果
                     </div>
                     <div class="comparison-body">
                         <div class="comparison-stats">
@@ -3175,7 +3182,7 @@ SzwegoSpider/
             console.log('[搜索] 搜索词:', searchTerm, '匹配数量:', matchCountNum);
         }
         
-        window.showAllProducts = function() {
+        window.showAllProducts = function(signal) {
             const productsPanel = document.getElementById('products-panel');
             const productsContent = document.getElementById('products-content');
             if (!productsPanel || !productsContent) {
@@ -3190,7 +3197,8 @@ SzwegoSpider/
                 headers: {
                     'Cache-Control': 'no-cache',
                     'Pragma': 'no-cache'
-                }
+                },
+                signal: signal
             })
             .then(response => response.json())
             .then(data => {
@@ -3362,8 +3370,16 @@ SzwegoSpider/
                 }, 100);
             })
             .catch(error => {
-                console.error('获取商品失败:', error);
-                 showToast('获取商品失败: ' + error.message, 'error');
+                if (error.name === 'AbortError') {
+                    showToast('已取消请求', 'warning');
+                } else {
+                    console.error('获取商品失败:', error);
+                    showToast('获取商品失败: ' + error.message, 'error');
+                }
+            })
+            .finally(() => {
+                activeAbortController = null;
+                resetButtons();
             });
         }
         
@@ -3377,17 +3393,12 @@ SzwegoSpider/
                 return;
             }
             btn.setAttribute('data-original', btn.innerHTML);
+            document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
             
-            document.querySelectorAll('.btn-run').forEach(b => {
-                if (b.id !== btnIds[choice]) {
-                    b.disabled = true;
-                }
-            });
-            
-            const stopBtn = document.getElementById('btn-stop-task');
-            if (stopBtn) stopBtn.style.display = 'inline-block';
+            const stopTaskBar = document.getElementById('stop-task-bar');
+            if (stopTaskBar) stopTaskBar.style.display = 'block';
             
             const cmd = VENV_PYTHON + ' main.py --task ' + choice;
             
@@ -3446,32 +3457,39 @@ SzwegoSpider/
             });
         }
         
-        function stopTask() {
-            if (!currentTaskId) {
-                showToast('没有正在运行的任务', 'warning');
-                return;
+        window.stopTask = function() {
+            if (activeAbortController) {
+                activeAbortController.abort();
+                activeAbortController = null;
             }
-            fetch('/kill', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_id: currentTaskId })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    clearInterval(pollingInterval);
-                    const statusEl = document.getElementById('output-status');
-                    if (statusEl) statusEl.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行</span>';
-                    const inputArea = document.getElementById('output-input-area');
-                    if (inputArea) inputArea.style.display = 'none';
-                    resetButtons();
-                } else {
-                    showToast('停止失败: ' + (data.error || '未知错误'), 'error');
-                }
-            })
-            .catch(error => {
-                showToast('请求失败: ' + error.message, 'error');
-            });
+            clearAllPollingIntervals();
+            if (currentTaskId) {
+                fetch('/kill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task_id: currentTaskId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const statusEl = document.getElementById('output-status');
+                        if (statusEl) statusEl.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行</span>';
+                        const inputArea = document.getElementById('output-input-area');
+                        if (inputArea) inputArea.style.display = 'none';
+                    } else {
+                        showToast('停止失败: ' + (data.error || '未知错误'), 'error');
+                    }
+                })
+                .catch(error => {
+                    showToast('请求失败: ' + error.message, 'error');
+                });
+            }
+            fetch('/api/tunnel/stop', { method: 'POST' }).catch(() => {});
+            const cleanStatusDiv = document.getElementById('clean-status');
+            if (cleanStatusDiv) cleanStatusDiv.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行</span>';
+            const statusEl = document.getElementById('output-status');
+            if (statusEl && !currentTaskId) statusEl.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行</span>';
+            resetButtons();
         }
         
         const userInputEl = document.getElementById('user-input');
@@ -3502,7 +3520,13 @@ SzwegoSpider/
         if (viewProductsBtn) {
             viewProductsBtn.onclick = function() {
                 console.log('[按钮点击] 查看所有商品');
-                showAllProducts();
+                document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
+                viewProductsBtn.disabled = true;
+                viewProductsBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 加载中...';
+                const stopTaskBar = document.getElementById('stop-task-bar');
+                if (stopTaskBar) stopTaskBar.style.display = 'block';
+                activeAbortController = new AbortController();
+                showAllProducts(activeAbortController.signal);
             };
         }
         
@@ -3510,15 +3534,21 @@ SzwegoSpider/
         if (dailyProfitBtn) {
             dailyProfitBtn.onclick = function() {
                 console.log('[按钮点击] 每日利润报表');
-                showDailyProfitReport();
+                document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
+                dailyProfitBtn.disabled = true;
+                dailyProfitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 加载中...';
+                const stopTaskBar = document.getElementById('stop-task-bar');
+                if (stopTaskBar) stopTaskBar.style.display = 'block';
+                activeAbortController = new AbortController();
+                showDailyProfitReport('day', '', '', activeAbortController.signal);
             };
         }
-        window.showDailyProfitReport = function(groupBy = 'day', startDate = '', endDate = '') {
+        window.showDailyProfitReport = function(groupBy = 'day', startDate = '', endDate = '', signal) {
             let url = '/api/daily-profit?group_by=' + groupBy;
             if (startDate) url += '&start_date=' + startDate;
             if (endDate) url += '&end_date=' + endDate;
             
-            fetch(url)
+            fetch(url, signal ? { signal: signal } : {})
                 .then(response => {
                     if (!response.ok) {
                         return response.text().then(text => {
@@ -3546,7 +3576,7 @@ SzwegoSpider/
                     let cardHtml = `
                     <div class="daily-profit-card">
                         <div class="comparison-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                            <i class="fa fa-chart-line"></i> 每日利润报表
+                            <i class="fa fa-bar-chart"></i> 每日利润报表
                         </div>
                         <div class="comparison-body" style="padding: 0;">
                             <div style="background: #f8f9fa; padding: 15px; border-bottom: 1px solid #dee2e6;">
@@ -3576,7 +3606,7 @@ SzwegoSpider/
                             <div id="profit-report-top" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; margin-bottom: 0; position: relative;">
                                 <div style="color: white; font-size: 14px; line-height: 1.8; white-space: pre-wrap;">${data.daily_profit_report}</div>
                             </div>
-                            <button id="profit-fab-btn" class="profit-fab-btn" onclick="window.showFloatingProfitReport(event)"><i class="fa fa-chart-line"></i></button>
+                            <button id="profit-fab-btn" class="profit-fab-btn" onclick="window.showFloatingProfitReport(event)"><i class="fa fa-bar-chart"></i></button>
                             <div id="profit-floating-panel" class="profit-floating-panel"></div>
                             <div id="profit-chart-container" style="padding: 15px; background: #fff; border-bottom: 2px solid #667eea;">
                                 <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px;">
@@ -4222,7 +4252,7 @@ SzwegoSpider/
             
             let html = `
                 <div class="drag-handle" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 12px 16px; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: white; font-weight: 600; font-size: 15px;"><i class="fa fa-grip-lines" style="margin-right: 6px; opacity: 0.6;"></i><i class="fa fa-chart-line"></i> 汇总统计</span>
+                    <span style="color: white; font-weight: 600; font-size: 15px;"><i class="fa fa-grip-lines" style="margin-right: 6px; opacity: 0.6;"></i><i class="fa fa-bar-chart"></i> 汇总统计</span>
                     <span onclick="document.getElementById('profit-floating-panel').style.display='none'" style="color: white; cursor: pointer; font-size: 18px; padding: 0 4px;"><i class="fa fa-times"></i></span>
                 </div>
             `;
@@ -4406,12 +4436,16 @@ SzwegoSpider/
         async function startTunnelAndShow() {
             const btn = document.getElementById('btn-run-tunnel');
             if (!btn) return;
+            document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 启动中...';
+            const stopTaskBar = document.getElementById('stop-task-bar');
+            if (stopTaskBar) stopTaskBar.style.display = 'block';
+            activeAbortController = new AbortController();
             try {
-                const serverRes = await fetch('/api/server/info');
+                const serverRes = await fetch('/api/server/info', { signal: activeAbortController.signal });
                 const serverData = await serverRes.json();
-                const startRes = await fetch('/api/tunnel/start', { method: 'POST' });
+                const startRes = await fetch('/api/tunnel/start', { method: 'POST', signal: activeAbortController.signal });
                 const startData = await startRes.json();
                 const localUrl = serverData.success ? serverData.local_url : window.location.origin;
                 const lanUrl = serverData.success && serverData.lan_url ? serverData.lan_url : '';
@@ -4514,13 +4548,15 @@ SzwegoSpider/
                     if (tunnelContent) tunnelContent.insertBefore(alertDiv, tunnelContent.firstChild);
                 }
             } catch (e) {
-                console.error('[隧道共享] 操作失败:', e);
-                showToast('操作失败: ' + e.message, 'error');
-            } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa fa-external-link"></i> 隧道共享';
+                if (e.name === 'AbortError') {
+                    showToast('已取消隧道启动', 'warning');
+                } else {
+                    console.error('[隧道共享] 操作失败:', e);
+                    showToast('操作失败: ' + e.message, 'error');
                 }
+            } finally {
+                activeAbortController = null;
+                resetButtons();
             }
         }
         function copyToClipboard(text) {
@@ -4586,7 +4622,13 @@ SzwegoSpider/
                 
                 if (apiUrl) {
                     console.log('[功能] 调用对比API:', apiUrl);
-                    fetch(apiUrl)
+                    document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
+                    btn.disabled = true;
+                    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
+                    const stopTaskBar = document.getElementById('stop-task-bar');
+                    if (stopTaskBar) stopTaskBar.style.display = 'block';
+                    activeAbortController = new AbortController();
+                    fetch(apiUrl, { signal: activeAbortController.signal })
                     .then(response => response.json())
                     .then(data => {
                         if (data.error) {
@@ -4760,7 +4802,15 @@ SzwegoSpider/
                         outputPanel.insertAdjacentHTML('beforeend', cardHtml);
                     })
                     .catch(error => {
-                        showToast('请求失败: ' + error.message, 'error');
+                        if (error.name === 'AbortError') {
+                            showToast('已取消请求', 'warning');
+                        } else {
+                            showToast('请求失败: ' + error.message, 'error');
+                        }
+                    })
+                    .finally(() => {
+                        activeAbortController = null;
+                        resetButtons();
                     });
                 }
             };
@@ -4825,7 +4875,7 @@ SzwegoSpider/
             
             return formatted;
         }
-        function showSkuInputPanel() {
+        window.showSkuInputPanel = function() {
             const skuPanel = document.getElementById('sku-input-panel');
             const skuContent = document.getElementById('sku-input-content');
             if (!skuPanel || !skuContent) return;
@@ -4851,7 +4901,7 @@ SzwegoSpider/
             `;
         }
         
-        function compareSku() {
+        window.compareSku = function() {
             const skuInputEl = document.getElementById('sku-input');
             if (!skuInputEl) {
                 showToast('找不到输入框', 'error');
@@ -4868,11 +4918,16 @@ SzwegoSpider/
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 对比中...';
             }
+            document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
+            const stopTaskBar = document.getElementById('stop-task-bar');
+            if (stopTaskBar) stopTaskBar.style.display = 'block';
+            activeAbortController = new AbortController();
             
             fetch('/api/sku/compare/txt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ skus: skuInput })
+                body: JSON.stringify({ skus: skuInput }),
+                signal: activeAbortController.signal
             })
             .then(response => response.json())
             .then(data => {
@@ -4888,11 +4943,19 @@ SzwegoSpider/
                 showComparisonResult(data);
             })
             .catch(error => {
-                showToast('请求失败: ' + error.message, 'error');
+                if (error.name === 'AbortError') {
+                    showToast('已取消货号对比', 'warning');
+                } else {
+                    showToast('请求失败: ' + error.message, 'error');
+                }
                 if (btn) {
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fa fa-exchange"></i> 开始对比';
                 }
+            })
+            .finally(() => {
+                activeAbortController = null;
+                resetButtons();
             });
         }
         
@@ -5110,6 +5173,10 @@ SzwegoSpider/
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 执行中...';
             }
+            document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
+            const stopTaskBar = document.getElementById('stop-task-bar');
+            if (stopTaskBar) stopTaskBar.style.display = 'block';
+            activeAbortController = new AbortController();
             
             if (outputDiv) {
                 outputDiv.style.display = 'block';
@@ -5144,7 +5211,8 @@ SzwegoSpider/
             fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
+                signal: activeAbortController.signal
             })
             .then(response => response.json())
             .then(result => {
@@ -5161,12 +5229,21 @@ SzwegoSpider/
                 }
             })
             .catch(error => {
-                if (outputDiv) outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败: ' + error.message + '</span>';
-                if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败</span>';
+                if (error.name === 'AbortError') {
+                    if (outputDiv) outputDiv.innerHTML = '<span style="color: #f56c6c;">■ 已取消清理</span>';
+                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行</span>';
+                } else {
+                    if (outputDiv) outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败: ' + error.message + '</span>';
+                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 请求失败</span>';
+                }
                 if (btn) {
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fa fa-play"></i> 执行清理';
                 }
+            })
+            .finally(() => {
+                activeAbortController = null;
+                resetButtons();
             });
         }
         
@@ -5287,7 +5364,7 @@ SzwegoSpider/
                 }
             }
         }
-        async function toggleTunnel() {
+        window.toggleTunnel = async function() {
             const btn = document.getElementById('btn-toggle-tunnel');
             const status = document.getElementById('tunnel-status');
             if (btn) btn.disabled = true;
@@ -5327,7 +5404,7 @@ SzwegoSpider/
                 checkTunnelStatus();
             }
         }
-        function showTunnelSection() {
+        window.showTunnelSection = function() {
             console.log('[隧道管理] 显示隧道管理面板');
             const tunnelPanel = document.getElementById('tunnel-panel');
             const tunnelContent = document.getElementById('tunnel-content');
