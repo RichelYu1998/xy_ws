@@ -196,52 +196,72 @@ class Environment:
 → [4/6] NPM 镜像源测速 → [5/6] 虚拟环境管理 → [6/6] 依赖安装
 ```
 
-#### Python 环境检测（跨平台）
+#### Python 环境检测 + 全自动安装（跨平台）
 
-**Windows (BAT)**:
+**检测流程**：
+```
+PATH 搜索 → 常见路径扫描 → 自动安装（包管理器/直接下载）→ 验证安装结果
+```
+
+**Windows (BAT)** - 4层全自动安装回退：
 ```batch
-:: 1. PATH 搜索（优先级最高）
+:: 第1步：PATH 搜索（优先级最高）
 where py >nul 2>&1 && set "PYTHON_CMD=py"
-where python3 >nul 2>&1 && set "PYTHON_CMD=python3"
 where python >nul 2>&1 && set "PYTHON_CMD=python"
 
-:: 2. 常见安装路径搜索（PATH 找不到时）
+:: 第2步：常见安装路径搜索（PATH 找不到时）
 if not defined PYTHON_CMD (
-    if exist "C:\Python3*\python.exe" (
-        for /d %%p in ("C:\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
-    ) else if exist "C:\Program Files\Python3*\python.exe" (
-        for /d %%p in ("C:\Program Files\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
-    ) else if exist "C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*\python.exe" (
-        for /d %%p in ("C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
-    )
+    if exist "C:\Python3*\python.exe" ( ... )
+    else if exist "C:\Program Files\Python3*\python.exe" ( ... )
+    else if exist "C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*\python.exe" ( ... )
 )
 
-:: 3. 虚拟环境状态检测
-if defined VIRTUAL_ENV (
-    echo [*] 已在虚拟环境中: %VIRTUAL_ENV%
-) else (
-    echo [*] 未在虚拟环境中，将自动创建 .venv
+:: 第3步：全自动安装（4种方式按优先级尝试）
+if not defined PYTHON_CMD (
+    :: 方式1：Winget（推荐，Win10 1709+ 内置）
+    where winget >nul 2>&1 && (
+        winget install Python.Python.3 --accept-package-agreements --accept-source-agreements --silent
+    )
+    
+    :: 方式2：Chocolatey（企业常用）
+    where choco >nul 2>&1 || (
+        choco install python -y
+    )
+    
+    :: 方式3：Scoop（开发者友好）
+    where scoop >nul 2>&1 || (
+        scoop install python
+    )
+    
+    :: 方式4：直接下载 MSI（最终回退，安装到 _python/ 临时目录）
+    curl -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
+    "%TEMP%\python_installer.exe" /quiet InstallAllUsers=0 PrependPath=0 Include_pip=1 TargetDir="%CD%\_python"
+)
+
+:: 第4步：验证安装结果
+:python_verify_install
+if not defined PYTHON_CMD (
+    where py >nul 2>&1 && set "PYTHON_CMD=py"
+    where python >nul 2>&1 && set "PYTHON_CMD=python"
 )
 ```
 
-**Unix (SH)**:
+**Unix (SH)** - 按操作系统自动选择包管理器：
 ```bash
-# 1. PATH 搜索（优先级最高）
+# 第1步：PATH 搜索（优先级最高）
 if command -v python3 &>/dev/null; then
     PYTHON_CMD="python3"
 elif command -v python &>/dev/null; then
     PYTHON_CMD="python"
 fi
 
-# 2. 常见安装路径搜索（PATH 找不到时）
+# 第2步：常见安装路径搜索（PATH 找不到时）
 if [ -z "$PYTHON_CMD" ]; then
     COMMON_PYTHON_PATHS=(
         "/usr/bin/python3"
         "/usr/local/bin/python3"
         "/opt/homebrew/bin/python3"
         "$HOME/.pyenv/shims/python3"
-        "/usr/bin/python"
-        "/usr/local/bin/python"
     )
     for py_path in "${COMMON_PYTHON_PATHS[@]}"; do
         if [ -x "$py_path" ]; then
@@ -251,12 +271,25 @@ if [ -z "$PYTHON_CMD" ]; then
     done
 fi
 
-# 3. 虚拟环境状态检测
-if [ -n "$VIRTUAL_ENV" ]; then
-    echo "[*] 已在虚拟环境中: $VIRTUAL_ENV"
-else
-    echo "[*] 未在虚拟环境中，将自动创建 .venv"
+# 第3步：全自动安装（根据操作系统选择包管理器）
+if [ -z "$PYTHON_CMD" ]; then
+    case "$(uname -s)" in
+        Darwin)  # macOS
+            command -v brew &>/dev/null && brew install python
+            [ -f "/opt/homebrew/bin/brew" ] && /opt/homebrew/bin/brew install python
+            ;;
+        Linux)
+            command -v apt-get &>/dev/null && sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip
+            command -v yum &>/dev/null && sudo yum install -y python3 python3-pip
+            command -v dnf &>/dev/null && sudo dnf install -y python3 python3-pip
+            command -v pacman &>/dev/null && sudo pacman -Syu --noconfirm python python-pip
+            ;;
+    esac
 fi
+
+# 第4步：验证安装结果
+command -v python3 &>/dev/null && PYTHON_CMD="python3"
+command -v python &>/dev/null && PYTHON_CMD="python"
 ```
 
 #### Node.js/NVM 检测（跨平台）
@@ -1270,17 +1303,42 @@ fi
 
 ### 临时环境隔离规范
 
-| 环境 | 目录 | 用途 |
-|------|------|------|
-| Python 虚拟环境 | `.venv/` | 隔离 Python 包依赖 |
-| Node.js 临时环境 | `.node_env/` (仅Windows无NVM时) | 隔离 Node.js 运行时 |
-| PIP 配置 | `.venv/pip_config/pip.ini或.conf` | 项目级镜像源配置 |
+| 环境 | 目录 | 用途 | 创建条件 |
+|------|------|------|----------|
+| Python 虚拟环境 | `.venv/` | 隔离 Python 包依赖 | 始终创建 |
+| Node.js 临时环境 | `.node_env/` (仅Windows无NVM时) | 隔离 Node.js 运行时 | Windows + 无NVM |
+| Python 临时安装 | `_python/` (仅Windows无包管理器时) | Python 全自动安装回退 | Windows + 无winget/choco/scoop |
+| PIP 配置 | `.venv/pip_config/pip.ini或.conf` | 项目级镜像源配置 | 始终创建 |
 
 **关键规则**：
 - ❌ 禁止修改系统全局 Python/Node.js/NPM 设置
-- ✅ 所有配置文件必须放在项目目录内（`.venv/`, `.node_env/`）
+- ✅ 所有配置文件必须放在项目目录内（`.venv/`, `.node_env/`, `_python/`）
 - ✅ 启动脚本结束后，临时环境不影响系统全局配置
-- ✅ git 忽略规则：`.venv/`, `.node_env/`, `node_modules/`
+- ✅ git 忽略规则：`.venv/`, `.node_env/`, `_python/`, `node_modules/`
+
+### Python 全自动安装规范
+
+| 操作系统 | 第1优先级 | 第2优先级 | 第3优先级 | 最终回退 |
+|----------|----------|----------|----------|----------|
+| Windows | Winget | Chocolatey | Scoop | MSI下载到 `_python/` |
+| macOS | Homebrew (Intel) | Homebrew (Apple Silicon) | - | 提示手动安装Homebrew |
+| Linux (Ubuntu) | apt | - | - | 提示手动安装 |
+| Linux (CentOS) | yum | - | - | 提示手动安装 |
+| Linux (Fedora) | dnf | - | - | 提示手动安装 |
+| Linux (Arch) | pacman | - | - | 提示手动安装 |
+
+**安装后必须验证**：
+```batch
+:: Windows
+where py >nul 2>&1 && set "PYTHON_CMD=py"
+where python >nul 2>&1 && set "PYTHON_CMD=python"
+```
+
+```bash
+# Unix
+command -v python3 &>/dev/null && PYTHON_CMD="python3"
+command -v python &>/dev/null && PYTHON_CMD="python"
+```
 
 ### 性能要求
 

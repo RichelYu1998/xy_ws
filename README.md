@@ -185,12 +185,20 @@ class Environment:
 ## 最新更新
 ### v3.7.6 (2026-06-27)
 - **综合环境检测系统（6步流程）**
-  - [1/6] Python 环境智能检测：PATH 搜索 + 常见安装路径扫描 + 虚拟环境状态检测
+  - [1/6] Python 环境智能检测 + **全自动安装**：
+    - PATH 搜索 + 常见安装路径扫描 + 虚拟环境状态检测
+    - **Windows 全自动安装**（4层回退）：
+      - 第1优先级：Winget (`winget install Python.Python.3 --silent`)
+      - 第2优先级：Chocolatey (`choco install python -y`)
+      - 第3优先级：Scoop (`scoop install python`)
+      - 第4优先级：直接下载 MSI 安装到 `_python/` 临时目录
+    - **macOS 全自动安装**：Homebrew (`brew install python`)，支持 Intel + Apple Silicon
+    - **Linux 全自动安装**（4种包管理器）：
+      - Ubuntu/Debian: `apt install python3 python3-venv python3-pip`
+      - CentOS/RHEL: `yum install python3 python3-pip`
+      - Fedora: `dnf install python3 python3-pip`
+      - Arch Linux: `pacman -Syu python python-pip`
   - [2/6] Node.js/NVM 智能检测与自动安装：
-    - Windows: 支持 NVM + MSI静默安装到 `.node_env/` 目录
-    - macOS: 支持 NVM + Homebrew 自动安装
-    - Linux (Ubuntu/Debian): 支持 NVM + apt + nodesource 自动安装
-    - Linux (CentOS/RHEL): 支持 NVM + yum + nodesource 自动安装
   - [3/6] **PIP 镜像源轮询测速**（毫秒级精度）：
     - 测试 4 个国内镜像源：清华/阿里云/豆瓣/中科大
     - 使用 `curl --connect-timeout 1.5` 测试 TCP 连接时间（速度快10倍以上）

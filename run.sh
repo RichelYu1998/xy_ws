@@ -36,9 +36,6 @@ FASTEST_PIP_MIRROR=""
 FASTEST_NPM_MIRROR=""
 
 detect_python_env() {
-    echo ""
-    echo "========================================"
-    echo "综合环境检测与配置"
     echo "========================================"
     echo "[1/6] 检测Python环境..."
 
@@ -49,7 +46,7 @@ detect_python_env() {
         PYTHON_CMD="python"
         echo "Python版本：$(python --version 2>&1)"
     else
-        echo "ERROR: Python未在PATH中找到"
+        echo "Python未在PATH中，正在尝试查找系统中的Python..."
         
         COMMON_PYTHON_PATHS=(
             "/usr/bin/python3"
@@ -62,7 +59,7 @@ detect_python_env() {
         
         for py_path in "${COMMON_PYTHON_PATHS[@]}"; do
             if [ -x "$py_path" ]; then
-                echo "发现Python: $py_path"
+                echo "[*] 发现Python: $py_path"
                 export PATH="$py_path:$(dirname $py_path):$PATH"
                 PYTHON_CMD="$py_path"
                 break
@@ -70,15 +67,61 @@ detect_python_env() {
         done
         
         if [ -z "$PYTHON_CMD" ]; then
-            echo "ERROR: 无法找到Python安装"
-            echo "请通过以下方式之一安装："
-            echo "  macOS: brew install python"
-            echo "  Ubuntu/Debian: sudo apt install python3 python3-venv"
-            echo "  CentOS/RHEL: sudo yum install python3"
-            return 1
+            echo "[WARNING] 系统中未找到Python，正在自动安装..."
+            
+            case "$(uname -s)" in
+                Darwin)
+                    if command -v brew &> /dev/null; then
+                        echo "    使用Homebrew安装Python..."
+                        brew install python
+                    elif [ -f "/opt/homebrew/bin/brew" ]; then
+                        echo "    使用Homebrew (Apple Silicon) 安装Python..."
+                        /opt/homebrew/bin/brew install python
+                    else
+                        echo "[ERROR] 未检测到Homebrew，无法自动安装Python"
+                        echo "请先安装Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+                        return 1
+                    fi
+                    ;;
+                Linux)
+                    if command -v apt-get &> /dev/null; then
+                        echo "    使用apt安装Python..."
+                        sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip
+                    elif command -v yum &> /dev/null; then
+                        echo "    使用yum安装Python..."
+                        sudo yum install -y python3 python3-pip
+                    elif command -v dnf &> /dev/null; then
+                        echo "    使用dnf安装Python..."
+                        sudo dnf install -y python3 python3-pip
+                    elif command -v pacman &> /dev/null; then
+                        echo "    使用pacman安装Python..."
+                        sudo pacman -Syu --noconfirm python python-pip
+                    else
+                        echo "[ERROR] 无法识别包管理器，请手动安装Python"
+                        return 1
+                    fi
+                    ;;
+                *)
+                    echo "[ERROR] 不支持的操作系统用于自动Python安装"
+                    return 1
+                    ;;
+            esac
+            
+            # 验证安装结果
+            if command -v python3 &> /dev/null; then
+                PYTHON_CMD="python3"
+                echo "[*] Python安装成功: $(python3 --version 2>&1)"
+            elif command -v python &> /dev/null; then
+                PYTHON_CMD="python"
+                echo "[*] Python安装成功: $(python --version 2>&1)"
+            else
+                echo "[ERROR] Python安装失败"
+                return 1
+            fi
         fi
     fi
     
+    echo ""
     echo "[*] 检测虚拟环境状态..."
     if [ -n "$VIRTUAL_ENV" ]; then
         echo "当前已在虚拟环境中: $VIRTUAL_ENV"

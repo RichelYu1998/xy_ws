@@ -85,9 +85,8 @@ where py >nul 2>&1
 if errorlevel 1 (
     where python >nul 2>&1
     if errorlevel 1 (
-        echo ERROR: Python未在PATH中找到
-        echo.
-        echo 正在尝试查找系统中的Python...
+        echo Python未在PATH中，正在尝试查找系统中的Python...
+        
         if exist "C:\Python3*\python.exe" (
             for /d %%p in ("C:\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
         ) else if exist "C:\Program Files\Python3*\python.exe" (
@@ -97,13 +96,71 @@ if errorlevel 1 (
         )
         
         if defined PYTHON_PATH (
-            echo 找到Python: %PYTHON_PATH%
+            echo [*] 找到Python: %PYTHON_PATH%
             for %%P in ("%PYTHON_PATH%") do set "PYTHON_DIR=%%~dpP"
             set "PATH=%PATH%;%PYTHON_DIR%"
+            set "PYTHON_CMD=%PYTHON_PATH%"
         ) else (
-            echo ERROR: 无法找到Python安装，请手动安装
-            echo   下载地址: https://www.python.org/downloads/
-            exit /b 1
+            echo [WARNING] 系统中未找到Python，正在自动安装...
+            
+            :: 检测包管理器并自动安装
+            where winget >nul 2>&1
+            if not errorlevel 1 (
+                echo     使用 Winget 安装 Python...
+                winget install Python.Python.3 --accept-package-agreements --accept-source-agreements --silent
+                if errorlevel 1 (
+                    echo [ERROR] Winget 安装失败
+                    goto :python_install_fallback
+                )
+                goto :python_verify_install
+            )
+            
+            :python_install_fallback
+            where choco >nul 2>&1
+            if not errorlevel 1 (
+                echo     使用 Chocolatey 安装 Python...
+                choco install python -y
+                if errorlevel 1 (
+                    echo [ERROR] Chocolatey 安装失败
+                    goto :python_download_direct
+                )
+                goto :python_verify_install
+            )
+            
+            :python_download_direct
+            where scoop >nul 2>&1
+            if not errorlevel 1 (
+                echo     使用 Scoop 安装 Python...
+                scoop install python
+                if errorlevel 1 (
+                    echo [ERROR] Scoop 安装失败
+                    goto :python_msi_download
+                )
+                goto :python_verify_install
+            )
+            
+            :python_msi_download
+            echo     直接下载 Python 安装程序...
+            if not exist "%TEMP%\python_installer.exe" (
+                curl -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
+            )
+            
+            if exist "%TEMP%\python_installer.exe" (
+                echo     正在静默安装 Python 到 %CD%\_python...
+                "%TEMP%\python_installer.exe" /quiet InstallAllUsers=0 PrependPath=0 Include_pip=1 TargetDir="%CD%\_python"
+                if exist "%CD%\_python\python.exe" (
+                    set "PYTHON_CMD=%CD%\_python\python.exe"
+                    set "PATH=%CD%\_python;%PATH%"
+                    echo [*] Python 已安装到临时目录: %CD%\_python
+                    del "%TEMP%\python_installer.exe" 2>nul
+                ) else (
+                    echo [ERROR] Python 安装失败
+                    exit /b 1
+                )
+            ) else (
+                echo [ERROR] Python 下载失败
+                exit /b 1
+            )
         )
     ) else (
         set PYTHON_CMD=python
@@ -112,6 +169,13 @@ if errorlevel 1 (
     set PYTHON_CMD=py
 )
 
+:python_verify_install
+if not defined PYTHON_CMD (
+    where py >nul 2>&1 && set "PYTHON_CMD=py"
+    where python >nul 2>&1 && set "PYTHON_CMD=python"
+)
+
+echo.
 echo Python版本：
 %PYTHON_CMD% --version
 
