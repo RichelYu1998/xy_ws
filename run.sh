@@ -9,9 +9,9 @@ echo "========================================"
 echo ""
 echo "[*] 清理临时文件..."
 if [ -d "temp" ]; then
-    TOTAL_SIZE=$(du -sb temp | awk '{print $1}')
-    LIMIT_SIZE=3145728
-    if [ "$TOTAL_SIZE" -gt "$LIMIT_SIZE" ]; then
+    TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
+    LIMIT_SIZE_KB=3072
+    if [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
         rm -rf temp/*
         echo "[*] temp目录超过3MB，已清理所有文件"
     else
@@ -252,6 +252,7 @@ test_pip_mirrors() {
         else
             PIP_INT_TIME=${TEST_TIME%%.*}
             PIP_INT_TIME=${PIP_INT_TIME#0}
+            [ -z "$PIP_INT_TIME" ] && PIP_INT_TIME=0
             echo "        $MIRROR_NAME: ${TEST_TIME}秒"
             if [ "$PIP_INT_TIME" -lt "$MIN_TIME" ]; then
                 MIN_TIME=$PIP_INT_TIME
@@ -352,14 +353,15 @@ setup_venv() {
         
         mkdir -p "$VENV_PATH/pip_config"
         
+        # 提取纯主机名（去掉协议和路径）
+        TRUSTED_HOST=$(echo "$FASTEST_PIP_MIRROR" | sed -E 's|^https?://([^/]+).*|\1|')
+        
         cat > "$VENV_PATH/pip_config/pip.conf" << EOF
 [global]
-index-url=$FASTEST_PIP_MIRROR
-trusted-host=${FASTEST_PIP_MIRROR#https://}
-trusted-host=${FASTEST_PIP_MIRROR#http://}
+index-url = $FASTEST_PIP_MIRROR
+trusted-host = $TRUSTED_HOST
 [install]
-trusted-host=${FASTEST_PIP_MIRROR#https://}
-trusted-host=${FASTEST_PIP_MIRROR#http://}
+trusted-host = $TRUSTED_HOST
 EOF
         
         export PIP_CONFIG_FILE="$VENV_PATH/pip_config/pip.conf"
@@ -496,9 +498,9 @@ run_web() {
         while true; do
             sleep 60
             if [ -d "temp" ]; then
-                TOTAL_SIZE=$(du -sb temp 2>/dev/null | awk '{print $1}')
-                LIMIT_SIZE=3145728
-                if [ "$TOTAL_SIZE" -gt "$LIMIT_SIZE" ]; then
+                TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
+                LIMIT_SIZE_KB=3072
+                if [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
                     rm -rf temp/*
                     echo "[*] 定时检查: temp目录超过3MB，已清理所有文件"
                 fi

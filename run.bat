@@ -448,11 +448,16 @@ if defined FASTEST_PIP_MIRROR (
     
     if not exist "%VENV_PATH%\pip_config" mkdir "%VENV_PATH%\pip_config"
     
+    set "TRUSTED_HOST=!FASTEST_PIP_MIRROR!"
+    set "TRUSTED_HOST=!TRUSTED_HOST:https://=!"
+    set "TRUSTED_HOST=!TRUSTED_HOST:http://=!"
+    for /f "delims=/" %%h in ("!TRUSTED_HOST!") do set "TRUSTED_HOST=%%h"
+    
     echo [global]> "%VENV_PATH%\pip_config\pip.ini"
     echo index-url=%FASTEST_PIP_MIRROR%>> "%VENV_PATH%\pip_config\pip.ini"
-    echo trusted-host=%FASTEST_PIP_MIRROR:~8,-7%>> "%VENV_PATH%\pip_config\pip.ini"
+    echo trusted-host=%TRUSTED_HOST%>> "%VENV_PATH%\pip_config\pip.ini"
     echo [install]>> "%VENV_PATH%\pip_config\pip.ini"
-    echo trusted-host=%FASTEST_PIP_MIRROR:~8,-7%>> "%VENV_PATH%\pip_config\pip.ini"
+    echo trusted-host=%TRUSTED_HOST%>> "%VENV_PATH%\pip_config\pip.ini"
     
     set PIP_CONFIG_FILE=%VENV_PATH%\pip_config\pip.ini
 )

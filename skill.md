@@ -444,6 +444,7 @@ TEST_TIME=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 1.5 --ma
 # 转换为毫秒整数
 INT_TIME=${TEST_TIME%%.*}
 INT_TIME=${INT_TIME#0}  # 去掉前导零
+[ -z "$INT_TIME" ] && INT_TIME=0  # 兜底：测速<1秒时去前导零后变空字符串
 
 # 选择最小值
 if [ "$INT_TIME" -lt "$MIN_TIME" ]; then
