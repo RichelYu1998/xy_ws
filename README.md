@@ -19,7 +19,10 @@ bash run.sh
 **程序会自动：**
 - ✅ **智能环境检测**（6步流程）：
   - [1/6] Python 环境检测（PATH + 常见安装路径搜索 + 虚拟环境状态检测）
-  - [2/6] Node.js/NVM 检测（自动安装/配置，支持 Windows NVM、macOS Homebrew、Linux apt/yum）
+  - [2/6] Node.js/NVM 检测与 **全自动安装**（5层回退）：
+    - Windows: NVM PATH → NVM 注册表 → Winget → Chocolatey → Scoop → MSI下载到 `.node_env/`
+    - macOS: NVM → Homebrew (Intel + Apple Silicon)
+    - Linux: NVM → apt+nodesource / yum+nodesource / dnf+nodesource / pacman
   - [3/6] **PIP 镜像源轮询测速**（测试清华/阿里云/豆瓣/中科大4个镜像，选择毫秒级最快源）
   - [4/6] **NPM 镜像源轮询测速**（测试淘宝/官方源2个镜像，自动设置最快源）
   - [5/6] Python 虚拟环境管理（自动创建 `.venv`，生成 pip 配置文件）
@@ -198,7 +201,21 @@ class Environment:
       - CentOS/RHEL: `yum install python3 python3-pip`
       - Fedora: `dnf install python3 python3-pip`
       - Arch Linux: `pacman -Syu python python-pip`
-  - [2/6] Node.js/NVM 智能检测与自动安装：
+  - [2/6] Node.js/NVM 智能检测与 **全自动安装**（5层回退）：
+    - **Windows 全自动安装**：
+      - 第1优先级：NVM PATH (`where nvm` → `nvm install lts`)
+      - 第2优先级：NVM 注册表路径检测
+      - 第3优先级：Winget (`winget install OpenJS.NodeJS.LTS --silent`)
+      - 第4优先级：Chocolatey (`choco install nodejs -y`)
+      - 第5优先级：Scoop (`scoop install nodejs-lts`)
+      - 最终回退：MSI 下载安装到 `.node_env/` 临时目录
+    - **macOS 全自动安装**：NVM → Homebrew (Intel + Apple Silicon)
+    - **Linux 全自动安装**（5种包管理器）：
+      - Ubuntu/Debian: `apt` + nodesource 官方源
+      - CentOS/RHEL: `yum` + nodesource 官方源
+      - Fedora: `dnf` + nodesource 官方源
+      - Arch Linux: `pacman -Syu nodejs npm`
+      - 推荐备选：fnm (Fast Node Manager)
   - [3/6] **PIP 镜像源轮询测速**（毫秒级精度）：
     - 测试 4 个国内镜像源：清华/阿里云/豆瓣/中科大
     - 使用 `curl --connect-timeout 1.5` 测试 TCP 连接时间（速度快10倍以上）

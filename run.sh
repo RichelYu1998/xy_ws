@@ -143,67 +143,88 @@ detect_node_env() {
         return 0
     fi
     
-    echo "Node.js未在PATH中"
+    echo "Node.js未在PATH中，正在尝试查找或自动安装..."
     
+    # 第1步：尝试 NVM（PATH 中有 nvm 命令或 NVM 目录存在）
     if command -v nvm &> /dev/null || [ -s "$HOME/.nvm/nvm.sh" ]; then
-        echo "发现NVM，正在使用NVM管理Node.js..."
+        echo "    发现NVM，正在使用NVM管理Node.js..."
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         
         nvm use default &>/dev/null || nvm use lts &>/dev/null
         
         if ! command -v node &> /dev/null; then
-            echo "NVM中未安装Node.js，正在安装LTS版本..."
+            echo "    NVM中未安装Node.js，正在安装LTS版本..."
             nvm install lts
             nvm use lts
             nvm alias default lts
         fi
         
-        echo "Node.js已就绪: $(node --version 2>&1)"
-        return 0
+        # 验证安装结果
+        if command -v node &> /dev/null; then
+            echo ""
+            echo "Node.js已就绪: $(node --version 2>&1)"
+            echo "NPM版本: $(npm --version 2>&1)"
+            return 0
+        else
+            echo "[ERROR] NVM 安装 Node.js 失败"
+            return 1
+        fi
     fi
     
+    # 第2步：按操作系统选择包管理器全自动安装
     case "$(uname -s)" in
-        Darwin)
+        Darwin)  # macOS
             if command -v brew &> /dev/null; then
-                echo "使用Homebrew安装Node.js..."
+                echo "    使用Homebrew安装Node.js..."
                 brew install node
             elif [ -f "/opt/homebrew/bin/brew" ]; then
+                echo "    使用Homebrew (Apple Silicon) 安装Node.js..."
                 /opt/homebrew/bin/brew install node
             else
-                echo "[WARNING] 未检测到Homebrew，无法自动安装Node.js"
-                echo "请手动安装: https://nodejs.org/"
+                echo "[ERROR] 未检测到Homebrew，无法自动安装Node.js"
+                echo "请先安装Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
                 return 1
             fi
             ;;
         Linux)
             if command -v apt-get &> /dev/null; then
-                echo "使用apt安装Node.js..."
+                echo "    使用apt+nodesource安装Node.js..."
                 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
                 sudo apt-get install -y nodejs
             elif command -v yum &> /dev/null; then
-                echo "使用yum安装Node.js..."
+                echo "    使用yum+nodesource安装Node.js..."
                 curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
                 sudo yum install -y nodejs
+            elif command -v dnf &> /dev/null; then
+                echo "    使用dnf+nodesource安装Node.js..."
+                curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+                sudo dnf install -y nodejs
+            elif command -v pacman &> /dev/null; then
+                echo "    使用pacman安装Node.js..."
+                sudo pacman -Syu --noconfirm nodejs npm
             else
-                echo "[WARNING] 无法识别包管理器，请手动安装Node.js"
+                echo "[ERROR] 无法识别包管理器，请手动安装Node.js"
+                echo "推荐方式：curl -fsSL https://fnm.vercel.app/install | bash"
                 return 1
             fi
             ;;
         *)
-            echo "[WARNING] 不支持的操作系统用于自动Node.js安装"
+            echo "[ERROR] 不支持的操作系统用于自动Node.js安装"
             return 1
             ;;
     esac
     
+    # 验证安装结果
     if command -v node &> /dev/null; then
+        echo ""
         echo "Node.js安装成功: $(node --version 2>&1)"
+        echo "NPM版本: $(npm --version 2>&1)"
+        return 0
     else
         echo "[ERROR] Node.js安装失败"
         return 1
     fi
-    
-    return 0
 }
 
 test_pip_mirrors() {
