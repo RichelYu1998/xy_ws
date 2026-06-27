@@ -331,10 +331,20 @@ class Environment:
   - 连接超时从 3秒 缩短到 1.5秒（总测速时间 <8秒）
   - 显示毫秒级精度（如"中科大 29ms"），而非模糊的秒数
 
+- **启动脚本关键修复**
+  - 修复 `run.sh` pip.conf 生成中 `trusted-host` 重复写入问题（每个 section 出现两次导致 pip 报错）
+  - 修复 `run.sh`/`run.bat` 中 `trusted-host` 提取逻辑，从脆弱字符串截取改为正确提取纯主机名：
+    - `run.sh`：使用 `sed -E 's|^https?://([^/]+).*|\1|'` 提取主机名
+    - `run.bat`：使用字符串替换 `!VAR:https://=!` + `for /f "delims=/"` 提取主机名
+  - 修复 `run.sh` 整数比较的 `integer expression expected` 错误：PIP 测速时间 <1秒时去掉前导零后变空字符串，添加 `[ -z "$PIP_INT_TIME" ] && PIP_INT_TIME=0` 兜底
+  - 修复 `run.sh` macOS 兼容性：`du -sb` 改为 `du -sk`（macOS 不支持 `-b` 参数）
+
 - **skill.md / skill.docx 同步更新**
   - skill.md 新增 §2.4.1 启动脚本环境检测规范
   - skill.md 新增 §2.4.2 镜像源测速规范
   - skill.md 编码风格速查表新增：跨平台路径、毫秒级测速、临时环境隔离
+  - skill.md §2.4.2 镜像源测速规范中的 pip.conf 生成示例已更新为正确写法
+  - skill.md §2.4.2 Unix SH 测速示例已更新（添加去前导零后空字符串兜底）
   - skill.docx 重新生成（符合 v3.6.0 字体规范：Consolas + 微软雅黑）
 
 ### v3.7.5 (2026-06-26)
