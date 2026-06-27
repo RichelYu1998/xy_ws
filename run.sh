@@ -455,8 +455,9 @@ run_web() {
     echo "正在启动 Web 服务..."
     echo ""
 
+    WEB_PORT="${WEB_PORT:-8888}"
     > file/web_output.log  # 清空日志文件
-    python main.py --web 2>&1 | tee file/web_output.log &
+    python main.py --web --port $WEB_PORT 2>&1 | tee file/web_output.log &
     PYTHON_PID=$!
 
     echo "等待 Web 服务启动完成..."
@@ -468,7 +469,7 @@ run_web() {
     fi
 
     echo "Web 服务已就绪，正在启动隧道..."
-    npx -y hostc@latest 8888 --local-host 127.0.0.1 > file/tunnel_url.txt 2>&1 &
+    npx -y hostc@latest $WEB_PORT --local-host localhost > file/tunnel_url.txt 2>&1 &
     TUNNEL_PID=$!
 
     sleep 2
@@ -484,7 +485,7 @@ run_web() {
     echo "启动完成！"
     echo "========================================"
     echo ""
-    echo "本地访问: http://localhost:8888"
+    echo "本地访问: http://localhost:$WEB_PORT"
     echo "公网访问: 查看 file/tunnel_url.txt"
     echo "Web日志: 查看 file/web_output.log"
     echo ""

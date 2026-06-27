@@ -140,9 +140,16 @@ if errorlevel 1 (
             )
             
             :python_msi_download
-            echo     直接下载 Python 安装程序...
+            echo     正在查询最新 Python 版本...
+            for /f "delims=" %%v in ('curl -s https://www.python.org/ftp/python/ ^| findstr /r "^3\.[0-9]*\.[0-9]*/$" ^| sort /r ^| findstr /n "^" ^| findstr "^[1]:"') do (
+                for /f "tokens=1 delims=/" %%a in ("%%v") do set "PYTHON_LATEST_VERSION=%%a"
+            )
+            if not defined PYTHON_LATEST_VERSION set "PYTHON_LATEST_VERSION=3.11.9"
+            echo     检测到最新Python版本: %PYTHON_LATEST_VERSION%
+
+            echo     直接下载 Python %PYTHON_LATEST_VERSION% 安装程序...
             if not exist "%TEMP%\python_installer.exe" (
-                curl -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe
+                curl -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/%PYTHON_LATEST_VERSION%/python-%PYTHON_LATEST_VERSION%-amd64.exe
             )
             
             if exist "%TEMP%\python_installer.exe" (
@@ -255,10 +262,17 @@ if errorlevel 1 (
     )
     
     :: 方式3d：直接下载 MSI 到临时目录（最终回退）
-    echo     直接下载 Node.js 安装程序到 %NODE_ENV_PATH%...
+    echo     正在查询最新 Node.js LTS 版本...
+    for /f "delims=" %%v in ('curl -s https://nodejs.org/dist/index.tab ^| findstr /i "LTS" ^| findstr /v "headers" ^| findstr /v "src" ^| findstr /r "^[v]?[0-9]" ^| sort /r ^| findstr /n "^" ^| findstr "^[1]:"') do (
+        for /f "tokens=1 delims= " %%a in ("%%v") do set "NODE_LTS_VERSION=%%a"
+    )
+    if not defined NODE_LTS_VERSION set "NODE_LTS_VERSION=v20.11.1"
+    echo     检测到最新Node.js LTS版本: %NODE_LTS_VERSION%
+
+    echo     直接下载 Node.js %NODE_LTS_VERSION% 安装程序到 %NODE_ENV_PATH%...
     if not exist "%NODE_ENV_PATH%" mkdir "%NODE_ENV_PATH%"
-    
-    curl -L -o "%NODE_ENV_PATH%\node-installer.msi" https://nodejs.org/dist/v20.11.1/node-v20.11.1-x64.msi
+
+    curl -L -o "%NODE_ENV_PATH%\node-installer.msi" https://nodejs.org/dist/%NODE_LTS_VERSION%/node-%NODE_LTS_VERSION%-x64.msi
     
     if exist "%NODE_ENV_PATH%\node-installer.msi" (
         echo     正在静默安装 Node.js 到 %CD%\%NODE_ENV_PATH%...
@@ -535,14 +549,16 @@ echo 正在启动 Web 服务...
 echo.
 
 set PYTHON_LOG_FILE=%CD%\file\web_output.log
+set "WEB_PORT=%WEB_PORT%"
+if not defined WEB_PORT set "WEB_PORT=8888"
 echo. > %PYTHON_LOG_FILE%
-start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web"
+start /b cmd /c "call %VENV_PATH%\Scripts\activate.bat && python main.py --web --port %WEB_PORT%"
 
 echo 等待 Web 服务启动完成...
 timeout /t 5 /nobreak >nul
 
 :wait_flask
-for /f %%i in ('curl -s -o nul -w "%%{http_code}" http://localhost:8888') do set "HTTP_CODE=%%i"
+for /f %%i in ('curl -s -o nul -w "%%{http_code}" http://localhost:%WEB_PORT%') do set "HTTP_CODE=%%i"
 if not "%HTTP_CODE%"=="200" (
     if not "%HTTP_CODE%"=="302" (
         timeout /t 2 /nobreak >nul
@@ -551,14 +567,14 @@ if not "%HTTP_CODE%"=="200" (
 )
 
 echo Web 服务已就绪，正在启动隧道...
-start /b cmd /c "npx -y hostc@latest 8888 --local-host 127.0.0.1 > file\tunnel_url.txt 2>&1"
+start /b cmd /c "npx -y hostc@latest %WEB_PORT% --local-host localhost > file\tunnel_url.txt 2>&1"
 
 echo.
 echo ========================================
 echo 启动完成！
 echo ========================================
 echo.
-echo 本地访问: http://localhost:8888
+echo 本地访问: http://localhost:%WEB_PORT%
 echo 公网访问: 查看 file\tunnel_url.txt
 echo Web日志: 查看 file\web_output.log
 echo.
