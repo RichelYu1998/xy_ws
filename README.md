@@ -296,7 +296,7 @@ class Environment:
   - ✅ 功能按钮 CSS Grid 布局（`display:grid;grid-template-columns:repeat(N,1fr)`，按屏幕宽度自适应列数）
   - ✅ 桌面端 8 列网格（8 个按钮一行等宽对齐）
   - ✅ 平板端 4 列网格（4×2 严格对齐，最后一行不偏移）
-  - ✅ 手机端 2 列网格（2×4 严格对齐，最后一行不偏移）
+  - ✅ 手机端 4 列网格（4×2 居中布局，`max-width:600px` 不拉满全屏，两侧留白 16px，间距 8px）
   - ✅ 移除功能按钮的 `btn-lg` 类（消除 Bootstrap `padding`/`font-size`/`min-height` 冲突）
   - ✅ 移除 `.btn-run` 的 `margin-left: 8px`（消除部分按钮偏移）
   - ✅ 触摸设备 `.func-btn` 覆盖 `min-height: unset; min-width: unset`（防止 `.btn-lg` 48px 覆盖）

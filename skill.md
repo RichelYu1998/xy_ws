@@ -858,16 +858,19 @@ body { padding-top: 56px; }
     gap: 4px;
 }
 
-/* 移动端 <576px - 2列网格（每行2个，4行对齐） */
+/* 移动端 <576px - 4列网格（4×2居中布局，不拉满全屏） */
 @media (max-width: 575.98px) {
     .func-btn-container {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 6px;
-        padding: 0 8px;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        padding: 0 16px;
+        max-width: 600px;
+        margin: 0 auto;
     }
     .func-btn {
-        height: 2.75rem;
-        font-size: 13px;
+        height: 2.5rem;
+        font-size: 12px;
+        padding: 0 6px;
     }
 }
 
@@ -900,7 +903,7 @@ body { padding-top: 56px; }
 
 **关键规则**：
 - 按钮容器使用 **CSS Grid**（`display: grid`），禁止 flex + `justify-content:center`（移动端最后一行按钮偏移不对齐）
-- Grid 列数按屏幕宽度自适应：桌面8列、平板4列、手机2列
+- Grid 列数按屏幕宽度自适应：桌面8列、平板4列、手机4列（居中不拉满）
 - 使用 `1fr` 等分列宽，确保同一行按钮严格对齐，最后一行不会偏移
 - 使用 `padding` 自适应宽度，禁止固定 `width`（修复 Mac 14寸换行问题）
 - 禁止 `text-overflow: ellipsis`，按钮文字必须完整显示
@@ -1705,7 +1708,7 @@ function exportData(format) {
 | 聚合级别 | 按天→月度聚合，按月→月度聚合，按年→年度聚合，使用 `filteredRecords` |
 | 图标切换 | 同组多行用 `querySelectorAll('.class')` 统一切换，禁止重复 ID |
 | CSS 变量 | 使用 `:root` 定义主题色 |
-| 移动端适配 | 5 个断点全覆盖，CSS Grid 按钮对齐（桌面8列/平板4列/手机2列），图表高度自适应 |
+| 移动端适配 | 5 个断点全覆盖，CSS Grid 按钮对齐（桌面8列/平板4列/手机4列居中），`max-width:600px` 不拉满，图表高度自适应 |
 | 图表联动 | 利润趋势图随汇总视图按钮联动，禁止独立按钮，双向高亮 |
 | 日期格式化 | `formatDate` 处理9种格式，数字类型Excel序列号优先于字符串类型 |
 | 后端日期预处理 | `table_data` 在 `jsonify` 前转换 datetime 和 Excel 序列号为 `YYYY-MM-DD` |
