@@ -194,45 +194,99 @@ echo [2/6] 检测Node.js环境...
 
 where node >nul 2>&1
 if errorlevel 1 (
-    echo Node.js未在PATH中
+    echo Node.js未在PATH中，正在尝试查找或自动安装...
     
+    :: 第1步：尝试 NVM（PATH 中有 nvm 命令）
     where nvm >nul 2>&1
-    if errorlevel 1 (
-        if exist "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" (
-            echo 发现NVM，正在使用NVM管理Node.js...
-            call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use latest
-            if errorlevel 1 (
-                echo NVM中未安装Node.js版本，正在安装...
-                call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" install lts
-                call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use lts
-            )
-        ) else (
-            echo 未发现Node.js和NVM
-            echo 正在创建临时Node.js环境到 %NODE_ENV_PATH%...
-            
-            if not exist "%NODE_ENV_PATH%" mkdir "%NODE_ENV_PATH%"
-            
-            echo 下载Node.js安装程序...
-            curl -L -o "%NODE_ENV_PATH%\node-installer.msi" https://nodejs.org/dist/v20.11.1/node-v20.11.1-x64.msi
-            
-            if exist "%NODE_ENV_PATH%\node-installer.msi" (
-                msiexec /i "%NODE_ENV_PATH%\node-installer.msi" INSTALLDIR="%CD%\%NODE_ENV_PATH%" /quiet /norestart
-                set "PATH=%CD%\%NODE_ENV_PATH%;%PATH%"
-                del "%NODE_ENV_PATH%\node-installer.msi"
-                echo 临时Node.js环境已创建
-            ) else (
-                echo [WARNING] Node.js下载失败，跳过Node.js相关功能
-                exit /b 1
-            )
-        )
-    ) else (
-        echo 使用NVM管理Node.js
+    if not errorlevel 1 (
+        echo     使用NVM管理Node.js...
         nvm list
+        nvm use latest >nul 2>&1 || nvm use lts >nul 2>&1
+        if errorlevel 1 (
+            echo     NVM中未安装Node.js，正在安装LTS版本...
+            nvm install lts
+            nvm use lts
+        )
+        goto :node_verify_install
+    )
+    
+    :: 第2步：尝试 NVM 注册表路径
+    if exist "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" (
+        echo     发现NVM（注册表路径），正在使用NVM管理Node.js...
+        call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use latest
+        if errorlevel 1 (
+            call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" install lts
+            call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use lts
+        )
+        goto :node_verify_install
+    )
+    
+    :: 第3步：全自动安装（按优先级尝试多种方式）
+    echo [WARNING] 未发现Node.js和NVM，正在全自动安装...
+    
+    :: 方式3a：Winget 安装
+    where winget >nul 2>&1
+    if not errorlevel 1 (
+        echo     使用 Winget 安装 Node.js...
+        winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --silent
+        if not errorlevel 1 (
+            goto :node_verify_install
+        )
+    )
+    
+    :: 方式3b：Chocolatey 安装
+    where choco >nul 2>&1
+    if not errorlevel 1 (
+        echo     使用 Chocolatey 安装 Node.js...
+        choco install nodejs -y
+        if not errorlevel 1 (
+            goto :node_verify_install
+        )
+    )
+    
+    :: 方式3c：Scoop 安装
+    where scoop >nul 2>&1
+    if not errorlevel 1 (
+        echo     使用 Scoop 安装 Node.js...
+        scoop install nodejs-lts
+        if not errorlevel 1 (
+            goto :node_verify_install
+        )
+    )
+    
+    :: 方式3d：直接下载 MSI 到临时目录（最终回退）
+    echo     直接下载 Node.js 安装程序到 %NODE_ENV_PATH%...
+    if not exist "%NODE_ENV_PATH%" mkdir "%NODE_ENV_PATH%"
+    
+    curl -L -o "%NODE_ENV_PATH%\node-installer.msi" https://nodejs.org/dist/v20.11.1/node-v20.11.1-x64.msi
+    
+    if exist "%NODE_ENV_PATH%\node-installer.msi" (
+        echo     正在静默安装 Node.js 到 %CD%\%NODE_ENV_PATH%...
+        msiexec /i "%NODE_ENV_PATH%\node-installer.msi" INSTALLDIR="%CD%\%NODE_ENV_PATH%" /quiet /norestart
+        set "PATH=%CD%\%NODE_ENV_PATH%;%PATH%"
+        del "%NODE_ENV_PATH%\node-installer.msi"
+        echo [*] Node.js 已安装到临时目录: %CD%\%NODE_ENV_PATH%
+    ) else (
+        echo [ERROR] Node.js 下载失败
+        exit /b 1
     )
 ) else (
     echo Node.js版本:
     node --version
     npm --version
+)
+
+:node_verify_install
+:: 验证安装结果
+where node >nul 2>&1
+if not errorlevel 1 (
+    echo.
+    echo Node.js版本:
+    node --version
+    npm --version
+) else (
+    echo [ERROR] Node.js 安装失败
+    exit /b 1
 )
 exit /b 0
 

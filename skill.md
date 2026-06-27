@@ -292,55 +292,102 @@ command -v python3 &>/dev/null && PYTHON_CMD="python3"
 command -v python &>/dev/null && PYTHON_CMD="python"
 ```
 
-#### Node.js/NVM 检测（跨平台）
+#### Node.js/NVM 检测 + 全自动安装（跨平台）
 
-**Windows (BAT)**:
-```batch
-:: 1. PATH 搜索
-where node >nul 2>&1
-
-:: 2. NVM 检测与自动安装 LTS
-if errorlevel 1 (
-    if exist "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" (
-        call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" install lts
-        call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use lts
-    ) else (
-        :: 3. MSI 下载安装到临时目录
-        echo [*] 正在下载 Node.js...
-        curl -L -o node.msi https://nodejs.org/dist/v20.11.0/node-v20.11.0-x64.msi
-        msiexec /i node.msi INSTALLDIR="%CD%\.node_env" /quiet /norestart
-        set "PATH=%CD%\.node_env;%PATH%"
-    )
-)
+**检测流程**：
+```
+PATH 搜索 → NVM 检测 → 全自动安装（包管理器/直接下载）→ 验证安装结果
 ```
 
-**Unix (SH)**:
+**Windows (BAT)** - 5层全自动安装回退：
+```batch
+:: 第1步：PATH 搜索（优先级最高）
+where node >nul 2>&1
+
+:: 第2步：NVM PATH 搜索
+where nvm >nul 2>&1 && (
+    nvm use latest || nvm use lts
+    nvm install lts && nvm use lts
+)
+
+:: 第3步：NVM 注册表路径检测
+if exist "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" (
+    call nvm.exe install lts && call nvm.exe use lts
+)
+
+:: 第4步：全自动安装（按优先级尝试多种方式）
+if not defined NODE_CMD (
+    :: 方式1：Winget（推荐，Win10 1709+ 内置）
+    where winget >nul 2>&1 && (
+        winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --silent
+    )
+    
+    :: 方式2：Chocolatey（企业常用）
+    where choco >nul 2>&1 || (
+        choco install nodejs -y
+    )
+    
+    :: 方式3：Scoop（开发者友好）
+    where scoop >nul 2>&1 || (
+        scoop install nodejs-lts
+    )
+    
+    :: 方式4：直接下载 MSI（最终回退，安装到 .node_env/ 目录）
+    curl -L -o ".node_env/node-installer.msi" https://nodejs.org/dist/v20.11.1/node-v20.11.1-x64.msi
+    msiexec /i ".node_env/node-installer.msi" INSTALLDIR="%CD%\.node_env" /quiet /norestart
+)
+
+:: 第5步：验证安装结果
+:node_verify_install
+where node >nul 2>&1 && (
+    echo Node.js版本: 
+    node --version
+    npm --version
+) || (echo [ERROR] Node.js 安装失败 & exit /b 1)
+```
+
+**Unix (SH)** - 按操作系统自动选择包管理器 + NVM：
 ```bash
-# 1. PATH 搜索
+# 第1步：PATH 搜索（优先级最高）
+command -v node &>/dev/null && echo "Node.js: $(node --version)"
+
+# 第2步：NVM 检测与自动安装 LTS
 if ! command -v node &>/dev/null; then
-    # 2. NVM 检测与自动安装 LTS
-    if [ -s "$HOME/.nvm/nvm.sh" ]; then
-        source "$HOME/.nvm/nvm.sh"
-        nvm install --lts
-        nvm use --lts
-    else
-        # 3. 包管理器自动安装
-        case "$(uname -s)" in
-            Darwin)
-                brew install node
-                ;;
-            Linux)
-                if command -v apt-get &>/dev/null; then
-                    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-                    sudo apt-get install -y nodejs
-                elif command -v yum &>/dev/null; then
-                    curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-                    sudo yum install -y nodejs
-                fi
-                ;;
-        esac
+    if command -v nvm &>/dev/null || [ -s "$HOME/.nvm/nvm.sh" ]; then
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+        nvm use default || nvm use lts
+        nvm install lts && nvm use lts && nvm alias default lts
     fi
 fi
+
+# 第3步：全自动安装（根据操作系统选择包管理器）
+if ! command -v node &>/dev/null; then
+    case "$(uname -s)" in
+        Darwin)  # macOS
+            command -v brew &>/dev/null && brew install node
+            [ -f "/opt/homebrew/bin/brew" ] && /opt/homebrew/bin/brew install node
+            ;;
+        Linux)
+            command -v apt-get &>/dev/null && {
+                curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+                sudo apt-get install -y nodejs
+            }
+            command -v yum &>/dev/null && {
+                curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+                sudo yum install -y nodejs
+            }
+            command -v dnf &>/dev/null && {
+                curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+                sudo dnf install -y nodejs
+            }
+            command -v pacman &>/dev/null && sudo pacman -Syu --noconfirm nodejs npm
+            ;;
+    esac
+fi
+
+# 第4步：验证安装结果
+command -v node &>/dev/null && echo "Node.js: $(node --version)" || echo "[ERROR] 安装失败"
 ```
 
 **关键规则**：
@@ -1327,17 +1374,38 @@ fi
 | Linux (Fedora) | dnf | - | - | 提示手动安装 |
 | Linux (Arch) | pacman | - | - | 提示手动安装 |
 
+### Node.js/NVM 全自动安装规范
+
+| 操作系统 | 第1优先级 | 第2优先级 | 第3优先级 | 第4优先级 | 最终回退 |
+|----------|----------|----------|----------|----------|----------|
+| **Windows** | NVM PATH | NVM 注册表路径 | Winget | Chocolatey | Scoop → MSI到 `.node_env/` |
+| **macOS** | NVM | Homebrew (Intel) | Homebrew (Apple Silicon) | - | 提示手动安装 |
+| **Linux (Ubuntu)** | NVM | apt + nodesource | - | - | fnm 推荐 |
+| **Linux (CentOS)** | NVM | yum + nodesource | - | - | fnm 推荐 |
+| **Linux (Fedora)** | NVM | dnf + nodesource | - | - | fnm 推荐 |
+| **Linux (Arch)** | NVM | pacman | - | - | fnm 推荐 |
+
 **安装后必须验证**：
 ```batch
-:: Windows
+:: Windows - Python
 where py >nul 2>&1 && set "PYTHON_CMD=py"
 where python >nul 2>&1 && set "PYTHON_CMD=python"
+
+:: Windows - Node.js
+where node >nul 2>&1 && (
+    echo Node.js版本: 
+    node --version
+    npm --version
+)
 ```
 
 ```bash
-# Unix
+# Unix - Python
 command -v python3 &>/dev/null && PYTHON_CMD="python3"
 command -v python &>/dev/null && PYTHON_CMD="python"
+
+# Unix - Node.js
+command -v node &>/dev/null && echo "Node.js: $(node --version)"
 ```
 
 ### 性能要求
