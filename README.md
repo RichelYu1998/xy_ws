@@ -287,6 +287,20 @@ class Environment:
   - ✅ 版本号替换使用正则匹配（`re.sub`），不再硬编码旧版本号
   - ✅ 所有 `127.0.0.1` 替换为 `localhost`（跨平台统一）
   - ✅ 导入精简（`random`、`ctypes` 移至顶部，消除内联 import）
+  - ✅ 前端按钮编号删除（`1.` `2.` `3.` 等数字前缀全部移除）
+  - ✅ 前端版权年份动态获取（`new Date().getFullYear()`）
+  - ✅ 前端页面标题动态设置（从 API 获取版本号）
+  - ✅ 前端按钮容器改为 flex 自适应布局（修复 Mac 14寸换行问题）
+
+- **前端响应式优化（符合 v3.5.0 移动端规范）**
+  - ✅ 功能按钮自适应宽度（移除固定 `width: 12.5rem`，改为 `padding` 自适应）
+  - ✅ 按钮容器 flex 布局（`display:flex;flex-wrap:wrap;justify-content:center;gap:6px`）
+  - ✅ 5 个断点全覆盖（超小屏/小屏/平板/大屏/超大屏）
+  - ✅ 触摸友好按钮最小高度 44px（Apple HIG）
+  - ✅ 输入框字体 16px（防止 iOS 自动缩放）
+  - ✅ 导航栏固定顶部 z-index: 9999
+  - ✅ 中等屏幕按钮适配（`min-width:0; font-size:12px; padding:0 6px`）
+  - ✅ 横屏模式适配（`max-height:500px + landscape`）
 
 - **临时环境隔离机制**
   - Python 虚拟环境：`.venv/` 目录（含 `pip_config/` 子目录）

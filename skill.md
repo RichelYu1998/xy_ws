@@ -829,44 +829,63 @@ body { padding-top: 56px; }
 
 ### 3.4.1 功能按钮统一样式规范
 
-所有 `.func-btn` 按钮必须大小一致、文字完整显示、内容居中：
+所有 `.func-btn` 按钮必须文字完整显示、内容居中、自适应宽度：
 
 ```css
 /* 桌面端 */
 .func-btn {
-    width: 12.5rem;          /* 固定宽度，不用 min-width */
-    height: 3rem;
-    line-height: 2rem;
-    font-size: 14px;         /* 统一字号 */
+    height: 2.5rem;
+    line-height: 1.5rem;
+    font-size: 13px;
     text-align: center;
-    display: inline-flex;    /* flex 居中 */
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    padding: 0 8px;           /* 自适应宽度，不用固定 width */
+    white-space: nowrap;      /* 禁止文字换行 */
 }
 .func-btn span {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;                /* 图标与文字间距统一 */
+    gap: 4px;
+}
+
+/* 按钮容器 - flex 自适应布局 */
+.btn-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
 }
 
 /* 移动端 <576px */
 @media (max-width: 575.98px) {
     .func-btn {
-        width: 10rem;
         height: 2.75rem;
-        line-height: 1.75rem;
         font-size: 13px;
+    }
+}
+
+/* 平板/笔记本 (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .text-center.mt-4.mb-4 .btn {
+        min-width: 0;
+        height: 36px;
+        font-size: 12px;
+        padding: 0 6px;
     }
 }
 ```
 
 **关键规则**：
-- 使用固定 `width` 而非 `min-width`，确保所有按钮等宽
+- 使用 `padding` 自适应宽度，禁止固定 `width`（修复 Mac 14寸换行问题）
 - 禁止 `text-overflow: ellipsis`，按钮文字必须完整显示
 - 使用 `inline-flex` + `align-items/justify-content: center` 居中
+- 按钮容器使用 `display:flex;flex-wrap:wrap;justify-content:center;gap:6px`
+- 禁止按钮文字前缀数字编号（如 `1.` `2.` `3.`）
 - 统一 `font-size` 确保文字大小一致
-- 宽度需容纳最长按钮文字（如"3. Excel与JSON对比"）
+- `white-space: nowrap` 防止按钮文字换行
 
 ### 3.5 iframe 懒加载模式
 
@@ -1353,6 +1372,11 @@ fi
 | 本地回环地址 | `localhost`（跨平台统一） | 硬编码 `127.0.0.1` |
 | 版本号替换 | `re.sub(r'版本:\s*[\d.]+', ...)` | 硬编码 `'版本: 3.0.9'` |
 | Python 导入 | 顶部统一导入，消除内联 import | 函数内 `import random` |
+| 前端按钮编号 | 无数字前缀（如 `运行爬虫`） | 硬编码 `1. 运行爬虫` |
+| 前端版权年份 | `new Date().getFullYear()` 动态获取 | 硬编码 `© 2024` |
+| 前端页面标题 | 从 API 动态获取版本号设置 | 硬编码 `Szwego商品爬虫 - 项目主页` |
+| 前端按钮宽度 | `padding` 自适应 + flex 容器 | 固定 `width: 12.5rem`（Mac 14寸换行） |
+| 前端按钮容器 | `display:flex;flex-wrap:wrap;gap:6px` | 普通块级容器（按钮换行） |
 
 ### 镜像源测速规范
 
@@ -1654,7 +1678,7 @@ function exportData(format) {
 | 前端提示 | 使用 `showToast()`，禁止 `alert()` |
 | HTML 标签 | `<code>` 等行内标签必须成对闭合，禁止多余 `</code>` |
 | JS 括号闭合 | 所有 `{}` `()` 必须成对，修改后用 `new Function(code)` 验证 |
-| 功能按钮 | `.func-btn` 固定 `width`，`inline-flex` 居中，禁止 `text-overflow: ellipsis` |
+| 功能按钮 | `.func-btn` 自适应 `padding`，`inline-flex` 居中，flex 容器，禁止固定 `width`，禁止数字前缀 |
 | 动态展开行 | 点击时 `createElement` + `rowElement.after()`，禁止预创建 detail-row |
 | 聚合级别 | 按天→月度聚合，按月→月度聚合，按年→年度聚合，使用 `filteredRecords` |
 | 图标切换 | 同组多行用 `querySelectorAll('.class')` 统一切换，禁止重复 ID |
@@ -1664,7 +1688,7 @@ function exportData(format) {
 | 日期格式化 | `formatDate` 处理9种格式，数字类型Excel序列号优先于字符串类型 |
 | 后端日期预处理 | `table_data` 在 `jsonify` 前转换 datetime 和 Excel 序列号为 `YYYY-MM-DD` |
 | 图表渲染 | 使用 `requestAnimationFrame` 替代 `setTimeout`，确保 DOM 就绪 |
-| 跨系统兼容 | 所有路径 `os.path.join()`，前端 `window.location.origin`，无硬编码 |
+| 跨系统兼容 | 所有路径 `os.path.join()`，前端 `window.location.origin`，无硬编码，按钮无数字前缀 |
 | 版本号 | 唯一来源 `README.md`，格式 `### v3.7.5 (2026-06-26)` |
 | 依赖管理 | `requirements.txt`，虚拟环境 `.venv` |
 | 进程管理 | Windows: `taskkill`，Linux/Mac: `pkill` |
