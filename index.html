@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Szwego商品爬虫 - 项目主页</title>
+    <title>Szwego商品爬虫</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
     <style>
@@ -637,14 +637,15 @@
             vertical-align: middle;
         }
         .func-btn {
-            width: 12.5rem;
-            height: 3rem;
-            line-height: 2rem;
-            font-size: 14px;
+            height: 2.5rem;
+            line-height: 1.5rem;
+            font-size: 13px;
             text-align: center;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            padding: 0 8px;
+            white-space: nowrap;
         }
         .func-btn span {
             display: flex;
@@ -820,11 +821,11 @@
             }
             
             .text-center.mt-4.mb-4 .btn {
-                min-width: 140px !important;
+                min-width: 0 !important;
                 height: 44px !important;
                 font-size: 13px !important;
                 padding: 6px 10px !important;
-                flex: 0 0 calc(50% - 4px);
+                flex: 0 0 auto;
             }
             
             .text-center.mt-4.mb-4 .btn span {
@@ -1285,9 +1286,10 @@
             }
             
             .text-center.mt-4.mb-4 .btn {
-                min-width: 150px;
-                height: 46px;
-                font-size: 13px;
+                min-width: 0;
+                height: 36px;
+                font-size: 12px;
+                padding: 0 6px;
             }
             
             .footer {
@@ -1312,8 +1314,10 @@
             }
             
             .text-center.mt-4.mb-4 .btn {
-                min-width: 155px;
-                height: 47px;
+                min-width: 0;
+                height: 36px;
+                font-size: 12px;
+                padding: 0 6px;
             }
             
             #output-panel {
@@ -1717,7 +1721,7 @@ SzwegoSpider/
                     
                     <div id="usage-steps-container"></div>
                     
-                    <h4 class="mt-4 mb-3" id="changelog-title">5. 最新更新</h4>
+                    <h4 class="mt-4 mb-3" id="changelog-title">最新更新</h4>
                     <div id="changelog-container"></div>
                     
                     <div id="output-panel" class="output-panel" style="display: none;">
@@ -1773,15 +1777,15 @@ SzwegoSpider/
         </div>
     </section>
     
-    <div class="text-center mt-4 mb-4"><button class="btn btn-primary btn-lg m-1 btn-run func-btn" id="btn-run-spider" data-func="1"><span><i class="fa fa-spider"></i> 1. 运行爬虫</span></button>
-        <button class="btn btn-primary btn-lg m-1 btn-sku-api func-btn" data-api="/api/sku/compare/txt"><span><i class="fa fa-exchange"></i> 2. 货号对比</span></button>
-        <button class="btn btn-primary btn-lg m-1 btn-sku-api func-btn" data-api="/api/sku/compare/excel"><span><i class="fa fa-file-excel-o"></i> 3. Excel与JSON对比</span></button>
-        <button class="btn btn-primary btn-lg m-1 btn-run func-btn" id="btn-run-cookie" data-func="4"><span><i class="fa fa-refresh"></i> 4. 更新Cookie</span></button>
-        <button class="btn btn-primary btn-lg m-1 func-btn" id="btn-view-products"><span><i class="fa fa-list"></i> 查看所有商品</span></button>
-        <button class="btn btn-primary btn-lg m-1 func-btn" id="btn-daily-profit"><span><i class="fa fa-chart-line"></i> 每日利润报表</span></button>
-        <button class="btn btn-primary btn-lg m-1 btn-run func-btn" id="btn-run-cleaner" data-func="6"><span><i class="fa fa-trash"></i> 6. 文件清理工具</span></button>
-        <button class="btn btn-primary btn-lg m-1 func-btn" id="btn-run-tunnel"><span><i class="fa fa-external-link"></i> 7. 隧道共享</span></button>
-        <button class="btn btn-primary btn-lg m-1 func-btn" id="btn-stop-task" style="display: none;"><span><i class="fa fa-stop"></i> 停止</span></button>
+    <div class="text-center mt-4 mb-4" style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;"><button class="btn btn-primary btn-lg btn-run func-btn" id="btn-run-spider" data-func="1"><span><i class="fa fa-spider"></i> 运行爬虫</span></button>
+        <button class="btn btn-primary btn-lg btn-sku-api func-btn" data-api="/api/sku/compare/txt"><span><i class="fa fa-exchange"></i> 货号对比</span></button>
+        <button class="btn btn-primary btn-lg btn-sku-api func-btn" data-api="/api/sku/compare/excel"><span><i class="fa fa-file-excel-o"></i> Excel与JSON对比</span></button>
+        <button class="btn btn-primary btn-lg btn-run func-btn" id="btn-run-cookie" data-func="4"><span><i class="fa fa-refresh"></i> 更新Cookie</span></button>
+        <button class="btn btn-primary btn-lg func-btn" id="btn-view-products"><span><i class="fa fa-list"></i> 查看所有商品</span></button>
+        <button class="btn btn-primary btn-lg func-btn" id="btn-daily-profit"><span><i class="fa fa-chart-line"></i> 每日利润报表</span></button>
+        <button class="btn btn-primary btn-lg btn-run func-btn" id="btn-run-cleaner" data-func="6"><span><i class="fa fa-trash"></i> 文件清理工具</span></button>
+        <button class="btn btn-primary btn-lg func-btn" id="btn-run-tunnel"><span><i class="fa fa-external-link"></i> 隧道共享</span></button>
+        <button class="btn btn-primary btn-lg func-btn" id="btn-stop-task" style="display: none;"><span><i class="fa fa-stop"></i> 停止</span></button>
     </div>
     <footer class="footer">
         <div class="container">
@@ -1799,7 +1803,7 @@ SzwegoSpider/
             </div>
             <hr style="border-color: rgba(255,255,255,0.1);">
             <div class="text-center">
-                <p class="mb-0">© 2024 Szwego爬虫. All rights reserved.</p>
+                <p class="mb-0" id="footer-copyright">© Szwego爬虫. All rights reserved.</p>
             </div>
         </div>
     </footer>
@@ -2427,7 +2431,7 @@ SzwegoSpider/
                     if (!data.success || !data.changelog || !data.changelog.length) return;
                     var latest = data.changelog[0];
                     var titleEl = document.getElementById('changelog-title');
-                    if (titleEl) titleEl.textContent = '5. 最新更新 (v' + latest.version + ')';
+                    if (titleEl) titleEl.textContent = '最新更新 (v' + latest.version + ')';
                     var container = document.getElementById('changelog-container');
                     if (!container) return;
                     container.innerHTML = '';
@@ -4382,7 +4386,7 @@ SzwegoSpider/
                 if (!tunnelPanel || !tunnelContent) {
                     showToast('找不到隧道面板', 'error');
                     btn.disabled = false;
-                    btn.innerHTML = '<span><i class="fa fa-external-link"></i> 7. 隧道共享</span>';
+                    btn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
                     return;
                 }
                 
@@ -4481,7 +4485,7 @@ SzwegoSpider/
             } finally {
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fa fa-external-link"></i> 7. 隧道共享';
+                    btn.innerHTML = '<i class="fa fa-external-link"></i> 隧道共享';
                 }
             }
         }
@@ -5017,12 +5021,12 @@ SzwegoSpider/
                     <div class="form-group">
                         <label><strong>清理模式:</strong></label>
                         <select id="clean-mode" class="form-control">
-                            <option value="list">1. 列出文件（不删除）</option>
-                            <option value="group">2. 按组清理（保留最新的一组文件）</option>
-                            <option value="time">3. 按时间清理</option>
-                            <option value="png">4. 删除PNG文件</option>
-                            <option value="media">5. 删除媒体文件（PNG/JPG/GIF/MP4）</option>
-                            <option value="all">6. 删除所有文件和文件夹</option>
+                            <option value="list">列出文件（不删除）</option>
+                            <option value="group">按组清理（保留最新的一组文件）</option>
+                            <option value="time">按时间清理</option>
+                            <option value="png">删除PNG文件</option>
+                            <option value="media">删除媒体文件（PNG/JPG/GIF/MP4）</option>
+                            <option value="all">删除所有文件和文件夹</option>
                         </select>
                     </div>
                     <div class="form-group" id="minutes-group" style="display: none;">
@@ -5160,6 +5164,15 @@ SzwegoSpider/
                                 el.textContent = '版本: ' + data.version;
                             }
                         });
+                    }
+                    // 动态设置版权年份
+                    var copyrightEl = document.getElementById('footer-copyright');
+                    if (copyrightEl) {
+                        copyrightEl.textContent = '\u00a9 ' + new Date().getFullYear() + ' Szwego爬虫. All rights reserved.';
+                    }
+                    // 动态设置页面标题
+                    if (data.version) {
+                        document.title = 'Szwego商品爬虫 v' + data.version;
                     }
                 }
             } catch (e) {
