@@ -6380,6 +6380,25 @@ if __name__ == '__main__':
                 'tunnel_type': tunnel_type
             })
 
+        @app.route('/api/tunnel/stop', methods=['POST'])
+        def stop_tunnel():
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_need_restart, tunnel_restart_count, tunnel_last_error, tunnel_consecutive_failures
+            tunnel_auto_restart = False
+            tunnel_need_restart = False
+            Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
+            if tunnel_process:
+                try:
+                    tunnel_process.terminate()
+                    tunnel_process.wait(timeout=2)
+                except:
+                    try:
+                        tunnel_process.kill()
+                    except:
+                        pass
+            tunnel_process = None
+            tunnel_url = None
+            return jsonify({'success': True, 'message': '隧道已停止'})
+
         # 初始化日志输出到 web_output.log
         setup_web_logging()
         

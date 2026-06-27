@@ -296,7 +296,8 @@ class Environment:
   - ✅ 功能按钮 CSS Grid 布局（`display:grid;grid-template-columns:repeat(N,1fr)`，按屏幕宽度自适应列数）
   - ✅ 桌面端 8 列网格（8 个按钮一行等宽对齐）
   - ✅ 平板端 4 列网格（4×2 严格对齐，最后一行不偏移）
-  - ✅ 手机端 4 列网格（4×2 居中布局，`max-width:600px` 不拉满全屏，两侧留白 16px，间距 8px）
+  - ✅ 手机端 4 列网格（4×2 居中布局，图标文字竖排，`max-width:600px` 不拉满全屏，两侧留白 16px，间距 8px）
+  - ✅ Font Awesome 图标兼容性修复（`fa-spider`→`fa-bug`，`fa-chart-line`→`fa-bar-chart`，8 个按钮全部配图标）
   - ✅ 移除功能按钮的 `btn-lg` 类（消除 Bootstrap `padding`/`font-size`/`min-height` 冲突）
   - ✅ 移除 `.btn-run` 的 `margin-left: 8px`（消除部分按钮偏移）
   - ✅ 触摸设备 `.func-btn` 覆盖 `min-height: unset; min-width: unset`（防止 `.btn-lg` 48px 覆盖）
@@ -304,6 +305,16 @@ class Environment:
   - ✅ 输入框字体 16px（防止 iOS 自动缩放）
   - ✅ 导航栏固定顶部 z-index: 9999
   - ✅ 横屏模式适配（`max-height:500px + landscape`）
+
+- **停止按钮全局化（8 个功能全覆盖）**
+  - ✅ 独立悬浮停止栏（`#stop-task-bar`），任务运行时显示，完成后自动隐藏
+  - ✅ `AbortController` 全覆盖：货号对比、Excel与JSON对比、查看所有商品、文件清理工具、每日利润报表、隧道共享
+  - ✅ `/kill` API 覆盖：运行爬虫、更新Cookie（后台进程终止）
+  - ✅ `/api/tunnel/stop` 端点：隧道进程终止 + 自动重启禁用
+  - ✅ `clearAllPollingIntervals()`：清除所有轮询定时器（输出轮询 + 隧道状态轮询）
+  - ✅ `window.stopTask` 全局挂载：修复 `onclick` 无法访问闭包内函数的 `ReferenceError`
+  - ✅ 全局变量提升：`pollingInterval`、`currentTaskId`、`currentChoice`、`activeAbortController` 移至全局作用域，修复跨作用域访问错误
+  - ✅ 所有 `onclick` 引用的闭包内函数统一挂载 `window.*`（`stopTask`、`compareSku`、`showSkuInputPanel`、`showTunnelSection`、`toggleTunnel`、`showProductDetail`、`showProductByDescription`）
 
 - **临时环境隔离机制**
   - Python 虚拟环境：`.venv/` 目录（含 `pip_config/` 子目录）

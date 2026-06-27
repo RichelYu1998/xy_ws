@@ -911,6 +911,155 @@ body { padding-top: 56px; }
 - 禁止按钮文字前缀数字编号（如 `1.` `2.` `3.`）
 - 统一 `font-size` 确保文字大小一致
 - `white-space: nowrap` 防止按钮文字换行
+- 所有按钮必须配 Font Awesome 图标（兼容 v4.7.0），移动端图标文字竖排（`flex-direction: column`）
+
+### 3.4.2 停止按钮全局化规范
+
+停止按钮必须支持所有 8 个功能任务的终止，采用独立悬浮栏 + AbortController + 后端终止三层机制：
+
+#### 停止栏 UI
+
+```html
+<div id="stop-task-bar" style="display:none;text-align:center;margin-top:-4px;margin-bottom:8px;">
+    <button class="btn btn-danger" id="btn-stop-task" onclick="stopTask()"
+            style="border-radius:20px;padding:4px 24px;font-size:13px;">
+        <i class="fa fa-stop"></i> 停止运行
+    </button>
+</div>
+```
+
+- 默认 `display:none`，任务启动时显示，任务完成/停止后隐藏
+- 独立于 `.func-btn-container`，不参与 Grid 布局
+
+#### 三层终止机制
+
+| 任务类型 | 终止方式 | 适用功能 |
+|----------|----------|----------|
+| API 请求 | `AbortController.abort()` | 货号对比、Excel与JSON对比、查看所有商品、文件清理工具、每日利润报表、隧道共享 |
+| 后台进程 | `POST /kill` (`task_id`) | 运行爬虫、更新Cookie |
+| 隧道进程 | `POST /api/tunnel/stop` | 隧道共享（终止 hostc/node 进程 + 禁用自动重启） |
+
+#### AbortController 使用规范
+
+所有 fetch 请求必须支持 `signal` 参数，以便停止按钮取消请求：
+
+```javascript
+activeAbortController = new AbortController();
+const signal = activeAbortController.signal;
+
+fetch('/api/xxx', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+    signal: signal
+})
+.then(response => response.json())
+.then(data => { /* ... */ })
+.catch(error => {
+    if (error.name === 'AbortError') {
+        showToast('已取消操作', 'info');
+        return;
+    }
+    showToast('请求失败: ' + error.message, 'error');
+})
+.finally(() => {
+    activeAbortController = null;
+    resetButtons();
+});
+```
+
+#### 后端隧道终止端点
+
+```python
+@app.route('/api/tunnel/stop', methods=['POST'])
+def api_tunnel_stop():
+    global tunnel_auto_restart, tunnel_process, tunnel_url
+    tunnel_auto_restart = False
+    Environment.kill_process_by_name('hostc')
+    Environment.kill_process_by_name('node')
+    if tunnel_process and tunnel_process.poll() is None:
+        tunnel_process.terminate()
+    tunnel_process = None
+    tunnel_url = None
+    return jsonify({'success': True, 'message': '隧道已停止'})
+```
+
+#### stopTask 函数
+
+```javascript
+window.stopTask = function() {
+    if (activeAbortController) {
+        activeAbortController.abort();
+        activeAbortController = null;
+    }
+    clearAllPollingIntervals();
+    if (currentTaskId) {
+        fetch('/kill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: currentTaskId })
+        })
+        .then(response => response.json())
+        .then(data => { /* 更新状态 */ })
+        .catch(error => { /* 错误处理 */ });
+    }
+    fetch('/api/tunnel/stop', { method: 'POST' }).catch(() => {});
+    resetButtons();
+};
+```
+
+### 3.4.3 window.* 全局函数规范
+
+`DOMContentLoaded` 闭包内定义的函数，若被 HTML `onclick` 属性引用，必须挂载到 `window` 上：
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    // ❌ 错误：onclick 无法访问闭包内的函数
+    function stopTask() { /* ... */ }
+
+    // ✅ 正确：挂载到 window 使其全局可访问
+    window.stopTask = function() { /* ... */ };
+});
+```
+
+**必须挂载 `window.*` 的函数列表**：
+
+| 函数名 | 用途 | 触发方式 |
+|--------|------|----------|
+| `window.stopTask` | 停止当前任务 | `onclick="stopTask()"` |
+| `window.compareSku` | 货号对比 | `onclick="compareSku()"` |
+| `window.showSkuInputPanel` | 显示货号输入面板 | `onclick="showSkuInputPanel()"` |
+| `window.showTunnelSection` | 显示隧道面板 | `onclick="showTunnelSection()"` |
+| `window.toggleTunnel` | 切换隧道状态 | `onclick="toggleTunnel()"` |
+| `window.showProductDetail` | 显示商品详情 | `onclick="showProductDetail(sku)"` |
+| `window.showProductByDescription` | 按描述搜索商品 | `onclick="showProductByDescription(desc)"` |
+
+**全局变量提升**：被跨作用域访问的变量必须定义在 `DOMContentLoaded` 闭包外部：
+
+```javascript
+// ✅ 全局作用域（闭包外）
+let pollingInterval = null;
+let currentTaskId = null;
+let currentChoice = null;
+let activeAbortController = null;
+let tunnelPollInterval = null;
+let tunnelRetryInterval = null;
+let tunnelStatusInterval = null;
+
+function clearAllPollingIntervals() { /* 可以访问上述变量 */ }
+
+document.addEventListener('DOMContentLoaded', function() {
+    // 闭包内可直接读写全局变量
+    pollingInterval = setInterval(/* ... */);
+    currentTaskId = data.task_id;
+});
+```
+
+**关键规则**：
+- HTML `onclick` 属性在全局作用域执行，无法访问 `DOMContentLoaded` 闭包内的局部函数
+- 被 `onclick` 引用的函数必须使用 `window.xxx = function()` 挂载
+- 被全局函数（如 `clearAllPollingIntervals`、`stopTask`）访问的变量必须定义在闭包外
+- 禁止在闭包内外重复定义同名变量（会导致 `ReferenceError` 或遮蔽）
 
 ### 3.5 iframe 懒加载模式
 
@@ -1703,7 +1852,10 @@ function exportData(format) {
 | 前端提示 | 使用 `showToast()`，禁止 `alert()` |
 | HTML 标签 | `<code>` 等行内标签必须成对闭合，禁止多余 `</code>` |
 | JS 括号闭合 | 所有 `{}` `()` 必须成对，修改后用 `new Function(code)` 验证 |
-| 功能按钮 | `.func-btn` 自适应 `padding`，`display:flex` 居中，CSS Grid 容器（`repeat(N,1fr)`），禁止 `btn-lg`，禁止 `margin-left`，禁止数字前缀 |
+| 功能按钮 | `.func-btn` 自适应 `padding`，`display:flex` 居中，CSS Grid 容器（`repeat(N,1fr)`），禁止 `btn-lg`，禁止 `margin-left`，禁止数字前缀，必须配图标（FA v4.7.0） |
+| 停止按钮 | 独立悬浮栏 `#stop-task-bar`，`AbortController` 取消 API 请求，`/kill` 终止后台进程，`/api/tunnel/stop` 终止隧道 |
+| 全局函数 | `DOMContentLoaded` 闭包内被 `onclick` 引用的函数必须 `window.xxx = function()` 挂载，禁止局部函数 |
+| 全局变量 | `pollingInterval`/`currentTaskId`/`currentChoice`/`activeAbortController` 必须定义在闭包外，禁止闭包内外重复定义 |
 | 动态展开行 | 点击时 `createElement` + `rowElement.after()`，禁止预创建 detail-row |
 | 聚合级别 | 按天→月度聚合，按月→月度聚合，按年→年度聚合，使用 `filteredRecords` |
 | 图标切换 | 同组多行用 `querySelectorAll('.class')` 统一切换，禁止重复 ID |
