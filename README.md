@@ -56,14 +56,59 @@ bash run.sh
 | npmmirror淘宝 | `https://registry.npmmirror.com` | 国内同步快 |
 | 官方源 | `https://registry.npmjs.org` | 全球CDN |
 
-#### Node.js 自动安装策略
+#### Node.js/NVM 全自动安装策略（5-6层回退）
 
-| 操作系统 | 检测顺序 | 自动安装方式 |
-|----------|----------|--------------|
-| Windows | PATH → NVM (`%USERPROFILE%\AppData\Roaming\nvm`) → MSI下载到 `.node_env/` | `msiexec /quiet` |
-| macOS | PATH → NVM (`$HOME/.nvm`) → Homebrew | `brew install node` |
-| Linux (Ubuntu) | PATH → NVM (`$HOME/.nvm`) → apt + nodesource | `apt install nodejs` |
-| Linux (CentOS) | PATH → NVM (`$HOME/.nvm`) → yum + nodesource | `yum install nodejs` |
+**Windows（6层全自动回退）**：
+
+| 优先级 | 检测方式 | 安装命令 | 说明 |
+|--------|----------|----------|------|
+| 第1优先级 | `where node` (PATH) | - | 已安装，直接使用 |
+| 第2优先级 | `where nvm` (PATH) | `nvm install lts && nvm use lts` | NVM 版本管理器 |
+| 第3优先级 | NVM 注册表路径检测 | `nvm.exe install lts && nvm.exe use lts` | `%USERPROFILE%\AppData\Roaming\nvm\nvm.exe` |
+| 第4优先级 | Winget 检测 | `winget install OpenJS.NodeJS.LTS --silent` | Win10 1709+ 内置包管理器 |
+| 第5优先级 | Chocolatey 检测 | `choco install nodejs -y` | 企业常用包管理器 |
+| 第6优先级 | Scoop 检测 | `scoop install nodejs-lts` | 开发者友好包管理器 |
+| **最终回退** | 直接下载 MSI | `msiexec /quiet INSTALLDIR=%CD%\.node_env` | 安装到临时目录，不污染系统 |
+
+**macOS（3层回退）**：
+
+| 优先级 | 检测方式 | 安装命令 | 说明 |
+|--------|----------|----------|------|
+| 第1优先级 | `command -v node` (PATH) | - | 已安装，直接使用 |
+| 第2优先级 | NVM 检测 | `nvm install --lts && nvm use --lts` | 版本管理器 |
+| **最终回退** | Homebrew | `brew install node` | 支持 Intel + Apple Silicon |
+
+**Linux（5种发行版支持）**：
+
+| 发行版 | 包管理器 | 安装命令 | 特点 |
+|--------|----------|----------|------|
+| Ubuntu/Debian | apt + nodesource | `curl nodesource/setup_lts.x \| sudo -E bash - && sudo apt install nodejs` | 官方源，最新 LTS |
+| CentOS/RHEL | yum + nodesource | `curl nodesource/setup_lts.x \| sudo bash - && sudo yum install nodejs` | RHEL 系官方支持 |
+| Fedora | dnf + nodesource | `curl nodesource/setup_lts.x \| sudo bash - && sudo dnf install nodejs` | 新一代 RPM 包管理器 |
+| Arch Linux | pacman | `sudo pacman -Syu nodejs npm` | 滚动更新，始终最新 |
+| **通用备选** | fnm (Fast Node Manager) | `curl -fsSL https://fnm.vercel.app/install \| bash` | 跨平台版本管理器 |
+
+#### Python 全自动安装策略（4层回退）
+
+**Windows（4层全自动回退）**：
+
+| 优先级 | 检测方式 | 安装命令 | 说明 |
+|--------|----------|----------|------|
+| 第1优先级 | `where py/python` (PATH) | - | 已安装，直接使用 |
+| 第2优先级 | Winget 检测 | `winget install Python.Python.3 --silent` | Win10 1709+ 内置 |
+| 第3优先级 | Chocolatey 检测 | `choco install python -y` | 企业常用 |
+| 第4优先级 | Scoop 检测 | `scoop install python` | 开发者友好 |
+| **最终回退** | 直接下载 MSI | `python-installer.exe /quiet TargetDir=%CD%\_python` | 临时目录隔离 |
+
+**macOS/Linux（按发行版自动选择）**：
+
+| 发行版 | 包管理器 | 安装命令 | 特点 |
+|--------|----------|----------|------|
+| macOS | Homebrew | `brew install python` | 支持 Intel + Apple Silicon |
+| Ubuntu/Debian | apt | `sudo apt install python3 python3-venv python3-pip` | 完整依赖 |
+| CentOS/RHEL | yum | `sudo yum install python3 python3-pip` | RHEL 系支持 |
+| Fedora | dnf | `sudo dnf install python3 python3-pip` | 新一代包管理器 |
+| Arch Linux | pacman | `sudo pacman -Syu python python-pip` | 滚动更新 |
 
 #### 跨平台路径处理示例
 
