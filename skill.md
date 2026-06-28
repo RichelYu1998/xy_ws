@@ -1062,6 +1062,76 @@ document.addEventListener('DOMContentLoaded', function() {
 - 被全局函数（如 `clearAllPollingIntervals`、`stopTask`）访问的变量必须定义在闭包外
 - 禁止在闭包内外重复定义同名变量（会导致 `ReferenceError` 或遮蔽）
 
+### 3.4.4 按钮状态管理规范（data-original 模式）
+
+所有功能按钮在点击后进入"运行中"状态，任务完成或停止后必须恢复到初始状态。统一使用 `data-original` 属性保存原始内容，禁止硬编码恢复文本。
+
+#### 状态流转
+
+```
+初始状态 → [点击] → 保存 data-original → 显示"运行中..." → [完成/停止] → resetButtons() → 恢复初始状态
+```
+
+#### 按钮分类与状态管理
+
+| 按钮类 | 保存方式 | 恢复方式 | 示例 |
+|--------|----------|----------|------|
+| `.btn-run` | `btn.setAttribute('data-original', btn.innerHTML)` | `resetButtons()` 遍历 `.btn-run` 用 `data-original` 恢复 | 运行爬虫、更新Cookie、文件清理工具 |
+| `.btn-sku-api` | `btn.setAttribute('data-original', btn.innerHTML)` | `resetButtons()` 遍历 `.btn-sku-api` 用 `data-original` 恢复 | 货号对比、Excel与JSON对比 |
+| 特定按钮（by ID） | 无需保存 | `resetButtons()` 硬编码恢复文本 | 隧道共享、查看所有商品、每日利润报表 |
+
+#### resetButtons 函数规范
+
+```javascript
+function resetButtons() {
+    currentTaskId = null;
+    currentChoice = null;
+    // .btn-run 按钮：使用 data-original 恢复
+    document.querySelectorAll('.btn-run').forEach(b => {
+        b.disabled = false;
+        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+    });
+    // .btn-sku-api 按钮：使用 data-original 恢复
+    document.querySelectorAll('.btn-sku-api').forEach(b => {
+        b.disabled = false;
+        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+    });
+    // .func-btn 按钮：仅恢复 disabled 状态
+    document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+    // 特定按钮：硬编码恢复文本
+    const tunnelBtn = document.getElementById('btn-run-tunnel');
+    if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+    const viewProductsBtn = document.getElementById('btn-view-products');
+    if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+    const dailyProfitBtn = document.getElementById('btn-daily-profit');
+    if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+    const stopTaskBar = document.getElementById('stop-task-bar');
+    if (stopTaskBar) stopTaskBar.style.display = 'none';
+}
+```
+
+#### 点击处理规范
+
+```javascript
+// ✅ 正确：先保存原始内容，再修改按钮状态
+btn.setAttribute('data-original', btn.innerHTML);
+btn.disabled = true;
+btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
+
+// ❌ 错误：不保存原始内容，resetButtons() 无法恢复
+btn.disabled = true;
+btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
+```
+
+#### 关键规则
+
+- ✅ 所有动态修改 `innerHTML` 的按钮，修改前必须 `setAttribute('data-original', btn.innerHTML)` 保存原始内容
+- ✅ `resetButtons()` 必须遍历所有按钮类（`.btn-run`、`.btn-sku-api`），使用 `data-original` 恢复 `innerHTML`
+- ✅ `.func-btn` 的 `disabled` 状态通过 `resetButtons()` 统一恢复
+- ✅ 点击"停止"按钮时调用 `resetButtons()`，8 个功能按钮状态全部正确复位
+- ❌ 禁止硬编码恢复文本（如 `btn.innerHTML = '<span>Excel与JSON对比</span>'`），必须使用 `data-original` 动态恢复
+- ❌ 禁止遗漏按钮类（新增按钮类时必须同步更新 `resetButtons()`）
+
 ### 3.5 iframe 懒加载模式
 
 ```html
@@ -1855,6 +1925,7 @@ function exportData(format) {
 | JS 括号闭合 | 所有 `{}` `()` 必须成对，修改后用 `new Function(code)` 验证 |
 | 功能按钮 | `.func-btn` 自适应 `padding`，`display:flex` 居中，CSS Grid 容器（`repeat(N,1fr)`），禁止 `btn-lg`，禁止 `margin-left`，禁止数字前缀，必须配图标（FA v4.7.0） |
 | 停止按钮 | 独立悬浮栏 `#stop-task-bar`，`AbortController` 取消 API 请求，`/kill` 终止后台进程，`/api/tunnel/stop` 终止隧道 |
+| 按钮状态管理 | 点击时 `setAttribute('data-original', btn.innerHTML)` 保存原始内容，`resetButtons()` 用 `data-original` 恢复，禁止硬编码恢复文本，新增按钮类必须同步更新 `resetButtons()` |
 | 全局函数 | `DOMContentLoaded` 闭包内被 `onclick` 引用的函数必须 `window.xxx = function()` 挂载，禁止局部函数 |
 | 全局变量 | `pollingInterval`/`currentTaskId`/`currentChoice`/`activeAbortController` 必须定义在闭包外，禁止闭包内外重复定义 |
 | 动态展开行 | 点击时 `createElement` + `rowElement.after()`，禁止预创建 detail-row |

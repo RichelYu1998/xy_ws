@@ -231,6 +231,16 @@ class Environment:
 - Python包自动安装（使用最优镜像源）
 
 ## 最新更新
+### v3.7.7 (2026-06-28)
+- **修复"Excel与JSON对比"按钮状态不复位问题**
+  - 点击"Excel与JSON对比"按钮后，按钮显示"运行中..."，请求完成后未恢复到初始状态
+  - 根因：`btn-sku-api` 按钮点击时未保存原始内容（`data-original`），`resetButtons()` 未处理 `btn-sku-api` 类按钮的 `innerHTML` 恢复
+  - 修复：点击时先 `btn.setAttribute('data-original', btn.innerHTML)` 保存原始内容
+  - 修复：`resetButtons()` 新增 `.btn-sku-api` 按钮遍历，使用 `data-original` 恢复 `innerHTML`
+  - 点击"停止"按钮时同样触发 `resetButtons()`，8 个功能按钮状态全部正确复位
+  - 符合 v3.6.0 编码规范：按钮状态管理统一使用 `data-original` 模式，禁止硬编码恢复文本
+  - 符合 v3.5.0 移动端规范：按钮复位逻辑与 CSS Grid 布局无冲突，移动端表现一致
+
 ### v3.7.6 (2026-06-27)
 - **综合环境检测系统（6步流程）**
   - [1/6] Python 环境智能检测 + **全自动安装**：
