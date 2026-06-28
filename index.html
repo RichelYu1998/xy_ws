@@ -2687,6 +2687,10 @@ SzwegoSpider/
                 b.disabled = false;
                 b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
             });
+            document.querySelectorAll('.btn-sku-api').forEach(b => {
+                b.disabled = false;
+                b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+            });
             document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
             const tunnelBtn = document.getElementById('btn-run-tunnel');
             if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
@@ -4622,6 +4626,7 @@ SzwegoSpider/
                 
                 if (apiUrl) {
                     console.log('[功能] 调用对比API:', apiUrl);
+                    btn.setAttribute('data-original', btn.innerHTML);
                     document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
                     btn.disabled = true;
                     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
