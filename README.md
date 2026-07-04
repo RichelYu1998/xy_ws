@@ -244,7 +244,8 @@ class Environment:
 - **Web 日志双写机制（完整记录）**
   - `web_output.log` 每次启动时**从头记录完整启动过程**（清空 + 双写）
   - **根因修复**：之前 log 仅捕获 Python 子进程输出，bat/sh 脚本自身的 echo 只打印到控制台
-  - **BAT 方案**：定义 `:log` 子程序（`echo %*` + `echo %* >> "!LOG_FILE!"`），所有 `echo` 改为 `call :log`
+  - **BAT 方案**：定义 `:log` 子程序（`echo %*` + `(echo %*) >> "!LOG_FILE!" 2>nul`），所有 `echo` 改为 `call :log`
+    - 文件写入用括号包裹 `(echo %*) >> file 2>nul`，避免与 Python 子进程并发写同一文件时的锁冲突
   - **SH 方案**：定义 `log()` 函数（`echo "$*"` + `echo "$*" >> "$LOG_FILE"`），所有 `echo` 改为 `log`
   - 空行用 `:log_blank` / `log_blank()` 处理
   - Python 子进程输出继续追加到同一文件（`>> "!LOG_FILE!" 2>&1`）
