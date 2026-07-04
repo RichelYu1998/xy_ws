@@ -146,6 +146,10 @@
   - [示例 4：新增跨平台路径](#示例-4新增跨平台路径)
   - [示例 5：新增前端功能区块](#示例-5新增前端功能区块)
 - [八、编码风格速查](#八编码风格速查)
+- [九、skill.docx 生成规范](#九skilldocx-生成规范)
+  - [9.1 字体要求](#91-字体要求)
+  - [9.2 生成流程](#92-生成流程)
+  - [9.3 同步规则](#93-同步规则)
 - [十、Hostc隧道优化方案 (2026-07-04)](#十hostc隧道优化方案-2026-07-04)
   - [10.1 问题诊断](#101-问题诊断)
     - [原始问题](#原始问题)
@@ -171,10 +175,6 @@
     - [为什么会频繁生成新URL？](#为什么会频繁生成新url)
   - [10.7 最佳实践建议](#107-最佳实践建议)
   - [10.8 符合性检查清单](#108-符合性检查清单)
-- [九、skill.docx 生成规范](#九skilldocx-生成规范)
-  - [9.1 字体要求](#91-字体要求)
-  - [9.2 生成流程](#92-生成流程)
-  - [9.3 同步规则](#93-同步规则)
 - [十一、编码规范合规性检查清单](#十一编码规范合规性检查清单)
   - [v3.6.0 编码规范 ✅](#v360-编码规范)
   - [v3.5.0 移动端规范 ✅](#v350-移动端规范)
@@ -5085,6 +5085,46 @@ function exportData(format) {
 
 ---
 
+## 九、skill.docx 生成规范
+
+### 9.1 字体要求
+
+| 类型 | 字体 | XML 属性 |
+|------|------|----------|
+| 西文（代码/英文） | Consolas | `w:ascii` / `w:hAnsi` |
+| 东亚（中文） | 微软雅黑 | `w:eastAsia` |
+
+**关键**：每个 `w:rPr` 下的 `w:rFonts` 必须同时设置 `w:eastAsia`，否则中文显示时字体缺失。
+
+### 9.2 生成流程
+
+使用 `pypandoc_binary`（自带 pandoc 3.9 二进制，无需 brew）：
+
+```python
+import pypandoc
+
+pypandoc.convert_file(
+    'skill.md',
+    'docx',
+    outputfile='skill.docx',
+    extra_args=['--toc', '--toc-depth=4']
+)
+```
+
+**核心优势**：
+1. pandoc 原生解析 Markdown，正确区分代码块内外标题（修复旧版 `# 第1步` 等误识别问题）
+2. `--toc` 自动生成目录（4 级层级，182 个标题）
+3. `pypandoc_binary` 为纯 Python + 预编译二进制，Windows/macOS/Linux 均可运行
+4. 无硬编码路径，`pypandoc.get_pandoc_path()` 动态获取 pandoc 位置
+
+### 9.3 同步规则
+
+- `skill.md` 是唯一源文件
+- 修改 `skill.md` 后必须重新生成 `skill.docx`
+- 两个文件一起提交到 git
+
+---
+
 ## 十、Hostc隧道优化方案 (2026-07-04)
 
 > 符合 v3.6.0 编码规范：所有路径使用动态变量，跨平台支持，无硬编码
@@ -5456,46 +5496,6 @@ pkill -f hostc
 - [x] 所有代码无平台特定硬编码
 - [x] 进程管理自动适配
 - [x] 路径处理动态获取
-
----
-
-## 九、skill.docx 生成规范
-
-### 9.1 字体要求
-
-| 类型 | 字体 | XML 属性 |
-|------|------|----------|
-| 西文（代码/英文） | Consolas | `w:ascii` / `w:hAnsi` |
-| 东亚（中文） | 微软雅黑 | `w:eastAsia` |
-
-**关键**：每个 `w:rPr` 下的 `w:rFonts` 必须同时设置 `w:eastAsia`，否则中文显示时字体缺失。
-
-### 9.2 生成流程
-
-使用 `pypandoc_binary`（自带 pandoc 3.9 二进制，无需 brew）：
-
-```python
-import pypandoc
-
-pypandoc.convert_file(
-    'skill.md',
-    'docx',
-    outputfile='skill.docx',
-    extra_args=['--toc', '--toc-depth=4']
-)
-```
-
-**核心优势**：
-1. pandoc 原生解析 Markdown，正确区分代码块内外标题（修复旧版 `# 第1步` 等误识别问题）
-2. `--toc` 自动生成目录（4 级层级，182 个标题）
-3. `pypandoc_binary` 为纯 Python + 预编译二进制，Windows/macOS/Linux 均可运行
-4. 无硬编码路径，`pypandoc.get_pandoc_path()` 动态获取 pandoc 位置
-
-### 9.3 同步规则
-
-- `skill.md` 是唯一源文件
-- 修改 `skill.md` 后必须重新生成 `skill.docx`
-- 两个文件一起提交到 git
 
 ---
 
