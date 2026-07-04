@@ -2344,6 +2344,421 @@ print(f"[*] 清理临时文件...")
 print(f"[OK] config.json 已创建")
 ```
 
+### 2.15 main.py 独立函数完整列表
+
+#### 2.15.1 工具函数
+
+```python
+def format_size(size_bytes: int) -> str:
+    """字节数格式化（B/KB/MB/GB/TB/PB 自动转换）"""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} PB"
+
+def print_separator(char='=', length=60):
+    """打印分隔线"""
+    print(char * length)
+
+def get_version_from_readme():
+    """从 README.md 自动解析最新版本号（唯一来源）"""
+    readme_path = os.path.join(PROJECT_DIR, 'README.md')
+    try:
+        with open(readme_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        match = re.search(r'###\s+v(\d+\.\d+\.\d+)', content)
+        return match.group(1) if match else '0.0.0'
+    except:
+        return '0.0.0'
+
+def get_python_executable():
+    """获取Python可执行文件路径，优先使用虚拟环境，不存在则创建"""
+    venv_python = Environment.get_venv_python()
+    if os.path.exists(venv_python):
+        return venv_python
+    print(f"虚拟环境不存在，正在创建...")
+    try:
+        subprocess.run([sys.executable, '-m', 'venv', '.venv'], check=True, capture_output=True)
+        print(f"虚拟环境创建成功: .venv")
+        return venv_python
+    except Exception as e:
+        print(f"创建虚拟环境失败: {e}")
+        return 'python' if Environment.IS_WINDOWS else 'python3'
+```
+
+#### 2.15.2 文件清理函数（6个，对应API端点 /api/clean/*）
+
+```python
+# 文件扩展名常量（跨系统）
+IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.svg'}
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.m4v'}
+MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
+EXCLUDE_EXTENSIONS = {'.log', '.sh', '.py', '.bat', '.json', '.md', '.txt', '.html', '.htm', '.sql', '.xml', '.yml', '.yaml', '.ini', '.cfg', '.conf'}
+EXCLUDE_FOLDERS = {'file', 'config', '__pycache__', 'clean', '.venv', 'templates', '.git', '.idea', 'node_modules', '.vscode', 'static'}
+EXCLUDE_FILE_NAMES = {'.DS_Store', 'Thumbs.db', '.gitkeep', '.gitignore'}
+
+def clean_old_files(directory, dry_run=False, log_file=None, log_level=logging.INFO, stream=None):
+    """按组清理：保留最新的一组文件（'_'前完全一致的为一组），删除其他组
+    - 按文件下载到本地的毫秒时间排序
+    - 对应API: POST /api/clean/group
+    """
+
+def clean_old_files_by_time(directory, minutes=5, dry_run=False, log_file=None, log_level=logging.INFO, stream=None):
+    """按时间清理：删除指定分钟前下载的所有媒体文件
+    - 对应API: POST /api/clean/time
+    """
+
+def list_files(directory, log_file=None, log_level=logging.INFO, stream=None):
+    """递归扫描文件列表（不删除），按下载时间排序
+    - 对应API: POST /api/clean/list
+    """
+
+def clean_all_files(directory, dry_run=False, log_file=None, log_level=logging.INFO, stream=None):
+    """删除所有文件和文件夹（排除 EXCLUDE_EXTENSIONS/EXCLUDE_FOLDERS/EXCLUDE_FILE_NAMES）
+    - 对应API: POST /api/clean/all
+    """
+
+def clean_png_files(directory, dry_run=False, log_file=None, log_level=logging.INFO, stream=None):
+    """删除所有PNG文件
+    - 对应API: POST /api/clean/png
+    """
+
+def clean_media_files(directory, dry_run=False, log_file=None, log_level=logging.INFO, stream=None):
+    """删除所有媒体文件（PNG/JPG/GIF/MP4）
+    - 对应API: POST /api/clean/media
+    """
+
+def run_cleaner():
+    """文件清理工具主函数（CLI交互模式，6个选项）"""
+    # 1. 按组清理  2. 按时间清理  3. 列出文件  4. 删除所有  5. 删除PNG  6. 删除媒体  0. 返回
+```
+
+#### 2.15.3 利润报表函数
+
+```python
+def get_daily_profit_report_from_excel(excel_file):
+    """从Excel的'每日利润'sheet的A列中查找以'截止'开头的报表文本
+    Args:
+        excel_file: Excel文件路径
+    Returns:
+        str: 报表文本，如果未找到则返回None
+    """
+
+def get_excel_files_with_report():
+    """获取Excel文件列表和每日利润报表
+    Returns:
+        tuple: (excel_files_list, daily_profit_report)
+    - 从 config.json 的 excel_files 字段读取路径列表
+    - 使用 os.path.expanduser() 展开用户目录（跨系统）
+    - 去重并转为绝对路径
+    """
+```
+
+#### 2.15.4 Flask 辅助函数
+
+```python
+def handle_api_exception(e):
+    """Flask全局异常处理器 - 统一处理所有未捕获的异常
+    - 使用 handle_exception() 记录日志
+    - 返回统一JSON格式: {'error': msg, 'success': False, 'code': 'UNKNOWN'}
+    - HTTP状态码: 500
+    """
+
+def run_command_background(task_id, command):
+    """后台运行命令（跨系统进程管理）
+    - 设置 PYTHONIOENCODING='utf-8' 环境变量
+    - Windows: 使用 subprocess.Popen(shell=True, stdin=DEVNULL)
+    - Unix: 使用 select 非阻塞读取输出
+    - 实时更新 tasks[task_id]['output']
+    - 进程结束后设置 returncode 和 status='completed'
+    """
+```
+
+#### 2.15.5 主菜单函数
+
+```python
+def main():
+    """主菜单（6个选项 + 退出）
+    1. 运行爬虫 → run_scraper()
+    2. 货号对比 → StockNumberComparator().run_comparison()
+    3. Excel与JSON对比 → StockNumberComparator().compare_excel_with_json()
+    4. 更新Cookie → update_cookie()
+    5. 启动Web服务 → os.system(f'"{VENV_PYTHON}" main.py --web')
+    6. 文件清理工具 → run_cleaner()
+    0. 退出
+    """
+
+def run_scraper():
+    """运行爬虫（使用现有Cookie）"""
+
+def update_cookie():
+    """自动更新Cookie
+    - 使用 Playwright 打开浏览器
+    - 自动检测登录状态（每5秒检查token/session/auth Cookie）
+    - 超时300秒
+    - 保存到 cookies.json 和 config.json
+    - 跨系统：使用 Environment.get_default_viewport() + WegoScraper.get_user_agent()
+    """
+```
+
+#### 2.15.6 镜像安装函数
+
+```python
+def select_pip_mirror(venv_path: str):
+    """pip镜像智能测速+写入配置
+    - 测试5个镜像源（阿里云/清华/腾讯云/中科大/豆瓣）
+    - 自动选择最快的镜像
+    - 配置文件路径跨系统：Windows→pip.ini，Unix→pip.conf
+    """
+
+def install_playwright_cdn():
+    """Playwright CDN智能测速+安装
+    - 测试3个CDN（npmmirror/azureedge/cdn）
+    - 按速度排序依次尝试下载
+    - 设置 PLAYWRIGHT_DOWNLOAD_HOST 环境变量
+    """
+```
+
+#### 2.15.7 命令行参数
+
+```python
+parser = argparse.ArgumentParser(description='Szwego商品爬虫')
+parser.add_argument('--web', action='store_true', help='启动Web服务模式')
+parser.add_argument('--port', type=int, default=int(os.environ.get('WEB_PORT', '8888')), help='Web服务端口')
+parser.add_argument('--setup', action='store_true', help='运行配置初始化向导')
+parser.add_argument('--username', '-u', help='登录用户名')
+parser.add_argument('--password', '-p', help='登录密码')
+parser.add_argument('--url', '-l', help='目标店铺URL')
+parser.add_argument('--excel', '-e', help='Excel文件路径')
+parser.add_argument('--task', type=int, choices=[1,2,3,4,6], help='直接执行指定任务后退出')
+parser.add_argument('--install-playwright', action='store_true', help='Playwright CDN智能测速+安装浏览器')
+parser.add_argument('--select-pip-mirror', action='store_true', help='pip镜像智能测速并写入配置')
+```
+
+### 2.16 index.html 前端函数完整列表（61个）
+
+#### 2.16.1 设备检测与适配（3个）
+
+```javascript
+function detectDevice() {
+    // 检测设备类型（mobile/tablet/desktop）
+    // 通过 window.innerWidth 和 navigator.userAgent 判断
+    // 返回 'mobile' | 'tablet' | 'desktop'
+}
+
+function applyDeviceStyles() {
+    // 根据设备类型应用不同样式
+    // mobile: 按钮全宽、字号放大、间距调整
+    // tablet: 按钮半宽
+    // desktop: 默认样式
+}
+
+function detectSystem() {
+    // 检测操作系统（Windows/Mac/Linux）
+    // 显示系统信息到UI
+}
+```
+
+#### 2.16.2 下拉刷新（7个，IIFE闭包）
+
+```javascript
+(function initPullRefresh() {
+    function createIndicator() { /* 创建下拉指示器DOM */ }
+    function findScrollableContainer() { /* 查找可滚动容器 */ }
+    function init() { /* 绑定touch事件 */ }
+    function handleTouchStart(e) { /* 记录起始Y坐标 */ }
+    function handleTouchMove(e) { /* 计算下拉距离，显示指示器 */ }
+    function handleTouchEnd() { /* 判断是否触发刷新 */ }
+    function performRefresh() { /* 执行刷新操作（重新加载商品） */ }
+    function resetIndicator() { /* 重置指示器状态 */ }
+})();
+```
+
+#### 2.16.3 商品展示（8个）
+
+```javascript
+function showProductModal(p) {
+    // 显示商品详情模态框
+    // 支持图片轮播、视频播放、Base64解码
+}
+
+function showImagePreview(imageUrl, index) {
+    // 图片预览（全屏查看）
+    // 支持左右滑动切换、键盘导航
+    function handleSwipe() { /* 滑动检测 */ }
+    function handleKeyDown(e) { /* 键盘事件 */ }
+    function prevImage() { /* 上一张 */ }
+    function nextImage() { /* 下一张 */ }
+    function updatePreviewImage() { /* 更新预览图 */ }
+}
+
+function highlightRow(sku, allProductsData) { /* 高亮商品行 */ }
+function unhighlightRow(sku, allProductsData) { /* 取消高亮 */ }
+function scrollToSku(sku) { /* 滚动到指定货号行 */ }
+function searchProductBySku(sku) { /* 按货号搜索商品 */ }
+function filterProducts(searchTerm) { /* 过滤商品列表 */ }
+
+window.showProductDetail = function(sku) { /* 显示商品详情（全局） */ }
+window.showProductByDescription = function(description) { /* 按描述搜索（全局） */ }
+window.showAllProducts = function(signal) { /* 显示所有商品（全局，支持AbortController） */ }
+```
+
+#### 2.16.4 视频处理（3个）
+
+```javascript
+function handleVideoError(videoElement, videoUrl, isPreview = false) {
+    // 视频加载失败处理
+    // 显示错误提示和重试按钮
+}
+
+function retryVideoLoad(errorDiv, videoUrl, isPreview = false) {
+    // 重试加载视频（最多3次）
+}
+
+function handleVideoLoad(videoElement) {
+    // 视频加载成功处理
+    // 隐藏加载动画
+}
+
+function decodeBase64Url(url) {
+    // Base64 URL解码
+    // 处理视频URL的Base64编码
+}
+```
+
+#### 2.16.5 面板管理（5个）
+
+```javascript
+function closePanel(panelId) { /* 关闭面板 */ }
+function closeTunnelPanel() { /* 关闭隧道面板 */ }
+function showOutputPanel() { /* 显示输出面板 */ }
+function showCleanerPanel() { /* 显示文件清理面板 */ }
+function closeSkuPanel() { /* 关闭货号对比面板 */ }
+```
+
+#### 2.16.6 命令执行（4个）
+
+```javascript
+function runCommand(cmd, btn) {
+    // 运行命令（发送到 /run 端点）
+    // 按钮状态管理（data-original模式）
+    // 启动 pollOutput() 轮询输出
+}
+
+function pollOutput() {
+    // 轮询 /output/<task_id> 获取命令输出
+    // 间隔500ms，支持 AbortController
+}
+
+function runFunction(choice) {
+    // 运行指定功能（choice=1~6）
+    // 调用 runCommand()
+}
+
+function sendUserInput() {
+    // 发送用户输入到运行中进程（/input 端点）
+}
+```
+
+#### 2.16.7 货号对比（2个）
+
+```javascript
+window.showSkuInputPanel = function() { /* 显示货号输入面板（全局） */ }
+window.compareSku = function() { /* 执行货号对比（全局，调用 /api/sku/compare/txt） */ }
+
+function showComparisonResult(data) { /* 显示对比结果 */ }
+```
+
+#### 2.16.8 利润报表（8个）
+
+```javascript
+window.showDailyProfitReport = function(groupBy='day', startDate='', endDate='', signal) {
+    // 显示每日利润报表（全局，调用 /api/daily-profit）
+}
+
+window.applyDateFilter = function() { /* 应用日期筛选（全局） */ }
+window.clearDateFilter = function() { /* 清除日期筛选（全局） */ }
+window.renderProfitChart = function(groupBy='day') { /* 渲染利润趋势图（全局，ECharts） */ }
+window.highlightChartPoint = function(dateKey) { /* 高亮图表数据点（全局） */ }
+window.showDailyProfitDetail = function(dateKey, groupBy) { /* 显示利润详情（全局） */ }
+window.toggleProfitDetail = function(dateKey, rowElement) { /* 切换利润详情展开（全局） */ }
+window.showFloatingProfitReport = function(event) { /* 显示浮动利润报表（全局，可拖拽） */ }
+
+function formatDate(value) { /* 日期格式化（9种格式，含Excel序列号） */ }
+function formatNumber(value, isMoney) { /* 数字格式化（千分位+货币符号） */ }
+```
+
+#### 2.16.9 隧道管理（5个）
+
+```javascript
+function initHostcTunnel() { /* 初始化Hostc隧道 */ }
+async function loadServerInfo() { /* 加载服务器信息（/api/server/info） */ }
+async function checkTunnelStatus() { /* 检查隧道状态（/api/tunnel/status） */ }
+function updateTunnelUI(running, url, autoRestart, restartCount, lastError, tunnelType) {
+    // 更新隧道UI状态（按钮、URL显示、状态指示灯）
+}
+async function startTunnelAndShow() { /* 启动隧道并显示URL */ }
+window.showTunnelSection = function() { /* 显示隧道面板（全局） */ }
+```
+
+#### 2.16.10 文件清理（2个）
+
+```javascript
+function showCleanerPanel() { /* 显示清理面板 */ }
+function executeClean() { /* 执行清理操作（调用 /api/clean/* 端点） */ }
+```
+
+#### 2.16.11 工具函数（8个）
+
+```javascript
+function clearAllPollingIntervals() {
+    // 清除所有轮询定时器
+    // pollingInterval, tunnelPollInterval, tunnelRetryInterval, tunnelStatusInterval
+}
+
+function resetButtons() { /* 恢复所有按钮到初始状态（data-original模式） */ }
+function checkCookieStatus() { /* 检查Cookie状态（/api/cookie） */ }
+function copyCommand(cmd) { /* 复制命令到剪贴板 */ }
+function copyToClipboard(text) { /* 复制文本到剪贴板（navigator.clipboard API） */ }
+function fallbackCopy(text) { /* 剪贴板复制回退方案（textarea + execCommand） */ }
+function showToast(message, type='success', duration=3000) { /* 显示Toast提示 */ }
+function formatOutput(text) { /* 格式化命令输出（ANSI颜色码清理） */ }
+```
+
+#### 2.16.12 天气时钟（2个）
+
+```javascript
+function detectSystem() { /* 检测操作系统 */ }
+function updateTime() { /* 更新时间显示（每秒刷新） */ }
+```
+
+#### 2.16.13 拖拽功能（3个，利润报表浮动面板）
+
+```javascript
+function onDragStart(clientX, clientY) { /* 记录拖拽起始位置 */ }
+function onDragMove(clientX, clientY) { /* 计算拖拽偏移并更新位置 */ }
+function onDragEnd() { /* 结束拖拽 */ }
+// 全局事件绑定：
+window._profitPanelDragStart = function(e) { onDragStart(e.clientX, e.clientY); };
+window._profitPanelDragMove = function(e) { onDragMove(e.clientX, e.clientY); };
+window._profitPanelDragMoveTouch = function(e) { var t = e.touches[0]; onDragMove(t.clientX, t.clientY); };
+```
+
+#### 2.16.14 表格渲染与联动（2个）
+
+```javascript
+function renderTable(products, title, color, tableId) {
+    // 渲染商品表格（支持颜色标记、SKU高亮）
+    // 自动计算列宽、响应式适配
+}
+
+function syncScroll(sourceContainer, sourceIndex) {
+    // 同步滚动（对比视图左右表格联动）
+    // sourceIndex: 0=左表, 1=右表
+}
+```
+
 ---
 
 ## 三、前端规范
