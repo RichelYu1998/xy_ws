@@ -15,12 +15,12 @@ goto main_start
 
 :log
 echo %*
-echo %* >> "!LOG_FILE!"
+(echo %*) >> "!LOG_FILE!" 2>nul
 exit /b
 
 :log_blank
 echo.
-echo. >> "!LOG_FILE!"
+(echo.) >> "!LOG_FILE!" 2>nul
 exit /b
 
 :main_start
