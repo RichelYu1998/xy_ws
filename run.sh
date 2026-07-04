@@ -1,6 +1,11 @@
 #!/bin/bash
 
-VERSION=$(python3 -c "import re; m=re.search(r'###\s+v(\d+\.\d+\.\d+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2>/dev/null || python -c "import re; m=re.search(r'###\s+v(\d+\.\d+\.\d+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')")
+VERSION="0.0.0"
+for cmd in python3 python; do
+    if command -v "$cmd" &>/dev/null; then
+        VERSION=$("$cmd" -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2>/dev/null) && break
+    fi
+done
 
 echo "========================================"
 echo "Szwego商品爬虫和货号对比工具 - v${VERSION}"
@@ -11,7 +16,7 @@ echo "[*] 清理临时文件..."
 if [ -d "temp" ]; then
     TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
     LIMIT_SIZE_KB=3072
-    if [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
+    if [ -n "$TOTAL_SIZE_KB" ] && [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
         rm -rf temp/*
         echo "[*] temp目录超过3MB，已清理所有文件"
     else
@@ -60,7 +65,7 @@ detect_python_env() {
         for py_path in "${COMMON_PYTHON_PATHS[@]}"; do
             if [ -x "$py_path" ]; then
                 echo "[*] 发现Python: $py_path"
-                export PATH="$py_path:$(dirname $py_path):$PATH"
+                export PATH="$(dirname "$py_path"):$PATH"
                 PYTHON_CMD="$py_path"
                 break
             fi
@@ -107,7 +112,6 @@ detect_python_env() {
                     ;;
             esac
             
-            # 验证安装结果
             if command -v python3 &> /dev/null; then
                 PYTHON_CMD="python3"
                 echo "[*] Python安装成功: $(python3 --version 2>&1)"
@@ -121,6 +125,11 @@ detect_python_env() {
         fi
     fi
     
+    if [ -z "$PYTHON_CMD" ]; then
+        echo "[ERROR] 无法找到或安装Python"
+        return 1
+    fi
+
     echo ""
     echo "[*] 检测虚拟环境状态..."
     if [ -n "$VIRTUAL_ENV" ]; then
@@ -145,7 +154,6 @@ detect_node_env() {
     
     echo "Node.js未在PATH中，正在尝试查找或自动安装..."
     
-    # 第1步：尝试 NVM（PATH 中有 nvm 命令或 NVM 目录存在）
     if command -v nvm &> /dev/null || [ -s "$HOME/.nvm/nvm.sh" ]; then
         echo "    发现NVM，正在使用NVM管理Node.js..."
         export NVM_DIR="$HOME/.nvm"
@@ -160,21 +168,19 @@ detect_node_env() {
             nvm alias default lts
         fi
         
-        # 验证安装结果
         if command -v node &> /dev/null; then
             echo ""
             echo "Node.js已就绪: $(node --version 2>&1)"
             echo "NPM版本: $(npm --version 2>&1)"
             return 0
         else
-            echo "[ERROR] NVM 安装 Node.js 失败"
-            return 1
+            echo "[WARNING] NVM 安装 Node.js 失败，部分功能可能不可用"
+            return 0
         fi
     fi
     
-    # 第2步：按操作系统选择包管理器全自动安装
     case "$(uname -s)" in
-        Darwin)  # macOS
+        Darwin)
             if command -v brew &> /dev/null; then
                 echo "    使用Homebrew安装Node.js..."
                 brew install node
@@ -182,9 +188,9 @@ detect_node_env() {
                 echo "    使用Homebrew (Apple Silicon) 安装Node.js..."
                 /opt/homebrew/bin/brew install node
             else
-                echo "[ERROR] 未检测到Homebrew，无法自动安装Node.js"
+                echo "[WARNING] 未检测到Homebrew，无法自动安装Node.js"
                 echo "请先安装Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-                return 1
+                return 0
             fi
             ;;
         Linux)
@@ -204,31 +210,36 @@ detect_node_env() {
                 echo "    使用pacman安装Node.js..."
                 sudo pacman -Syu --noconfirm nodejs npm
             else
-                echo "[ERROR] 无法识别包管理器，请手动安装Node.js"
+                echo "[WARNING] 无法识别包管理器，请手动安装Node.js"
                 echo "推荐方式：curl -fsSL https://fnm.vercel.app/install | bash"
-                return 1
+                return 0
             fi
             ;;
         *)
-            echo "[ERROR] 不支持的操作系统用于自动Node.js安装"
-            return 1
+            echo "[WARNING] 不支持的操作系统用于自动Node.js安装，部分功能可能不可用"
+            return 0
             ;;
     esac
     
-    # 验证安装结果
     if command -v node &> /dev/null; then
         echo ""
         echo "Node.js安装成功: $(node --version 2>&1)"
         echo "NPM版本: $(npm --version 2>&1)"
         return 0
     else
-        echo "[ERROR] Node.js安装失败"
-        return 1
+        echo "[WARNING] Node.js安装失败，部分功能可能不可用"
+        return 0
     fi
 }
 
 test_pip_mirrors() {
     echo "[3/6] 测试PIP加速镜像源..."
+
+    if [ -z "$PYTHON_CMD" ]; then
+        echo "[WARNING] Python未安装，跳过PIP镜像测试"
+        FASTEST_PIP_MIRROR="https://pypi.org/simple/"
+        return 0
+    fi
 
     declare -a MIRRORS=(
         "https://pypi.tuna.tsinghua.edu.cn/simple|清华源"
@@ -247,14 +258,12 @@ test_pip_mirrors() {
         
         TEST_TIME=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 1.5 --max-time 2 "$MIRROR_URL" 2>/dev/null)
 
-        if [ -z "$TEST_TIME" ] || [ "$TEST_TIME" = "0.000" ]; then
+        if [ -z "$TEST_TIME" ] || [ "$TEST_TIME" = "0.000" ] || [ "$TEST_TIME" = "0" ]; then
             echo "        $MIRROR_NAME: 超时/失败"
         else
-            PIP_INT_TIME=${TEST_TIME%%.*}
-            PIP_INT_TIME=${PIP_INT_TIME#0}
-            [ -z "$PIP_INT_TIME" ] && PIP_INT_TIME=0
-            echo "        $MIRROR_NAME: ${TEST_TIME}秒"
-            if [ "$PIP_INT_TIME" -lt "$MIN_TIME" ]; then
+            PIP_INT_TIME=$(echo "$TEST_TIME" | awk '{printf "%d", $1 * 1000}')
+            echo "        $MIRROR_NAME: ${TEST_TIME}秒 (${PIP_INT_TIME}ms)"
+            if [ "$PIP_INT_TIME" -lt "$MIN_TIME" ] 2>/dev/null; then
                 MIN_TIME=$PIP_INT_TIME
                 BEST_MIRROR="$MIRROR_URL"
                 BEST_NAME="$MIRROR_NAME"
@@ -274,6 +283,11 @@ test_pip_mirrors() {
 test_npm_mirrors() {
     echo "[4/6] 测试NPM加速镜像源..."
 
+    if ! command -v npm &> /dev/null; then
+        echo "[WARNING] npm未安装，跳过NPM镜像测试"
+        return 0
+    fi
+
     declare -a NPM_MIRRORS=(
         "https://registry.npmmirror.com|npmmirror淘宝"
         "https://registry.npmjs.org|官方源"
@@ -289,12 +303,12 @@ test_npm_mirrors() {
         
         NPM_TEST_TIME=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 "$NPM_URL" 2>/dev/null)
 
-        if [ -z "$NPM_TEST_TIME" ] || [ "$NPM_TEST_TIME" = "0.000" ]; then
+        if [ -z "$NPM_TEST_TIME" ] || [ "$NPM_TEST_TIME" = "0.000" ] || [ "$NPM_TEST_TIME" = "0" ]; then
             echo "        $NPM_NAME: 超时/失败"
         else
-            NPM_INT_TIME=${NPM_TEST_TIME%%.*}
-            echo "        $NPM_NAME: ${NPM_TEST_TIME}秒"
-            if [ "$NPM_INT_TIME" -lt "$NPM_MIN_TIME" ]; then
+            NPM_INT_TIME=$(echo "$NPM_TEST_TIME" | awk '{printf "%d", $1 * 1000}')
+            echo "        $NPM_NAME: ${NPM_TEST_TIME}秒 (${NPM_INT_TIME}ms)"
+            if [ "$NPM_INT_TIME" -lt "$NPM_MIN_TIME" ] 2>/dev/null; then
                 NPM_MIN_TIME=$NPM_INT_TIME
                 NPM_BEST_MIRROR="$NPM_URL"
                 NPM_BEST_NAME="$NPM_NAME"
@@ -304,7 +318,7 @@ test_npm_mirrors() {
 
     if [ -n "$NPM_BEST_MIRROR" ]; then
         FASTEST_NPM_MIRROR="$NPM_BEST_MIRROR"
-        echo "[*] 最快NPM镜像: $NPM_BEST_NAME (${NPM_MIN_TIME}秒)"
+        echo "[*] 最快NPM镜像: $NPM_BEST_NAME (${NPM_MIN_TIME}毫秒)"
         
         if command -v npm &> /dev/null; then
             npm config set registry "$NPM_BEST_MIRROR"
@@ -337,13 +351,18 @@ setup_venv() {
 
     if [ "$VENV_EXISTS" -eq 0 ]; then
         echo "正在创建虚拟环境到 $VENV_PATH..."
-        $PYTHON_CMD -m venv $VENV_PATH
+        "$PYTHON_CMD" -m venv "$VENV_PATH"
         
         if [ $? -ne 0 ]; then
             echo "ERROR: 创建虚拟环境失败"
             exit 1
         fi
         VENV_EXISTS=1
+    fi
+
+    if [ ! -d "$VENV_PATH" ]; then
+        echo "ERROR: 虚拟环境路径不存在：$VENV_PATH"
+        exit 1
     fi
 
     source "$VENV_PATH/bin/activate"
@@ -353,7 +372,6 @@ setup_venv() {
         
         mkdir -p "$VENV_PATH/pip_config"
         
-        # 提取纯主机名（去掉协议和路径）
         TRUSTED_HOST=$(echo "$FASTEST_PIP_MIRROR" | sed -E 's|^https?://([^/]+).*|\1|')
         
         cat > "$VENV_PATH/pip_config/pip.conf" << EOF
@@ -369,25 +387,31 @@ EOF
 
     if [ -f "requirements.txt" ]; then
         echo "正在安装Python依赖..."
+        PIP_INSTALL_OK=0
         
         if [ -n "$FASTEST_PIP_MIRROR" ]; then
             pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --disable-pip-version-check
-            
             if [ $? -ne 0 ]; then
                 echo "WARNING: 使用镜像源安装失败，尝试默认源..."
                 pip install -r requirements.txt --disable-pip-version-check
+                if [ $? -ne 0 ]; then
+                    PIP_INSTALL_OK=1
+                fi
             fi
         else
             pip install -r requirements.txt --disable-pip-version-check
+            if [ $? -ne 0 ]; then
+                PIP_INSTALL_OK=1
+            fi
         fi
 
-        if [ $? -ne 0 ]; then
-            echo "ERROR: 依赖安装失败，虚拟环境创建未完成"
+        if [ "$PIP_INSTALL_OK" -ne 0 ]; then
+            echo "ERROR: 依赖安装完全失败"
             exit 1
         fi
 
         echo "[*] 安装Playwright浏览器..."
-        $PYTHON_CMD main.py --install-playwright
+        "$VENV_PATH/bin/python" main.py --install-playwright
     fi
 
     echo "Python虚拟环境设置完成"
@@ -408,7 +432,7 @@ check_config() {
 }
 
 auto_setup() {
-    echo "[5/5] 自动配置..."
+    echo "[*] 自动配置..."
 
     echo ""
     echo "正在复制配置文件模板..."
@@ -442,7 +466,7 @@ auto_setup() {
 }
 
 run_web() {
-    echo "[5/5] 预启动隧道服务(加快首次启动速度)..."
+    echo "[*] 预启动隧道服务(加快首次启动速度)..."
     npx -y hostc@latest --help >/dev/null 2>&1
     echo "隧道服务就绪"
 
@@ -457,29 +481,42 @@ run_web() {
     echo "正在启动 Web 服务..."
     echo ""
 
+    mkdir -p file
     WEB_PORT="${WEB_PORT:-8888}"
-    > file/web_output.log  # 清空日志文件
-    python main.py --web --port $WEB_PORT 2>&1 | tee file/web_output.log &
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ===" >> file/web_output.log
+    "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" >> file/web_output.log 2>&1 &
     PYTHON_PID=$!
 
     echo "等待 Web 服务启动完成..."
     sleep 5
 
-    if ! kill -0 $PYTHON_PID 2>/dev/null; then
-        echo "Web 服务启动失败，请检查 file/web_output.log"
-        exit 1
+    FLASK_WAIT_COUNT=0
+    FLASK_MAX_WAIT=30
+    while [ $FLASK_WAIT_COUNT -lt $FLASK_MAX_WAIT ]; do
+        if ! kill -0 $PYTHON_PID 2>/dev/null; then
+            echo "[ERROR] Web 服务进程已退出，请检查 file/web_output.log"
+            exit 1
+        fi
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT" 2>/dev/null)
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+            break
+        fi
+        FLASK_WAIT_COUNT=$((FLASK_WAIT_COUNT + 1))
+        sleep 2
+    done
+
+    if [ $FLASK_WAIT_COUNT -ge $FLASK_MAX_WAIT ]; then
+        echo "[WARNING] Web服务启动超时（等待了$((FLASK_MAX_WAIT * 2))秒），请检查日志: file/web_output.log"
     fi
 
     echo "Web 服务已就绪，正在启动隧道..."
-    npx -y hostc@latest $WEB_PORT --local-host localhost > file/tunnel_url.txt 2>&1 &
+    npx -y hostc@latest "$WEB_PORT" --local-host localhost > file/tunnel_url.txt 2>&1 &
     TUNNEL_PID=$!
 
     sleep 2
 
     if ! kill -0 $TUNNEL_PID 2>/dev/null; then
-        echo "隧道服务启动失败"
-        kill $PYTHON_PID 2>/dev/null
-        exit 1
+        echo "[WARNING] 隧道服务启动失败，本地访问仍可用"
     fi
 
     echo ""
@@ -500,7 +537,7 @@ run_web() {
             if [ -d "temp" ]; then
                 TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
                 LIMIT_SIZE_KB=3072
-                if [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
+                if [ -n "$TOTAL_SIZE_KB" ] && [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
                     rm -rf temp/*
                     echo "[*] 定时检查: temp目录超过3MB，已清理所有文件"
                 fi
@@ -509,7 +546,7 @@ run_web() {
     ) &
     CLEANUP_PID=$!
 
-    wait $PYTHON_PID $TUNNEL_PID
+    wait $PYTHON_PID $TUNNEL_PID 2>/dev/null
     kill $CLEANUP_PID 2>/dev/null
 }
 
@@ -519,6 +556,12 @@ cleanup_exit() {
     if [ -n "$PYTHON_PID" ]; then
         kill -15 $PYTHON_PID 2>/dev/null
     fi
+    if [ -n "$TUNNEL_PID" ]; then
+        kill -15 $TUNNEL_PID 2>/dev/null
+    fi
+    if [ -n "$CLEANUP_PID" ]; then
+        kill -15 $CLEANUP_PID 2>/dev/null
+    fi
     pkill -f "python main.py" >/dev/null 2>&1
     pkill -f "hostc" >/dev/null 2>&1
     echo "清理完成"
@@ -527,7 +570,7 @@ cleanup_exit() {
 
 main() {
     detect_python_env || exit 1
-    detect_node_env || echo "[WARNING] Node.js环境配置失败"
+    detect_node_env
     test_pip_mirrors
     test_npm_mirrors
     detect_venv
