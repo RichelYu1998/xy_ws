@@ -1603,11 +1603,14 @@ fi
   - BAT: 定义 `:log`（双写）+ `:log_console_only`（仅控制台），Web 就绪后切换
     - 文件写入用前置重定向 `>> "!LOG_FILE!" echo %* 2>nul`
     - Web 服务就绪后执行 `set "LOG_FILE="` 停止文件写入，后续用 `call :log_console_only`
-  - SH: 定义 `log()`（双写），Unix 文件锁粒度更细，一般无冲突
-  - **括号禁忌**：`call :log` 参数中禁止使用 ASCII `( )`，CMD 会误解析为块语法
+  - SH: 定义 `log()`（双写）+ `log_console_only()`（仅控制台），Web 就绪后 `LOG_FILE=""`
+  - **括号禁忌**：`call :log` / `log()` 参数中禁止使用 ASCII `( )`，CMD 会误解析为块语法
     - ❌ `call :log 预启动隧道服务(加快首次启动速度)...` → `) was unexpected at this time`
     - ✅ `call :log [*] 预启动隧道服务【加快首次启动速度】...` （全角方括号）
     - ✅ 毫秒显示用 `[34ms]` 而非 `(34ms)`
+  - **Python 写入模式**：`web_output.log` 必须用 `'a'`（追加），禁止 `'w'`（覆盖）
+    - ❌ `open(web_output_file, 'w')` → 清空文件 + 与 bat 追加写入锁冲突 `[Errno 13] Permission denied`
+    - ✅ `open(web_output_file, 'a')` → 统一追加模式，权限错误静默吞掉
 - Python 子进程输出追加到同一日志文件（`>> "!LOG_FILE!" 2>&1`）
 - ✅ `tunnel_url.txt` 保持覆盖模式（`>`），只保留最新公网地址
 - ❌ 写入配置文件的 echo 不走日志（如 pip.ini/pip.conf 的 echo 重定向）
@@ -1615,6 +1618,9 @@ fi
 ### 6.3 邮件通知
 
 - 隧道 URL 变化时自动发送邮件
+- **邮件去重**：`auto_start_tunnel()` 统一负责 `new` 事件发送，`restart_tunnel()` 仅打印日志不重复发 `update`
+  - ❌ 同一 URL 收到两封邮件（`new` + `update`）
+  - ✅ 每个新 URL 只发一封邮件（仅 `new` 事件）
 - 支持 SMTP SSL/TLS
 - 敏感字段 API 返回时脱敏
 - 邮件发送有冷却时间（60秒）和失败熔断（连续3次失败后冷却5分钟）

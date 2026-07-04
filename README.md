@@ -253,6 +253,12 @@ class Environment:
     - ❌ `call :log [*] 预启动隧道服务(加快首次启动速度)...`
     - ✅ `call :log [*] 预启动隧道服务【加快首次启动速度】...`
     - ✅ 毫秒显示从 `(37ms)` 改为 `[37ms]`
+  - **邮件去重修复**：删除 `restart_tunnel()` 中重复的 `send_tunnel_notification(new_url, 'update')` 调用
+    - 根因：`auto_start_tunnel()` 已发送 `new` 事件，回到循环又检测到 URL 变化发 `update`，同一 URL 收到两封邮件
+    - 修复：`auto_start_tunnel()` 统一负责通知发送，`restart_tunnel()` 仅打印日志不重复发邮件
+  - **Python 日志写入修复**：`web_output.log` 写入模式从 `'w'`（覆盖）改为 `'a'`（追加）
+    - 根因：Python 用 `'w'` 覆盖写入与 bat 脚本追加写入产生锁冲突 → `[Errno 13] Permission denied`
+    - 修复：统一使用追加模式，权限错误静默吞掉（bat 双写已覆盖）
   - 符合 v3.6.0 编码规范：双写机制 + 运行阶段隔离
   - 符合 v3.5.0 移动端规范：无前端变更
 

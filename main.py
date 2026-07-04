@@ -6143,15 +6143,15 @@ if __name__ == '__main__':
                                     if file_url and file_url != tunnel_url:
                                         print(f"[Tunnel] 从 hostc 输出获取到URL: {file_url}")
                                         
-                                        # 同时写入 web_output.log 和 tunnel_url.txt
+                                        # 追加写入 web_output.log（避免与 bat 脚本追加写入的锁冲突）
                                         web_output_file = PathManager.get_web_output_file()
                                         tunnel_url_file = PathManager.get_tunnel_url_file()
                                         try:
-                                            with open(web_output_file, 'w', encoding='utf-8') as wf:
+                                            with open(web_output_file, 'a', encoding='utf-8') as wf:
                                                 wf.write(f"Public URL: {file_url}\n")
                                             print(f"[Tunnel] 已写入 web_output.log")
                                         except Exception as e:
-                                            print(f"[Tunnel] 写入 web_output.log 失败: {e}")
+                                            pass
                                         
                                         try:
                                             with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
@@ -6264,6 +6264,8 @@ if __name__ == '__main__':
                         except:
                             pass
                 
+                saved_old_url = old_tunnel_url
+                
                 tunnel_process = None
                 tunnel_url = None
                 old_tunnel_url = None
@@ -6279,11 +6281,9 @@ if __name__ == '__main__':
                     if result['success']:
                         new_url = result.get('url')
                         if new_url:
-                            # URL变化时发送通知，让用户知道新地址
-                            if old_tunnel_url and old_tunnel_url != new_url:
-                                print(f"[Tunnel] 隧道URL已变化: {old_tunnel_url} -> {new_url}")
+                            if saved_old_url and saved_old_url != new_url:
+                                print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
                                 sys.stdout.flush()
-                                send_tunnel_notification(new_url, 'update')
                             
                             tunnel_last_error = None
                             tunnel_need_restart = False
