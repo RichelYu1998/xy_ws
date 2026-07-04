@@ -109,28 +109,279 @@ except PermissionError as e:
 
 ### 2.2 异常处理装饰器
 
-为不同操作类型提供专用装饰器，自动捕获标准异常并转换为 `AppException`：
+#### ExceptionHandler 统一异常处理器（单例模式）
 
 ```python
-@file_operation_handler(operation='读取')
+class ExceptionHandler:
+    """统一异常处理器 - 单例模式"""
+    
+    _instance = None
+    _logger = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
+        self._setup_logger()
+        self._error_counts = {}
+        self._error_history = []
+        self._max_history = 100
+    
+    def _setup_logger(self):
+        """设置日志记录器"""
+        if self._logger is None:
+            self._logger = logging.getLogger('ExceptionHandler')
+            self._logger.setLevel(logging.ERROR)
+            if not self._logger.handlers:
+                handler = logging.StreamHandler()
+                handler.setFormatter(logging.Formatter(
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S'
+                ))
+                self._logger.addHandler(handler)
+    
+    def handle(self, error: Exception, context: str = '', show_traceback: bool = True) -> str:
+        """处理异常并返回错误信息"""
+        error_type = type(error).__name__
+        error_msg = str(error)
+        
+        # 错误统计
+        self._error_counts[error_type] = self._error_counts.get(error_type, 0) + 1
+        
+        # 错误历史记录
+        error_record = {
+            'timestamp': datetime.now().isoformat(),
+            'type': error_type,
+            'message': error_msg,
+            'context': context
+        }
+        self._error_history.append(error_record)
+        if len(self._error_history) > self._max_history:
+            self._error_history.pop(0)
+        
+        # 格式化错误信息
+        if isinstance(error, AppException):
+            full_msg = f"[{error.code}] {error.message}"
+        else:
+            full_msg = f"[{error_type}] {error_msg"
+        
+        if context:
+            full_msg = f"{context}: {full_msg}"
+        
+        print(f'错误: {full_msg}')
+        if show_traceback:
+            traceback.print_exc()
+        
+        self._logger.error(full_msg, exc_info=show_traceback)
+        
+        return full_msg
+    
+    def try_execute(self, func: Callable, default: Any = None, context: str = '') -> Any:
+        """统一异常处理包装器 - 用于需要捕获异常并返回默认值的场景"""
+        try:
+            return func()
+        except Exception as e:
+            self.handle(e, context)
+            return default
+    
+    def try_execute_with_error(self, func: Callable, context: str = '') -> Tuple[Any, str]:
+        """统一异常处理包装器 - 用于需要获取错误信息的场景"""
+        try:
+            return func(), None
+        except Exception as e:
+            error_msg = self.handle(e, context)
+            return None, error_msg
+    
+    def get_error_counts(self) -> dict:
+        """获取错误统计"""
+        return self._error_counts.copy()
+    
+    def get_error_history(self, limit: int = 10) -> List[dict]:
+        """获取错误历史"""
+        return self._error_history[-limit:]
+```
+
+#### ExceptionContext 上下文管理器
+
+```python
+class ExceptionContext:
+    """异常处理上下文管理器 - with语句方式"""
+    
+    def __init__(self, context: str = '', default: Any = None, show_traceback: bool = True):
+        self.context = context
+        self.default = default
+        self.show_traceback = show_traceback
+        self.handler = ExceptionHandler()
+        self.result = None
+        self.error = None
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.error = self.handler.handle(exc_val, self.context, self.show_traceback)
+            self.result = self.default
+            return True  # 吞掉异常
+        return False
+    
+    def get_result(self) -> Tuple[Any, str]:
+        """获取结果和错误信息"""
+        return self.result, self.error
+
+# 使用示例：
+with ExceptionContext("读取配置文件", default={}) as ctx:
+    config = json.load(f)
+# 如果发生异常，ctx.result = {}, ctx.error = "错误信息"
+```
+
+#### 安全调用工具函数
+
+```python
+T = TypeVar('T')
+
+def safe_call(func: Callable[..., T], *args, default: T = None, context: str = '', **kwargs) -> T:
+    """安全调用函数，异常时返回默认值"""
+    handler = ExceptionHandler()
+    return handler.try_execute(lambda: func(*args, **kwargs), default, context)
+
+def safe_call_with_error(func: Callable[..., T], *args, context: str = '', **kwargs) -> Tuple[T, str]:
+    """安全调用函数，返回(结果, 错误信息)元组"""
+    handler = ExceptionHandler()
+    return handler.try_execute_with_error(lambda: func(*args, **kwargs), context)
+
+def handle_error(error: Exception, context: str = '') -> str:
+    """处理已捕获的异常"""
+    handler = ExceptionHandler()
+    return handler.handle(error, context)
+
+def safe_execute_func(func: Callable, default: Any = None, context: str = '') -> Any:
+    """统一异常处理包装器 - 无参数版本"""
+    handler = ExceptionHandler()
+    return handler.try_execute(func, default, context)
+
+def safe_execute_with_error(func: Callable, context: str = '') -> Tuple[Any, str]:
+    """统一异常处理包装器 - 返回错误信息版本"""
+    handler = ExceptionHandler()
+    return handler.try_execute_with_error(func, context)
+
+def handle_exception(e: Exception, context: str = '') -> str:
+    """handle_error的别名"""
+    return handle_error(e, context)
+```
+
+#### 装饰器工厂函数
+
+```python
+def exception_handler(context: str = '', default: Any = None, reraise: bool = False, custom_exc: type = None):
+    """
+    异常处理装饰器工厂
+    
+    Args:
+        context: 操作上下文描述
+        default: 异常时的默认返回值
+        reraise: 是否重新抛出异常
+        custom_exc: 自定义异常类型（用于转换标准异常）
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except AppException:
+                if reraise:
+                    raise
+                return default
+            except PermissionError as e:
+                raise custom_exc(f"权限不足: {e}") if custom_exc else AppException.permission_error(str(e)) from e
+            except FileNotFoundError as e:
+                raise custom_exc(f"文件不存在: {e}") if custom_exc else AppException.file_error(str(e)) from e
+            except json.JSONDecodeError as e:
+                raise custom_exc(f"JSON解析错误: {e}") if custom_exc else AppException.parse_error(str(e)) from e
+            except urllib.error.URLError as e:
+                raise custom_exc(f"网络错误: {e}") if custom_exc else AppException.network_error(str(e)) from e
+            except Exception as e:
+                handler = ExceptionHandler()
+                handler.handle(e, context or func.__name__)
+                if reraise:
+                    raise
+                return default
+        return wrapper
+    return decorator
+
+def file_operation_handler(operation: str = '文件操作'):
+    """文件操作专用装饰器"""
+    return exception_handler(
+        context=f'文件{operation}',
+        custom_exc=AppException.file_error,
+        reraise=True
+    )
+
+def network_handler(url: str = None):
+    """网络请求专用装饰器"""
+    return exception_handler(
+        context=f'网络请求({url})' if url else '网络请求',
+        custom_exc=AppException.network_error,
+        reraise=True
+    )
+
+def json_handler(context: str = 'JSON解析'):
+    """JSON解析专用装饰器"""
+    return exception_handler(
+        context=context,
+        custom_exc=AppException.parse_error,
+        reraise=True
+    )
+
+def excel_handler(operation: str = 'Excel操作'):
+    """Excel操作专用装饰器"""
+    return exception_handler(
+        context=f'Excel{operation}',
+        custom_exc=AppException.excel_error,
+        reraise=True
+    )
+```
+
+**使用示例**：
+
+```python
+@file_operation_handler(operation='读取配置')
 def read_config(path):
-    with open(path, 'r') as f:
-        return f.read()
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 @network_handler(url='https://api.example.com')
 def fetch_data(url):
-    return urllib.request.urlopen(url)
+    return urllib.request.urlopen(url).read()
 
-@excel_handler(operation='读取货号')
+@excel_handler(operation='读取货号数据')
 def load_excel(file_path):
     return openpyxl.load_workbook(file_path)
 
-@json_handler(context='解析配置')
-def parse_config(text):
+@json_handler(context='解析用户输入')
+def parse_user_input(text):
     return json.loads(text)
+
+# 使用上下文管理器
+with ExceptionContext("读取配置文件", default={}) as ctx:
+    config = json.load(open('config.json', 'r', encoding='utf-8'))
+# ctx.result 包含结果或默认值
+# ctx.error 包含错误信息（如果有）
+
+# 使用安全调用函数
+result = safe_call(load_json, 'data.json', default=[])
+result, error = safe_call_with_error(fetch_api, url=url)
 ```
 
 ### 2.3 安全调用工具函数
+
+**已在§2.2完整定义，此处为快速参考**：
 
 ```python
 # 返回默认值（异常时返回 None）
@@ -148,6 +399,153 @@ with ExceptionContext("读取配置文件", default={}) as ctx:
 def send_email(to, subject, body):
     ...
 ```
+
+### 2.3.1 TeeOutput 双输出类（控制台 + 文件）
+
+```python
+class TeeOutput:
+    """同时输出到控制台和文件"""
+    
+    def __init__(self, original, log_file_path=None):
+        self.original = original
+        self.log_file_path = log_file_path
+        self.file = None
+        if log_file_path:
+            safe_execute_func(
+                lambda: setattr(self, 'file', open(log_file_path, 'a', encoding='utf-8')),
+                context='TeeOutput初始化'
+            )
+    
+    def write(self, text):
+        self.original.write(text)
+        if self.file:
+            safe_execute_func(
+                lambda: (self.file.write(text), self.file.flush()),
+                context='TeeOutput写入'
+            )
+    
+    def flush(self):
+        self.original.flush()
+        if self.file:
+            safe_execute_func(
+                lambda: self.file.flush(),
+                context='TeeOutput刷新'
+            )
+    
+    def close(self):
+        if self.file:
+            safe_execute_func(
+                lambda: self.file.close(),
+                context='TeeOutput关闭'
+            )
+    
+    def isatty(self):
+        return False
+
+# 使用示例：
+# 替换sys.stdout和sys.stderr，实现双输出
+sys.stdout = TeeOutput(sys.stdout, 'file/web_output.log')
+sys.stderr = TeeOutput(sys.stderr, 'file/web_output.log')
+```
+
+### 2.3.2 Web日志系统
+
+```python
+def setup_web_logging():
+    """设置Web模式下的日志输出 - 启动时调用一次"""
+    global web_log_file
+    web_log_file = PathManager.get_web_output_file()
+    
+    # 清空旧日志（覆盖模式）
+    safe_execute_func(
+        lambda: open(web_log_file, 'w', encoding='utf-8').write(
+            "=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n"
+        ),
+        context='setup_web_logging'
+    )
+    
+    # 替换stdout和stderr为双输出
+    sys.stdout = TeeOutput(sys.stdout, web_log_file)
+    sys.stderr = TeeOutput(sys.stderr, web_log_file)
+
+def log_print(*args, **kwargs):
+    """
+    同时输出到控制台和 web_output.log
+    
+    使用场景：需要确保日志写入文件的场景
+    （TeeOutput只对print有效，log_print显式写文件）
+    """
+    global web_log_file
+    msg = ' '.join(str(a) for a in args)
+    print(msg, **kwargs)  # 输出到控制台（通过TeeOutput也会写文件）
+    
+    # 显式追加到文件（双重保险）
+    if web_log_file:
+        safe_execute_func(
+            lambda: open(web_log_file, 'a', encoding='utf-8').write(msg + '\n'),
+            context='log_print'
+        )
+
+def format_size(size_bytes: int) -> str:
+    """格式化文件大小（B/KB/MB/GB/TB）"""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} PB"
+
+def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, stream=None) -> logging.Logger:
+    """
+    创建标准化的Logger实例
+    
+    Args:
+        log_file: 日志文件路径（可选）
+        log_level: 日志级别（INFO/WARNING/ERROR）
+        stream: 输出流（默认sys.stderr）
+    
+    Returns:
+        配置好的logging.Logger实例
+    """
+    logger = logging.getLogger('FileCleaner')  # 或其他模块名
+    logger.setLevel(log_level)
+    logger.handlers.clear()
+    
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # 控制台处理器
+    console_handler = logging.StreamHandler(stream)
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    # 文件处理器（可选）
+    if log_file:
+        safe_execute_func(
+            lambda: logger.addHandler(logging.FileHandler(log_file, encoding='utf-8')),
+            context='setup_logger'
+        )
+        for h in logger.handlers:
+            if isinstance(h, logging.FileHandler):
+                h.setLevel(log_level)
+                h.setFormatter(formatter)
+    
+    return logger
+
+# 使用示例：
+logger = setup_logger('logs/cleaner.log')
+logger.info('开始清理文件...')
+logger.error('清理失败: 权限不足')
+```
+
+**关键规则**：
+- ✅ `web_output.log` 必须用 `'a'`（追加）模式，禁止用 `'w'`（覆盖）
+- ✅ 启动时清空日志：`open(file, 'w').write(...)`
+- ✅ 运行时追加日志：`open(file, 'a').write(msg + '\n')`
+- ✅ 所有文件操作使用 `safe_execute_func` 包装
+- ✅ `log_print` 用于需要确保日志持久化的场景
 
 ### 2.4 跨平台环境类
 
@@ -549,50 +947,296 @@ class PathManager:
                 os.makedirs(dir_path)
 ```
 
-### 2.6 配置管理类
+### 2.6 配置管理类（ConfigManager）
 
-懒加载 + 自动保存，对外提供 `get/set` 接口：
+懒加载 + 自动保存 + 异常处理 + 便捷方法：
 
 ```python
 class ConfigManager:
+    """
+    配置管理器 - 懒加载模式
+    
+    特性：
+    - 首次访问时加载配置文件（_config=None时触发）
+    - set()方法自动调用save_config()持久化
+    - 所有文件操作使用AppException异常体系
+    - 提供便捷方法获取常用配置项
+    """
+    
     def __init__(self, config_path=None):
         self.config_path = config_path or PathManager.get_config_file()
         self._config = None
 
     @property
     def config(self):
+        """懒加载：首次访问时才读取配置文件"""
         if self._config is None:
             self._config = self._load_config()
         return self._config
 
+    def _load_config(self):
+        """加载配置文件（带异常处理）"""
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return {}  # 文件不存在返回空字典
+        except json.JSONDecodeError as e:
+            handle_exception(e, 'ConfigManager JSON解析')
+            raise AppException.config_error(
+                f"配置文件格式错误: {e}",
+                config_key=self.config_path
+            )
+        except Exception as e:
+            handle_exception(e, 'ConfigManager加载配置')
+            raise AppException.config_error(
+                f"加载配置文件失败: {e}",
+                config_key=self.config_path
+            )
+
+    def save_config(self):
+        """保存配置到文件（带权限检查）"""
+        if self._config:
+            try:
+                with open(self.config_path, 'w', encoding='utf-8') as f:
+                    json.dump(self._config, f, ensure_ascii=False, indent=2)
+                return True
+            except PermissionError as e:
+                handle_exception(e, 'ConfigManager保存配置权限')
+                raise AppException.permission_error(
+                    f"保存配置文件失败（权限不足）: {e}",
+                    path=self.config_path,
+                    operation='write'
+                )
+            except Exception as e:
+                handle_exception(e, 'ConfigManager保存配置')
+                raise AppException.config_error(
+                    f"保存配置文件失败: {e}",
+                    config_key=self.config_path
+                )
+        return False
+
     def get(self, key, default=None):
+        """获取配置项"""
         return self.config.get(key, default)
 
     def set(self, key, value):
+        """
+        设置配置项并自动保存
+        
+        Args:
+            key: 配置键名
+            value: 配置值
+        
+        注意：
+        - 会立即写入磁盘
+        - 如果_save_config失败会抛出AppException
+        """
         if self._config is not None:
             self._config[key] = value
             self.save_config()
+
+    # ========== 便捷方法 ==========
+
+    def get_cookie_file(self):
+        """获取Cookie文件路径"""
+        return self.config.get('cookie_file', PathManager.get_cookie_file())
+
+    def get_output_file(self):
+        """获取输出文件路径"""
+        return self.config.get('output_file', PathManager.get_output_file())
+
+    def get_excel_file(self):
+        """
+        获取第一个存在的Excel文件路径
+        
+        Returns:
+            存在的Excel文件路径，或空字符串
+        """
+        excel_files = self.config.get('excel_files', [])
+        if excel_files:
+            for path in excel_files:
+                expanded_path = os.path.expanduser(path)  # 展开 ~ 为用户目录
+                if FileManager.file_exists(expanded_path):
+                    return expanded_path
+        return self.config.get('excel_file', '')
+
+    def get_all_excel_files(self):
+        """获取所有存在的Excel文件路径列表"""
+        excel_files = self.config.get('excel_files', [])
+        existing_files = []
+        if excel_files:
+            for path in excel_files:
+                expanded_path = os.path.expanduser(path)
+                if FileManager.file_exists(expanded_path):
+                    existing_files.append(expanded_path)
+        return existing_files
+
+    def get_target_url(self):
+        """获取目标URL"""
+        return self.config.get('target_url', '')
+
+    def get_user_agent(self):
+        """获取User-Agent（优先使用配置值，否则动态生成）"""
+        return self.config.get('user_agent', WegoScraper.get_user_agent())
+
+# 使用示例：
+config = ConfigManager()
+
+# 读取配置
+enabled = config.get('email_notification_enabled', False)
+smtp_host = config.get('email_smtp_host', 'smtp.qq.com')
+
+# 写入配置（自动保存）
+config.set('max_retries', 3)  # 立即写入磁盘
+
+# 使用便捷方法
+cookie_file = config.get_cookie_file()
+output_file = config.get_output_file()
+excel_file = config.get_excel_file()
 ```
 
-### 2.7 文件操作类
+### 2.7 文件操作类（FileManager）
 
-统一文件读写，内建异常上下文：
+统一文件操作接口 + 异常处理 + 便捷方法：
 
 ```python
 class FileManager:
+    """
+    文件管理器 - 统一文件操作接口
+    
+    特性：
+    - 所有方法都是静态方法（无需实例化）
+    - 自动使用ExceptionContext进行异常包装
+    - 自动创建父目录（write方法）
+    - 提供文件查找便捷方法
+    """
+    
     @staticmethod
     def read_json(file_path):
-        with ExceptionContext(f"FileManager.read_json({file_path})", default=None):
+        """读取JSON文件"""
+        with ExceptionContext(f"FileManager.read_json({file_path})", default=None) as ctx:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
 
     @staticmethod
     def write_json(file_path, data, indent=2):
-        with ExceptionContext(f"FileManager.write_json({file_path})", default=False):
+        """写入JSON文件（自动创建父目录）"""
+        with ExceptionContext(f"FileManager.write_json({file_path})", default=False) as ctx:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=indent)
             return True
+
+    @staticmethod
+    def read_text(file_path):
+        """读取文本文件"""
+        with ExceptionContext(f"FileManager.read_text({file_path})", default=None) as ctx:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+
+    @staticmethod
+    def write_text(file_path, content):
+        """写入文本文件（自动创建父目录）"""
+        with ExceptionContext(f"FileManager.write_text({file_path})", default=False) as ctx:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            return True
+
+    @staticmethod
+    def file_exists(file_path):
+        """检查文件是否存在"""
+        return os.path.exists(file_path)
+
+    @staticmethod
+    def get_latest_json_file(directory=None, pattern='微购相册'):
+        """获取目录中最新修改的JSON文件"""
+        with ExceptionContext("FileManager.get_latest_json_file", default=None) as ctx:
+            directory = directory or PathManager.get_file_dir()
+            if not os.path.exists(directory):
+                print(f'目录 {directory} 不存在')
+                return None
+            
+            json_files = []
+            for file in os.listdir(directory):
+                if file.endswith('.json') and pattern in file:
+                    file_path = os.path.join(directory, file)
+                    json_files.append((file_path, os.path.getmtime(file)))
+            
+            if not json_files:
+                print(f'未找到包含"{pattern}"的JSON文件')
+                return None
+            
+            # 按修改时间降序排序，取最新的
+            json_files.sort(key=lambda x: x[1], reverse=True)
+            latest_file = json_files[0][0]
+            print(f'找到最新的JSON文件: {latest_file}')
+            return latest_file
+
+    @staticmethod
+    def get_today_json_files(directory=None, pattern='微购相册'):
+        """
+        获取用于对比的两个JSON文件（智能选择策略）
+        
+        优先级：
+        1. 当天的缓存文件和最新文件
+        2. 当天的最新文件和前一天的文件
+        3. 最新的两个文件
+        
+        Returns:
+            tuple: (文件1路径, 文件2路径) 或 (None, None)
+        """
+        with ExceptionContext("FileManager.get_today_json_files", default=(None, None)) as ctx:
+            directory = directory or PathManager.get_file_dir()
+            if not os.path.exists(directory):
+                return None, None
+            
+            today = datetime.now().strftime('%Y%m%d')
+            
+            # 获取所有匹配的JSON文件（排除缓存文件）
+            all_json_files = []
+            for file in os.listdir(directory):
+                if file.endswith('.json') and pattern in file and '_cache' not in file:
+                    file_path = os.path.join(directory, file)
+                    all_json_files.append((file_path, os.path.getmtime(file)))
+            
+            if len(all_json_files) < 1:
+                print(f'未找到包含"{pattern}"的JSON文件')
+                return None, None
+            
+            all_json_files.sort(key=lambda x: x[1], reverse=True)
+            latest_file = all_json_files[0][0]
+            
+            # 策略1：优先使用当天缓存文件
+            cache_file = PathManager.get_cache_file_path(today)
+            if os.path.exists(cache_file):
+                print(f'找到当天缓存文件: {cache_file}')
+                print(f'找到当天最新文件: {latest_file}')
+                return latest_file, cache_file
+            
+            # 策略2：使用当天两个文件
+            today_files = []
+            for file in os.listdir(directory):
+                if file.endswith('.json') and pattern in file and today in file and '_cache' not in file:
+                    file_path = os.path.join(directory, file)
+                    today_files.append((file_path, os.path.getmtime(file)))
+            
+            if len(today_files) >= 2:
+                today_files.sort(key=lambda x: x[1], reverse=True)
+                return today_files[0][0], today_files[1][0]
+            
+            # 策略3：使用最新两个文件
+            if len(all_json_files) >= 2:
+                return latest_file, all_json_files[1][0]
+            
+            return latest_file, None
+
+# 使用示例：
+config = FileManager.read_json('config/config.json')
+success = FileManager.write_json('file/output.json', data, indent=2)
+latest = FileManager.get_latest_json_file(pattern='微购相册')
+file1, file2 = FileManager.get_today_json_files()
 ```
 
 ### 2.8 Flask API 路由规范
@@ -2404,495 +3048,6 @@ pkill -f hostc
 - `skill.md` 是唯一源文件
 - 修改 `skill.md` 后必须重新生成 `skill.docx`
 - 两个文件一起提交到 git
-
----
-
-## 十、Hostc隧道优化方案 (2026-07-04)
-
-> 符合 v3.6.0 编码规范：所有路径使用动态变量，跨平台支持，无硬编码
-> 符合 v3.5.0 移动端规范：无前端变更，移动端表现不受影响
-
-### 10.1 问题诊断
-
-#### 原始问题
-公网URL（如 `https://t-xxx.hostc.dev`）在生成后**20-30秒内就变成502错误**，导致：
-- 邮件通知的URL无法访问
-- 前端显示的URL不可用
-- 系统频繁重启（每分钟多次）
-
-#### 根本原因分析
-
-**1. 代码Bug：读取旧URL** ✅ 已修复
-- **位置**：`main.py` 第1800行 `get_public_url_from_web_log()`
-- **问题**：使用 `re.search()` 返回第一个匹配项（最旧的URL）
-- **修复**：改用 `re.findall()` 返回最后一个匹配项（最新URL）
-- **跨平台说明**：
-  - ✅ 使用标准库 `re`，无平台依赖
-  - ✅ 正则表达式通用，Windows/macOS/Linux行为一致
-  - ✅ 文件读取使用 `PathManager.get_web_output_file()` 动态获取路径
-
-```python
-# 旧代码 - 总是返回最旧的URL ❌
-match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-if match:
-    return match.group(1).rstrip('/')
-
-# 新代码 - 返回最新的URL ✅
-matches = re.findall(r'Public URL:\s*(https?://[^\s]+)', content)
-if matches:
-    return matches[-1].rstrip('/')  # 返回最新的URL
-```
-
-**2. 过度敏感的重启机制** ✅ 已优化
-- **原始配置**：心跳间隔2秒、失败阈值2次、重启等待3秒（太敏感）
-- **优化后配置**：心跳间隔15秒、失败阈值3次、重启等待60秒（合理容忍）
-
-| 参数 | 修改前 | 修改后 | 说明 |
-|------|--------|--------|------|
-| URL验证超时 | 2秒 | **5秒** | 避免网络波动误判 |
-| 心跳检测间隔 | 5秒 | **15秒** | 降低检测频率 |
-| 失败触发条件 | 失败1次 | **连续失败3次** | 增加容错性 |
-| 重启等待时间 | 15秒 | **60秒** | 给URL足够稳定时间 |
-| 日志打印间隔 | 10秒 | **30秒** | 减少日志刷屏 |
-
-**3. 多进程冲突** ✅ 已修复
-- **问题**：检测到4个node.exe进程同时运行（Windows）或多个hostc进程（Unix）
-- **修复**：清理后等待2秒确保完全退出 + 二次检查残留进程
-
-### 10.2 核心修改详情（跨平台实现）
-
-#### 修改1：URL读取逻辑（第1800-1815行）⭐ 核心修复
-
-```python
-@staticmethod
-def get_public_url_from_web_log():
-    web_output_file = PathManager.get_web_output_file()
-    if not os.path.exists(web_output_file):
-        return None
-    try:
-        with open(web_output_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-        # 使用 findall 返回所有匹配项，取最后一个（最新URL）
-        matches = re.findall(r'Public URL:\s*(https?://[^\s]+)', content)
-        if matches:
-            return matches[-1].rstrip('/')  # 返回最新的URL
-    except Exception as e:
-        safe_execute_func(lambda: print(f"[Tunnel] 读取web日志失败: {e}"), context='get_public_url_from_web_log')
-    return None
-```
-
-#### 修改2：智能邮件发送机制（第5923-5999行）⭐⭐ 终极解决方案
-
-**问题**：邮件发送的URL有时可用，有时不可用（502）
-
-**原因**：
-- URL生成后立即发邮件，不验证稳定性
-- URL可能在20-30秒后就失效
-- 用户打开邮件时可能已失效
-
-**解决方案**：3轮验证机制 + 熔断保护
-
-```python
-def send_tunnel_email_with_verification(url, event_type='new'):
-    """
-    发送带验证的隧道邮件通知
-
-    Args:
-        url: 公网URL
-        event_type: 'new' 或 'update'（仅 'new' 触发实际发送）
-    """
-    # 仅处理 'new' 事件（避免重复发送）
-    if event_type != 'new':
-        print(f"[Email] 跳过非首次事件: {event_type}")
-        return False
-
-    # 检查冷却时间（60秒内不重复发送）
-    global last_email_time
-    current_time = time.time()
-    if last_email_time and (current_time - last_email_time) < 60:
-        print(f"[Email] 冷却期内，跳过发送")
-        return False
-
-    # 3轮验证机制（每5秒验证一次）
-    max_retries = 3
-    retry_interval = 5  # 秒
-
-    for attempt in range(1, max_retries + 1):
-        print(f"[Email] 📊 第{attempt}/{max_retries}次验证...")
-
-        # 验证URL可用性（超时5秒）
-        if verify_url(url, timeout=5):
-            print(f"[Email] ✅ 第{attempt}次验证通过！")
-            break
-        else:
-            print(f"[Email] ❌ 第{attempt}次验证失败")
-            if attempt < max_retries:
-                time.sleep(retry_interval)
-    else:
-        # 所有验证都失败
-        print(f"[Email] ❌ 已验证{max_retries}次，URL仍不可用，放弃发送")
-        return False
-
-    # 验证通过，发送邮件
-    try:
-        config = ConfigManager().config
-        subject = f"🚀 隧道已启动 - {url}"
-        body = f"""
-        隧道公网地址已就绪！
-
-        地址: {url}
-        状态: ✅ 已通过{max_retries}次验证
-        时间: {time.strftime('%Y-%m-%d %H:%M:%S')}
-
-        请在浏览器中打开上述地址访问服务。
-        """
-
-        success = send_email(
-            to=config.get('email_to', ''),
-            subject=subject,
-            body=body
-        )
-
-        if success:
-            last_email_time = current_time
-            print(f"[Email] ✅ 邮件发送成功（已验证{max_retries}次）")
-            return True
-        else:
-            print(f"[Email] ❌ 邮件发送失败")
-            return False
-
-    except Exception as e:
-        print(f"[Email] ❌ 发送异常: {e}")
-        return False
-```
-
-**熔断机制**：
-
-```python
-# 全局变量
-email_failure_count = 0
-email_failure_threshold = 3  # 连续失败3次触发熔断
-email_cooldown_period = 300  # 熔断冷却时间5分钟
-last_failure_time = None
-
-def send_with_circuit_breaker(url):
-    """带熔断保护的邮件发送"""
-    global email_failure_count, last_failure_time
-
-    # 检查是否处于熔断状态
-    if email_failure_count >= email_failure_threshold:
-        if last_failure_time and (time.time() - last_failure_time) < email_cooldown_period:
-            remaining = int(email_cooldown_period - (time.time() - last_failure_time))
-            print(f"[Email] ⚠️ 熔断中，{remaining}秒后重试")
-            return False
-        else:
-            # 冷却期结束，重置计数器
-            email_failure_count = 0
-
-    # 尝试发送
-    success = send_tunnel_email_with_verification(url)
-
-    if not success:
-        email_failure_count += 1
-        last_failure_time = time.time()
-
-        if email_failure_count >= email_failure_threshold:
-            print(f"[Email] 🔒 连续失败{email_failure_count}次，进入熔断状态")
-    else:
-        # 发送成功，重置计数器
-        email_failure_count = 0
-
-    return success
-```
-
-#### 修改3：心跳检测优化（第6078-6096行）⭐⭐⭐ 关键改进
-
-**新增容错计数器**：
-
-```python
-def heartbeat_loop():
-    global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
-    consecutive_failures = 0
-    max_consecutive_failures = 3  # 连续失败3次才标记需要重启
-    url_verify_failures = 0  # URL验证连续失败计数（新增）
-    max_url_verify_failures = 3  # URL验证允许连续失败3次（新增）
-    heartbeat_interval = 15  # 心跳间隔15秒（从5秒降低到15秒）
-    last_log_time = 0
-
-    while tunnel_auto_restart:
-        # 从 web_output.log 获取 URL（唯一来源）
-        web_url = PathManager.get_public_url_from_web_log()
-        is_tunnel_running = False
-
-        if web_url:
-            try:
-                if verify_url(web_url, timeout=5):  # 超时从2秒增加到5秒
-                    is_tunnel_running = True
-                    url_verify_failures = 0  # 验证成功，重置计数
-                else:
-                    url_verify_failures += 1
-                    # 30秒才打印一次日志（从10秒增加到30秒）
-                    if time.time() - last_log_time > 30:
-                        print(f"[Tunnel] URL验证失败 ({url_verify_failures}/{max_url_verify_failures}): {web_url}")
-                        last_log_time = time.time()
-                    # 只有连续失败达到阈值才标记重启
-                    if url_verify_failures >= max_url_verify_failures:
-                        print(f"[Tunnel] URL连续验证失败{url_verify_failures}次，标记需要重启")
-                        tunnel_need_restart = True
-            except Exception as e:
-                url_verify_failures += 1
-                if time.time() - last_log_time > 30:
-                    print(f"[Tunnel] URL验证异常 ({url_verify_failures}/{max_url_verify_failures}): {e}")
-                    last_log_time = time.time()
-                if url_verify_failures >= max_url_verify_failures:
-                    tunnel_need_restart = True
-```
-
-**关键改进点**：
-1. ✅ **容错计数器**：`url_verify_failures` 记录连续失败次数
-2. ✅ **延迟响应**：不是立即标记重启，而是等3次失败后才标记
-3. ✅ **日志降噪**：30秒才打印一次日志，避免刷屏
-4. ✅ **自动重置**：验证成功后计数器归零
-
-#### 修改4：重启流程优化（第6289行）⭐⭐
-
-```python
-# 重启等待时间阈值：60秒（从15秒增加到60秒）
-wait_threshold = 60  # 给URL足够的时间稳定，避免频繁重启
-```
-
-#### 修改5：API状态检测优化（第6395-6405行）⭐
-
-```python
-# 验证 URL 是否可用（5秒超时，更稳定的检测）
-if web_url:
-    try:
-        if verify_url(web_url, timeout=5):  # 从2秒增加到5秒
-            url_valid = True
-        else:
-            # URL不可用，延迟触发自动重启（避免过于敏感）
-            if time.time() - last_url_invalid_log_time > 30:  # 从10秒增加到30秒
-                print(f"[Tunnel] 检测到URL不可用: {web_url}")  # 改为"检测到"而非"触发重启"
-                last_url_invalid_log_time = time.time()
-```
-
-### 10.3 跨平台进程管理规范
-
-#### Windows 进程清理
-
-```python
-if Environment.IS_WINDOWS:
-    # 清理 hostc 进程
-    Environment.kill_process_by_name('hostc')
-    # 清理 node 进程
-    Environment.kill_process_by_name('node')
-    # 等待2秒确保完全退出
-    time.sleep(2)
-    # 二次检查残留进程
-    try:
-        result = subprocess.run(
-            ['tasklist', '/FI', 'IMAGENAME eq hostc.exe', '/FI', 'IMAGENAME eq node.exe'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        if 'hostc.exe' in result.stdout or 'node.exe' in result.stdout:
-            print("[Tunnel] ⚠️ 检测到残留进程，强制终止")
-            Environment.kill_process_by_name('hostc')
-            Environment.kill_process_by_name('node')
-    except Exception as e:
-        print(f"[Tunnel] 二次检查异常: {e}")
-```
-
-#### Unix 进程清理
-
-```python
-else:
-    # Unix/macOS/Linux
-    import signal
-    # 终止 hostc 进程
-    subprocess.run(['pkill', '-f', 'hostc'], capture_output=True, timeout=10)
-    # 终止 node 进程
-    subprocess.run(['pkill', '-f', 'node.*hostc'], capture_output=True, timeout=10)
-    # 等待2秒确保完全退出
-    time.sleep(2)
-    # 二次检查残留进程
-    try:
-        result = subprocess.run(['pgrep', '-f', 'hostc'], capture_output=True, text=True, timeout=10)
-        if result.stdout.strip():
-            print("[Tunnel] ⚠️ 检测到残留进程，强制终止")
-            subprocess.run(['pkill', '-9', '-f', 'hostc'], capture_output=True, timeout=10)
-            subprocess.run(['pkill', '-9', '-f', 'node.*hostc'], capture_output=True, timeout=10)
-    except Exception as e:
-        print(f"[Tunnel] 二次检查异常: {e}")
-```
-
-**统一接口封装**（已在 `Environment` 类中实现）：
-
-```python
-class Environment:
-    @staticmethod
-    def kill_process_by_name(process_name):
-        """跨平台进程终止"""
-        if Environment.IS_WINDOWS:
-            subprocess.run(
-                f'taskkill /F /IM {process_name}',
-                shell=True,
-                capture_output=True,
-                timeout=10
-            )
-        else:
-            subprocess.run(
-                f'pkill -f "{process_name}"',
-                shell=True,
-                capture_output=True,
-                timeout=10
-            )
-```
-
-### 10.4 性能对比与预期效果
-
-#### 修改前后对比表
-
-| 指标 | 修改前 | 修改后 | 提升幅度 |
-|------|--------|--------|----------|
-| URL平均存活时间 | 20-30秒 | **45秒以上** | **+50%** |
-| 重启频率 | 每分钟多次 | **每小时<1次** | **-90%** |
-| 邮件有效率 | 经常失效 | **99%+可用** | **大幅提升** |
-| 日志刷屏频率 | 每10秒一次 | **每30秒一次** | **-67%** |
-| CPU占用（频繁重启） | 高 | **低** | **显著降低** |
-| 用户体验 | 差（频繁断开） | **优秀（稳定连接）** | **质的飞跃** |
-
-#### 时间线对比
-
-**修改前（恶性循环）**：
-```
-18:48:18 → 获取新URL: t-la2kmhphg7
-18:48:20 → ❌ 2秒后验证失败，触发重启
-18:48:29 → 获取新URL: t-t9iafah8z5
-18:48:45 → ❌ 16秒后验证失败，触发重启
-18:49:06 → 获取新URL: t-1cy2jcwxv2
-18:49:27 → ❌ 验证失败...（无限循环）
-```
-
-**修改后（稳定运行）**：
-```
-18:50:00 → 获取新URL: t-abc123def
-18:50:05 → ✅ 第1次验证通过
-18:50:10 → ✅ 第2次验证通过
-18:50:15 → ✅ 第3次验证通过 → 发送邮件
-18:51:00 → 心跳检测正常（每15秒一次）
-19:00:00 → URL仍然稳定存活（已超过10分钟）
-...（长时间稳定运行，无需重启）
-```
-
-### 10.5 监控与维护建议
-
-#### 日常监控指标
-
-1. **URL存活时间**
-   - 正常值：>45秒
-   - 异常值：<20秒（需排查网络/服务器问题）
-
-2. **重启频率**
-   - 正常值：<每天1次
-   - 异常值：>每小时1次（需调整参数）
-
-3. **心跳成功率**
-   - 正常值：>99%
-   - 异常值：<95%（需检查网络连通性）
-
-4. **邮件发送成功率**
-   - 正常值：>98%
-   - 异常值：<90%（需检查SMTP配置）
-
-#### 日志分析命令
-
-```bash
-# 查看24小时内的隧道重启次数
-grep "检测到问题.*尝试重启" file/web_output.log | grep "$(date +%Y-%m-%d)" | wc -l
-
-# 查看URL验证失败的分布
-grep "URL验证失败" file/web_output.log | awk '{print $1}' | sort | uniq -c | sort -rn | head -10
-
-# 查看邮件发送记录
-grep "邮件发送\|冷却期\|熔断中" file/web_output.log | tail -20
-```
-
-#### 故障排查清单
-
-**问题1：URL频繁失效**
-
-- [ ] 检查网络连接（ping hostc.dev）
-- [ ] 检查DNS解析（nslookup t-xxx.hostc.dev）
-- [ ] 检查防火墙设置（确保出站443端口开放）
-- [ ] 检查hostc服务状态（npx hostc --version）
-- [ ] 查看系统资源（CPU/内存使用率）
-
-**问题2：邮件发送失败**
-
-- [ ] 检查SMTP配置（host/port/user/password）
-- [ ] 测试SMTP连通性（telnet smtp.qq.com 587）
-- [ ] 检查邮箱授权码是否过期
-- [ ] 查看邮件日志（grep "Email" file/web_output.log）
-- [ ] 检查是否触发熔断机制（连续失败3次）
-
-**问题3：进程残留**
-
-- [ ] Windows: tasklist | findstr "hostc node"
-- [ ] Unix: pgrep -a "hostc|node"
-- [ ] 手动清理：taskkill /F /IM hostc.exe（Win）/ pkill -9 -f hostc（Unix）
-- [ ] 检查是否有其他程序占用相同端口（netstat -ano | findstr :8888）
-
-### 10.6 未来优化方向
-
-#### 短期优化（1-2周内）
-
-1. **自适应参数调整**
-   ```python
-   # 根据历史数据动态调整超时和阈值
-   adaptive_timeout = calculate_adaptive_timeout(history_data)
-   ```
-
-2. **健康检查仪表盘**
-   - Web界面展示实时监控数据
-   - 图表化展示URL存活时间、重启频率趋势
-   - 一键导出诊断报告
-
-3. **多URL备份机制**
-   ```python
-   # 同时维护多个活跃URL，主URL失效时自动切换
-   backup_urls = []
-   ```
-
-#### 中期优化（1个月内）
-
-1. **机器学习预测**
-   - 收集历史失效模式数据
-   - 预测URL可能失效时间点
-   - 在失效前主动切换
-
-2. **分布式部署**
-   - 多节点负载均衡
-   - 自动故障转移
-   - 全球CDN加速
-
-3. **用户自定义策略**
-   - 允许用户配置容忍度等级（激进/平衡/保守）
-   - 自定义通知方式（邮件/Webhook/短信）
-   - 自定义验证规则
-
-#### 长期规划（3个月+）
-
-1. **自愈系统**
-   - 自动识别根因并修复
-   - 无需人工干预的完全自动化
-   - 智能容量规划
-
-2. **多协议支持**
-   - 除HTTP外支持WebSocket、gRPC
-   - 协议自动协商
-   - QoS保障
 
 ---
 
