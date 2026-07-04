@@ -6027,7 +6027,7 @@ if __name__ == '__main__':
                         print(f"[Email] 待发邮件发送异常: {e}")
                 threading.Thread(target=send_pending, daemon=True).start()
         
-        def verify_url(url, timeout=2):
+        def verify_url(url, timeout=5):
             try:
                 req = urllib.request.Request(url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-verify/1.0')
@@ -6056,28 +6056,37 @@ if __name__ == '__main__':
         def heartbeat_loop():
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             consecutive_failures = 0
-            max_consecutive_failures = 5  # 允许5次失败才触发重启（避免过于敏感）
-            heartbeat_interval = 5  # 心跳间隔5秒（降低频率，减少误判）
+            max_consecutive_failures = 3  # 连续失败3次才标记需要重启
+            url_verify_failures = 0  # URL验证连续失败计数
+            max_url_verify_failures = 3  # URL验证允许连续失败3次
+            heartbeat_interval = 15  # 心跳间隔15秒（降低频率，避免误判）
             last_log_time = 0
             while tunnel_auto_restart:
                 # 从 web_output.log 获取 URL（唯一来源）
                 web_url = PathManager.get_public_url_from_web_log()
                 is_tunnel_running = False
-                
+
                 if web_url:
                     try:
-                        if verify_url(web_url, timeout=2):
+                        if verify_url(web_url, timeout=5):
                             is_tunnel_running = True
+                            url_verify_failures = 0  # 验证成功，重置计数
                         else:
-                            if time.time() - last_log_time > 10:
-                                print(f"[Tunnel] URL验证失败: {web_url}")
+                            url_verify_failures += 1
+                            if time.time() - last_log_time > 30:  # 30秒才打印一次日志
+                                print(f"[Tunnel] URL验证失败 ({url_verify_failures}/{max_url_verify_failures}): {web_url}")
                                 last_log_time = time.time()
-                            tunnel_need_restart = True
+                            # 只有连续失败达到阈值才标记重启
+                            if url_verify_failures >= max_url_verify_failures:
+                                print(f"[Tunnel] URL连续验证失败{url_verify_failures}次，标记需要重启")
+                                tunnel_need_restart = True
                     except Exception as e:
-                        if time.time() - last_log_time > 10:
-                            print(f"[Tunnel] URL验证异常: {e}")
+                        url_verify_failures += 1
+                        if time.time() - last_log_time > 30:
+                            print(f"[Tunnel] URL验证异常 ({url_verify_failures}/{max_url_verify_failures}): {e}")
                             last_log_time = time.time()
-                        tunnel_need_restart = True
+                        if url_verify_failures >= max_url_verify_failures:
+                            tunnel_need_restart = True
                 
                 if is_tunnel_running:
                     success = send_heartbeat()
@@ -6278,8 +6287,8 @@ if __name__ == '__main__':
                 else:
                     elapsed = time.time() - restart_wait_start
                 
-                # 等待时间阈值：15秒（给URL足够的时间稳定，避免频繁重启）
-                wait_threshold = 15
+                # 等待时间阈值：60秒（给URL足够的时间稳定，避免频繁重启）
+                wait_threshold = 60
                 
                 if elapsed < wait_threshold:
                     # 短暂等待后立即重启
@@ -6383,15 +6392,15 @@ if __name__ == '__main__':
             # 检测是否有 hostc 进程在运行
             process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
             
-            # 验证 URL 是否可用（2秒超时，快速检测）
+            # 验证 URL 是否可用（5秒超时，更稳定的检测）
             if web_url:
                 try:
-                    if verify_url(web_url, timeout=2):
+                    if verify_url(web_url, timeout=5):
                         url_valid = True
                     else:
-                        # URL不可用，立即触发自动重启
-                        if time.time() - last_url_invalid_log_time > 10:
-                            print(f"[Tunnel] 检测到URL不可用，触发自动重启: {web_url}")
+                        # URL不可用，延迟触发自动重启（避免过于敏感）
+                        if time.time() - last_url_invalid_log_time > 30:
+                            print(f"[Tunnel] 检测到URL不可用: {web_url}")
                             last_url_invalid_log_time = time.time()
                         tunnel_need_restart = True
                 except Exception as e:
