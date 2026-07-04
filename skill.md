@@ -2285,12 +2285,20 @@ def get_version_from_readme():
 
 README 中的格式：`### v3.6.0 (2026-06-11)`
 
+**⚠️ 格式注意事项（v3.8.3 新增）**：
+- `## 最新更新` 后**必须有空行**，不可与 `### v版本号` 合并同一行
+- ❌ `## 最新更新### v3.8.2 (2026-07-04)` → `/api/changelog` 匹配失败，返回空数据；`/api/readme-sections` 解析出错返回 500
+- ✅ `## 最新更新` + 空行 + `### v3.8.2 (2026-07-04)` → 两个 API 均正常解析
+- h2/h3 标题**必须独立成行**，不可合并，否则正则匹配和行级解析全部失效
+
 ### 2.11 更新日志 API
 
 `/api/changelog` 接口解析 README "最新更新"章节，返回结构化 JSON，支持子条目：
 
 **README 格式**：
 ```markdown
+## 最新更新
+
 ### v3.6.0 (2026-06-11)
 - **分类标题**
   - 子条目1
@@ -3249,6 +3257,8 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 
 **README 格式**：
 ```markdown
+## 最新更新
+
 ### v3.6.0 (2026-06-11)
 - **分类标题**
   - 子条目1
@@ -4855,6 +4865,7 @@ function exportData(format) {
 | 图表渲染 | 使用 `requestAnimationFrame` 替代 `setTimeout`，确保 DOM 就绪 |
 | 跨系统兼容 | 所有路径 `os.path.join()`，前端 `window.location.origin`，无硬编码，按钮无数字前缀 |
 | 版本号 | 唯一来源 `README.md`，格式 `### v3.7.5 (2026-06-26)` |
+| README Markdown 标题 | h2/h3 标题必须独立成行，`## 最新更新` 后必须有空行，禁止与 `### v版本号` 合并同一行（v3.8.3） |
 | 依赖管理 | `requirements.txt`，虚拟环境 `.venv` |
 | 进程管理 | Windows: `taskkill`，Linux/Mac: `pkill` |
 | 敏感信息 | 配置模板用占位符，API 返回时脱敏 |
@@ -5278,6 +5289,7 @@ pkill -f hostc
 - [x] API响应格式统一（`{'success': True, ...}` / `{'error': '...'}`）
 - [x] 版本号唯一来源为 `README.md`
 - [x] 敏感信息脱敏（password字段返回 `******`）
+- [x] README Markdown 标题独立成行，h2/h3 不可合并同一行（v3.8.3）
 
 ### v3.5.0 移动端规范 ✅
 
@@ -5437,7 +5449,7 @@ git reset --hard HEAD~1
 
 ---
 
-> **文档版本**: v3.7.9 (2026-07-04)
-> **最后更新**: Hostc隧道稳定性终极优化
+> **文档版本**: v3.8.3 (2026-07-04)
+> **最后更新**: 修复"最新更新"区域空白 Bug + Markdown 标题格式规范
 > **适用范围**: xy_ws 项目全栈代码（Python + Flask + 原生JS）
 > **合规标准**: v3.6.0编码规范 + v3.5.0移动端规范 + 跨平台兼容性
