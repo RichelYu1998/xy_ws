@@ -553,6 +553,7 @@ logger.error('清理失败: 权限不足')
 
 ```python
 class Environment:
+    """统一环境检测和管理"""
     SYSTEM = platform.system()
     IS_WINDOWS = SYSTEM == 'Windows'
     IS_MAC = SYSTEM == 'Darwin'
@@ -560,6 +561,7 @@ class Environment:
 
     @staticmethod
     def get_venv_python():
+        """获取虚拟环境Python路径（跨系统）"""
         if Environment.IS_WINDOWS:
             return os.path.join(PROJECT_DIR, '.venv', 'Scripts', 'python.exe')
         else:
@@ -567,6 +569,7 @@ class Environment:
 
     @staticmethod
     def get_chrome_path():
+        """获取Chrome浏览器路径（跨系统，Windows使用Playwright内置）"""
         if Environment.IS_WINDOWS:
             return None  # Windows 使用 Playwright 内置浏览器
         elif Environment.IS_MAC:
@@ -577,11 +580,130 @@ class Environment:
             return '/usr/bin/google-chrome'
 
     @staticmethod
+    def get_browser_args():
+        """获取浏览器启动参数（根据系统类型返回不同参数）"""
+        args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled']
+        if Environment.IS_WINDOWS:
+            args.append('--disable-gpu')
+        elif Environment.IS_LINUX:
+            args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
+        return args
+
+    @staticmethod
+    def get_user_agent():
+        """获取用户代理字符串（动态版本号，跨系统）"""
+        chrome_versions = ['120.0.0.0', '121.0.0.0', '122.0.0.0', '123.0.0.0', '124.0.0.0',
+                          '125.0.0.0', '126.0.0.0', '127.0.0.0', '128.0.0.0', '129.0.0.0']
+        chrome_version = random.choice(chrome_versions)
+        if Environment.IS_WINDOWS:
+            return f'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36'
+        elif Environment.IS_MAC:
+            return f'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36'
+        elif Environment.IS_LINUX:
+            return f'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36'
+        else:
+            return f'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36'
+
+    @staticmethod
+    def get_default_viewport():
+        """动态获取默认浏览器视口大小（根据系统屏幕分辨率）"""
+        try:
+            if Environment.IS_WINDOWS:
+                user32 = ctypes.windll.user32
+                width = user32.GetSystemMetrics(0)
+                height = user32.GetSystemMetrics(1)
+                return {'width': min(width, 1920), 'height': min(height - 100, 1080)}
+            elif Environment.IS_MAC or Environment.IS_LINUX:
+                try:
+                    result = subprocess.run(['xdpyinfo'], capture_output=True, text=True, timeout=2)
+                    match = re.search(r'dimensions:\s*(\d+)\s*x\s*(\d+)', result.stdout)
+                    if match:
+                        return {'width': min(int(match.group(1)), 1920), 'height': min(int(match.group(2)) - 100, 1080)}
+                except:
+                    pass
+            return {'width': 1920, 'height': 1080}
+        except:
+            return {'width': 1920, 'height': 1080}
+
+    @staticmethod
+    def get_system_info():
+        """获取系统信息（调试/日志用）"""
+        return {
+            'system': Environment.SYSTEM,
+            'is_windows': Environment.IS_WINDOWS,
+            'is_mac': Environment.IS_MAC,
+            'is_linux': Environment.IS_LINUX,
+            'venv_python': Environment.get_venv_python(),
+            'project_dir': PROJECT_DIR
+        }
+
+    @staticmethod
+    def test_pip_mirror(mirror_url, timeout=3):
+        """测试pip镜像源速度"""
+        try:
+            start_time = time.time()
+            urllib.request.urlopen(mirror_url, timeout=timeout)
+            return time.time() - start_time
+        except:
+            return None
+
+    @staticmethod
+    def get_fastest_pip_mirror():
+        """获取最快的pip镜像源（轮询测速）"""
+        mirrors = [
+            ('https://mirrors.aliyun.com/pypi/simple/', 'mirrors.aliyun.com'),
+            ('https://pypi.tuna.tsinghua.edu.cn/simple/', 'pypi.tuna.tsinghua.edu.cn'),
+            ('https://mirrors.cloud.tencent.com/pypi/simple/', 'mirrors.cloud.tencent.com'),
+            ('https://mirrors.ustc.edu.cn/pypi/simple/', 'mirrors.ustc.edu.cn'),
+            ('https://pypi.douban.com/simple/', 'pypi.douban.com')
+        ]
+        fastest = mirrors[0]
+        min_time = float('inf')
+        for url, host in mirrors:
+            elapsed = Environment.test_pip_mirror(url)
+            if elapsed is not None and elapsed < min_time:
+                min_time = elapsed
+                fastest = (url, host)
+        return fastest
+
+    @staticmethod
     def kill_process_by_name(process_name):
+        """跨系统终止进程"""
         if Environment.IS_WINDOWS:
             subprocess.run(f'taskkill /F /IM {process_name}', shell=True, capture_output=True, timeout=10)
         else:
             subprocess.run(f'pkill -f "{process_name}"', shell=True, capture_output=True, timeout=10)
+
+    @staticmethod
+    def check_process_running(process_name):
+        """跨系统检查进程是否运行"""
+        if Environment.IS_WINDOWS:
+            result = subprocess.run(f'tasklist /FI "IMAGENAME eq {process_name}"', shell=True, capture_output=True, text=True, timeout=3)
+            return process_name in result.stdout
+        else:
+            result = subprocess.run(f'pgrep -f "{process_name}"', shell=True, capture_output=True, text=True, timeout=3)
+            return result.returncode == 0
+
+def safe_print(*args, **kwargs):
+    """安全打印，处理Windows上的emoji编码问题"""
+    try:
+        print(*args, **kwargs)
+    except UnicodeEncodeError:
+        emoji_map = {
+            '🔍': '[检查]', '❌': '[错误]', '✓': '[OK]',
+            '⚠️': '[警告]', '✗': '[失败]', '📝': '[说明]',
+            '💡': '[提示]', '🚀': '[启动]', '🎯': '[目标]',
+            '📊': '[数据]', '🔧': '[设置]', '🎉': '[完成]'
+        }
+        safe_args = []
+        for arg in args:
+            if isinstance(arg, str):
+                for emoji, replacement in emoji_map.items():
+                    arg = arg.replace(emoji, replacement)
+                safe_args.append(arg)
+            else:
+                safe_args.append(arg)
+        print(*safe_args, **kwargs)
 
 ### 2.4.1 启动脚本环境检测规范
 
@@ -927,20 +1049,120 @@ if "!BEST_MIRROR!"=="" (
 
 ```python
 class PathManager:
+    """路径管理类，统一处理跨系统路径问题"""
+    
     @staticmethod
     def get_config_dir():
+        """获取配置文件目录"""
         return os.path.join(PROJECT_DIR, 'config')
-
+    
+    @staticmethod
+    def get_file_dir():
+        """获取输出文件目录"""
+        return os.path.join(PROJECT_DIR, 'file')
+    
     @staticmethod
     def get_config_file():
+        """获取配置文件路径"""
         return os.path.join(PathManager.get_config_dir(), 'config.json')
-
+    
+    @staticmethod
+    def get_cookie_file():
+        """获取Cookie文件路径"""
+        return os.path.join(PathManager.get_config_dir(), 'cookies.json')
+    
     @staticmethod
     def get_output_file():
-        return os.path.join(PROJECT_DIR, 'file', 'output.json')
-
+        """获取输出文件路径"""
+        return os.path.join(PathManager.get_file_dir(), 'output.json')
+    
+    @staticmethod
+    def get_input_file():
+        """获取输入文件路径"""
+        return os.path.join(PathManager.get_config_dir(), 'input_stock_numbers.txt')
+    
+    @staticmethod
+    def get_json_filename(date_str):
+        """获取JSON文件名"""
+        return f"{date_str}微购相册(小旭数码).json"
+    
+    @staticmethod
+    def get_cache_filename(date_str):
+        """获取缓存文件名"""
+        return f"{date_str}微购相册(小旭数码)_cache.json"
+    
+    @staticmethod
+    def get_json_file_path(date_str):
+        """获取JSON文件完整路径"""
+        return os.path.join(PathManager.get_file_dir(), PathManager.get_json_filename(date_str))
+    
+    @staticmethod
+    def get_cache_file_path(date_str):
+        """获取缓存文件完整路径"""
+        return os.path.join(PathManager.get_file_dir(), PathManager.get_cache_filename(date_str))
+    
+    @staticmethod
+    def get_diff_log_file(date_str):
+        """获取差异日志文件路径"""
+        return os.path.join(PathManager.get_file_dir(), f'diff_log_{date_str}.json')
+    
+    @staticmethod
+    def get_duplicate_log_file():
+        """获取重复日志文件路径"""
+        return os.path.join(PathManager.get_file_dir(), 'duplicate_log.json')
+    
+    @staticmethod
+    def get_tunnel_url_file():
+        """获取隧道URL文件路径"""
+        return os.path.join(PathManager.get_file_dir(), 'tunnel_url.txt')
+    
+    @staticmethod
+    def get_web_output_file():
+        """获取Web输出日志文件路径"""
+        return os.path.join(PathManager.get_file_dir(), 'web_output.log')
+    
+    @staticmethod
+    def get_public_url_from_web_log():
+        """从 web_output.log 读取公网地址（返回最新/最后一个URL）"""
+        try:
+            web_log_file = PathManager.get_web_output_file()
+            if os.path.exists(web_log_file):
+                with open(web_log_file, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+                # 优先匹配 Public URL 行
+                matches = re.findall(r'Public URL:\s*(https?://[^\s]+)', content)
+                if matches:
+                    return matches[-1].rstrip('/')  # 返回最后一个（最新）
+                # 回退匹配 hostc.dev 域名
+                matches = re.findall(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', content)
+                if matches:
+                    return matches[-1].rstrip('/')
+        except Exception as e:
+            handle_exception(e, 'get_public_url_from_web_log')
+        return None
+    
+    @staticmethod
+    def get_lan_ip():
+        """获取局域网IP（跨系统，使用UDP连接检测）"""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(2)
+            s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), 
+                       int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return ''
+    
+    @staticmethod
+    def sync_web_output_from_tunnel_url():
+        """从 tunnel_url.txt 同步公网地址到 web_output.log"""
+        pass  # 详见隧道管理章节
+    
     @staticmethod
     def ensure_dirs_exist():
+        """确保所有必要的目录存在"""
         dirs = [PathManager.get_config_dir(), PathManager.get_file_dir()]
         for dir_path in dirs:
             if not os.path.exists(dir_path):
@@ -1096,6 +1318,60 @@ output_file = config.get_output_file()
 excel_file = config.get_excel_file()
 ```
 
+### 2.6.1 CookieValidator Cookie验证器
+
+```python
+class CookieValidator:
+    """
+    Cookie验证器 - 提供完整的cookie验证和友好提示
+    
+    特性：
+    - 7步验证流程（文件存在→可读→非空→Token存在→未过期→值有效→即将过期预警）
+    - 统一友好提示格式（原因+解决方案+提示）
+    - 过期预警（7天内黄色警告，3天内红色警告）
+    """
+    
+    @staticmethod
+    def validate_and_prompt(cookie_file):
+        """
+        验证cookie并给出友好提示
+        
+        Args:
+            cookie_file: Cookie文件路径
+        
+        Returns:
+            tuple: (is_valid, cookies_or_None)
+        
+        验证流程：
+        1. 检查文件是否存在
+        2. 检查文件是否可读（JSON格式）
+        3. 检查cookie是否为空
+        4. 检查是否存在token
+        5. 检查token是否过期
+        6. 检查token值是否有效（长度>=10）
+        7. 检查cookie是否即将过期（7天内预警）
+        """
+        pass
+    
+    @staticmethod
+    def _show_prompt(title, file_path, extra_info=None, reasons=None, 
+                     solutions=None, tip=None, impact=False):
+        """显示统一的友好提示（原因+解决方案+提示）"""
+        pass
+    
+    @staticmethod
+    def _show_expiry_warning(days_until_expiry):
+        """显示即将过期的警告（7天内黄色，3天内红色）"""
+        pass
+
+# 使用示例：
+is_valid, cookies = CookieValidator.validate_and_prompt(
+    PathManager.get_cookie_file()
+)
+if not is_valid:
+    print("Cookie无效，请更新")
+```
+
 ### 2.7 文件操作类（FileManager）
 
 统一文件操作接口 + 异常处理 + 便捷方法：
@@ -1239,9 +1515,515 @@ latest = FileManager.get_latest_json_file(pattern='微购相册')
 file1, file2 = FileManager.get_today_json_files()
 ```
 
-### 2.8 Flask API 路由规范
+### 2.8 WegoScraper 核心爬虫引擎
 
-#### 路由命名
+#### 2.8.1 架构设计
+
+```python
+class WegoScraper:
+    """
+    Szwego商品爬虫引擎 - 智能滚动 + API获取 + 并发处理
+    
+    核心特性：
+    - 智能滚动策略（动态检测页面高度变化）
+    - 多源数据获取（API + 页面解析）
+    - 并发请求控制
+    - 自动重试与熔断机制
+    - 反爬策略规避
+    """
+    
+    def __init__(self):
+        self.browser = None
+        self.page = None
+        self.scroll_config = None
+        self.user_agent = Environment.get_user_agent()
+        self.headers = self._build_headers()
+    
+    def _build_headers(self):
+        """构建请求头（动态User-Agent）"""
+        return {
+            'User-Agent': self.user_agent,
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Sec-Ch-Ua-Platform': '"Windows"' if Environment.IS_WINDOWS else 
+                               '"macOS"' if Environment.IS_MAC else '"Linux"'
+        }
+```
+
+#### 2.8.2 智能滚动策略
+
+```python
+def scroll_to_bottom(self, max_attempts=30, same_height_limit=8, 
+                     scroll_wait_time=0.8, dynamic_adjust=True):
+    """
+    智能滚动到页面底部
+    
+    Args:
+        max_attempts: 最大滚动尝试次数
+        same_height_limit: 相同高度连续出现次数（触发停止）
+        scroll_wait_time: 每次滚动后等待时间（秒）
+        dynamic_adjust: 是否动态调整等待时间
+    
+    Returns:
+        bool: 是否成功滚动到底部
+    """
+    last_height = 0
+    same_height_count = 0
+    
+    for attempt in range(max_attempts):
+        # 执行滚动
+        self.page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+        
+        # 等待页面加载
+        time.sleep(scroll_wait_time)
+        
+        # 获取当前页面高度
+        current_height = self.page.evaluate('document.body.scrollHeight')
+        
+        # 检查是否到达底部
+        if current_height == last_height:
+            same_height_count += 1
+            if same_height_count >= same_height_limit:
+                print(f"[Scraper] 连续{same_height_limit}次高度相同，停止滚动")
+                return True
+        else:
+            same_height_count = 0
+            last_height = current_height
+            
+            # 动态调整等待时间（页面加载慢时增加等待）
+            if dynamic_adjust and current_height > 50000:
+                scroll_wait_time = min(scroll_wait_time + 0.2, 2.0)
+        
+        print(f"[Scraper] 滚动进度: {attempt+1}/{max_attempts}, 高度: {current_height}")
+    
+    return False
+```
+
+#### 2.8.3 API数据获取
+
+```python
+def fetch_products_from_api(self, url, max_pages=10):
+    """
+    从API获取商品数据
+    
+    Args:
+        url: API基础URL
+        max_pages: 最大页数
+    
+    Returns:
+        list: 商品列表
+    """
+    products = []
+    session = requests.Session()
+    session.headers.update(self.headers)
+    
+    for page in range(1, max_pages + 1):
+        try:
+            api_url = f"{url}?page={page}&limit=50"
+            response = session.get(api_url, timeout=15)
+            response.raise_for_status()
+            
+            data = response.json()
+            page_products = data.get('data', {}).get('products', [])
+            
+            if not page_products:
+                break  # 没有更多数据
+            
+            products.extend(page_products)
+            print(f"[Scraper] 获取第{page}页，新增{len(page_products)}个商品")
+            
+            # 请求间隔，避免触发限流
+            time.sleep(0.5)
+            
+        except Exception as e:
+            handle_exception(e, f'fetch_products_from_api page {page}')
+            break
+    
+    return products
+```
+
+#### 2.8.4 页面解析
+
+```python
+def extract_products_from_page(self):
+    """
+    从已加载页面提取商品数据
+    
+    Returns:
+        list: 商品列表（含价格、标题、货号等）
+    """
+    products = []
+    
+    try:
+        # 执行JS获取商品列表
+        products_js = self.page.evaluate('''
+            Array.from(document.querySelectorAll('.product-item')).map(item => ({
+                sku: item.getAttribute('data-sku') || '',
+                title: item.querySelector('.title')?.textContent || '',
+                price: item.querySelector('.price')?.textContent || '',
+                image: item.querySelector('img')?.src || '',
+                description: item.querySelector('.desc')?.textContent || ''
+            }))
+        ''')
+        
+        products = [p for p in products_js if p['sku']]
+        print(f"[Scraper] 从页面提取了{len(products)}个商品")
+        
+    except Exception as e:
+        handle_exception(e, 'extract_products_from_page')
+    
+    return products
+```
+
+#### 2.8.5 并发处理
+
+```python
+def fetch_concurrent(self, urls, max_workers=5):
+    """
+    并发获取多个URL数据
+    
+    Args:
+        urls: URL列表
+        max_workers: 最大并发数
+    
+    Returns:
+        list: 各URL响应结果
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    
+    results = []
+    session = requests.Session()
+    session.headers.update(self.headers)
+    
+    def fetch_url(url):
+        try:
+            response = session.get(url, timeout=10)
+            return {'url': url, 'success': True, 'data': response.json()}
+        except Exception as e:
+            return {'url': url, 'success': False, 'error': str(e)}
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(fetch_url, url): url for url in urls}
+        
+        for future in as_completed(futures):
+            results.append(future.result())
+    
+    return results
+```
+
+### 2.9 StockNumberComparator 货号对比类
+
+#### 2.9.1 核心算法
+
+```python
+class StockNumberComparator:
+    """
+    货号对比工具 - Excel读取 + JSON对比 + 差异检测
+    
+    特性：
+    - 支持多格式Excel（.xlsx/.xls）
+    - 智能列识别（自动检测货号列）
+    - 模糊匹配算法（支持部分匹配）
+    - 差异报告生成
+    """
+    
+    def __init__(self):
+        self.excel_loader = self._get_excel_loader()
+    
+    def _get_excel_loader(self):
+        """根据环境选择Excel加载器"""
+        try:
+            import openpyxl
+            return 'openpyxl'
+        except ImportError:
+            try:
+                import xlrd
+                return 'xlrd'
+            except ImportError:
+                return None
+    
+    def load_excel_stock_numbers(self, file_path):
+        """
+        从Excel文件加载货号列表
+        
+        Args:
+            file_path: Excel文件路径
+        
+        Returns:
+            list: 货号列表（去重后）
+        """
+        stock_numbers = set()
+        
+        try:
+            if self.excel_loader == 'openpyxl':
+                from openpyxl import load_workbook
+                wb = load_workbook(file_path, read_only=True)
+                ws = wb.active
+                
+                # 智能识别货号列（查找包含"货号"、"SKU"、"编号"等关键词的列）
+                header_row = [cell.value for cell in ws[1]]
+                sku_col_idx = self._find_sku_column(header_row)
+                
+                if sku_col_idx is None:
+                    sku_col_idx = 0  # 默认第一列
+                
+                for row in ws.iter_rows(min_row=2):
+                    cell_value = row[sku_col_idx].value
+                    if cell_value:
+                        stock_numbers.add(str(cell_value).strip())
+            
+            elif self.excel_loader == 'xlrd':
+                from xlrd import open_workbook
+                wb = open_workbook(file_path)
+                ws = wb.sheet_by_index(0)
+                
+                header_row = ws.row_values(0)
+                sku_col_idx = self._find_sku_column(header_row)
+                
+                if sku_col_idx is None:
+                    sku_col_idx = 0
+                
+                for row_idx in range(1, ws.nrows):
+                    cell_value = ws.cell_value(row_idx, sku_col_idx)
+                    if cell_value:
+                        stock_numbers.add(str(cell_value).strip())
+            
+            print(f"[Comparator] 从Excel加载了{len(stock_numbers)}个货号")
+            
+        except Exception as e:
+            handle_exception(e, 'load_excel_stock_numbers')
+        
+        return list(stock_numbers)
+    
+    def _find_sku_column(self, headers):
+        """智能查找货号列"""
+        sku_keywords = ['货号', 'SKU', 'sku', '编号', '商品编号', '产品编号']
+        
+        for idx, header in enumerate(headers):
+            if header:
+                header_str = str(header).strip()
+                for keyword in sku_keywords:
+                    if keyword in header_str:
+                        return idx
+        return None
+```
+
+#### 2.9.2 差异检测算法
+
+```python
+def compare_stock_numbers(self, excel_numbers, json_data, match_threshold=0.8):
+    """
+    对比货号差异
+    
+    Args:
+        excel_numbers: Excel中的货号列表
+        json_data: JSON数据（爬虫输出）
+        match_threshold: 模糊匹配阈值（0-1）
+    
+    Returns:
+        dict: 差异结果
+    """
+    # 从JSON提取货号
+    json_numbers = set()
+    if isinstance(json_data, dict):
+        products = json_data.get('商品列表', [])
+    else:
+        products = json_data
+    
+    for product in products:
+        sku = product.get('sku', '') or product.get('货号', '')
+        if sku:
+            json_numbers.add(str(sku).strip())
+    
+    # 精确匹配
+    exact_match = excel_numbers & json_numbers
+    excel_only = excel_numbers - json_numbers
+    json_only = json_numbers - excel_numbers
+    
+    # 模糊匹配（处理格式差异）
+    fuzzy_match = set()
+    for excel_sku in excel_only.copy():
+        for json_sku in json_only.copy():
+            if self._fuzzy_match(excel_sku, json_sku) >= match_threshold:
+                fuzzy_match.add((excel_sku, json_sku))
+                excel_only.remove(excel_sku)
+                json_only.remove(json_sku)
+    
+    return {
+        'total_excel': len(excel_numbers),
+        'total_json': len(json_numbers),
+        'exact_match': list(exact_match),
+        'fuzzy_match': list(fuzzy_match),
+        'excel_only': list(excel_only),
+        'json_only': list(json_only)
+    }
+    
+def _fuzzy_match(self, str1, str2):
+    """模糊匹配相似度计算"""
+    str1 = str(str1).strip().upper()
+    str2 = str(str2).strip().upper()
+    
+    # 去除特殊字符
+    str1 = re.sub(r'[^A-Z0-9]', '', str1)
+    str2 = re.sub(r'[^A-Z0-9]', '', str2)
+    
+    if not str1 or not str2:
+        return 0.0
+    
+    # 完全匹配
+    if str1 == str2:
+        return 1.0
+    
+    # 包含匹配
+    if str1 in str2 or str2 in str1:
+        return max(len(str1), len(str2)) / max(len(str1), len(str2))
+    
+    # 编辑距离
+    try:
+        from difflib import SequenceMatcher
+        return SequenceMatcher(None, str1, str2).ratio()
+    except:
+        return 0.0
+```
+
+### 2.10 FileCleaner 文件清理系统
+
+#### 2.10.1 清理策略
+
+```python
+class FileCleaner:
+    """
+    文件清理工具 - 分组清理 + 时间清理 + PNG专项
+    
+    清理策略：
+    1. 按时间清理（保留最近N天的文件）
+    2. 按大小清理（超过阈值时清理）
+    3. PNG临时文件专项清理
+    """
+    
+    def __init__(self):
+        self.logger = setup_logger('FileCleaner')
+    
+    def clean_by_time(self, directory, days_to_keep=7):
+        """
+        按时间清理文件
+        
+        Args:
+            directory: 目标目录
+            days_to_keep: 保留天数
+        
+        Returns:
+            int: 清理的文件数量
+        """
+        cleaned_count = 0
+        cutoff_time = time.time() - (days_to_keep * 24 * 60 * 60)
+        
+        try:
+            for filename in os.listdir(directory):
+                file_path = os.path.join(directory, filename)
+                
+                if os.path.isfile(file_path):
+                    mtime = os.path.getmtime(file_path)
+                    if mtime < cutoff_time:
+                        os.remove(file_path)
+                        cleaned_count += 1
+                        self.logger.info(f"清理过期文件: {filename}")
+        
+        except Exception as e:
+            handle_exception(e, 'clean_by_time')
+        
+        return cleaned_count
+    
+    def clean_by_size(self, directory, max_size_mb=100):
+        """
+        按大小清理文件（按修改时间排序，保留最新的）
+        
+        Args:
+            directory: 目标目录
+            max_size_mb: 最大允许大小（MB）
+        
+        Returns:
+            int: 清理的文件数量
+        """
+        cleaned_count = 0
+        max_size_bytes = max_size_mb * 1024 * 1024
+        
+        try:
+            # 获取所有文件及其大小和修改时间
+            files = []
+            for filename in os.listdir(directory):
+                file_path = os.path.join(directory, filename)
+                if os.path.isfile(file_path):
+                    files.append({
+                        'path': file_path,
+                        'size': os.path.getsize(file_path),
+                        'mtime': os.path.getmtime(file_path)
+                    })
+            
+            # 计算当前总大小
+            total_size = sum(f['size'] for f in files)
+            
+            if total_size <= max_size_bytes:
+                return 0
+            
+            # 按修改时间排序（最新的在前）
+            files.sort(key=lambda x: x['mtime'], reverse=True)
+            
+            # 累计保留文件大小，直到超过阈值
+            current_size = 0
+            keep_until_idx = 0
+            
+            for idx, f in enumerate(files):
+                current_size += f['size']
+                if current_size > max_size_bytes:
+                    keep_until_idx = idx
+                    break
+            
+            # 删除超出部分
+            for f in files[keep_until_idx:]:
+                os.remove(f['path'])
+                cleaned_count += 1
+                self.logger.info(f"清理超大小文件: {os.path.basename(f['path'])}")
+        
+        except Exception as e:
+            handle_exception(e, 'clean_by_size')
+        
+        return cleaned_count
+    
+    def clean_png_temp_files(self, directory):
+        """
+        清理PNG临时文件（通常是截图或缓存）
+        
+        Args:
+            directory: 目标目录
+        
+        Returns:
+            int: 清理的文件数量
+        """
+        cleaned_count = 0
+        
+        try:
+            for filename in os.listdir(directory):
+                if filename.lower().endswith('.png'):
+                    # 检查是否是临时文件（文件名包含temp、cache、screenshot等）
+                    name_lower = filename.lower()
+                    if any(keyword in name_lower for keyword in ['temp', 'cache', 'screenshot', '_tmp']):
+                        file_path = os.path.join(directory, filename)
+                        os.remove(file_path)
+                        cleaned_count += 1
+                        self.logger.info(f"清理PNG临时文件: {filename}")
+        
+        except Exception as e:
+            handle_exception(e, 'clean_png_temp_files')
+        
+        return cleaned_count
+```
+
+### 2.11 Flask API 路由规范
+
+#### 2.11.1 路由命名
 
 | 类型 | 前缀 | 示例 |
 |------|------|------|
@@ -1301,7 +2083,178 @@ def dist_files(filename):
     return response
 ```
 
-### 2.9 版本号管理
+### 2.12 EmailNotifier 邮件通知服务
+
+#### 2.12.1 配置规范
+
+```python
+class EmailNotifier:
+    """
+    邮件通知服务 - SMTP配置 + 熔断机制 + 去重策略
+    
+    特性：
+    - 支持 SMTP SSL/TLS
+    - 熔断保护（连续失败后冷却）
+    - 邮件去重（相同URL只发一次）
+    - 冷却时间控制（避免频繁发送）
+    """
+    
+    def __init__(self):
+        self.config_manager = ConfigManager()
+        self.last_email_sent_time = 0
+        self.last_email_sent_url = None
+        self.email_fail_count = 0
+        
+        # 配置参数
+        self.COOLDOWN_PERIOD = 60  # 邮件发送冷却时间（秒）
+        self.FAILURE_THRESHOLD = 3  # 熔断触发阈值
+        self.CIRCUIT_COOLDOWN = 300  # 熔断冷却时间（秒）
+    
+    def _get_config(self):
+        """获取邮件配置"""
+        return {
+            'enabled': self.config_manager.get('email_notification_enabled', False),
+            'smtp_host': self.config_manager.get('email_smtp_host', 'smtp.qq.com'),
+            'smtp_port': self.config_manager.get('email_smtp_port', 587),
+            'smtp_user': self.config_manager.get('email_smtp_user', ''),
+            'smtp_password': self.config_manager.get('email_smtp_password', ''),
+            'from_name': self.config_manager.get('email_from_name', '公网IP监控'),
+            'to': self.config_manager.get('email_to', '')
+        }
+    
+    def send_tunnel_notification(self, url, event_type='new'):
+        """
+        发送隧道通知邮件
+        
+        Args:
+            url: 公网URL
+            event_type: 事件类型（new/update）
+        
+        Returns:
+            bool: 是否发送成功
+        """
+        config = self._get_config()
+        
+        # 检查是否启用
+        if not config['enabled']:
+            print("[Email] 邮件通知未启用")
+            return False
+        
+        # 检查去重（同一URL只发一次）
+        if url == self.last_email_sent_url:
+            print("[Email] 同一URL已发送过，跳过")
+            return False
+        
+        # 检查冷却时间
+        now = time.time()
+        if now - self.last_email_sent_time < self.COOLDOWN_PERIOD:
+            print(f"[Email] 冷却时间内，{self.COOLDOWN_PERIOD - (now - self.last_email_sent_time):.0f}秒后重试")
+            return False
+        
+        # 检查熔断
+        if self.email_fail_count >= self.FAILURE_THRESHOLD:
+            print(f"[Email] 熔断中，{self.CIRCUIT_COOLDOWN}秒后恢复")
+            return False
+        
+        # 发送邮件
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            from email.utils import formataddr
+            
+            msg = MIMEText(f"""
+Szwego商品爬虫 - 隧道状态通知
+
+事件类型: {event_type}
+公网地址: {url}
+
+访问地址: {url}
+
+时间: {time.strftime('%Y-%m-%d %H:%M:%S')}
+            """.strip(), 'plain', 'utf-8')
+            
+            msg['From'] = formataddr((config['from_name'], config['smtp_user']))
+            msg['To'] = config['to']
+            msg['Subject'] = f"【Szwego爬虫】隧道{event_type} - {url}"
+            
+            server = smtplib.SMTP(config['smtp_host'], config['smtp_port'])
+            server.starttls()
+            server.login(config['smtp_user'], config['smtp_password'])
+            server.sendmail(config['smtp_user'], [config['to']], msg.as_string())
+            server.quit()
+            
+            self.last_email_sent_time = now
+            self.last_email_sent_url = url
+            self.email_fail_count = 0
+            
+            return True
+            
+        except Exception as e:
+            self.email_fail_count += 1
+            handle_exception(e, 'send_tunnel_notification')
+            return False
+```
+
+#### 2.12.2 QQ邮箱授权码配置
+
+```json
+{
+  "email_notification_enabled": true,
+  "email_smtp_host": "smtp.qq.com",
+  "email_smtp_port": 587,
+  "email_smtp_user": "your_email@qq.com",
+  "email_smtp_password": "授权码",
+  "email_from_name": "公网IP监控",
+  "email_to": "980187223@qq.com"
+}
+```
+
+**QQ邮箱授权码获取步骤**：
+1. 登录 QQ邮箱网页版
+2. 设置 → 账户 → POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV服务
+3. 开启"POP3/SMTP服务"
+4. 生成授权码（16位字符串）
+5. 将授权码填入 `email_smtp_password` 字段（不是QQ密码）
+
+### 2.13 完整 Flask API 端点列表（33个，与 main.py 代码完全一致）
+
+| 序号 | 端点 | 方法 | 功能 | 参数 | 返回值 |
+|------|------|------|------|------|--------|
+| 1 | `/` | GET | 首页（注入版本号，无缓存头） | 无 | HTML页面 |
+| 2 | `/dist/<path:filename>` | GET | 静态资源（含gzip压缩） | 路径 | 文件流 |
+| 3 | `/run` | POST | 运行命令（跨系统进程管理） | `{command}` | `{success, task_id, message}` |
+| 4 | `/input` | POST | 发送输入到运行中进程 | `{task_id, input}` | `{success, message}` |
+| 5 | `/kill` | POST | 终止任务 | `{task_id}` | `{success, message}` |
+| 6 | `/output/<task_id>` | GET | 获取任务输出 | task_id | `{output, status, returncode}` |
+| 7 | `/api/cookie` | GET | 获取Cookie | 无 | Cookie JSON |
+| 8 | `/api/sku/compare` | GET | 货号对比(JSON) | `stock_numbers` | `{success, data}` |
+| 9 | `/api/sku/compare/txt` | GET/POST | 货号对比(文本) | `stock_numbers` | 文本/JSON |
+| 10 | `/api/sku/compare/excel` | GET | 货号对比(Excel下载) | 无 | Excel文件流 |
+| 11 | `/api/products` | GET | 获取商品列表 | `t`(时间戳) | `{success, data}` |
+| 12 | `/api/daily-profit` | GET | 每日利润报表 | 无 | `{success, data}` |
+| 13 | `/api/product` | GET | 获取商品详情 | `sku` | `{success, data}` |
+| 14 | `/api/product/search` | GET | 搜索商品 | `keyword` | `{success, data}` |
+| 15 | `/api/product/by-description` | GET | 按描述搜索商品 | `description` | `{success, data}` |
+| 16 | `/api/clean/list` | POST | 文件清理列表 | `{directory}` | `{success, output}` |
+| 17 | `/api/clean/group` | POST | 分组清理 | `{directory, dry_run}` | `{success, output}` |
+| 18 | `/api/clean/time` | POST | 按时间清理 | `{directory, minutes, dry_run}` | `{success, output}` |
+| 19 | `/api/clean/all` | POST | 全部清理 | `{directory, dry_run}` | `{success, output}` |
+| 20 | `/api/clean/png` | POST | PNG清理 | `{directory, dry_run}` | `{success, output}` |
+| 21 | `/api/clean/media` | POST | 媒体清理 | `{directory, dry_run}` | `{success, output}` |
+| 22 | `/api/version` | GET | 版本信息 | 无 | `{version}` |
+| 23 | `/api/changelog` | GET | 更新日志 | 无 | `{success, changelog}` |
+| 24 | `/api/readme-sections` | GET | README章节 | 无 | `{success, sections}` |
+| 25 | `/api/email/config` | GET | 获取邮件配置 | 无 | `{success, config}` |
+| 26 | `/api/email/config` | POST | 保存邮件配置 | `{smtp_host, smtp_port, ...}` | `{success, message}` |
+| 27 | `/api/email/test` | POST | 测试邮件 | `{smtp_host, smtp_port, ...}` | `{success, message}` |
+| 28 | `/api/server/info` | GET | 服务器信息（含局域网IP） | 无 | `{success, local_url, lan_url, ...}` |
+| 29 | `/api/tunnel/start` | POST | 启动隧道 | 无 | `{success, url}` |
+| 30 | `/api/tunnel/status` | GET | 隧道状态（含心跳检测） | 无 | `{running, url, url_valid, ...}` |
+| 31 | `/api/tunnel/stop` | POST | 停止隧道 | 无 | `{success, message}` |
+| 32 | `/<path:invalid_path>` | GET | 兜底404路由 | 无 | `{error: '页面不存在'}` |
+| 33 | `/favicon.ico` | GET | 网站图标 | 无 | 图标文件 |
+
+### 2.14 版本号管理
 
 版本号唯一来源为 `README.md`，程序自动解析：
 
@@ -2139,42 +3092,871 @@ return str;
 `run.bat` 和 `run.sh` 必须保持逻辑一致，遵循以下六步：
 
 ```
-[1/6] 检测 Python 环境
-[2/6] 检测 Node.js/NVM 环境
-[3/6] 测速 PIP 镜像源
-[4/6] 测速 NPM 镜像源
-[5/6] 检测虚拟环境 + 设置虚拟环境 + 安装依赖
-[6/6] 检测配置文件
+[1/6] 检测 Python 环境 → [2/6] 检测 Node.js/NVM 环境 → [3/6] 测速 PIP 镜像源
+→ [4/6] 测速 NPM 镜像源 → [5/6] 检测/创建虚拟环境 + 安装依赖 → [6/6] 检测配置文件 → 启动Web服务
 ```
 
 ### 4.2 关键差异对照
 
 | 功能 | Windows (run.bat) | Linux/Mac (run.sh) |
 |------|-------------------|---------------------|
-| Python 命令 | `py` | `python3` / `python` |
-| 虚拟环境 | `.venv\Scripts\activate.bat` | `source .venv/bin/activate` |
-| 进程终止 | `taskkill /F /IM` | `pkill -f` |
-| 进程检测 | `tasklist /FI` | `pgrep -f` |
-| 睡眠 | `timeout /t 5 /nobreak >nul` | `sleep 5` |
-| 环境变量 | `set VAR=value` | `export VAR=value` |
-| 后台运行 | `start /b cmd /c "..."` | `command &` |
-| 清理 | `del /f /s /q` | `rm -rf` |
+| Python 命令 | `py` / `python` | `python3` / `python` |
+| 虚拟环境激活 | `.venv\Scripts\activate.bat` | `source .venv/bin/activate` |
+| 进程终止 | `taskkill /F /IM` | `kill` / `pkill` |
+| 进程检测 | `where` | `command -v` / `pgrep` |
+| 睡眠 | `timeout /t N /nobreak >nul` | `sleep N` |
+| 环境变量设置 | `set VAR=value` | `export VAR=value` |
+| 后台运行 | `start /b` | `command &` |
+| 文件删除 | `del /f /s /q` | `rm -rf` |
+| 目录创建 | `if not exist dir mkdir dir` | `mkdir -p dir` |
+| 条件判断 | `if errorlevel 1` / `if defined VAR` | `if [ $? -ne 0 ]` / `if [ -n "$VAR" ]` |
+| 循环 | `for /L` / `for /f` | `for ((i=0; i<N; i++))` / `for i in` |
+| 字符串替换 | `set "VAR=!VAR:old=new!"` | `VAR=${VAR//old/new}` |
+| 正则匹配 | `findstr /r` | `grep -E` |
 
-### 4.3 版本号读取
-
-两个脚本都从 `README.md` 解析版本号：
-
-```batch
-:: Windows
-for /f "delims=" %%i in ('py -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')"') do set VERSION=%%i
-```
+### 4.3 run.sh 完整范式
 
 ```bash
-# Linux/Mac
-VERSION=$(python3 -c "import re; m=re.search(r'###\s+v(\d+\.\d+\.\d+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')")
+#!/bin/bash
+
+# ========================================
+# 版本号读取（从README.md解析）
+# ========================================
+VERSION="0.0.0"
+for cmd in python3 python; do
+    if command -v "$cmd" &>/dev/null; then
+        VERSION=$("$cmd" -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2>/dev/null) && break
+    fi
+done
+
+# ========================================
+# 日志函数（双写模式）
+# ========================================
+mkdir -p file
+LOG_FILE="$(pwd)/file/web_output.log"
+> "$LOG_FILE"
+
+log() {
+    echo "$*"
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "$*" >> "$LOG_FILE" 2>/dev/null
+}
+
+log_blank() {
+    echo ""
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "" >> "$LOG_FILE" 2>/dev/null
+}
+
+log_console_only() {
+    echo "$*"
+}
+
+# ========================================
+# 临时文件清理（超过3MB自动清理）
+# ========================================
+cleanup_temp() {
+    if [ -d "temp" ]; then
+        TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
+        LIMIT_SIZE_KB=3072
+        if [ -n "$TOTAL_SIZE_KB" ] && [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
+            rm -rf temp/*
+            log "[*] temp目录超过3MB，已清理所有文件"
+        fi
+    fi
+}
+
+# ========================================
+# [1/6] Python 环境检测 + 全自动安装
+# ========================================
+detect_python_env() {
+    log "[1/6] 检测Python环境..."
+    
+    if command -v python3 &> /dev/null; then
+        PYTHON_CMD="python3"
+    elif command -v python &> /dev/null; then
+        PYTHON_CMD="python"
+    else
+        # 搜索常见Python路径
+        COMMON_PYTHON_PATHS=(
+            "/usr/bin/python3" "/usr/local/bin/python3" "/opt/homebrew/bin/python3"
+            "$HOME/.pyenv/shims/python3" "/usr/bin/python" "/usr/local/bin/python"
+        )
+        
+        for py_path in "${COMMON_PYTHON_PATHS[@]}"; do
+            if [ -x "$py_path" ]; then
+                export PATH="$(dirname "$py_path"):$PATH"
+                PYTHON_CMD="$py_path"
+                break
+            fi
+        done
+        
+        # 自动安装回退
+        if [ -z "$PYTHON_CMD" ]; then
+            case "$(uname -s)" in
+                Darwin)
+                    if command -v brew &> /dev/null; then
+                        brew install python
+                    elif [ -f "/opt/homebrew/bin/brew" ]; then
+                        /opt/homebrew/bin/brew install python
+                    fi
+                    ;;
+                Linux)
+                    if command -v apt-get &> /dev/null; then
+                        sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip
+                    elif command -v yum &> /dev/null; then
+                        sudo yum install -y python3 python3-pip
+                    elif command -v dnf &> /dev/null; then
+                        sudo dnf install -y python3 python3-pip
+                    elif command -v pacman &> /dev/null; then
+                        sudo pacman -Syu --noconfirm python python-pip
+                    fi
+                    ;;
+            esac
+            
+            if command -v python3 &> /dev/null; then
+                PYTHON_CMD="python3"
+            elif command -v python &> /dev/null; then
+                PYTHON_CMD="python"
+            fi
+        fi
+    fi
+    
+    [ -z "$PYTHON_CMD" ] && return 1
+    return 0
+}
+
+# ========================================
+# [2/6] Node.js/NVM 检测 + 全自动安装
+# ========================================
+detect_node_env() {
+    log "[2/6] 检测Node.js环境..."
+    
+    if command -v node &> /dev/null; then
+        return 0
+    fi
+    
+    # NVM检测与使用
+    if command -v nvm &> /dev/null || [ -s "$HOME/.nvm/nvm.sh" ]; then
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use default &>/dev/null || nvm use lts &>/dev/null
+        if ! command -v node &> /dev/null; then
+            nvm install lts && nvm use lts && nvm alias default lts
+        fi
+        return 0
+    fi
+    
+    # 自动安装回退
+    case "$(uname -s)" in
+        Darwin)
+            if command -v brew &> /dev/null; then
+                brew install node
+            elif [ -f "/opt/homebrew/bin/brew" ]; then
+                /opt/homebrew/bin/brew install node
+            fi
+            ;;
+        Linux)
+            if command -v apt-get &> /dev/null; then
+                curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+                sudo apt-get install -y nodejs
+            elif command -v yum &> /dev/null; then
+                curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+                sudo yum install -y nodejs
+            elif command -v dnf &> /dev/null; then
+                curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+                sudo dnf install -y nodejs
+            elif command -v pacman &> /dev/null; then
+                sudo pacman -Syu --noconfirm nodejs npm
+            fi
+            ;;
+    esac
+    
+    command -v node &> /dev/null && return 0
+    return 0  # Node.js非必需，失败不中断流程
+}
+
+# ========================================
+# [3/6] PIP 镜像源轮询测速
+# ========================================
+test_pip_mirrors() {
+    log "[3/6] 测试PIP加速镜像源..."
+    
+    if [ -z "$PYTHON_CMD" ]; then
+        FASTEST_PIP_MIRROR="https://pypi.org/simple/"
+        return 0
+    fi
+    
+    declare -a MIRRORS=(
+        "https://pypi.tuna.tsinghua.edu.cn/simple|清华源"
+        "https://mirrors.aliyun.com/pypi/simple/|阿里云"
+        "https://pypi.douban.com/simple/|豆瓣"
+        "https://pypi.mirrors.ustc.edu.cn/simple/|中科大"
+    )
+    
+    MIN_TIME=9999
+    BEST_MIRROR=""
+    
+    for mirror_entry in "${MIRRORS[@]}"; do
+        IFS='|' read -r MIRROR_URL MIRROR_NAME <<< "$mirror_entry"
+        TEST_TIME=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 1.5 --max-time 2 "$MIRROR_URL" 2>/dev/null)
+        
+        if [ -n "$TEST_TIME" ] && [ "$TEST_TIME" != "0.000" ] && [ "$TEST_TIME" != "0" ]; then
+            PIP_INT_TIME=$(echo "$TEST_TIME" | awk '{printf "%d", $1 * 1000}')
+            if [ "$PIP_INT_TIME" -lt "$MIN_TIME" ] 2>/dev/null; then
+                MIN_TIME=$PIP_INT_TIME
+                BEST_MIRROR="$MIRROR_URL"
+            fi
+        fi
+    done
+    
+    FASTEST_PIP_MIRROR="${BEST_MIRROR:-https://pypi.org/simple/}"
+}
+
+# ========================================
+# [4/6] NPM 镜像源轮询测速
+# ========================================
+test_npm_mirrors() {
+    log "[4/6] 测试NPM加速镜像源..."
+    
+    if ! command -v npm &> /dev/null; then
+        return 0
+    fi
+    
+    declare -a NPM_MIRRORS=(
+        "https://registry.npmmirror.com|npmmirror淘宝"
+        "https://registry.npmjs.org|官方源"
+    )
+    
+    NPM_MIN_TIME=9999
+    NPM_BEST_MIRROR=""
+    
+    for npm_mirror_entry in "${NPM_MIRRORS[@]}"; do
+        IFS='|' read -r NPM_URL NPM_NAME <<< "$npm_mirror_entry"
+        NPM_TEST_TIME=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 "$NPM_URL" 2>/dev/null)
+        
+        if [ -n "$NPM_TEST_TIME" ] && [ "$NPM_TEST_TIME" != "0.000" ] && [ "$NPM_TEST_TIME" != "0" ]; then
+            NPM_INT_TIME=$(echo "$NPM_TEST_TIME" | awk '{printf "%d", $1 * 1000}')
+            if [ "$NPM_INT_TIME" -lt "$NPM_MIN_TIME" ] 2>/dev/null; then
+                NPM_MIN_TIME=$NPM_INT_TIME
+                NPM_BEST_MIRROR="$NPM_URL"
+            fi
+        fi
+    done
+    
+    if [ -n "$NPM_BEST_MIRROR" ]; then
+        npm config set registry "$NPM_BEST_MIRROR"
+    fi
+}
+
+# ========================================
+# [5/6] 虚拟环境管理 + 依赖安装
+# ========================================
+setup_venv() {
+    log "[5/6] 设置Python虚拟环境并安装依赖..."
+    
+    VENV_PATH=".venv"
+    
+    # 创建/检测虚拟环境
+    if [ ! -d "$VENV_PATH/bin" ]; then
+        "$PYTHON_CMD" -m venv "$VENV_PATH"
+    fi
+    
+    source "$VENV_PATH/bin/activate"
+    
+    # 配置PIP镜像源
+    if [ -n "$FASTEST_PIP_MIRROR" ]; then
+        mkdir -p "$VENV_PATH/pip_config"
+        TRUSTED_HOST=$(echo "$FASTEST_PIP_MIRROR" | sed -E 's|^https?://([^/]+).*|\1|')
+        
+        cat > "$VENV_PATH/pip_config/pip.conf" << EOF
+[global]
+index-url = $FASTEST_PIP_MIRROR
+trusted-host = $TRUSTED_HOST
+[install]
+trusted-host = $TRUSTED_HOST
+EOF
+        export PIP_CONFIG_FILE="$VENV_PATH/pip_config/pip.conf"
+    fi
+    
+    # 安装依赖
+    if [ -f "requirements.txt" ]; then
+        pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --disable-pip-version-check || \
+        pip install -r requirements.txt --disable-pip-version-check
+        
+        "$VENV_PATH/bin/python" main.py --install-playwright
+    fi
+}
+
+# ========================================
+# [6/6] 配置文件检测 + 自动配置
+# ========================================
+check_config() {
+    log "[*] 检测配置文件..."
+    mkdir -p config
+    
+    if [ -f "config/config.json" ]; then
+        run_web
+    else
+        # 自动复制配置模板
+        [ -f "config/config.json.example" ] && cp -f config/config.json.example config/config.json
+        [ -f "config/cookies.json.example" ] && cp -f config/cookies.json.example config/cookies.json
+        
+        read -p "按回车键继续，或 Ctrl+C 退出: "
+        run_web
+    fi
+}
+
+# ========================================
+# 启动Web服务和隧道
+# ========================================
+run_web() {
+    log "[*] 预启动隧道服务【加快首次启动速度】..."
+    npx -y hostc@latest --help >/dev/null 2>&1
+    
+    source "$VENV_PATH/bin/activate"
+    
+    WEB_PORT="${WEB_PORT:-8888}"
+    "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" >> "$LOG_FILE" 2>&1 &
+    PYTHON_PID=$!
+    
+    # 等待Web服务启动
+    FLASK_WAIT_COUNT=0
+    FLASK_MAX_WAIT=30
+    while [ $FLASK_WAIT_COUNT -lt $FLASK_MAX_WAIT ]; do
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT" 2>/dev/null)
+        [ "$HTTP_CODE" = "200" ] && break
+        FLASK_WAIT_COUNT=$((FLASK_WAIT_COUNT + 1))
+        sleep 2
+    done
+    
+    # 切换到仅控制台日志
+    LOG_FILE=""
+    log_console_only "Web 服务已就绪，正在启动隧道..."
+    
+    # 启动隧道
+    npx -y hostc@latest "$WEB_PORT" --local-host localhost > file/tunnel_url.txt 2>&1 &
+    TUNNEL_PID=$!
+    
+    log_console_only "启动完成！"
+    log_console_only "本地访问: http://localhost:$WEB_PORT"
+    log_console_only "公网访问: 查看 file/tunnel_url.txt"
+    
+    wait $PYTHON_PID $TUNNEL_PID 2>/dev/null
+}
+
+# ========================================
+# 主流程
+# ========================================
+log "========================================"
+log "Szwego商品爬虫和货号对比工具 - v${VERSION}"
+log "========================================"
+
+cleanup_temp
+detect_python_env || { log "[ERROR] Python安装失败"; exit 1; }
+detect_node_env
+test_pip_mirrors
+test_npm_mirrors
+setup_venv
+check_config
 ```
 
-### 4.4 临时文件清理
+### 4.4 run.bat 完整范式
+
+```batch
+@echo off
+setlocal enabledelayedexpansion
+chcp 65001 > nul 2>&1
+set PYTHONIOENCODING=utf-8
+title Szwego Crawler Tool
+
+rem ========================================
+rem 版本号读取（从README.md解析）
+rem ========================================
+set "VERSION=0.0.0"
+for /f "delims=" %%i in ('py -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2^>nul') do set "VERSION=%%i"
+
+rem ========================================
+rem 日志函数（双写模式）
+rem ========================================
+if not exist file mkdir file
+set "LOG_FILE=%CD%\file\web_output.log"
+echo. > "!LOG_FILE!"
+
+:log
+echo %*
+if not "%LOG_FILE%"=="" if exist "!LOG_FILE!" >> "!LOG_FILE!" echo %* 2>nul
+exit /b
+
+:log_blank
+echo.
+if not "%LOG_FILE%"=="" if exist "!LOG_FILE!" >> "!LOG_FILE!" echo. 2>nul
+exit /b
+
+:log_console_only
+echo %*
+exit /b
+
+rem ========================================
+rem 临时文件清理（超过3MB自动清理）
+rem ========================================
+:get_dir_size
+set "TOTAL_SIZE=0"
+for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path '%~1' -Recurse -File -ErrorAction SilentlyContinue ^| Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum" 2^>nul') do set "TOTAL_SIZE=%%a"
+if not defined TOTAL_SIZE set "TOTAL_SIZE=0"
+goto :eof
+
+rem ========================================
+rem [1/6] Python 环境检测 + 全自动安装
+rem ========================================
+:detect_python_env
+call :log [1/6] 检测Python环境...
+
+where py >nul 2>&1
+if errorlevel 1 (
+    where python >nul 2>&1
+    if errorlevel 1 (
+        rem 搜索常见Python路径
+        set "PYTHON_PATH="
+        for /d %%p in ("C:\Python3*") do if exist "%%p\python.exe" set "PYTHON_PATH=%%p\python.exe"
+        if not defined PYTHON_PATH for /d %%p in ("C:\Program Files\Python3*") do if exist "%%p\python.exe" set "PYTHON_PATH=%%p\python.exe"
+        if not defined PYTHON_PATH for /d %%p in ("C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*") do if exist "%%p\python.exe" set "PYTHON_PATH=%%p\python.exe"
+        
+        if defined PYTHON_PATH (
+            for %%P in ("!PYTHON_PATH!") do set "PYTHON_DIR=%%~dpP"
+            set "PATH=!PYTHON_DIR!;!PATH!"
+            set "PYTHON_CMD=!PYTHON_PATH!"
+        ) else (
+            rem 自动安装回退
+            where winget >nul 2>&1
+            if not errorlevel 1 (
+                winget install Python.Python.3 --accept-package-agreements --accept-source-agreements --silent
+                if not errorlevel 1 goto :python_verify_install
+            )
+            
+            where choco >nul 2>&1
+            if not errorlevel 1 (
+                choco install python -y
+                if not errorlevel 1 goto :python_verify_install
+            )
+            
+            where scoop >nul 2>&1
+            if not errorlevel 1 (
+                scoop install python
+                if not errorlevel 1 goto :python_verify_install
+            )
+            
+            rem 直接下载MSI安装到临时目录
+            for /f "delims=" %%v in ('curl.exe -s https://www.python.org/ftp/python/ 2^>nul ^| findstr /r "^3\.[0-9]*\.[0-9]*/$" ^| sort /r ^| findstr /n "^" ^| findstr "^[1]:"') do (
+                for /f "tokens=1 delims=/" %%a in ("%%v") do set "PYTHON_LATEST_VERSION=%%a"
+            )
+            
+            curl.exe -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/!PYTHON_LATEST_VERSION!/python-!PYTHON_LATEST_VERSION!-amd64.exe
+            if exist "%TEMP%\python_installer.exe" (
+                "%TEMP%\python_installer.exe" /quiet InstallAllUsers=0 PrependPath=0 Include_pip=1 TargetDir="%CD%\_python"
+                if exist "%CD%\_python\python.exe" (
+                    set "PYTHON_CMD=%CD%\_python\python.exe"
+                    set "PATH=%CD%\_python;!PATH!"
+                )
+            )
+        )
+    ) else (
+        set "PYTHON_CMD=python"
+    )
+) else (
+    set "PYTHON_CMD=py"
+)
+
+:python_verify_install
+if not defined PYTHON_CMD (
+    where py >nul 2>&1 && set "PYTHON_CMD=py"
+    if not defined PYTHON_CMD where python >nul 2>&1 && set "PYTHON_CMD=python"
+)
+
+if not defined PYTHON_CMD (
+    call :log [ERROR] 无法找到或安装Python
+    exit /b 1
+)
+exit /b 0
+
+rem ========================================
+rem [2/6] Node.js/NVM 检测 + 全自动安装
+rem ========================================
+:detect_node_env
+call :log [2/6] 检测Node.js环境...
+
+where node >nul 2>&1
+if errorlevel 1 (
+    where nvm >nul 2>&1
+    if not errorlevel 1 (
+        nvm use latest >nul 2>&1 || nvm use lts >nul 2>&1
+        if errorlevel 1 (
+            nvm install lts && nvm use lts
+        )
+        goto :node_verify_install
+    )
+    
+    if exist "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" (
+        call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use latest
+        if errorlevel 1 (
+            call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" install lts
+            call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use lts
+        )
+        goto :node_verify_install
+    )
+    
+    rem 自动安装回退
+    where winget >nul 2>&1
+    if not errorlevel 1 (
+        winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --silent
+        if not errorlevel 1 goto :node_verify_install
+    )
+    
+    where choco >nul 2>&1
+    if not errorlevel 1 (
+        choco install nodejs -y
+        if not errorlevel 1 goto :node_verify_install
+    )
+    
+    where scoop >nul 2>&1
+    if not errorlevel 1 (
+        scoop install nodejs-lts
+        if not errorlevel 1 goto :node_verify_install
+    )
+    
+    rem 直接下载MSI安装到临时目录
+    for /f "delims=" %%v in ('curl.exe -s https://nodejs.org/dist/index.tab 2^>nul ^| findstr /i "LTS" ^| findstr /v "headers" ^| findstr /v "src" ^| findstr /r "^[v]?[0-9]" ^| sort /r ^| findstr /n "^" ^| findstr "^[1]:"') do (
+        for /f "tokens=1 delims= " %%a in ("%%v") do set "NODE_LTS_VERSION=%%a"
+    )
+    
+    mkdir ".node_env" 2>nul
+    curl.exe -L -o ".node_env\node-installer.msi" https://nodejs.org/dist/!NODE_LTS_VERSION!/node-!NODE_LTS_VERSION!-x64.msi
+    if exist ".node_env\node-installer.msi" (
+        msiexec /i ".node_env\node-installer.msi" INSTALLDIR="%CD%\.node_env" /quiet /norestart
+        set "PATH=%CD%\.node_env;!PATH!"
+        del ".node_env\node-installer.msi" 2>nul
+    )
+) else (
+    call :log Node.js版本:
+    node --version
+    npm --version
+)
+
+:node_verify_install
+where node >nul 2>&1
+if not errorlevel 1 (
+    call :log Node.js版本:
+    node --version
+    npm --version
+)
+exit /b 0
+
+rem ========================================
+rem [3/6] PIP 镜像源轮询测速
+rem ========================================
+:test_pip_mirrors
+call :log [3/6] 测试PIP加速镜像源...
+
+if not defined PYTHON_CMD (
+    set "FASTEST_PIP_MIRROR=https://pypi.org/simple/"
+    exit /b 0
+)
+
+set "MIRRORS[0]=https://pypi.tuna.tsinghua.edu.cn/simple|清华源"
+set "MIRRORS[1]=https://mirrors.aliyun.com/pypi/simple/|阿里云"
+set "MIRRORS[2]=https://pypi.douban.com/simple/|豆瓣"
+set "MIRRORS[3]=https://pypi.mirrors.ustc.edu.cn/simple/|中科大"
+
+set "MIN_TIME=9999"
+set "BEST_MIRROR="
+
+for /L %%i in (0,1,3) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!MIRRORS[%%i]!") do (
+        set "MIRROR_URL=%%a"
+        set "TEST_TIME=9999"
+        curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 1.5 --max-time 2 "!MIRROR_URL!" > temp_pip_time.txt 2>nul
+        if exist temp_pip_time.txt (
+            set /p TEST_TIME=<temp_pip_time.txt
+            del temp_pip_time.txt 2>nul
+        )
+        
+        if not "!TEST_TIME!"=="0" if not "!TEST_TIME!"=="0.000000" (
+            "!PYTHON_CMD!" -c "print(int(float('!TEST_TIME!')*1000))" > temp_pip_int.txt 2>nul
+            if exist temp_pip_int.txt (
+                set /p PIP_INT_TIME=<temp_pip_int.txt
+                del temp_pip_int.txt 2>nul
+            )
+            
+            if !PIP_INT_TIME! LSS !MIN_TIME! (
+                set "MIN_TIME=!PIP_INT_TIME!"
+                set "BEST_MIRROR=!MIRROR_URL!"
+            )
+        )
+    )
+)
+
+if not defined BEST_MIRROR set "BEST_MIRROR=https://pypi.org/simple/"
+set "FASTEST_PIP_MIRROR=!BEST_MIRROR!"
+exit /b 0
+
+rem ========================================
+rem [4/6] NPM 镜像源轮询测速
+rem ========================================
+:test_npm_mirrors
+call :log [4/6] 测试NPM加速镜像源...
+
+where npm >nul 2>&1
+if errorlevel 1 exit /b 0
+
+set "NPM_MIRRORS[0]=https://registry.npmmirror.com|npmmirror淘宝"
+set "NPM_MIRRORS[1]=https://registry.npmjs.org|官方源"
+
+set "NPM_MIN_TIME=9999"
+set "NPM_BEST_MIRROR="
+
+for /L %%i in (0,1,1) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!NPM_MIRRORS[%%i]!") do (
+        set "NPM_URL=%%a"
+        set "NPM_TEST_TIME=9999"
+        curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 3 "!NPM_URL!" > temp_npm_time.txt 2>nul
+        if exist temp_npm_time.txt (
+            set /p NPM_TEST_TIME=<temp_npm_time.txt
+            del temp_npm_time.txt 2>nul
+        )
+        
+        if not "!NPM_TEST_TIME!"=="0" if not "!NPM_TEST_TIME!"=="0.000000" (
+            "!PYTHON_CMD!" -c "print(int(float('!NPM_TEST_TIME!')*1000))" > temp_npm_int.txt 2>nul
+            if exist temp_npm_int.txt (
+                set /p NPM_INT_TIME=<temp_npm_int.txt
+                del temp_npm_int.txt 2>nul
+            )
+            
+            if !NPM_INT_TIME! LSS !NPM_MIN_TIME! (
+                set "NPM_MIN_TIME=!NPM_INT_TIME!"
+                set "NPM_BEST_MIRROR=!NPM_URL!"
+            )
+        )
+    )
+)
+
+if defined NPM_BEST_MIRROR npm config set registry "!NPM_BEST_MIRROR!"
+exit /b 0
+
+rem ========================================
+rem [5/6] 虚拟环境管理 + 依赖安装
+rem ========================================
+:setup_venv
+call :log [5/6] 设置Python虚拟环境并安装依赖...
+
+set "VENV_PATH=.venv"
+
+if not exist "!VENV_PATH!\Scripts\activate.bat" (
+    "!PYTHON_CMD!" -m venv "!VENV_PATH!"
+    if errorlevel 1 (
+        call :log ERROR: 创建虚拟环境失败
+        exit /b 1
+    )
+)
+
+call "!VENV_PATH!\Scripts\activate.bat"
+
+if defined FASTEST_PIP_MIRROR (
+    if not exist "!VENV_PATH!\pip_config" mkdir "!VENV_PATH!\pip_config"
+    
+    set "TRUSTED_HOST=!FASTEST_PIP_MIRROR!"
+    set "TRUSTED_HOST=!TRUSTED_HOST:https://=!"
+    set "TRUSTED_HOST=!TRUSTED_HOST:http://=!"
+    for /f "delims=/" %%h in ("!TRUSTED_HOST!") do set "TRUSTED_HOST=%%h"
+    
+    echo:[global]> "!VENV_PATH!\pip_config\pip.ini"
+    echo:index-url=!FASTEST_PIP_MIRROR!>> "!VENV_PATH!\pip_config\pip.ini"
+    echo:trusted-host=!TRUSTED_HOST!>> "!VENV_PATH!\pip_config\pip.ini"
+    echo:[install]>> "!VENV_PATH!\pip_config\pip.ini"
+    echo:trusted-host=!TRUSTED_HOST!>> "!VENV_PATH!\pip_config\pip.ini"
+    
+    set "PIP_CONFIG_FILE=!VENV_PATH!\pip_config\pip.ini"
+)
+
+if exist requirements.txt (
+    "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check -i "!FASTEST_PIP_MIRROR!" || ^
+    "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check
+    
+    "!VENV_PATH!\Scripts\python.exe" main.py --install-playwright
+)
+exit /b 0
+
+rem ========================================
+rem [6/6] 配置文件检测 + 自动配置
+rem ========================================
+:check_config
+call :log [*] 检测配置文件...
+
+if not exist config mkdir config
+
+if exist config\config.json (
+    goto run_web
+) else (
+    if exist config\config.json.example copy /Y config\config.json.example config\config.json >nul
+    if exist config\cookies.json.example copy /Y config\cookies.json.example config\cookies.json >nul
+    
+    call :log 首次配置完成！请编辑 config\config.json
+    pause >nul
+    goto run_web
+)
+
+rem ========================================
+rem 启动Web服务和隧道
+rem ========================================
+:run_web
+call :log [*] 预启动隧道服务【加快首次启动速度】...
+npx -y hostc@latest --help >nul 2>&1
+
+set "WEB_PORT=8888"
+if defined WEB_PORT set "WEB_PORT=%WEB_PORT%"
+
+"!VENV_PATH!\Scripts\python.exe" main.py --web --port "!WEB_PORT!" >> "!LOG_FILE!" 2>&1
+set "LOG_FILE="
+
+call :log_console_only Web 服务已就绪，正在启动隧道...
+npx -y hostc@latest "!WEB_PORT!" --local-host localhost > file\tunnel_url.txt 2>&1
+
+call :log_console_only 启动完成！
+call :log_console_only 本地访问: http://localhost:!WEB_PORT!
+call :log_console_only 公网访问: 查看 file\tunnel_url.txt
+
+pause >nul
+goto :eof
+
+rem ========================================
+rem 主流程
+rem ========================================
+:main_start
+call :log ========================================
+call :log Szwego商品爬虫和货号对比工具 - v%VERSION%
+call :log ========================================
+
+rem 清理临时文件
+if exist temp (
+    call :get_dir_size temp
+    set "LIMIT_SIZE=3145728"
+    if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
+        del /f /s /q temp\*.* >nul 2>&1
+        call :log [*] temp目录超过3MB，已清理所有文件
+    )
+)
+
+call :detect_python_env
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
+
+call :detect_node_env
+call :test_pip_mirrors
+call :test_npm_mirrors
+call :setup_venv
+call :check_config
+```
+
+### 4.5 启动脚本关键规范
+
+#### 4.5.1 日志双写机制
+
+| 阶段 | 日志模式 | 说明 |
+|------|----------|------|
+| 启动阶段 | 双写（控制台 + 文件） | `:log` / `log()` 同时输出到控制台和 `web_output.log` |
+| Web就绪后 | 仅控制台 | `:log_console_only` / `log_console_only()` 只输出到控制台 |
+
+**关键规则**：
+- `web_output.log` 使用追加模式（`>>`），禁止覆盖（`>`）
+- Web服务启动后执行 `set "LOG_FILE="`（BAT）或 `LOG_FILE=""`（SH）切换模式
+- `tunnel_url.txt` 保持覆盖模式（`>`），只保留最新地址
+
+#### 4.5.2 括号禁忌
+
+`call :log` / `log()` 参数中**禁止使用 ASCII 圆括号 `( )`**，CMD 会误解析为块语法：
+
+```batch
+:: ❌ 错误
+call :log 预启动隧道服务(加快首次启动速度)...
+
+:: ✅ 正确（使用全角方括号）
+call :log [*] 预启动隧道服务【加快首次启动速度】...
+```
+
+#### 4.5.3 毫秒显示格式
+
+```batch
+:: ❌ 错误
+call :log 中科大 (29ms)
+
+:: ✅ 正确
+call :log 中科大 [29ms]
+```
+
+#### 4.5.4 延迟扩展
+
+在 `enabledelayedexpansion` 块中必须使用 `!VAR!` 而非 `%VAR%`：
+
+```batch
+setlocal enabledelayedexpansion
+set "VAR=1"
+echo !VAR!  :: ✅ 正确，输出 1
+echo %VAR%  :: ❌ 错误，可能输出旧值
+```
+
+#### 4.5.5 空值兜底
+
+所有变量使用前必须检查是否为空：
+
+```bash
+# Shell
+if [ -z "$VAR" ]; then
+    VAR="default_value"
+fi
+```
+
+```batch
+:: Batch
+if not defined VAR set "VAR=default_value"
+if "!VAR!"=="" set "VAR=default_value"
+```
+
+### 4.6 自动安装策略汇总
+
+#### Python 安装优先级
+
+| 优先级 | Windows | macOS | Linux (Ubuntu) | Linux (CentOS) |
+|--------|---------|-------|----------------|----------------|
+| 1 | PATH 搜索 | PATH 搜索 | PATH 搜索 | PATH 搜索 |
+| 2 | Winget | Homebrew | apt | yum |
+| 3 | Chocolatey | - | - | - |
+| 4 | Scoop | - | - | - |
+| 5 | MSI 下载到 `_python/` | - | - | - |
+
+#### Node.js 安装优先级
+
+| 优先级 | Windows | macOS | Linux |
+|--------|---------|-------|-------|
+| 1 | PATH 搜索 | PATH 搜索 | PATH 搜索 |
+| 2 | NVM (PATH) | NVM | NVM |
+| 3 | NVM (注册表) | - | - |
+| 4 | Winget | Homebrew | apt + nodesource |
+| 5 | Chocolatey | - | yum + nodesource |
+| 6 | Scoop | - | dnf + nodesource |
+| 7 | MSI 下载到 `.node_env/` | - | pacman |
+
+### 4.7 临时环境隔离
+
+| 环境 | 目录 | 创建条件 |
+|------|------|----------|
+| Python 虚拟环境 | `.venv/` | 始终创建 |
+| Node.js 临时环境 | `.node_env/` | Windows + 无NVM时 |
+| Python 临时安装 | `_python/` | Windows + 无包管理器时 |
+| PIP 配置 | `.venv/pip_config/` | 始终创建 |
+
+**规则**：
+- ✅ 所有临时文件放在项目目录内
+- ✅ 不修改系统全局配置
+- ✅ gitignore 包含上述目录
 
 ```batch
 :: Windows - 检查 temp 目录大小，超过 3MB 则清理
