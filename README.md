@@ -473,9 +473,10 @@ taskkill /F /IM node.exe
   - **Environment 类补全**：新增 `get_browser_args()`、`get_user_agent()`、`get_default_viewport()`、`get_system_info()`、`test_pip_mirror()`、`get_fastest_pip_mirror()`、`check_process_running()` 共7个方法文档
   - **PathManager 类补全**：新增 `get_file_dir()`、`get_cookie_file()`、`get_input_file()`、`get_json_filename()`、`get_cache_filename()`、`get_json_file_path()`、`get_cache_file_path()`、`get_diff_log_file()`、`get_duplicate_log_file()`、`get_tunnel_url_file()`、`get_web_output_file()`、`get_public_url_from_web_log()`、`get_lan_ip()`、`sync_web_output_from_tunnel_url()` 共14个方法文档
   - **CookieValidator 类新增**：7步验证流程（文件存在→可读→非空→Token存在→未过期→值有效→即将过期预警），统一友好提示格式
+  - **main.py 独立函数补全（§2.15）**：`format_size()`、`print_separator()`、`get_version_from_readme()`、`get_python_executable()`、6个文件清理函数、2个利润报表函数、2个Flask辅助函数、3个主菜单函数、2个镜像安装函数、命令行参数完整文档
+  - **index.html 前端函数补全（§2.16，61个）**：设备检测3个、下拉刷新7个、商品展示8个、视频处理4个、面板管理5个、命令执行4个、货号对比3个、利润报表8个、隧道管理6个、文件清理2个、工具函数8个、天气时钟2个、拖拽功能3个、表格渲染2个
+  - **Flask API 端点列表修正**：33个端点与 main.py 代码完全一致（`/input`、`/output/<task_id>`、`/api/product`、`/api/product/search`、`/api/product/by-description`、`/api/daily-profit`、`/api/clean/*`、`/api/readme-sections`、`/api/email/config`、`/api/email/test`、`/api/server/info` 等）
   - **safe_print() 函数新增**：Windows emoji 编码安全打印，12个 emoji→ASCII 映射
-  - **Flask API 端点列表修正**：33个端点与 main.py 代码完全一致（修正了旧列表中不存在的端点，补充了实际存在的端点）
-  - **实际端点修正**：`/input`、`/output/<task_id>`、`/api/product`、`/api/product/search`、`/api/product/by-description`、`/api/daily-profit`、`/api/clean/list`、`/api/clean/group`、`/api/clean/time`、`/api/clean/all`、`/api/clean/png`、`/api/clean/media`、`/api/readme-sections`、`/api/email/config`(GET+POST)、`/api/email/test`、`/api/server/info`
 - **skill.docx 重新生成**：符合 v3.6.0 编码规范（动态路径、跨平台、无硬编码）和 v3.5.0 移动端规范（响应式布局、触摸事件）
 - **跨系统支持验证**：所有代码支持 Windows/macOS/Linux，无硬编码路径或平台字符串
 - **Git 同步**：所有文档变更提交至版本库
