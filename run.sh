@@ -13,12 +13,20 @@ LOG_FILE="$(pwd)/file/web_output.log"
 
 log() {
     echo "$*"
-    echo "$*" >> "$LOG_FILE"
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "$*" >> "$LOG_FILE" 2>/dev/null
 }
 
 log_blank() {
     echo ""
-    echo "" >> "$LOG_FILE"
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "" >> "$LOG_FILE" 2>/dev/null
+}
+
+log_console_only() {
+    echo "$*"
+}
+
+log_blank_console_only() {
+    echo ""
 }
 
 log "========================================"
@@ -280,7 +288,7 @@ test_pip_mirrors() {
             log "        $MIRROR_NAME: 超时/失败"
         else
             PIP_INT_TIME=$(echo "$TEST_TIME" | awk '{printf "%d", $1 * 1000}')
-            log "        $MIRROR_NAME: ${TEST_TIME}秒 (${PIP_INT_TIME}ms)"
+            log "        $MIRROR_NAME: ${TEST_TIME}秒 [${PIP_INT_TIME}ms]"
             if [ "$PIP_INT_TIME" -lt "$MIN_TIME" ] 2>/dev/null; then
                 MIN_TIME=$PIP_INT_TIME
                 BEST_MIRROR="$MIRROR_URL"
@@ -292,7 +300,7 @@ test_pip_mirrors() {
     if [ -n "$BEST_MIRROR" ]; then
         FASTEST_PIP_MIRROR="$BEST_MIRROR"
         log_blank
-        log "[*] 最快PIP镜像: $BEST_NAME (${MIN_TIME}毫秒)"
+        log "[*] 最快PIP镜像: $BEST_NAME [${MIN_TIME}毫秒]"
     else
         log "[WARNING] 所有镜像测试失败，使用默认PyPI源"
         FASTEST_PIP_MIRROR="https://pypi.org/simple/"
@@ -326,7 +334,7 @@ test_npm_mirrors() {
             log "        $NPM_NAME: 超时/失败"
         else
             NPM_INT_TIME=$(echo "$NPM_TEST_TIME" | awk '{printf "%d", $1 * 1000}')
-            log "        $NPM_NAME: ${NPM_TEST_TIME}秒 (${NPM_INT_TIME}ms)"
+            log "        $NPM_NAME: ${NPM_TEST_TIME}秒 [${NPM_INT_TIME}ms]"
             if [ "$NPM_INT_TIME" -lt "$NPM_MIN_TIME" ] 2>/dev/null; then
                 NPM_MIN_TIME=$NPM_INT_TIME
                 NPM_BEST_MIRROR="$NPM_URL"
@@ -338,7 +346,7 @@ test_npm_mirrors() {
     if [ -n "$NPM_BEST_MIRROR" ]; then
         FASTEST_NPM_MIRROR="$NPM_BEST_MIRROR"
         log_blank
-        log "[*] 最快NPM镜像: $NPM_BEST_NAME (${NPM_MIN_TIME}毫秒)"
+        log "[*] 最快NPM镜像: $NPM_BEST_NAME [${NPM_MIN_TIME}毫秒]"
         
         if command -v npm &> /dev/null; then
             npm config set registry "$NPM_BEST_MIRROR"
@@ -492,7 +500,7 @@ run_web() {
     log "========================================"
     log_blank
     log "正在配置 hostc 隧道服务..."
-    log "[*] 预启动隧道服务(加快首次启动速度)..."
+    log "[*] 预启动隧道服务【加快首次启动速度】..."
     npx -y hostc@latest --help >/dev/null 2>&1
     log "隧道服务就绪"
 
@@ -534,27 +542,28 @@ run_web() {
         log "[WARNING] Web服务启动超时（等待了$((FLASK_MAX_WAIT * 2))秒），请检查日志: file/web_output.log"
     fi
 
-    log "Web 服务已就绪，正在启动隧道..."
+    LOG_FILE=""
+    log_console_only "Web 服务已就绪，正在启动隧道..."
     npx -y hostc@latest "$WEB_PORT" --local-host localhost > file/tunnel_url.txt 2>&1 &
     TUNNEL_PID=$!
 
     sleep 2
 
     if ! kill -0 $TUNNEL_PID 2>/dev/null; then
-        log "[WARNING] 隧道服务启动失败，本地访问仍可用"
+        log_console_only "[WARNING] 隧道服务启动失败，本地访问仍可用"
     fi
 
-    log_blank
-    log "========================================"
-    log "启动完成！"
-    log "========================================"
-    log_blank
-    log "本地访问: http://localhost:$WEB_PORT"
-    log "公网访问: 查看 file/tunnel_url.txt"
-    log "Web日志: 查看 file/web_output.log"
-    log_blank
-    log "关闭此窗口可停止服务，或使用 Ctrl+C"
-    log_blank
+    log_blank_console_only
+    log_console_only "========================================"
+    log_console_only "启动完成！"
+    log_console_only "========================================"
+    log_blank_console_only
+    log_console_only "本地访问: http://localhost:$WEB_PORT"
+    log_console_only "公网访问: 查看 file/tunnel_url.txt"
+    log_console_only "Web日志: 查看 file/web_output.log"
+    log_blank_console_only
+    log_console_only "关闭此窗口可停止服务，或使用 Ctrl+C"
+    log_blank_console_only
 
     (
         while true; do
@@ -564,7 +573,7 @@ run_web() {
                 LIMIT_SIZE_KB=3072
                 if [ -n "$TOTAL_SIZE_KB" ] && [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
                     rm -rf temp/*
-                    log "[AUTO] temp目录超过3MB，已清理所有文件"
+                    log_console_only "[AUTO] temp目录超过3MB，已清理所有文件"
                 fi
             fi
         done
