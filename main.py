@@ -5900,7 +5900,7 @@ if __name__ == '__main__':
         tunnel_restart_thread = None
         tunnel_last_error = None
         tunnel_restart_count = 0
-        tunnel_restart_delay = 1
+        tunnel_restart_delay = 0  # 立即重启，3秒级快速响应
         tunnel_heartbeat_thread = None
         tunnel_last_heartbeat = 0
         tunnel_heartbeat_failed = False
@@ -5991,7 +5991,7 @@ if __name__ == '__main__':
                         print(f"[Email] 待发邮件发送异常: {e}")
                 threading.Thread(target=send_pending, daemon=True).start()
         
-        def verify_url(url, timeout=10):
+        def verify_url(url, timeout=2):
             try:
                 req = urllib.request.Request(url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-verify/1.0')
@@ -6009,7 +6009,7 @@ if __name__ == '__main__':
             try:
                 req = urllib.request.Request(web_url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-heartbeat/1.0')
-                urllib.request.urlopen(req, timeout=15)
+                urllib.request.urlopen(req, timeout=3)
                 tunnel_last_heartbeat = time.time()
                 tunnel_heartbeat_failed = False
                 return True
@@ -6020,8 +6020,8 @@ if __name__ == '__main__':
         def heartbeat_loop():
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             consecutive_failures = 0
-            max_consecutive_failures = 10
-            heartbeat_interval = 5  # 心跳间隔5秒
+            max_consecutive_failures = 2
+            heartbeat_interval = 2  # 心跳间隔2秒，3秒级快速响应
             last_log_time = 0
             while tunnel_auto_restart:
                 # 从 web_output.log 获取 URL（唯一来源）
@@ -6030,15 +6030,15 @@ if __name__ == '__main__':
                 
                 if web_url:
                     try:
-                        if verify_url(web_url, timeout=5):
+                        if verify_url(web_url, timeout=2):
                             is_tunnel_running = True
                         else:
-                            if time.time() - last_log_time > 60:
+                            if time.time() - last_log_time > 10:
                                 print(f"[Tunnel] URL验证失败: {web_url}")
                                 last_log_time = time.time()
                             tunnel_need_restart = True
                     except Exception as e:
-                        if time.time() - last_log_time > 60:
+                        if time.time() - last_log_time > 10:
                             print(f"[Tunnel] URL验证异常: {e}")
                             last_log_time = time.time()
                         tunnel_need_restart = True
@@ -6048,10 +6048,10 @@ if __name__ == '__main__':
                     if not success:
                         consecutive_failures += 1
                         if consecutive_failures >= max_consecutive_failures:
-                            print(f"[Tunnel] 心跳连续失败 {consecutive_failures} 次，标记需要重启")
+                            print(f"[Tunnel] 心跳连续失败 {consecutive_failures} 次，立即触发重启")
                             tunnel_need_restart = True
                             last_log_time = time.time()
-                        elif consecutive_failures == 1 and time.time() - last_log_time > 60:
+                        elif consecutive_failures == 1 and time.time() - last_log_time > 10:
                             print(f"[Tunnel] 心跳检测异常: 网络连接不稳定 ({consecutive_failures}/{max_consecutive_failures})")
                             last_log_time = time.time()
                     else:
@@ -6182,8 +6182,8 @@ if __name__ == '__main__':
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
                 
-                # 等待 read_output 线程完成（获取到 URL 或超时）
-                read_thread.join(timeout=30)
+                # 等待 read_output 线程完成（获取到 URL 或超时，10秒快速获取）
+                read_thread.join(timeout=10)
                 
                 if tunnel_url:
                     print(f"[Tunnel] 隧道启动成功: {tunnel_url}")
@@ -6233,12 +6233,12 @@ if __name__ == '__main__':
                 else:
                     elapsed = time.time() - restart_wait_start
                 
-                # 等待时间阈值：首次等待 30 秒，之后等待 60 秒
-                wait_threshold = 30 if elapsed < 60 else 60
+                # 等待时间阈值：3秒立即响应（快速恢复公网访问）
+                wait_threshold = 3
                 
                 if elapsed < wait_threshold:
-                    # 等待期间，不打印日志避免刷屏
-                    time.sleep(2)
+                    # 短暂等待后立即重启
+                    time.sleep(1)
                     continue
                 
                 # 超过等待时间，触发重启
@@ -6338,19 +6338,21 @@ if __name__ == '__main__':
             # 检测是否有 hostc 进程在运行
             process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
             
-            # 验证 URL 是否可用
+            # 验证 URL 是否可用（2秒超时，快速检测）
             if web_url:
                 try:
-                    if verify_url(web_url, timeout=5):
+                    if verify_url(web_url, timeout=2):
                         url_valid = True
                     else:
-                        # URL不可用，触发自动重启
-                        if time.time() - last_url_invalid_log_time > 60:
+                        # URL不可用，立即触发自动重启
+                        if time.time() - last_url_invalid_log_time > 10:
                             print(f"[Tunnel] 检测到URL不可用，触发自动重启: {web_url}")
                             last_url_invalid_log_time = time.time()
                         tunnel_need_restart = True
                 except Exception as e:
-                    print(f"[Tunnel] 验证URL失败: {e}")
+                    if time.time() - last_url_invalid_log_time > 10:
+                        print(f"[Tunnel] 验证URL失败: {e}")
+                        last_url_invalid_log_time = time.time()
                     tunnel_need_restart = True
             
             # 判断隧道是否在运行
