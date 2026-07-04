@@ -244,13 +244,16 @@ class Environment:
 - **Web 日志双写机制（完整记录）**
   - `web_output.log` 每次启动时**从头记录完整启动过程**（清空 + 双写）
   - **根因修复**：之前 log 仅捕获 Python 子进程输出，bat/sh 脚本自身的 echo 只打印到控制台
-  - **BAT 方案**：定义 `:log` 子程序（`echo %*` + `(echo %*) >> "!LOG_FILE!" 2>nul`），所有 `echo` 改为 `call :log`
-    - 文件写入用括号包裹 `(echo %*) >> file 2>nul`，避免与 Python 子进程并发写同一文件时的锁冲突
-  - **SH 方案**：定义 `log()` 函数（`echo "$*"` + `echo "$*" >> "$LOG_FILE"`），所有 `echo` 改为 `log`
-  - 空行用 `:log_blank` / `log_blank()` 处理
-  - Python 子进程输出继续追加到同一文件（`>> "!LOG_FILE!" 2>&1`）
-  - 写入配置文件的 echo 不走日志（如 pip.ini 的 echo 重定向）
-  - 符合 v3.6.0 编码规范：双写机制确保日志完整性
+  - **BAT 方案**：定义 `:log`（双写）+ `:log_console_only`（仅控制台），Web 就绪后切换
+    - 启动阶段用 `>> "!LOG_FILE!" echo %* 2<nul` 前置重定向写文件
+    - Web 服务就绪后执行 `set "LOG_FILE="` 停止文件写入，后续用 `call :log_console_only`
+    - 彻底解决 Windows 文件锁冲突（Python 子进程持续持有文件句柄时 bat 无法追加写入）
+  - **SH 方案**：定义 `log()` 函数（`echo "$*"` + `echo "$*" >> "$LOG_FILE"`），Unix 文件锁粒度更细一般无冲突
+  - **括号禁忌修复**：`call :log` 参数中禁止 ASCII `( )`，CMD 会误解析为块语法导致 `) was unexpected at this time`
+    - ❌ `call :log [*] 预启动隧道服务(加快首次启动速度)...`
+    - ✅ `call :log [*] 预启动隧道服务【加快首次启动速度】...`
+    - ✅ 毫秒显示从 `(37ms)` 改为 `[37ms]`
+  - 符合 v3.6.0 编码规范：双写机制 + 运行阶段隔离
   - 符合 v3.5.0 移动端规范：无前端变更
 
 - **跨平台硬编码消除**
