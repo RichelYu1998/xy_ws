@@ -452,19 +452,32 @@ sys.stderr = TeeOutput(sys.stderr, 'file/web_output.log')
 
 ```python
 def setup_web_logging():
-    """设置Web模式下的日志输出 - 启动时调用一次"""
+    """设置Web模式下的日志输出（追加模式，保留shell脚本已写入的完整启动日志）"""
     global web_log_file
     web_log_file = PathManager.get_web_output_file()
     
-    # 清空旧日志（覆盖模式）
-    safe_execute_func(
-        lambda: open(web_log_file, 'w', encoding='utf-8').write(
-            "=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n"
-        ),
-        context='setup_web_logging'
-    )
+    # 智能判断是否需要写入Python头部
+    # shell脚本（run.sh/run.bat）启动时已通过log()函数写入完整启动日志
+    # 如果文件已有内容，说明shell脚本已写入，跳过头部避免重复
+    # 如果文件为空（直接启动Python的场景），则写入Python头部
+    need_header = True
+    if os.path.exists(web_log_file):
+        try:
+            with open(web_log_file, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+            if content:
+                need_header = False
+        except Exception:
+            pass
+    if need_header:
+        safe_execute_func(
+            lambda: open(web_log_file, 'a', encoding='utf-8').write(
+                "=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n"
+            ),
+            context='setup_web_logging'
+        )
     
-    # 替换stdout和stderr为双输出
+    # 替换stdout和stderr为双输出（追加模式）
     sys.stdout = TeeOutput(sys.stdout, web_log_file)
     sys.stderr = TeeOutput(sys.stderr, web_log_file)
 
@@ -4438,7 +4451,7 @@ fi
 
 ### 6.2 Web 日志持久化
 
-- `file/web_output.log` 每次启动时**从头记录完整日志**
+- `file/web_output.log` 每次启动时**从头记录完整日志**（shell脚本阶段 + Python阶段）
 - 启动时清空日志：BAT `echo. > "!LOG_FILE!"`，SH `> "$LOG_FILE"`
 - **双写机制**：启动阶段同时写控制台+文件，运行阶段仅控制台
   - BAT: 定义 `:log`（双写）+ `:log_console_only`（仅控制台），Web 就绪后切换
@@ -4450,8 +4463,10 @@ fi
     - ✅ `call :log [*] 预启动隧道服务【加快首次启动速度】...` （全角方括号）
     - ✅ 毫秒显示用 `[34ms]` 而非 `(34ms)`
   - **Python 写入模式**：`web_output.log` 必须用 `'a'`（追加），禁止 `'w'`（覆盖）
-    - ❌ `open(web_output_file, 'w')` → 清空文件 + 与 bat 追加写入锁冲突 `[Errno 13] Permission denied`
-    - ✅ `open(web_output_file, 'a')` → 统一追加模式，权限错误静默吞掉
+    - ❌ `open(web_output_file, 'w')` → 清空shell脚本已写入的完整启动日志，丢失环境检测/镜像测速等记录
+    - ❌ `open(web_output_file, 'w')` → 与 bat 追加写入锁冲突 `[Errno 13] Permission denied`
+    - ✅ `open(web_output_file, 'a')` → 追加模式，保留shell脚本日志 + Python日志无缝衔接
+    - ✅ `setup_web_logging()` 智能头部判断：文件已有内容则跳过Python头部，避免重复
 - Python 子进程输出追加到同一日志文件（`>> "!LOG_FILE!" 2>&1`）
 - ✅ `tunnel_url.txt` 保持覆盖模式（`>`），只保留最新公网地址
 - ❌ 写入配置文件的 echo 不走日志（如 pip.ini/pip.conf 的 echo 重定向）

@@ -525,13 +525,23 @@ class TeeOutput:
         return False
 
 def setup_web_logging():
-    """设置Web模式下的日志输出"""
+    """设置Web模式下的日志输出（追加模式，保留shell脚本已写入的完整启动日志）"""
     global web_log_file
     web_log_file = PathManager.get_web_output_file()
-    safe_execute_func(
-        lambda: open(web_log_file, 'w', encoding='utf-8').write("=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n"),
-        context='setup_web_logging'
-    )
+    need_header = True
+    if os.path.exists(web_log_file):
+        try:
+            with open(web_log_file, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+            if content:
+                need_header = False
+        except Exception:
+            pass
+    if need_header:
+        safe_execute_func(
+            lambda: open(web_log_file, 'a', encoding='utf-8').write("=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n"),
+            context='setup_web_logging'
+        )
     sys.stdout = TeeOutput(sys.stdout, web_log_file)
     sys.stderr = TeeOutput(sys.stderr, web_log_file)
 

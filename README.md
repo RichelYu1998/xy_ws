@@ -467,7 +467,28 @@ taskkill /F /IM node.exe
 
 ---
 
-## 最新更新
+## 最新更新### v3.8.2 (2026-07-04)
+- **修复 web_output.log 启动日志被覆盖 Bug**
+  - 根因：`setup_web_logging()` 用 `'w'`（覆盖）模式打开 `web_output.log`，把 `run.sh`/`run.bat` 已写入的完整启动日志（版本头、环境检测、镜像测速等）全部清空，只留下 Python 自身的 `Szwego商品爬虫 - Web服务` 头部
+  - 修复：`setup_web_logging()` 改为 `'a'`（追加）模式，并智能判断是否需要写入 Python 头部
+    - 文件已有内容（shell 脚本已写入完整启动日志）→ 跳过头部写入，直接追加
+    - 文件为空（直接启动 Python 的场景）→ 写入 Python 头部
+  - 修复后 `web_output.log` 完整记录从 shell 脚本到 Python 的全部启动过程：
+    - ✅ 版本头 `Szwego商品爬虫和货号对比工具 - v3.8.x`
+    - ✅ 临时文件清理
+    - ✅ `[1/6]` Python 环境检测
+    - ✅ `[2/6]` Node.js 检测
+    - ✅ `[3/6]` PIP 镜像测速
+    - ✅ `[4/6]` NPM 镜像测速
+    - ✅ `[5/6]` 虚拟环境检测
+    - ✅ `[6/6]` 依赖安装
+    - ✅ Flask 启动、隧道、邮件通知
+  - 符合 v3.6.0 编码规范：所有路径使用 `PathManager.get_web_output_file()` 动态获取，跨平台支持，无硬编码
+  - 符合 v3.5.0 移动端规范：无前端变更，移动端布局不受影响
+- **skill.md / skill.docx 同步更新**
+  - skill.md §2.3.2 Web日志系统代码范式更新（`'w'` → `'a'` + 智能头部判断）
+  - skill.docx 重新生成（包含完整的日志修复章节）
+
 ### v3.8.1 (2026-07-04)
 - **skill.md 全面补全（项目所有内容写入，非仅核心数据）**
   - **Environment 类补全**：新增 `get_browser_args()`、`get_user_agent()`、`get_default_viewport()`、`get_system_info()`、`test_pip_mirror()`、`get_fastest_pip_mirror()`、`check_process_running()` 共7个方法文档
