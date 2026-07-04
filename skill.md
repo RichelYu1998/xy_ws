@@ -1599,12 +1599,15 @@ fi
 
 - `file/web_output.log` 每次启动时**从头记录完整日志**
 - 启动时清空日志：BAT `echo. > "!LOG_FILE!"`，SH `> "$LOG_FILE"`
-- **双写机制**：所有脚本输出同时写入控制台和日志文件
-  - BAT: 定义 `:log` 子程序（`echo %*` + `(echo %*) >> "!LOG_FILE!" 2>nul`），用 `call :log` 替代 `echo`
-    - 文件写入必须用括号包裹 `(echo %*) >> file 2>nul`，避免与 Python 子进程并发写同一文件时的锁冲突
-    - ❌ 禁止裸写 `echo %* >> file`（会报 "The process cannot access the file because it is being used by another process"）
-  - SH: 定义 `log()` 函数（`echo "$*"` + `echo "$*" >> "$LOG_FILE"`），用 `log` 替代 `echo`
-  - 空行用 BAT `:log_blank` / SH `log_blank()` 处理
+- **双写机制**：启动阶段同时写控制台+文件，运行阶段仅控制台
+  - BAT: 定义 `:log`（双写）+ `:log_console_only`（仅控制台），Web 就绪后切换
+    - 文件写入用前置重定向 `>> "!LOG_FILE!" echo %* 2>nul`
+    - Web 服务就绪后执行 `set "LOG_FILE="` 停止文件写入，后续用 `call :log_console_only`
+  - SH: 定义 `log()`（双写），Unix 文件锁粒度更细，一般无冲突
+  - **括号禁忌**：`call :log` 参数中禁止使用 ASCII `( )`，CMD 会误解析为块语法
+    - ❌ `call :log 预启动隧道服务(加快首次启动速度)...` → `) was unexpected at this time`
+    - ✅ `call :log [*] 预启动隧道服务【加快首次启动速度】...` （全角方括号）
+    - ✅ 毫秒显示用 `[34ms]` 而非 `(34ms)`
 - Python 子进程输出追加到同一日志文件（`>> "!LOG_FILE!" 2>&1`）
 - ✅ `tunnel_url.txt` 保持覆盖模式（`>`），只保留最新公网地址
 - ❌ 写入配置文件的 echo 不走日志（如 pip.ini/pip.conf 的 echo 重定向）
@@ -1645,7 +1648,7 @@ fi
 | 前端页面标题 | 从 API 动态获取版本号设置 | 硬编码 `Szwego商品爬虫 - 项目主页` |
 | 前端按钮宽度 | `padding` 自适应 + CSS Grid 容器（`1fr` 等分） | 固定 `width: 12.5rem`（Mac 14寸换行） |
 | 前端按钮容器 | `display:grid;grid-template-columns:repeat(N,1fr)` | `display:flex;justify-content:center`（移动端末行偏移） |
-| Web 日志 | 双写机制 `:log` + `(echo) >> file 2>nul` 括号包裹防锁冲突 | 裸写 `echo >> file`（并发锁冲突报错） |
+| Web 日志 | 启动阶段`:log`双写 + 运行阶段`:log_console_only`纯控制台 | 全程双写（文件锁冲突报错） |
 | 隧道地址文件 | 覆盖模式 `>`，只保留最新地址 | 追加模式（历史地址混淆） |
 
 ### 镜像源测速规范
@@ -1659,7 +1662,8 @@ fi
 | SH 时间转换 | `awk '{printf "%d", $1 * 1000}'` | `delims=.0` (bug: 删掉所有0和点) |
 | curl 命令 | `curl.exe`（BAT）/ `curl`（SH） | `curl`（BAT，PowerShell 别名冲突） |
 | stderr 重定向 | `2>nul`（BAT）/ `2>/dev/null`（SH） | `2>&1`（stderr 混入时间值） |
-| echo 括号 | `^(` `^)` 转义（BAT） | `(` `)` 原样（批处理语法错误） |
+| echo 括号 | **禁止在 `call :log` 参数中使用 ASCII `( )`** | `call :log 文本(内容)` → `) was unexpected` |
+| 毫秒显示格式 | `[34ms]` 方括号 | `(34ms)` 圆括号（CMD 块语法冲突） |
 | 延迟扩展 | `!VAR!`（在 `enabledelayedexpansion` 块中） | `%VAR%`（不更新值） |
 | 空值兜底 | `if "!VAR!"=="" set "VAR=9999"` | 不检查空值 |
 | 回退机制 | 所有镜像失败时回退官方 PyPI | 直接报错退出 |

@@ -15,12 +15,28 @@ goto main_start
 
 :log
 echo %*
-(echo %*) >> "!LOG_FILE!" 2>nul
+if not "%LOG_FILE%"=="" (
+    if exist "!LOG_FILE!" (
+        >> "!LOG_FILE!" echo %* 2>nul
+    )
+)
 exit /b
 
 :log_blank
 echo.
-(echo.) >> "!LOG_FILE!" 2>nul
+if not "%LOG_FILE%"=="" (
+    if exist "!LOG_FILE!" (
+        >> "!LOG_FILE!" echo. 2>nul
+    )
+)
+exit /b
+
+:log_console_only
+echo %*
+exit /b
+
+:log_blank_console_only
+echo.
 exit /b
 
 :main_start
@@ -351,7 +367,7 @@ for /L %%i in (0,1,3) do (
         if !PIP_INT_TIME! equ 9999 (
             call :log         !MIRROR_NAME!: 超时/失败
         ) else (
-            call :log         !MIRROR_NAME!: !TEST_TIME!秒 ^(!PIP_INT_TIME!ms^)
+            call :log         !MIRROR_NAME!: !TEST_TIME!秒 [!PIP_INT_TIME!ms]
             if !PIP_INT_TIME! LSS !MIN_TIME! (
                 set "MIN_TIME=!PIP_INT_TIME!"
                 set "BEST_MIRROR=!MIRROR_URL!"
@@ -370,7 +386,7 @@ if "!BEST_MIRROR!"=="" (
 ) else (
     set "FASTEST_PIP_MIRROR=!BEST_MIRROR!"
     call :log_blank
-    call :log [*] 最快PIP镜像: !BEST_NAME! ^(!MIN_TIME!毫秒^)
+    call :log [*] 最快PIP镜像: !BEST_NAME! [!MIN_TIME!毫秒]
 )
 exit /b 0
 
@@ -419,7 +435,7 @@ for /L %%i in (0,1,1) do (
         if !NPM_INT_TIME! equ 9999 (
             call :log         !NPM_NAME!: 超时/失败
         ) else (
-            call :log         !NPM_NAME!: !NPM_TEST_TIME!秒 ^(!NPM_INT_TIME!ms^)
+            call :log         !NPM_NAME!: !NPM_TEST_TIME!秒 [!NPM_INT_TIME!ms]
             if !NPM_INT_TIME! LSS !NPM_MIN_TIME! (
                 set "NPM_MIN_TIME=!NPM_INT_TIME!"
                 set "NPM_BEST_MIRROR=!NPM_URL!"
@@ -437,7 +453,7 @@ if "!NPM_BEST_MIRROR!"=="" (
 ) else (
     set "FASTEST_NPM_MIRROR=!NPM_BEST_MIRROR!"
     call :log_blank
-    call :log [*] 最快NPM镜像: !NPM_BEST_NAME! ^(!NPM_MIN_TIME!毫秒^)
+    call :log [*] 最快NPM镜像: !NPM_BEST_NAME! [!NPM_MIN_TIME!毫秒]
     
     where npm >nul 2>&1
     if not errorlevel 1 (
@@ -587,7 +603,7 @@ call :log 隧道服务配置
 call :log ========================================
 call :log_blank
 call :log 正在配置 hostc 隧道服务...
-call :log [*] 预启动隧道服务(加快首次启动速度)...
+call :log [*] 预启动隧道服务【加快首次启动速度】...
 call npx -y hostc@latest --help >nul 2>&1
 call :log 隧道服务就绪
 
@@ -628,20 +644,21 @@ if not "!HTTP_CODE!"=="200" (
     )
 )
 
-call :log Web 服务已就绪，正在启动隧道...
+set "LOG_FILE="
+call :log_console_only Web 服务已就绪，正在启动隧道...
 start /b cmd /c "npx -y hostc@latest !WEB_PORT! --local-host localhost > file\tunnel_url.txt 2>&1"
 
-call :log_blank
-call :log ========================================
-call :log 启动完成！
-call :log ========================================
-call :log_blank
-call :log 本地访问: http://localhost:!WEB_PORT!
-call :log 公网访问: 查看 file\tunnel_url.txt
-call :log Web日志: 查看 file\web_output.log
-call :log_blank
-call :log 按 Ctrl+C 停止服务，或关闭此窗口
-call :log_blank
+call :log_blank_console_only
+call :log_console_only ========================================
+call :log_console_only 启动完成！
+call :log_console_only ========================================
+call :log_blank_console_only
+call :log_console_only 本地访问: http://localhost:!WEB_PORT!
+call :log_console_only 公网访问: 查看 file\tunnel_url.txt
+call :log_console_only Web日志: 查看 file\web_output.log
+call :log_blank_console_only
+call :log_console_only 按 Ctrl+C 停止服务，或关闭此窗口
+call :log_blank_console_only
 
 :wait_loop_entry
 set "CHECK_INTERVAL=60"
@@ -662,7 +679,7 @@ if exist temp (
     set "LIMIT_SIZE=3145728"
     if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
         del /f /s /q temp\*.* >nul 2>&1
-        call :log [AUTO] temp目录超过3MB，已自动清理
+        call :log_console_only [AUTO] temp目录超过3MB，已自动清理
     )
 )
 goto :eof
