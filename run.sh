@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")"
+
 VERSION="0.0.0"
 for cmd in python3 python; do
     if command -v "$cmd" &>/dev/null; then

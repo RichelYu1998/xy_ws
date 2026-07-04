@@ -1,6 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 chcp 65001 > nul 2>&1
+cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 title Szwego Crawler Tool
 
