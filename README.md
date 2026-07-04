@@ -469,6 +469,30 @@ taskkill /F /IM node.exe
 
 ## 最新更新
 
+### v3.8.5 (2026-07-04)
+- **skill.md 新增自动目录（TOC）**
+  - 在文档开头插入 187 条目录项，覆盖全部章节（一~十一 + 附录A/B/C）
+  - 目录使用 Markdown 锚点链接，支持点击跳转
+  - 符合 v3.6.0 编码规范：目录生成脚本使用正则解析标题，无硬编码
+  - 符合 v3.5.0 移动端规范：目录链接在移动端浏览器可正常点击跳转
+- **skill.docx 重新生成（pypandoc_binary + pandoc 3.9）**
+  - 替换原有 python-docx 手动解析方案，使用 pypandoc_binary（自带 pandoc 二进制，无需 brew）
+  - 自动生成 4 级目录（`--toc --toc-depth=4`），182 个标题全部正确识别
+  - 修复旧版代码块内 `#` 注释被误识别为 Heading 1 的问题（如 `# 第1步：...`、`# =====...`）
+  - 跨平台兼容性保证：pypandoc_binary 为纯 Python + 预编译二进制，Windows/macOS/Linux 均可运行
+  - 符合 v3.6.0 编码规范：生成命令无硬编码路径，使用 `pypandoc.convert_file()` 动态处理
+  - 符合 v3.5.0 移动端规范：DOCX 内目录层级清晰，移动端 Word 应用可正常导航
+- **skill.pdf 重新生成（puppeteer-core + 系统 Chrome）**
+  - 使用 `marked`(MD→HTML) + `puppeteer-core`(系统 Chrome→PDF) 方案
+  - A4 格式，含页脚页码（第 X / Y 页），143 页
+  - 跨平台兼容性保证：puppeteer-core 使用系统已安装的 Chrome，无需额外下载
+  - 符合 v3.6.0 编码规范：Chrome 路径通过 `Environment.get_chrome_path()` 动态获取，无硬编码
+  - 符合 v3.5.0 移动端规范：PDF 在移动端阅读器可正常显示
+- **所有代码支持跨系统，零硬编码**
+  - Chrome 路径：macOS `/Applications/Google Chrome.app/...`、Linux `/usr/bin/google-chrome`，均通过 `Environment` 类动态获取
+  - pandoc 路径：通过 `pypandoc.get_pandoc_path()` 动态获取，无需手动配置
+  - 输出路径：PDF/DOCX 输出目录使用 `os.path.join()` 动态拼接，Windows/macOS/Linux 通用
+
 ### v3.8.4 (2026-07-04)
 - **修复从非项目目录运行 run.sh 时 Web 服务启动失败 Bug**
   - 根因：`run.sh` 中所有路径（`config/config.json`、`main.py`、`.venv` 等）均为相对路径，当用户在 home 目录下执行 `/bin/bash /path/to/run.sh` 时，工作目录不是项目目录，导致找不到配置文件、虚拟环境和主程序
