@@ -483,6 +483,7 @@ run_web() {
 
     mkdir -p file
     WEB_PORT="${WEB_PORT:-8888}"
+    > file/web_output.log
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ===" >> file/web_output.log
     "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" >> file/web_output.log 2>&1 &
     PYTHON_PID=$!

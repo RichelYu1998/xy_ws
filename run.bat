@@ -588,6 +588,7 @@ echo.
 if not exist file mkdir file
 set "PYTHON_LOG_FILE=%CD%\file\web_output.log"
 if not defined WEB_PORT set "WEB_PORT=8888"
+echo. > "!PYTHON_LOG_FILE!"
 echo [!date! !time!] === Web服务启动 === >> "!PYTHON_LOG_FILE!"
 start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT! >> "!PYTHON_LOG_FILE!" 2>&1"
 

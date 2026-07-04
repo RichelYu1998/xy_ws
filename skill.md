@@ -1597,12 +1597,11 @@ fi
 
 ### 6.2 Web 日志持久化
 
-- `file/web_output.log` 使用追加模式（`>>`），跨重启保留历史日志
+- `file/web_output.log` 每次启动时先清空，然后追加写入（`>>`）
+- 启动时先清空日志：BAT `echo. > file\web_output.log`，SH `> file/web_output.log`
 - 每次启动写入时间戳分隔线，便于区分不同会话：
   - BAT: `echo [!date! !time!] === Web服务启动 === >> file\web_output.log`
   - SH: `echo "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ===" >> file/web_output.log`
-- 可追踪历史公网地址变化，判断老地址是否真正失效
-- ❌ 禁止启动时清空 `web_output.log`（如 `echo. > file\web_output.log`）
 - ✅ `tunnel_url.txt` 保持覆盖模式（`>`），只保留最新公网地址
 
 ### 6.3 邮件通知
@@ -1641,7 +1640,7 @@ fi
 | 前端页面标题 | 从 API 动态获取版本号设置 | 硬编码 `Szwego商品爬虫 - 项目主页` |
 | 前端按钮宽度 | `padding` 自适应 + CSS Grid 容器（`1fr` 等分） | 固定 `width: 12.5rem`（Mac 14寸换行） |
 | 前端按钮容器 | `display:grid;grid-template-columns:repeat(N,1fr)` | `display:flex;justify-content:center`（移动端末行偏移） |
-| Web 日志 | 追加模式 `>>`，启动时写时间戳分隔线 | 启动时清空 `> file\web_output.log` |
+| Web 日志 | 启动时清空 `>`，运行时追加 `>>`，写时间戳分隔线 | 跨重启追加（历史混淆） |
 | 隧道地址文件 | 覆盖模式 `>`，只保留最新地址 | 追加模式（历史地址混淆） |
 
 ### 镜像源测速规范
