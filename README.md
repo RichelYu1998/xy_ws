@@ -1,4 +1,43 @@
 # Szwego商品爬虫和货号对比工具
+
+## 📢 最新更新 (v3.8.5 - 2026-07-05)
+
+### ✅ 关键修复：PowerShell 兼容性优化
+
+#### 问题背景
+在 PowerShell 环境中运行 `cmd.exe /c run.bat` 时，会出现大量 "Input redirection is not supported" 和 "The process cannot access the file because it is being used by another process" 错误。
+
+#### 根本原因
+1. **`timeout` 命令不兼容**：CMD 的 `timeout` 命令在 PowerShell 中会尝试读取标准输入，导致输入重定向错误
+2. **残留进程未清理**：上次运行的 Python/Node 进程未完全退出，锁定临时文件
+3. **子进程输入未隔离**：后台启动的 Web 服务和隧道服务未禁用标准输入
+
+#### 解决方案（跨平台实现）
+
+| 修改文件 | 修改内容 | 技术细节 |
+|---------|---------|----------|
+| [run.bat](run.bat) | `timeout` → `ping -n X 127.0.0.1` | 避免输入读取，使用 ICMP 回显代替 |
+| [run.bat](run.bat) | 新增残留进程自动清理 | 启动前强制结束 python.exe/node.exe |
+| [run.bat](run.bat) | 后台进程添加 `< nul` | 禁用子进程标准输入 |
+| [run.sh](run.sh) | 新增残留进程自动清理 | 使用 `pkill -9` 强制结束进程 |
+| [run.sh](run.sh) | 后台进程添加 `< /dev/null` | Unix 标准的输入隔离方式 |
+| [main.py](main.py) | 隧道进程添加 `stdin=subprocess.DEVNULL` | Python 层面的输入隔离 |
+
+#### 跨平台等待命令对照表
+
+| 平台 | 原写法（❌ 不兼容） | 新写法（✅ 兼容） | 等待时间 |
+|------|-------------------|-----------------|---------|
+| Windows CMD | `timeout /t 1 /nobreak` | `ping -n 2 127.0.0.1 >nul 2>&1` | ~1秒 |
+| Linux/Mac | N/A（已正确） | `sleep 1` | 1秒 |
+
+#### 修复效果
+- ✅ **零错误输出**：不再出现 "Input redirection is not supported"
+- ✅ **文件访问正常**：不再出现 "file is being used by another process"
+- ✅ **自动进程管理**：启动时自动清理残留进程，无需手动干预
+- ✅ **完全跨平台**：支持 PowerShell/CMD/WSL/Bash/Zsh 等所有环境
+
+---
+
 ## 快速开始
 
 ### 1. 克隆仓库
@@ -18,6 +57,24 @@ bash run.sh
 
 **程序会自动：**
 - ✅ **智能环境检测**（6步流程）：
+  - [0/6] ⭐ **新增**：自动清理残留进程（避免文件锁定冲突）
+  - [1/6] Python 环境检测（PATH + 常见安装路径搜索 + 虚拟环境状态检测）
+  - [2/6] Node.js/NVM 检测与 **全自动安装**（5层回退）：
+    - Windows: NVM PATH → NVM 注册表 → Winget → Chocolatey → Scoop → MSI下载到 `.node_env/`
+    - macOS: NVM → Homebrew (Intel + Apple Silicon)
+    - Linux: NVM → apt+nodesource / yum+nodesource / dnf+nodesource / pacman
+  - [3/6] **PIP 镜像源轮询测速**（测试清华/阿里云/豆瓣/中科大4个镜像，选择毫秒级最快源）
+  - [4/6] **NPM 镜像源轮询测速**（测试淘宝/官方源2个镜像，自动设置最快源）
+  - [5/6] Python 虚拟环境管理（自动创建 `.venv`，生成 pip 配置文件）
+  - [6/6] 依赖安装与 Playwright 浏览器安装
+- ✅ **跨平台完全支持**（Windows/macOS/Linux，零硬编码，所有路径动态获取）
+- ✅ **智能回退机制**（镜像源失败自动切换默认 PyPI，依赖安装失败自动重试）
+- ✅ **临时环境隔离**（Python: `.venv/`，Node.js: `.node_env/`，不影响系统全局配置）
+- ✅ 检测配置文件（首次使用自动从模板复制）
+- ✅ 启动 Web 服务（⭐ 输入已隔离，兼容 PowerShell）
+- ✅ 启动 hostc 隧道（⭐ 输入已隔离，兼容 PowerShell）
+
+### 环境检测详情
   - [1/6] Python 环境检测（PATH + 常见安装路径搜索 + 虚拟环境状态检测）
   - [2/6] Node.js/NVM 检测与 **全自动安装**（5层回退）：
     - Windows: NVM PATH → NVM 注册表 → Winget → Chocolatey → Scoop → MSI下载到 `.node_env/`
