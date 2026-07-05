@@ -5932,121 +5932,162 @@ if __name__ == '__main__':
         email_fail_cooldown = 300
         last_email_sent_url = None
         pending_email_url = None
+        email_send_lock = threading.Lock()
         
         def send_tunnel_notification(new_url, event_type='new'):
             global last_email_sent_time, email_fail_count, last_email_sent_url, pending_email_url
+            
+            with email_send_lock:
+                current_time = time.time()
 
-            current_time = time.time()
+                if email_fail_count >= email_max_fail_count:
+                    if current_time - last_email_sent_time < email_fail_cooldown:
+                        print(f"[Email] 邮件发送失败次数过多 ({email_fail_count}次)，暂停发送 {email_fail_cooldown} 秒")
+                        return
+                    else:
+                        print(f"[Email] 邮件发送失败冷却期已过，重置失败计数")
+                        email_fail_count = 0
 
-            if email_fail_count >= email_max_fail_count:
-                if current_time - last_email_sent_time < email_fail_cooldown:
-                    print(f"[Email] 邮件发送失败次数过多 ({email_fail_count}次)，暂停发送 {email_fail_cooldown} 秒")
+                remaining_cooldown = email_cooldown - (current_time - last_email_sent_time)
+
+                if current_time - last_email_sent_time < email_cooldown:
+                    if new_url != last_email_sent_url:
+                        pending_email_url = new_url
+                        print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒，已记录待发送URL: {new_url}")
+                    else:
+                        print(f"[Email] ⏭️ 相同URL已在冷却期内发送过，跳过重复发送: {new_url}")
                     return
-                else:
-                    print(f"[Email] 邮件发送失败冷却期已过，重置失败计数")
-                    email_fail_count = 0
+                
+                if new_url == last_email_sent_url:
+                    print(f"[Email] ⏭️ URL去重：相同URL不会重复发送: {new_url} (当前类型: {event_type})")
+                    return
 
-            remaining_cooldown = email_cooldown - (current_time - last_email_sent_time)
-
-            if current_time - last_email_sent_time < email_cooldown:
-                if new_url != last_email_sent_url:
-                    pending_email_url = new_url
-                    print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒，已记录待发送URL: {new_url}")
-                else:
-                    print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒")
-                return
-
-            last_email_sent_url = new_url
-            pending_email_url = None
+                pending_email_url = None
 
             def verify_and_send():
                 global last_email_sent_time, email_fail_count, last_email_sent_url
+                import datetime
+                current_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 try:
-                    print(f"[Email] 🔍 正在验证URL稳定性: {new_url}")
-
-                    max_retries = 3
-                    retry_delay = 5  # 每次验证间隔5秒
-                    url_stable = False
-
-                    for attempt in range(1, max_retries + 1):
-                        print(f"[Email] 📊 第{attempt}/{max_retries}次验证...")
-                        if verify_url(new_url, timeout=3):
-                            print(f"[Email] ✅ 第{attempt}次验证成功！")
-
-                            if attempt < max_retries:
-                                print(f"[Email] ⏳ 等待{retry_delay}秒进行二次确认...")
-                                time.sleep(retry_delay)
-
-                                if verify_url(new_url, timeout=3):
-                                    print(f"[Email] ✅✅ 二次确认成功！URL稳定可靠")
-                                    url_stable = True
-                                    break
-                                else:
-                                    print(f"[Email] ⚠️ 二次确认失败，URL不稳定，继续验证...")
-                                    continue
+                    print(f"[{current_time_str}] [Email] 📧 开始处理邮件发送任务")
+                    print(f"[{current_time_str}] [Email] 目标URL: {new_url}")
+                    print(f"[{current_time_str}] [Email] 事件类型: {event_type}")
+                    print(f"[{current_time_str}] [Email] 上次发送URL: {last_email_sent_url}")
+                    
+                    with email_send_lock:
+                        if new_url != last_email_sent_url:
+                            print(f"[{current_time_str}] [Email] ✅ URL校验通过，准备调用SMTP服务...")
+                            success = email_notifier.send_tunnel_notification(new_url, event_type)
+                            
+                            if success:
+                                last_email_sent_time = time.time()
+                                email_fail_count = 0
+                                last_email_sent_url = new_url
+                                send_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                print(f"[{send_time_str}] [Email] ✅✅✅ 邮件发送成功！")
+                                print(f"[{send_time_str}] [Email] 📨 收件人: 980187223@qq.com")
+                                print(f"[{send_time_str}] [Email] 🔗 隧道地址: {new_url}")
+                                print(f"[{send_time_str}] [Email] ⏰ 发送时间: {send_time_str}")
+                                print(f"[{send_time_str}] [Email] 📊 失败计数已重置为0")
                             else:
-                                url_stable = True
-                                break
+                                email_fail_count += 1
+                                last_email_sent_url = None
+                                fail_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                print(f"[{fail_time_str}] [Email] ❌❌❌ 邮件发送失败！")
+                                print(f"[{fail_time_str}] [Email] 💥 失败原因: SMTP服务返回错误或网络异常")
+                                print(f"[{fail_time_str}] [Email] 📈 当前累计失败次数: {email_fail_count}/{email_max_fail_count}")
+                                print(f"[{fail_time_str}] [Email] 🔄 已标记URL可重试，等待下次发送")
                         else:
-                            if attempt < max_retries:
-                                print(f"[Email] ❌ 第{attempt}次验证失败，{retry_delay}秒后重试...")
-                                time.sleep(retry_delay)
-                            else:
-                                print(f"[Email] ❌ 已验证{max_retries}次，URL仍不可用，放弃发送")
-
-                    if url_stable:
-                        print(f"[Email] 📧 准备发送邮件通知: {new_url} (事件类型: {event_type})")
-                        success = email_notifier.send_tunnel_notification(new_url, event_type)
-                        if success:
-                            last_email_sent_time = time.time()
-                            email_fail_count = 0
-                            last_email_sent_url = new_url
-                            print(f"[Email] ✅ 邮件发送成功（已验证URL稳定）")
-                        else:
-                            email_fail_count += 1
-                            print(f"[Email] 邮件发送失败，当前失败次数: {email_fail_count}")
-                    else:
-                        print(f"[Email] ⚠️ URL不稳定，跳过本次邮件发送（避免发送无效URL）")
+                            skip_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            print(f"[{skip_time_str}] [Email] ⏭️ 邮件发送被跳过")
+                            print(f"[{skip_time_str}] [Email] 原因: 该URL已在之前发送过")
+                            print(f"[{skip_time_str}] [Email] 已发送URL: {last_email_sent_url}")
+                            print(f"[{skip_time_str}] [Email] 待发送URL: {new_url}")
 
                 except Exception as e:
                     email_fail_count += 1
-                    print(f"[Email] 发送邮件异常: {e}，当前失败次数: {email_fail_count}")
+                    last_email_sent_url = None
+                    error_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    print(f"[{error_time_str}] [Email] 💥💥💥 邮件发送发生异常！")
+                    print(f"[{error_time_str}] [Email] ❌ 异常类型: {type(e).__name__}")
+                    print(f"[{error_time_str}] [Email] ❌ 错误详情: {str(e)[:200]}")
+                    print(f"[{error_time_str}] [Email] 📈 当前累计失败次数: {email_fail_count}/{email_max_fail_count}")
+                    print(f"[{error_time_str}] [Email] 🔄 已标记可重试")
 
             threading.Thread(target=verify_and_send, daemon=True).start()
         
         def check_and_send_pending_email():
             global pending_email_url, last_email_sent_time, email_fail_count, last_email_sent_url
+            import datetime
             current_time = time.time()
+            current_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
             if pending_email_url and (current_time - last_email_sent_time) >= email_cooldown:
                 url_to_send = pending_email_url
                 pending_email_url = None
                 last_email_sent_url = url_to_send
-                print(f"[Email] 冷却期已过，发送待发邮件: {url_to_send}")
+                
+                print(f"[{current_time_str}] [Email] 📋 检测到待发送邮件")
+                print(f"[{current_time_str}] [Email] ⏱️ 冷却期已结束，准备发送")
+                print(f"[{current_time_str}] [Email] 🎯 目标URL: {url_to_send}")
+                
                 def send_pending():
                     global last_email_sent_time, email_fail_count, last_email_sent_url
                     try:
+                        pending_start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        print(f"[{pending_start_time}] [Email] 🚀 开始发送待发邮件...")
+                        
                         success = email_notifier.send_tunnel_notification(url_to_send, 'pending')
+                        
+                        pending_end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        
                         if success:
                             last_email_sent_time = time.time()
                             email_fail_count = 0
                             last_email_sent_url = url_to_send
-                            print(f"[Email] 待发邮件发送成功")
+                            print(f"[{pending_end_time}] [Email] ✅✅✅ 待发邮件发送成功！")
+                            print(f"[{pending_end_time}] [Email] 🔗 隧道地址: {url_to_send}")
+                            print(f"[{pending_end_time}] [Email] ⏰ 完成时间: {pending_end_time}")
                         else:
                             email_fail_count += 1
                             pending_email_url = url_to_send
+                            print(f"[{pending_end_time}] [Email] ❌❌❌ 待发邮件发送失败！")
+                            print(f"[{pending_end_time}] [Email] 💥 失败原因: SMTP服务异常")
+                            print(f"[{pending_end_time}] [Email] 📈 累计失败次数: {email_fail_count}/{email_max_fail_count}")
+                            print(f"[{pending_end_time}] [Email] 🔄 已重新加入待发送队列")
                     except Exception as e:
                         email_fail_count += 1
                         pending_email_url = url_to_send
-                        print(f"[Email] 待发邮件发送异常: {e}")
+                        error_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        print(f"[{error_time}] [Email] 💥💥💥 待发邮件发送发生异常！")
+                        print(f"[{error_time}] [Email] ❌ 异常类型: {type(e).__name__}")
+                        print(f"[{error_time}] [Email] ❌ 错误详情: {str(e)[:200]}")
+                        print(f"[{error_time}] [Email] 📈 累计失败次数: {email_fail_count}/{email_max_fail_count}")
+                        print(f"[{error_time}] [Email] 🔄 已重新加入待发送队列")
+                
                 threading.Thread(target=send_pending, daemon=True).start()
+            elif pending_email_url:
+                remaining_cooldown = int(email_cooldown - (current_time - last_email_sent_time))
+                print(f"[{current_time_str}] [Email] ⏳ 待发邮件等待冷却中...")
+                print(f"[{current_time_str}] [Email] 剩余冷却时间: {remaining_cooldown}秒")
         
-        def verify_url(url, timeout=5):
+        def verify_url(url, timeout=5, verbose=False):
             try:
+                import ssl
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                
                 req = urllib.request.Request(url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-verify/1.0')
-                urllib.request.urlopen(req, timeout=timeout)
-                return True
+                
+                response = urllib.request.urlopen(req, timeout=timeout, context=ctx)
+                if response.status in [200, 301, 302, 307, 308]:
+                    return True
+                return False
             except Exception as e:
+                if verbose:
+                    print(f"[Email] URL验证失败: {url} - {str(e)[:100]}")
                 return False
         
         def send_heartbeat():
@@ -6069,37 +6110,48 @@ if __name__ == '__main__':
         def heartbeat_loop():
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             consecutive_failures = 0
-            max_consecutive_failures = 3  # 连续失败3次才标记需要重启
+            max_consecutive_failures = 5  # 连续失败5次才标记需要重启
             url_verify_failures = 0  # URL验证连续失败计数
-            max_url_verify_failures = 3  # URL验证允许连续失败3次
-            heartbeat_interval = 15  # 心跳间隔15秒（降低频率，避免误判）
+            max_url_verify_failures = 10  # URL验证允许连续失败10次（降低敏感度）
+            heartbeat_interval = 60  # 心跳间隔60秒（大幅降低频率）
             last_log_time = 0
+            skip_url_verify_count = 0  # 跳过URL验证的次数计数
+            skip_url_verify_max = 4  # 前4次心跳跳过URL验证（给隧道启动时间）
+            
             while tunnel_auto_restart:
                 # 从 web_output.log 获取 URL（唯一来源）
                 web_url = PathManager.get_public_url_from_web_log()
                 is_tunnel_running = False
 
                 if web_url:
-                    try:
-                        if verify_url(web_url, timeout=5):
-                            is_tunnel_running = True
-                            url_verify_failures = 0  # 验证成功，重置计数
-                        else:
+                    # 前几次心跳跳过URL验证，避免刚启动时误判
+                    if skip_url_verify_count < skip_url_verify_max:
+                        skip_url_verify_count += 1
+                        is_tunnel_running = True  # 假设隧道正常
+                        if skip_url_verify_count == 1:
+                            print(f"[Tunnel] 心跳启动，前{skip_url_verify_max}次将跳过URL验证")
+                    else:
+                        try:
+                            # 使用更长的超时时间，并只在verbose模式输出日志
+                            if verify_url(web_url, timeout=10):
+                                is_tunnel_running = True
+                                url_verify_failures = 0  # 验证成功，重置计数
+                            else:
+                                url_verify_failures += 1
+                                if time.time() - last_log_time > 120:  # 2分钟才打印一次日志
+                                    print(f"[Tunnel] URL不可用 ({url_verify_failures}/{max_url_verify_failures}): {web_url}")
+                                    last_log_time = time.time()
+                                # 只有连续失败达到阈值才标记重启
+                                if url_verify_failures >= max_url_verify_failures:
+                                    print(f"[Tunnel] URL连续验证失败{url_verify_failures}次，标记需要重启")
+                                    tunnel_need_restart = True
+                        except Exception as e:
                             url_verify_failures += 1
-                            if time.time() - last_log_time > 30:  # 30秒才打印一次日志
-                                print(f"[Tunnel] URL验证失败 ({url_verify_failures}/{max_url_verify_failures}): {web_url}")
+                            if time.time() - last_log_time > 120:
+                                print(f"[Tunnel] URL验证异常: {e}")
                                 last_log_time = time.time()
-                            # 只有连续失败达到阈值才标记重启
                             if url_verify_failures >= max_url_verify_failures:
-                                print(f"[Tunnel] URL连续验证失败{url_verify_failures}次，标记需要重启")
                                 tunnel_need_restart = True
-                    except Exception as e:
-                        url_verify_failures += 1
-                        if time.time() - last_log_time > 30:
-                            print(f"[Tunnel] URL验证异常 ({url_verify_failures}/{max_url_verify_failures}): {e}")
-                            last_log_time = time.time()
-                        if url_verify_failures >= max_url_verify_failures:
-                            tunnel_need_restart = True
                 
                 if is_tunnel_running:
                     success = send_heartbeat()
