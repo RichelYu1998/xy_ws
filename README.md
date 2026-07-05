@@ -70,6 +70,392 @@
 
 ---
 
+## 📏 编码规范与格式标准
+
+### 一、v3.6.0 编码规范（强制遵循）
+
+#### 1.1 路径管理（零硬编码）
+- ✅ 所有路径使用 `PathManager.get_xxx()` 动态获取
+- ✅ 禁止硬编码路径或用户名
+- ✅ 使用 `os.path.join()` 或 `pathlib.Path` 拼接路径
+
+```python
+# ✅ 正确示例
+tunnel_url_file = PathManager.get_tunnel_url_file()
+web_output_log = PathManager.get_web_output_file()
+
+# ❌ 错误示例
+tunnel_url_file = 'D:/ws/xy_ws/file/tunnel_url.txt'  # 硬编码路径！
+```
+
+#### 1.2 平台检测
+- ✅ 使用 `Environment.IS_WINDOWS / IS_MAC / IS_LINUX` 判断平台
+- ✅ 进程管理使用 `Environment.kill_process_by_name()` 跨平台方法
+
+```python
+# ✅ 正确示例
+if Environment.IS_WINDOWS:
+    process_name = 'node.exe'
+else:
+    process_name = 'hostc'
+Environment.kill_process_by_name(process_name)
+
+# ❌ 错误示例
+os.system('taskkill /F /IM node.exe')  # Windows 专用！
+```
+
+#### 1.3 异常处理
+- ✅ 使用 `AppException` 统一异常体系
+- ✅ 文件读写必须指定 `encoding='utf-8'`
+
+```python
+# ✅ 正确示例
+try:
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+except AppException as e:
+    logger.error(f"文件读取失败: {e}")
+
+# ❌ 错误示例
+content = open(file_path).read()  # 未指定编码！
+```
+
+#### 1.4 配置管理
+- ✅ 使用 `ConfigManager.get_config()` 懒加载模式
+- ✅ 禁止全局配置变量
+
+```python
+# ✅ 正确示例
+def get_smtp_config():
+    config = ConfigManager.get_config()
+    return config['email']['smtp_host']
+
+# ❌ 错误示例
+SMTP_HOST = "smtp.qq.com"  # 全局硬编码！
+```
+
+#### 1.5 API 响应格式
+- ✅ 成功：`{'success': True, 'data': ...}`
+- ✅ 失败：`{'success': False, 'error': '...'}`
+- ✅ 敏感信息脱敏（password 返回 `******`）
+
+```python
+# ✅ 正确示例
+return jsonify({
+    'success': True,
+    'email_config': {
+        'smtp_host': config['smtp_host'],
+        'smtp_user': config['smtp_user'],
+        'smtp_pass': '******'  # 脱敏处理
+    }
+})
+```
+
+#### 1.6 版本号管理
+- ✅ 唯一来源为 `README.md`，动态解析
+- ✅ 格式：`### vX.X.X (YYYY-MM-DD)` 或 `### vX.X.X (YYYY-MM-DD) - 描述`
+
+```python
+# ✅ 正确示例（main.py:1358）
+def get_version_from_readme():
+    readme_path = os.path.join(PROJECT_DIR, 'README.md')
+    with open(readme_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    match = re.search(r'###\s+v([\d.]+)', content)
+    return match.group(1) if match else "0.0.0"
+
+VERSION = get_version_from_readme()  # 动态获取
+```
+
+#### 1.7 文档生成工具
+- ✅ **DOCX**: 使用 `pypandoc_binary`（自带 pandoc 二进制，无需 brew）
+- ✅ **PDF**: 使用 `puppeteer-core` + 系统 Chrome
+- ✅ Chrome 路径通过 `Environment.get_chrome_path()` 动态获取
+- ✅ pandoc 路径通过 `pypandoc.get_pandoc_path()` 动态获取
+
+```python
+# ✅ 正确示例（generate_docx.py）
+import pypandoc
+output_file = os.path.join(os.path.dirname(__file__), 'skill.docx')
+pypandoc.convert_file('skill.docx', 'docx', outputfile=output_file,
+                      extra_args=['--toc', '--toc-depth=4'])
+```
+
+#### 1.8 启动脚本规范
+- ✅ 工作目录自动切换：
+  - Windows: `cd /d "%~dp0"`
+  - Unix: `cd "$(dirname "$0")"`
+- ✅ 残留进程清理（启动前强制结束）
+
+```bat
+:: run.bat 示例
+@echo off
+cd /d "%~dp0"  ← 自动切换到脚本所在目录
+taskkill /F /IM python.exe >nul 2>&1  ← 清理残留进程
+```
+
+```bash
+#!/bin/bash
+# run.sh 示例
+cd "$(dirname "$0")"  ← 自动切换到脚本所在目录
+pkill -9 python  ← 清理残留进程
+```
+
+---
+
+### 二、v3.5.0 移动端规范（必须满足）
+
+#### 2.1 布局要求
+- ✅ CSS Grid 按钮布局保持不变
+- ✅ 响应式断点全覆盖（手机/平板/桌面）
+- ✅ 触摸设备适配正常（按钮大小 ≥ 44×44px）
+
+```css
+/* ✅ 正确示例 */
+.button-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 768px) {
+  .button-grid {
+    grid-template-columns: repeat(2, 1fr);  /* 移动端2列 */
+  }
+}
+```
+
+#### 2.2 交互规范
+- ✅ 按钮无数字前缀（使用 `data-original` 模式）
+- ✅ 全局函数正确挂载到 `window` 对象
+- ✅ 下拉刷新支持（移动端手势）
+
+```javascript
+// ✅ 正确示例
+window.startCrawler = function() {
+  // 函数实现
+};
+
+// ❌ 错误示例
+function startCrawler() {}  // 未挂载到 window！
+```
+
+#### 2.3 文档可读性
+- ✅ DOCX 目录在移动端 Word 应用可正常导航
+- ✅ PDF 在移动端阅读器可正常显示
+- ✅ skill.md 目录链接在移动端浏览器可正常点击跳转
+
+---
+
+### 三、README 格式规范（PY-STD-098~101）
+
+#### 3.1 双标题结构（PY-STD-101 强制）
+
+README.md **必须**包含两个"最新更新"标题：
+
+```
+第3行左右:   ## 📢 最新更新 (v3.8.6 - 2026-07-05)
+             ### v3.8.6 (2026-07-05) - 📧 关键修复
+             ... （当前版本详细说明，50-200行） ...
+
+第600行左右: ## 最新更新
+             ### v3.8.5 (2026-07-04)
+             ### v3.8.4 (2026-07-04)
+             ... （历史版本列表） ...
+```
+
+| 标题 | 用途 | 解析方式 |
+|------|------|----------|
+| `## 📢 最新更新 (vX.X.X)` | 启动脚本显示版本号 | 精确匹配 `### v` |
+| `## 最新更新` | 前端展示 + API 定位 | 模糊匹配 |
+
+#### 3.2 版本行格式（两种均可）
+
+```markdown
+格式1（标准）:     ### v3.8.6 (2026-07-05)
+格式2（带描述）:   ### v3.8.6 (2026-07-05) - 📧 关键修复：隧道重启邮件通知完善
+```
+
+**API 兼容逻辑**（main.py:5711）：
+```python
+version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.strip())
+if not version_match:
+    # 兼容带描述的格式
+    version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)',
+                            line.split(' - ')[0].strip())
+```
+
+#### 3.3 更新日志条目格式（强制标准）
+
+**必须使用** `- **分类**` + `  - 子条目` 格式：
+
+```markdown
+### v3.8.6 (2026-07-05) - 📧 关键修复
+- **问题背景**
+  - 隧道服务在自动重启后不会发送邮件通知...
+- **解决方案**
+  - 修改位置：main.py:6352
+  - 新增代码：send_tunnel_notification(new_url, 'available')
+```
+
+**禁止使用**：
+- ❌ `#### 子标题` + 大段文字
+- ❌ 版本行内包含代码块
+- ❌ 不规范的 Markdown 格式
+
+#### 3.4 隧道状态变更通知（PY-STD-098 强制）
+
+当隧道 URL 发生变化或恢复可用时，**必须**调用邮件通知函数：
+
+```python
+# ✅ 正确示例
+send_tunnel_notification(new_url, 'available')
+
+# ❌ 错误示例
+print(f"[Tunnel] URL已变化: {old} -> {new}")  # 仅打印日志，未发邮件！
+```
+
+#### 3.5 事件类型语义化（PY-STD-099 推荐）
+
+| 事件类型 | 使用场景 | 邮件标题示例 |
+|----------|----------|-------------|
+| `'new'` | 首次启动 | `[公网监控] 新地址可用: https://t-xxx.hostc.dev` |
+| `'available'` | 重启/恢复 | `[公网监控] 地址已恢复: https://t-xxx.hostc.dev` |
+| `'pending'` | 冷却期补发 | `[公网监控] 待发通知: https://t-xxx.hostc.dev` |
+
+#### 3.6 重启流程完整性（PY-STD-100 强制）
+
+`restart_*` 类函数**必须**包含完整流程：
+
+```python
+def restart_tunnel():
+    # 1️⃣ 清理旧资源
+    stop_tunnel_process()
+    
+    # 2️⃣ 重置全局变量
+    global tunnel_last_error
+    tunnel_last_error = None
+    
+    # 3️⃣ 启动新实例
+    result = auto_start_tunnel()
+    
+    # 4️⃣ 发送通知（如有变更）
+    if result['success'] and result.get('url'):
+        send_tunnel_notification(result['url'], 'available')
+    
+    # 5️⃣ 打印成功日志
+    print(f"[Tunnel] 隧道重启成功! URL: {result['url']}")
+```
+
+**检查清单**：
+- [ ] 清理旧资源
+- [ ] 重置全局变量
+- [ ] 启动新实例
+- [ ] 发送通知（如有变更）
+- [ ] 打印成功日志
+
+---
+
+### 四、跨平台兼容性检查清单
+
+#### 4.1 支持平台
+- ✅ Windows 10/11
+- ✅ macOS 10.15+ (Intel + Apple Silicon)
+- ✅ Linux (Ubuntu 20.04+/Debian/CentOS/Fedora/Arch)
+
+#### 4.2 必须避免的硬编码
+
+| 类型 | ❌ 禁止示例 | ✅ 正确做法 |
+|------|-----------|-----------|
+| 文件路径 | `D:/ws/xy_ws/file/` | `PathManager.get_xxx()` |
+| 进程命令 | `taskkill /F /IM` | `Environment.kill_process_by_name()` |
+| Chrome路径 | `/Applications/Chrome.app` | `Environment.get_chrome_path()` |
+| 用户名 | `C:/Users/Administrator/` | `os.path.expanduser('~')` |
+| 换行符 | `\r\n` (Windows) | `os.linesep` |
+| 路径分隔符 | `/` 或 `\` | `os.path.sep` 或 `pathlib.Path` |
+
+#### 4.3 平台特定代码示例
+
+```python
+class Environment:
+    SYSTEM = platform.system()
+    IS_WINDOWS = SYSTEM == 'Windows'
+    IS_MAC = SYSTEM == 'Darwin'
+    IS_LINUX = SYSTEM == 'Linux'
+    
+    @staticmethod
+    def kill_process_by_name(name):
+        if Environment.IS_WINDOWS:
+            os.system(f'taskkill /F /IM {name} >nul 2>&1')
+        else:
+            import signal
+            os.system(f'pkill -9 -f {name}')
+    
+    @staticmethod
+    def get_chrome_path():
+        if Environment.IS_MAC:
+            return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        elif Environment.IS_LINUX:
+            return '/usr/bin/google-chrome'
+        else:  # Windows
+            import winreg
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                               r'Software\Google\Chrome\BLBeacon')
+            value, _ = winreg.QueryValueEx(key, 'location')
+            return value
+```
+
+---
+
+### 五、符合性验证命令
+
+#### 5.1 检查硬编码路径
+```bash
+grep -rn "D:\\\\\\|/home/|C:\\\\\\" --include="*.py" .
+# 应该返回空结果
+```
+
+#### 5.2 验证版本号解析
+```bash
+python -c "
+import re
+content = open('README.md', encoding='utf-8').read()
+match = re.search(r'###\s+v([\d.]+)', content)
+print(f'✅ 版本号: {match.group(1)}' if match else '❌ 未找到')
+"
+```
+
+#### 5.3 测试跨平台导入
+```bash
+python -c "from main import PathManager, Environment, ConfigManager; print('✅ 导入成功')"
+```
+
+#### 5.4 验证 API 格式
+```bash
+python -c "
+import re
+with open('README.md', encoding='utf-8') as f:
+    lines = f.readlines()
+in_changelog = False
+for line in lines:
+    if '最新更新' in line and line.startswith('##'):
+        in_changelog = True
+        continue
+    if in_changelog and line.startswith('- **'):
+        print(f'✅ 找到标准格式条目: {line[:50]}')
+        break
+"
+```
+
+---
+
+> **📌 规范版本**: v3.8.6 (2026-07-05)
+> **最后更新**: 新增 PY-STD-098/099/100/101 + 双标题结构规范
+> **适用范围**: xy_ws 项目全栈代码（Python + Flask + 原生JS）
+> **强制等级**: MUST（必须遵循）/ SHOULD（推荐遵循）
+
+---
+
 ## 快速开始
 
 ### 1. 克隆仓库
