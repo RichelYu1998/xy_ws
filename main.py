@@ -5697,7 +5697,7 @@ if __name__ == '__main__':
                 current_item = None
                 in_changelog = False
                 for line in lines:
-                    if line.strip() == '## 最新更新':
+                    if '最新更新' in line.strip() and line.strip().startswith('##'):
                         in_changelog = True
                         continue
                     if not in_changelog:
