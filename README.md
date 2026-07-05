@@ -1,8 +1,8 @@
 # Szwego商品爬虫和货号对比工具
 
-## 📢 最新更新 (v3.8.5 - 2026-07-05)
+## 📢 最新更新 (v3.8.6 - 2026-07-05)
 
-### ✅ 关键修复：PowerShell 兼容性优化
+### ✅ 关键修复：隧道重启邮件通知完善 + PowerShell 兼容性优化
 
 #### 问题背景
 在 PowerShell 环境中运行 `cmd.exe /c run.bat` 时，会出现大量 "Input redirection is not supported" 和 "The process cannot access the file because it is being used by another process" 错误。
