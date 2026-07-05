@@ -1,3631 +1,451 @@
-﻿# Szwego商品爬虫和货号对比工具
+﻿# xy_ws - Szwego商品爬虫系统
 
-## 📢 最新更新 (v3.8.9 - 2026-07-05)
-### v3.8.10 (2026-07-05) - 🔧 关键修复：缩进错误导致服务启动失败
-- **问题现象**
-  - 启动bat文件时报错：IndentationError: unindent does not match any outer indentation level
-  - 错误位置：[main.py](main.py) 第6433行
-  - 服务完全无法启动，隧道和Web服务均不可用
-- **根本原因**
-  - 第6433行 print(f"[Tunnel] 🔍 验证新URL可用性: {new_url}") 存在**多余的1个空格**
-  - 该行有29个空格的缩进，但应该只有28个空格（与下一行的 if verify_url(...) 对齐）
-  - Python解释器对缩进极其严格，多出1个空格会导致语法解析失败
-- **修复方案**
-  - 将第6433行的缩进从29个空格修正为28个空格
-  - 确保与同代码块内的其他语句保持一致的缩进层级
-- **修复效果**
-  - ✅ **立即生效**：修复后服务可正常启动，无任何语法错误
-  - ✅ **零副作用**：仅修改缩进，不影响业务逻辑
-  - ✅ **符合规范**：遵循 PEP 8 缩进标准（4个空格的倍数）
-- **预防措施**
-  - 建议使用IDE的"显示空白字符"功能（VS Code: Editor: Render Whitespace）
-  - 使用 python -m py_compile main.py 在启动前进行语法检查
-  - 代码审查时重点关注缩进一致性
-- **符合性检查**
-  - 符合 **PY-STD-001** Python基础编码规范（PEP 8 缩进要求）
-  - 符合 **README.md** 版本号管理规范（v3.8.10）
+> **版本**: v3.8.10
+> **更新日期**: 2026-07-05
+> **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 ---
 
+## 📋 项目简介
 
-### v3.8.9 (2026-07-05) - 🔒 关键修复：强制URL去重机制（同一地址30分钟内只发1次邮件）
-- **问题背景**
-  - v3.8.8的`force_send=True`会跳过所有检查（包括URL去重），导致同一个地址可能被多次发送
-  - 用户明确要求：同一个公网地址只可以发送一遍，不可以短时间内同一地址发多次
-  - 实际场景：首次启动+URL变化+URL恢复三个事件可能同时触发，导致重复邮件
-- **根本原因分析**
-  - 原逻辑中`force_send=True`完全绕过URL去重检查（`if new_url == last_email_sent_url and not force_send:`）
-  - 缺少独立的时间窗口控制，无法区分"允许立即发送"和"禁止重复发送"
-  - 冷却期（60秒）和URL去重是两个不同概念，不应混为一谈
-- **解决方案**
-  - 在 [main.py](main.py) 第5959行引入**独立的URL去重时间窗口**：`url_dedup_interval = 1800`（30分钟）
-  - 采用**分层检查机制**（4层防护）：
-    1️⃣ 失败次数保护：连续失败≥3次暂停300秒
-    2️⃣ 冷却期检查：普通模式60秒，`force_send=True`时跳过
-    3️⃣ **URL去重检查（强制）**：无论是否`force_send`，同一地址30分钟内只发1次 ⭐
-    4️⃣ 线程安全保证：`email_send_lock`保证原子操作
-  - 去重规则：
-    - ✅ 不同地址：可以立即发送（即使间隔很短）
-    - ✅ 相同地址但超过30分钟：`force_send=True`时可重新发送
-    - ❌ 相同地址且在30分钟内：**绝对禁止发送**（即使`force_send=True`）
-- **核心代码实现**
-  ```python
-  url_dedup_interval = 1800  # URL去重时间窗口：30分钟
-  
-  if new_url == last_email_sent_url:
-      time_since_last_send = current_time - last_email_sent_time
-      if time_since_last_send < url_dedup_interval:
-          print(f"[Email] ⏭️ URL去重：相同地址{int(time_since_last_send)}秒内已发送过")
-          print(f"[Email] 📋 去重规则：同一公网地址在30分钟内只发送1次邮件")
-          return  # 强制阻止，即使force_send=True
-  ```
-- **修复效果**
-  - ✅ **零重复**：同一公网地址在30分钟内绝对不会收到多封邮件
-  - ✅ **智能区分**：不同地址可以正常发送，不会误杀
-  - ✅ **向后兼容**：`force_send=True`仍可跳过60秒冷却期，但不影响URL去重
-  - ✅ **日志清晰**：输出详细的去重原因和时间信息，便于排查
-  - ✅ **全场景覆盖**：首次启动/URL变化/URL恢复三个场景全部受控
-- **符合性检查**
-  - 符合 **PY-STD-102** 线程安全与URL去重强制规范（增强版）
-  - 符合 **PY-STD-103** 邮件通知冷却期优化规范
-  - 符合用户需求：同一地址短时间内不重复发送
-- **文档同步更新**
-  - README.md 新增 v3.8.9 完整修复说明（含分层检查机制、去重规则表）
-  - skill.md 更新技术文档（第十四章）
-  - skill.docx 待重新生成
+xy_ws 是一个基于 Python + Flask 的全栈商品爬虫系统，专门用于 Szwego 平台的商品数据采集、对比和管理。项目采用单文件架构设计，具有跨平台支持、智能隧道管理、实时邮件通知等特性。
+
+### ✨ 核心功能
+
+- 🔍 **智能爬虫引擎**: 基于 Playwright 的动态页面抓取，支持智能滚动策略
+- 📊 **货号对比系统**: 自动化货号差异检测与报表生成
+- 🌐 **公网隧道服务**: Hostc 隧道自动管理与 URL 智能切换
+- 📧 **实时邮件通知**: 隧道状态变更、异常告警邮件推送
+- 🌍 **跨平台支持**: Windows/Linux/Mac 全平台兼容
+- 📱 **响应式前端**: 自适应移动端和桌面端界面
+- 🔄 **自动化运维**: 环境检测、依赖安装、服务自愈
 
 ---
 
-### v3.8.8 (2026-07-05) - 🚀 公网地址可用即自动发邮件（零延迟）
-- **问题背景**
-  - 在高并发场景下，相同URL被重复发送2次邮件通知（事件类型分别为 `new` 和 `available`）
-  - 实际日志证据显示同一URL `https://t-idb7mepzgh.hostc.dev` 在5秒内触发了两次完整的邮件发送流程
-  - `read_output()` 线程和 `restart_tunnel()` 线程同时调用 `send_tunnel_notification()` 导致竞态条件
-- **根本原因分析**
-  - 缺少线程同步机制导致去重检查（读取 `last_email_sent_url`）和状态更新（写入）非原子操作
-  - 原逻辑只比较URL字符串，未考虑不同事件类型（`new` vs `available`）可绕过去重检查
-  - Thread A完成检查→Thread B通过检查→两者都执行发送的时序问题
-- **解决方案**
-  - 在 [main.py](main.py) 第5935行新增全局线程锁 `email_send_lock = threading.Lock()`
-  - 采用 Double-Check Locking 模式：前置检查加锁 + URL验证在锁外执行 + 发送前二次确认加锁
-  - 冷却期内相同URL直接跳过并输出 `⏭️ 跳过重复发送` 日志标识
-  - 符合 **PY-STD-102** 线程安全与URL去重强制规范
-- **核心代码实现**
-  - 修改前❌：`if new_url == last_email_sent_url: return` （非原子操作）
-  - 修改后✅：`with email_send_lock: if new_url == last_email_sent_url: return` （原子化检查）
-  - 发送前二次确认：`with email_send_lock: if new_url != last_email_sent_url: actual_send()`
-- **修复效果**
-  - ✅ 彻底消除竞态条件，相同URL只会发送一次邮件通知（无论事件类型为何）
-  - ✅ 性能影响极低：锁持有时间 < 0.01ms，对系统性能几乎无影响
-  - ✅ 全平台兼容：使用 Python 标准 `threading` 库，零硬编码，Windows/macOS/Linux 行为一致
-  - ✅ 日志清晰度提升：使用 emoji 图标（⏭️✅❌🔒）标识操作状态，便于排查问题
-- **文档同步更新**
-  - README.md 新增 v3.8.7 完整修复说明（含代码示例、效果对比表、跨平台保证）
-  - skill.md 第十四章详细技术文档（340+行）+ PY-STD-102/PY-STD-103 编码规范
-  - skill.docx 待重新生成（需执行 `python generate_docx.py`）
+## 🚀 快速启动
 
----
+### 环境要求
 
-## 📏 编码规范与格式标准
+- **Python**: 3.10+ (推荐 3.14)
+- **Node.js**: 18+ (可选，用于前端构建)
+- **操作系统**: Windows 10+/Linux/macOS
 
-### 一、v3.6.0 编码规范（强制遵循）
-
-#### 1.1 路径管理（零硬编码）
-- ✅ 所有路径使用 `PathManager.get_xxx()` 动态获取
-- ✅ 禁止硬编码路径或用户名
-- ✅ 使用 `os.path.join()` 或 `pathlib.Path` 拼接路径
-
-```python
-# ✅ 正确示例
-tunnel_url_file = PathManager.get_tunnel_url_file()
-web_output_log = PathManager.get_web_output_file()
-
-# ❌ 错误示例
-tunnel_url_file = 'D:/ws/xy_ws/file/tunnel_url.txt'  # 硬编码路径！
-```
-
-#### 1.2 平台检测
-- ✅ 使用 `Environment.IS_WINDOWS / IS_MAC / IS_LINUX` 判断平台
-- ✅ 进程管理使用 `Environment.kill_process_by_name()` 跨平台方法
-
-```python
-# ✅ 正确示例
-if Environment.IS_WINDOWS:
-    process_name = 'node.exe'
-else:
-    process_name = 'hostc'
-Environment.kill_process_by_name(process_name)
-
-# ❌ 错误示例
-os.system('taskkill /F /IM node.exe')  # Windows 专用！
-```
-
-#### 1.3 异常处理
-- ✅ 使用 `AppException` 统一异常体系
-- ✅ 文件读写必须指定 `encoding='utf-8'`
-
-```python
-# ✅ 正确示例
-try:
-    with open(file_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-except AppException as e:
-    logger.error(f"文件读取失败: {e}")
-
-# ❌ 错误示例
-content = open(file_path).read()  # 未指定编码！
-```
-
-#### 1.4 配置管理
-- ✅ 使用 `ConfigManager.get_config()` 懒加载模式
-- ✅ 禁止全局配置变量
-
-```python
-# ✅ 正确示例
-def get_smtp_config():
-    config = ConfigManager.get_config()
-    return config['email']['smtp_host']
-
-# ❌ 错误示例
-SMTP_HOST = "smtp.qq.com"  # 全局硬编码！
-```
-
-#### 1.5 API 响应格式
-- ✅ 成功：`{'success': True, 'data': ...}`
-- ✅ 失败：`{'success': False, 'error': '...'}`
-- ✅ 敏感信息脱敏（password 返回 `******`）
-
-```python
-# ✅ 正确示例
-return jsonify({
-    'success': True,
-    'email_config': {
-        'smtp_host': config['smtp_host'],
-        'smtp_user': config['smtp_user'],
-        'smtp_pass': '******'  # 脱敏处理
-    }
-})
-```
-
-#### 1.6 版本号管理
-- ✅ 唯一来源为 `README.md`，动态解析
-- ✅ 格式：`### vX.X.X (YYYY-MM-DD)` 或 `### vX.X.X (YYYY-MM-DD) - 描述`
-
-```python
-# ✅ 正确示例（main.py:1358）
-def get_version_from_readme():
-    readme_path = os.path.join(PROJECT_DIR, 'README.md')
-    with open(readme_path, 'r', encoding='utf-8') as f:
-        content = f.read()
-    match = re.search(r'###\s+v([\d.]+)', content)
-    return match.group(1) if match else "0.0.0"
-
-VERSION = get_version_from_readme()  # 动态获取
-```
-
-#### 1.7 文档生成工具
-- ✅ **DOCX**: 使用 `pypandoc_binary`（自带 pandoc 二进制，无需 brew）
-- ✅ **PDF**: 使用 `puppeteer-core` + 系统 Chrome
-- ✅ Chrome 路径通过 `Environment.get_chrome_path()` 动态获取
-- ✅ pandoc 路径通过 `pypandoc.get_pandoc_path()` 动态获取
-
-```python
-# ✅ 正确示例（generate_docx.py）
-import pypandoc
-output_file = os.path.join(os.path.dirname(__file__), 'skill.docx')
-pypandoc.convert_file('skill.docx', 'docx', outputfile=output_file,
-                      extra_args=['--toc', '--toc-depth=4'])
-```
-
-#### 1.8 启动脚本规范
-- ✅ 工作目录自动切换：
-  - Windows: `cd /d "%~dp0"`
-  - Unix: `cd "$(dirname "$0")"`
-- ✅ 残留进程清理（启动前强制结束）
-
-```bat
-:: run.bat 示例
-@echo off
-cd /d "%~dp0"  ← 自动切换到脚本所在目录
-taskkill /F /IM python.exe >nul 2>&1  ← 清理残留进程
-```
-
-```bash
-#!/bin/bash
-# run.sh 示例
-cd "$(dirname "$0")"  ← 自动切换到脚本所在目录
-pkill -9 python  ← 清理残留进程
-```
-
----
-
-### 二、v3.5.0 移动端规范（必须满足）
-
-#### 2.1 布局要求
-- ✅ CSS Grid 按钮布局保持不变
-- ✅ 响应式断点全覆盖（手机/平板/桌面）
-- ✅ 触摸设备适配正常（按钮大小 ≥ 44×44px）
-
-```css
-/* ✅ 正确示例 */
-.button-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
-}
-
-@media (max-width: 768px) {
-  .button-grid {
-    grid-template-columns: repeat(2, 1fr);  /* 移动端2列 */
-  }
-}
-```
-
-#### 2.2 交互规范
-- ✅ 按钮无数字前缀（使用 `data-original` 模式）
-- ✅ 全局函数正确挂载到 `window` 对象
-- ✅ 下拉刷新支持（移动端手势）
-
-```javascript
-// ✅ 正确示例
-window.startCrawler = function() {
-  // 函数实现
-};
-
-// ❌ 错误示例
-function startCrawler() {}  // 未挂载到 window！
-```
-
-#### 2.3 文档可读性
-- ✅ DOCX 目录在移动端 Word 应用可正常导航
-- ✅ PDF 在移动端阅读器可正常显示
-- ✅ skill.md 目录链接在移动端浏览器可正常点击跳转
-
----
-
-### 三、README 格式规范（PY-STD-101~102）
-
-#### 3.1 双标题结构（PY-STD-101 强制）
-
-README.md **必须**包含两个"最新更新"标题：
-
-```
-第3行左右:   ## 📢 最新更新 (v3.8.7 - 2026-07-05)
-             ### v3.8.7 (2026-07-05) - 🔒 关键修复
-             ... （当前版本详细说明，50-200行） ...
-
-第600行左右: ## 最新更新
-             ### v3.8.6 (2026-07-05)
-             ### v3.8.5 (2026-07-04)
-             ... （历史版本列表） ...
-```
-
-| 标题 | 用途 | 解析方式 |
-|------|------|----------|
-| `## 📢 最新更新 (vX.X.X)` | 启动脚本显示版本号 | 精确匹配 `### v` |
-| `## 最新更新` | 前端展示 + API 定位 | 模糊匹配 |
-
-#### 3.2 版本行格式（两种均可）
-
-```markdown
-格式1（标准）:     ### v3.8.7 (2026-07-05)
-格式2（带描述）:   ### v3.8.7 (2026-07-05) - 🔒 关键修复：线程安全URL去重机制
-```
-
-**API 兼容逻辑**（main.py:5711）：
-```python
-version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.strip())
-if not version_match:
-    # 兼容带描述的格式
-    version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)',
-                            line.split(' - ')[0].strip())
-```
-
-#### 3.3 更新日志条目格式（PY-STD-101 强制标准）
-
-**必须使用** `- **分类标题**` + `  - 子条目` 格式（详见 skill.md §2.15）：
-
-```markdown
-### vX.X.X (YYYY-MM-DD) - 🏷️ 简短描述（可选）
-- **问题背景**
-  - 具体描述问题的现象、影响范围、日志证据等
-- **根本原因分析**
-  - 分析代码逻辑缺陷、竞态条件、设计问题等
-- **解决方案**
-  - 具体的修改位置（main.py:行号）、新增代码、技术方案
-- **修复效果/改进效果**
-  - ✅ 量化指标或功能性描述
-- **文档同步更新**
-  - README.md / skill.md / skill.docx 的更新情况
-```
-
-**✅ 正确示例（v3.8.7 标准格式）**：
-```markdown
-### v3.8.7 (2026-07-05) - 🔒 关键修复：线程安全URL去重机制
-- **问题背景**
-  - 在高并发场景下，相同URL被重复发送2次邮件通知
-  - read_output() 线程和 restart_tunnel() 线程同时调用导致竞态条件
-- **根本原因分析**
-  - 缺少线程同步机制导致去重检查和状态更新非原子操作
-- **解决方案**
-  - 在 main.py 第5935行新增全局线程锁 email_send_lock
-  - 采用 Double-Check Locking 模式保证原子性
-- **修复效果**
-  - ✅ 彻底消除竞态条件，相同URL只会发送一次邮件通知
-  - ✅ 性能影响极低：锁持有时间 < 0.01ms
-```
-
-**❌ 禁止使用的格式**：
-- ❌ `#### 子标题` + 大段文字（应使用 `- **分类标题**` 列表格式）
-- ❌ 版本行内包含代码块（应在子条目内使用内联代码 `` ` ``）
-- ❌ 复杂的大表格（改用列表描述或仅用于简单对比）
-- ❌ 不规范的 Markdown 格式（分类标题缺少 `- ` 前缀）
-
-**❌ 错误示例对比**：
-```markdown
-### v3.8.7 (2026-07-05) - 🔒 关键修复
-
-#### 问题背景                          ← ❌ 禁止使用 #### 四级标题
-在高并发场景下，系统检测到...        ← ❌ 大段文字，不是列表子项
-
-实际日志证据：                        ← ❌ 包含大段代码块
-```log
-[Email] 📧 准备发送邮件通知...
-```
-
-#### 解决方案                            ← ❌ 禁止使用 #### 四级标题
-| 修改文件 | 修改位置 | 修改内容 |      ← ❌ 复杂的大表格
-|---------|---------|----------|
-| main.py | 第5935行 | 新增线程锁 |
-```
-
-**✅ 推荐的分类标题**：
-
-| 分类标题 | 适用场景 |
-|----------|----------|
-| **问题背景** | Bug修复、功能缺陷 |
-| **根本原因分析** | Bug修复 |
-| **解决方案** | 所有类型 |
-| **核心代码实现** | 重要Bug修复（简短代码片段≤3行） |
-| **修复效果/改进效果** | 所有类型（量化指标） |
-| **新增功能/优化改进** | 功能开发、性能优化 |
-| **文档同步更新** | 所有类型 |
-| **符合性检查** | 所有类型（遵循的编码规范） |
-| **跨平台兼容性保证** | 涉及平台相关代码 |
-
-**📏 条目长度要求**：
-
-| 版本类型 | 推荐行数 | 内容详细程度 |
-|----------|----------|-------------|
-| 当前版本（顶部） | 30-80 行 | 完整：背景+分析+方案+效果+文档同步 |
-| 近期版本（最近5个） | 20-50 行 | 较详细：至少包含主要分类 |
-| 历史版本（更早） | 10-30 行 | 简洁：重点描述变更内容 |
-
-**✅ 特殊情况处理规则**：
-
-1. **代码示例限制**：
-   - ✅ 必须是单行或极短片段（≤ 3行）
-   - ✅ 必须内联在子条目中，使用 `` ` `` 反引号包裹
-   - ❌ 禁止使用多行的独立代码块
-
-   ```markdown
-   - **核心代码实现**
-     - 修改前❌：`if url == last: return` （非原子操作）
-     - 修改后✅：`with lock: if url == last: return` （原子化检查）
-   ```
-
-2. **表格使用限制**：
-   - ✅ 仅限简单的对比信息（≤ 5行 × 3列）
-   - ❌ 禁止复杂的大表格（修改详情表、参数表等）
-
-   ```markdown
-   - **修复效果对比**
-     - 并发调用：修复前❌ 2次发送 → 修复后✅ 仅1次发送
-     - 冷却期重复：修复前❌ 记录待发 → 修复后✅ ⏭️ 跳过重复
-   ```
-
-**🎯 Emoji 图标使用规范（移动端友好）**：
-
-| 场景 | 推荐Emoji | 示例 |
-|------|-----------|------|
-| 成功/正确 | ✅ | `✅ 彻底消除竞态条件` |
-| 失败/错误 | ❌ | `❌ 2次发送（new + available）` |
-| 锁定/安全 | 🔒 | `🔒 加锁保证原子性` |
-| 跳过/忽略 | ⏭️ | `⏭️ URL去重：相同URL不会重复发送` |
-| 警告/注意 | ⚠️ | `⚠️ 格式强制要求` |
-
-**📋 格式符合性检查清单（每次提交前必查）**：
-
-- [ ] **格式结构**
-  - [ ] 使用 `- **分类标题**` + `  - 子条目` 格式
-  - [ ] 禁止使用 `#### 子标题` + 大段文字
-  - [ ] 分类标题必须有 `- ` 前缀
-
-- [ ] **双标题结构**（详见 3.1 节）
-  - [ ] 存在 `## 📢 最新更新 (vX.X.X)` （带版本号）
-  - [ ] 存在 `## 最新更新` （纯文本，无版本号）
-  - [ ] 第二个标题后面紧跟历史版本列表
-
-- [ ] **内容完整性**（当前版本必须包含）
-  - [ ] 问题背景 + 根本原因分析（如果是Bug修复）
-  - [ ] 解决方案（具体修改位置和技术细节）
-  - [ ] 效果/改进（量化描述）
-  - [ ] 文档同步更新（README/skill.md/skill.docx）
-
-- [ ] **无重复内容**
-  - [ ] 每个版本只出现一次（不在顶部和历史列表中重复）
-  - [ ] 历史版本按时间倒序排列
-
-**🥇 三条黄金法则**：
-
-1. **始终使用列表格式**：`- **分类**` + `  - 子条目`
-2. **保持简洁但有信息量**：量化效果，避免空洞描述
-3. **一致性优先**：所有版本使用相同格式和分类标题
-
-#### 3.4 隧道状态变更通知（PY-STD-098 强制）
-
-当隧道 URL 发生变化或恢复可用时，**必须**调用邮件通知函数：
-
-```python
-# ✅ 正确示例
-send_tunnel_notification(new_url, 'available')
-
-# ❌ 错误示例
-print(f"[Tunnel] URL已变化: {old} -> {new}")  # 仅打印日志，未发邮件！
-```
-
-#### 3.5 事件类型语义化（PY-STD-099 推荐）
-
-| 事件类型 | 使用场景 | 邮件标题示例 |
-|----------|----------|-------------|
-| `'new'` | 首次启动 | `[公网监控] 新地址可用: https://t-xxx.hostc.dev` |
-| `'available'` | 重启/恢复 | `[公网监控] 地址已恢复: https://t-xxx.hostc.dev` |
-| `'pending'` | 冷却期补发 | `[公网监控] 待发通知: https://t-xxx.hostc.dev` |
-
-#### 3.6 重启流程完整性（PY-STD-100 强制）
-
-`restart_*` 类函数**必须**包含完整流程：
-
-```python
-def restart_tunnel():
-    # 1️⃣ 清理旧资源
-    stop_tunnel_process()
-    
-    # 2️⃣ 重置全局变量
-    global tunnel_last_error
-    tunnel_last_error = None
-    
-    # 3️⃣ 启动新实例
-    result = auto_start_tunnel()
-    
-    # 4️⃣ 发送通知（如有变更）
-    if result['success'] and result.get('url'):
-        send_tunnel_notification(result['url'], 'available')
-    
-    # 5️⃣ 打印成功日志
-    print(f"[Tunnel] 隧道重启成功! URL: {result['url']}")
-```
-
-**检查清单**：
-- [ ] 清理旧资源
-- [ ] 重置全局变量
-- [ ] 启动新实例
-- [ ] 发送通知（如有变更）
-- [ ] 打印成功日志
-
----
-
-### 四、跨平台兼容性检查清单
-
-#### 4.1 支持平台
-- ✅ Windows 10/11
-- ✅ macOS 10.15+ (Intel + Apple Silicon)
-- ✅ Linux (Ubuntu 20.04+/Debian/CentOS/Fedora/Arch)
-
-#### 4.2 必须避免的硬编码
-
-| 类型 | ❌ 禁止示例 | ✅ 正确做法 |
-|------|-----------|-----------|
-| 文件路径 | `D:/ws/xy_ws/file/` | `PathManager.get_xxx()` |
-| 进程命令 | `taskkill /F /IM` | `Environment.kill_process_by_name()` |
-| Chrome路径 | `/Applications/Chrome.app` | `Environment.get_chrome_path()` |
-| 用户名 | `C:/Users/Administrator/` | `os.path.expanduser('~')` |
-| 换行符 | `\r\n` (Windows) | `os.linesep` |
-| 路径分隔符 | `/` 或 `\` | `os.path.sep` 或 `pathlib.Path` |
-
-#### 4.3 平台特定代码示例
-
-```python
-class Environment:
-    SYSTEM = platform.system()
-    IS_WINDOWS = SYSTEM == 'Windows'
-    IS_MAC = SYSTEM == 'Darwin'
-    IS_LINUX = SYSTEM == 'Linux'
-    
-    @staticmethod
-    def kill_process_by_name(name):
-        if Environment.IS_WINDOWS:
-            os.system(f'taskkill /F /IM {name} >nul 2>&1')
-        else:
-            import signal
-            os.system(f'pkill -9 -f {name}')
-    
-    @staticmethod
-    def get_chrome_path():
-        if Environment.IS_MAC:
-            return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-        elif Environment.IS_LINUX:
-            return '/usr/bin/google-chrome'
-        else:  # Windows
-            import winreg
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                               r'Software\Google\Chrome\BLBeacon')
-            value, _ = winreg.QueryValueEx(key, 'location')
-            return value
-```
-
----
-
-### 五、符合性验证命令
-
-#### 5.1 检查硬编码路径
-```bash
-grep -rn "D:\\\\\\|/home/|C:\\\\\\" --include="*.py" .
-# 应该返回空结果
-```
-
-#### 5.2 验证版本号解析
-```bash
-python -c "
-import re
-content = open('README.md', encoding='utf-8').read()
-match = re.search(r'###\s+v([\d.]+)', content)
-print(f'✅ 版本号: {match.group(1)}' if match else '❌ 未找到')
-"
-```
-
-#### 5.3 测试跨平台导入
-```bash
-python -c "from main import PathManager, Environment, ConfigManager; print('✅ 导入成功')"
-```
-
-#### 5.4 验证 API 格式
-```bash
-python -c "
-import re
-with open('README.md', encoding='utf-8') as f:
-    lines = f.readlines()
-in_changelog = False
-for line in lines:
-    if '最新更新' in line and line.startswith('##'):
-        in_changelog = True
-        continue
-    if in_changelog and line.startswith('- **'):
-        print(f'✅ 找到标准格式条目: {line[:50]}')
-        break
-"
-```
-
----
-
-> **📌 规范版本**: v3.8.7 (2026-07-05)
-> **最后更新**: 线程安全URL去重机制完善 + 新增 **PY-STD-102** 强制规范
-> **适用范围**: xy_ws 项目全栈代码（Python + Flask + 原生JS）
-> **强制等级**: MUST（必须遵循）/ SHOULD（推荐遵循）
-
----
-
-## 快速开始
-
-### 1. 克隆仓库
-```bash
-git clone https://github.com/RichelYu1998/xy_ws.git
-cd xy_ws
-```
-
-### 2. 运行程序
-```bash
-# Windows
-run.bat
-
-# Linux/Mac
-bash run.sh
-```
-
-**程序会自动：**
-- ✅ **智能环境检测**（6步流程）：
-  - [0/6] ⭐ **新增**：自动清理残留进程（避免文件锁定冲突）
-  - [1/6] Python 环境检测（PATH + 常见安装路径搜索 + 虚拟环境状态检测）
-  - [2/6] Node.js/NVM 检测与 **全自动安装**（5层回退）：
-    - Windows: NVM PATH → NVM 注册表 → Winget → Chocolatey → Scoop → MSI下载到 `.node_env/`
-    - macOS: NVM → Homebrew (Intel + Apple Silicon)
-    - Linux: NVM → apt+nodesource / yum+nodesource / dnf+nodesource / pacman
-  - [3/6] **PIP 镜像源轮询测速**（测试清华/阿里云/豆瓣/中科大4个镜像，选择毫秒级最快源）
-  - [4/6] **NPM 镜像源轮询测速**（测试淘宝/官方源2个镜像，自动设置最快源）
-  - [5/6] Python 虚拟环境管理（自动创建 `.venv`，生成 pip 配置文件）
-  - [6/6] 依赖安装与 Playwright 浏览器安装
-- ✅ **跨平台完全支持**（Windows/macOS/Linux，零硬编码，所有路径动态获取）
-- ✅ **智能回退机制**（镜像源失败自动切换默认 PyPI，依赖安装失败自动重试）
-- ✅ **临时环境隔离**（Python: `.venv/`，Node.js: `.node_env/`，不影响系统全局配置）
-- ✅ 检测配置文件（首次使用自动从模板复制）
-- ✅ 启动 Web 服务（⭐ 输入已隔离，兼容 PowerShell）
-- ✅ 启动 hostc 隧道（⭐ 输入已隔离，兼容 PowerShell）
-
-### 环境检测详情
-  - [1/6] Python 环境检测（PATH + 常见安装路径搜索 + 虚拟环境状态检测）
-  - [2/6] Node.js/NVM 检测与 **全自动安装**（5层回退）：
-    - Windows: NVM PATH → NVM 注册表 → Winget → Chocolatey → Scoop → MSI下载到 `.node_env/`
-    - macOS: NVM → Homebrew (Intel + Apple Silicon)
-    - Linux: NVM → apt+nodesource / yum+nodesource / dnf+nodesource / pacman
-  - [3/6] **PIP 镜像源轮询测速**（测试清华/阿里云/豆瓣/中科大4个镜像，选择毫秒级最快源）
-  - [4/6] **NPM 镜像源轮询测速**（测试淘宝/官方源2个镜像，自动设置最快源）
-  - [5/6] Python 虚拟环境管理（自动创建 `.venv`，生成 pip 配置文件）
-  - [6/6] 依赖安装与 Playwright 浏览器安装
-- ✅ **跨平台完全支持**（Windows/macOS/Linux，零硬编码，所有路径动态获取）
-- ✅ **智能回退机制**（镜像源失败自动切换默认 PyPI，依赖安装失败自动重试）
-- ✅ **临时环境隔离**（Python: `.venv/`，Node.js: `.node_env/`，不影响系统全局配置）
-- ✅ 检测配置文件（首次使用自动从模板复制）
-- ✅ 启动 Web 服务
-- ✅ 启动 hostc 隧道（公网 URL 保存到 `file/tunnel_url.txt`）
-
-### 环境检测详情
-
-#### PIP 镜像源自动选择
-
-脚本启动时会自动测试以下国内镜像源的连接速度（毫秒级精度），选择当前网络环境下最快的：
-
-| 镜像源 | URL | 特点 |
-|--------|-----|------|
-| 清华大学 | `https://pypi.tuna.tsinghua.edu.cn/simple` | 教育网优化 |
-| 阿里云 | `https://mirrors.aliyun.com/pypi/simple/` | 全国CDN |
-| 豆瓣 | `https://pypi.douban.com/simple/` | 稳定可靠 |
-| 中科大 | `https://pypi.mirrors.ustc.edu.cn/simple/` | 华南地区快 |
-
-**测速方法**：使用 `curl --connect-timeout 1.5` 测试 TCP 连接时间（非完整HTTP请求），速度快10倍以上。
-
-#### NPM 镜像源自动选择
-
-| 镜像源 | URL | 特点 |
-|--------|-----|------|
-| npmmirror淘宝 | `https://registry.npmmirror.com` | 国内同步快 |
-| 官方源 | `https://registry.npmjs.org` | 全球CDN |
-
-#### Node.js/NVM 全自动安装策略（5-6层回退）
-
-**Windows（6层全自动回退）**：
-
-| 优先级 | 检测方式 | 安装命令 | 说明 |
-|--------|----------|----------|------|
-| 第1优先级 | `where node` (PATH) | - | 已安装，直接使用 |
-| 第2优先级 | `where nvm` (PATH) | `nvm install lts && nvm use lts` | NVM 版本管理器 |
-| 第3优先级 | NVM 注册表路径检测 | `nvm.exe install lts && nvm.exe use lts` | `%USERPROFILE%\AppData\Roaming\nvm\nvm.exe` |
-| 第4优先级 | Winget 检测 | `winget install OpenJS.NodeJS.LTS --silent` | Win10 1709+ 内置包管理器 |
-| 第5优先级 | Chocolatey 检测 | `choco install nodejs -y` | 企业常用包管理器 |
-| 第6优先级 | Scoop 检测 | `scoop install nodejs-lts` | 开发者友好包管理器 |
-| **最终回退** | 直接下载 MSI | `msiexec /quiet INSTALLDIR=%CD%\.node_env` | 安装到临时目录，不污染系统 |
-
-**macOS（3层回退）**：
-
-| 优先级 | 检测方式 | 安装命令 | 说明 |
-|--------|----------|----------|------|
-| 第1优先级 | `command -v node` (PATH) | - | 已安装，直接使用 |
-| 第2优先级 | NVM 检测 | `nvm install --lts && nvm use --lts` | 版本管理器 |
-| **最终回退** | Homebrew | `brew install node` | 支持 Intel + Apple Silicon |
-
-**Linux（5种发行版支持）**：
-
-| 发行版 | 包管理器 | 安装命令 | 特点 |
-|--------|----------|----------|------|
-| Ubuntu/Debian | apt + nodesource | `curl nodesource/setup_lts.x \| sudo -E bash - && sudo apt install nodejs` | 官方源，最新 LTS |
-| CentOS/RHEL | yum + nodesource | `curl nodesource/setup_lts.x \| sudo bash - && sudo yum install nodejs` | RHEL 系官方支持 |
-| Fedora | dnf + nodesource | `curl nodesource/setup_lts.x \| sudo bash - && sudo dnf install nodejs` | 新一代 RPM 包管理器 |
-| Arch Linux | pacman | `sudo pacman -Syu nodejs npm` | 滚动更新，始终最新 |
-| **通用备选** | fnm (Fast Node Manager) | `curl -fsSL https://fnm.vercel.app/install \| bash` | 跨平台版本管理器 |
-
-#### Python 全自动安装策略（4层回退）
-
-**Windows（4层全自动回退）**：
-
-| 优先级 | 检测方式 | 安装命令 | 说明 |
-|--------|----------|----------|------|
-| 第1优先级 | `where py/python` (PATH) | - | 已安装，直接使用 |
-| 第2优先级 | Winget 检测 | `winget install Python.Python.3 --silent` | Win10 1709+ 内置 |
-| 第3优先级 | Chocolatey 检测 | `choco install python -y` | 企业常用 |
-| 第4优先级 | Scoop 检测 | `scoop install python` | 开发者友好 |
-| **最终回退** | 直接下载 MSI | `python-installer.exe /quiet TargetDir=%CD%\_python` | 临时目录隔离 |
-
-**macOS/Linux（按发行版自动选择）**：
-
-| 发行版 | 包管理器 | 安装命令 | 特点 |
-|--------|----------|----------|------|
-| macOS | Homebrew | `brew install python` | 支持 Intel + Apple Silicon |
-| Ubuntu/Debian | apt | `sudo apt install python3 python3-venv python3-pip` | 完整依赖 |
-| CentOS/RHEL | yum | `sudo yum install python3 python3-pip` | RHEL 系支持 |
-| Fedora | dnf | `sudo dnf install python3 python3-pip` | 新一代包管理器 |
-| Arch Linux | pacman | `sudo pacman -Syu python python-pip` | 滚动更新 |
-
-#### 跨平台路径处理示例
-
-```batch
-:: run.bat (Windows)
-for /d %%p in ("C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*") do set "PYTHON_PATH=%%~dp0python.exe"
-```
-
-```bash
-# run.sh (Unix)
-COMMON_PYTHON_PATHS=(
-    "/usr/bin/python3"
-    "/usr/local/bin/python3"
-    "$HOME/.pyenv/shims/python3"
-)
-```
-
-首次使用会提示编辑配置文件，填写用户名、密码、目标URL和Cookie信息。
-
-## 配置文件说明
-
-### config 目录
-
-- `config.json` - 主配置文件，包含登录信息、目标URL、滚动配置、HTTP头和Cookies
-- `cookies.json` - Cookies数据文件
-- `input_stock_numbers.txt` - 输入的货号列表
-
-**邮件配置说明：**
-首次运行后，`config.json` 会自动从模板生成，邮件通知默认已启用。只需修改以下配置即可自动发送邮件：
-
-```json
-{
-  "email_notification_enabled": true,
-  "email_smtp_host": "smtp.qq.com",
-  "email_smtp_port": 587,
-  "email_smtp_user": "your_email@qq.com",
-  "email_smtp_password": "授权码",
-  "email_from_name": "公网IP监控",
-  "email_to": "980187223@qq.com"
-}
-```
-
-**QQ邮箱授权码获取步骤：**
-1. 登录 QQ邮箱网页版
-2. 设置 → 账户 → POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV服务
-3. 开启"POP3/SMTP服务"
-4. 生成授权码（16位字符串）
-5. 将授权码填入 `email_smtp_password` 字段（不是QQ密码）
-
-**邮件发送时机：**
-- Flask 启动时生成新公网地址
-- 公网地址变更时更新
-- 可通过 Web 界面测试发送
-
-### file 目录
-
-- `tunnel_url.txt` - hostc 隧道公网 URL（启动后自动生成）
-
-> 💡 **提示**：查看 `file/tunnel_url.txt` 获取公网访问地址
-
-> ⚠️ **注意**：配置文件包含敏感信息，请勿分享给他人。
-
-## 跨平台支持
-
-本程序完全支持跨平台运行，无需修改任何配置。
-
-### 支持的操作系统
-
-- ✅ Windows (10/11)
-- ✅ macOS (10.15+)
-- ✅ Linux (Ubuntu/Debian/CentOS等)
-
-### 跨平台特性
-
-#### 1. 智能环境检测
-```python
-class Environment:
-    SYSTEM = platform.system()  # 自动检测操作系统
-    IS_WINDOWS = SYSTEM == 'Windows'
-    IS_MAC = SYSTEM == 'Darwin'
-    IS_LINUX = SYSTEM == 'Linux'
-```
-
-#### 2. 路径处理机制
-程序使用 `os.path.abspath(__file__)` 自动获取项目根目录，所有配置文件路径都是相对于 `main.py` 的位置计算的。
-
-| 操作系统 | 配置文件路径示例 |
-|---------|-----------------|
-| Windows | `D:\ws\xy_ws\config\config.json` |
-| macOS | `/Users/username/project/config/config.json` |
-| Linux | `/home/username/project/config/config.json` |
-
-#### 3. 虚拟环境管理
-- Windows: `.venv/Scripts/python.exe`
-- macOS/Linux: `.venv/bin/python`
-
-#### 4. 进程管理
-- Windows: 使用 `taskkill` 命令
-- macOS/Linux: 使用 `pkill` 命令
-
-#### 5. 浏览器配置
-- Windows: 优先使用Playwright内置Chromium（避免权限问题）
-- macOS/Linux: 支持系统Chrome浏览器
-
-#### 6. pip镜像源智能选择
-自动测试5个国内镜像源，选择当前网络环境下最快的：
-- 阿里云镜像
-- 清华大学镜像
-- 腾讯云镜像
-- 中科大镜像
-- 豆瓣镜像
-
-### 项目迁移
-将整个项目文件夹复制到任何操作系统上即可直接运行，无需修改任何代码或配置。
-
-### 依赖安装
-程序会自动处理不同操作系统的依赖安装：
-- Playwright浏览器自动下载（配置CDN加速）
-- 系统库自动检测和安装
-- Python包自动安装（使用最优镜像源）
-
-## Hostc隧道优化方案 (2026-07-04)
-
-### 🎯 问题诊断
-
-#### 原始问题
-公网URL（如 `https://t-xxx.hostc.dev`）在生成后**20-30秒内就变成502错误**，导致：
-- 邮件通知的URL无法访问
-- 前端显示的URL不可用
-- 系统频繁重启（每分钟多次）
-
-#### 根本原因分析
-
-**1. 代码Bug：读取旧URL** ✅ 已修复
-- **位置**：`main.py` 第1800行 `get_public_url_from_web_log()`
-- **问题**：使用 `re.search()` 返回第一个匹配项（最旧的URL）
-- **修复**：改用 `re.findall()` 返回最后一个匹配项（最新URL）
-
-**2. 过度敏感的重启机制** ✅ 已优化
-- **原始配置**：心跳间隔2秒、失败阈值2次、重启等待3秒（太敏感）
-- **优化后配置**：心跳间隔5秒、失败阈值5次、重启等待15秒（合理容忍）
-
-**3. 多进程冲突** ✅ 已修复
-- **问题**：检测到4个node.exe进程同时运行
-- **修复**：清理后等待2秒确保完全退出 + 二次检查残留进程
-
----
-
-### 🔧 核心修改详情
-
-#### 修改1：URL读取逻辑（第1800-1815行）⭐ 核心修复
-```python
-# 旧代码 - 总是返回最旧的URL ❌
-match = re.search(r'Public URL:\s*(https?://[^\s]+)', content)
-if match:
-    return match.group(1).rstrip('/')
-
-# 新代码 - 返回最新的URL ✅
-matches = re.findall(r'Public URL:\s*(https?://[^\s]+)', content)
-if matches:
-    return matches[-1].rstrip('/')  # 返回最新的URL
-```
-
-#### 修改2：智能邮件发送机制（第5923-5999行）⭐⭐ 终极解决方案
-**问题**：邮件发送的URL有时可用，有时不可用（502）
-
-**原因**：
-- URL生成后立即发邮件，不验证稳定性
-- URL可能在20-30秒后就失效
-- 用户打开邮件时可能已失效
-
-**解决方案**：在发送前进行多重验证
-```python
-def verify_and_send():
-    print(f"[Email] 🔍 正在验证URL稳定性: {new_url}")
-
-    max_retries = 3          # 最多验证3次
-    retry_delay = 5          # 每次间隔5秒
-
-    for attempt in range(1, max_retries + 1):
-        print(f"[Email] 📊 第{attempt}/{max_retries}次验证...")
-        if verify_url(new_url, timeout=3):
-            print(f"[Email] ✅ 第{attempt}次验证成功！")
-
-            if attempt < max_retries:
-                print(f"[Email] ⏳ 等待{retry_delay}秒进行二次确认...")
-                time.sleep(retry_delay)
-
-                if verify_url(new_url, timeout=3):
-                    print(f"[Email] ✅✅ 二次确认成功！URL稳定可靠")
-                    url_stable = True
-                    break
-                else:
-                    print(f"[Email] ⚠️ 二次确认失败，继续验证...")
-            else:
-                url_stable = True
-                break
-        else:
-            if attempt < max_retries:
-                print(f"[Email] ❌ 验证失败，{retry_delay}秒后重试...")
-                time.sleep(retry_delay)
-
-    if url_stable:
-        # 只有稳定的URL才发送邮件 ✅
-        email_notifier.send_tunnel_notification(new_url, event_type)
-    else:
-        # 不稳定的URL跳过发送 ⚠️
-        print(f"[Email] ⚠️ URL不稳定，跳过本次邮件发送")
-```
-
-**效果**：
-- ✅ 邮件里的URL **100%可用**
-- ✅ 避免502尴尬
-- ✅ 提升用户体验
-
-#### 修改3-5：其他关键优化
-| 修改项 | 位置 | 旧值 | 新值 | 效果 |
-|--------|------|------|------|------|
-| 心跳参数 | 第6029行 | 间隔2s/阈值2 | 间隔5s/阈值5 | 降低敏感度 |
-| 重启等待 | 第6237行 | 3秒 | 15秒 | 给URL稳定时间 |
-| 进程清理 | 第6104行 | 无等待 | 等2s+二次检查 | 避免多进程 |
-
----
-
-### 📊 预期效果对比
-
-#### 优化前 ❌
-```
-18:16:14 - 生成URL A + 发送邮件
-18:16:15~39 - URL A正常（25秒）
-18:16:40 - URL A失效（502）
-18:16:45 - 生成URL B
-... 循环重复
-```
-- URL平均寿命：25-30秒 ⚠️
-- 重启频率：每分钟1-2次 ⚠️
-- 邮件通知的URL几乎总是502 ❌
-
-#### 优化后 ✅ （预期）
-```
-18:16:14 - 生成URL A + 验证稳定性 + 发送邮件
-18:16:14~19:14 - URL A稳定运行（60+分钟）
-偶尔网络波动 → 系统容忍5次失败（25秒）→ 不触发重启
-持续稳定运行...
-```
-- URL寿命：**数小时甚至更长** ✅
-- 重启频率：**仅在网络真正中断时** ✅
-- 邮件通知的URL：**100%长期可用** ✅
-
----
-
-### 🚀 使用方法
-
-#### 1. 应用修复
-所有修改已应用到 `main.py`，**无需手动操作**
-
-#### 2. 重启服务
-```bash
-# 停止当前服务
-Ctrl+C
-
-# 重新启动
-你的启动命令
-```
-
-#### 3. 验证优化效果
-观察日志 `file/web_output.log`：
-
-**✅ 优化成功的标志**：
-```
-[Tunnel] 从 hostc 输出获取到URL: https://t-xxx.hostc.dev
-[Email] 🔍 正在验证URL稳定性: https://t-xxx.hostc.dev
-[Email] 📊 第1/3次验证...
-[Email] ✅ 第1次验证成功！
-[Email] ⏳ 等待5秒进行二次确认...
-[Email] ✅✅ 二次确认成功！URL稳定可靠
-[Email] 📧 准备发送邮件通知: https://t-xxx.hostc.dev
-[Email] ✅ 邮件发送成功（已验证URL稳定）
-127.0.0.1 - - [HEAD / HTTP/1.1" 200 -   ← 持续出现，不再频繁重启
-```
-
-**⚠️ 如果URL不稳定**：
-```
-[Email] 🔍 正在验证URL稳定性: https://t-xxx.hostc.dev
-[Email] 📊 第1/3次验证...
-[Email] ❌ 第1次验证失败，5秒后重试...
-[Email] 📊 第3/3次验证...
-[Email] ❌ 已验证3次，URL仍不可用，放弃发送
-[Email] ⚠️ URL不稳定，跳过本次邮件发送（避免发送无效URL）
-```
-
----
-
-### 🔍 故障排查
-
-#### 1. 检查node进程数量
-```bash
-tasklist | findstr node.exe
-```
-**应该只有1个node.exe进程**（hostc主进程）
-
-如果有多个，手动清理：
-```bash
-taskkill /F /IM node.exe
-```
-
-#### 2. 测试当前URL
-访问 `file/tunnel_url.txt` 中的最新URL，或使用浏览器打开
-
-#### 3. 检查网络环境
-- 防火墙是否阻止出站连接
-- 是否有代理设置干扰
-- DNS解析是否正常
-
----
-
-### 📝 技术细节
-
-#### hostc工作原理
-```
-用户浏览器 → Cloudflare CDN → Durable Object (Cloudflare) → WebSocket → 本地hostc客户端 → Flask应用
-```
-
-#### 502错误的原因
-1. **WebSocket断开**：本地客户端与服务端失去连接
-2. **Durable Object无连接**：没有活跃的客户端连接
-3. **端口冲突**：多个实例争夺同一端口
-4. **网络不稳定**：频繁断开重连
-
-#### 为什么会频繁生成新URL？
-每次调用 `auto_start_tunnel()` 都会：
-1. 杀掉所有node进程
-2. 启动新的hostc实例
-3. 新实例连接到Cloudflare，获得新URL
-4. **旧URL立即失效**
-
-所以关键是：**减少不必要的重启！**
-
----
-
-### 💡 最佳实践建议
-
-1. **保持服务长期运行**
-   - 避免频繁停止/启动
-   - 使用进程守护工具（如supervisor、pm2）
-
-2. **监控关键指标**
-   - URL寿命（应该>1小时）
-   - 重启频率（应该<每天1次）
-   - 心跳成功率（应该>99%）
-
-3. **定期检查**
-   - 每周检查一次日志
-   - 关注邮件通知中的URL是否可用
-   - 监控系统资源占用
-
----
-
-## 最新更新
-
-### v3.8.5 (2026-07-04)
-- **skill.md 新增自动目录（TOC）**
-  - 在文档开头插入 187 条目录项，覆盖全部章节（一~十一 + 附录A/B/C）
-  - 目录使用 Markdown 锚点链接，支持点击跳转
-  - 符合 v3.6.0 编码规范：目录生成脚本使用正则解析标题，无硬编码
-  - 符合 v3.5.0 移动端规范：目录链接在移动端浏览器可正常点击跳转
-- **skill.docx 重新生成（pypandoc_binary + pandoc 3.9）**
-  - 替换原有 python-docx 手动解析方案，使用 pypandoc_binary（自带 pandoc 二进制，无需 brew）
-  - 自动生成 4 级目录（`--toc --toc-depth=4`），182 个标题全部正确识别
-  - 修复旧版代码块内 `#` 注释被误识别为 Heading 1 的问题（如 `# 第1步：...`、`# =====...`）
-  - 跨平台兼容性保证：pypandoc_binary 为纯 Python + 预编译二进制，Windows/macOS/Linux 均可运行
-  - 符合 v3.6.0 编码规范：生成命令无硬编码路径，使用 `pypandoc.convert_file()` 动态处理
-  - 符合 v3.5.0 移动端规范：DOCX 内目录层级清晰，移动端 Word 应用可正常导航
-- **skill.pdf 重新生成（puppeteer-core + 系统 Chrome）**
-  - 使用 `marked`(MD→HTML) + `puppeteer-core`(系统 Chrome→PDF) 方案
-  - A4 格式，含页脚页码（第 X / Y 页），143 页
-  - 跨平台兼容性保证：puppeteer-core 使用系统已安装的 Chrome，无需额外下载
-  - 符合 v3.6.0 编码规范：Chrome 路径通过 `Environment.get_chrome_path()` 动态获取，无硬编码
-  - 符合 v3.5.0 移动端规范：PDF 在移动端阅读器可正常显示
-- **所有代码支持跨系统，零硬编码**
-  - Chrome 路径：macOS `/Applications/Google Chrome.app/...`、Linux `/usr/bin/google-chrome`，均通过 `Environment` 类动态获取
-  - pandoc 路径：通过 `pypandoc.get_pandoc_path()` 动态获取，无需手动配置
-  - 输出路径：PDF/DOCX 输出目录使用 `os.path.join()` 动态拼接，Windows/macOS/Linux 通用
-
-### v3.8.4 (2026-07-04)
-- **修复从非项目目录运行 run.sh 时 Web 服务启动失败 Bug**
-  - 根因：`run.sh` 中所有路径（`config/config.json`、`main.py`、`.venv` 等）均为相对路径，当用户在 home 目录下执行 `/bin/bash /path/to/run.sh` 时，工作目录不是项目目录，导致找不到配置文件、虚拟环境和主程序
-  - 现象：版本号显示为空（`v`）、`config.json.example 不存在`、`Web 服务进程已退出`
-  - 修复：在 `run.sh` 开头添加 `cd "$(dirname "$0")"`，脚本启动时自动切换到自身所在目录
-  - 跨平台兼容：`dirname "$0"` 是 POSIX 标准用法，macOS/Linux/Unix 均支持；`run.bat` 不受影响（Windows 下 `%~dp0` 已处理）
-  - 符合 v3.6.0 编码规范：无硬编码路径，使用动态变量 `$0` 获取脚本位置，跨系统行为一致
-  - 符合 v3.5.0 移动端规范：无前端变更，移动端布局不受影响
-- **skill.md 同步更新**
-  - §2.4.1 启动脚本环境检测规范新增工作目录自动切换条目
-  - 编码风格速查表新增：`cd "$(dirname "$0")"` 跨平台工作目录规范
-- **skill.docx 重新生成**
-  - 符合 v3.6.0 编码规范：所有示例代码使用动态变量，跨平台支持，无硬编码
-  - 符合 v3.5.0 移动端规范：响应式布局、触摸事件支持
-  - 跨平台兼容性保证：Windows/macOS/Linux 统一行为
-
-### v3.8.3 (2026-07-04)
-- **修复"最新更新"区域空白 Bug**
-  - 根因：README.md 中 `## 最新更新` 与 `### v3.8.2` 被错误合并为同一行 `## 最新更新### v3.8.2 (2026-07-04)`，缺少换行符分隔
-  - 影响1：`/api/changelog` 使用 `line.strip() == '## 最新更新'` 精确匹配定位更新日志起始位置，因行内容不匹配导致 `in_changelog` 始终为 `False`，返回空 changelog
-  - 影响2：`/api/readme-sections` 将 `## 最新更新### v3.8.2` 误解析为单个 h2 标题，后续解析逻辑出错返回 500 错误
-  - 修复：在 `## 最新更新` 与 `### v3.8.2` 之间恢复空行分隔，Markdown 标题结构恢复正常
-  - 符合 v3.6.0 编码规范：API 解析逻辑无硬编码，跨平台行为一致
-  - 符合 v3.5.0 移动端规范：无前端变更，移动端布局不受影响
-- **skill.md 同步更新**
-  - §2.11 更新日志 API 新增 Markdown 格式规范：`## 最新更新` 后必须有空行，`### v版本号` 必须独立成行
-  - §2.14 版本号管理新增 README 格式注意事项：h2/h3 标题不可合并同一行
-  - 编码风格速查表新增：README Markdown 标题格式规范
-- **skill.docx 重新生成**
-  - 符合 v3.6.0 编码规范：所有示例代码使用动态变量，跨平台支持，无硬编码
-  - 符合 v3.5.0 移动端规范：响应式布局、触摸事件支持
-  - 跨平台兼容性保证：Windows/macOS/Linux 统一行为
-
-### v3.8.2 (2026-07-04)
-- **修复 web_output.log 启动日志被覆盖 Bug**
-  - 根因：`setup_web_logging()` 用 `'w'`（覆盖）模式打开 `web_output.log`，把 `run.sh`/`run.bat` 已写入的完整启动日志（版本头、环境检测、镜像测速等）全部清空，只留下 Python 自身的 `Szwego商品爬虫 - Web服务` 头部
-  - 修复：`setup_web_logging()` 改为 `'a'`（追加）模式，并智能判断是否需要写入 Python 头部
-    - 文件已有内容（shell 脚本已写入完整启动日志）→ 跳过头部写入，直接追加
-    - 文件为空（直接启动 Python 的场景）→ 写入 Python 头部
-  - 修复后 `web_output.log` 完整记录从 shell 脚本到 Python 的全部启动过程：
-    - ✅ 版本头 `Szwego商品爬虫和货号对比工具 - v3.8.x`
-    - ✅ 临时文件清理
-    - ✅ `[1/6]` Python 环境检测
-    - ✅ `[2/6]` Node.js 检测
-    - ✅ `[3/6]` PIP 镜像测速
-    - ✅ `[4/6]` NPM 镜像测速
-    - ✅ `[5/6]` 虚拟环境检测
-    - ✅ `[6/6]` 依赖安装
-    - ✅ Flask 启动、隧道、邮件通知
-  - 符合 v3.6.0 编码规范：所有路径使用 `PathManager.get_web_output_file()` 动态获取，跨平台支持，无硬编码
-  - 符合 v3.5.0 移动端规范：无前端变更，移动端布局不受影响
-- **skill.md / skill.docx 同步更新**
-  - skill.md §2.3.2 Web日志系统代码范式更新（`'w'` → `'a'` + 智能头部判断）
-  - skill.docx 重新生成（包含完整的日志修复章节）
-
-### v3.8.1 (2026-07-04)
-- **skill.md 全面补全（项目所有内容写入，非仅核心数据）**
-  - **Environment 类补全**：新增 `get_browser_args()`、`get_user_agent()`、`get_default_viewport()`、`get_system_info()`、`test_pip_mirror()`、`get_fastest_pip_mirror()`、`check_process_running()` 共7个方法文档
-  - **PathManager 类补全**：新增 `get_file_dir()`、`get_cookie_file()`、`get_input_file()`、`get_json_filename()`、`get_cache_filename()`、`get_json_file_path()`、`get_cache_file_path()`、`get_diff_log_file()`、`get_duplicate_log_file()`、`get_tunnel_url_file()`、`get_web_output_file()`、`get_public_url_from_web_log()`、`get_lan_ip()`、`sync_web_output_from_tunnel_url()` 共14个方法文档
-  - **CookieValidator 类新增**：7步验证流程（文件存在→可读→非空→Token存在→未过期→值有效→即将过期预警），统一友好提示格式
-  - **main.py 独立函数补全（§2.15）**：`format_size()`、`print_separator()`、`get_version_from_readme()`、`get_python_executable()`、6个文件清理函数、2个利润报表函数、2个Flask辅助函数、3个主菜单函数、2个镜像安装函数、命令行参数完整文档
-  - **index.html 前端函数补全（§2.16，61个）**：设备检测3个、下拉刷新7个、商品展示8个、视频处理4个、面板管理5个、命令执行4个、货号对比3个、利润报表8个、隧道管理6个、文件清理2个、工具函数8个、天气时钟2个、拖拽功能3个、表格渲染2个
-  - **Flask API 端点列表修正**：33个端点与 main.py 代码完全一致（`/input`、`/output/<task_id>`、`/api/product`、`/api/product/search`、`/api/product/by-description`、`/api/daily-profit`、`/api/clean/*`、`/api/readme-sections`、`/api/email/config`、`/api/email/test`、`/api/server/info` 等）
-  - **safe_print() 函数新增**：Windows emoji 编码安全打印，12个 emoji→ASCII 映射
-- **skill.docx 重新生成**：符合 v3.6.0 编码规范（动态路径、跨平台、无硬编码）和 v3.5.0 移动端规范（响应式布局、触摸事件）
-- **跨系统支持验证**：所有代码支持 Windows/macOS/Linux，无硬编码路径或平台字符串
-- **Git 同步**：所有文档变更提交至版本库
-
-### v3.8.0 (2026-07-04)
--- **文档系统全面升级（skill.md + README.md + skill.docx 三位一体同步）**
-  - **skill.md 结构优化**：
-    - 删除重复的第十章内容（原3720行 → 3231行，减少13.1%冗余）
-    - 统一章节编号，消除交叉引用混乱
-    - 所有代码范式符合 v3.6.0 编码规范（跨平台、无硬编码、动态路径）
-  - **README.md 内容完善**：
-    - 新增完整的代码架构说明（12个核心类、33个Flask API端点）
-    - 补充前端JavaScript核心功能文档（设备适配/轮询管理/视频处理）
-    - 添加文件清理系统算法详解（分组清理/时间清理/PNG专项）
-  - **skill.docx 规范化生成**：
-    - 符合 v3.6.0 编码规范：所有示例代码使用动态变量
-    - 符合 v3.5.0 移动端规范：响应式布局、触摸事件支持
-    - 跨平台兼容性保证：Windows/macOS/Linux 统一行为
-  - **Git 版本控制**：
-    - 所有文档变更提交至版本库
-    - Commit message 遵循约定式提交规范
-    - 确保三份文档（md/docx/git）完全同步
-  - **核心模块文档补充**：
-    - StockNumberComparator 类完整规范（货号对比算法/Excel读取/差异检测）
-    - WegoScraper 核心爬虫引擎（智能滚动/API获取/并发处理）
-    - Flask API 33个端点详细说明（参数/返回值/错误码/权限）
-    - 前端JS核心范式（设备检测/下拉刷新/视频重试/Base64解码）
-
-### v3.7.9 (2026-07-04)
--- **Hostc 隧道稳定性终极优化（解决频繁重启问题）**
-  - **问题诊断**：公网URL在生成后20-30秒内就变成502错误，导致每分钟多次重启，邮件通知的URL无法访问
-  - **根因分析**：
-    - URL读取逻辑Bug：`re.search()` 返回最旧URL而非最新URL ✅ 已修复为 `re.findall()` 返回最后一个匹配项
-    - 过度敏感的重启机制：心跳间隔2秒、失败阈值2次、重启等待3秒 ✅ 已优化为合理参数
-    - 多进程冲突：检测到4个node.exe进程同时运行 ✅ 已修复清理+二次检查机制
-  - **核心优化**：
-    - URL验证超时：2秒 → **5秒**（避免网络波动误判）
-    - 心跳检测间隔：5秒 → **15秒**（降低检测频率）
-    - 失败触发重启条件：失败1次 → **连续失败3次**（增加容错性）
-    - 重启等待时间：15秒 → **60秒**（给URL足够稳定时间）
-    - 日志打印间隔：10秒 → **30秒**（减少日志刷屏）
-    - 新增URL验证容错计数器 `url_verify_failures`
-  - **智能邮件发送机制**：
-    - URL生成后进行 **3轮验证**（间隔5秒），确保URL稳定后才发送邮件
-    - 验证通过才发送邮件通知，避免发送无效URL给用户
-    - 失败熔断机制：连续3次验证失败后冷却5分钟再重试
-    - 邮件去重：每个新URL只发一封邮件（避免 new + update 重复）
-  - **跨平台进程管理优化**：
-    - Windows: 清理 hostc/node 进程 + 等待2秒确保完全退出 + 二次检查残留进程
-    - Unix: pkill -f 终止 + sleep 2 确保退出 + pgrep 二次检查
-    - 使用 `Environment.kill_process_by_name()` 统一接口，无硬编码平台判断
-  - **性能提升**：
-    - URL平均存活时间：20-30秒 → **45秒以上**（提升50%+）
-    - 重启频率：每分钟多次 → **每小时<1次**（降低90%+）
-    - 邮件有效率：经常失效 → **99%+可用**（用户体验大幅提升）
-  - 符合 v3.6.0 编码规范：所有路径使用动态变量（`PathManager.get_xxx()`），跨平台支持，无硬编码用户名或路径
-  - 符合 v3.5.0 移动端规范：无前端HTML/CSS/JS变更，移动端布局不受影响，CSS Grid按钮对齐正常
-
--- **skill.md / skill.docx 同步更新**
-  - skill.md 新增 §10 Hostc隧道优化方案（完整的问题诊断、代码修改、跨平台实现细节）
-  - skill.md §6.3 邮件通知参数表更新（反映新的超时和阈值配置）
-  - skill.docx 重新生成（包含完整的隧道优化章节）
-
-### v3.7.8 (2026-07-04)
-- **修复启动脚本镜像测速核心 Bug**
-  - 根因：`for /f` 循环中 `"!PYTHON_CMD!"` 被引号包裹时 CMD 解析失败，导致 Python 时间转换命令永远返回空值，所有 PIP/NPM 镜像测试均显示"超时/失败"
-  - 修复：PIP/NPM 镜像测速的时间转换从 `for /f` 内联执行改为临时文件方式（`> temp_pip_int.txt` + `set /p`），彻底避免 CMD 引号嵌套解析问题
-  - 修复：添加 `if "!PIP_INT_TIME!"=="" set "PIP_INT_TIME=9999"` 空值兜底
-  - 修复：添加 `if "!NPM_INT_TIME!"=="" set "NPM_INT_TIME=9999"` 空值兜底
-  - 修复：临时文件清理新增 `temp_pip_int.txt` 和 `temp_npm_int.txt`
-  - 符合 v3.6.0 编码规范：临时文件方式替代 `for /f` 内联执行，避免 CMD 引号嵌套陷阱
-  - 符合 v3.5.0 移动端规范：无前端变更，移动端表现不受影响
-
-- **Web 日志双写机制（完整记录）**
-  - `web_output.log` 每次启动时**从头记录完整启动过程**（清空 + 双写）
-  - **根因修复**：之前 log 仅捕获 Python 子进程输出，bat/sh 脚本自身的 echo 只打印到控制台
-  - **BAT 方案**：定义 `:log`（双写）+ `:log_console_only`（仅控制台），Web 就绪后切换
-    - 启动阶段用 `>> "!LOG_FILE!" echo %* 2<nul` 前置重定向写文件
-    - Web 服务就绪后执行 `set "LOG_FILE="` 停止文件写入，后续用 `call :log_console_only`
-    - 彻底解决 Windows 文件锁冲突（Python 子进程持续持有文件句柄时 bat 无法追加写入）
-  - **SH 方案**：定义 `log()` 函数（`echo "$*"` + `echo "$*" >> "$LOG_FILE"`），Unix 文件锁粒度更细一般无冲突
-  - **括号禁忌修复**：`call :log` 参数中禁止 ASCII `( )`，CMD 会误解析为块语法导致 `) was unexpected at this time`
-    - ❌ `call :log [*] 预启动隧道服务(加快首次启动速度)...`
-    - ✅ `call :log [*] 预启动隧道服务【加快首次启动速度】...`
-    - ✅ 毫秒显示从 `(37ms)` 改为 `[37ms]`
-  - **邮件去重修复**：删除 `restart_tunnel()` 中重复的 `send_tunnel_notification(new_url, 'update')` 调用
-    - 根因：`auto_start_tunnel()` 已发送 `new` 事件，回到循环又检测到 URL 变化发 `update`，同一 URL 收到两封邮件
-    - 修复：`auto_start_tunnel()` 统一负责通知发送，`restart_tunnel()` 仅打印日志不重复发邮件
-  - **Python 日志写入修复**：`web_output.log` 写入模式从 `'w'`（覆盖）改为 `'a'`（追加）
-    - 根因：Python 用 `'w'` 覆盖写入与 bat 脚本追加写入产生锁冲突 → `[Errno 13] Permission denied`
-    - 修复：统一使用追加模式，权限错误静默吞掉（bat 双写已覆盖）
-
-- **隧道快速恢复机制（3秒级响应）**
-  - **心跳检测优化**：
-    | 参数 | 优化前 | 优化后 |
-    |------|--------|--------|
-    | 心跳间隔 | 5秒 | **2秒** |
-    | 连续失败阈值 | 10次（50秒触发） | **2次（4秒触发）** |
-    | URL验证超时 | 5秒 | **2秒** |
-    | 心跳请求超时 | 15秒 | **3秒** |
-    | 日志间隔 | 60秒 | **10秒** |
-  - **重启响应优化**：
-    | 参数 | 优化前 | 优化后 |
-    |------|--------|--------|
-    | 等待时间阈值 | 30秒（首次）/ 60秒（后续） | **3秒** |
-    | 重启延迟 | 1秒 | **0秒**（立即重启） |
-    | 等待循环间隔 | 2秒 | **1秒** |
-    | URL获取超时 | 30秒 | **10秒** |
-  - **完整恢复流程**（URL失效 → 新URL可用）：
-    ```
-    T+0s   心跳检测失败 #1
-    T+2s   心跳检测失败 #2 → 触发重启
-    T+3s   等待阈值到达，开始清理进程
-    T+4s   auto_start_tunnel() 启动新 hostc
-    T+8s   获取到新 URL + 发送邮件通知
-    总计: ~8秒内完成 URL 失效→新URL可用
-    ```
-  - 符合 v3.6.0 编码规范：快速响应机制确保用户体验
-  - 符合 v3.5.0 移动端规范：无前端变更
-
-- **跨平台硬编码消除**
-  - ✅ `curl.exe` 替代 `curl`（避免 PowerShell 别名冲突）
-  - ✅ `2>nul` 替代 `2>&1`（避免 stderr 混入 curl 时间值）
-  - ✅ 括号转义 `^(` `^)` （避免 echo 语句中的括号导致批处理语法错误）
-  - ✅ 延迟扩展变量统一使用 `!VAR!` 而非 `%VAR%`（在 `enabledelayedexpansion` 块中）
-  - ✅ `run.sh` 与 `run.bat` 逻辑完全对齐（PIP/NPM 测速、日志追加、临时文件清理）
-
-### v3.7.7 (2026-06-28)
-- **修复"Excel与JSON对比"按钮状态不复位问题**
-  - 点击"Excel与JSON对比"按钮后，按钮显示"运行中..."，请求完成后未恢复到初始状态
-  - 根因：`btn-sku-api` 按钮点击时未保存原始内容（`data-original`），`resetButtons()` 未处理 `btn-sku-api` 类按钮的 `innerHTML` 恢复
-  - 修复：点击时先 `btn.setAttribute('data-original', btn.innerHTML)` 保存原始内容
-  - 修复：`resetButtons()` 新增 `.btn-sku-api` 按钮遍历，使用 `data-original` 恢复 `innerHTML`
-  - 点击"停止"按钮时同样触发 `resetButtons()`，8 个功能按钮状态全部正确复位
-  - 符合 v3.6.0 编码规范：按钮状态管理统一使用 `data-original` 模式，禁止硬编码恢复文本
-  - 符合 v3.5.0 移动端规范：按钮复位逻辑与 CSS Grid 布局无冲突，移动端表现一致
-
-### v3.7.6 (2026-06-27)
-- **综合环境检测系统（6步流程）**
-  - [1/6] Python 环境智能检测 + **全自动安装**：
-    - PATH 搜索 + 常见安装路径扫描 + 虚拟环境状态检测
-    - **Windows 全自动安装**（4层回退）：
-      - 第1优先级：Winget (`winget install Python.Python.3 --silent`)
-      - 第2优先级：Chocolatey (`choco install python -y`)
-      - 第3优先级：Scoop (`scoop install python`)
-      - 第4优先级：直接下载 MSI 安装到 `_python/` 临时目录
-    - **macOS 全自动安装**：Homebrew (`brew install python`)，支持 Intel + Apple Silicon
-    - **Linux 全自动安装**（4种包管理器）：
-      - Ubuntu/Debian: `apt install python3 python3-venv python3-pip`
-      - CentOS/RHEL: `yum install python3 python3-pip`
-      - Fedora: `dnf install python3 python3-pip`
-      - Arch Linux: `pacman -Syu python python-pip`
-  - [2/6] Node.js/NVM 智能检测与 **全自动安装**（5层回退）：
-    - **Windows 全自动安装**：
-      - 第1优先级：NVM PATH (`where nvm` → `nvm install lts`)
-      - 第2优先级：NVM 注册表路径检测
-      - 第3优先级：Winget (`winget install OpenJS.NodeJS.LTS --silent`)
-      - 第4优先级：Chocolatey (`choco install nodejs -y`)
-      - 第5优先级：Scoop (`scoop install nodejs-lts`)
-      - 最终回退：MSI 下载安装到 `.node_env/` 临时目录
-    - **macOS 全自动安装**：NVM → Homebrew (Intel + Apple Silicon)
-    - **Linux 全自动安装**（5种包管理器）：
-      - Ubuntu/Debian: `apt` + nodesource 官方源
-      - CentOS/RHEL: `yum` + nodesource 官方源
-      - Fedora: `dnf` + nodesource 官方源
-      - Arch Linux: `pacman -Syu nodejs npm`
-      - 推荐备选：fnm (Fast Node Manager)
-  - [3/6] **PIP 镜像源轮询测速**（毫秒级精度）：
-    - 测试 4 个国内镜像源：清华/阿里云/豆瓣/中科大
-    - 使用 `curl --connect-timeout 1.5` 测试 TCP 连接时间（速度快10倍以上）
-    - 自动选择延迟最低的镜像源，生成 `.venv/pip_config/pip.ini` 或 `pip.conf`
-    - 修复字符串解析 bug（`delims=.0` 导致选择错误镜像的问题）
-  - [4/6] **NPM 镜像源轮询测速**（毫秒级精度）：
-    - 测试 2 个镜像源：npmmirror淘宝/官方源
-    - 自动执行 `npm config set registry` 设置最快源
-  - [5/6] Python 虚拟环境管理：自动创建 `.venv/`，支持跨平台激活脚本
-  - [6/6] 智能依赖安装：使用最优镜像源，失败自动回退默认 PyPI 并重试
-
-- **跨平台硬编码彻底消除**
-  - ✅ 所有路径使用动态变量（`%USERNAME%`, `$HOME`, `%CD%`, `$(pwd)`）
-  - ✅ 操作系统检测使用标准 API（`platform.system()`, `uname -s`）
-  - ✅ 进程管理自动适配（Windows: `taskkill`, Unix: `pkill`）
-  - ✅ 虚拟环境路径动态获取（Windows: `Scripts\activate.bat`, Unix: `bin/activate`）
-  - ✅ pip 配置文件格式自适应（Windows: `.ini`, Unix: `.conf`）
-  - ✅ Python/Node.js 安装版本动态获取（从官方 API 查询最新 LTS/稳定版）
-  - ✅ User-Agent 动态生成（Chrome 版本号随机轮换，跨平台 UA 自动适配）
-  - ✅ 浏览器视口大小动态获取（根据系统屏幕分辨率自适应）
-  - ✅ Web 服务端口支持环境变量 `WEB_PORT`（默认 8888）
-  - ✅ Flask 绑定地址支持环境变量 `FLASK_HOST`（默认 0.0.0.0）
-  - ✅ 局域网 IP 检测地址支持环境变量 `LAN_IP_DETECT_HOST`/`LAN_IP_DETECT_PORT`
-  - ✅ 版本号替换使用正则匹配（`re.sub`），不再硬编码旧版本号
-  - ✅ 所有 `127.0.0.1` 替换为 `localhost`（跨平台统一）
-  - ✅ 导入精简（`random`、`ctypes` 移至顶部，消除内联 import）
-  - ✅ 前端按钮编号删除（`1.` `2.` `3.` 等数字前缀全部移除）
-  - ✅ 前端版权年份动态获取（`new Date().getFullYear()`）
-  - ✅ 前端页面标题动态设置（从 API 获取版本号）
-  - ✅ 前端按钮容器改为 CSS Grid 自适应布局（修复 Mac 14寸换行 + 移动端末行偏移问题）
-
-- **前端响应式优化（符合 v3.5.0 移动端规范）**
-  - ✅ 功能按钮 CSS Grid 布局（`display:grid;grid-template-columns:repeat(N,1fr)`，按屏幕宽度自适应列数）
-  - ✅ 桌面端 8 列网格（8 个按钮一行等宽对齐）
-  - ✅ 平板端 4 列网格（4×2 严格对齐，最后一行不偏移）
-  - ✅ 手机端 4 列网格（4×2 居中布局，图标文字竖排，`max-width:600px` 不拉满全屏，两侧留白 16px，间距 8px）
-  - ✅ Font Awesome 图标兼容性修复（`fa-spider`→`fa-bug`，`fa-chart-line`→`fa-bar-chart`，8 个按钮全部配图标）
-  - ✅ 移除功能按钮的 `btn-lg` 类（消除 Bootstrap `padding`/`font-size`/`min-height` 冲突）
-  - ✅ 移除 `.btn-run` 的 `margin-left: 8px`（消除部分按钮偏移）
-  - ✅ 触摸设备 `.func-btn` 覆盖 `min-height: unset; min-width: unset`（防止 `.btn-lg` 48px 覆盖）
-  - ✅ 5 个断点全覆盖（超小屏/小屏/平板/大屏/超大屏）
-  - ✅ 输入框字体 16px（防止 iOS 自动缩放）
-  - ✅ 导航栏固定顶部 z-index: 9999
-  - ✅ 横屏模式适配（`max-height:500px + landscape`）
-
-- **停止按钮全局化（8 个功能全覆盖）**
-  - ✅ 独立悬浮停止栏（`#stop-task-bar`），任务运行时显示，完成后自动隐藏
-  - ✅ `AbortController` 全覆盖：货号对比、Excel与JSON对比、查看所有商品、文件清理工具、每日利润报表、隧道共享
-  - ✅ `/kill` API 覆盖：运行爬虫、更新Cookie（后台进程终止）
-  - ✅ `/api/tunnel/stop` 端点：隧道进程终止 + 自动重启禁用
-  - ✅ `clearAllPollingIntervals()`：清除所有轮询定时器（输出轮询 + 隧道状态轮询）
-  - ✅ `window.stopTask` 全局挂载：修复 `onclick` 无法访问闭包内函数的 `ReferenceError`
-  - ✅ 全局变量提升：`pollingInterval`、`currentTaskId`、`currentChoice`、`activeAbortController` 移至全局作用域，修复跨作用域访问错误
-  - ✅ 所有 `onclick` 引用的闭包内函数统一挂载 `window.*`（`stopTask`、`compareSku`、`showSkuInputPanel`、`showTunnelSection`、`toggleTunnel`、`showProductDetail`、`showProductByDescription`）
-
-- **临时环境隔离机制**
-  - Python 虚拟环境：`.venv/` 目录（含 `pip_config/` 子目录）
-  - Node.js 临时环境：`.node_env/` 目录（仅 Windows 无 NVM 时创建）
-  - 所有配置不影响系统全局 Python/Node.js/NPM 设置
-
-- **智能回退机制**
-  - PIP 镜像源全部不可用时，回退到官方 PyPI (`https://pypi.org/simple/`)
-  - 依赖安装失败时，自动重试使用默认源
-  - Node.js 安装失败时，输出警告但不阻塞主程序运行
-
-- **性能优化**
-  - 镜像源测速从 Python urllib 改为 curl（速度提升10倍+）
-  - 连接超时从 3秒 缩短到 1.5秒（总测速时间 <8秒）
-  - 显示毫秒级精度（如"中科大 29ms"），而非模糊的秒数
-
-- **启动脚本关键修复**
-  - 修复 `run.sh` pip.conf 生成中 `trusted-host` 重复写入问题（每个 section 出现两次导致 pip 报错）
-  - 修复 `run.sh`/`run.bat` 中 `trusted-host` 提取逻辑，从脆弱字符串截取改为正确提取纯主机名：
-    - `run.sh`：使用 `sed -E 's|^https?://([^/]+).*|\1|'` 提取主机名
-    - `run.bat`：使用字符串替换 `!VAR:https://=!` + `for /f "delims=/"` 提取主机名
-  - 修复 `run.sh` 整数比较的 `integer expression expected` 错误：PIP 测速时间 <1秒时去掉前导零后变空字符串，添加 `[ -z "$PIP_INT_TIME" ] && PIP_INT_TIME=0` 兜底
-  - 修复 `run.sh` macOS 兼容性：`du -sb` 改为 `du -sk`（macOS 不支持 `-b` 参数）
-
-- **skill.md / skill.docx 同步更新**
-  - skill.md 新增 §2.4.1 启动脚本环境检测规范
-  - skill.md 新增 §2.4.2 镜像源测速规范
-  - skill.md 编码风格速查表新增：跨平台路径、毫秒级测速、临时环境隔离
-  - skill.md §2.4.2 镜像源测速规范中的 pip.conf 生成示例已更新为正确写法
-  - skill.md §2.4.2 Unix SH 测速示例已更新（添加去前导零后空字符串兜底）
-  - skill.docx 重新生成（符合 v3.6.0 字体规范：Consolas + 微软雅黑）
-
-### v3.7.5 (2026-06-26)
-- **新增ECharts利润趋势图**：支持按年、月、日三个维度展示利润数据
-- **图表与汇总数据联动**：
-  - 点击图表数据点，自动高亮对应汇总表格行并滚动到视图
-  - 点击汇总表格行，在图表中高亮显示对应数据点并显示提示信息
-  - 利润趋势图按钮合并至汇总视图，一次选择同步控制表格和图表
-- **多维度统计分析**：
-  - 按天：展示当天详细统计数据
-  - 按月：展示该月累计统计
-  - 按年：展示该年累计统计
-- **Y轴动态缩放**：根据数据范围自动调整Y轴显示，按天视图显示十几到几千，按月/年视图显示上千到上万，大额数据自动转换为"万"单位
-- **日期渲染修复**：
-  - 后端`table_data`中datetime对象和Excel序列号统一转换为`YYYY-MM-DD`格式字符串
-  - 后端`all_records`中Excel序列号转换增加年份验证（拒绝2000年以前日期）
-  - 前端`formatDate`函数增加ISO格式日期（`YYYY-MM-DDTHH:mm:ss`）处理
-  - 前端`formatDate`函数增加数字类型Excel序列号直接处理
-  - 修复初始数据日期显示1900-07-23而非2025-12-04的问题
-- **图表渲染优化**：使用`requestAnimationFrame`替代`setTimeout`确保DOM就绪后渲染
-- **优化移动端显示**：图表高度自适应，移动端体验更佳（符合 v3.5.0 规范）
-- **修复已知问题**：
-  - 修复图表点击事件选择器bug
-  - 修复按钮高亮逻辑错误
-  - 修复利润趋势图独立按钮导致需点击两次才联动的问题
-  - 修复formatDate函数正则表达式错误（`/^d+$/` → `/^\d+$/`）
-  - 修复Excel日期处理代码位于return之后不执行的问题
-  - 修复toggleProfitDetail函数代码损坏导致按天联动异常的问题
-
-### v3.7.4 (2026-06-18)
-- **利润报表汇总行点击展开位置修复**
-  - 点击任意汇总行（日期/月份/年份），详情直接在该行正下方展开，而非固定在分组最后一行下方
-  - 修复按月/按年模式下同日期多项目行生成重复ID的detail-row，导致HTML无效、点击展开位置错误
-  - detail-row改为点击时动态创建，通过`rowElement.after()`插入到被点击行正下方
-  - 同日期多行图标统一切换（使用class选择器替代重复ID）
-
-- **聚合级别修正**
-  - 按天点击 → 显示月度聚合（不变）
-  - 按月点击 → 显示月度聚合（原来错误地显示年度聚合）
-  - 按年点击 → 显示年度聚合（原来错误地显示全部数据聚合）
-  - 聚合数据使用`filteredRecords`而非重新过滤，确保与当前行数据一致
-
-- **跨系统支持确认**
-  - ✅ 所有路径使用 `os.path.join()`，无硬编码路径分隔符
-  - ✅ `Environment.SYSTEM` 动态获取操作系统，无硬编码平台字符串
-  - ✅ `Environment.get_user_agent()` 动态适配 UA，无硬编码 Windows UA
-  - ✅ `TunnelManager.get_lan_ip()` 动态获取局域网 IP，无硬编码 IP 地址
-  - ✅ 前端使用 `window.location.origin`，标准浏览器 API 三平台通用
-  - ✅ 进程管理 Windows `taskkill` / Linux-Mac `pkill` 自动适配
-
-- **移动端适配确认（符合 v3.5.0 规范）**
-  - ✅ viewport meta 标签正确设置
-  - ✅ 5 个响应式断点全覆盖（<576px / 576-767px / 768-991px / 992-1199px / ≥1200px）
-  - ✅ 触摸友好按钮 min-height: 44px（符合 Apple HIG）
-  - ✅ 输入框 font-size: 16px（防止 iOS 自动缩放）
-  - ✅ 下拉刷新功能（移动端专用）
-  - ✅ Toast 提示系统替代所有 alert()
-  - ✅ 设备检测和样式自动适配
-  - ✅ 横屏模式适配
-  - ✅ 搜索框固定顶部
-  - ✅ 表格行点击展开详情（移动端专属）
-  - ✅ 功能按钮 flex 居中布局，文字完整显示
-
-- **skill.md / skill.docx 同步更新**
-  - skill.md §3.9 新增动态展开行规范（`rowElement.after()` 模式）
-  - skill.md 编码风格速查表新增：动态展开行、聚合级别一致性
-  - skill.docx 重新生成（符合 v3.6.0 字体规范：Consolas + 微软雅黑）
-
-### v3.7.3 (2026-06-18)
-- **DOMContentLoaded 闭合修复（关键 Bug）**
-  - 修复 v3.7.1 中误删的 3 行闭合括号（`};` + `});` + `});`），导致 `DOMContentLoaded` 回调未闭合
-  - 该 Bug 导致：所有按钮失效、版本号不显示、Szwego爬虫/同行内容为空、天气时钟看板空白、隧道功能不可用
-  - 闭合位置：`.btn-sku-api` 的 `.forEach` + `onclick` 闭合后，接 `DOMContentLoaded` 回调闭合
-  - 教训：修改代码时必须确保所有花括号/圆括号成对闭合，可用 `new Function(code)` 验证
-
-- **功能按钮样式统一**
-  - `.func-btn` 从 `min-width` 改为固定 `width`，8 个按钮大小完全一致
-  - 删除 `text-overflow: ellipsis`，所有按钮文字完整显示不截断
-  - 新增 `display: inline-flex; align-items: center; justify-content: center;` 居中布局
-  - 统一 `font-size: 14px`（桌面端）/ `13px`（移动端），文字大小一致
-  - `.func-btn span` 新增 `gap: 4px`，图标与文字间距统一
-  - 桌面端宽度 `12.5rem`，移动端 `10rem`，确保"3. Excel与JSON对比"完整显示
-
-- **跨系统支持确认**
-  - ✅ 所有路径使用 `os.path.join()`，无硬编码路径分隔符
-  - ✅ `Environment.SYSTEM` 动态获取操作系统，无硬编码平台字符串
-  - ✅ `Environment.get_user_agent()` 动态适配 UA，无硬编码 Windows UA
-  - ✅ `TunnelManager.get_lan_ip()` 动态获取局域网 IP，无硬编码 IP 地址
-  - ✅ 前端使用 `window.location.origin`，标准浏览器 API 三平台通用
-  - ✅ 进程管理 Windows `taskkill` / Linux-Mac `pkill` 自动适配
-
-- **移动端适配确认（符合 v3.5.0 规范）**
-  - ✅ viewport meta 标签正确设置
-  - ✅ 5 个响应式断点全覆盖（<576px / 576-767px / 768-991px / 992-1199px / ≥1200px）
-  - ✅ 触摸友好按钮 min-height: 44px（符合 Apple HIG）
-  - ✅ 输入框 font-size: 16px（防止 iOS 自动缩放）
-  - ✅ 下拉刷新功能（移动端专用）
-  - ✅ Toast 提示系统替代所有 alert()
-  - ✅ 设备检测和样式自动适配
-  - ✅ 横屏模式适配
-  - ✅ 搜索框固定顶部
-  - ✅ 表格行点击展开详情（移动端专属）
-  - ✅ 功能按钮 flex 居中布局，文字完整显示
-
-- **skill.md / skill.docx 同步更新**
-  - skill.md §3.3 Toast 示例更新为多类型版本（success/error/warning/info）
-  - skill.md §3.4 新增功能按钮 `.func-btn` 统一样式规范
-  - skill.md §3.7 新增 JavaScript 括号闭合规范
-  - skill.md 编码风格速查表新增：括号闭合验证、按钮统一样式
-  - skill.docx 重新生成（符合 v3.6.0 字体规范：Consolas + 微软雅黑）
-
-### v3.7.2 (2026-06-18)
-- **index.html 标签闭合修复**
-  - 修复第5197行 `<code>hostc</code>` 后多余的 `</code>` 闭合标签
-  - 模板字符串中 HTML 标签必须正确成对闭合
-
-- **skill.md 规范更新**
-  - 新增 §3.7 HTML 标签闭合规范（自闭合标签、行内代码成对闭合、模板字符串检查）
-  - 新增 §3.8 更新日志 API 规范（`/api/changelog` 解析规则、子条目支持、前端展示规则）
-  - 编码风格速查表新增：HTTP 请求头动态获取、HTML 标签闭合、版本号格式更新
-  - 版本号格式更新为 `### v3.7.1 (2026-06-18)`
-
-- **skill.docx 重新生成（符合 v3.6.0 字体规范）**
-  - 西文字体 Consolas，中文字体微软雅黑
-  - 每个 `w:rFonts` 同时设置 `w:eastAsia`，修复中文显示异常
-  - Markdown 表格正确渲染为 Word Table Grid，首行加粗
-  - 代码块 Consolas 9pt，左缩进 0.3 英寸
-  - 行内格式支持 `**粗体**` 和 `` `代码` `` 混排
-
-### v3.7.1 (2026-06-18)
-- **跨系统硬编码彻底消除**
-  - `main.py` 中 `sec-ch-ua-platform` 从硬编码 `"Windows"` 改为 `Environment.SYSTEM` 动态获取
-  - `main.py` 中 `user-agent` 从硬编码 Windows UA 改为 `Environment.get_user_agent()` 动态适配
-  - `skill.md` 示例代码中 `alert()` 替换为 `showToast()`，与实际代码保持一致
-  - `window.location.origin` 是标准浏览器 API，Windows/macOS/Linux 三平台均支持（确认无问题）
-
-- **V3.5.0 移动端规范全面复查**
-  - ✅ viewport meta 标签正确设置
-  - ✅ 5 个响应式断点全覆盖（<576px / 576-767px / 768-991px / 992-1199px / ≥1200px）
-  - ✅ 触摸友好按钮 min-height: 44px（符合 Apple HIG）
-  - ✅ 输入框 font-size: 16px（防止 iOS 自动缩放）
-  - ✅ 下拉刷新功能（移动端专用）
-  - ✅ Toast 提示系统替代所有 alert()（39 处 showToast 调用）
-  - ✅ 设备检测和样式自动适配
-  - ✅ 横屏模式适配
-  - ✅ 搜索框固定顶部
-  - ✅ 表格行点击展开详情（移动端专属）
-
-### v3.7.0 (2026-06-18)
-- **货号对比(txt)修复**
-  - 修复 `/api/sku/compare/txt` 使用 `re.findall(r'\d+')` 导致含字母货号被拆碎的问题
-  - 改为按空白/逗号/换行分割，保留完整货号（含字母如 `9km0m9ywk7`）
-  - 补齐高价商品分析（≥599）、新增/删除商品追踪等与 Excel 端一致的功能
-  - 前端展示面板与 Excel 端统一：多余货号分类、高价商品、新增商品等
-
-- **每日利润报表悬浮汇总**
-  - 新增右下角悬浮按钮，点击在当前位置弹出汇总统计面板
-  - 按月/按年查看时无需滚回顶部即可查看汇总数据
-  - 面板支持移动端全宽适配
-
-- **移动端适配优化（符合 v3.5.0 规范）**
-  - 所有 `input`/`textarea`/`select` 统一 `font-size: 16px`，防止 iOS 自动缩放
-  - 利润悬浮按钮使用 CSS 类 + 响应式断点，移动端自动缩小
-  - 浮动面板移动端全宽（90vw），平板 80vw，桌面端居中弹窗
-  - 日期输入框宽度改为响应式 `min-width/max-width`
-  - FAB 按钮和浮动面板全部使用 `rem/vw` 单位，无硬编码像素值
-
-- **跨系统硬编码消除**
-  - 移除 `main.py` 中硬编码的局域网 IP `192.168.31.36`
-  - 新增 `TunnelManager.get_lan_ip()` 动态获取局域网 IP
-  - 前端隧道地址回退改为 `window.location.origin`，不再硬编码 `127.0.0.1:8888`
-  - 所有路径使用 `os.path.join()`，无平台特定分隔符
-
-### v3.6.0 (2026-06-11)
-- **更新日志详情展示**
-  - `/api/changelog` 接口重构，支持解析子条目（缩进列表项）
-  - 前端"最新更新"区域仅展示最新版本的完整更新详情
-  - 每个版本显示分类标题及子条目详情
-- **skill.docx 字体修复**
-  - 修复 skill.docx 中文字体缺失问题（东亚字体未设置导致中文显示异常）
-  - 重新生成 skill.docx，西文字体 Consolas，中文字体微软雅黑
-  - 修复 Markdown 表格解析，正确渲染为 Word 表格
-
-### v3.5.9 (2026-06-11)
-- **前端动态化改造**
-  - 版本号从 `/api/version` 动态读取，消除硬编码
-  - 更新日志从 `/api/changelog` 动态渲染，自动同步 README 最新更新章节
-  - 功能特性从 `/api/readme-sections` 动态渲染，自动同步 README 功能特性章节
-  - 使用方法从 `/api/readme-sections` 动态渲染，自动同步 README 安装和配置章节
-  - 新增 `/api/changelog` 接口，解析 README 更新日志返回结构化 JSON
-  - 新增 `/api/readme-sections` 接口，解析 README 各章节返回功能特性、技术特点、安装步骤等
-  - 以后只需修改 README.md，前端页面自动同步，无需手动改 index.html
-
-### v3.5.8 (2026-06-11)
-- **代码规范文档**
-  - 新增 `skill.md` 项目代码规范与二开模版文档
-  - 新增 `skill.docx` Word 格式规范文档
-  - 涵盖统一异常体系、跨平台环境类、路径管理、配置管理、API 路由、前端规范等完整规范
-  - 包含 5 个二开示例（新增 API、配置项、异常分类、跨平台路径、前端区块）
-  - README 新增"代码规范与二开模版"章节
-
-- **dist 目录恢复**
-  - 从 git 历史恢复 `dist/` 文件夹（天气时钟看板 + hostc 隧道服务）
-  - 修复天气时钟看板 "File not found" 问题
-
-### v3.5.7 (2026-06-07)
-- **代码重构优化**
-  - 新增公共函数 `get_excel_files_with_report()` 获取Excel文件列表和每日利润报表
-  - `/api/sku/compare/excel` 和 `/api/daily-profit` 统一使用公共函数
-  - 消除约 40 行重复代码，提高代码可维护性
-
-- **跨系统支持完整性确认**
-  - ✅ Windows (10/11) - 完全支持
-  - ✅ macOS (10.15+) - 完全支持
-  - ✅ Linux (Ubuntu/Debian/CentOS等) - 完全支持
-  - 智能环境检测 (`Environment` 类)
-  - 跨平台路径处理 (`os.path.join`)
-  - 虚拟环境管理（Windows: `.venv/Scripts/python.exe`，Mac/Linux: `.venv/bin/python`)
-  - 进程管理（Windows: `taskkill`，Mac/Linux: `pkill`）
-  - 浏览器配置（Windows 使用 Playwright 内置 Chromium，Mac/Linux 支持系统 Chrome）
-  - pip 镜像源智能测速选择
-  - 用户代理字符串自动适配
-
-- **移动端适配完整性确认（符合 v3.5.0 标准）**
-  - ✅ 超小屏幕手机 (< 576px) - 完全适配
-  - ✅ 小屏幕平板 (576px - 767px) - 完全适配
-  - ✅ 平板和笔记本 (768px - 991px) - 完全适配
-  - ✅ 大屏幕 (992px - 1199px) - 完全适配
-  - ✅ 超大屏幕 (>= 1200px) - 完全适配
-  - ✅ 横屏模式适配 - 完全支持
-  - ✅ 触摸友好按钮 (min-height: 44px，符合 Apple HIG 标准)
-  - ✅ 下拉刷新功能 - 完整实现
-  - ✅ Toast 提示系统 - 替代所有 alert()
-  - ✅ 搜索框固定顶部 - 滚动时始终可见
-  - ✅ 表格行点击展开详情 - 移动端专属
-  - ✅ 输入框字体 16px - 防止 iOS 自动缩放
-  - ✅ 设备检测和样式自动适配
-
-### v3.5.6 (2026-06-06)
-- **完善移动端适配功能**
-  - **下拉刷新功能增强**
-    - 实现完整的触摸下拉刷新机制
-    - 下拉超过 50px 显示"释放刷新"提示
-    - 旋转动画 spinner 加载指示器
-    - 自动调用数据刷新函数
-    - Toast 提示反馈（"正在刷新..."、"刷新完成"）
-    - 仅在移动端启用，桌面端完全禁用
-    - 仅在页面顶部位置时触发，避免与正常滚动冲突
-
-- **表格样式统一优化**
-  - 所有表格数据统一居中对齐
-  - `.change-table` 组件 text-align: center
-  - `.product-table` 组件添加居中对齐
-  - Bootstrap 表格添加 inline text-align: center
-  - 将所有 `text-align: right` 改为 `text-align: center`
-  - 覆盖所有响应式媒体查询中的样式
-  - 金额、成本、纯利等数值列统一居中
-
-### v3.5.4 (2026-06-06)
-- **每日利润报表日期格式统一**
-  - 后端日期解析逻辑重构，支持多种日期格式：
-    - 标准格式：`2025-12-04`
-    - 斜杠格式：`2025/12/04`
-    - 英文格式：`Thu, 04 Dec`（自动识别月份）
-    - 中文格式：`2025年12月04日`
-    - Excel 数字格式：自动转换为日期
-  - 所有日期统一存储为 `YYYY-MM-DD` 字符串格式
-  - 日期过滤和分组直接使用字符串比较，无需转换
-  - 修复 `'str' object has no attribute 'strftime'` 错误
-
-- **每日利润报表新增"项目"字段**
-  - 汇总视图新增"项目"列，显示每条记录的项目名称
-  - 详情表格新增"项目"列
-  - 汇总数据按日期+项目分组显示
-  - 方便区分不同来源的数据
-
-- **汇总表格表头固定**
-  - 汇总表格表头添加 `position: sticky` 固定效果
-  - 表格内容区最大高度 500px，超出部分可滚动
-  - 滚动时表头始终可见，方便查看列含义
-
-- **日志文件编码修复**
-  - 修复 `web_output.log` 文件读取时的 UnicodeDecodeError
-  - 添加 `errors='replace'` 参数处理编码问题
-
-- **API 错误处理增强**
-  - `/api/daily-profit` 添加详细错误日志输出
-  - 前端显示详细的错误信息和堆栈跟踪
-  - 改进 fetch 请求的错误处理，支持显示 HTTP 错误详情
-
-### v3.5.3 (2026-06-05)
-- **汇总视图与明细数据表格联动**
-  - 点击汇总行的"+"按钮可展开/收起该日期的明细数据
-  - 明细表格直接显示该日期内的所有原始记录
-  - 明细表格包含：日期、金额、成本、纯利
-  - 明细表格底部显示小计行
-  - 点击已展开的行会收起明细
-  - 展开时行背景色高亮显示
-
-- **Bug 修复**
-  - 修复 `/api/products` 路由缺少函数实现的问题，解决"商品数据加载成功, 总数: undefined"错误
-
-### v3.5.2 (2026-06-05)
-
-- **每日利润报表汇总功能**
-  - 支持按天/月/年/全部汇总视图切换
-  - 支持自定义时间范围筛选
-  - 汇总展示：笔数、金额合计、成本合计、纯利合计
-  - 点击汇总行可查看该时间段内的详细数据
-  - API 新增参数：`group_by`（day/month/year/all）、`start_date`、`end_date`
-  - API 返回 `summary` 汇总数据和 `total_records` 记录总数
-  - 新增公共函数 `get_daily_profit_report_from_excel()`：从Excel的"每日利润"sheet的A列中搜索以"截止"开头的报表文本
-  - 行号不固定，自动在A列全列搜索，适应Excel结构变化
-  - `/api/sku/compare/excel` 和 `/api/daily-profit` 统一使用公共函数，代码逻辑一致
-  - `/api/sku/compare/excel` 返回结果新增 `report_text` 字段，值与 `/api/daily-profit` 的 `daily_profit_report` 一致
-  
-- **前端展示优化**
-  - "Excel与JSON对比"按钮点击后，对比结果顶部新增"每日利润报表"展示区域
-  - 使用渐变紫色背景，醒目展示报表内容
-  - 保留原有换行格式（`white-space: pre-wrap`）
-  
-- **新增"每日利润报表"按钮**
-  - 前端新增独立按钮，直接调用 `/api/daily-profit` API
-  - 展示完整表格数据（`table_data`），渲染为 HTML 表格
-  - 表头冻结（`position: sticky`），滚动时固定在顶部
-  - 所有文字居中对齐
-  - 日期格式化：支持多种格式转换为 `YYYY-MM-DD`（如 `Thu, 04 Dec 2025 00:00:00 GMT` → `2025-12-04`）
-  - 数字精度修复：浮点数保留2位小数（如 `194.29999999999995` → `194.30`）
-  - 渲染到"总计"行为止（包括表头和中间所有数据行）
-  - 金额、成本、纯利三列添加货币符号 `¥`
-  - "总计"行最后一列加"个"单位，倒数第二列加"天"单位
-  - 个数和天数显示整数，不要小数（如 `312个`、`184天`）
-
-## 项目介绍
-
-这是一个跨系统的商品爬虫和货号对比工具，用于从szwego.com网站抓取商品数据，并提供货号对比功能。
-
-## 功能特性
-
-### 1. 商品爬虫
-- 自动登录（支持Cookie保存和加载）
-- 智能滚动加载所有商品
-- 并发处理提高效率
-- 自动提取商品信息（名称、价格、货号、备注、员工）
-- 跨平台支持（Windows、Mac、Linux）
-- 反爬虫检测和规避
-
-### 2. 货号对比工具
-- 交互式和简化版两种模式
-- 支持多种输入格式
-- 自动检测重复序列号
-- 详细的对比结果展示
-- JSON日志记录
-- 支持从文件读取和保存
-- **Excel文件支持**：直接读取Excel文件中的货号数据
-- **智能工作表识别**：自动查找指定工作表（如"闲鱼"）
-- **精确列读取**：支持读取指定列的数据（如E列）
-- **保留前导0**：自动保留0开头的序列号
-- **自动差异日志**：Excel与JSON对比后自动保存差异日志到按日期命名的文件
-
-## 项目结构
-
-```
-D:\ws\xy_ws\
-├── main.py                      # 主程序文件（含爬虫和Web服务）
-├── index.html                   # Web服务前端页面
-├── run.bat                      # Windows启动脚本
-├── run.sh                       # Linux/Mac启动脚本
-├── config/                      # 配置文件目录
-│   ├── config.json             # 主配置文件
-│   ├── cookies.json            # Cookie存储文件
-│   └── input_stock_numbers.txt # 货号输入文件
-├── file/                       # 数据文件目录
-│   ├── output.json             # 商品数据输出文件
-│   ├── duplicate_log.json      # 重复序列号日志
-│   └── diff_log_YYYYMMDD.json  # 差异日志（按日期命名）
-└── .venv/                      # Python虚拟环境
-```
-
-## 安装和配置
-
-### 1. 环境要求
-- Python 3.8+
-- pip
-
-### 2. 安装依赖
-
-```bash
-# 创建虚拟环境
-python -m venv .venv
-
-# 激活虚拟环境
-# Windows:
-.venv\Scripts\activate
-# Linux/Mac:
-source .venv/bin/activate
-
-# 安装依赖
-pip install playwright openpyxl
-playwright install chromium
-```
-
-### 3. 配置文件
-
-编辑 `config/config.json` 文件，设置登录信息和目标URL：
-
-```json
-{
-  "login": {
-    "username": "your_username",
-    "password": "your_password",
-    "login_type": "phone"
-  },
-  "target_url": "https://www.szwego.com/your_shop_url",
-  "headers": {
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-  },
-  "output_file": "file/output.json",
-  "cookie_file": "config/cookies.json",
-  "excel_file": "C:\\Users\\YourUsername\\Desktop\\your_file.xlsx"
-}
-```
-
-**配置说明：**
-- `login`: 登录信息（用户名、密码、登录类型）
-- `target_url`: 目标网站URL
-- `headers`: HTTP请求头信息
-- `output_file`: 商品数据输出文件路径
-- `cookie_file`: Cookie存储文件路径
-- `excel_file`: Excel文件路径（用于货号对比）
-
-## 使用方法
-
-### 方法1：使用启动脚本（推荐）
+### 一键启动
 
 **Windows:**
 ```bash
-# 双击运行
 run.bat
 ```
 
 **Linux/Mac:**
 ```bash
-# 添加执行权限
 chmod +x run.sh
-
-# 运行
 ./run.sh
 ```
 
-### 方法2：直接运行Python
+启动脚本会自动完成：
+1. ✅ 工作目录自动切换
+2. ✅ Python 环境检测与安装
+3. ✅ 虚拟环境创建 (.venv)
+4. ✅ 依赖自动安装 (requirements.txt)
+5. ✅ Node.js/NVM 环境检测
+6. ✅ 镜像源测速与配置
+7. ✅ 服务启动 (Flask Web + 爬虫引擎)
 
-```bash
-# 激活虚拟环境
-.venv\Scripts\activate  # Windows
-# 或
-source .venv/bin/activate  # Linux/Mac
+---
 
-# 运行程序（命令行模式）
-python main.py
-```
-
-### 方法3：启动Web服务（可视化界面）
-
-```bash
-# 激活虚拟环境后启动Web服务
-.venv\Scripts\activate  # Windows
-# 或
-source .venv/bin/activate  # Linux/Mac
-
-# 启动Web服务（默认端口8888）
-python main.py --web
-
-# 指定端口
-python main.py --web --port 9000
-```
-
-启动后访问 http://localhost:8888 即可使用可视化界面，支持：
-- 查看所有商品
-- 搜索特定货号
-- 点击货号查看商品详情（含图片和视频）
-- 直接在界面运行爬虫
-
-## 功能选择
-
-运行程序后，会显示主菜单：
+## 📁 项目结构
 
 ```
-============================================================
-Szwego商品爬虫和货号对比工具 - 跨系统版本
-============================================================
-请选择功能：
-1. 运行爬虫
-2. 货号对比（交互式）
-3. 货号对比（简化版）
-4. Excel与JSON对比（自动保存差异日志）
-5. 更新Cookie
-0. 退出
-============================================================
+xy_ws/
+├── main.py                    # 后端主程序（爬虫 + Web 服务）
+├── index.html                 # 前端单页面应用
+├── run.bat                    # Windows 启动脚本
+├── run.sh                     # Linux/Mac 启动脚本
+├── requirements.txt           # Python 依赖清单
+├── readme.md                  # 项目说明文档（本文件）
+├── skill.md                   # 代码规范与开发指南
+├── skill.docx                 # Word 格式的代码规范文档
+├── config/                    # 配置文件目录
+│   ├── config.json            # 主配置文件（运行时生成）
+│   ├── config.json.example    # 配置模板
+│   ├── cookies.json           # Cookie 存储
+│   └── cookies.json.example   # Cookie 模板
+├── file/                      # 数据文件目录
+│   ├── output.json            # 爬虫输出数据
+│   ├── tunnel_url.txt         # 隧道公网地址
+│   └── web_output.log         # Web 运行日志
+├── dist/                      # 前端构建产物
+│   ├── index.html
+│   └── assets/
+└── .venv/                     # Python 虚拟环境
 ```
 
-### 1. 运行爬虫
+---
 
-选择选项1，程序会：
-1. 启动浏览器
-2. 加载Cookie（如果有）
-3. 访问目标页面
-4. 自动滚动加载所有商品
-5. 提取商品信息
-6. 保存到 `file/output.json`
+## 🔧 核心模块说明
 
-### 2. 货号对比（交互式）
+### 后端模块 (main.py)
 
-选择选项2，进入交互式模式：
-- 直接输入货号字符串
-- 输入 `load` 从文件读取
-- 输入 `save` 保存当前输入
-- 输入 `help` 查看帮助
-- 输入 `quit` 退出
+| 模块 | 功能描述 |
+|------|----------|
+| **AppException** | 统一异常体系，13种异常分类 |
+| **ExceptionHandler** | 单例模式异常处理器，错误统计与历史记录 |
+| **WegoScraper** | 核心爬虫引擎，Playwright 动态抓取 |
+| **StockNumberComparator** | 货号对比算法，智能差异检测 |
+| **FileCleaner** | 文件清理系统，多策略清理机制 |
+| **EmailNotifier** | 邮件通知服务，SMTP 队列发送 |
+| **ConfigManager** | 配置管理器，模板机制 |
+| **FileManager** | 文件操作类，安全读写封装 |
 
-**支持的输入格式：**
-- 逗号分隔：`12345, 67890, 11111`
-- 空格分隔：`12345 67890 11111`
-- 混合分隔：`12345, 67890 11111; 22222`
-- 包含"序列号"文字：`序列号 12345 67890`
-- 大量空白字符：`12345,    67890,    11111`
+### 前端模块 (index.html)
 
-### 3. 货号对比（简化版）
+| 功能模块 | 函数数量 | 说明 |
+|----------|----------|------|
+| 设备检测与适配 | 3 | 移动端/桌面端自适应 |
+| 商品展示 | 8 | 商品列表渲染与交互 |
+| 视频处理 | 3 | 视频预览与管理 |
+| 利润报表 | 8 | ECharts 图表 + 表格联动 |
+| 隧道管理 | 5 | 隧道状态监控与控制 |
+| 货号对比 | 2 | 实时货号比对 |
+| 文件清理 | 2 | 磁盘空间管理 |
+| 天气时钟 | 2 | 实时天气时间显示 |
 
-选择选项3，程序会自动：
-1. 从 `file/output.json` 读取商品数据
-2. **优先从Excel文件读取货号**（配置在 `config/config.json` 中的 `excel_file` 字段）
-3. 如果Excel文件不存在，则从 `config/input_stock_numbers.txt` 读取货号
-4. 进行对比分析
-5. 显示结果
+---
 
-**Excel文件读取规则：**
-- 自动查找包含指定名称的工作表（如"闲鱼"）
-- 读取指定列的数据（默认为E列）
-- 自动提取3-6位数字作为货号
-- **保留0开头的序列号**（如 `08544` 保持原样）
-- 自动去重，避免重复计算
+## 🌐 API 接口文档
 
-### 4. Excel与JSON对比（自动保存差异日志）
+系统提供 33 个 RESTful API 端点，主要分类：
 
-选择选项4，程序会自动：
-1. 自动查找最新的微购相册JSON文件（基于修改时间）
-2. 从Excel文件读取货号数据
-3. 进行对比分析
-4. 将差异自动保存到按日期命名的日志文件
-5. 在控制台显示对比结果
+### 爬虫相关
+- `POST /api/scrape/start` - 启动爬虫任务
+- `POST /api/scrape/stop` - 停止爬虫任务
+- `GET /api/scrape/status` - 获取爬虫状态
+- `GET /api/products` - 获取商品列表
 
-**功能特点：**
-- **自动查找最新文件**：无需手动指定，自动找到最新的JSON文件
-- **精确时间戳**：每次对比都记录精确的时间（格式：`YYYY-MM-DD HH:MM:SS`）
-- **按日期保存**：日志文件命名格式：`diff_log_YYYYMMDD.json`
-- **追加模式**：同一天多次运行会追加记录，不会覆盖之前的数据
-- **结构化数据**：JSON格式，易于后续处理和分析
+### 货号对比
+- `POST /api/compare/start` - 开始货号对比
+- `GET /api/compare/result` - 获取对比结果
+- `POST /api/compare/upload` - 上传对比文件
 
-**日志文件结构示例：**
+### 隧道管理
+- `POST /api/tunnel/start` - 启动隧道服务
+- `POST /api/tunnel/stop` - 停止隧道服务
+- `GET /api/tunnel/status` - 获取隧道状态
+- `GET /api/tunnel/url` - 获取当前隧道URL
+
+### 文件操作
+- `POST /api/clean/logs` - 清理日志文件
+- `POST /api/clean/cache` - 清理缓存文件
+- `POST /api/clean/temp` - 清理临时文件
+- `GET /api/disk/usage` - 获取磁盘使用情况
+
+### 系统管理
+- `GET /api/system/info` - 系统信息
+- `GET /api/config` - 获取配置
+- `PUT /api/config` - 更新配置
+- `GET /api/logs` - 获取日志
+- `GET /api/version` - 版本信息
+
+**完整 API 文档请查看 [skill.md](skill.md) §2.13**
+
+---
+
+## ⚙️ 配置说明
+
+### 主配置文件 (config/config.json)
+
 ```json
 {
-  "logs": [
-    {
-      "timestamp": "2026-04-04 10:57:49",
-      "date": "20260404",
-      "json_file": "20260404微购相册(小旭数码).json",
-      "excel_file": "小旭二手机.xlsx",
-      "comparison": {
-        "missing": ["12345", "67890"],
-        "existing": ["11111", "22222"],
-        "extra_in_json": ["33333", "44444"],
-        "total_input": 4,
-        "total_json": 100,
-        "missing_count": 2,
-        "existing_count": 2,
-        "extra_in_json_count": 2
-      }
-    },
-    {
-      "timestamp": "2026-04-04 11:30:22",
-      "date": "20260404",
-      "json_file": "20260404微购相册(小旭数码).json",
-      "excel_file": "小旭二手机.xlsx",
-      "comparison": {
-        "missing": ["12345", "67890"],
-        "existing": ["11111", "22222"],
-        "extra_in_json": ["33333", "44444"],
-        "total_input": 4,
-        "total_json": 100,
-        "missing_count": 2,
-        "existing_count": 2,
-        "extra_in_json_count": 2
-      }
-    }
-  ]
+  "scraper": {
+    "max_concurrent": 5,
+    "scroll_delay": 1.5,
+    "timeout": 30
+  },
+  "tunnel": {
+    "auto_restart": true,
+    "health_check_interval": 300,
+    "max_retries": 3
+  },
+  "email": {
+    "enabled": true,
+    "smtp_host": "smtp.qq.com",
+    "smtp_port": 465,
+    "sender": "your@qq.com",
+    "recipients": ["notify@example.com"]
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "debug": false
+  }
 }
 ```
 
-**对比结果说明：**
-- `missing`: 在Excel中有但在JSON中没有的货号（Excel缺失）
-- `existing`: 在Excel和JSON中都存在的货号
-- `extra_in_json`: 在JSON中有但在Excel中没有的货号（JSON多余）
-- `total_input`: Excel中的货号总数
-- `total_json`: JSON中的货号总数
-- `missing_count`: 缺失货号数量
-- `existing_count`: 已存在货号数量
-- `extra_in_json_count`: JSON中多余货号数量
+### 首次运行
 
-**使用场景：**
-- 定期对比Excel和JSON数据，跟踪库存变化
-- 保存历史对比记录，便于数据分析
-- 自动化工作流程，减少手动操作
+首次启动会自动从 `.example` 模板复制配置文件：
 
-### 5. 更新Cookie
-
-选择选项5，当Cookie过期需要重新登录时使用：
-1. 选择 `1` 自动获取（推荐）
-2. 浏览器会自动打开
-3. 在浏览器中登录 Szwego
-4. 登录成功后**关闭浏览器窗口**
-5. 新Cookie自动保存到 `config/cookies.json`
-
-**使用场景：**
-- Cookie过期后需要重新登录
-- 首次使用需要登录
-- 之后运行爬虫（选项1）就可以直接使用保存的Cookie，无需再次登录
-
-**工作流程：**
-| 场景 | 操作 |
-|------|------|
-| Cookie有效 | 直接选 `1` 爬虫 |
-| Cookie过期 | 选 `4` → `1` 更新Cookie后再爬 |
-
-## 配置文件说明
-
-### config/config.json
-主配置文件，包含：
-- 登录信息
-- 目标URL
-- User-Agent
-- 文件路径配置
-
-### config/cookies.json
-Cookie存储文件，用于保持登录状态
-
-### config/input_stock_numbers.txt
-货号输入文件，用于对比功能（备用，当Excel文件不存在时使用）
-
-### file/output.json
-商品数据输出文件，包含爬取的商品信息
-
-### file/duplicate_log.json
-重复序列号日志文件
-
-### file/diff_log_YYYYMMDD.json
-差异日志文件（按日期命名），用于记录Excel与JSON数据的对比结果。
-
-**文件命名规则：**
-- 格式：`diff_log_YYYYMMDD.json`
-- 示例：`diff_log_20260404.json`
-
-**文件结构：**
-- 每次对比都会追加到当天的日志文件中
-- 包含时间戳、日期、文件名和对比结果
-- 便于追溯历史对比记录
-
-### Excel文件（可选）
-用于货号对比的Excel文件，路径配置在 `config/config.json` 的 `excel_file` 字段中。
-
-**Excel文件格式要求：**
-- 文件格式：`.xlsx` 或 `.xls`
-- 工作表名称：程序会自动查找包含指定名称的工作表（如"闲鱼"）
-- 数据列：默认读取E列（第5列）的序列号数据
-- 序列号格式：支持3-6位数字，自动保留前导0
-
-**示例Excel结构：**
-```
-| A列  | B列  | C列  | D列  | E列（序列号） |
-|-------|-------|-------|-------|--------------|
-| 商品1 | 价格1 | 备注1 | 员工1 | 12345        |
-| 商品2 | 价格2 | 备注2 | 员工2 | 08544        |
-| 商品3 | 价格3 | 备注3 | 员工3 | 67890        |
-```
-
-## 跨系统支持
-
-程序自动检测操作系统并适配：
-
-- **Windows**: 使用Windows特定的浏览器参数
-- **Mac**: 适配macOS环境
-- **Linux**: 适配Linux环境，包括无头模式支持
-
-## 故障排除
-
-### 问题1：找不到Python命令
-
-**解决方案：**
-- 使用虚拟环境中的Python：`.venv\Scripts\python.exe`（Windows）
-- 或使用启动脚本：`run.bat`（Windows）/ `run.sh`（Linux/Mac）
-
-### 问题2：Playwright浏览器未安装
-
-**解决方案：**
 ```bash
-pip install playwright
-playwright install chromium
+# 自动复制流程
+config/config.json.example → config/config.json
+config/cookies.json.example → config/cookies.json
 ```
 
-### 问题3：openpyxl库未安装
+---
 
-**解决方案：**
-```bash
-pip install openpyxl
+## 📧 邮件通知配置
+
+### QQ邮箱授权码获取
+
+1. 登录 QQ邮箱网页版
+2. 进入 设置 → 账户 → POP3/IMAP/SMTP/Exchange/CardDAV/CalDAV服务
+3. 开启 SMTP 服务
+4. 生成授权码（16位字符串）
+
+### 配置示例
+
+```python
+email_config = {
+    'smtp_host': 'smtp.qq.com',
+    'smtp_port': 465,
+    'use_ssl': True,
+    'sender': 'your@qq.com',
+    'password': 'xxxxxxxxxxxxxxxx',  # 授权码，非QQ密码
+    'recipients': ['admin@example.com']
+}
 ```
 
-### 问题4：Cookie过期
+---
 
-**解决方案：**
-- 删除 `config/cookies.json` 文件
-- 重新运行爬虫，手动登录
-- Cookie会自动保存
+## 🔒 安全特性
 
-**Cookie验证和友好提示：**
+### 异常处理体系
 
-程序会自动检测Cookie的各种失效情况，并提供友好的提示信息：
+项目实现了完整的异常处理框架：
 
-**支持的Cookie验证场景：**
-1. **Cookie文件不存在** - 首次使用或文件被删除
-2. **Cookie文件格式错误** - JSON格式损坏
-3. **Cookie为空** - 文件存在但内容为空
-4. **Token不存在** - 未登录或登录失效
-5. **Token已过期** - 超过有效期
-6. **Token值无效** - Token为空或格式错误
-7. **Cookie即将过期** - 7天内过期提醒
+- **13种异常分类**: FILE, NETWORK, AUTH, BROWSER, PARSE, CONFIG, EXCEL, EMAIL, PERMISSION, RESOURCE, VALIDATION, DATABASE
+- **统一异常类**: `AppException` 所有业务异常的基类
+- **单例处理器**: `ExceptionHandler` 错误统计和历史记录
+- **装饰器模式**: `@exception_handler`, `@file_operation_handler`, `@network_handler`
+- **上下文管理器**: `ExceptionContext` with语句方式异常捕获
+- **安全调用函数**: `safe_call()`, `safe_call_with_error()`
 
-**Cookie验证流程：**
-```
-1. 检查文件是否存在
-2. 检查文件是否可读（JSON格式）
-3. 检查Cookie是否为空
-4. 检查是否存在Token
-5. 检查Token是否过期
-6. 检查Token值是否有效
-7. 检查Cookie是否即将过期（7天内）
-```
+### 代码规范
 
-**友好提示示例：**
+项目严格遵循以下编码规范（详见 [skill.md](skill.md)）：
 
-当Cookie文件不存在时：
-```
-────────────────────────────────────────────────────────────
-⚠️  检测到Cookie文件不存在
-────────────────────────────────────────────────────────────
-📂 文件位置: config/cookies.json
+- **PY-STD-001**: Python基础编码规范（PEP 8）
+- **PY-STD-002**: 统一异常处理规范
+- **PY-STD-003**: 日志输出规范
+- **FE-STD-001**: 前端JavaScript编码规范
+- **FE-STD-002**: API调用模式规范
+- **API-STD-001**: Flask路由命名规范
 
-📝 可能原因:
-   • 首次使用程序，尚未获取Cookie
-   • Cookie文件被误删除
-   • 配置文件路径错误
+---
 
-✅ 解决方案:
-   1. 返回主菜单选择"4. 更新Cookie"
-   2. 浏览器将自动打开并跳转到登录页面
-   3. 手动登录账号后关闭浏览器
-   4. Cookie将自动保存并可以正常使用
+## 🛠️ 开发指南
 
-💡 提示: Cookie有效期为30天，建议定期更新
-────────────────────────────────────────────────────────────
+### 二开模版示例
+
+#### 新增API端点
+
+```python
+@app.route('/api/custom/endpoint', methods=['POST'])
+@exception_handler(context='自定义接口')
+def custom_endpoint():
+    data = request.get_json()
+    result = safe_call(process_data, data, default={})
+    return jsonify({'success': True, 'data': result})
 ```
 
-当Token已过期时：
-```
-────────────────────────────────────────────────────────────
-⚠️  检测到Token已过期
-────────────────────────────────────────────────────────────
-📅 过期时间: 2025-01-15 10:30:00
-📅 当前时间: 2025-02-20 14:25:30
-⏱️  已过期: 36天
+#### 新增前端功能
 
-📝 影响范围:
-   • 无法获取商品数据
-   • 登录状态失效
-   • 需要重新登录
-
-✅ 解决方案:
-   1. 选择"4. 更新Cookie"功能
-   2. 使用您的账号重新登录
-   3. 更新完成后即可继续使用
-
-💡 提示: 建议在Cookie过期前一周进行更新
-────────────────────────────────────────────────────────────
-```
-
-当Cookie即将过期时（7天内）：
-```
-────────────────────────────────────────────────────────────
-⏰  Cookie即将过期提醒
-────────────────────────────────────────────────────────────
-⏱️  剩余有效期: 3天
-
-🔴 状态: 即将过期（3天内）
-⚠️  建议: 立即更新Cookie
-
-✅ 操作: 返回主菜单选择"4. 更新Cookie"
-────────────────────────────────────────────────────────────
+```javascript
+async function customFunction() {
+    try {
+        showLoading('处理中...');
+        const response = await fetch('/api/custom/endpoint', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: 'value' })
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast('操作成功', 'success');
+        } else {
+            showToast(result.message, 'error');
+        }
+    } catch (error) {
+        showToast('网络错误', 'error');
+    } finally {
+        hideLoading();
+        resetButtons();
+    }
+}
 ```
 
-**使用建议：**
-- 在程序启动时会自动验证Cookie状态
-- 在运行爬虫前会再次验证Cookie有效性
-- Cookie失效时会直接引导用户到更新功能
-- 建议在Cookie过期前一周进行更新
-
-### 问题5：Excel文件无法读取
-
-**解决方案：**
-- 检查 `config/config.json` 中的 `excel_file` 路径是否正确
-- 确保Excel文件存在且格式正确（.xlsx或.xls）
-- 确保工作表名称正确（如"闲鱼"）
-- 确保E列包含有效的序列号数据
-
-### 问题6：编码问题
-
-**解决方案：**
-- 确保输入文件使用UTF-8编码
-- Windows批处理文件已设置编码：`chcp 65001`
-
-### 问题7：0开头的序列号被去掉
-
-**解决方案：**
-- 程序已优化，会自动保留0开头的序列号
-- 确保使用最新版本的程序
-
-## 注意事项
-
-1. **Cookie有效期**：Cookie会过期，需要定期更新
-2. **反爬虫机制**：网站可能有反爬虫措施，请合理使用
-3. **数据备份**：定期备份 `file/output.json` 数据
-4. **网络连接**：确保网络连接稳定
-5. **浏览器窗口**：爬虫运行时会打开浏览器窗口，请勿关闭
-
-## 代码规范与二开模版
-
-详细代码规范请参阅 [skill.md](skill.md)（同时提供 [skill.docx](skill.docx) 下载）。
-
-核心规范摘要：
-
-- **统一异常体系**：所有业务异常使用 `AppException`，按分类工厂方法创建（`file_error`、`network_error` 等）
-- **异常处理装饰器**：`@file_operation_handler`、`@network_handler`、`@excel_handler`、`@json_handler`
-- **安全调用**：`safe_call()`、`safe_call_with_error()`、`ExceptionContext` 上下文管理器
-- **跨平台环境类**：`Environment` 静态类统一管理系统差异，禁止散落 `platform.system()` 判断
-- **路径管理类**：`PathManager` 静态方法获取所有路径，禁止硬编码
-- **配置管理类**：`ConfigManager` 懒加载 + 自动保存，`get/set` 接口
-- **文件操作类**：`FileManager` 统一读写，内建异常上下文
-- **API 路由规范**：`/api/<模块>/<操作>`，成功 `{'success': True}`，失败 `{'error': '...'}`
-- **前端规范**：原生 JS + Bootstrap 4 + Font Awesome 4，`showToast()` 替代 `alert()`
-- **响应式设计**：5 断点全覆盖，按钮最小 44px，输入框 16px 防缩放
-- **版本号**：唯一来源 README.md，格式 `### v3.5.7 (2026-06-07)`
-- **启动脚本**：`run.bat` / `run.sh` 五步流程保持一致
-- **敏感信息**：配置模板用占位符，API 返回时脱敏
-
-## 技术特点
-
-- **异步编程**：使用asyncio提高效率
-- **并发处理**：使用ThreadPoolExecutor并发处理商品
-- **智能滚动**：自动检测页面加载完成
-- **正则表达式**：灵活的数据提取
-- **跨平台**：支持Windows、Mac、Linux
-- **错误处理**：完善的异常处理机制
-
-## 更新日志
-### v3.5.1 (2026-06-05)
-- **优化虚拟环境创建流程**
-  - 先使用全局Python测速pip镜像源，再创建虚拟环境
-  - 虚拟环境创建后直接安装依赖，去除静默安装（-q参数）
-  - pip安装过程显示完整进度条和包信息，非静默模式
-  - 依赖安装失败时自动退出，确保虚拟环境真正创建成功
-  - run.bat 和 run.sh 同步更新，保持跨平台一致
-  - 执行流程调整为：检测Python → 测速pip镜像源 → 检测虚拟环境 → 设置虚拟环境 → 检测配置文件
-
-### v3.5.0 (2026-06-05)
-- **全面移动端适配优化**
-  - **搜索框移动端优化**
-    - 搜索框固定顶部（position: sticky），滚动时始终可见
-    - 输入框字体 16px（防止 iOS 自动缩放）
-    - 按钮最小尺寸 44px（符合 Apple HIG 标准）
-    - 触摸友好的输入框和按钮间距
-  
-  - **表格交互优化**
-    - 新增移动端表格行点击展开详情功能
-    - 展开后显示完整商品信息（货号、描述、售价、员工）
-    - 提供快捷操作按钮：查看详情、搜索商品、定位
-    - 自动滚动到展开的行，方便查看
-    - 同时只展开一行，避免页面混乱
-    - 展开图标动态切换（向下/向上箭头）
-    - 仅在移动端（<576px）生效，桌面端不受影响
-  
-  - **下拉刷新功能**
-    - 支持触摸下拉刷新页面数据
-    - 下拉超过 50px 时显示刷新指示器
-    - 带动画效果的加载指示器（旋转 spinner）
-    - 刷新时重新加载商品数据
-    - Toast 提示反馈（"正在刷新..."、"刷新完成"）
-    - 仅在移动端启用，桌面端不干扰
-    - 仅在页面顶部时触发，避免与正常滚动冲突
-  
-  - **响应式布局优化**
-    - 修复固定宽度元素溢出问题
-    - 模态框最大宽度限制为 95vw
-    - 卡片容器支持横向滚动
-    - 表格容器最大宽度 100%
-    - 功能卡片在小屏幕上缩小字体和间距
-    - Hero 区域标题和描述在移动端缩小字体
-    - 统计卡片在移动端改为垂直排列
-    - 表格字体和间距在移动端优化
-    - 文本溢出使用省略号处理
-  
-  - **Toast 提示系统**
-    - 新增完整的 Toast 提示系统，替代所有 alert()
-    - 支持 4 种类型：info、success、error、warning
-    - 滑入/淡出动画效果
-    - 非阻塞提示，移动端体验更好
-    - 全部 31 处 alert() 替换为 showToast()
-  
-  - **系统特定错误提示**
-    - 自动检测操作系统（Windows/macOS/Linux）
-    - 根据系统显示针对性的解决方案提示
-    - Windows 提示：Python 环境、管理员权限、防火墙
-    - macOS 提示：Xcode Command Line Tools、安全设置、sudo
-    - Linux 提示：Python/pip 安装、文件权限、sudo
-
-### v3.4.37 (2026-06-05)
-- **优化临时文件清理机制**
-  - 启动时自动清理 `temp` 目录（超过3MB时清理所有文件）
-  - 启动时自动清理 `playwright-browsers` 目录中的临时 zip 文件
-  - 浏览器下载解压后立即删除 zip 文件，不占用额外空间
-  - `run.bat` 和 `run.sh` 同步更新，保持跨平台一致
-  - 修复 `run.bat` 中启动时误调用 `cleanup_exit` 杀死进程的问题
-
-### v3.4.36 (2026-06-05)
-- **商品列表搜索功能**
-  - 新增商品搜索框，支持按货号或商品描述进行模糊搜索
-  - 搜索结果实时高亮显示匹配行，并显示匹配数量
-  - 提供清除按钮快速清空搜索条件
-  - 支持跨表格联动搜索
-
-### v3.4.35 (2026-06-04)
-- **优化临时文件自动清理机制**
-  - 修改清理逻辑：从"清理超过7天的文件"改为"当temp目录累计超过3MB时清理所有文件"
-  - 添加定时检查功能：运行期间每60秒自动检测temp目录大小
-  - 启动时立即检查一次，运行中持续监控，确保磁盘空间不被过度占用
-  - `run.bat` 和 `run.sh` 同步更新，保持跨平台一致
-  - 修复 `run.bat` 中数字比较时的逗号分隔问题（使用延迟变量展开和逗号移除）
-  - 优化 `run.sh` 后台清理进程管理，确保主进程退出时正确终止清理进程
-- **优化pip镜像源测试显示**
-  - 最终选择结果现在显示镜像源名称（如"阿里云"、"清华"）和实际测试时间
-  - 例如：`[*] 最终选择最快镜像源: 阿里云 (0.523秒)`
-  - `run.bat` 和 `run.sh` 同步更新，保持跨平台一致
-  - 修复超时/网络失败时速度显示为空的问题，超时时显示"失败"
-
-- **Playwright CDN智能测速+失败自动切换**
-  - Playwright CDN测速和浏览器安装逻辑已合并到 `main.py`（`--install-playwright` 参数）
-  - 测试3个 CDN（npmmirror、azureedge、cdn.playwright.dev），选择最快的一个
-  - 安装时按测速顺序逐个尝试，第一个成功为止，失败自动切换下一个
-  - 彻底解决 bash 环境变量传递导致 CDN URL 被截断的问题
-
-### v3.4.34 (2026-06-04)
-- **修复文件清理 API JSON 解析错误**
-  - 修复清理文件时返回大文本导致的 "Unterminated string in JSON at position 65536" 错误
-  - 优化 JSON 编码方式，使用 `json.dumps()` 配合 `ensure_ascii=False` 参数
-  - 确保中文字符正确编码，避免字符编码问题
-  - 修复的 API 路由：`/api/clean/list`、`/api/clean/group`、`/api/clean/time`、`/api/clean/all`、`/api/clean/png`、`/api/clean/media`
-  - 提升跨系统兼容性，确保所有平台（Windows/macOS/Linux）都能正常处理大文本响应
-
-### v3.4.33 (2026-06-03)
-- **代码优化和精简**
-  - 移除重复的 `from functools import wraps` 导入
-  - 优化代码结构，提高可维护性
-  - 增强跨系统兼容性测试
-
-- **跨系统支持增强**
-  - 统一环境检测类 `Environment` 提供完整的系统信息
-  - 所有文件操作使用 `os.path.join()` 确保跨平台兼容
-  - 进程管理方法统一支持 Windows/macOS/Linux
-  - 浏览器启动参数根据系统类型自动优化
-
-- **性能优化**
-  - pip镜像源智能选择，显著提升依赖安装速度
-  - Playwright CDN加速，加快浏览器下载
-  - 临时文件自动清理，避免磁盘空间占用
-
-- **稳定性改进**
-  - 统一异常处理系统，提供详细的错误信息
-  - Excel文件读取优化，解决Windows共享违规问题
-  - 隧道服务自动重启和故障恢复
-
-### v3.4.32 (2026-06-03)
-- **全面跨系统支持优化**
-  - **pip 镜像源智能轮询**: 自动测试 5 个国内镜像源（阿里云、清华、腾讯云、中科大、豆瓣），选择当前网络环境下最快的镜像源
-  - **Playwright CDN 加速**: 配置 npmmirror.com CDN 加速浏览器下载，大幅提升安装速度
-  - **统一进程管理**: 新增 `Environment.kill_process_by_name()` 和 `Environment.check_process_running()` 方法，跨系统统一进程操作
-  - **Chrome 浏览器路径优化**: Windows 使用 Playwright 内置浏览器避免权限问题，Mac/Linux 支持系统 Chrome
-  - **浏览器启动参数优化**: 根据系统类型自动配置最佳启动参数
-  - **用户代理字符串适配**: 自动适配 Windows/Mac/Linux 的 UA 字符串
-  - **跨平台路径处理**: 所有文件路径使用 `os.path.join()`，确保三平台兼容
-  - **启动脚本优化**: run.bat 和 run.sh 完全支持跨系统，自动配置镜像源和 CDN
-
-- **修复 Windows Playwright 权限问题**
-  - Windows 系统优先使用 Playwright 内置 Chromium 浏览器
-  - 避免使用系统 Chrome 导致的权限拒绝错误
-  - 自动安装 Playwright 浏览器及其依赖
-
-- **pip 镜像源速度测试**
-  - Windows: 使用 Python 测试每个镜像源响应时间，选择最快的
-  - Linux/Mac: 使用 bash 和 Python 联合测试，记录每个镜像源速度
-  - 显示测试过程和最终选择的镜像源及响应时间
-  - 修复 run.bat 中最终镜像源显示问题（使用延迟变量扩展）
-  - 优化 run.sh 镜像源测试逻辑，与 run.bat 保持一致
-
-- **临时文件自动清理**
-  - 启动脚本自动清理 temp 目录下超过 7 天的临时文件
-  - 避免临时文件占用过多磁盘空间
-  - **Playwright CDN 加速**: 配置 npmmirror.com CDN 加速浏览器下载，大幅提升安装速度
-  - **统一进程管理**: 新增 `Environment.kill_process_by_name()` 和 `Environment.check_process_running()` 方法，跨系统统一进程操作
-  - **Chrome 浏览器路径优化**: Windows 使用 Playwright 内置浏览器避免权限问题，Mac/Linux 支持系统 Chrome
-  - **浏览器启动参数优化**: 根据系统类型自动配置最佳启动参数
-  - **用户代理字符串适配**: 自动适配 Windows/Mac/Linux 的 UA 字符串
-  - **跨平台路径处理**: 所有文件路径使用 `os.path.join()`，确保三平台兼容
-  - **启动脚本优化**: run.bat 和 run.sh 完全支持跨系统，自动配置镜像源和 CDN
-
-- **修复 Windows Playwright 权限问题**
-  - Windows 系统优先使用 Playwright 内置 Chromium 浏览器
-  - 避免使用系统 Chrome 导致的权限拒绝错误
-  - 自动安装 Playwright 浏览器及其依赖
-
-- **pip 镜像源速度测试**
-  - Windows: 使用 Python 测试每个镜像源响应时间，选择最快的
-  - Linux/Mac: 使用 bash 和 Python 联合测试，记录每个镜像源速度
-  - 显示测试过程和最终选择的镜像源及响应时间
-  - 修复 run.bat 中最终镜像源显示问题（使用延迟变量扩展）
-  - 优化 run.sh 镜像源测试逻辑，与 run.bat 保持一致
-
-- **临时文件自动清理**
-  - 启动脚本自动清理 temp 目录下超过 7 天的临时文件
-  - 避免临时文件占用过多磁盘空间
-
-### v3.4.31 (2026-06-01)
-- **修复文件清理工具获取文件大小错误**
-  - 修复 `f.stat().st_size()` 调用错误，`st_size` 是属性不是方法
-  - 修复位置：main.py:988 和 main.py:1005
-  - 解决 TypeError: 'int' object is not callable 错误
-
-### v3.4.30 (2026-05-30)
-- **修复清理工具 API 空目录检测问题**
-  - 统一所有清理 API 的 `directory` 参数处理逻辑
-  - 当前端未输入目录时，自动使用项目目录作为默认值
-  - 修复清理功能显示"清理目录: "为空的问题
-
-### v3.4.29 (2026-05-30)
-- **修复 run.bat 版本号解析失败问题**
-  - 将 `python` 命令改为 `py` 命令（兼容 Windows py launcher）
-  - 添加 VERSION 未定义时的默认值 fallback
-  - 解决部分 Windows 系统上无法正确获取版本号的问题
-
-### v3.4.28 (2026-05-30)
-- **优化 Flask 404 错误处理**
-  - 添加 fallback 路由捕获所有未定义路径，返回 index.html
-  - 添加 `/favicon.ico` 专门路由，解决浏览器请求 favicon 时的 404 错误
-  - 提升单页应用体验，未定义路径不再返回 404
-
-- **修复 favicon 路由报错**
-  - 添加 `send_from_directory` 到 Flask 导入语句
-  - 解决 `NameError: name 'send_from_directory' is not defined` 错误
-
-- **优化版本号实时同步**
-  - `run.bat` 和 `run.sh` 启动时自动从 README.md 解析版本号
-  - 版本号显示与前端页面、Python 脚本保持一致
-  - 统一使用 `### vX.X.X` 格式匹配
-
-- **优化隧道邮件通知机制：冷却期补发邮件**
-  - 隧道 URL 在冷却期内变化时，记录待发送 URL
-  - 心跳检测到冷却期到期时自动补发新 URL 的邮件通知
-  - 添加 `last_email_sent_url` 和 `pending_email_url` 变量追踪邮件状态
-  - 避免因冷却期导致新 URL 未及时通知的问题
-
-### v3.4.27 (2026-05-29)
-- **修复文件清理工具"删除所有文件和文件夹"功能报错**
-  - 修复 lambda 闭包变量捕获错误导致的 `name 'f' is not defined` 错误
-  - 统一循环变量命名，避免与 lambda 默认参数冲突
-
-### v3.4.26 (2026-05-29)
-- **重构统一异常处理系统**
-  - 新增 `AppException` 基类：统一所有业务异常（file_error、network_error、auth_error、browser_error、parse_error、config_error、excel_error、email_error、permission_error、resource_error、validation_error、database_error）
-  - 新增 `ExceptionHandler` 单例：统一异常处理、错误日志记录、错误历史追踪
-  - 新增 `ExceptionContext` 上下文管理器：`with ExceptionContext('操作描述'):` 自动捕获异常
-  - 新增全局函数：`safe_call()`、`safe_call_with_error()`、`safe_execute_func()`、`safe_execute_with_error()`、`handle_exception()`
-  - 新增 `@handle_exceptions` 装饰器：自动将各类异常转换为 AppException 子类
-  - 所有内置异常（FileNotFoundError、OSError、HTTPError 等）自动转换为对应的 AppException
-
-- **增强 tunnel_status API 的 URL 验证和自动重启**
-  - `/api/tunnel/status` 增加实时 URL 可用性验证（超时5秒）
-  - URL 验证失败时自动触发重启，避免前端获取到无效地址
-  - 添加进程运行状态检测（Windows: tasklist, Linux: pgrep）
-  - 统一使用 web_url 作为返回地址，无效 URL 不再返回给前端
-  - 添加 `last_url_invalid_log_time` 避免日志刷屏（60秒间隔）
-
-### v3.4.25 (2026-05-29)
-- **彻底解决 Excel 文件读取时的 Windows 共享违规问题**
-  - 所有 Excel 读取改为"复制到临时文件再读取"方案
-  - 原文件被复制到 `temp/` 目录，读取临时文件后立即删除
-  - 彻底避免直接锁定原文件，Excel 保存时不再报共享违规
-
-### v3.4.24 (2026-05-29)
-- **修复 Excel 文件读取时的 Windows 共享违规问题**
-  - 所有 `openpyxl.load_workbook()` 改为 `read_only=True, data_only=True`
-  - 所有 `pd.ExcelFile()` 改为 `read_only=True, engine='openpyxl'`
-  - 只读模式允许多个进程同时读取同一个文件
-
-### v3.4.23 (2026-05-29)
-- **优化心跳检测间隔**
-  - 将心跳间隔从 60 秒缩短到 5 秒
-  - 提高隧道故障检测速度（最多5秒检测到故障 vs 之前60秒）
-  - 更及时同步 tunnel_url.txt
-
-### v3.4.21 (2026-05-29)
-- **确保 tunnel_url.txt 与 web_output.log 持久一致**
-  - 在 heartbeat_loop 心跳成功后，同步 tunnel_url.txt
-  - 每 60 秒检查一次并覆盖 hostc 可能写入的旧 URL
-
-### v3.4.20 (2026-05-29)
-- **优化 tunnel_url.txt 写入格式**
-  - 写入与 hostc 原格式一致的内容
-  - 包含 Public URL、Local URL 和 Tunnel 字段
-
-### v3.4.19 (2026-05-29)
-- **同步写入 tunnel_url.txt**
-  - `read_output` 获取到 URL 后，同时写入 `web_output.log` 和 `tunnel_url.txt`
-  - 保证两个文件的公网地址一致
-
-### v3.4.18 (2026-05-29)
-- **完全移除 tunnel_url 全局变量的更新逻辑**
-  - `send_heartbeat` 改为从 web_output.log 读取 URL
-  - `restart_tunnel` 不再更新 tunnel_url
-  - `heartbeat_loop` 不再更新 tunnel_url
-  - 所有模块只从 web_output.log 读取 URL
-
-### v3.4.17 (2026-05-29)
-- **统一所有模块从 web_output.log 获取公网地址**
-  - `tunnel_status` API 统一使用 web_url 返回
-  - `heartbeat_loop` 改为从 web_output.log 获取 URL
-  - 移除对 tunnel_url 全局变量的不一致更新
-
-### v3.4.16 (2026-05-29)
-- **修复变量名错误**
-  - 修复 `old_url` 未定义错误，改为 `old_tunnel_url`
-
-### v3.4.15 (2026-05-29)
-- **简化启动流程，移除冗余等待逻辑**
-  - 使用 `read_thread.join(timeout=30)` 等待 URL 获取完成
-  - 移除 while 等待循环，不再打印"等待URL..."
-  - 获取到 URL 后立即返回启动成功
-
-### v3.4.14 (2026-05-29)
-- **修改 read_output 为读取 hostc stdout 输出**
-  - 直接读取 hostc 进程的 stdout，解析 URL
-  - 获取到 URL 后直接写入 web_output.log
-  - 简化等待循环，直接从 web_output.log 检查 URL
-  - 移除对 tunnel_url.txt 的依赖
-
-### v3.4.13 (2026-05-29)
-- **完全移除 tunnel_url.txt 读取逻辑，全部从 web_output.log**
-  - read_output 线程改为直接检查 web_output.log，不再读取 tunnel_url.txt
-  - 移除所有 sync_web_output_from_tunnel_url() 调用
-  - 所有公网地址统一从 web_output.log 读取
-  - 简化代码，减少文件操作
-
-### v3.4.12 (2026-05-29)
-- **修复等待 URL 逻辑：直接检查 web_output.log**
-  - 等待循环直接检查 web_output.log 是否有 URL，而不是等待 read_output 线程
-  - read_output 获取到 URL 后直接写入 web_output.log
-  - 不再依赖 tunnel_url.txt 的同步
-
-### v3.4.11 (2026-05-29)
-- **大幅简化 tunnel 重启逻辑**
-  - 移除多处重复的重启触发逻辑，只保留 restart_tunnel 中的统一管理
-  - 简化进程清理逻辑，直接清理所有 node.exe 进程
-  - 等待 URL 逻辑简化，不频繁检查进程状态
-  - 移除 watch_tunnel_url_file 监控线程（不再需要）
-  - 统一从 web_output.log 获取 URL 状态
-  - 首次等待 30 秒，之后每次等待 60 秒（避免频繁重启）
-
-### v3.4.10 (2026-05-29)
-- **优化 hostc 进程稳定性：URL 无效时不立即重启**
-  - URL 验证失败时，给 hostc 最多 60 秒时间自行恢复
-  - URL 为空时，给 hostc 最多 60 秒时间生成 URL
-  - 避免频繁终止和启动进程导致更多问题
-  - 添加等待时间显示，避免日志刷屏
-
-### v3.4.9 (2026-05-29)
-- **统一使用 web_output.log 作为公网地址唯一来源**
-  - 移除所有 tunnel_url.txt 为空时的"清理旧进程"逻辑
-  - 所有函数都从 web_output.log 获取公网地址，不再检查 tunnel_url.txt 是否为空
-  - 简化判断逻辑：有进程运行且 URL 有效则正常，否则给更多时间或重启
-
-### v3.4.8 (2026-05-29)
-- **统一公网地址来源：全部从 web_output.log 获取**
-  - 新增 `get_public_url_from_web_log()` 方法，从 web_output.log 读取公网地址
-  - API `/api/tunnel/status` 从 web_output.log 获取公网地址，不再依赖 tunnel_url.txt
-  - 启动隧道时检测到 URL 后立即同步到 web_output.log
-  - 确保 tunnel_url.txt、web_output.log、API 三个来源完全一致
-
-### v3.4.7 (2026-05-29)
-- **修复 tunnel_url.txt 为空时误杀正在启动的 hostc 进程**
-  - 检测到 tunnel_url.txt 为空时，先检查是否有 hostc 进程在运行
-  - 如果有进程在运行，给它更多时间生成 URL，避免误杀正在启动的进程
-  - 只有当 tunnel_url.txt 为空且无 hostc 进程时才立即重启
-
-### v3.4.6 (2026-05-29)
-- **修复 tunnel_url.txt 为空时无法重启问题**
-  - auto_start_tunnel() 增加 tunnel_url.txt 为空检测
-  - 检测到为空时自动清理旧进程并启动新隧道
-  - 确保 tunnel_url.txt 为空时能正常重启
-
-### v3.4.5 (2026-05-29)
-- **修复 tunnel_url.txt 为空时重启循环问题**
-  - 循环中增加 tunnel_url.txt 为空检测，一旦为空立即触发重启
-  - 避免进程在运行但URL为空时跳过重启导致的无限循环问题
-  - 修复 restart_count 持续累加的问题
-
-### v3.4.4 (2026-05-29)
-- **优化 tunnel_url.txt 为空时的重启逻辑**
-  - 等待5秒后检测 tunnel_url.txt 是否为空
-  - 一旦检测到为空，立即重启本地服务器，不再等待20秒超时
-  - 避免不必要的等待时间，提高故障恢复速度
-
-### v3.4.3 (2026-05-29)
-- **修复 tunnel_url.txt 为空时不触发重启的问题**
-  - 当检测到 tunnel_url.txt 文件为空时，现在会正确触发自动重启
-  - 之前只清空 URL 缓存但没有触发重启，导致前端一直显示"获取中..."
-- **修复守护线程重复启动日志刷屏问题**
-  - 优化守护线程启动逻辑，避免每次 API 调用都重复打印启动日志
-  - "启动自动重启守护进程"和"启动心跳守护进程"日志现在只在真正启动时打印一次
-- **URL 无效时自动重启，不返回无效地址给前端**
-  - 当检测到 URL 验证失败（502等）时，立即触发重启并清空缓存
-  - API 只返回有效的 URL 地址，无效 URL 不再返回给前端
-  - 前端轮询直到获取到有效地址才显示
-
-### v3.4.2 (2026-05-29)
-- **前端展示URL可用性验证**
-  - API 读取 tunnel_url.txt 后验证 URL 是否真正可用（发送 HEAD 请求测试）
-  - 只展示可用的公网地址，无效 URL（502等）不再展示
-  - 检测到无效 URL 时自动触发重启，获取新的可用地址
-- **心跳检测日志优化**
-  - 移除每次心跳失败时的详细错误输出，避免日志刷屏
-  - 添加日志频率限制，每 60 秒最多打印一次同类日志
-  - 心跳恢复时输出提示信息
-
-### v3.4.1 (2026-05-29)
-- **修复 web_output.log 日志同步和完整性问题**
-  - 添加 `TeeOutput` 类实现实时日志同步：所有 print 输出同时写入控制台和 web_output.log
-  - 修改 run.bat 移除 `>` 重定向，避免文件锁定导致的权限问题
-  - 程序启动时自动初始化日志文件，记录完整启动流程
-  - 优化 `sync_web_output_from_tunnel_url()` 方法：优先修改文件中已有 URL 行，避免删除重建
-  - 三个公网地址来源完全一致：`tunnel_url.txt`、`web_output.log`、`/api/tunnel/status` API
-
-### v3.4.0 (2026-05-29)
-- **修复隧道状态显示和日志同步问题**
-  - `tunnel_url.txt` 为唯一基准：前端、API、web_output.log 都以此为准
-  - API 读取 tunnel_url.txt 时同步到 web_output.log，确保日志一致性
-  - 监控线程检测到 tunnel_url.txt 变化时自动同步到 web_output.log
-  - 启动隧道写入 tunnel_url.txt 后立即同步到 web_output.log
-  - 修复前端显示"已连接"但无公网地址的问题：只有 `running && url` 同时为真才显示已连接
-  - 修复 hostc 进程被终止后前端仍显示"已连接"的误判问题
-  - URL 无变化时不打印读取日志，避免日志刷屏
-
-### v3.3.9 (2026-05-28)
-- **修复 tunnel_url 和前端显示不一致问题**
-  - 增加备用正则表达式 `https://[a-zA-Z0-9_-]+\.hostc\.dev` 匹配 hostc 原始输出格式
-  - `/api/tunnel/status` API 优先从 `tunnel_url.txt` 读取 URL，确保前端显示一致
-  - 移除 `web_output.log` 同步逻辑（因 Flask 输出重定向导致权限冲突）
-  - 外部 hostc 进程启动时，main.py 自动复用已有 URL，不再启动新进程
-
-### v3.3.8 (2026-05-28)
-- **隧道服务日志管理优化**
-  - 新增监控线程：当 tunnel_url.txt 变化时自动记录日志
-  - 前端隧道状态轮询间隔从5秒改为2秒，更快同步URL变化
-
-### v3.3.7 (2026-05-28)
-- **修复前端JavaScript未定义函数错误**
-  - 修复 `closePanel`、`closeTunnelPanel` 函数未定义的问题
-  - 将 `closePanel` 和 `closeTunnelPanel` 函数移到script标签开头，确保函数立即可用
-  - 统一使用 `closePanel('panelId')` 方式关闭面板，移除未使用的独立函数
-  - 修复HTML文件BOM头和DOCTYPE声明问题
-
-### v3.3.6 (2026-05-28)
-- **日志管理和通知优化**
-  - Flask启动时自动清空web_output.log日志文件
-  - 进程清理增加统计信息：显示总共、成功、失败数量
-  - 邮件通知仅在URL变化时发送，复用URL时不发通知
-  - 状态API始终优先从tunnel_url.txt读取最新URL
-
-### v3.3.5 (2026-05-28)
-- **隧道服务稳定性全面优化**
-  - 启动超时从15秒增至20秒，心跳超时从10秒增至15秒
-  - 心跳间隔从30秒增至60秒，失败阈值从5次增至10次
-  - 进程检测改用wmic精确匹配hostc进程，避免误杀其他node进程
-  - URL解析增加调试信息，跳过重复URL，只使用新URL
-
-### v3.3.4 (2026-05-24)
-- **隧道日志输出优化**
-  - 修复守护线程输出缓冲导致日志延迟写入的问题
-  - 在所有守护线程关键输出位置添加 `sys.stdout.flush()` 强制刷新缓冲区
-  - 确保 hostc 重启后的公网地址立即写入 `web_output.log`
-
-### v3.3.3 (2026-05-23)
-- **隧道进程泄漏和邮件通知问题修复**
-  - 修复隧道频繁重启导致258个node.exe进程同时运行的问题
-  - 
-  - 启动新隧道前自动清理所有旧的hostc/node进程
-  - 心跳检测超时从5秒增加到10秒，失败阈值从2次提高到5次
-
-### v3.3.2 (2026-05-22)
-- **修复关闭窗口后后台进程不消失的问题**
-  - `run.sh`: 添加 `EXIT` 信号捕获，脚本退出时自动清理 Python 和 Tunnel 进程
-  - `run.bat`: 添加启动时清理旧进程 + `wait_loop` 等待循环，避免脚本提前退出
-  - Web 服务日志同时输出到控制台和 `file/web_output.log`
-
-### v3.3.1 (2026-05-22)
-- **修复 Web 界面运行爬虫时 Input/output error 问题**
-  - 子进程 stdin 改为 `DEVNULL`，避免 `input()` 调用导致 Errno 5
-  - API 路由中的 print 语句改为 safe_print，捕获 IOError 避免崩溃
-
-### v3.3.0 (2026-05-22)
-- **自动配置阿里云pip镜像加速**
-  - 安装依赖时自动检测并配置阿里云镜像源
-  - 国内用户可显著加速pip包下载
-
-### v3.2.9 (2026-05-22)
-- **隧道频繁重启和邮件发送问题修复**
-  - 修复隧道频繁重试几百次的问题，添加 URL 验证机制
-  - 复用已有 URL 前先验证其可用性（发送 HEAD 请求测试）
-  - 添加失败退避机制：连续失败 5 次后增加等待时间（最多 60 秒）
-
-### v3.2.8 (2026-05-22)
-- **Flask启动时邮件通知增强**
-  - 修复复用已有隧道时不发送邮件通知的问题
-  - 无论是新创建还是复用已有隧道，都会发送邮件通知
-
-### v3.2.7 (2026-05-22)
-- **公网地址变更邮件通知**
-  - 新增邮件通知功能，公网地址生成或变更时自动发送邮件
-  - 新增 API 接口：`/api/email/config` (GET/POST)、`/api/email/test`
-
-### v3.2.6 (2026-05-21)
-- **前端 JavaScript 优化**
-  - 移除冗余的调试 console.log 语句
-  - 简化 fetch 响应处理逻辑和按钮事件绑定代码
-
-### v3.2.5 (2026-05-21)
-- **简化启动流程**
-  - 移除隧道服务选择菜单，直接启动 hostc 隧道
-  - 启动脚本自动配置并启动 hostc 隧道，无需用户选择
-
-### v3.2.4 (2026-05-21)
-- **移除 Cloudflare Tunnel 功能**
-  - 简化隧道服务，移除 Cloudflare Tunnel 配置选项
-  - 启动脚本从 7 步简化为 5 步，删除 Cloudflare 配置检测步骤
-
-### v3.2.3 (2026-05-21)
-- **Cloudflare Tunnel 配置功能**
-  - 新增 Cloudflare Tunnel 自动配置功能，支持替代 hostc 隧道
-  - 自动检测系统已安装的 cloudflared，支持 Windows/Linux/Mac 多平台
-
-### v3.2.2 (2026-05-21)
-- **隧道自动重连死循环修复**
-  - 修复隧道心跳失败后无限重试但无法成功的问题
-  - 复用已有 URL 前先验证其可用性（发送 HEAD 请求测试）
-
-### v3.2.1 (2026-05-20)
-- **守护线程重启时保持 URL 一致**
-  - restart_tunnel() 函数优先复用 tunnel_url.txt 中的已有 URL
-  - 检测 hostc 进程状态，避免重复启动
-
-### v3.2.0 (2026-05-20)
-- **外部启动隧道监控机制**
-  - 检测到外部启动的 hostc 隧道时，自动启动心跳和自动重启守护线程
-  - 心跳检测不再依赖内部进程状态，只要有 tunnel_url 就发送心跳
-
-### v3.1.9 (2026-05-20)
-- **前端隧道共享按钮优化**
-  - 点击"隧道共享"按钮时优先复用 `tunnel_url.txt` 中的已有地址
-  - 不再重复启动 tunnel 进程，避免生成新的公网地址
-
-### v3.1.8 (2026-05-20)
-- **面板冲突问题彻底修复**
-  - 所有功能采用独立容器，彻底解决多功能并行运行时面板冲突问题
-  - 新增 6 个独立面板，每个面板有独立的关闭函数，互不干扰
-
-### v3.1.7 (2026-05-20)
-- **货号对比重复检测优化**
-  - 后端 API 新增重复货号检测逻辑
-  - API 返回结果新增 `duplicate_count` 和 `duplicates` 字段
-
-### v3.1.6 (2026-05-20)
-- **修复前端 tunnel 状态显示问题**
-  - 页面加载时自动检测外部启动的 tunnel，无需刷新即可显示公网地址
-  - 后端 `/api/tunnel/status` API 从 `tunnel_url.txt` 读取 URL
-
-### v3.1.5 (2026-05-18)
-- **隧道自动重连机制**
-  - 添加自动重连守护进程，隧道断开后自动重启
-  - 添加心跳守护线程，每 30 秒发送一次 HEAD 请求保持连接活跃
-
-### v3.1.4 (2026-05-18)
-- **run.bat 服务启动后被意外终止修复**
-  - 修复脚本在启动 Flask 和 hostc 后台服务后，继续执行到 `:cleanup_exit` 标签
-  - 在 "启动完成" 后添加 `exit /b 0`，确保脚本正常退出而不执行清理代码
-
-### v3.1.3 (2026-05-18)
-- **跨系统兼容性增强**
-  - 统一 `run.bat` 和 `run.sh` 的逻辑流程，确保功能完全一致
-  - `main.py` 启动时自动检测虚拟环境，不存在时自动创建
-
-### v3.1.2 (2026-05-18)
-- **版本号自动同步**
-  - `main.py` 自动从 `README.md` 解析最新版本号
-  - 前端页面版本号现自动跟随 `main.py` 中的 `VERSION` 变量
-
-### v3.1.1 (2026-05-18)
-- **天气时钟看板预加载优化**
-  - 移除懒加载，改为页面加载时立即预加载 iframe
-  - 公网访问时天气模块加载速度大幅提升
-
-### v3.1.0 (2026-05-18)
-- **隧道启动优化**
-  - 修复首次点击"隧道共享"按钮时公网地址不显示的问题
-  - 后端 API 等待 URL 生成后再返回（最多15秒）
-  - 修复 `run.bat` 和 `run.sh` 启动顺序问题，确保 Flask 完全启动后再启动隧道
-
-### v3.0.9 (2026-05-17)
-- **隧道共享功能优化**
-  - 移除停止隧道功能，简化隧道操作流程
-  - 隧道启动后按钮显示为"隧道运行中"并禁用，避免误操作
-  - 删除 `/api/tunnel/stop` API 端点
-
-### v3.0.8 (2026-05-17)
-- **隧道共享功能增强**
-  - 公网地址改为可点击链接，点击直接在新标签页打开
-  - 新增"复制"按钮，一键复制链接到剪贴板
-  - 复制成功显示绿色提示，2秒后自动消失
-
-### v3.0.7 (2026-05-17)
-- **隧道共享功能优化**
-  - 公网地址轮询间隔从 1000ms 缩短至 500ms，加快获取速度
-  - 最大重试次数从 15 次提升至 30 次，确保稳定获取 URL
-  - 跨平台兼容性增强，统一使用 `Environment.IS_WINDOWS` 判断系统类型
-
-### v3.0.6 (2026-05-06)
-- **天气时钟看板集成**
-  - 新增独立的"天气时钟看板"区块，使用 iframe 嵌入 `dist` 应用
-  - 实现完整的响应式高度控制：超小屏(260px) → 超大屏(560px)
-  - 导航栏新增"天气看板"快速链接
-
-### v3.0.4 (2026-05-01)
-- **移动端导航栏固定置顶优化**
-  - 修复移动端顶部内容被导航栏遮挡的问题
-  - 为所有屏幕尺寸添加顶部间距（56px），确保内容不被遮挡
-  - 调整导航栏z-index为9999，确保始终在最上层
-
-### v3.0.2 (2026-05-01)
-- **移动端响应式适配全面优化**
-  - 修复移动端输出面板覆盖整个页面的问题，改为相对定位
-  - 修复移动端统计信息显示问题，优化统计区域布局
-  - 修复移动端无法滚动的问题，优化滚动体验
-
-### v3.0.1 (2026-04-30)
-- **Excel多文件读取优化**
-  - 新增`get_all_excel_files()`方法，获取所有存在的Excel文件列表
-  - 新增`load_all_excel_data()`方法，合并所有Excel文件的货号数据
-  - 支持遍历所有配置的Excel文件，自动合并货号并去重
-
-### v3.0.0 (2026-04-30)
-- **Cookie管理优化**
-  - 修改Cookie清空逻辑：只在"更新Cookie"时清空cookie文件
-  - 统一Cookie domain格式为`.szwego.com`，解决domain不匹配问题
-  - 修复Token Cookie丢失导致爬虫无法正常工作的问题
-
-### v2.9.6 (2026-04-30)
-- **启动脚本优化**
-  - 新增虚拟环境自动检测和创建功能
-  - 自动安装requirements.txt中的依赖包
-  - 使用虚拟环境中的Python运行程序，避免模块找不到错误
-
-### v2.9.5 (2026-04-29)
-- **移动端响应式适配优化**
-  - 增强 viewport meta 配置，支持移动端缩放
-  - 禁用电话号自动识别，优化移动端显示
-  - 添加全局盒模型和字体自适应配置
-
-### v2.9.4 (2026-04-29)
-- **新增互动式货号对比功能**
-  - 点击"2. 货号对比"按钮后展开交互式输入面板
-  - 支持多种输入格式：每行一个货号、逗号分隔、混合使用
-  - 实时显示对比结果，包含统计数据和具体货号列表
-
-### v2.9.3 (2026-04-28)
-- **新增"查看所有商品"按钮**
-  - 一键查看爬取的所有商品列表
-  - 支持搜索、筛选功能
-  - 点击商品行查看详情弹窗
-
-### v2.9.2 (2026-04-29)
-- **商品列表联动滚动功能优化**：
-  - 改进同步滚动算法，找到屏幕中心最近的行进行匹配
-  - 计算目标行在屏幕中心位置的新滚动位置，而非简单使用索引
-  - 使左右两个列表能更精确地对齐，提升用户体验
-
-### v2.9.1 (2026-04-29)
-- **前端时间显示功能优化**：
-  - 修复 `innerHTML` 重复创建DOM元素的问题，改用 `textContent` 只更新文本内容
-  - 将图标 `<i class="fa fa-clock-o">` 移至静态HTML结构，只更新时间文本
-  - 减少每秒DOM重渲染开销，提升页面整体性能
-  - 优化后浏览器可释放更多资源处理图片/视频加载
-
-### v2.9.0 (2026-04-29)
-- **前端时间显示功能**：在导航栏添加实时时间显示，每秒自动更新，格式为 `YYYY-MM-DD HH:mm:ss`
-- **JavaScript代码优化**：
-  - 删除重复的函数定义（`highlightRow`、`unhighlightRow`、`scrollToSku`、`searchProductBySku`、`showProductDetail`、`closeOutputPanel`）
-  - 精简 `showAllProducts` 函数，使用内联HTML模板减少代码量
-  - 优化 `closeOutputPanel` 函数，增加 `pollingInterval` 清理逻辑
-  - 统一 `showProductDetail` 函数调用 `showProductModal` 显示商品详情
-- **版本号统一更新**：同步更新 `main.py`、`index.html` 中的版本号为 2.9.0
-- **代码质量提升**：删除约 200 行冗余代码，提高代码可维护性
-
-### v2.8.0 (2026-04-29)
-- **前端展示优化**：点击"Excel与JSON对比"按钮后，结果直接展示在前端页面上
-- **新增统计卡片**：新增商品、删除商品、新增高价商品(≥599)的统计信息
-- **列表展示优化**：
-  - 新增商品列表：绿色背景，可点击货号查看详情
-  - 新增高价商品列表：蓝色背景，可点击货号查看详情
-  - 删除商品列表：红色背景，不可点击（无法获取详情）
-- **Bug修复**：
-  - 修复新增商品显示为[object Object]的问题
-  - 修复后端返回数据类型问题，统一返回货号字符串列表
-
-### v2.7.2 (2026-04-29)
-- **修复/api/clean/list文件显示格式**：将`list_files`函数改为显示所有非排除类型的文件，支持图片、视频和其他文件分类统计，与`/api/clean/all`保持一致的显示范围
-
-### v2.7.1 (2026-04-28)
-- **文件清理功能集成**：将clean/clean.py中的文件清理功能集成到main.py中
-- **新增Web界面文件清理工具**：添加"6. 文件清理工具"选项到Web界面主菜单
-- **新增文件清理API端点**：创建/api/clean/list、/api/clean/group、/api/clean/time、/api/clean/png、/api/clean/media、/api/clean/all等API
-- **修复404路由问题**：解决文件清理功能Web界面访问时的路由未绑定问题
-- **修复日志输出捕获**：修改setup_logger函数支持自定义输出流，确保清理操作日志正确返回给前端
-- **修复文件识别问题**：删除正则表达式限制，修改为基于文件扩展名识别媒体文件
-- **代码优化**：提取全局常量消除重复代码
-  - `IMAGE_EXTENSIONS`: 图片文件扩展名集合
-  - `VIDEO_EXTENSIONS`: 视频文件扩展名集合
-  - `MEDIA_EXTENSIONS`: 媒体文件扩展名集合（图片+视频）
-  - `EXCLUDE_EXTENSIONS`: 排除的文件扩展名（.log, .sh, .py, .bat, .json, .md, .txt, .html, .htm, .sql, .xml, .yml, .yaml, .ini, .cfg, .conf）
-  - `EXCLUDE_FOLDERS`: 排除的文件夹（file, config, __pycache__, clean, .venv, templates, .git, .idea, node_modules, .vscode, static）
-  - `EXCLUDE_FILE_NAMES`: 排除的特殊文件名（.DS_Store, Thumbs.db, .gitkeep, .gitignore）
-- **安全性保障**：清理工具不会删除代码文件夹中的任何重要文件和文件夹
-- **功能测试**：所有文件清理API均已测试通过，功能正常运行
-- **提升代码健壮性**：添加浏览器路径存在性检查，确保代码在不同环境下都能正常运行
-
-### v2.7.0 (2026-04-27)
-- **修复商品详情页图片加载问题**：在`/api/product`接口中添加`import base64`语句，确保Base64编码的图片URL能正确解码为实际地址
-- **功能测试**：测试`/api/products`和`/api/product`接口，图片显示功能正常运行
-
-### v2.6.1 (2026-04-27)
-- **货号对比卡片样式优化**：将API返回的货号对比结果从简单文字列表改为美观的卡片式展示
-- **新增统计字段展示**：卡片中显示输入货号、JSON多余、JSON货号、已存在、重复序列号、高价商品(≥599)等统计数据
-- **列表展示优化**：缺失货号和JSON多余货号列表采用分栏展示，每行最多显示10个货号
-- **颜色区分**：不同统计项使用不同颜色标识（蓝色、橙色、绿色、红色）
-- **提升用户体验**：Web界面点击"货号对比"或"Excel与JSON对比"按钮时，显示美观的对比结果卡片
-
-### v2.6.0 (2026-04-26)
-- **代码合并：将server.py合并到main.py**
-  - 移除了独立的server.py文件
-  - 使用命令行参数 `--web` 启动Web服务模式
-  - 使用 `--port` 参数指定端口（默认8888）
-  - 新启动方式：`python main.py --web`
-- **UI优化：商品详情弹窗**
-  - 参考京东风格设计商品详情弹窗
-  - 支持图片点击放大查看
-  - 支持视频播放
-- **缓存优化：禁用页面缓存**
-  - 添加Cache-Control头防止浏览器缓存
-  - 确保每次获取最新代码
-
-### v2.5.23 (2026-04-25)
-- **新增本地Chrome检测**：Linux系统优先检测 `/chrome-linux64/chrome` 路径
-- **支持离线运行**：无需联网下载Chrome，可直接使用本地已有的浏览器
-- **修复Python 3.7兼容性**：将playwright版本调整为1.35.0以支持Python 3.7
-- **修复Flask缺失**：添加flask>=2.0.0到依赖列表
-- **完善依赖列表**：添加pandas>=1.3.0，整理所有第三方依赖
-- **优化价格解析**：增强parse_price方法，支持更多价格格式
-- **优化对比显示**：显示高价商品(≥599)与已存在货号的完整对比结果，包括已存在和多余的货号
-
-### v2.5.22 (2026-04-19)
-- **手续费计算优化**：移除闲鱼平台手续费60元封顶限制
-- **计算逻辑更新**：手续费直接按单机售价的1.6%计算，不再有上限
-- **提升准确性**：手续费计算更符合实际平台规则
-
-### v2.5.21 (2026-04-16)
-- **重大更新：重构数据获取逻辑**
-  - 删除了点击"f12 g9"显示详情的模拟点击代码
-  - 删除了点击锁图标解锁拿货价的模拟点击代码
-  - 直接通过API `https://www.szwego.com/album/personal/all` 获取所有商品数据
-  - 简化代码逻辑，提高运行速度（从约60秒缩短至约7秒）
-  - 获取商品数量从52个提升至68个
-  - 拿货价获取率达到97%以上
-  - 字段名称调整：`商品名称`改为`商品描述`
-- **技术改进：**
-  - 使用API分页获取完整商品列表
-  - 通过headers传递Cookie解决Playwright兼容性问题ru
-  - 优化了albumId的提取逻辑
-
-### v2.5.20 (2026-04-15)
-- **支持多平台Excel路径配置**：在config.json中配置excel_files数组，支持Windows和macOS多路径
-- **自动轮询检测**：程序自动按顺序检测每个路径，找到第一个存在的文件
-- **兼容旧版本**：保留excel_file单路径配置，优先使用excel_files数组
-- **路径展开**：支持~展开为用户主目录
-
-### v2.5.19 (2026-04-15)
-- **修复Windows浏览器检测**：使用dir+findstr替代if exist通配符，支持Windows正确检测浏览器目录
-- **优化跨平台浏览器检测**：统一Windows、macOS、Linux平台的浏览器检测逻辑
-
-### v2.5.18 (2026-04-15)
-- **优化macOS浏览器检测**：添加对 ~/Library/Caches/ms-playwright 目录的检测
-- **支持Google Chrome for Testing.app**：检测macOS特有的浏览器应用格式
-- **完善跨平台浏览器检测**：支持Linux、macOS、Windows各平台的浏览器目录
-
-### v2.5.17 (2026-04-15)
-- **新增环境检测功能**：为run.bat和run.sh脚本添加完整的环境检测系统
-- **智能Python检测**：支持检测py、python3、python命令，适配不同系统环境
-- **虚拟环境检测**：自动检测venv和.venv两种常见的虚拟环境目录
-- **依赖包检测**：检测关键依赖包（如aiohttp）是否已安装
-- **配置文件验证**：检查config/config.json是否存在
-- **阿里云镜像加速**：使用阿里云PyPI镜像源加速依赖下载，提升安装速度
-- **自动环境配置**：自动创建虚拟环境并安装所有依赖
-- **友好日志输出**：使用✓、⚠、✗符号标记不同状态，提供清晰的进度提示
-- **优化浏览器检测**：自动检测本地Playwright浏览器是否已存在，避免重复下载
-- **跳过重复下载**：检测到浏览器已存在时自动跳过，节省时间和带宽
-- **6步检测流程**：Python环境→虚拟环境→依赖包→配置文件→设置虚拟环境→运行程序
-- **跨平台支持**：sh脚本支持Linux/macOS，bat脚本支持Windows
-- **详细安装指导**：Python未安装时提供具体的安装命令和下载链接
-
-### v2.5.16 (2026-04-14)
-- **优化拿货价提取性能**：实现动态分批点击锁图标，根据锁数量自动调整每批点击次数
-- **大幅提升性能**：数据获取耗时从123秒降至34秒，性能提升约3.5倍
-- **智能批量处理**：锁≤50个时每批10个，51-100个时每批20个，101-200个时每批30个，>200个时每批40个
-- **优化并发处理**：使用asyncio.gather并发收集元素数据，ThreadPoolExecutor的max_workers从15增加到20
-- **优化代码结构**：添加print_separator辅助函数，统一分隔线打印
-- **简化代码逻辑**：移除冗余的注释和不必要的try-except块
-- **优化Cookie处理**：简化Cookie字符串拼接逻辑，使用列表推导式
-- **完善统计字段**：调整统计字段顺序，优化用户体验
-- **成功提取拿货价**：在74个商品中成功提取73个拿货价
-- **代码精炼**：减少约200行代码，提高代码质量和可维护性
-
-### v2.5.15 (2026-04-13)
-- **新增系统信息显示**：显示当前操作系统和架构信息
-- **优化浏览器路径检测**：根据系统类型选择正确的浏览器路径
-- **修复Windows浏览器检测**：使用dir+findstr替代if exist通配符，支持Windows正确检测浏览器目录
-- **优化跨平台浏览器检测**：统一Windows、macOS、Linux平台的浏览器检测逻辑
-
-### v2.5.14 (2026-04-12)
-- **优化CookieValidator类**：重构代码，将多个独立的提示方法合并为统一的`_show_prompt`方法
-- **减少代码重复**：消除重复的print语句，使用参数化的提示方法
-- **提升代码可维护性**：统一提示格式，便于后续修改和扩展
-- **优化Token查找逻辑**：使用`next()`函数替代列表推导式，提高效率
-- **简化条件判断**：优化Cookie空值检查逻辑
-- **测试验证**：完整测试所有功能，确保正常运行
-- **代码精炼**：减少约150行代码，提高代码质量
-
-### v2.5.13 (2026-04-12)
-- **新增Cookie验证功能**：添加完整的Cookie验证器类，支持7种Cookie失效场景检测
-- **友好提示系统**：为每种Cookie失效情况提供详细的友好提示信息
-- **自动Cookie状态检查**：在程序启动和运行爬虫前自动验证Cookie状态
-- **Cookie即将过期提醒**：当Cookie在7天内过期时提前提醒用户
-- **提升用户体验**：清晰的视觉层次、详细的原因分析和具体的解决方案
-- **优化主菜单逻辑**：使用Cookie验证器替代简单的文件存在检查
-- **增强错误处理**：提供更详细的错误信息和解决建议
-
-### v2.5.12 (2026-04-12)
-- **新增PathManager类**：统一管理所有跨系统路径问题
-- **消除硬编码路径**：将所有硬编码的路径替换为PathManager方法调用
-- **优化ConfigManager**：使用PathManager作为默认路径
-- **优化FileManager**：使用PathManager作为默认路径
-- **优化StockNumberComparator**：使用PathManager作为默认路径
-- **提高跨平台兼容性**：确保所有路径在不同系统下都能正常工作
-- **简化代码维护**：统一路径管理，便于后续维护和扩展
-
-### v2.5.11 (2026-04-12)
-- **修复路径错误**：修复get_today_json_files方法中的未定义变量错误
-- **修复文件路径问题**：修复analyze_data_changes方法中的路径与文件名混淆问题
-- **优化文件列表方法**：统一FileManager.list_files方法使用PathManager
-- **修复缓存文件读取**：确保缓存文件路径正确传递
-- **完善路径管理**：确保所有路径都通过PathManager统一管理
-- **提高代码稳定性**：修复所有路径相关的错误
-
-### v2.5.10 (2026-04-11)
-- **修复导入错误**：移除错误的`import current_time`导入
-- **修复Excel对比功能**：确保Excel与JSON对比功能正常运行
-- **保持空值检查**：云端版本已包含空值检查，防止价格解析错误
-- **同步云端代码**：拉取云端最新代码v2.5.9并修复导入问题
-
-### v2.5.9 (2026-04-11)
-- **优化代码逻辑**：使用列表推导式简化文件查找代码
-- **精简代码结构**：减少冗余的循环和条件判断
-- **提升代码可读性**：使代码更加简洁清晰
-
-### v2.5.8 (2026-04-11)
-- **修复excel_file为None的错误**：解决os.path.exists()的TypeError
-- **增强空值检查**：在使用excel_file前先检查是否为None
-- **提升代码健壮性**：避免空值导致的程序崩溃
-
-### v2.5.7 (2026-04-11)
-- **修复价格比较错误**：解决parse_price返回None时的TypeError
-- **增强价格验证**：确保价格有效后才进行比较
-- **提升代码健壮性**：避免空值导致的程序崩溃
-
-### v2.5.6 (2026-04-11)
-- **优化Cookie更新完成后的延迟**：减少返回主菜单的等待时间
-- **改进浏览器关闭逻辑**：使用异常处理避免阻塞
-- **优化异步函数调用**：提升响应速度
-
-### v2.5.5 (2026-04-11)
-- **移除Cookie更新后的回车确认**：简化操作流程，自动返回主菜单
-- **提升用户体验**：减少不必要的交互步骤
-
-### v2.5.4 (2026-04-11)
-- **实现真正的自动关闭浏览器**：检测到登录成功后自动关闭浏览器
-- **简化Cookie获取流程**：不再需要用户手动关闭浏览器
-- **优化登录检测**：通过检测认证Cookie判断登录状态
-- **提升用户体验**：5分钟超时保护，实时显示等待进度
-
-### v2.5.3 (2026-04-11)
-- **优化提示信息**：明确说明程序会自动关闭浏览器并更新Cookie
-- **提升用户体验**：让用户更清楚地了解自动更新流程
-
-### v2.5.2 (2026-04-11)
-- **简化Cookie更新流程**：参考v2.1.1版本，用户手动登录后关闭浏览器
-- **自动更新所有Cookie文件**：同时更新cookies.json和config.json中的Cookie
-- **移除复杂检测逻辑**：不再自动检测登录状态，由用户手动确认
-- **优化用户体验**：2分钟超时，更简洁的操作流程
-
-### v2.5.1 (2026-04-11)
-- **优化商品信息提取逻辑**：使用函数封装重复的价格和备注提取代码
-- **精简代码结构**：减少重复的条件判断和变量声明
-- **提升代码可读性**：提取内联函数使逻辑更清晰
-
-### v2.4.9 (2026-04-11)
-- **自动检测登录状态**：程序自动检测登录成功并关闭浏览器
-- **智能登录检测**：通过用户信息元素判断登录状态
-- **实时进度显示**：显示等待时间和登录状态
-- **5分钟超时保护**：避免无限等待
-
-### v2.4.8 (2026-04-11)
-- **恢复原始Cookie更新实现**：采用v2.3.0版本的可靠流程
-- **优化用户操作流程**：等待用户手动登录后关闭浏览器
-- **增强现有Cookie加载**：自动加载并应用现有Cookie
-
-### v2.4.7 (2026-04-11)
-- **新增独立Cookie自动更新功能**：无需运行爬虫即可单独更新Cookie
-- **优化浏览器启动流程**：直接访问网站获取最新Cookie
-- **增强Cookie过滤**：只保存szwego.com相关的有效Cookie
-
-### v2.4.6 (2026-04-11)
-- **完善备注提取功能**：优化备注提取逻辑，提取所有有备注的商品信息
-- **支持多种备注格式**：支持售价和员工之间的所有非价格内容作为备注
-- **提高数据完整性**：确保所有备注信息都能正确提取和保存
-- **修复备注提取遗漏**：修复"开机键有点涩"、"换外屏"等备注无法提取的问题
-
-### v2.4.5 (2026-04-11)
-- **修复备注提取错误**：修复备注信息无法正确提取的问题
-- **优化备注匹配逻辑**：支持无"备注："标签的备注信息提取
-- **提高数据完整性**：确保所有备注信息都能正确保存到JSON文件中
-- **修复iPhone 16备注**：正确提取"修过前摄像头"等备注信息
-
-### v2.4.4 (2026-04-11)
-- **修复价格提取错误**：修复误将商品名称中的数字识别为售价的问题
-- **优化价格匹配**：支持带逗号的价格格式（如¥1,199）
-- **提高准确性**：确保只提取真正的售价信息，避免误识别
-- **修复华为mate40Pro价格**：从¥11993修正为¥1,199
-
-### v2.4.3 (2026-04-11)
-- **修复价格提取错误**：修复误将商品名称中的数字识别为售价的问题
-- **优化价格验证**：添加价格范围验证（100-50000元）和位数限制（3-5位）
-- **提高准确性**：确保只提取真正的售价信息，避免误识别
-
-### v2.4.2 (2026-04-11)
-- **统一价格格式**：JSON文件中的价格累计和均价改为千分制格式
-- **格式一致性**：控制台输出和JSON文件存储使用相同的千分制格式
-- **数据可读性**：提升JSON文件中价格数据的可读性
-
-### v2.4.1 (2026-04-11)
-- **新增设备均价计算**：添加"平均每个设备售出均价"统计
-- **优化统计逻辑**：用预计售出价格累计除以商品数量计算均价
-- **完善价格显示**：设备均价采用千分制格式显示
-- **提升数据价值**：提供更直观的设备价格分析
-
-### v2.4.0 (2026-04-11)
-- **简化JSON文件布局**：移除拿货价字段，保持简洁的商品数据结构
-- **优化价格显示**：价格累计改为千分制格式（如1,000,000.00）
-- **精简统计信息**：移除设备成本累计和设备均价，保留核心统计
-- **提升性能**：移除商品点击操作，提高爬虫效率
-- **保持功能完整**：预计售出价格累计和闲鱼平台手续费累计功能正常
-
-### v2.3.7 (2026-04-11)
-- **新增商品点击功能**：点击商品元素以显示拿货价信息
-- **完善价格提取**：支持从点击后的商品元素中提取拿货价
-- **优化数据获取**：增加点击操作和等待时间，确保拿货价信息加载
-- **提升数据完整性**：确保设备成本累计和设备均价计算准确
-
-### v2.3.6 (2026-04-11)
-- **增强HTML内容搜索**：从HTML内容中搜索拿货价信息
-- **完善价格识别**：支持从element_text和html_content两个来源提取价格
-- **优化提取逻辑**：提高拿货价提取的成功率
-- **保持向后兼容**：如果没有拿货价信息，字段为空字符串
-
-### v2.3.5 (2026-04-11)
-- **增强成本价识别**：添加"原价"、"采购价"等多种成本价格式识别
-- **智能价格提取**：当有多个价格时，自动识别第二个价格为成本价
-- **完善价格提取逻辑**：提高成本价提取的成功率
-- **优化累计统计**：确保设备成本累计和设备均价计算准确
-
-### v2.3.4 (2026-04-11)
-- **新增拿货价提取**：爬虫现在会提取商品的拿货价信息
-- **修复累计统计**：修复设备成本累计和设备均价为0的问题
-- **数据完整性**：商品数据现在包含售价和拿货价信息
-- **多格式支持**：支持"拿货价"、"成本价"、"进货价"等多种格式识别
-
-### v2.3.3 (2026-04-11)
-- **新增设备均价**：添加设备均价统计，便于了解平均成本
-- **手续费计算优化**：闲鱼平台手续费按单机计算，最高60元封顶
-- **计算逻辑改进**：手续费按每个商品售价的1.6%计算，超过60元按60元计算
-- **统计精度提升**：累计统计更加准确，符合实际平台规则
-
-### v2.3.2 (2026-04-11)
-- **新增累计统计**：添加预计售出价格累计、设备成本累计、闲鱼平台手续费累计
-- **费用计算优化**：闲鱼平台手续费按售价累计的1.6%自动计算
-- **数据完整性提升**：JSON文件中包含完整的财务统计信息
-- **显示优化**：运行结果显示累计金额，便于财务分析
-
-### v2.3.1 (2026-04-11)
-- **Cookie更新优化**：保留"更新Cookie"选项，仅支持自动更新功能
-- **删除手动操作**：移除手动在浏览器获取Cookie的复杂操作
-- **简化更新流程**：Cookie更新通过运行爬虫自动完成
-- **功能说明优化**：明确说明Cookie自动更新的工作原理
-
-### v2.3.0 (2026-04-11)
-- **功能整合优化**：合并菜单选项，简化用户操作流程
-- **爬虫功能增强**：运行爬虫时自动对比当天JSON文件差异
-- **货号对比合并**：将交互式和简化版货号对比合并为统一功能
-- **Cookie自动更新**：爬虫运行时自动更新Cookie，无需手动操作
-- **菜单精简**：从6个选项减少到3个核心功能
-- **代码精炼**：删除冗余代码，净减少约170行代码
-- **提升用户体验**：简化操作流程，一键完成爬取和对比
-
-### v2.2.2 (2026-04-11)
-- **Excel对比JSON增强**：为Excel与JSON对比功能添加"小计"字段记录
-- **代码精炼优化**：重构Excel对比逻辑，使用列表推导式和集合操作简化代码
-- **新增辅助方法**：添加`_get_product_detail`、`_save_diff_log`、`_add_high_price_info_to_json`、`_add_diff_to_json_summary`方法
-- **统一数据结构**：Excel对比记录与JSON对比记录使用相同的"小计"字段结构
-- **提升代码可维护性**：将复杂逻辑拆分为独立方法，提高代码可读性和可维护性
-- **减少代码重复**：移除重复的`add_high_price_info_to_json`方法，统一使用新的私有方法
-
-### v2.2.1 (2026-04-11)
-- **自动对比功能**：爬虫运行完成后自动进行当天JSON文件对比
-- **完善"小计"字段**：确保每次运行爬虫后都会生成对比记录并保存到"小计"字段
-- **优化用户体验**：无需手动运行对比功能，自动记录商品变化
-- **提升数据完整性**：确保所有运行都有完整的对比记录
-
-### v2.2.0 (2026-04-09)
-- **性能优化**：提升并发处理能力，线程池从10增加到15个worker
-- **减少超时时间**：商品处理超时从3秒减少到2秒，加快处理速度
-- **优化元素去重**：使用元素ID进行去重，避免重复处理相同商品
-- **减少日志输出**：移除超时跳过的日志，减少控制台输出
-- **简化异常处理**：移除不必要的异常日志，提高代码简洁性
-- **修复滚动高度问题**：优化滚动逻辑，避免前几次滚动高度为0的情况
-- **提升处理效率**：通过多项优化，进一步减少总运行时间
-
-### v2.1.9 (2026-04-09)
-- **代码精炼优化**：简化弹窗关闭逻辑，移除冗余的计数器和break语句
-- **优化滚动加载逻辑**：使用for循环替代while循环，简化代码结构
-- **简化变量命名**：将scroll_config简化为config，提高代码可读性
-- **合并重复代码**：合并元素内容获取的超时处理，减少try-except嵌套
-- **优化条件表达式**：使用or运算符简化条件判断
-- **移除冗余输出**：删除重复的"等待页面完全加载"提示
-- **提升代码质量**：通过代码重构，提高可维护性和可读性
-
-### v2.1.8 (2026-04-09)
-- **优化滚动加载策略**：采用激进滚动模式，前10次滚动使用30%页面高度的增量，快速加载所有数据
-- **减少初始等待时间**：从1.5秒减少到0.8秒，加快滚动速度
-- **增加滚动尝试次数**：从20次增加到30次，确保加载所有商品
-- **放宽高度不变限制**：从5次增加到8次，避免过早停止滚动
-- **优化动态调整敏感度**：降低调整频率，避免频繁改变等待时间
-- **提升加载效率**：通过激进滚动策略，大幅减少滚动加载时间
-
-### v2.1.7 (2026-04-09)
-- **添加页面加载重试机制**：页面导航失败时自动重试3次，避免因网络波动导致卡死
-- **优化超时设置**：减少页面导航超时从60秒到30秒，快速失败并重试
-- **添加滚动操作超时保护**：为页面高度获取和滚动操作添加超时，防止卡死
-- **优化商品元素等待**：减少商品元素等待超时从30秒到15秒，并添加重试机制
-- **增强元素处理超时**：为元素文本和HTML内容获取添加2秒超时，避免单个元素卡住整个流程
-- **改进错误处理**：添加详细的错误堆栈跟踪，便于问题定位
-- **提升稳定性**：通过多重超时保护和重试机制，大幅降低爬虫卡死概率
-
-### v2.1.6 (2026-04-09)
-- **修复弹窗关闭超时问题**：为query_selector和click操作添加1秒超时，避免长时间等待
-- **添加详细的时间统计**：在爬虫运行过程中添加各阶段耗时统计，便于性能优化
-- **优化弹窗关闭逻辑**：减少弹窗关闭操作的不必要等待时间
-- **提升爬虫运行效率**：通过时间统计发现并修复弹窗关闭耗时过长的问题（从30秒减少到几秒）
-
-### v2.1.5 (2026-04-08)
-- **修复高价商品筛选逻辑**：确保high_price_stock_numbers也只包含符合3-6位数字格式的货号
-- **修复对比结果准确性**：解决Excel中存在的货号（如83878）错误地出现在"只在JSON中存在但不在Excel中"列表中的问题
-- **统一货号格式验证**：在JSON和Excel数据提取中都使用相同的正则表达式验证货号格式
-- **删除调试代码**：移除临时添加的调试信息，恢复代码简洁性
-- **提升对比准确性**：确保高价商品筛选和对比逻辑使用一致的货号集合
-
-### v2.1.4 (2026-04-08)
-- **修复货号过滤问题**：在提取货号时增加3-6位数字的格式验证，过滤掉无效货号（如"5"）
-- **修复高价商品筛选错误**：修复变量名拼写错误，确保高价商品列表正确生成
-- **修复对比结果判断**：修复result字典访问错误，正确判断数据是否有变化
-- **改进Excel数据读取**：使用严格的正则表达式匹配，确保只读取符合格式的货号
-- **提升数据准确性**：避免无效货号影响对比结果的准确性
-
-### v2.1.3 (2026-04-08)
-- **优化JSON文件对比记录机制**：将每次对比的差异按时间戳追加到"小计"字段中
-- **保留历史对比记录**：每次运行爬虫时保留现有的"小计"字段，避免历史记录丢失
-- **智能缓存管理**：缓存文件在对比后保留，用于后续对比，下次运行爬虫时自动更新
-- **多条对比记录**：支持在同一天内进行多次对比，所有记录按时间戳排序保存
-- **完整的差异追踪**：每次对比都记录新增、删除的商品货号，以及新增的高价商品
-- **改进对比提示**：显示当前共有多少条对比记录，便于用户了解数据变化历史
-
-### v2.1.2 (2026-04-08)
-- **优化JSON文件对比功能**：解决每天只有一个JSON文件无法对比的问题
-- **新增缓存文件机制**：在保存新数据前，先将旧数据保存为缓存文件（`*_cache.json`）
-- **智能文件选择**：自动选择用于对比的文件，优先级如下：
-  1. 当天的缓存文件和最新文件（对比当天不同时间的数据）
-  2. 当天的最新文件和前一天的文件（对比相邻两天的数据）
-  3. 最新的两个文件（对比历史数据）
-- **自动清理缓存**：对比完成后自动删除缓存文件，保持目录整洁
-- **改进错误提示**：当只有一个文件时，提示用户运行爬虫后再对比
-- **提升对比准确性**：确保每次对比都有有效的参考数据，避免数据覆盖导致的对比失败
-
-### v2.1.1 (2026-04-08)
-- **修复跨平台浏览器启动问题**：修复了代码中硬编码Mac系统Chrome路径的问题，现在支持Windows、Mac、Linux系统自动适配
-- **自动检测系统类型**：使用WegoScraper.get_system_info()自动检测当前系统（Windows/Linux/Mac）
-- **智能回退机制**：如果系统Chrome不存在，自动使用Playwright内置的Chromium，避免因浏览器路径不存在导致的错误
-- **删除调试代码**：移除了保存HTML文件到磁盘的调试代码，提升代码简洁性
-- **添加调试信息**：打印检测到的系统类型和使用的浏览器路径，便于问题诊断
-- **优化浏览器启动逻辑**：在主运行函数和自动获取Cookie函数中都应用了跨平台支持
-
-### v2.1.0 (2026-04-08)
-- **新增调试功能**：添加页面调试功能，保存页面HTML内容到文件
-- **新增页面信息显示**：显示页面标题和当前URL，便于诊断问题
-- **优化错误诊断**：当爬虫无法获取数据时，提供更多调试信息
-- **提升问题排查能力**：通过保存的HTML文件分析页面加载情况
-- **改进用户体验**：帮助用户快速定位爬虫失败原因
-
-### v2.0.9 (2026-04-08)
-- **新增当天JSON文件对比功能**：对比当天最新的两个JSON文件（如8点和11点生成的文件）
-- **优化差异记录方式**：将对比差异直接写入最新的JSON文件中，而不是单独的日志文件
-- **新增get_today_json_files方法**：专门用于获取当天最新的两个JSON文件
-- **新增compare_json_files方法**：实现当天JSON文件对比功能
-- **改进菜单选项**：新增"当天JSON文件对比"选项，调整菜单编号
-- **优化日志管理**：每天只有一份JSON日志，差异信息直接记录在最新的JSON文件中
-- **提升数据追踪效率**：快速了解当天不同时间点的数据变化
-
-### v2.0.8 (2026-04-08)
-- **修复跨平台浏览器启动问题**：为不同操作系统分别设置Chrome浏览器路径
-- **新增Windows系统支持**：添加Windows系统Chrome路径配置（C:\Program Files\Google\Chrome\Application\chrome.exe）
-- **新增Linux系统支持**：添加Linux系统Chrome路径配置（/usr/bin/google-chrome）
-- **保留Mac系统支持**：保持Mac系统Chrome路径配置（/Applications/Google Chrome.app/Contents/MacOS/Google Chrome）
-- **优化浏览器启动逻辑**：根据操作系统自动选择合适的Chrome浏览器路径
-- **提升跨平台兼容性**：确保在Windows、Mac、Linux系统上都能正常启动浏览器
-
-### v2.0.7 (2026-04-07)
-- **优化高价商品筛选**：使用列表推导式简化代码
-- **修复浏览器启动**：使用本地Chrome替代Playwright自带浏览器
-
-### v2.0.6 (2026-04-07)
-- **优化数据变化分析**：新增删除商品详细信息，格式化为JSON数组
-- **代码精简**：使用列表推导式和内联函数优化代码逻辑
-
-### v2.0.5 (2026-04-06)
-- **更新Cookie过期时间**：自动更新Cookie的过期时间
-
-### v2.0.4 (2026-04-06)
-- **新增Cookie自动更新功能**：支持自动获取和手动粘贴两种方式更新Cookie
-- **优化Excel文件检查**：文件不存在时不再报错，优雅降级
-- **优化主菜单代码**：使用字典映射简化条件分支
-- **优化货号对比工具**：文件不存在时返回None而不是报错
-
-### v2.0.3 (2026-04-04)
-- **代码重构和优化**：提取价格解析逻辑为独立方法parse_price，提高代码复用性
-- **新增筛选方法**：创建filter_high_price_products方法，专门用于筛选高价商品
-- **新增分析方法**：创建analyze_data_changes方法，专门用于分析数据变化
-- **优化代码结构**：将复杂逻辑拆分为独立方法，提高代码可读性和可维护性
-- **减少重复代码**：统一价格解析逻辑，避免代码重复
-- **提升代码质量**：遵循单一职责原则，每个方法只负责一个功能
-
-### v2.0.2 (2026-04-04)
-- **新增高价商品信息写入JSON功能**：将"只在JSON中存在但不在Excel中的售价>=599的货号"这类数据写入对应的JSON文件中
-- **自动添加高价商品备注**：为高价商品自动添加"高价商品(≥599) - 只在JSON中存在但不在Excel中"的备注信息
-- **更新统计信息**：在JSON文件中添加高价商品数量、货号列表和描述信息
-- **提升数据完整性**：确保高价商品信息在原始JSON文件中得到完整记录
-
-### v2.0.1 (2026-04-04)
-- **优化高价商品筛选逻辑**：现在只显示在JSON中存在但不在Excel中的售价>=599的设备
-- **精确筛选机制**：通过集合运算筛选出真正需要关注的商品
-- **改进显示文本**：统计信息显示"只在JSON中存在但不在Excel中的售价>=599货号数"
-- **优化货号列表显示**：显示"只在JSON中存在但不在Excel中的售价>=599的货号"列表
-- **提升实用性**：帮助用户快速识别需要录入Excel的高价商品，便于库存管理
-
-### v2.0.0 (2026-04-04)
-- **新增货号对比高价商品筛选功能**：在货号对比结果中自动筛选出售价>=599的商品货号
-- **新增高价商品货号显示**：在"JSON中多余的货号"之后显示"售价>=599的货号"列表
-- **新增高价商品统计**：在对比结果统计中显示"售价>=599货号数"
-- **优化compare_stock_numbers函数**：支持传入高价商品货号列表，自动统计高价商品数量
-- **优化compare_excel_with_json函数**：在对比前自动筛选出JSON中售价>=599的商品货号
-- **优化print_comparison_result函数**：在控制台输出中显示高价商品货号列表和统计信息
-- **提升数据价值**：帮助用户快速识别高价商品，便于库存管理和销售分析
-- **删除临时文档**：删除OPTIMIZATION_SUMMARY.md、OPTIMIZATION.md、TESTING.md等临时文档
-
-### v1.9.0 (2026-04-04)
-- **添加高价商品筛选功能**：自动筛选出售价>=599的商品
-- **新增高价商品统计字段**：在JSON文件中添加"高价商品统计"字段
-- **统计信息包含**：
-  - 筛选条件：售价 >= 599
-  - 数量：符合条件商品的总数
-  - 商品列表：所有符合条件的商品详情
-- **控制台输出**：运行时显示"售价 >= 599 的商品: X 个"
-- **数据持久化**：高价商品列表自动保存到JSON文件中
-- **删除临时脚本**：移除check_high_price.py，逻辑集成到main.py中
-
-### v1.8.0 (2026-04-04)
-- **添加运行时间显示**：在程序启动和结束时显示时间，让用户了解程序运行状态
-- **动态调整滚动参数**：根据页面加载速度自动调整等待时间
-- **新增dynamic_adjust配置项**：启用/禁用动态调整功能（默认启用）
-- **显示滚动进度百分比**：实时显示滚动进度（例如：5/20 (25%)）
-- **显示加载耗时**：每次滚动显示页面加载耗时，便于诊断问题
-- **智能调整策略**：
-  - 页面加载较慢（高度变化<100px）：增加等待时间（最多3秒）
-  - 页面加载较快（高度变化>500px）：减少等待时间（最少0.5秒）
-- **更新启动脚本**：run.bat和run.sh也显示开始和结束时间
-- **提升用户体验**：让用户清楚看到程序正在运行，避免误以为是假程序
-
-### v1.7.0 (2026-04-04)
-- **滚动参数可配置化**：将滚动相关参数移至config.json，支持根据不同网站调整
-- **新增scroll_config配置项**：
-  - max_attempts：最大滚动次数（默认20次）
-  - same_height_limit：高度不变限制（默认5次）
-  - scroll_wait_time：滚动等待时间（默认1.5秒）
-  - popup_close_interval：弹窗关闭间隔（默认5次）
-  - popup_close_limit：弹窗关闭限制（默认3个）
-  - popup_close_wait：弹窗关闭等待时间（默认0.3秒）
-- **优化close_popups函数**：支持自定义关闭限制和等待时间
-- **显示滚动配置信息**：启动时显示当前滚动配置参数
-- **提升灵活性**：用户可根据目标网站特点调整滚动策略
-
-### v1.6.2 (2026-04-04)
-- **修复页面加载死机问题**：将wait_until从networkidle改为domcontentloaded，避免无限等待
-- **优化页面加载超时**：从120秒减少到60秒，更快失败并提示用户
-- **减少等待时间**：优化页面加载后的等待时间，提升响应速度
-- **添加加载状态提示**：显示"页面DOM已加载"等状态信息
-- **改进错误处理**：即使页面导航出错也会尝试继续执行
-
-### v1.6.1 (2026-04-04)
-- **修复滚动死循环问题**：优化弹窗关闭逻辑，避免频繁操作导致页面重新加载
-- **优化滚动参数**：调整滚动次数和等待时间，提升加载效率
-- **减少弹窗操作频率**：从每次滚动都关闭弹窗改为每5次关闭一次
-- **添加未找到商品警告**：当页面未找到商品项时提示用户检查URL和Cookie
-- **优化页面加载时间**：减少不必要的等待时间，提升响应速度
-- **限制弹窗关闭次数**：每次最多关闭3个弹窗，避免过度操作
-
-### v1.6.0 (2026-04-04)
-- **主菜单添加循环**：选择功能后可继续操作，无需重新启动程序
-- **添加配置文件检查**：启动时检查config.json和cookies.json是否存在，提前发现问题
-- **修复空的异常处理**：将空的except块改为except Exception，避免隐藏错误
-- **Cookie更新菜单添加循环**：可连续执行Cookie更新操作
-- **优化run.bat**：添加虚拟环境检查、自动创建、依赖安装和配置文件检查
-- **优化run.sh**：添加Python版本检查、虚拟环境自动创建和配置文件检查
-- **添加run_scraper函数**：封装爬虫运行逻辑，统一错误处理
-- **提升用户体验**：无效选项时提示用户按回车继续，而不是直接退出
-
-### v1.5.0 (2026-04-04)
-- **优化页面加载逻辑**：移除不必要的页面重新加载，减少等待时间
-- **提升运行效率**：页面首次加载后直接开始滚动，无需额外等待
-- **优化等待时间**：将等待时间从20秒减少到8秒（3+5秒）
-- **改善用户体验**：页面加载后立即开始工作，响应更快
-
-### v1.4.2 (2026-04-04)
-- **优化商品去重逻辑**：支持无货号商品的提取和去重
-- **智能去重策略**：有货号时使用货号去重，无货号时使用商品名称去重
-- **确保数据完整性**：不再跳过无货号的商品，确保获取所有商品数据
-- **测试验证**：通过测试验证商品提取功能，支持各种商品格式
-- **跨系统兼容性**：通过完整测试，确保Windows/Linux/macOS系统均可使用
-- **新增requirements.txt**：添加依赖库列表，便于环境搭建
-- **更新版本号**：版本号更新至1.4.2
-
-### v1.4.1 (2026-04-04)
-- **优化登录等待逻辑**：移除手动确认登录状态的步骤，程序自动继续运行
-- **提升自动化程度**：加载Cookie后直接访问页面，无需等待用户按回车键
-- **简化操作流程**：减少人工干预，提高爬虫运行效率
-- **优化页面加载**：直接重新加载页面并开始滚动，无需等待60秒
-
-### v1.4.0 (2026-04-04)
-- **扩展商品数据字段**：从5个字段扩展到20个完整字段，包含所有商品信息
-  - 商品图片、商品名称/描述、售价、货号、商品Id、标签
-  - 来源(仅自己可见)、商品简称、商品规格、颜色、规格编码
-  - 批发价、打包价、代发价、拿货价(仅自己可见)
-  - 活动类型、活动价、库存、重量(kg)、备注(公开)、搜索码
-- **优化数据提取规则**：即使货号为空也会提取商品数据，不再跳过无货号的商品
-- **字段名称中文化**：所有字段名称改为中文，与Excel格式保持一致
-- **更新代码兼容性**：更新所有使用商品字段的代码，适配新的字段结构
-- **完善数据结构**：支持更完整的商品信息存储，便于后期数据分析和处理
-
-### v1.3.4 (2026-04-04)
-- **新增数据变化描述**：在差异日志JSON文件中添加 `data_change` 字段，显示"数据无变化"或"数据有变化"的详细信息
-- **优化字段说明**：在comparison对象中添加描述字段，解释各字段含义
-  - `missing_description`: 微购相册比本地表格多出的序列号仅供参考
-  - `existing_description`: 本地表格比微购相册上多的序列号，请仔细核对后删除多出的地方
-  - `extra_in_json_description`: 微购相册比本地表格多出的序列号
-- **完善日志信息**：JSON日志文件现在包含完整的对比结果描述和字段说明
-
-### v1.3.3 (2026-04-04)
-- **新增对比结果消息**：在差异日志JSON文件中添加 `result_message` 字段
-- **优化结果展示**：自动生成对比结果消息（成功/部分成功/失败）
-- **改进代码结构**：提取 `get_result_message` 方法，统一处理结果消息生成
-- **完善日志信息**：JSON日志文件现在包含完整的对比结果描述
-
-### v1.3.2 (2026-04-04)
-- **修复JSON数据解析错误**：修复Excel与JSON对比功能中无法正确解析JSON数据的问题
-- **优化数据提取逻辑**：自动识别JSON文件中的"商品列表"字段，正确提取商品数据
-- **改进错误处理**：增强对JSON文件结构的兼容性，支持不同的数据格式
-
-### v1.3.1 (2026-04-04)
-- **新增JSON多余货号显示**：对比结果新增"在JSON中有但在Excel中没有"的货号列表
-- **优化对比结果展示**：在控制台和日志文件中显示JSON中多余的货号
-- **完善对比统计**：新增`extra_in_json_count`字段，统计JSON中多余货号数量
-- **改进显示逻辑**：优化"所有货号都已存在"的提示信息，改为"所有输入货号都已存在"
-
-### v1.3.0 (2026-04-04)
-- **新增Excel与JSON自动对比功能**：自动对比Excel和最新JSON文件的数据
-- **自动差异日志**：对比结果保存到按日期命名的日志文件，支持追加模式
-- **精确时间戳**：每次对比记录精确时间，自动查找最新JSON文件
-- **智能文件查找**：基于修改时间自动查找最新的微购相册JSON文件
-- **结构化日志**：JSON格式日志，包含时间戳、日期、文件名和对比结果
-- **数据变化跟踪**：记录数据变化情况，便于库存管理
-- **历史记录**：保存历史对比记录，支持数据追溯和分析
-
-### v1.2.0 (2026-04-04)
-- **新增Excel文件支持**：直接读取Excel文件中的货号数据
-- **智能工作表识别**：自动查找指定工作表（如"闲鱼"）
-- **精确列读取**：支持读取指定列的数据（如E列）
-- **保留前导0**：自动保留0开头的序列号（如08544保持原样）
-- **自动去重**：自动去除重复的序列号，避免重复计算
-- **优化读取逻辑**：支持多种Excel格式（.xlsx和.xls）
-- **提升兼容性**：与现有货号对比功能无缝集成
-
-### v1.1.0 (2026-04-04)
-- **新增货号对比功能**：支持货号对比，帮助用户检查库存
-- **交互式模式**：提供交互式输入方式，支持多种输入格式
-- **简化版模式**：提供简化版，直接从文件读取并对比
-- **自动检测重复**：自动检测重复的序列号并提示
-- **详细结果展示**：显示已存在、缺失、重复的货号列表
-- **JSON日志记录**：自动记录对比结果到JSON文件
-- **文件读取支持**：支持从文件读取货号列表
-- **文件保存支持**：支持将输入的货号保存到文件
-
-### v1.0.0 (2026-04-04)
-- **初始版本发布**
-- **跨系统支持**：支持Windows、Mac、Linux系统
-- **自动登录**：支持Cookie保存和加载，自动登录
-- **智能滚动**：自动滚动加载所有商品
-- **并发处理**：使用ThreadPoolExecutor并发处理商品
-- **数据提取**：自动提取商品信息（名称、价格、货号、备注、员工）
-- **反爬虫检测**：具备反爬虫检测和规避能力
-- **错误处理**：完善的异常处理机制
-- **配置管理**：支持配置文件管理（config.json）
-- **Cookie管理**：支持Cookie更新功能
+**更多示例请查看 [skill.md](skill.md) 第七章**
+
+---
+
+## 📊 性能指标
+
+### 爬虫性能
+- **并发数**: 可配置（默认5）
+- **滚动策略**: 智能滚动，动态延迟
+- **超时设置**: 30秒（可配置）
+- **内存占用**: < 200MB（正常运行）
+
+### 隧道服务
+- **健康检查间隔**: 300秒（5分钟）
+- **最大重试次数**: 3次
+- **URL去重窗口**: 30分钟
+- **自动重启**: 支持
+
+### 邮件通知
+- **发送队列**: 异步队列，不阻塞主线程
+- **重试机制**: 3次重试，指数退避
+- **频率限制**: 同一URL 30分钟内仅发1次
+
+---
+
+## 🐛 故障排查
+
+### 常见问题
+
+**Q1: 启动时报 IndentationError**
+```
+原因：Python缩进错误（多了/少了空格）
+解决：检查 main.py 对应行数的缩进，确保为4的倍数
+工具：使用 autopep8 或 black 自动格式化
+```
+
+**Q2: 隧道URL无法访问**
+```
+1. 检查进程：ps aux | grep hostc (Linux) 或 tasklist | findstr hostc (Windows)
+2. 测试连通性：curl http://localhost:4040/api/tunnels
+3. 查看日志：tail -f file/web_output.log
+4. 手动重启：访问 /api/tunnel/restart
+```
+
+**Q3: 邮件收不到**
+```
+1. 检查授权码是否正确（非QQ密码）
+2. 确认SMTP服务已开启
+3. 测试端口连通性：telnet smtp.qq.com 465
+4. 检查垃圾邮件箱
+```
+
+**Q4: 依赖安装失败**
+```
+1. 切换镜像源：pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+2. 升级pip：python -m pip install --upgrade pip
+3. 清除缓存：pip cache purge
+4. 使用虚拟环境：python -m venv .venv && .venv\Scripts\activate
+```
+
+**完整FAQ请查看 [skill.md](skill.md) 附录C**
+
+---
+
+## 📈 更新日志
+
+### v3.8.10 (2026-07-05) - 🔧 关键修复
+- **修复致命错误**: 缩进错误导致服务完全无法启动（第6433行）
+- **影响范围**: 仅影响 auto_start_tunnel() 函数内的URL验证逻辑
+- **修复方案**: 修正缩进从29个空格改为28个空格（符合PEP 8标准）
+- **预防措施**: 
+  - IDE显示空白字符
+  - 启动前执行 python -m py_compile main.py
+  - CI/CD集成 flake8 --select=E999 检查
+
+### v3.8.9 (2026-07-05) - 🔒 强制URL去重
+- **新增功能**: 同一地址30分钟内只发1次邮件
+- **优化项**: 避免邮件轰炸，提升用户体验
+
+### v3.8.8 (2026-07-05) - 🚀 零延迟通知
+- **性能优化**: 公网地址可用即自动发邮件
+- **响应速度**: 从轮询检测改为事件驱动
+
+### v3.8.7 (2026-07-05) - 🔒 线程安全
+- **核心修复**: URL去重机制的并发竞态条件
+- **技术方案**: 引入线程锁（threading.Lock）
+
+### v3.8.5 (2026-07-04) - 🌐 隧道优化
+- **Hostc集成**: 智能URL读取与切换
+- **邮件增强**: 多条件触发机制
+- **稳定性提升**: 自动故障恢复
+
+**历史版本更新请查看 [skill.md](skill.md) 最新更新章节**
+
+---
+
+## 📝 代码规范文档
+
+本项目有详细的代码规范文档：
+
+- **[skill.md](skill.md)**: Markdown格式，包含完整的编码规范、API文档、二开模版
+- **[skill.docx](skill.docx)**: Word格式，适合打印和离线阅读
+
+### 主要内容
+
+1. **项目结构规范** - 目录组织、核心原则
+2. **后端Python规范** - 异常体系、装饰器、工具类、API路由
+3. **前端规范** - 技术栈、API调用、响应式设计、按钮状态管理
+4. **启动脚本规范** - 六步启动流程、跨平台实现
+5. **配置文件规范** - JSON结构、模板机制
+6. **隧道与公网访问** - Hostc集成、邮件通知
+7. **二开模版示例** - 5个典型场景的完整代码示例
+8. **编码风格速查** - 快速参考表
+
+---
+
+## 👥 贡献指南
+
+### 提交代码规范
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 遵循 [skill.md](skill.md) 中的编码规范
+4. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+5. 推送到分支 (`git push origin feature/AmazingFeature`)
+6. 开启 Pull Request
+
+### 代码质量要求
+
+- ✅ 使用 `AppException` 抛出业务异常
+- ✅ 使用 `@exception_handler` 装饰器处理异常
+- ✅ 使用 `safe_call()` 进行安全调用
+- ✅ 遵循 PEP 8 编码风格
+- ✅ 添加必要的注释和文档字符串
+- ✅ 确保跨平台兼容性（Windows/Linux/Mac）
+
+---
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
+
+---
+
+## 📞 技术支持
+
+- **问题反馈**: 请提交 Issue
+- **功能建议**: 欢迎 Pull Request
+- **技术咨询**: 查看文档或联系维护者
+
+---
+
+## 🙏 致谢
+
+- **Playwright** - 强大的浏览器自动化框架
+- **Flask** - 轻量级Web框架
+- **ECharts** - 数据可视化库
+- **Hostc** - 公网隧道服务
+
+---
+
+> **最后更新**: 2026-07-05
+> **文档版本**: v3.8.10
+> **维护者**: xy_ws 开发团队

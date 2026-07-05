@@ -1936,26 +1936,57 @@ class EmailNotifier:
             msg = MIMEMultipart('alternative')
             msg['From'] = f"{Header(config['from_name'], 'utf-8').encode()} <{config['smtp_user']}>"
             msg['To'] = config['to_email']
-            msg['Subject'] = Header(f'【{"新" if event_type == "new" else "更新"}公网地址】{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 'utf-8')
+            event_titles = {
+                'new': '新公网地址',
+                'available': '公网地址可用',
+                'update': '公网地址已更新',
+                'stable_available': '✅ 公网地址已稳定可用'
+            }
+            event_title = event_titles.get(event_type, f'{"新" if event_type == "new" else ""}公网地址')
+            
+            msg['Subject'] = Header(f'【{event_title}】{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 'utf-8')
             
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            body = f"""公网地址已{"生成" if event_type == "new" else "更新"}
+            status_note = ""
+            html_status_note = ""
+            
+            if event_type == 'stable_available':
+                import time as _time
+                global stable_url_confirm_count, url_first_seen_time, stable_url_min_confirms
+                verify_duration = int(_time.time() - url_first_seen_time) if url_first_seen_time > 0 else 0
+                status_note = f"""
+✅ 稳定性验证：已连续通过 {stable_url_min_confirms} 次验证
+📊 验证耗时：{verify_duration} 秒
+🎯 状态：确认稳定可用，可放心使用
+
+"""
+                html_status_note = f'''
+<table style="background-color: #e8f5e9; padding: 10px; border-radius: 5px; margin: 10px 0;">
+<tr><td colspan="2" style="color: #2e7d32; font-weight: bold;">✅ 稳定性验证通过</td></tr>
+<tr><td><b>验证次数:</b></td><td>{stable_url_min_confirms} 次连续通过</td></tr>
+<tr><td><b>验证耗时:</b></td><td>{verify_duration} 秒</td></tr>
+<tr><td><b>当前状态:</b></td><td style="color: #2e7d32; font-weight: bold;">🎯 确认稳定可用</td></tr>
+</table>
+'''
+            
+            body = f"""{event_title}
 
 时间: {current_time}
 公网地址: {tunnel_url}
-
+{status_note}
 请妥善保管此地址。
 """
             
             html_body = f"""
 <html>
 <body>
-<h2>{"新公网地址已生成" if event_type == "new" else "公网地址已更新"}</h2>
+<h2>{event_title}</h2>
 <table>
 <tr><td><b>时间:</b></td><td>{current_time}</td></tr>
-<tr><td><b>公网地址:</b></td><td><a href="{tunnel_url}">{tunnel_url}</a></td></tr>
+<tr><td><b>公网地址:</b></td><td><a href="{tunnel_url}" target="_blank">{tunnel_url}</a></td></tr>
 </table>
+{html_status_note}
 <p>请妥善保管此地址。</p>
 </body>
 </html>
@@ -5934,6 +5965,12 @@ if __name__ == '__main__':
         pending_email_url = None
         email_send_lock = threading.Lock()
         
+        stable_url = None
+        stable_url_confirm_count = 0
+        stable_url_min_confirms = 3  # 需要连续3次验证通过才认为稳定
+        url_first_seen_time = 0
+        last_stable_notification_time = 0
+        
         def send_tunnel_notification(new_url, event_type='new', force_send=False):
             global last_email_sent_time, email_fail_count, last_email_sent_url, pending_email_url
             
@@ -6084,24 +6121,31 @@ if __name__ == '__main__':
                 print(f"[{current_time_str}] [Email] ⏳ 待发邮件等待冷却中...")
                 print(f"[{current_time_str}] [Email] 剩余冷却时间: {remaining_cooldown}秒")
         
-        def verify_url(url, timeout=5, verbose=False):
-            try:
-                import ssl
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                
-                req = urllib.request.Request(url, method='HEAD')
-                req.add_header('User-Agent', 'hostc-verify/1.0')
-                
-                response = urllib.request.urlopen(req, timeout=timeout, context=ctx)
-                if response.status in [200, 301, 302, 307, 308]:
-                    return True
-                return False
-            except Exception as e:
-                if verbose:
-                    print(f"[Email] URL验证失败: {url} - {str(e)[:100]}")
-                return False
+        def verify_url(url, timeout=10, verbose=False, max_retries=3):
+            import time as _time
+            for attempt in range(max_retries):
+                try:
+                    import ssl
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+                    
+                    req = urllib.request.Request(url, method='HEAD')
+                    req.add_header('User-Agent', 'hostc-verify/1.0')
+                    
+                    response = urllib.request.urlopen(req, timeout=timeout, context=ctx)
+                    if response.status in [200, 301, 302, 307, 308]:
+                        if verbose and attempt > 0:
+                            print(f"[Email] ✅ URL验证成功 (第{attempt+1}次尝试): {url}")
+                        return True
+                    return False
+                except Exception as e:
+                    if verbose:
+                        print(f"[Email] URL验证失败 (第{attempt+1}/{max_retries}次): {url} - {str(e)[:100]}")
+                    if attempt < max_retries - 1:
+                        _time.sleep(2)
+                    continue
+            return False
         
         def send_heartbeat():
             global tunnel_last_heartbeat, tunnel_heartbeat_failed
@@ -6122,6 +6166,7 @@ if __name__ == '__main__':
         
         def heartbeat_loop():
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
+            global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time
             consecutive_failures = 0
             max_consecutive_failures = 5  # 连续失败5次才标记需要重启
             url_verify_failures = 0  # URL验证连续失败计数
@@ -6149,8 +6194,46 @@ if __name__ == '__main__':
                             if verify_url(web_url, timeout=10):
                                 is_tunnel_running = True
                                 url_verify_failures = 0  # 验证成功，重置计数
+                                
+                                # 精准稳定性检测：跟踪URL是否真正稳定
+                                if web_url != stable_url:
+                                    # 新URL出现，开始计数
+                                    if stable_url_confirm_count == 0 or web_url != stable_url:
+                                        # 完全新的URL或URL变化了
+                                        stable_url = web_url
+                                        stable_url_confirm_count = 1
+                                        url_first_seen_time = time.time()
+                                        print(f"[Tunnel] 🔍 检测到新URL，开始稳定性验证 (1/{stable_url_min_confirms}): {web_url}")
+                                    else:
+                                        # 同一URL继续验证
+                                        stable_url_confirm_count += 1
+                                        print(f"[Tunnel] ✅ URL稳定性验证 ({stable_url_confirm_count}/{stable_url_min_confirms}): {web_url}")
+                                        
+                                        # 达到稳定阈值，发送精准邮件通知
+                                        if stable_url_confirm_count >= stable_url_min_confirms:
+                                            time_since_first_seen = int(time.time() - url_first_seen_time)
+                                            print(f"[Tunnel] 🎯 URL已确认为稳定！持续验证{stable_url_confirm_count}次，耗时{time_since_first_seen}秒")
+                                            print(f"[Tunnel] 📧 发送精准邮件通知...")
+                                            send_tunnel_notification(web_url, 'stable_available', force_send=True)
+                                            last_stable_notification_time = time.time()
+                                            last_email_sent_url = web_url
+                                else:
+                                    # URL已经是稳定的，保持计数
+                                    if stable_url_confirm_count < stable_url_min_confirms:
+                                        stable_url_confirm_count += 1
+                                        if stable_url_confirm_count >= stable_url_min_confirms:
+                                            print(f"[Tunnel] 🎯 稳定URL确认完成 ({stable_url_confirm_count}/{stable_url_min_confirms})")
+                                            send_tunnel_notification(web_url, 'stable_available', force_send=True)
+                                            last_stable_notification_time = time.time()
+                                            last_email_sent_url = web_url
                             else:
                                 url_verify_failures += 1
+                                # URL验证失败，重置稳定性计数
+                                if stable_url_confirm_count > 0:
+                                    print(f"[Tunnel] ⚠️ URL验证失败，重置稳定性计数 ({stable_url_confirm_count} -> 0): {web_url}")
+                                    stable_url_confirm_count = 0
+                                    stable_url = None
+                                
                                 if time.time() - last_log_time > 120:  # 2分钟才打印一次日志
                                     print(f"[Tunnel] URL不可用 ({url_verify_failures}/{max_url_verify_failures}): {web_url}")
                                     last_log_time = time.time()
@@ -6160,6 +6243,11 @@ if __name__ == '__main__':
                                     tunnel_need_restart = True
                         except Exception as e:
                             url_verify_failures += 1
+                            # 异常也重置稳定性计数
+                            if stable_url_confirm_count > 0:
+                                stable_url_confirm_count = 0
+                                stable_url = None
+                            
                             if time.time() - last_log_time > 120:
                                 print(f"[Tunnel] URL验证异常: {e}")
                                 last_log_time = time.time()
@@ -6430,12 +6518,14 @@ if __name__ == '__main__':
                                 print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
                                 sys.stdout.flush()
                             
-                            print(f"[Tunnel] 🔍 验证新URL可用性: {new_url}")
-                            if verify_url(new_url, timeout=5, verbose=True):
-                                print(f"[Tunnel] ✅ 新URL验证通过，立即发送邮件通知...")
-                                send_tunnel_notification(new_url, 'available', force_send=True)
-                            else:
-                                print(f"[Tunnel] ⚠️ 新URL验证未通过，稍后重试发送邮件")
+                            print(f"[Tunnel] 🔍 获取到新URL: {new_url}")
+                            print(f"[Tunnel] ⏳ 等待心跳检测确认稳定性（需要连续{stable_url_min_confirms}次验证通过）...")
+                            
+                            # 重置稳定性检测状态，让心跳机制处理
+                            global stable_url, stable_url_confirm_count, url_first_seen_time
+                            stable_url = None
+                            stable_url_confirm_count = 0
+                            url_first_seen_time = time.time()
                             
                             tunnel_last_error = None
                             tunnel_need_restart = False
@@ -6460,18 +6550,65 @@ if __name__ == '__main__':
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, tunnel_consecutive_failures
+            global stable_url, stable_url_confirm_count, url_first_seen_time
 
             tunnel_need_restart = False
             tunnel_consecutive_failures = 0
             
+            # 重置稳定性检测状态，确保从头开始验证
+            old_stable_url = stable_url
+            stable_url = None
+            stable_url_confirm_count = 0
+            url_first_seen_time = time.time()
+            
+            print(f"[Tunnel/API] 🚀 收到手动启动请求")
+            print(f"[Tunnel/API] 📊 重置稳定性检测 (旧URL: {old_stable_url})")
+            
             if tunnel_process and tunnel_process.poll() is None:
-                return jsonify({'success': True, 'url': tunnel_url, 'message': '隧道已在运行'})
+                return jsonify({
+                    'success': True,
+                    'url': tunnel_url,
+                    'message': '隧道已在运行',
+                    'status': 'running',
+                    'stable_confirmed': stable_url == tunnel_url and stable_url_confirm_count >= stable_url_min_confirms
+                })
 
-            result = auto_start_tunnel()
+            result = auto_start_tunnel(force_restart=True)
             if result['success']:
-                return jsonify(result)
+                new_url = result.get('url')
+                response_data = {
+                    'success': True,
+                    'url': new_url,
+                    'message': f'隧道已启动，正在验证稳定性 ({stable_url_min_confirms}次连续验证)',
+                    'status': 'verifying',
+                    'verify_progress': {
+                        'current': 0,
+                        'required': stable_url_min_confirms,
+                        'estimated_time_seconds': stable_url_min_confirms * 60  # 每次心跳约60秒
+                    },
+                    'next_notification': '等待稳定性确认后自动发送邮件通知'
+                }
+                
+                if new_url:
+                    print(f"[Tunnel/API] ✅ 隧道启动成功: {new_url}")
+                    print(f"[Tunnel/API] ⏳ 进入稳定性验证模式 (需要{stable_url_min_confirms}次通过)")
+                    print(f"[Tunnel/API] 📧 邮件将在验证通过后自动发送")
+                else:
+                    print(f"[Tunnel/API] ⚠️ 隧道启动成功但URL未就绪")
+                    response_data['message'] = '隧道进程已启动，等待获取公网地址...'
+                    response_data['status'] = 'waiting_for_url'
+                
+                sys.stdout.flush()
+                return jsonify(response_data)
             else:
-                return jsonify({'success': False, 'error': result.get('error', '启动失败')})
+                error_msg = result.get('error', '启动失败')
+                print(f"[Tunnel/API] ❌ 启动失败: {error_msg}")
+                sys.stdout.flush()
+                return jsonify({
+                    'success': False,
+                    'error': error_msg,
+                    'status': 'failed'
+                })
 
         last_url_invalid_log_time = 0  # 上次打印URL不可用日志的时间
         
@@ -6510,6 +6647,38 @@ if __name__ == '__main__':
             # 判断隧道是否在运行
             is_running = process_running and url_valid
             
+            # 计算稳定性验证状态
+            stable_confirmed = (stable_url == web_url and 
+                              stable_url_confirm_count >= stable_url_min_confirms and 
+                              url_valid)
+            
+            verify_status = {
+                'is_verifying': stable_url_confirm_count > 0 and stable_url_confirm_count < stable_url_min_confirms,
+                'current_count': stable_url_confirm_count,
+                'required_count': stable_url_min_confirms,
+                'progress_percent': int((stable_url_confirm_count / stable_url_min_confirms) * 100) if stable_url_min_confirms > 0 else 0,
+                'stable_url': stable_url,
+                'time_elapsed_seconds': int(time.time() - url_first_seen_time) if url_first_seen_time > 0 and stable_url_confirm_count > 0 else 0,
+                'estimated_remaining_seconds': max(0, (stable_url_min_confirms - stable_url_confirm_count) * 60) if stable_url_confirm_count < stable_url_min_confirms else 0
+            }
+            
+            # 确定详细状态描述
+            if stable_confirmed:
+                detailed_status = 'stable'
+                status_message = f'✅ 公网地址已稳定可用 (已连续验证{stable_url_confirm_count}次)'
+            elif verify_status['is_verifying']:
+                detailed_status = 'verifying'
+                status_message = f'⏳ 正在验证稳定性 ({verify_status["current_count"]}/{verify_status["required_count"]})，预计还需{verify_status["estimated_remaining_seconds"]}秒'
+            elif web_url and not url_valid:
+                detailed_status = 'unstable'
+                status_message = '⚠️ URL不可用，等待重新获取...'
+            elif process_running and not web_url:
+                detailed_status = 'starting'
+                status_message = '🔄 隧道启动中，等待获取公网地址...'
+            else:
+                detailed_status = 'stopped'
+                status_message = '⏹️ 隧道未运行'
+            
             # 确保守护线程在运行
             if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
                 if not tunnel_daemon_started:
@@ -6522,16 +6691,26 @@ if __name__ == '__main__':
                 tunnel_heartbeat_thread.start()
                 print("[Tunnel] 启动心跳守护进程")
             
-            # 返回状态 - 统一使用 web_url
+            # 返回状态 - 统一使用 web_url，包含详细的稳定性信息
             return jsonify({
                 'running': is_running,
-                'url': web_url if url_valid else None,
+                'url': web_url,
                 'url_valid': url_valid,
                 'auto_restart': tunnel_auto_restart,
                 'restart_count': tunnel_restart_count,
                 'last_error': tunnel_last_error or ('URL无效，正在重启...' if tunnel_need_restart else None),
                 'last_heartbeat': heartbeat_str,
-                'tunnel_type': tunnel_type
+                'tunnel_type': tunnel_type,
+                'detailed_status': detailed_status,
+                'status_message': status_message,
+                'stable_confirmed': stable_confirmed,
+                'verify_progress': verify_status,
+                'email_notification_status': {
+                    'will_notify': not stable_confirmed and web_url is not None,
+                    'notification_type': 'stable_available',
+                    'condition': f'需要连续{stable_url_min_confirms}次验证通过',
+                    'last_stable_notification': datetime.fromtimestamp(last_stable_notification_time).strftime('%Y-%m-%d %H:%M:%S') if last_stable_notification_time > 0 else None
+                }
             })
 
         @app.route('/api/tunnel/stop', methods=['POST'])
