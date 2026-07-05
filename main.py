@@ -6350,6 +6350,8 @@ if __name__ == '__main__':
                                 print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
                                 sys.stdout.flush()
                             
+                            send_tunnel_notification(new_url, 'available')
+                            
                             tunnel_last_error = None
                             tunnel_need_restart = False
                             tunnel_consecutive_failures = 0
