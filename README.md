@@ -1,55 +1,56 @@
 # Szwego商品爬虫和货号对比工具
 
-## 📢 最新更新 (v3.8.8 - 2026-07-05)
+## 📢 最新更新 (v3.8.9 - 2026-07-05)
 
-### v3.8.8 (2026-07-05) - 🚀 核心优化：公网地址可用即自动发邮件（零延迟）
-- **需求背景**
-  - 用户要求：公网地址一有新的并且真能用的话就自动发邮件
-  - 原逻辑有60秒冷却期，新URL需要等待才能发送邮件通知
-  - 部分场景下URL已可用但邮件延迟发送，影响用户体验
+### v3.8.9 (2026-07-05) - 🔒 关键修复：强制URL去重机制（同一地址30分钟内只发1次邮件）
+- **问题背景**
+  - v3.8.8的`force_send=True`会跳过所有检查（包括URL去重），导致同一个地址可能被多次发送
+  - 用户明确要求：同一个公网地址只可以发送一遍，不可以短时间内同一地址发多次
+  - 实际场景：首次启动+URL变化+URL恢复三个事件可能同时触发，导致重复邮件
 - **根本原因分析**
-  - `send_tunnel_notification()` 函数强制执行60秒冷却期（email_cooldown = 60）
-  - 首次启动、URL变化、URL恢复三种场景都受冷却期限制
-  - 缺少"立即发送"模式，无法区分紧急通知和常规通知
+  - 原逻辑中`force_send=True`完全绕过URL去重检查（`if new_url == last_email_sent_url and not force_send:`）
+  - 缺少独立的时间窗口控制，无法区分"允许立即发送"和"禁止重复发送"
+  - 冷却期（60秒）和URL去重是两个不同概念，不应混为一谈
 - **解决方案**
-  - 在 [main.py](main.py) 第5937行新增 `force_send` 参数（默认False保持兼容）
-  - 采用**三重验证机制**确保邮件及时性：
-    1️⃣ URL可用性验证：调用 `verify_url()` 确认公网地址真正可访问
-    2️⃣ 强制发送模式：`force_send=True` 跳过冷却期和URL去重检查
-    3️⃣ 线程安全保证：使用 `email_send_lock` 保证并发安全
-  - 覆盖三大关键场景：
-    - ✅ **首次启动**（第6291行）：`verify_url(tunnel_url)` + `send_tunnel_notification(url, 'new', force_send=True)`
-    - ✅ **URL变化**（第6414行）：`verify_url(new_url)` + `send_tunnel_notification(url, 'available', force_send=True)`
-    - ✅ **URL恢复**（第6174行）：心跳检测到从不可用→可用状态时立即触发
+  - 在 [main.py](main.py) 第5959行引入**独立的URL去重时间窗口**：`url_dedup_interval = 1800`（30分钟）
+  - 采用**分层检查机制**（4层防护）：
+    1️⃣ 失败次数保护：连续失败≥3次暂停300秒
+    2️⃣ 冷却期检查：普通模式60秒，`force_send=True`时跳过
+    3️⃣ **URL去重检查（强制）**：无论是否`force_send`，同一地址30分钟内只发1次 ⭐
+    4️⃣ 线程安全保证：`email_send_lock`保证原子操作
+  - 去重规则：
+    - ✅ 不同地址：可以立即发送（即使间隔很短）
+    - ✅ 相同地址但超过30分钟：`force_send=True`时可重新发送
+    - ❌ 相同地址且在30分钟内：**绝对禁止发送**（即使`force_send=True`）
 - **核心代码实现**
   ```python
-  # 首次启动时（main.py:6291-6297）
-  print(f"[Tunnel] 🔍 验证URL可用性: {tunnel_url}")
-  if verify_url(tunnel_url, timeout=5, verbose=True):
-      print(f"[Tunnel] ✅ URL验证通过，立即发送邮件通知...")
-      send_tunnel_notification(tunnel_url, 'new', force_send=True)
-  else:
-      print(f"[Tunnel] ⚠️ URL验证未通过，稍后重试发送邮件")
+  url_dedup_interval = 1800  # URL去重时间窗口：30分钟
+  
+  if new_url == last_email_sent_url:
+      time_since_last_send = current_time - last_email_sent_time
+      if time_since_last_send < url_dedup_interval:
+          print(f"[Email] ⏭️ URL去重：相同地址{int(time_since_last_send)}秒内已发送过")
+          print(f"[Email] 📋 去重规则：同一公网地址在30分钟内只发送1次邮件")
+          return  # 强制阻止，即使force_send=True
   ```
-- **优化效果**
-  - ✅ **零延迟**：公网地址一旦可用，立即发送邮件通知（无需等待60秒）
-  - ✅ **可靠性**：先验证URL真正可访问才发送，避免无效通知
-  - ✅ **全覆盖**：首次启动、URL变化、URL恢复三个场景全部支持即时通知
-  - ✅ **向后兼容**：`force_send` 默认为 False，不影响现有调用方式
-  - ✅ **线程安全**：复用 v3.8.7 的锁机制，无竞态条件风险
-  - ✅ **智能降级**：如果URL验证失败，标记待发送队列，冷却期结束后补发
+- **修复效果**
+  - ✅ **零重复**：同一公网地址在30分钟内绝对不会收到多封邮件
+  - ✅ **智能区分**：不同地址可以正常发送，不会误杀
+  - ✅ **向后兼容**：`force_send=True`仍可跳过60秒冷却期，但不影响URL去重
+  - ✅ **日志清晰**：输出详细的去重原因和时间信息，便于排查
+  - ✅ **全场景覆盖**：首次启动/URL变化/URL恢复三个场景全部受控
 - **符合性检查**
-  - 符合 **PY-STD-098** 隧道状态变更通知强制规范
-  - 符合 **PY-STD-102** 线程安全与URL去重规范
+  - 符合 **PY-STD-102** 线程安全与URL去重强制规范（增强版）
   - 符合 **PY-STD-103** 邮件通知冷却期优化规范
+  - 符合用户需求：同一地址短时间内不重复发送
 - **文档同步更新**
-  - README.md 新增 v3.8.8 完整优化说明（含代码示例、效果对比表、三重验证机制）
-  - skill.md 待更新第十四章技术文档
-  - skill.docx 待重新生成（需执行 `python generate_docx.py`）
+  - README.md 新增 v3.8.9 完整修复说明（含分层检查机制、去重规则表）
+  - skill.md 更新技术文档（第十四章）
+  - skill.docx 待重新生成
 
 ---
 
-### v3.8.7 (2026-07-05) - 🔒 关键修复：线程安全URL去重机制 + 并发竞态条件彻底解决
+### v3.8.8 (2026-07-05) - 🚀 公网地址可用即自动发邮件（零延迟）
 - **问题背景**
   - 在高并发场景下，相同URL被重复发送2次邮件通知（事件类型分别为 `new` 和 `available`）
   - 实际日志证据显示同一URL `https://t-idb7mepzgh.hostc.dev` 在5秒内触发了两次完整的邮件发送流程
