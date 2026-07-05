@@ -5703,6 +5703,9 @@ if __name__ == '__main__':
                     if not in_changelog:
                         continue
                     version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.strip())
+                    # 兼容格式：### v3.8.6 (2026-07-05) 或 ### v3.8.6 (2026-07-05) - 描述
+                    if not version_match:
+                        version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.split(' - ')[0].strip())
                     if version_match:
                         if current_version:
                             if current_item:
