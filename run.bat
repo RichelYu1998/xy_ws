@@ -46,6 +46,13 @@ call :log Szwego商品爬虫和货号对比工具 - v%VERSION%
 call :log ========================================
 
 call :log_blank
+call :log [*] 清理残留进程...
+taskkill /F /IM python.exe >nul 2>&1
+taskkill /F /IM node.exe >nul 2>&1
+ping -n 2 127.0.0.1 >nul 2>&1
+call :log [*] 残留进程清理完成
+
+call :log_blank
 call :log [*] 清理临时文件...
 if exist temp (
     call :get_dir_size temp
@@ -621,10 +628,10 @@ call :log_blank
 
 if not defined WEB_PORT set "WEB_PORT=8888"
 call :log [!date! !time!] === Web服务启动 ===
-start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT! >> "!LOG_FILE!" 2>&1"
+start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT! >> "!LOG_FILE!" 2>&1" < nul
 
 call :log 等待 Web 服务启动完成...
-timeout /t 5 /nobreak >nul
+ping -n 6 127.0.0.1 >nul 2>&1
 
 set "FLASK_WAIT_COUNT=0"
 set "FLASK_MAX_WAIT=60"
@@ -640,14 +647,14 @@ for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" http://localhost
 if not defined HTTP_CODE set "HTTP_CODE=000"
 if not "!HTTP_CODE!"=="200" (
     if not "!HTTP_CODE!"=="302" (
-        timeout /t 2 /nobreak >nul
+        ping -n 3 127.0.0.1 >nul 2>&1
         goto wait_flask
     )
 )
 
 set "LOG_FILE="
 call :log_console_only Web 服务已就绪，正在启动隧道...
-start /b cmd /c "npx -y hostc@latest !WEB_PORT! --local-host localhost > file\tunnel_url.txt 2>&1"
+start /b cmd /c "npx -y hostc@latest !WEB_PORT! --local-host localhost > file\tunnel_url.txt 2>&1" < nul
 
 call :log_blank_console_only
 call :log_console_only ========================================
@@ -666,7 +673,7 @@ set "CHECK_INTERVAL=60"
 set "CHECK_COUNTER=0"
 
 :wait_loop
-timeout /t 1 /nobreak >nul
+ping -n 2 127.0.0.1 >nul 2>&1
 set /a CHECK_COUNTER+=1
 if !CHECK_COUNTER! geq !CHECK_INTERVAL! (
     set "CHECK_COUNTER=0"

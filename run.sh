@@ -36,6 +36,13 @@ log "Szwego商品爬虫和货号对比工具 - v${VERSION}"
 log "========================================"
 
 log_blank
+log "[*] 清理残留进程..."
+pkill -9 -f "python.*main.py" 2>/dev/null || true
+pkill -9 -f "hostc" 2>/dev/null || true
+sleep 1
+log "[*] 残留进程清理完成"
+
+log_blank
 log "[*] 清理临时文件..."
 if [ -d "temp" ]; then
     TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
@@ -519,7 +526,7 @@ run_web() {
 
     WEB_PORT="${WEB_PORT:-8888}"
     log "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ==="
-    "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" >> "$LOG_FILE" 2>&1 &
+    "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" >> "$LOG_FILE" 2>&1 < /dev/null &
     PYTHON_PID=$!
 
     log "等待 Web 服务启动完成..."
@@ -546,7 +553,7 @@ run_web() {
 
     LOG_FILE=""
     log_console_only "Web 服务已就绪，正在启动隧道..."
-    npx -y hostc@latest "$WEB_PORT" --local-host localhost > file/tunnel_url.txt 2>&1 &
+    npx -y hostc@latest "$WEB_PORT" --local-host localhost > file/tunnel_url.txt 2>&1 < /dev/null &
     TUNNEL_PID=$!
 
     sleep 2

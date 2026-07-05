@@ -6176,6 +6176,7 @@ if __name__ == '__main__':
                     f'npx hostc@latest {port} --local-host localhost',
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
+                    stdin=subprocess.DEVNULL,
                     text=True,
                     bufsize=0,
                     shell=True,
