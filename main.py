@@ -5958,12 +5958,22 @@ if __name__ == '__main__':
                         print(f"[Email] ⏭️ 相同URL已在冷却期内发送过，跳过重复发送: {new_url}")
                     return
                 
-                if new_url == last_email_sent_url and not force_send:
-                    print(f"[Email] ⏭️ URL去重：相同URL不会重复发送: {new_url} (当前类型: {event_type})")
-                    return
-
-                if force_send and new_url == last_email_sent_url:
-                    print(f"[Email] 🔄 强制发送模式：忽略URL去重检查，准备重新验证并发送")
+                url_dedup_interval = 1800  # URL去重时间窗口：30分钟（同一地址30分钟内只发1次）
+                
+                if new_url == last_email_sent_url:
+                    time_since_last_send = current_time - last_email_sent_time
+                    if time_since_last_send < url_dedup_interval:
+                        print(f"[Email] ⏭️ URL去重：相同地址{int(time_since_last_send)}秒内已发送过，跳过重复发送: {new_url}")
+                        print(f"[Email] 📋 去重规则：同一公网地址在{int(url_dedup_interval/60)}分钟内只发送1次邮件")
+                        return
+                    elif force_send:
+                        print(f"[Email] 🔄 强制发送模式：相同地址但已超过{int(url_dedup_interval/60)}分钟，允许重新发送")
+                    else:
+                        print(f"[Email] ⏭️ URL去重：相同地址未超过{int(url_dedup_interval/60)}分钟间隔，跳过发送")
+                        return
+                
+                if force_send:
+                    print(f"[Email] ✨ 强制发送模式：跳过冷却期检查，立即处理")
                 
                 pending_email_url = None
 
