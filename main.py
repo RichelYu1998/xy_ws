@@ -5934,7 +5934,7 @@ if __name__ == '__main__':
         pending_email_url = None
         email_send_lock = threading.Lock()
         
-        def send_tunnel_notification(new_url, event_type='new'):
+        def send_tunnel_notification(new_url, event_type='new', force_send=False):
             global last_email_sent_time, email_fail_count, last_email_sent_url, pending_email_url
             
             with email_send_lock:
@@ -5950,7 +5950,7 @@ if __name__ == '__main__':
 
                 remaining_cooldown = email_cooldown - (current_time - last_email_sent_time)
 
-                if current_time - last_email_sent_time < email_cooldown:
+                if not force_send and current_time - last_email_sent_time < email_cooldown:
                     if new_url != last_email_sent_url:
                         pending_email_url = new_url
                         print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒，已记录待发送URL: {new_url}")
@@ -5958,10 +5958,13 @@ if __name__ == '__main__':
                         print(f"[Email] ⏭️ 相同URL已在冷却期内发送过，跳过重复发送: {new_url}")
                     return
                 
-                if new_url == last_email_sent_url:
+                if new_url == last_email_sent_url and not force_send:
                     print(f"[Email] ⏭️ URL去重：相同URL不会重复发送: {new_url} (当前类型: {event_type})")
                     return
 
+                if force_send and new_url == last_email_sent_url:
+                    print(f"[Email] 🔄 强制发送模式：忽略URL去重检查，准备重新验证并发送")
+                
                 pending_email_url = None
 
             def verify_and_send():
@@ -6167,6 +6170,11 @@ if __name__ == '__main__':
                     else:
                         if consecutive_failures > 0:
                             print(f"[Tunnel] 心跳恢复，当前连续失败次数: {consecutive_failures}")
+                            
+                            if url_verify_failures > 0 and web_url:
+                                print(f"[Tunnel] 🎉 URL从不可用状态恢复，立即发送邮件通知...")
+                                send_tunnel_notification(web_url, 'available', force_send=True)
+                            
                             last_log_time = time.time()
                         consecutive_failures = 0
                         
@@ -6286,7 +6294,14 @@ if __name__ == '__main__':
                                         url_ready = True
                                         tunnel_consecutive_failures = 0
                                         old_tunnel_url = file_url
-                                        send_tunnel_notification(tunnel_url, 'new')
+                                        
+                                        print(f"[Tunnel] 🔍 验证URL可用性: {tunnel_url}")
+                                        if verify_url(tunnel_url, timeout=5, verbose=True):
+                                            print(f"[Tunnel] ✅ URL验证通过，立即发送邮件通知...")
+                                            send_tunnel_notification(tunnel_url, 'new', force_send=True)
+                                        else:
+                                            print(f"[Tunnel] ⚠️ URL验证未通过，稍后重试发送邮件")
+                                            
                                         print(f"[Tunnel] URL已就绪")
                                         sys.stdout.flush()
                                         return
@@ -6405,7 +6420,12 @@ if __name__ == '__main__':
                                 print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
                                 sys.stdout.flush()
                             
-                            send_tunnel_notification(new_url, 'available')
+                             print(f"[Tunnel] 🔍 验证新URL可用性: {new_url}")
+                            if verify_url(new_url, timeout=5, verbose=True):
+                                print(f"[Tunnel] ✅ 新URL验证通过，立即发送邮件通知...")
+                                send_tunnel_notification(new_url, 'available', force_send=True)
+                            else:
+                                print(f"[Tunnel] ⚠️ 新URL验证未通过，稍后重试发送邮件")
                             
                             tunnel_last_error = None
                             tunnel_need_restart = False

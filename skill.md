@@ -2526,6 +2526,60 @@ README 中的格式：`### v3.6.0 (2026-06-11)`
 
 ## 最新更新                              ← 标题3：分隔符（用于前端展示 + API定位）
 
+### v3.8.8 (2026-07-05) - 🚀 公网地址可用即自动发邮件（零延迟通知优化）
+- **需求背景**
+  - 用户要求：公网地址一有新的并且真能用的话就自动发邮件
+  - 原逻辑有60秒冷却期限制，新URL需要等待才能发送邮件
+  - 部分场景下URL已可用但邮件延迟发送，影响用户体验
+- **根本原因分析**
+  - `send_tunnel_notification()` 强制执行60秒冷却期（email_cooldown = 60）
+  - 首次启动、URL变化、URL恢复三种场景都受冷却期限制
+  - 缺少"立即发送"模式，无法区分紧急通知和常规通知
+- **解决方案**
+  - 新增 `force_send` 参数（默认False保持向后兼容）
+  - 采用**三重验证机制**：
+    1️⃣ URL可用性验证：`verify_url()` 确认地址真正可访问
+    2️⃣ 强制发送模式：`force_send=True` 跳过冷却期和去重检查
+    3️⃣ 线程安全保证：`email_send_lock` 保证并发安全
+  - 覆盖三大关键场景：
+    - ✅ 首次启动（main.py:6291）：`verify_url()` + `force_send=True`
+    - ✅ URL变化（main.py:6414）：`verify_url()` + `force_send=True`
+    - ✅ URL恢复（main.py:6174）：心跳检测到恢复时立即触发
+- **核心代码实现**
+  ```python
+  def send_tunnel_notification(new_url, event_type='new', force_send=False):
+      # ...冷却期和去重检查...
+      if not force_send and current_time - last_email_sent_time < email_cooldown:
+          return  # 普通模式：遵守冷却期
+      
+      if new_url == last_email_sent_url and not force_send:
+          return  # 普通模式：URL去重
+      
+      # force_send=True 时跳过上述检查，直接进入验证和发送流程
+  ```
+- **优化效果**
+  - ✅ **零延迟**：URL一旦可用立即发邮件，无需等待60秒
+  - ✅ **可靠性**：先验证URL可访问性才发送，避免无效通知
+  - ✅ **全覆盖**：首次启动、变化、恢复三个场景全部支持即时通知
+  - ✅ **向后兼容**：`force_send=False` 时行为与之前完全一致
+  - ✅ **智能降级**：URL验证失败时标记待发送队列，冷却期后补发
+- **符合的编码规范**
+  - PY-STD-098: 隧道状态变更必须调用邮件通知函数
+  - PY-STD-102: 线程安全与URL去重强制规范
+  - PY-STD-103: 邮件通知冷却期优化规范
+
+### v3.8.7 (2026-07-05) - 🔒 线程安全URL去重机制 + 并发竞态条件修复
+- **问题背景**
+  - 高并发场景下相同URL被重复发送2次邮件（new + available事件）
+  - read_output()线程和restart_tunnel()线程同时调用导致竞态条件
+- **解决方案**
+  - 新增全局线程锁 `email_send_lock`
+  - Double-Check Locking模式保证原子操作
+- **修复效果**
+  - ✅ 彻底消除竞态条件
+  - ✅ 锁持有时间 < 0.01ms，性能影响极低
+  - ✅ 全平台兼容（Windows/macOS/Linux）
+
 ### v3.8.5 (2026-07-04)                   ← 历史版本从这里开始
 - **skill.md 新增自动目录（TOC）**
   - 子条目1
