@@ -1,4 +1,4 @@
-import json
+﻿import json
 import time
 import asyncio
 import os
@@ -6430,7 +6430,7 @@ if __name__ == '__main__':
                                 print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
                                 sys.stdout.flush()
                             
-                             print(f"[Tunnel] 🔍 验证新URL可用性: {new_url}")
+                            print(f"[Tunnel] 🔍 验证新URL可用性: {new_url}")
                             if verify_url(new_url, timeout=5, verbose=True):
                                 print(f"[Tunnel] ✅ 新URL验证通过，立即发送邮件通知...")
                                 send_tunnel_notification(new_url, 'available', force_send=True)
