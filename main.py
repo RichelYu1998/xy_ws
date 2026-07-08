@@ -6081,9 +6081,10 @@ if __name__ == '__main__':
                                 last_email_sent_time = time.time()
                                 email_fail_count = 0
                                 last_email_sent_url = new_url
+                                _recipient_email = email_notifier.config.get('to_email', '980187223@qq.com') if hasattr(email_notifier, 'config') else '980187223@qq.com'
                                 send_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                                 print(f"[{send_time_str}] [Email-Thread:{thread_id}] ✅✅✅ 邮件发送成功！")
-                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 📨 收件人: 980187223@qq.com")
+                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 📨 收件人: {_recipient_email}")
                                 print(f"[{send_time_str}] [Email-Thread:{thread_id}] 🔗 隧道地址: {new_url}")
                                 print(f"[{send_time_str}] [Email-Thread:{thread_id}] ⏰ 发送时间: {send_time_str}")
                                 print(f"[{send_time_str}] [Email-Thread:{thread_id}] 📊 失败计数已重置为0")
@@ -6772,8 +6773,20 @@ if __name__ == '__main__':
                 'email_notification_status': {
                     'will_notify': not stable_confirmed and web_url is not None,
                     'notification_type': 'stable_available',
-                    'condition': f'需要连续{_min_confirms}次验证通过',
-                    'last_stable_notification': datetime.fromtimestamp(last_stable_notification_time).strftime('%Y-%m-%d %H:%M:%S') if last_stable_notification_time > 0 else None
+                    'enabled': email_notifier.get_email_config().get('enabled', False) if hasattr(email_notifier, 'get_email_config') else False,
+                    'recipient': email_notifier.get_email_config().get('to_email', '') if hasattr(email_notifier, 'get_email_config') else '',
+                    'sender': email_notifier.get_email_config().get('smtp_user', '') if hasattr(email_notifier, 'get_email_config') else '',
+                    'sender_name': email_notifier.get_email_config().get('from_name', '公网IP监控') if hasattr(email_notifier, 'get_email_config') else '公网IP监控',
+                    'condition': f'需要连续{stable_url_min_confirms}次验证通过',
+                    'current_progress': f'{stable_url_confirm_count}/{stable_url_min_confirms}',
+                    'last_stable_notification': datetime.fromtimestamp(last_stable_notification_time).strftime('%Y-%m-%d %H:%M:%S') if last_stable_notification_time > 0 else None,
+                    'preview_subject': f'【✅ 公网地址已稳定可用】{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}' if not stable_confirmed and web_url else None,
+                    'preview_body': f'''✅ 公网地址已稳定可用
+时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+公网地址: {web_url or "待确定"}
+✅ 稳定性验证：已连续通过 {stable_url_min_confirms} 次验证
+📊 验证耗时：{int(time.time() - url_first_seen_time) if url_first_seen_time > 0 else 0} 秒
+🎯 状态：确认稳定可用，可放心使用''' if not stable_confirmed and web_url else None
                 }
             })
 
