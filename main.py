@@ -1921,17 +1921,24 @@ class EmailNotifier:
     
     def send_tunnel_notification(self, tunnel_url, event_type='new'):
         """发送隧道URL变化通知邮件"""
+        import datetime as _dt
+        import threading as _threading
+        _current_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _thread_id = _threading.current_thread().name
+        
         config = self.get_email_config()
         
         if not config['enabled']:
-            print(f"[Email] 邮件通知未启用，跳过发送")
+            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] ⚠️ 邮件通知未启用，跳过发送")
             return False
         
         try:
-            print(f"[Email] 开始发送邮件通知: {tunnel_url} (事件类型: {event_type})")
-            print(f"[Email] SMTP服务器: {config['smtp_host']}:{config['smtp_port']}")
-            print(f"[Email] 发送人: {config['smtp_user']}")
-            print(f"[Email] 接收人: {config['to_email']}")
+            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 📧 开始发送邮件通知")
+            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 🎯 目标URL: {tunnel_url}")
+            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 📋 事件类型: {event_type}")
+            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 🖥️ SMTP服务器: {config['smtp_host']}:{config['smtp_port']}")
+            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 👤 发送人: {config['smtp_user']}")
+            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 📬 接收人: {config['to_email']}")
             
             msg = MIMEMultipart('alternative')
             msg['From'] = f"{Header(config['from_name'], 'utf-8').encode()} <{config['smtp_user']}>"
@@ -1953,10 +1960,17 @@ class EmailNotifier:
             
             if event_type == 'stable_available':
                 import time as _time
-                global stable_url_confirm_count, url_first_seen_time, stable_url_min_confirms
-                verify_duration = int(_time.time() - url_first_seen_time) if url_first_seen_time > 0 else 0
+                try:
+                    _verify_dur = int(_time.time() - globals().get('url_first_seen_time', 0)) if globals().get('url_first_seen_time', 0) > 0 else 0
+                    _min_confirms = globals().get('stable_url_min_confirms', 3)
+                    _confirm_count = globals().get('stable_url_confirm_count', 0)
+                except (NameError, TypeError):
+                    _verify_dur = 0
+                    _min_confirms = 3
+                    _confirm_count = 0
+                verify_duration = _verify_dur
                 status_note = f"""
-✅ 稳定性验证：已连续通过 {stable_url_min_confirms} 次验证
+✅ 稳定性验证：已连续通过 {_min_confirms} 次验证
 📊 验证耗时：{verify_duration} 秒
 🎯 状态：确认稳定可用，可放心使用
 
@@ -1964,7 +1978,7 @@ class EmailNotifier:
                 html_status_note = f'''
 <table style="background-color: #e8f5e9; padding: 10px; border-radius: 5px; margin: 10px 0;">
 <tr><td colspan="2" style="color: #2e7d32; font-weight: bold;">✅ 稳定性验证通过</td></tr>
-<tr><td><b>验证次数:</b></td><td>{stable_url_min_confirms} 次连续通过</td></tr>
+<tr><td><b>验证次数:</b></td><td>{_min_confirms} 次连续通过</td></tr>
 <tr><td><b>验证耗时:</b></td><td>{verify_duration} 秒</td></tr>
 <tr><td><b>当前状态:</b></td><td style="color: #2e7d32; font-weight: bold;">🎯 确认稳定可用</td></tr>
 </table>
@@ -1995,22 +2009,43 @@ class EmailNotifier:
             msg.attach(MIMEText(body, 'plain', 'utf-8'))
             msg.attach(MIMEText(html_body, 'html', 'utf-8'))
             
-            print(f"[Email] 正在连接SMTP服务器...")
+            _connect_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{_connect_time}] [EmailNotifier-Thread:{_thread_id}] 🔌 正在连接SMTP服务器 (超时: 30秒)...")
             timeout = 30
+            
+            _connect_start = _dt.datetime.now()
             if config['smtp_port'] == 465:
                 server = smtplib.SMTP_SSL(config['smtp_host'], config['smtp_port'], timeout=timeout)
             else:
                 server = smtplib.SMTP(config['smtp_host'], config['smtp_port'], timeout=timeout)
                 server.starttls()
+            _connect_end = _dt.datetime.now()
+            _connect_duration = (_connect_end - _connect_start).total_seconds()
             
-            print(f"[Email] 正在登录SMTP服务器...")
+            _login_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{_login_time}] [EmailNotifier-Thread:{_thread_id}] ✅ SMTP连接成功 (耗时: {_connect_duration:.2f}秒)")
+            print(f"[{_login_time}] [EmailNotifier-Thread:{_thread_id}] 🔐 正在登录SMTP服务器...")
+            
+            _login_start = _dt.datetime.now()
             server.login(config['smtp_user'], config['smtp_password'])
+            _login_end = _dt.datetime.now()
+            _login_duration = (_login_end - _login_start).total_seconds()
             
-            print(f"[Email] 正在发送邮件...")
+            _send_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{_send_time}] [EmailNotifier-Thread:{_thread_id}] ✅ SMTP登录成功 (耗时: {_login_duration:.2f}秒)")
+            print(f"[{_send_time}] [EmailNotifier-Thread:{_thread_id}] 📤 正在发送邮件...")
+            
+            _send_start = _dt.datetime.now()
             server.sendmail(config['smtp_user'], config['to_email'], msg.as_string())
             server.quit()
+            _send_end = _dt.datetime.now()
+            _send_duration = (_send_end - _send_start).total_seconds()
             
-            print(f"[Email] 已成功发送邮件通知到 {config['to_email']}")
+            _success_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{_success_time}] [EmailNotifier-Thread:{_thread_id}] ✅✅✅ 邮件发送成功！")
+            print(f"[{_success_time}] [EmailNotifier-Thread:{_thread_id}] 📬 收件人: {config['to_email']}")
+            print(f"[{_success_time}] [EmailNotifier-Thread:{_thread_id}] ⏱️ 发送耗时: {_send_duration:.2f}秒")
+            print(f"[{_success_time}] [EmailNotifier-Thread:{_thread_id}] ✅ SMTP连接已关闭")
             return True
         except smtplib.SMTPServerDisconnected as e:
             handle_exception(e, 'Email SMTP连接断开')
@@ -6017,54 +6052,83 @@ if __name__ == '__main__':
             def verify_and_send():
                 global last_email_sent_time, email_fail_count, last_email_sent_url
                 import datetime
+                import threading as _threading
                 current_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                thread_id = _threading.current_thread().name
                 try:
-                    print(f"[{current_time_str}] [Email] 📧 开始处理邮件发送任务")
-                    print(f"[{current_time_str}] [Email] 目标URL: {new_url}")
-                    print(f"[{current_time_str}] [Email] 事件类型: {event_type}")
-                    print(f"[{current_time_str}] [Email] 上次发送URL: {last_email_sent_url}")
+                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 📧 开始处理邮件发送任务")
+                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 目标URL: {new_url}")
+                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 事件类型: {event_type}")
+                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 上次发送URL: {last_email_sent_url}")
+                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 🔒 准备获取邮件发送锁...")
                     
                     with email_send_lock:
+                        lock_acquired_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        print(f"[{lock_acquired_time}] [Email-Thread:{thread_id}] 🔒 已获取邮件发送锁")
+                        
                         if new_url != last_email_sent_url:
-                            print(f"[{current_time_str}] [Email] ✅ URL校验通过，准备调用SMTP服务...")
+                            print(f"[{lock_acquired_time}] [Email-Thread:{thread_id}] ✅ URL校验通过，准备调用SMTP服务...")
+                            print(f"[{lock_acquired_time}] [Email-Thread:{thread_id}] ⏳ 调用 EmailNotifier.send_tunnel_notification()...")
+                            call_start = datetime.datetime.now()
+                            
                             success = email_notifier.send_tunnel_notification(new_url, event_type)
+                            
+                            call_end = datetime.datetime.now()
+                            call_duration = (call_end - call_start).total_seconds()
+                            print(f"[{call_end.strftime('%Y-%m-%d %H:%M:%S')}] [Email-Thread:{thread_id}] ⏱️ SMTP调用完成，耗时 {call_duration:.2f} 秒")
                             
                             if success:
                                 last_email_sent_time = time.time()
                                 email_fail_count = 0
                                 last_email_sent_url = new_url
                                 send_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                print(f"[{send_time_str}] [Email] ✅✅✅ 邮件发送成功！")
-                                print(f"[{send_time_str}] [Email] 📨 收件人: 980187223@qq.com")
-                                print(f"[{send_time_str}] [Email] 🔗 隧道地址: {new_url}")
-                                print(f"[{send_time_str}] [Email] ⏰ 发送时间: {send_time_str}")
-                                print(f"[{send_time_str}] [Email] 📊 失败计数已重置为0")
+                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] ✅✅✅ 邮件发送成功！")
+                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 📨 收件人: 980187223@qq.com")
+                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 🔗 隧道地址: {new_url}")
+                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] ⏰ 发送时间: {send_time_str}")
+                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 📊 失败计数已重置为0")
+                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 🔓 准备释放邮件发送锁...")
                             else:
                                 email_fail_count += 1
                                 last_email_sent_url = None
                                 fail_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                print(f"[{fail_time_str}] [Email] ❌❌❌ 邮件发送失败！")
-                                print(f"[{fail_time_str}] [Email] 💥 失败原因: SMTP服务返回错误或网络异常")
-                                print(f"[{fail_time_str}] [Email] 📈 当前累计失败次数: {email_fail_count}/{email_max_fail_count}")
-                                print(f"[{fail_time_str}] [Email] 🔄 已标记URL可重试，等待下次发送")
+                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] ❌❌❌ 邮件发送失败！")
+                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] 💥 失败原因: SMTP服务返回错误或网络异常")
+                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] 📈 当前累计失败次数: {email_fail_count}/{email_max_fail_count}")
+                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] 🔄 已标记URL可重试，等待下次发送")
+                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] 🔓 准备释放邮件发送锁...")
                         else:
                             skip_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                            print(f"[{skip_time_str}] [Email] ⏭️ 邮件发送被跳过")
-                            print(f"[{skip_time_str}] [Email] 原因: 该URL已在之前发送过")
-                            print(f"[{skip_time_str}] [Email] 已发送URL: {last_email_sent_url}")
-                            print(f"[{skip_time_str}] [Email] 待发送URL: {new_url}")
+                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] ⏭️ 邮件发送被跳过")
+                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] 原因: 该URL已在之前发送过")
+                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] 已发送URL: {last_email_sent_url}")
+                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] 待发送URL: {new_url}")
+                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] 🔓 准备释放邮件发送锁...")
+                    
+                    print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-Thread:{thread_id}] 🔓 已释放邮件发送锁")
 
                 except Exception as e:
                     email_fail_count += 1
                     last_email_sent_url = None
                     error_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    print(f"[{error_time_str}] [Email] 💥💥💥 邮件发送发生异常！")
-                    print(f"[{error_time_str}] [Email] ❌ 异常类型: {type(e).__name__}")
-                    print(f"[{error_time_str}] [Email] ❌ 错误详情: {str(e)[:200]}")
-                    print(f"[{error_time_str}] [Email] 📈 当前累计失败次数: {email_fail_count}/{email_max_fail_count}")
-                    print(f"[{error_time_str}] [Email] 🔄 已标记可重试")
-
-            threading.Thread(target=verify_and_send, daemon=True).start()
+                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] 💥💥💥 邮件发送发生异常！")
+                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] ❌ 异常类型: {type(e).__name__}")
+                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] ❌ 错误详情: {str(e)[:200]}")
+                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] 📋 异常堆栈:")
+                    import traceback as _tb
+                    _tb.print_exc()
+                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] 📈 当前累计失败次数: {email_fail_count}/{email_max_fail_count}")
+                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] 🔄 已标记可重试")
+                
+                end_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f"[{end_time_str}] [Email-Thread:{thread_id}] ✅ 邮件发送任务执行完毕")
+            
+            import datetime as _dt
+            thread_start_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{thread_start_time}] [Email] 🚀 启动邮件发送线程...")
+            email_thread = threading.Thread(target=verify_and_send, daemon=True, name=f"EmailSender-{_dt.datetime.now().strftime('%H%M%S')}")
+            email_thread.start()
+            print(f"[{thread_start_time}] [Email] ✅ 邮件发送线程已启动: {email_thread.name}")
         
         def check_and_send_pending_email():
             global pending_email_url, last_email_sent_time, email_fail_count, last_email_sent_url
@@ -6203,11 +6267,11 @@ if __name__ == '__main__':
                                         stable_url = web_url
                                         stable_url_confirm_count = 1
                                         url_first_seen_time = time.time()
-                                        print(f"[Tunnel] 🔍 检测到新URL，开始稳定性验证 (1/{stable_url_min_confirms}): {web_url}")
+                                        print(f"[Tunnel] 🔍 检测到新URL，开始稳定性验证 (1/{_min_confirms}): {web_url}")
                                     else:
                                         # 同一URL继续验证
                                         stable_url_confirm_count += 1
-                                        print(f"[Tunnel] ✅ URL稳定性验证 ({stable_url_confirm_count}/{stable_url_min_confirms}): {web_url}")
+                                        print(f"[Tunnel] ✅ URL稳定性验证 ({stable_url_confirm_count}/{_min_confirms}): {web_url}")
                                         
                                         # 达到稳定阈值，发送精准邮件通知
                                         if stable_url_confirm_count >= stable_url_min_confirms:
@@ -6222,7 +6286,7 @@ if __name__ == '__main__':
                                     if stable_url_confirm_count < stable_url_min_confirms:
                                         stable_url_confirm_count += 1
                                         if stable_url_confirm_count >= stable_url_min_confirms:
-                                            print(f"[Tunnel] 🎯 稳定URL确认完成 ({stable_url_confirm_count}/{stable_url_min_confirms})")
+                                            print(f"[Tunnel] 🎯 稳定URL确认完成 ({stable_url_confirm_count}/{_min_confirms})")
                                             send_tunnel_notification(web_url, 'stable_available', force_send=True)
                                             last_stable_notification_time = time.time()
                                             last_email_sent_url = web_url
@@ -6519,7 +6583,7 @@ if __name__ == '__main__':
                                 sys.stdout.flush()
                             
                             print(f"[Tunnel] 🔍 获取到新URL: {new_url}")
-                            print(f"[Tunnel] ⏳ 等待心跳检测确认稳定性（需要连续{stable_url_min_confirms}次验证通过）...")
+                            print(f"[Tunnel] ⏳ 等待心跳检测确认稳定性（需要连续{_min_confirms}次验证通过）...")
                             
                             # 重置稳定性检测状态，让心跳机制处理
                             global stable_url, stable_url_confirm_count, url_first_seen_time
@@ -6579,7 +6643,7 @@ if __name__ == '__main__':
                 response_data = {
                     'success': True,
                     'url': new_url,
-                    'message': f'隧道已启动，正在验证稳定性 ({stable_url_min_confirms}次连续验证)',
+                    'message': f'隧道已启动，正在验证稳定性 ({_min_confirms}次连续验证)',
                     'status': 'verifying',
                     'verify_progress': {
                         'current': 0,
@@ -6591,7 +6655,7 @@ if __name__ == '__main__':
                 
                 if new_url:
                     print(f"[Tunnel/API] ✅ 隧道启动成功: {new_url}")
-                    print(f"[Tunnel/API] ⏳ 进入稳定性验证模式 (需要{stable_url_min_confirms}次通过)")
+                    print(f"[Tunnel/API] ⏳ 进入稳定性验证模式 (需要{_min_confirms}次通过)")
                     print(f"[Tunnel/API] 📧 邮件将在验证通过后自动发送")
                 else:
                     print(f"[Tunnel/API] ⚠️ 隧道启动成功但URL未就绪")
@@ -6708,7 +6772,7 @@ if __name__ == '__main__':
                 'email_notification_status': {
                     'will_notify': not stable_confirmed and web_url is not None,
                     'notification_type': 'stable_available',
-                    'condition': f'需要连续{stable_url_min_confirms}次验证通过',
+                    'condition': f'需要连续{_min_confirms}次验证通过',
                     'last_stable_notification': datetime.fromtimestamp(last_stable_notification_time).strftime('%Y-%m-%d %H:%M:%S') if last_stable_notification_time > 0 else None
                 }
             })
