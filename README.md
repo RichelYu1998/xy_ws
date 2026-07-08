@@ -1,10 +1,216 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.12
+> **版本**: v3.8.13
 > **更新日期**: 2026-07-08
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 
+
+---
+
+## 最新更新
+
+### v3.8.13 (2026-07-08) - 🔧 关键Bug修复 + API信息完整性增强
+
+- **🐛 致命错误修复：tunnel_status API NameError** - 修正未定义变量 `_min_confirms` 为全局变量 `stable_url_min_confirms`
+- **📧 邮件收件人硬编码问题修复** - 动态读取配置文件中的收件人地址，不再硬编码
+- **✨ API返回信息重大增强** - email_notification_status 新增7个字段（enabled/recipient/sender/sender_name/current_progress/preview_subject/preview_body）
+- **📊 代码质量提升** - 遵循 PY-STD-VAR-001/PY-STD-CONFIG-001/PY-STD-API-001 规范
+
+---
+
+#### 🐛 致命错误修复：tunnel_status API NameError
+
+**问题描述**:
+```
+NameError: name '_min_confirms' is not defined
+File "main.py", line 6775, in tunnel_status
+    'condition': f'需要连续{_min_confirms}次验证通过',
+```
+
+**根本原因**:
+- `tunnel_status()` 函数中使用了未定义的局部变量 `_min_confirms`
+- 该变量仅在邮件通知的事件处理函数内部定义（main.py:1965-1969）
+- 全局变量 `stable_url_min_confirms` 才是正确的变量名（main.py:6005）
+
+**修复方案**:
+1. **main.py:6775** - 将 `_min_confirms` 改为全局变量 `stable_url_min_confirms`
+2. 确保使用正确的全局变量，避免作用域混淆
+
+**影响范围**: 
+- 文件: main.py:6775
+- API端点: GET /api/tunnel/status
+- 向后兼容: ✅ 完全兼容，仅修正变量引用
+
+#### 📧 邮件收件人硬编码问题修复
+
+**问题描述**:
+```python
+# 错误代码 ❌ (main.py:6086)
+print(f"📨 收件人: 980187223@qq.com")  # 硬编码邮箱地址
+```
+
+**问题影响**:
+1. 日志输出显示固定的测试邮箱，不反映实际配置
+2. 违反配置管理原则，应该从 config_manager 动态读取
+3. 多用户部署时会产生误导
+
+**修复方案**:
+```python
+# 正确代码 ✅ (main.py:6087-6088)
+_recipient_email = email_notifier.config.get('to_email', '980187223@qq.com') if hasattr(email_notifier, 'config') else '980187223@qq.com'
+print(f"📨 收件人: {_recipient_email}")
+```
+
+**改进点**:
+- 动态读取邮件配置中的收件人地址
+- 使用安全的属性检查 hasattr() 防止异常
+- 保留默认值作为兜底方案
+
+#### ✨ API返回信息重大增强：email_notification_status 完整化
+
+**问题描述**:
+原API返回的邮件通知状态信息过于简单：
+```json
+{
+  "email_notification_status": {
+    "will_notify": true,
+    "notification_type": "stable_available",
+    "condition": "需要连续3次验证通过",
+    "last_stable_notification": null
+  }
+}
+```
+
+缺少关键信息：
+- ❌ 邮件是否启用
+- ❌ 收件人是谁
+- ❌ 发件人是谁
+- ❌ 当前验证进度
+- ❌ 邮件内容预览
+
+**解决方案**:
+扩展 `email_notification_status` 为完整的信息结构（main.py:6771-6293）:
+
+```json
+{
+  "email_notification_status": {
+    "will_notify": true,
+    "notification_type": "stable_available",
+    
+    // 🔐 配置信息（新增）
+    "enabled": true,
+    "recipient": "980187223@qq.com",
+    "sender": "your_smtp@qq.com",
+    "sender_name": "公网IP监控",
+    
+    // 📊 进度追踪（新增）
+    "condition": "需要连续3次验证通过",
+    "current_progress": "1/3",
+    
+    // ⏰ 时间记录
+    "last_stable_notification": null,
+    
+    // 📋 邮件预览（新增，与实际发送格式一致！）
+    "preview_subject": "【✅ 公网地址已稳定可用】2026-07-08 15:30:00",
+    "preview_body": "✅ 公网地址已稳定可用\n时间: 2026-07-08 15:30:00\n公网地址: https://t-test-stable-final.hostc.dev\n✅ 稳定性验证：已连续通过 3 次验证\n📊 验证耗时：120 秒\n🎯 状态：确认稳定可用，可放心使用"
+  }
+}
+```
+
+**新增字段说明**:
+
+| 字段 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| `enabled` | boolean | 邮件通知是否启用 | `true/false` |
+| `recipient` | string | 📬 收件人邮箱 | `user@qq.com` |
+| `sender` | string | 👤 发件人邮箱 | `smtp@qq.com` |
+| `sender_name` | string | 📝 发件人显示名称 | `公网IP监控` |
+| `current_progress` | string | 📊 当前验证进度 | `"1/3"`, `"2/3"`, `"3/3"` |
+| `preview_subject` | string\|null | 📌 邮件标题预览 | 完整标题或null |
+| `preview_body` | string\|null | 📄 邮件正文预览 | 与实际发送内容完全一致 |
+
+**前端集成示例**:
+```javascript
+// 获取隧道状态后显示完整邮件通知信息
+const status = await fetch('/api/tunnel/status').then(r => r.json());
+const emailInfo = status.email_notification_status;
+
+if (emailInfo.will_notify) {
+    console.log(`将发送邮件至: ${emailInfo.recipient}`);
+    console.log(`发件人: ${emailInfo.sender_name}<${emailInfo.sender}>`);
+    console.log(`当前进度: ${emailInfo.current_progress}`);
+    console.log(`邮件标题: ${emailInfo.preview_subject}`);
+    console.log(`邮件内容:\n${emailInfo.preview_body}`);
+}
+```
+
+**实际效果对比**:
+
+**修改前（信息缺失）**:
+```
+✅ 将发送通知: 是
+📋 通知类型: stable_available
+⏳ 条件: 需要连续3次验证通过
+```
+
+**修改后（完整展示）**:
+```
+✅ 邮件通知: 已启用
+📬 收件人: 980187223@qq.com
+👤 发件人: 公网IP监控<your_smtp@qq.com>
+📊 当前进度: 1/3
+⏳ 完成条件: 需要连续3次验证通过
+📌 预览标题: 【✅ 公网地址已稳定可用】2026-07-08 15:30:00
+📄 预览正文:
+   ✅ 公网地址已稳定可用
+   时间: 2026-07-08 15:30:00
+   公网地址: https://t-test-stable-final.hostc.dev
+   ✅ 稳定性验证：已连续通过 3 次验证
+   📊 验证耗时：120 秒
+   🎯 状态：确认稳定可用，可放心使用
+```
+
+#### 📊 代码质量提升
+
+**遵循的代码规范**:
+- ✅ PY-STD-098: 隧道状态变更必须调用邮件通知函数
+- ✅ PY-STD-102: 线程安全与URL去重强制规范
+- ✅ **PY-STD-VAR-001**: 全局变量正确访问规范（新增）
+  - 禁止使用未定义的局部变量
+  - 必须使用已声明的全局变量
+  - 变量命名保持一致性
+- ✅ **PY-STD-CONFIG-001**: 配置动态读取规范（新增）
+  - 禁止硬编码用户配置数据
+  - 所有配置必须从 ConfigManager 动态获取
+  - 使用安全访问方式防止异常
+- ✅ **PY-STD-API-001**: API返回信息完整性规范（新增）
+  - API必须返回足够的前端渲染所需信息
+  - 提供数据预览功能便于调试
+  - 保持与实际业务逻辑的一致性
+
+#### 🧪 测试验证
+
+**自动化测试清单**:
+- [x] tunnel_status API 不再抛出 NameError
+- [x] 邮件日志正确显示配置的收件人地址
+- [x] email_notification_status 包含所有新字段
+- [x] preview_subject 和 preview_body 格式正确
+- [x] current_progress 实时反映验证进度
+- [x] 前端可以完整展示邮件通知详情
+
+**手动测试步骤**:
+1. 启动服务 → 访问 `/api/tunnel/status`
+2. 验证返回JSON包含完整的 email_notification_status 对象
+3. 检查 recipient 字段与配置文件一致
+4. 触发稳定性验证 → 观察 current_progress 变化
+5. 等待邮件发送 → 对比 preview_body 与实际收到邮件
+
+**回归测试**:
+- [x] stable_available 事件正常触发
+- [x] 邮件发送流程不受影响
+- [x] 其他API端点正常工作
+- [x] 前端页面正常渲染
 
 ---
 
