@@ -493,10 +493,56 @@ class TeeOutput:
         self.log_file_path = log_file_path
         self.file = None
         if log_file_path:
-            safe_execute_func(
-                lambda: setattr(self, 'file', open(log_file_path, 'a', encoding='utf-8')),
-                context='TeeOutput初始化'
-            )
+            self._init_log_file(log_file_path)
+    
+    def _init_log_file(self, log_file_path, retry_count=0):
+        max_retries = 3
+        try:
+            log_dir = os.path.dirname(log_file_path)
+            if log_dir and not os.path.exists(log_dir):
+                os.makedirs(log_dir, exist_ok=True)
+            
+            if os.path.exists(log_file_path):
+                try:
+                    test_fd = os.open(log_file_path, os.O_WRONLY | os.O_APPEND)
+                    os.close(test_fd)
+                except OSError as e:
+                    if retry_count < max_retries:
+                        import time as _t
+                        backup_path = f"{log_file_path}.locked_{_t.strftime('%H%M%S')}"
+                        try:
+                            os.rename(log_file_path, backup_path)
+                            print(f"[TeeOutput] ⚠️ 日志文件被锁定，已备份为: {backup_path}")
+                        except:
+                            pass
+                        _t.sleep(0.5 * (retry_count + 1))
+                        return self._init_log_file(log_file_path, retry_count + 1)
+                    else:
+                        raise
+            
+            self.file = open(log_file_path, 'a', encoding='utf-8')
+            
+        except PermissionError as e:
+            if retry_count < max_retries:
+                import time as _t
+                alt_path = f"{log_file_path}.{_t.strftime('%Y%m%d_%H%M%S')}"
+                print(f"[TeeOutput] ⚠️ 权限不足，尝试使用备用文件: {alt_path}")
+                _t.sleep(0.3 * (retry_count + 1))
+                return self._init_log_file(alt_path, retry_count + 1)
+            else:
+                print(f"[TeeOutput] ❌ 无法打开日志文件（已重试{max_retries}次），将仅输出到控制台")
+                print(f"[TeeOutput]    文件路径: {log_file_path}")
+                print(f"[TeeOutput]    错误: {e}")
+                self.file = None
+                
+        except Exception as e:
+            if retry_count < max_retries:
+                import time as _t
+                _t.sleep(0.2 * (retry_count + 1))
+                return self._init_log_file(log_file_path, retry_count + 1)
+            else:
+                print(f"[TeeOutput] ❌ 初始化失败（已重试{max_retries}次）: {e}")
+                self.file = None
     
     def write(self, text):
         self.original.write(text)
@@ -1944,12 +1990,12 @@ class EmailNotifier:
             msg['From'] = f"{Header(config['from_name'], 'utf-8').encode()} <{config['smtp_user']}>"
             msg['To'] = config['to_email']
             event_titles = {
-                'new': '新公网地址',
-                'available': '公网地址可用',
-                'update': '公网地址已更新',
+                'new': '✅ 新公网地址',
+                'available': '✅ 公网地址可用',
+                'update': '✅ 公网地址已更新',
                 'stable_available': '✅ 公网地址已稳定可用'
             }
-            event_title = event_titles.get(event_type, f'{"新" if event_type == "new" else ""}公网地址')
+            event_title = event_titles.get(event_type, f'{"✅ 新" if event_type == "new" else "✅"}公网地址')
             
             msg['Subject'] = Header(f'【{event_title}】{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 'utf-8')
             
@@ -1970,18 +2016,21 @@ class EmailNotifier:
                     _confirm_count = 0
                 verify_duration = _verify_dur
                 status_note = f"""
-✅ 稳定性验证：已连续通过 {_min_confirms} 次验证
-📊 验证耗时：{verify_duration} 秒
-🎯 状态：确认稳定可用，可放心使用
+✅ 稳定性验证通过
+验证次数: {_min_confirms}次连续通过
+验证耗时: {verify_duration}秒
+当前状态: 🎯 确认稳定可用
 
 """
                 html_status_note = f'''
-<table style="background-color: #e8f5e9; padding: 10px; border-radius: 5px; margin: 10px 0;">
-<tr><td colspan="2" style="color: #2e7d32; font-weight: bold;">✅ 稳定性验证通过</td></tr>
-<tr><td><b>验证次数:</b></td><td>{_min_confirms} 次连续通过</td></tr>
-<tr><td><b>验证耗时:</b></td><td>{verify_duration} 秒</td></tr>
-<tr><td><b>当前状态:</b></td><td style="color: #2e7d32; font-weight: bold;">🎯 确认稳定可用</td></tr>
+<div style="background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 4px;">
+<div style="color: #2e7d32; font-size: 16px; font-weight: bold; margin-bottom: 10px;">✅ 稳定性验证通过</div>
+<table style="width: 100%; color: #333;">
+<tr><td style="padding: 3px 0;"><strong>验证次数:</strong></td><td>{_min_confirms} 次连续通过</td></tr>
+<tr><td style="padding: 3px 0;"><strong>验证耗时:</strong></td><td>{verify_duration} 秒</td></tr>
+<tr><td style="padding: 3px 0;"><strong>当前状态:</strong></td><td style="color: #2e7d32; font-weight: bold;">🎯 确认稳定可用</td></tr>
 </table>
+</div>
 '''
             
             body = f"""{event_title}
@@ -1994,14 +2043,40 @@ class EmailNotifier:
             
             html_body = f"""
 <html>
-<body>
-<h2>{event_title}</h2>
-<table>
-<tr><td><b>时间:</b></td><td>{current_time}</td></tr>
-<tr><td><b>公网地址:</b></td><td><a href="{tunnel_url}" target="_blank">{tunnel_url}</a></td></tr>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
+<h1 style="margin: 0; font-size: 28px; font-weight: bold;">{event_title}</h1>
+<p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 16px;">隧道服务通知</p>
+</div>
+
+<div style="background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+<table style="width: 100%; border-collapse: collapse;">
+<tr style="border-bottom: 1px solid #f0f0f0;">
+<td style="padding: 12px 0; font-weight: bold; color: #555; width: 100px;">时间:</td>
+<td style="padding: 12px 0; color: #333;">{current_time}</td>
+</tr>
+<tr>
+<td style="padding: 12px 0; font-weight: bold; color: #555;">公网地址:</td>
+<td style="padding: 12px 0;">
+<a href="{tunnel_url}" target="_blank" style="color: #1976d2; text-decoration: none; word-break: break-all;">{tunnel_url}</a>
+<button onclick="window.open('{tunnel_url}', '_blank')" style="margin-left: 10px; background-color: #1976d2; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">点击访问</button>
+</td>
+</tr>
 </table>
+
 {html_status_note}
-<p>请妥善保管此地址。</p>
+
+<div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #f0f0f0; text-align: center; color: #666; font-size: 14px;">
+请妥善保管此地址。
+</div>
+</div>
+
+<div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+<p>此邮件由系统自动发送，请勿直接回复</p>
+<p>发送时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+</div>
+
 </body>
 </html>
 """
@@ -6009,6 +6084,8 @@ if __name__ == '__main__':
         def send_tunnel_notification(new_url, event_type='new', force_send=False):
             global last_email_sent_time, email_fail_count, last_email_sent_url, pending_email_url
             
+            should_send = False
+            
             with email_send_lock:
                 current_time = time.time()
 
@@ -6048,6 +6125,10 @@ if __name__ == '__main__':
                     print(f"[Email] ✨ 强制发送模式：跳过冷却期检查，立即处理")
                 
                 pending_email_url = None
+                should_send = True
+
+            if not should_send:
+                return
 
             def verify_and_send():
                 global last_email_sent_time, email_fail_count, last_email_sent_url
@@ -6137,18 +6218,31 @@ if __name__ == '__main__':
             current_time = time.time()
             current_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            if pending_email_url and (current_time - last_email_sent_time) >= email_cooldown:
-                url_to_send = pending_email_url
-                pending_email_url = None
-                last_email_sent_url = url_to_send
-                
-                print(f"[{current_time_str}] [Email] 📋 检测到待发送邮件")
-                print(f"[{current_time_str}] [Email] ⏱️ 冷却期已结束，准备发送")
-                print(f"[{current_time_str}] [Email] 🎯 目标URL: {url_to_send}")
-                
-                def send_pending():
-                    global last_email_sent_time, email_fail_count, last_email_sent_url
-                    try:
+            should_send_pending = False
+            url_to_send = None
+            
+            with email_send_lock:
+                if pending_email_url and (current_time - last_email_sent_time) >= email_cooldown:
+                    url_to_send = pending_email_url
+                    pending_email_url = None
+                    last_email_sent_url = url_to_send
+                    should_send_pending = True
+            
+            if not should_send_pending or not url_to_send:
+                if pending_email_url:
+                    remaining_cooldown = int(email_cooldown - (current_time - last_email_sent_time))
+                    print(f"[{current_time_str}] [Email] ⏳ 待发邮件等待冷却中...")
+                    print(f"[{current_time_str}] [Email] 剩余冷却时间: {remaining_cooldown}秒")
+                return
+            
+            print(f"[{current_time_str}] [Email] 📋 检测到待发送邮件")
+            print(f"[{current_time_str}] [Email] ⏱️ 冷却期已结束，准备发送")
+            print(f"[{current_time_str}] [Email] 🎯 目标URL: {url_to_send}")
+            
+            def send_pending():
+                global last_email_sent_time, email_fail_count, last_email_sent_url
+                try:
+                    with email_send_lock:
                         pending_start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         print(f"[{pending_start_time}] [Email] 🚀 开始发送待发邮件...")
                         
@@ -6170,21 +6264,18 @@ if __name__ == '__main__':
                             print(f"[{pending_end_time}] [Email] 💥 失败原因: SMTP服务异常")
                             print(f"[{pending_end_time}] [Email] 📈 累计失败次数: {email_fail_count}/{email_max_fail_count}")
                             print(f"[{pending_end_time}] [Email] 🔄 已重新加入待发送队列")
-                    except Exception as e:
+                except Exception as e:
+                    with email_send_lock:
                         email_fail_count += 1
                         pending_email_url = url_to_send
-                        error_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        print(f"[{error_time}] [Email] 💥💥💥 待发邮件发送发生异常！")
-                        print(f"[{error_time}] [Email] ❌ 异常类型: {type(e).__name__}")
-                        print(f"[{error_time}] [Email] ❌ 错误详情: {str(e)[:200]}")
-                        print(f"[{error_time}] [Email] 📈 累计失败次数: {email_fail_count}/{email_max_fail_count}")
-                        print(f"[{error_time}] [Email] 🔄 已重新加入待发送队列")
-                
-                threading.Thread(target=send_pending, daemon=True).start()
-            elif pending_email_url:
-                remaining_cooldown = int(email_cooldown - (current_time - last_email_sent_time))
-                print(f"[{current_time_str}] [Email] ⏳ 待发邮件等待冷却中...")
-                print(f"[{current_time_str}] [Email] 剩余冷却时间: {remaining_cooldown}秒")
+                    error_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    print(f"[{error_time}] [Email] 💥💥💥 待发邮件发送发生异常！")
+                    print(f"[{error_time}] [Email] ❌ 异常类型: {type(e).__name__}")
+                    print(f"[{error_time}] [Email] ❌ 错误详情: {str(e)[:200]}")
+                    print(f"[{error_time}] [Email] 📈 累计失败次数: {email_fail_count}/{email_max_fail_count}")
+                    print(f"[{error_time}] [Email] 🔄 已重新加入待发送队列")
+            
+            threading.Thread(target=send_pending, daemon=True).start()
         
         def verify_url(url, timeout=10, verbose=False, max_retries=3):
             import time as _time
