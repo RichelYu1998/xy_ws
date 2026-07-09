@@ -3815,10 +3815,13 @@ def log_print(*args, **kwargs):
 ```
 
 **自动检测的日志类型**:
-- ✅ 以 `[` 开头的消息（如 `[Tunnel]`, `[Email]`, `[DEBUG]`）
-- ✅ 包含关键词: `Tunnel`, `Email`, `DEBUG`, `ERROR`, `WARNING`
-- ✅ 包含状态标记: `[OK]`, `[*]`
-- ❌ 不处理的: API响应、纯数据输出、格式化表格等
+- ✅ **英文标记**: 以 `[` 开头的消息（`[Tunnel]`, `[Email]`, `[DEBUG]`, `[ERROR]`, `[WARNING]`, `[OK]`, `[*]`）
+- ✅ **分隔线**: `===` 开头的标题行
+- ✅ **中文操作动词**: 清理、检测、安装、配置、启动、正在、完成、失败、成功、跳过、设置、测试
+- ✅ **系统信息**: 版本、镜像、依赖、环境、服务、地址、访问
+- ✅ **Flask/服务器**: Press, Running, Serving, WARNING:
+- ✅ **用户交互**: 按 Ctrl
+- ❌ **不处理的**: 纯JSON响应、HTML内容、二进制数据等
 
 **时间戳格式**:
 - TeeOutput: `[YYYY-MM-DD HH:MM:SS.mmm]` (毫秒精度，用于精确调试)
