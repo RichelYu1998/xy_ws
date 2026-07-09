@@ -3866,11 +3866,24 @@ _has_timestamp = (
 
 ##### Windows 批处理 run.bat 实现
 
-**修改位置**: [run.bat:14-20](run.bat#L14-L20)
+**修改位置**: [run.bat:15-34](run.bat#L15-L34)
 
 ```batch
+:: 脚本启动时立即检测 Python（供时间戳使用，不依赖后续 PYTHON_CMD）
+set "_TS_PYTHON="
+where py >nul 2>&1 && set "_TS_PYTHON=py"
+if not defined _TS_PYTHON where python >nul 2>&1 && set "_TS_PYTHON=python"
+
+:ms_timestamp
+set "TIMESTAMP="
+if defined _TS_PYTHON (
+    for /f "delims=" %%t in ('"!_TS_PYTHON!" -c "from datetime import datetime; d=datetime.now(); print(d.strftime(\"%%Y-%%m-%%d %%H:%%M:%%S.\")+f\"{d.microsecond//1000:03d}\")" 2^>nul') do set "TIMESTAMP=%%t"
+)
+if not defined TIMESTAMP set "TIMESTAMP=%date% %time: =0%"
+exit /b
+
 :log
-set "TIMESTAMP=%date% %time%"
+call :ms_timestamp
 echo [%TIMESTAMP%] %*
 if not "%LOG_FILE%"=="" (
     if exist "!LOG_FILE!" (
@@ -3880,7 +3893,7 @@ if not "%LOG_FILE%"=="" (
 exit /b
 
 :log_console_only
-set "TIMESTAMP=%date% %time%"
+call :ms_timestamp
 echo [%TIMESTAMP%] %*
 exit /b
 
@@ -3895,36 +3908,53 @@ exit /b
 ```
 
 **时间戳格式**:
-- 格式: `[YYYY/MM/DD HH:MM:SS.mm]`
-- 示例: `[2026/07/09 18:02:17.35]`
-- 精度: 厘秒 (0.01秒)
-- 来源: Windows 系统 `%date% %time%` 变量
+- 格式: `[YYYY-MM-DD HH:MM:SS.mmm]`
+- 示例: `[2026-07-09 18:02:17.123]`
+- 精度: 毫秒 (0.001秒)
+- 来源: Python `datetime.now().microsecond`（优先），回退到 `%date% %time: =0%`
+- 关键设计: `_TS_PYTHON` 在脚本开头设置，不依赖后续 `PYTHON_CMD`
 
 **使用场景**:
 ```batch
 call :log [*] 清理残留进程...
-# 输出: [2026/07/09 18:02:17.12] [*] 清理残留进程...
+# 输出: [2026-07-09 18:02:17.120] [*] 清理残留进程...
 
 call :log [1/6] 检测Python环境...
-# 输出: [2026/07/09 18:02:17.45] [1/6] 检测Python环境...
+# 输出: [2026-07-09 18:02:17.450] [1/6] 检测Python环境...
 
 call :log [*] 最快PIP镜像: 阿里云 [87毫秒]
-# 输出: [2026/07/09 18:02:18.15] [*] 最快PIP镜像: 阿里云 [87毫秒]
+# 输出: [2026-07-09 18:02:18.150] [*] 最快PIP镜像: 阿里云 [87毫秒]
 ```
 
 ##### Linux/macOS Shell run.sh 实现
 
-**修改位置**: [run.sh:14-20](run.sh#L14-L20)
+**修改位置**: [run.sh:17-28](run.sh#L17-L28)
 
 ```bash
+# 启动时一次性检测 GNU date 是否可用（macOS BSD date 不支持 %3N）
+_HAS_GNU_DATE=false
+if date '+%3N' 2>/dev/null | grep -qE '^[0-9]{3}$'; then
+    _HAS_GNU_DATE=true
+fi
+
+_ms_timestamp() {
+    if $_HAS_GNU_DATE; then
+        date '+%Y-%m-%d %H:%M:%S.%3N'
+    else
+        local ms
+        ms=$(python3 -c "from datetime import datetime; print(datetime.now().microsecond//1000)" 2>/dev/null || echo "000")
+        printf '%s.%03d' "$(date '+%Y-%m-%d %H:%M:%S')" "${ms:-000}"
+    fi
+}
+
 log() {
-    TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    TIMESTAMP="$(_ms_timestamp)"
     echo "[$TIMESTAMP] $*"
     [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE" 2>/dev/null
 }
 
 log_console_only() {
-    TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    TIMESTAMP="$(_ms_timestamp)"
     echo "[$TIMESTAMP] $*"
 }
 
@@ -3938,7 +3968,8 @@ log_blank() {
 - 格式: `[YYYY-MM-DD HH:MM:SS.mmm]`
 - 示例: `[2026-07-09 18:02:17.123]`
 - 精度: 毫秒 (0.001秒)
-- 来源: GNU date 命令 `%3N` (3位纳秒→毫秒)
+- 来源: GNU date `%3N`（Linux），Python `datetime`（macOS 回退方案）
+- 关键设计: 启动时一次性检测 `_HAS_GNU_DATE`，避免每次调用都检测
 
 **date 参数说明**:
 | 参数 | 含义 | 示例 |
@@ -3978,15 +4009,15 @@ log "[*] 最快PIP镜像: 阿里云 [87毫秒]"
 
 | 层级 | 平台 | 实现方式 | 时间戳格式 | 精度 | 文件位置 |
 |------|------|---------|-----------|------|---------|
-| **L1: 启动脚本** | Windows | run.bat `:log()` | `[YYYY/MM/DD HH:MM:SS.mm]` | 厘秒 | run.bat:14-20 |
-| **L1: 启动脚本** | Linux/macOS | run.sh `log()` | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | run.sh:14-20 |
+| **L1: 启动脚本** | Windows | run.bat `:ms_timestamp()` | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | run.bat:21-27 |
+| **L1: 启动脚本** | Linux/macOS | run.sh `_ms_timestamp()` | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | run.sh:17-28 |
 | **L2: Python运行时** | 所有平台 | TeeOutput.write() | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | main.py:543-578 |
 | **L3: 应用日志** | 所有平台 | log_print() | `[YYYY-MM-DD HH:MM:SS]` | 秒 | main.py:594-609 |
 
 **效果一致性**:
 ```
 Windows 环境:
-[2026/07/09 18:02:17.35] [*] 清理残留进程...           ← run.bat (L1)
+[2026-07-09 18:02:17.123] [*] 清理残留进程...          ← run.bat (L1)
 [2026-07-09 18:02:18.153] [Tunnel] 启动隧道...         ← Python (L2)
 
 Linux/macOS 环境:
@@ -6101,7 +6132,26 @@ call :log 预启动隧道服务(加快首次启动速度)...
 call :log [*] 预启动隧道服务【加快首次启动速度】...
 ```
 
-#### 4.5.3 毫秒显示格式
+#### 4.5.3 毫秒显示格式与跨平台时间戳规范
+
+**统一格式**: 所有平台时间戳必须为 `[YYYY-MM-DD HH:MM:SS.mmm]`（3位毫秒）
+
+**macOS 注意事项**:
+- macOS BSD `date` 不支持 `%N`（纳秒），`date '+%3N'` 会输出字面量 `3N`
+- 必须在启动时检测 `_HAS_GNU_DATE`，不可用时回退到 Python 获取毫秒
+
+**Windows 注意事项**:
+- `%date% %time%` 精度仅厘秒（2位），且格式不统一（`YYYY/MM/DD`）
+- 必须使用 Python `datetime.now().microsecond` 获取3位毫秒
+- `_TS_PYTHON` 在脚本开头设置，不依赖后续 `PYTHON_CMD`
+- `%time%` 小时为个位数时前导为空格，需用 `%time: =0%` 修复
+
+**跨平台时间戳实现对照**:
+| 平台 | 检测机制 | 优先方案 | 回退方案 |
+|------|---------|---------|---------|
+| Linux | `_HAS_GNU_DATE=true` | `date '+%3N'` | Python `microsecond` |
+| macOS | `_HAS_GNU_DATE=false` | Python `microsecond` | `date` + `printf` |
+| Windows | `_TS_PYTHON=py/python` | Python `microsecond` | `%date% %time: =0%` |
 
 ```batch
 :: ❌ 错误
@@ -6322,6 +6372,9 @@ fi
 | 前端按钮容器 | `display:grid;grid-template-columns:repeat(N,1fr)` | `display:flex;justify-content:center`（移动端末行偏移） |
 | Web 日志 | 启动阶段`:log`双写 + 运行阶段`:log_console_only`纯控制台 | 全程双写（文件锁冲突报错） |
 | 隧道地址文件 | 覆盖模式 `>`，只保留最新地址 | 追加模式（历史地址混淆） |
+| 时间戳格式 | `[YYYY-MM-DD HH:MM:SS.mmm]` 统一3位毫秒 | `%3N`（macOS输出`3N`）/ `%date% %time%`（厘秒+格式不统一） |
+| Shell毫秒获取 | 启动时检测`_HAS_GNU_DATE`，回退Python | 直接`date '+%3N'`（macOS报错） |
+| Bat毫秒获取 | `_TS_PYTHON` + `:ms_timestamp` 子程序 | 直接`%date% %time%`（厘秒精度） |
 
 ### 镜像源测速规范
 

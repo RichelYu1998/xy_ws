@@ -13,8 +13,23 @@ mkdir -p file
 LOG_FILE="$(pwd)/file/web_output.log"
 > "$LOG_FILE"
 
+_HAS_GNU_DATE=false
+if date '+%3N' 2>/dev/null | grep -qE '^[0-9]{3}$'; then
+    _HAS_GNU_DATE=true
+fi
+
+_ms_timestamp() {
+    if $_HAS_GNU_DATE; then
+        date '+%Y-%m-%d %H:%M:%S.%3N'
+    else
+        local ms
+        ms=$(python3 -c "from datetime import datetime; print(datetime.now().microsecond//1000)" 2>/dev/null || echo "000")
+        printf '%s.%03d' "$(date '+%Y-%m-%d %H:%M:%S')" "${ms:-000}"
+    fi
+}
+
 log() {
-    TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    TIMESTAMP="$(_ms_timestamp)"
     echo "[$TIMESTAMP] $*"
     [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE" 2>/dev/null
 }
@@ -25,7 +40,7 @@ log_blank() {
 }
 
 log_console_only() {
-    TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    TIMESTAMP="$(_ms_timestamp)"
     echo "[$TIMESTAMP] $*"
 }
 
