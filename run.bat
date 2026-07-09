@@ -12,10 +12,22 @@ if not exist file mkdir file
 set "LOG_FILE=%CD%\file\web_output.log"
 echo. > "!LOG_FILE!"
 
+set "_TS_PYTHON="
+where py >nul 2>&1 && set "_TS_PYTHON=py"
+if not defined _TS_PYTHON where python >nul 2>&1 && set "_TS_PYTHON=python"
+
 goto main_start
 
+:ms_timestamp
+set "TIMESTAMP="
+if defined _TS_PYTHON (
+    for /f "delims=" %%t in ('"!_TS_PYTHON!" -c "from datetime import datetime; d=datetime.now(); print(d.strftime(\"%%Y-%%m-%%d %%H:%%M:%%S.\")+f\"{d.microsecond//1000:03d}\")" 2^>nul') do set "TIMESTAMP=%%t"
+)
+if not defined TIMESTAMP set "TIMESTAMP=%date% %time: =0%"
+exit /b
+
 :log
-set "TIMESTAMP=%date% %time%"
+call :ms_timestamp
 echo [%TIMESTAMP%] %*
 if not "%LOG_FILE%"=="" (
     if exist "!LOG_FILE!" (
@@ -25,7 +37,6 @@ if not "%LOG_FILE%"=="" (
 exit /b
 
 :log_blank
-set "TIMESTAMP=%date% %time%"
 echo.
 if not "%LOG_FILE%"=="" (
     if exist "!LOG_FILE!" (
@@ -35,7 +46,7 @@ if not "%LOG_FILE%"=="" (
 exit /b
 
 :log_console_only
-set "TIMESTAMP=%date% %time%"
+call :ms_timestamp
 echo [%TIMESTAMP%] %*
 exit /b
 
@@ -630,7 +641,8 @@ call :log 正在启动 Web 服务...
 call :log_blank
 
 if not defined WEB_PORT set "WEB_PORT=8888"
-call :log [!date! !time!] === Web服务启动 ===
+call :ms_timestamp
+call :log [!TIMESTAMP!] === Web服务启动 ===
 start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT! >> "!LOG_FILE!" 2>&1" < nul
 
 call :log 等待 Web 服务启动完成...

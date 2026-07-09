@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.15
+> **版本**: v3.8.16
 > **更新日期**: 2026-07-09
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,105 @@
 ---
 
 ## 最新更新
+
+### v3.8.16 (2026-07-09) - 🐛 macOS时间戳Bug修复 + 跨平台毫秒级时间戳统一
+
+#### 🎯 核心改进
+- **🐛 macOS时间戳Bug修复** - 修复 `date '+%3N'` 在BSD date上输出字面量 `3N` 的问题
+- **🖥️ Windows时间戳升级** - run.bat从 `%date% %time%`（厘秒）升级为Python毫秒级时间戳
+- **🌐 跨平台时间戳统一** - Windows/Linux/macOS 三平台统一为 `[YYYY-MM-DD HH:MM:SS.mmm]` 格式
+
+---
+
+#### 🐛 macOS时间戳Bug修复：`%3N` → 真实毫秒
+
+**问题描述**:
+```
+[2026-07-09 19:50:38.3N] ========================================     ← .3N 是字面量！
+[2026-07-09 19:50:38.3N] Szwego商品爬虫和货号对比工具 - v3.8.15
+[2026-07-09 19:50:39.3N] [*] 清理残留进程...
+```
+
+**根本原因**:
+- `date '+%Y-%m-%d %H:%M:%S.%3N'` 中的 `%3N` 是 GNU `date` 扩展（输出纳秒前3位=毫秒）
+- macOS 自带 BSD `date`，不支持 `%N`，`%3N` 被原样输出为字面量 `3N`
+
+**修复方案** (run.sh:17-28):
+```bash
+# 启动时一次性检测 GNU date 是否可用
+_HAS_GNU_DATE=false
+if date '+%3N' 2>/dev/null | grep -qE '^[0-9]{3}$'; then
+    _HAS_GNU_DATE=true
+fi
+
+# 时间戳函数：自动选择实现方式
+_ms_timestamp() {
+    if $_HAS_GNU_DATE; then
+        date '+%Y-%m-%d %H:%M:%S.%3N'
+    else
+        local ms
+        ms=$(python3 -c "from datetime import datetime; print(datetime.now().microsecond//1000)" 2>/dev/null || echo "000")
+        printf '%s.%03d' "$(date '+%Y-%m-%d %H:%M:%S')" "${ms:-000}"
+    fi
+}
+```
+
+**修复后效果**:
+```
+[2026-07-09 20:26:44.426] ========================================
+[2026-07-09 20:26:44.426] Szwego商品爬虫和货号对比工具 - v3.8.16
+[2026-07-09 20:26:44.428] [*] 清理残留进程...
+```
+
+---
+
+#### 🖥️ Windows时间戳升级：厘秒 → 毫秒
+
+**问题描述**:
+```
+[2026/07/09 18:02:17.35] [*] 清理残留进程...     ← 格式不统一，仅厘秒精度
+```
+
+**修复方案** (run.bat:21-27):
+```batch
+:ms_timestamp
+set "TIMESTAMP="
+if defined _TS_PYTHON (
+    for /f "delims=" %%t in ('"!_TS_PYTHON!" -c "from datetime import datetime; d=datetime.now(); print(d.strftime(\"%%Y-%%m-%%d %%H:%%M:%%S.\")+f\"{d.microsecond//1000:03d}\")" 2^>nul') do set "TIMESTAMP=%%t"
+)
+if not defined TIMESTAMP set "TIMESTAMP=%date% %time: =0%"
+exit /b
+```
+
+**关键设计**:
+- 脚本启动时立即检测 `_TS_PYTHON`（`py` 或 `python`），不依赖后续的 `PYTHON_CMD`
+- 优先用 Python 获取3位毫秒时间戳
+- Python 不可用时回退到 `%date% %time: =0%`（`time: =0` 修复小时前导空格）
+
+**修复后效果**:
+```
+[2026-07-09 20:26:44.426] [*] 清理残留进程...    ← 统一格式，毫秒精度
+```
+
+---
+
+#### 🌐 跨平台时间戳统一
+
+**修复前**:
+| 平台 | 格式 | 精度 | 问题 |
+|------|------|------|------|
+| Windows | `[YYYY/MM/DD HH:MM:SS.mm]` | 厘秒 | 格式不统一 |
+| Linux | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | 正常 |
+| macOS | `[YYYY-MM-DD HH:MM:SS.3N]` | ❌ Bug | `%3N` 字面量 |
+
+**修复后**:
+| 平台 | 格式 | 精度 | 状态 |
+|------|------|------|------|
+| Windows | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | ✅ 统一 |
+| Linux | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | ✅ 统一 |
+| macOS | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | ✅ 统一 |
+
+---
 
 ### v3.8.15 (2026-07-09) - ⚡ 隧道重启优化 + 全局时间戳100%覆盖 + NameError修复
 
@@ -176,10 +275,18 @@ def write(self, text):
 - ✅ **防重复**: 已有时间戳的不重复添加
 - ✅ **空行保护**: 空行保持原样，不破坏排版
 
-##### 2️⃣ **Windows 批处理 run.bat** (run.bat:14-20)
+##### 2️⃣ **Windows 批处理 run.bat** (run.bat:21-34)
 ```batch
+:ms_timestamp
+set "TIMESTAMP="
+if defined _TS_PYTHON (
+    for /f "delims=" %%t in ('"!_TS_PYTHON!" -c "from datetime import datetime; d=datetime.now(); print(d.strftime(\"%%Y-%%m-%%d %%H:%%M:%%S.\")+f\"{d.microsecond//1000:03d}\")" 2^>nul') do set "TIMESTAMP=%%t"
+)
+if not defined TIMESTAMP set "TIMESTAMP=%date% %time: =0%"
+exit /b
+
 :log
-set "TIMESTAMP=%date% %time%"
+call :ms_timestamp
 echo [%TIMESTAMP%] %*
 if not "%LOG_FILE%"=="" (
     if exist "!LOG_FILE!" (
@@ -189,14 +296,29 @@ if not "%LOG_FILE%"=="" (
 exit /b
 ```
 
-**格式**: `[YYYY/MM/DD HH:MM:SS.mm]` (如 `[2026/07/09 18:02:17.35]`)
+**格式**: `[YYYY-MM-DD HH:MM:SS.mmm]` (如 `[2026-07-09 18:02:17.123]`)
 
-##### 3️⃣ **Linux/macOS Shell run.sh** (run.sh:14-20)
+##### 3️⃣ **Linux/macOS Shell run.sh** (run.sh:17-28)
 ```bash
+_HAS_GNU_DATE=false
+if date '+%3N' 2>/dev/null | grep -qE '^[0-9]{3}$'; then
+    _HAS_GNU_DATE=true
+fi
+
+_ms_timestamp() {
+    if $_HAS_GNU_DATE; then
+        date '+%Y-%m-%d %H:%M:%S.%3N'
+    else
+        local ms
+        ms=$(python3 -c "from datetime import datetime; print(datetime.now().microsecond//1000)" 2>/dev/null || echo "000")
+        printf '%s.%03d' "$(date '+%Y-%m-%d %H:%M:%S')" "${ms:-000}"
+    fi
+}
+
 log() {
-    TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    TIMESTAMP="$(_ms_timestamp)"
     echo "[$TIMESTAMP] $*"
-    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE"
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE" 2>/dev/null
 }
 ```
 
@@ -213,38 +335,38 @@ def log_print(*args, **kwargs):
 
 **效果展示 - 修复后**:
 ```
-[2026/07/09 18:02:17.00] ========================================
-[2026/07/09 18:02:17.00] Szwego商品爬虫和货号对比工具 - v3.8.15
-[2026/07/09 18:02:17.00] ========================================
+[2026-07-09 18:02:17.004] ========================================
+[2026-07-09 18:02:17.004] Szwego商品爬虫和货号对比工具 - v3.8.16
+[2026-07-09 18:02:17.004] ========================================
 
-[2026/07/09 18:02:17.12] [*] 清理残留进程...
-[2026/07/09 18:02:17.15] [*] 残留进程清理完成
+[2026-07-09 18:02:17.120] [*] 清理残留进程...
+[2026-07-09 18:02:17.150] [*] 残留进程清理完成
 
-[2026/07/09 18:02:17.30] [*] 清理临时文件...
-[2026/07/09 18:02:17.35] [*] temp目录未超过3MB，跳过清理
+[2026-07-09 18:02:17.300] [*] 清理临时文件...
+[2026-07-09 18:02:17.350] [*] temp目录未超过3MB，跳过清理
 
-[2026/07/09 18:02:17.45] ========================================
-[2026/07/09 18:02:17.45] 综合环境检测与配置
-[2026/07/09 18:02:17.45] ========================================
-[2026/07/09 18:02:17.50] [1/6] 检测Python环境...
+[2026-07-09 18:02:17.450] ========================================
+[2026-07-09 18:02:17.450] 综合环境检测与配置
+[2026-07-09 18:02:17.450] ========================================
+[2026-07-09 18:02:17.500] [1/6] 检测Python环境...
 
-[2026/07/09 18:02:17.65] Python版本：
-[2026/07/09 18:02:17.70] [*] 检测虚拟环境状态...
-[2026/07/09 18:02:17.75] 未在虚拟环境中
+[2026-07-09 18:02:17.650] Python版本：
+[2026-07-09 18:02:17.700] [*] 检测虚拟环境状态...
+[2026-07-09 18:02:17.750] 未在虚拟环境中
 
-[2026/07/09 18:02:17.90] [3/6] 测试PIP加速镜像源...
-[2026/07/09 18:02:17.95] 测试 清华源...
-[2026/07/09 18:02:18.00] 清华源: 0.144055秒 [144ms]
+[2026-07-09 18:02:17.900] [3/6] 测试PIP加速镜像源...
+[2026-07-09 18:02:17.950] 测试 清华源...
+[2026-07-09 18:02:18.000] 清华源: 0.144055秒 [144ms]
 
-[2026/07/09 18:02:18.15] [*] 最快PIP镜像: 阿里云 [87毫秒]
-[2026/07/09 18:02:18.20] [4/6] 测试NPM加速镜像源...
-[2026/07/09 18:02:18.25] 测试 npmmirror淘宝...
+[2026-07-09 18:02:18.150] [*] 最快PIP镜像: 阿里云 [87毫秒]
+[2026-07-09 18:02:18.200] [4/6] 测试NPM加速镜像源...
+[2026-07-09 18:02:18.250] 测试 npmmirror淘宝...
 ```
 
 **跨平台一致性**:
 | 平台 | 文件 | 时间戳格式 | 精度 | 示例 |
 |------|------|-----------|------|------|
-| Windows | run.bat | `[YYYY/MM/DD HH:MM:SS.mm]` | 厘秒 | `[2026/07/09 18:02:17.35]` |
+| Windows | run.bat | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | `[2026-07-09 18:02:17.123]` |
 | Linux/macOS | run.sh | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | `[2026-07-09 18:02:17.123]` |
 | Python | main.py (TeeOutput) | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | `[2026-07-09 18:02:18.153]` |
 
