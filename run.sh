@@ -14,8 +14,9 @@ LOG_FILE="$(pwd)/file/web_output.log"
 > "$LOG_FILE"
 
 log() {
-    echo "$*"
-    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "$*" >> "$LOG_FILE" 2>/dev/null
+    TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    echo "[$TIMESTAMP] $*"
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE" 2>/dev/null
 }
 
 log_blank() {
@@ -24,7 +25,8 @@ log_blank() {
 }
 
 log_console_only() {
-    echo "$*"
+    TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    echo "[$TIMESTAMP] $*"
 }
 
 log_blank_console_only() {
