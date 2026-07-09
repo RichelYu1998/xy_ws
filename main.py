@@ -545,12 +545,50 @@ class TeeOutput:
                 self.file = None
     
     def write(self, text):
-        self.original.write(text)
-        if self.file:
-            _tee_text = text
-            if text.strip() and (text.strip().startswith('[') or 'Tunnel' in text or 'Email' in text or 'DEBUG' in text or 'ERROR' in text or 'WARNING' in text or '[OK]' in text or '[*]' in text):
+        _tee_text = text
+        
+        if text.strip():
+            _is_log_message = (
+                text.strip().startswith('[') or 
+                text.strip().startswith('[*]') or 
+                text.strip().startswith('===') or 
+                'Tunnel' in text or 
+                'Email' in text or 
+                'DEBUG' in text or 
+                'ERROR' in text or 
+                'WARNING' in text or 
+                '[OK]' in text or 
+                '[*]' in text or 
+                '清理' in text or 
+                '检测' in text or 
+                '安装' in text or 
+                '配置' in text or 
+                '启动' in text or 
+                '正在' in text or 
+                '完成' in text or 
+                '失败' in text or 
+                '成功' in text or 
+                '跳过' in text or 
+                '设置' in text or 
+                '测试' in text or 
+                '版本' in text or 
+                '镜像' in text or 
+                '依赖' in text or 
+                '环境' in text or 
+                '服务' in text or 
+                '地址' in text or 
+                '访问' in text or 
+                'Press' in text or 
+                'Running' in text or 
+                'Serving' in text or 
+                'WARNING:' in text or 
+                '按 Ctrl' in text
+            )
+            
+            if _is_log_message:
                 _tee_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-                if not text.strip().startswith(f'[{_tee_timestamp[:10]}'):
+                
+                if not (text.strip().startswith(f'[{_tee_timestamp[:10]}') or text.strip().startswith(f'[{_tee_timestamp[:4]}')):
                     _lines = text.split('\n')
                     _timestamped_lines = []
                     for _line in _lines:
@@ -559,6 +597,10 @@ class TeeOutput:
                         else:
                             _timestamped_lines.append(_line)
                     _tee_text = '\n'.join(_timestamped_lines)
+        
+        self.original.write(_tee_text)
+        
+        if self.file:
             safe_execute_func(
                 lambda: (self.file.write(_tee_text), self.file.flush()),
                 context='TeeOutput写入'
