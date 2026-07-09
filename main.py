@@ -6751,9 +6751,9 @@ if __name__ == '__main__':
                     if result['success']:
                         new_url = result.get('url')
                         if new_url:
-                                if saved_old_url and saved_old_url != new_url:
-                                    print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
-                                    sys.stdout.flush()
+                            if saved_old_url and saved_old_url != new_url:
+                                print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
+                                sys.stdout.flush()
                             
                             print(f"[Tunnel] 🔍 获取到新URL: {new_url}")
                             _min_confirms_restart = globals().get('stable_url_min_confirms', 3)
