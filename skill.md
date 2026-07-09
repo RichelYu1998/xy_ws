@@ -3765,47 +3765,48 @@ print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 检测到
 
 #### 2.10.2 全局日志时间戳自动化 (v3.8.15 新增)
 
-**核心机制**: 通过修改 `TeeOutput` 实现 **web_output.log 文件100%时间戳覆盖**
+**核心机制**: 通过修改 `TeeOutput` 实现 **控制台 + 文件 100% 时间戳全覆盖**
 
 **设计原则**:
-- ✅ **文件输出**: 所有非空内容强制添加时间戳（毫秒级精度）
-- ✅ **控制台输出**: 保持原始文本（不干扰用户查看）
+- ✅ **控制台输出**: 所有非空内容强制添加时间戳（毫秒级精度）
+- ✅ **文件输出**: 与控制台完全一致，100% 时间戳覆盖
 - ✅ **防重复机制**: 智能检测已有时间戳，避免双重时间戳
+- ✅ **零例外**: 无任何内容可以跳过时间戳（包括系统信息、Flask日志、API请求等）
 
 **TeeOutput 全量时间戳实现** (main.py:543-578):
 ```python
 def write(self, text):
-    # 控制台：输出原始文本（保持可读性）
-    self.original.write(text)
+    _output_text = text
     
-    # 文件：所有内容都添加时间戳
+    # 所有非空内容都添加时间戳（控制台 + 文件统一处理）
+    if text.strip():
+        # 生成毫秒级时间戳
+        _full_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        
+        # 检测是否已存在时间戳（防重复）
+        _has_timestamp = (
+            text.strip().startswith(f'[{_full_timestamp[:10]}') or 
+            text.strip().startswith(f'[{_full_timestamp[:4]}')
+        )
+        
+        if not _has_timestamp:
+            # 为每一行非空内容添加时间戳
+            _lines = text.split('\n')
+            _timestamped_lines = []
+            for _line in _lines:
+                if _line.strip():
+                    _timestamped_lines.append(f"[{_full_timestamp}] {_line}")
+                else:
+                    _timestamped_lines.append(_line)  # 空行保持原样
+            _output_text = '\n'.join(_timestamped_lines)
+    
+    # 控制台输出：带时间戳的文本
+    self.original.write(_output_text)
+    
+    # 文件输出：与控制台完全一致（带时间戳）
     if self.file:
-        _file_text = text
-        
-        if text.strip():
-            # 生成毫秒级时间戳
-            _full_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            
-            # 检测是否已存在时间戳（防重复）
-            _has_timestamp = (
-                text.strip().startswith(f'[{_full_timestamp[:10]}') or 
-                text.strip().startswith(f'[{_full_timestamp[:4]}')
-            )
-            
-            if not _has_timestamp:
-                # 为每一行非空内容添加时间戳
-                _lines = text.split('\n')
-                _timestamped_lines = []
-                for _line in _lines:
-                    if _line.strip():
-                        _timestamped_lines.append(f"[{_full_timestamp}] {_line}")
-                    else:
-                        _timestamped_lines.append(_line)  # 空行保持原样
-                _file_text = '\n'.join(_timestamped_lines)
-        
-        # 写入带时间戳的文本到文件
         safe_execute_func(
-            lambda: (self.file.write(_file_text), self.file.flush()),
+            lambda: (self.file.write(_output_text), self.file.flush()),
             context='TeeOutput写入'
         )
 ```
@@ -3814,11 +3815,13 @@ def write(self, text):
 
 | 场景 | 控制台显示 | web_output.log 文件内容 |
 |------|-----------|------------------------|
-| **普通日志** | `[Tunnel] 启动成功` | `[2026-07-09 18:02:18.153] [Tunnel] 启动成功` |
-| **API请求** | `127.0.0.1 - - [09/Jul/2026 18:02:39] "GET / HTTP/1.1" 200 -` | `[2026-07-09 18:02:39.001] 127.0.0.1 - - [09/Jul/2026 18:02:39] "GET / HTTP/1.1" 200 -` |
-| **Flask日志** | ` * Running on http://127.0.0.1:8888` | `[2026-07-09 18:02:19.005]  * Running on http://127.0.0.1:8888` |
-| **空行** | （空行） | （空行，保持原样） |
-| **已有时戳** | `[2026-07-09 18:02:17] === Web服务启动 ===` | `[2026-07-09 18:02:17] === Web服务启动 ===` （不重复添加） |
+| **普通日志** | `[2026-07-09 18:02:18.153] [Tunnel] 启动成功` | `[2026-07-09 18:02:18.153] [Tunnel] 启动成功` ✅ 完全一致 |
+| **API请求** | `[2026-07-09 18:02:39.001] 127.0.0.1 - - "GET / HTTP/1.1" 200 -` | `[2026-07-09 18:02:39.001] 127.0.0.1 - - "GET / HTTP/1.1" 200 -` ✅ 完全一致 |
+| **Flask日志** | `[2026-07-09 18:02:19.005]  * Running on http://127.0.0.1:8888` | `[2026-07-09 18:02:19.005]  * Running on http://127.0.0.1:8888` ✅ 完全一致 |
+| **系统信息** | `[2026-07-09 18:02:17.350] Python版本：3.11.5` | `[2026-07-09 18:02:17.350] Python版本：3.11.5` ✅ 完全一致 |
+| **中文操作** | `[2026-07-09 18:02:17.120] [*] 清理残留进程...` | `[2026-07-09 18:02:17.120] [*] 清理残留进程...` ✅ 完全一致 |
+| **空行** | （空行） | （空行，保持原样） ✅ 完全一致 |
+| **已有时戳** | `[2026-07-09 18:02:17] === Web服务启动 ===` | `[2026-07-09 18:02:17] === Web服务启动 ===` ✅ 不重复添加 |
 
 **时间戳格式**:
 - **精度**: 毫秒级 (`[YYYY-MM-DD HH:MM:SS.mmm]`)
@@ -3844,9 +3847,10 @@ _has_timestamp = (
 
 **技术优势**:
 1. **零配置** - 无需手动添加时间戳，全自动
-2. **零遗漏** - 所有写入文件的内容都有时间戳
-3. **零侵入** - 控制台输出不受影响
+2. **零遗漏** - 控制台 + 文件的所有内容都有时间戳（100%覆盖）
+3. **完全一致** - 控制台和文件显示完全相同，方便对比调试
 4. **高性能** - 时间戳生成 < 0.1ms，几乎无开销
+5. **零例外** - 包括系统信息、Flask日志、API请求、中文操作等所有内容
 
 **代码规范标识符**: `PY-STD-LOG-FULL-TIMESTAMP-001`
 
