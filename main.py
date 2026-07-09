@@ -545,31 +545,31 @@ class TeeOutput:
                 self.file = None
     
     def write(self, text):
-        self.original.write(text)
+        _output_text = text
+        
+        if text.strip():
+            _full_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            
+            _has_timestamp = (
+                text.strip().startswith(f'[{_full_timestamp[:10]}') or 
+                text.strip().startswith(f'[{_full_timestamp[:4]}')
+            )
+            
+            if not _has_timestamp:
+                _lines = text.split('\n')
+                _timestamped_lines = []
+                for _line in _lines:
+                    if _line.strip():
+                        _timestamped_lines.append(f"[{_full_timestamp}] {_line}")
+                    else:
+                        _timestamped_lines.append(_line)
+                _output_text = '\n'.join(_timestamped_lines)
+        
+        self.original.write(_output_text)
         
         if self.file:
-            _file_text = text
-            
-            if text.strip():
-                _full_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-                
-                _has_timestamp = (
-                    text.strip().startswith(f'[{_full_timestamp[:10]}') or 
-                    text.strip().startswith(f'[{_full_timestamp[:4]}')
-                )
-                
-                if not _has_timestamp:
-                    _lines = text.split('\n')
-                    _timestamped_lines = []
-                    for _line in _lines:
-                        if _line.strip():
-                            _timestamped_lines.append(f"[{_full_timestamp}] {_line}")
-                        else:
-                            _timestamped_lines.append(_line)
-                    _file_text = '\n'.join(_timestamped_lines)
-            
             safe_execute_func(
-                lambda: (self.file.write(_file_text), self.file.flush()),
+                lambda: (self.file.write(_output_text), self.file.flush()),
                 context='TeeOutput写入'
             )
     
