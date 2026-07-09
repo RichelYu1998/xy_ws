@@ -547,8 +547,20 @@ class TeeOutput:
     def write(self, text):
         self.original.write(text)
         if self.file:
+            _tee_text = text
+            if text.strip() and (text.strip().startswith('[') or 'Tunnel' in text or 'Email' in text or 'DEBUG' in text or 'ERROR' in text or 'WARNING' in text or '[OK]' in text or '[*]' in text):
+                _tee_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                if not text.strip().startswith(f'[{_tee_timestamp[:10]}'):
+                    _lines = text.split('\n')
+                    _timestamped_lines = []
+                    for _line in _lines:
+                        if _line.strip():
+                            _timestamped_lines.append(f"[{_tee_timestamp}] {_line}")
+                        else:
+                            _timestamped_lines.append(_line)
+                    _tee_text = '\n'.join(_timestamped_lines)
             safe_execute_func(
-                lambda: (self.file.write(text), self.file.flush()),
+                lambda: (self.file.write(_tee_text), self.file.flush()),
                 context='TeeOutput写入'
             )
     
@@ -592,13 +604,15 @@ def setup_web_logging():
     sys.stderr = TeeOutput(sys.stderr, web_log_file)
 
 def log_print(*args, **kwargs):
-    """同时输出到控制台和 web_output.log"""
+    """同时输出到控制台和 web_output.log（自动添加时间戳）"""
     global web_log_file
     msg = ' '.join(str(a) for a in args)
-    print(msg, **kwargs)
+    _log_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _msg_with_timestamp = f"[{_log_timestamp}] {msg}"
+    print(_msg_with_timestamp, **kwargs)
     if web_log_file:
         safe_execute_func(
-            lambda: open(web_log_file, 'a', encoding='utf-8').write(msg + '\n'),
+            lambda: open(web_log_file, 'a', encoding='utf-8').write(_msg_with_timestamp + '\n'),
             context='log_print'
         )
 
@@ -5926,16 +5940,18 @@ if __name__ == '__main__':
                     })
                 result = {'success': True, 'changelog': changelog}
                 import sys
-                print(f'[DEBUG] changelog API 返回: {len(changelog)} 个版本', file=sys.stderr)
+                _debug_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f'[{_debug_time}] [DEBUG] changelog API 返回: {len(changelog)} 个版本', file=sys.stderr)
                 if changelog:
-                    print(f'[DEBUG] 最新版本: {changelog[0]["version"]}, 包含 {len(changelog[0]["items"])} 个项目', file=sys.stderr)
+                    print(f'[{_debug_time}] [DEBUG] 最新版本: {changelog[0]["version"]}, 包含 {len(changelog[0]["items"])} 个项目', file=sys.stderr)
                     for idx, item in enumerate(changelog[0]['items']):
-                        print(f'[DEBUG]   项目{idx}: type={item.get("type")}, title={str(item.get("title", ""))[:50]}', file=sys.stderr)
+                        print(f'[{_debug_time}] [DEBUG]   项目{idx}: type={item.get("type")}, title={str(item.get("title", ""))[:50]}', file=sys.stderr)
                 return jsonify(result)
             except Exception as e:
                 import traceback
                 import sys
-                print(f'[ERROR] changelog 解析失败: {e}', file=sys.stderr)
+                _error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f'[{_error_time}] [ERROR] changelog 解析失败: {e}', file=sys.stderr)
                 traceback.print_exc(file=sys.stderr)
                 return jsonify({'success': False, 'error': str(e)}), 500
 

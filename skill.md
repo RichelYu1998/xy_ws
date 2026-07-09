@@ -3763,6 +3763,73 @@ print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 检测到
 
 **代码规范标识符**: `PY-STD-LOG-TIMESTAMP-001`
 
+#### 2.10.2 全局日志时间戳自动化 (v3.8.15 新增)
+
+**核心机制**: 通过修改 `TeeOutput` 和 `log_print` 实现全自动时间戳
+
+**TeeOutput 智能检测** (main.py:543-569):
+```python
+def write(self, text):
+    self.original.write(text)
+    if self.file:
+        _tee_text = text
+        # 智能检测：仅对日志消息添加时间戳（避免影响API响应等）
+        if text.strip() and (text.strip().startswith('[') or 
+            'Tunnel' in text or 'Email' in text or 'DEBUG' in text or 
+            'ERROR' in text or 'WARNING' in text or '[OK]' in text or '[*]' in text):
+            
+            _tee_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            
+            # 避免重复添加时间戳
+            if not text.strip().startswith(f'[{_tee_timestamp[:10]}'):
+                _lines = text.split('\n')
+                _timestamped_lines = []
+                for _line in _lines:
+                    if _line.strip():
+                        _timestamped_lines.append(f"[{_tee_timestamp}] {_line}")
+                    else:
+                        _timestamped_lines.append(_line)
+                _tee_text = '\n'.join(_timestamped_lines)
+        
+        # 写入带时间戳的文本到文件
+        safe_execute_func(
+            lambda: (self.file.write(_tee_text), self.file.flush()),
+            context='TeeOutput写入'
+        )
+```
+
+**log_print 自动时间戳** (main.py:594-609):
+```python
+def log_print(*args, **kwargs):
+    """同时输出到控制台和 web_output.log（自动添加时间戳）"""
+    global web_log_file
+    msg = ' '.join(str(a) for a in args)
+    _log_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    _msg_with_timestamp = f"[{_log_timestamp}] {msg}"
+    print(_msg_with_timestamp, **kwargs)  # 控制台输出带时间戳
+    if web_log_file:
+        safe_execute_func(
+            lambda: open(web_log_file, 'a', encoding='utf-8').write(_msg_with_timestamp + '\n'),
+            context='log_print'
+        )
+```
+
+**自动检测的日志类型**:
+- ✅ 以 `[` 开头的消息（如 `[Tunnel]`, `[Email]`, `[DEBUG]`）
+- ✅ 包含关键词: `Tunnel`, `Email`, `DEBUG`, `ERROR`, `WARNING`
+- ✅ 包含状态标记: `[OK]`, `[*]`
+- ❌ 不处理的: API响应、纯数据输出、格式化表格等
+
+**时间戳格式**:
+- TeeOutput: `[YYYY-MM-DD HH:MM:SS.mmm]` (毫秒精度，用于精确调试)
+- log_print: `[YYYY-MM-DD HH:MM:SS]` (秒精度，用于一般日志)
+
+**防重复机制**:
+- 检测消息是否已包含时间戳（以 `[YYYY-MM-DD` 开头）
+- 避免手动添加时间戳后再被自动添加一次
+
+**代码规范标识符**: `PY-STD-LOG-AUTO-TIMESTAMP-001`
+
 ### 2.15 main.py 独立函数完整列表
 
 #### 2.15.1 工具函数
