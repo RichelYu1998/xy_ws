@@ -15,15 +15,17 @@ echo. > "!LOG_FILE!"
 goto main_start
 
 :log
-echo %*
+set "TIMESTAMP=%date% %time%"
+echo [%TIMESTAMP%] %*
 if not "%LOG_FILE%"=="" (
     if exist "!LOG_FILE!" (
-        >> "!LOG_FILE!" echo %* 2>nul
+        >> "!LOG_FILE!" echo [%TIMESTAMP%] %* 2>nul
     )
 )
 exit /b
 
 :log_blank
+set "TIMESTAMP=%date% %time%"
 echo.
 if not "%LOG_FILE%"=="" (
     if exist "!LOG_FILE!" (
@@ -33,7 +35,8 @@ if not "%LOG_FILE%"=="" (
 exit /b
 
 :log_console_only
-echo %*
+set "TIMESTAMP=%date% %time%"
+echo [%TIMESTAMP%] %*
 exit /b
 
 :log_blank_console_only
