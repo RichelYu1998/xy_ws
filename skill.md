@@ -3854,6 +3854,167 @@ _has_timestamp = (
 
 **代码规范标识符**: `PY-STD-LOG-FULL-TIMESTAMP-001`
 
+#### 2.10.3 批处理/Shell 脚本日志时间戳规范 (v3.8.15 新增)
+
+**核心机制**: run.bat 和 run.sh 的日志函数统一添加时间戳支持
+
+**设计原则**:
+- ✅ **跨平台一致性** - Windows/Linux/macOS 都有时间戳
+- ✅ **双输出保证** - 控制台 + 文件统一时间戳
+- ✅ **格式标准化** - 遵循各平台原生时间格式
+- ✅ **空行保护** - 空行保持原样，不破坏排版
+
+##### Windows 批处理 run.bat 实现
+
+**修改位置**: [run.bat:14-20](run.bat#L14-L20)
+
+```batch
+:log
+set "TIMESTAMP=%date% %time%"
+echo [%TIMESTAMP%] %*
+if not "%LOG_FILE%"=="" (
+    if exist "!LOG_FILE!" (
+        >> "!LOG_FILE!" echo [%TIMESTAMP%] %* 2>nul
+    )
+)
+exit /b
+
+:log_console_only
+set "TIMESTAMP=%date% %time%"
+echo [%TIMESTAMP%] %*
+exit /b
+
+:log_blank
+echo.
+if not "%LOG_FILE%"=="" (
+    if exist "!LOG_FILE!" (
+        >> "!LOG_FILE!" echo. 2>nul
+    )
+)
+exit /b
+```
+
+**时间戳格式**:
+- 格式: `[YYYY/MM/DD HH:MM:SS.mm]`
+- 示例: `[2026/07/09 18:02:17.35]`
+- 精度: 厘秒 (0.01秒)
+- 来源: Windows 系统 `%date% %time%` 变量
+
+**使用场景**:
+```batch
+call :log [*] 清理残留进程...
+# 输出: [2026/07/09 18:02:17.12] [*] 清理残留进程...
+
+call :log [1/6] 检测Python环境...
+# 输出: [2026/07/09 18:02:17.45] [1/6] 检测Python环境...
+
+call :log [*] 最快PIP镜像: 阿里云 [87毫秒]
+# 输出: [2026/07/09 18:02:18.15] [*] 最快PIP镜像: 阿里云 [87毫秒]
+```
+
+##### Linux/macOS Shell run.sh 实现
+
+**修改位置**: [run.sh:14-20](run.sh#L14-L20)
+
+```bash
+log() {
+    TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    echo "[$TIMESTAMP] $*"
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE" 2>/dev/null
+}
+
+log_console_only() {
+    TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S.%3N')"
+    echo "[$TIMESTAMP] $*"
+}
+
+log_blank() {
+    echo ""
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "" >> "$LOG_FILE" 2>/dev/null
+}
+```
+
+**时间戳格式**:
+- 格式: `[YYYY-MM-DD HH:MM:SS.mmm]`
+- 示例: `[2026-07-09 18:02:17.123]`
+- 精度: 毫秒 (0.001秒)
+- 来源: GNU date 命令 `%3N` (3位纳秒→毫秒)
+
+**date 参数说明**:
+| 参数 | 含义 | 示例 |
+|------|------|------|
+| `%Y` | 4位年份 | 2026 |
+| `%m` | 2位月份 | 07 |
+| `%d` | 2位日期 | 09 |
+| `%H` | 24小时制小时 | 18 |
+| `%M` | 分钟 | 02 |
+| `%S` | 秒 | 17 |
+| `%3N` | 毫秒 (3位) | 123 |
+
+**使用场景**:
+```bash
+log "[*] 清理残留进程..."
+# 输出: [2026-07-09 18:02:17.120] [*] 清理残留进程...
+
+log "[1/6] 检测Python环境..."
+# 输出: [2026-07-09 18:02:17.450] [1/6] 检测Python环境..."
+
+log "[*] 最快PIP镜像: 阿里云 [87毫秒]"
+# 输出: [2026-07-09 18:02:18.150] [*] 最快PIP镜像: 阿里云 [87毫秒]
+```
+
+##### 函数对比表
+
+| 函数 | 用途 | 时间戳 | 写入文件 | 适用平台 |
+|------|------|--------|---------|---------|
+| `:log` / `log()` | 主日志（控制台+文件） | ✅ 有 | ✅ 是 | Windows/Linux/macOS |
+| `:log_console_only` / `log_console_only()` | 仅控制台日志 | ✅ 有 | ❌ 否 | Windows/Linux/macOS |
+| `:log_blank` / `log_blank()` | 空行（控制台+文件） | ❌ 无 | ✅ 是（空行） | Windows/Linux/macOS |
+| `:log_blank_console_only` / `log_blank_console_only()` | 仅控制台空行 | ❌ 无 | ❌ 否 | Windows/Linux/macOS |
+
+##### 跨平台一致性保证
+
+**三层时间戳系统对比**:
+
+| 层级 | 平台 | 实现方式 | 时间戳格式 | 精度 | 文件位置 |
+|------|------|---------|-----------|------|---------|
+| **L1: 启动脚本** | Windows | run.bat `:log()` | `[YYYY/MM/DD HH:MM:SS.mm]` | 厘秒 | run.bat:14-20 |
+| **L1: 启动脚本** | Linux/macOS | run.sh `log()` | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | run.sh:14-20 |
+| **L2: Python运行时** | 所有平台 | TeeOutput.write() | `[YYYY-MM-DD HH:MM:SS.mmm]` | 毫秒 | main.py:543-578 |
+| **L3: 应用日志** | 所有平台 | log_print() | `[YYYY-MM-DD HH:MM:SS]` | 秒 | main.py:594-609 |
+
+**效果一致性**:
+```
+Windows 环境:
+[2026/07/09 18:02:17.35] [*] 清理残留进程...           ← run.bat (L1)
+[2026-07-09 18:02:18.153] [Tunnel] 启动隧道...         ← Python (L2)
+
+Linux/macOS 环境:
+[2026-07-09 18:02:17.123] [*] 清理残留进程...          ← run.sh (L1)
+[2026-07-09 18:02:18.153] [Tunnel] 启动隧道...          ← Python (L2)
+```
+
+**覆盖范围**:
+✅ **启动阶段** - 环境检测、依赖安装、配置加载  
+✅ **运行阶段** - Tunnel、Email、API请求  
+✅ **系统信息** - 版本、镜像测试、进程管理  
+✅ **用户交互** - 提示信息、错误警告  
+✅ **所有非空内容** - 无任何遗漏  
+
+**特殊处理**:
+- ⚪ **空行** - 保持原样，不添加时间戳（避免干扰排版）
+- ✅ **已有时戳** - 智能检测，不重复添加（防双重时间戳）
+- 🔒 **线程安全** - 批处理/Shell 单线程，无并发问题
+
+**技术优势**:
+1. **零侵入性** - 不影响现有代码逻辑，仅增强日志输出
+2. **向后兼容** - 已有手动时间戳的代码不受影响
+3. **调试友好** - 所有关键操作都有精确时间点
+4. **问题定位** - 快速定位性能瓶颈和故障时刻
+5. **审计追踪** - 完整的操作时间线，便于回溯分析
+
+**代码规范标识符**: `BAT-STD-LOG-TIMESTAMP-001` (批处理), `SHL-STD-LOG-TIMESTAMP-001` (Shell)
+
 ### 2.15 main.py 独立函数完整列表
 
 #### 2.15.1 工具函数
