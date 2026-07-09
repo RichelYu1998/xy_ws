@@ -2631,6 +2631,27 @@ r'###\s+v(\d+\.\d+\.\d+)'
 ##### ✅ 格式二：章节式格式（适用于大版本、重要功能、复杂修复）
 
 ```markdown
+### v3.8.15 (2026-07-09) - ⚡ 隧道重启优化 + 日志时间戳统一 + NameError修复
+
+**核心改进**:
+1. **🚀 隧道重启响应速度提升50%** - 等待时间从60秒降至30秒
+2. **📝 Tunnel日志系统全面升级** - 统一时间戳格式，新增进度显示
+3. **🐛 _min_confirms变量未定义错误彻底解决**
+4. **📊 运维可视化增强** - 实时状态反馈、异常诊断信息
+
+**代码规范新增**:
+- `PY-STD-LOG-TIMESTAMP-001`: 时间戳强制规范（见 2.10.1 节）
+
+**修改文件**: main.py (6处修改)
+- [main.py:6707](main.py#L6707) - 重启等待阈值 60s → 30s
+- [main.py:6690-6716](main.py#L6690-L6716) - 异常检测+时间戳+诊断信息
+- [main.py:6719-6724](main.py#L6719-L6724) - 重启执行日志增强
+- [main.py:6924](main.py#L6924) - 心跳守护进程启动日志
+- [main.py:6921](main.py#L6921) - 自动重启守护进程启动日志
+- [main.py:6751,6811](main.py#L6751,L6811) - _min_confirms NameError修复
+
+---
+
 ### v3.8.14 (2026-07-08) - 🔒 致命死锁修复 + 邮件UI升级 + 日志系统增强
 
 #### 🚨 致命问题：邮件发送线程完全死锁（已彻底解决）
@@ -3684,6 +3705,63 @@ print(f"[Email] 正在发送邮件通知...")
 print(f"[*] 清理临时文件...")
 print(f"[OK] config.json 已创建")
 ```
+
+#### 2.10.1 时间戳统一规范 (v3.8.15 新增)
+
+**强制要求**: 所有 Tunnel 相关日志必须包含完整时间戳格式 `[YYYY-MM-DD HH:MM:SS]`
+
+**格式标准**:
+```python
+from datetime import datetime
+
+# ✅ 正确格式 (v3.8.15+)
+print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动心跳守护进程")
+print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 检测到URL不可用: {url}")
+print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 执行重启 (第{n}次)")
+
+# ❌ 禁止格式 (v3.8.14 及之前)
+print("[Tunnel] 启动心跳守护进程")           # 无时间戳
+print(f"[Tunnel] {datetime.now()} URL不可用") # 非标准格式
+```
+
+**适用范围**:
+- **必须添加时间戳的日志类型**:
+  - 心跳守护进程启动/停止
+  - 自动重启守护进程启动/停止
+  - URL可用性检测（检测到不可用/恢复）
+  - 重启操作执行（开始/完成/失败）
+  - 异常状态诊断信息
+  - 等待进度显示（每N秒一次）
+
+- **可选时间戳的日志类型**:
+  - 成功状态日志（URL验证通过）
+  - 常规信息提示
+  - 调试级别日志
+
+**时间戳使用示例**:
+```python
+# 示例1: 守护进程启动
+if tunnel_heartbeat_thread is None or not tunnel_heartbeat_thread.is_alive():
+    tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+    tunnel_heartbeat_thread.start()
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动心跳守护进程")
+
+# 示例2: 异常状态检测 + 详细诊断
+if not is_url_valid:
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ 检测到异常状态，开始计时等待重启...")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
+
+# 示例3: 等待进度显示（每10秒一次）
+if int(elapsed) % 10 == 0 and int(elapsed) > 0:
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ 等待重启中... ({int(elapsed)}/{wait_threshold}秒)")
+
+# 示例4: 重启执行
+print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 检测到问题，立即执行重启 (第{tunnel_restart_count}次)")
+```
+
+**代码规范标识符**: `PY-STD-LOG-TIMESTAMP-001`
 
 ### 2.15 main.py 独立函数完整列表
 

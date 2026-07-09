@@ -5836,20 +5836,25 @@ if __name__ == '__main__':
                 current_date = None
                 current_items = []
                 current_item = None
+                current_section = None
                 in_changelog = False
+                in_code_block = False
                 for line in lines:
                     if '最新更新' in line.strip() and line.strip().startswith('##'):
                         in_changelog = True
                         continue
                     if not in_changelog:
                         continue
-                    version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.strip())
-                    # 兼容格式：### v3.8.6 (2026-07-05) 或 ### v3.8.6 (2026-07-05) - 描述
+                    stripped = line.strip()
+                    version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
                     if not version_match:
                         version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.split(' - ')[0].strip())
                     if version_match:
                         if current_version:
-                            if current_item:
+                            if current_section:
+                                current_items.append(current_section)
+                                current_section = None
+                            elif current_item:
                                 current_items.append(current_item)
                                 current_item = None
                             changelog.append({
@@ -5861,26 +5866,57 @@ if __name__ == '__main__':
                         current_date = version_match.group(2)
                         current_items = []
                         current_item = None
+                        current_section = None
+                        in_code_block = False
                         continue
-                    if line.strip().startswith('## ') and in_changelog and current_version:
+                    if stripped.startswith('## ') and in_changelog and current_version:
                         break
-                    if not line.strip():
+                    if stripped.startswith('```'):
+                        in_code_block = not in_code_block
+                        if current_section:
+                            current_section['content'] += line + '\n'
                         continue
-                    item_match = re.match(r'^-\s+\*\*(.+?)\*\*\s*[-–]?\s*(.*)', line.strip())
+                    section_match = re.match(r'^####\s+(.+)$', stripped)
+                    if section_match and current_version:
+                        if current_section:
+                            current_items.append(current_section)
+                        elif current_item:
+                            current_items.append(current_item)
+                            current_item = None
+                        current_section = {
+                            'type': 'section',
+                            'title': section_match.group(1).strip(),
+                            'content': '',
+                            'sub_items': []
+                        }
+                        continue
+                    item_match = re.match(r'^-\s+\*\*(.+?)\*\*\s*[-–]?\s*(.*)', stripped)
                     if item_match and current_version:
-                        if current_item:
+                        if current_section:
+                            current_items.append(current_section)
+                            current_section = None
+                        elif current_item:
                             current_items.append(current_item)
                         current_item = {
+                            'type': 'item',
                             'title': item_match.group(1),
                             'desc': item_match.group(2).strip(),
                             'sub_items': []
                         }
                         continue
-                    sub_match = re.match(r'^-\s+(.*)', line.strip())
-                    if sub_match and current_item and (line.startswith('  ') or line.startswith('\t')):
-                        current_item['sub_items'].append(sub_match.group(1).strip())
+                    sub_match = re.match(r'^-\s+(.*)', stripped)
+                    if sub_match and (current_item or current_section):
+                        is_indented = line.startswith('  ') or line.startswith('\t')
+                        if current_item and is_indented:
+                            current_item['sub_items'].append(sub_match.group(1).strip())
+                        elif current_section:
+                            current_section['sub_items'].append(sub_match.group(1).strip())
                         continue
-                if current_item:
+                    if current_section and stripped and not in_code_block:
+                        current_section['content'] += line + '\n'
+                if current_section:
+                    current_items.append(current_section)
+                elif current_item:
                     current_items.append(current_item)
                 if current_version:
                     changelog.append({
@@ -5888,7 +5924,44 @@ if __name__ == '__main__':
                         'date': current_date,
                         'items': current_items
                     })
-                return jsonify({'success': True, 'changelog': changelog})
+                result = {'success': True, 'changelog': changelog}
+                import sys
+                print(f'[DEBUG] changelog API 返回: {len(changelog)} 个版本', file=sys.stderr)
+                if changelog:
+                    print(f'[DEBUG] 最新版本: {changelog[0]["version"]}, 包含 {len(changelog[0]["items"])} 个项目', file=sys.stderr)
+                    for idx, item in enumerate(changelog[0]['items']):
+                        print(f'[DEBUG]   项目{idx}: type={item.get("type")}, title={str(item.get("title", ""))[:50]}', file=sys.stderr)
+                return jsonify(result)
+            except Exception as e:
+                import traceback
+                import sys
+                print(f'[ERROR] changelog 解析失败: {e}', file=sys.stderr)
+                traceback.print_exc(file=sys.stderr)
+                return jsonify({'success': False, 'error': str(e)}), 500
+
+        @app.route('/api/changelog-debug', methods=['GET'])
+        def get_changelog_debug():
+            try:
+                readme_path = os.path.join(PROJECT_DIR, 'README.md')
+                with open(readme_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                lines = content.split('\n')
+                debug_lines = []
+                in_changelog = False
+                for i, line in enumerate(lines, 1):
+                    if '最新更新' in line.strip() and line.strip().startswith('##'):
+                        in_changelog = True
+                    if in_changelog:
+                        debug_lines.append(f'{i:4d}: {line}')
+                        if line.strip().startswith('## ') and i > 10:
+                            break
+                        if len(debug_lines) > 200:
+                            break
+                return jsonify({
+                    'success': True,
+                    'total_lines': len(lines),
+                    'changelog_preview': '\n'.join(debug_lines[:100])
+                })
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -6619,24 +6692,32 @@ if __name__ == '__main__':
                 if restart_wait_start is None:
                     restart_wait_start = time.time()
                     elapsed = 0
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ 检测到异常状态，开始计时等待重启...")
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
+                    sys.stdout.flush()
                 else:
                     elapsed = time.time() - restart_wait_start
                 
-                # 等待时间阈值：60秒（给URL足够的时间稳定，避免频繁重启）
-                wait_threshold = 60
+                # 等待时间阈值：30秒（减少等待时间，更快响应问题）
+                wait_threshold = 30
                 
                 if elapsed < wait_threshold:
-                    # 短暂等待后立即重启
+                    # 每10秒打印一次等待状态
+                    if int(elapsed) % 10 == 0 and int(elapsed) > 0:
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ 等待重启中... ({int(elapsed)}/{wait_threshold}秒)")
+                        sys.stdout.flush()
                     time.sleep(1)
                     continue
                 
                 # 超过等待时间，触发重启
                 restart_wait_start = None
                 tunnel_restart_count += 1
-                print(f"[Tunnel] 检测到问题，尝试重启 (第{tunnel_restart_count}次)")
-                print(f"[Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
-                print(f"[Tunnel] - 公网URL: {web_url if web_url else '无'}")
-                print(f"[Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 检测到问题，立即执行重启 (第{tunnel_restart_count}次)")
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
                 sys.stdout.flush()
                 
                 # 清理所有 hostc/node 进程
@@ -6670,12 +6751,13 @@ if __name__ == '__main__':
                     if result['success']:
                         new_url = result.get('url')
                         if new_url:
-                            if saved_old_url and saved_old_url != new_url:
-                                print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
-                                sys.stdout.flush()
+                                if saved_old_url and saved_old_url != new_url:
+                                    print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
+                                    sys.stdout.flush()
                             
                             print(f"[Tunnel] 🔍 获取到新URL: {new_url}")
-                            print(f"[Tunnel] ⏳ 等待心跳检测确认稳定性（需要连续{_min_confirms}次验证通过）...")
+                            _min_confirms_restart = globals().get('stable_url_min_confirms', 3)
+                            print(f"[Tunnel] ⏳ 等待心跳检测确认稳定性（需要连续{_min_confirms_restart}次验证通过）...")
                             
                             # 重置稳定性检测状态，让心跳机制处理
                             global stable_url, stable_url_confirm_count, url_first_seen_time
@@ -6732,10 +6814,11 @@ if __name__ == '__main__':
             result = auto_start_tunnel(force_restart=True)
             if result['success']:
                 new_url = result.get('url')
+                _min_confirms_api = globals().get('stable_url_min_confirms', 3)
                 response_data = {
                     'success': True,
                     'url': new_url,
-                    'message': f'隧道已启动，正在验证稳定性 ({_min_confirms}次连续验证)',
+                    'message': f'隧道已启动，正在验证稳定性 ({_min_confirms_api}次连续验证)',
                     'status': 'verifying',
                     'verify_progress': {
                         'current': 0,
@@ -6747,7 +6830,7 @@ if __name__ == '__main__':
                 
                 if new_url:
                     print(f"[Tunnel/API] ✅ 隧道启动成功: {new_url}")
-                    print(f"[Tunnel/API] ⏳ 进入稳定性验证模式 (需要{_min_confirms}次通过)")
+                    print(f"[Tunnel/API] ⏳ 进入稳定性验证模式 (需要{_min_confirms_api}次通过)")
                     print(f"[Tunnel/API] 📧 邮件将在验证通过后自动发送")
                 else:
                     print(f"[Tunnel/API] ⚠️ 隧道启动成功但URL未就绪")
@@ -6839,13 +6922,13 @@ if __name__ == '__main__':
             if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
                 if not tunnel_daemon_started:
                     tunnel_daemon_started = True
-                    print("[Tunnel] 启动自动重启守护进程")
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动自动重启守护进程")
                 tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
                 tunnel_restart_thread.start()
             if tunnel_heartbeat_thread is None or not tunnel_heartbeat_thread.is_alive():
                 tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
                 tunnel_heartbeat_thread.start()
-                print("[Tunnel] 启动心跳守护进程")
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动心跳守护进程")
             
             # 返回状态 - 统一使用 web_url，包含详细的稳定性信息
             return jsonify({
