@@ -2316,10 +2316,10 @@ if os.path.isdir(temp_dir):
         # 清理所有文件
         ...
 
-# 后台守护线程（每5分钟检查一次）
+# 后台守护线程（每1分钟检查一次，超过3MB立即清理）
 def temp_cleanup_loop():
     while True:
-        time.sleep(300)
+        time.sleep(60)
         # 检查 + 清理逻辑
 ```
 
@@ -2327,7 +2327,7 @@ def temp_cleanup_loop():
 - ✅ 临时文件创建必须用 `try/finally` 确保清理，禁止用 `ExceptionContext`
 - ✅ 重试循环中每轮开始前清理上一轮残留的临时文件
 - ✅ Python侧独立实现 temp 目录清理，不依赖启动脚本
-- ✅ 后台守护线程每5分钟检查一次，超过3MB自动清理
+- ✅ 后台守护线程每1分钟检查一次，超过3MB自动清理
 - ❌ 禁止在 `with ExceptionContext` 块内创建临时文件而在块外清理
 
 ### 2.11 Flask API 路由规范

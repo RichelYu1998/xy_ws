@@ -1,4 +1,4 @@
-﻿﻿﻿# xy_ws - Szwego商品爬虫系统
+﻿# xy_ws - Szwego商品爬虫系统
 
 > **版本**: v3.8.29
 > **更新日期**: 2026-07-11
@@ -14,7 +14,7 @@
 
 #### 🎯 核心改进
 - **🔧 safe_read_excel临时文件泄漏修复** - `ExceptionContext` 改为 `try/finally`，异常路径也清理临时文件；重试循环中清理上一轮残留
-- **🧹 Python侧temp目录自动清理** - Web服务启动时检查temp目录大小（超过3MB自动清理）+ 后台每5分钟定期清理，不再仅依赖run.sh/run.bat
+- **🧹 Python侧temp目录自动清理** - Web服务启动时检查temp目录大小（超过3MB自动清理）+ 后台每1分钟定期清理，不再仅依赖run.sh/run.bat
 
 ---
 
@@ -64,7 +64,7 @@ main.py Web服务启动时:
   → 超过3MB → 清理所有文件 + 打印日志
   → 未超过 → 跳过 + 打印日志
 
-后台守护线程（每5分钟）:
+后台守护线程（每1分钟）:
   → 检查 temp/ 目录大小
   → 超过3MB → 清理所有文件 + 打印日志
   → 无论通过 run.sh 还是 python main.py 启动都有效
@@ -72,7 +72,7 @@ main.py Web服务启动时:
 
 **关键修改**:
 - `main.py`: Web服务启动时新增 temp 目录大小检查和清理
-- `main.py`: 新增 `temp_cleanup_loop()` 后台守护线程（每5分钟检查一次）
+- `main.py`: 新增 `temp_cleanup_loop()` 后台守护线程（每1分钟检查一次，超过3MB立即清理）
 
 ---
 
