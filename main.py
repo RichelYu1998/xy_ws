@@ -7441,9 +7441,23 @@ if __name__ == '__main__':
                     time.sleep(1)
                     continue
                 
-                # 如果 tunnel_need_restart 已被标记（hostc退出等），立即重启不等30秒
+                if has_hostc_process and not is_url_valid:
+                    if restart_wait_start is None:
+                        restart_wait_start = time.time()
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ hostc运行中但URL未就绪，等待URL出现...")
+                        sys.stdout.flush()
+                    elapsed_waiting_url = time.time() - restart_wait_start
+                    if elapsed_waiting_url < 120:
+                        time.sleep(3)
+                        continue
+                    else:
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ hostc运行超过120秒仍无URL，触发重启")
+                        sys.stdout.flush()
+                        restart_wait_start = None
+
                 if tunnel_need_restart:
                     restart_wait_start = None
+                    tunnel_need_restart = False
                     tunnel_restart_count += 1
                     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 tunnel_need_restart=True，立即执行重启 (第{tunnel_restart_count}次)")
                     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
