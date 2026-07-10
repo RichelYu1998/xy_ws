@@ -7145,14 +7145,61 @@ if __name__ == '__main__':
                 if web_url:
                     tunnel_url = web_url
                     old_tunnel_url = web_url
-                    print(f"[Tunnel] ✅ 发现公网地址: {web_url}，验证将由心跳机制完成")
+                    print(f"[Tunnel] ✅ 发现公网地址: {web_url}，后台验证并发邮件")
                     sys.stdout.flush()
-                    return {'success': True, 'url': tunnel_url, 'message': f'发现已有URL: {tunnel_url}，验证将由心跳机制完成'}
+
+                    def _verify_and_notify_found_url(url):
+                        global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time, last_email_sent_url
+                        try:
+                            url_verified = verify_url(url, timeout=10, verbose=True)
+                        except Exception:
+                            url_verified = False
+                        if url_verified:
+                            print(f"[Tunnel] 🎉 公网地址验证通过！立即发送邮件通知...")
+                            send_tunnel_notification(url, 'stable_available', force_send=True)
+                            stable_url = url
+                            stable_url_confirm_count = stable_url_min_confirms
+                            url_first_seen_time = time.time()
+                            last_stable_notification_time = time.time()
+                            last_email_sent_url = url
+                        else:
+                            print(f"[Tunnel] ⏳ 公网地址暂不可用，将由心跳机制持续验证后发送邮件")
+
+                    threading.Thread(target=_verify_and_notify_found_url, args=(web_url,), daemon=True).start()
+                    return {'success': True, 'url': tunnel_url, 'message': f'发现已有URL: {tunnel_url}，后台验证中'}
 
                 if has_hostc_process:
-                    print(f"[Tunnel] 🔍 hostc在运行，URL将由心跳机制获取和验证")
+                    print(f"[Tunnel] 🔍 hostc在运行，后台等待URL出现后验证发邮件")
                     sys.stdout.flush()
-                    return {'success': True, 'url': None, 'message': 'hostc在运行，URL由心跳机制获取'}
+
+                    def _wait_and_notify_hostc_url():
+                        global tunnel_url, old_tunnel_url, stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time, last_email_sent_url
+                        for _ in range(30):
+                            time.sleep(2)
+                            found_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+                            if found_url:
+                                tunnel_url = found_url
+                                old_tunnel_url = found_url
+                                print(f"[Tunnel] ✅ 后台获取到URL: {found_url}")
+                                try:
+                                    url_verified = verify_url(found_url, timeout=10, verbose=True)
+                                except Exception:
+                                    url_verified = False
+                                if url_verified:
+                                    print(f"[Tunnel] 🎉 公网地址验证通过！立即发送邮件通知...")
+                                    send_tunnel_notification(found_url, 'stable_available', force_send=True)
+                                    stable_url = found_url
+                                    stable_url_confirm_count = stable_url_min_confirms
+                                    url_first_seen_time = time.time()
+                                    last_stable_notification_time = time.time()
+                                    last_email_sent_url = found_url
+                                else:
+                                    print(f"[Tunnel] ⏳ 公网地址暂不可用，将由心跳机制持续验证后发送邮件")
+                                return
+                        print(f"[Tunnel] ⏳ 后台等待URL超时，将由心跳机制继续获取")
+
+                    threading.Thread(target=_wait_and_notify_hostc_url, daemon=True).start()
+                    return {'success': True, 'url': None, 'message': 'hostc在运行，后台等待URL'}
 
                 print(f"[Tunnel] 🔍 无hostc进程且无URL，需要启动新隧道")
                 sys.stdout.flush()
