@@ -7459,11 +7459,11 @@ if __name__ == '__main__':
                         print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ hostc运行中但URL未就绪，等待URL出现...")
                         sys.stdout.flush()
                     elapsed_waiting_url = time.time() - restart_wait_start
-                    if elapsed_waiting_url < 120:
+                    if elapsed_waiting_url < 30:
                         time.sleep(3)
                         continue
                     else:
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ hostc运行超过120秒仍无URL，触发重启")
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ hostc运行超过30秒仍无URL，触发重启")
                         sys.stdout.flush()
                         restart_wait_start = None
 
