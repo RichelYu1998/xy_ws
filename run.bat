@@ -67,7 +67,7 @@ ping -n 2 127.0.0.1 >nul 2>&1
 call :log [*] 残留进程清理完成
 
 call :log_blank
-call :log [*] 预启动 hostc 隧道（后台运行，不阻塞）...
+call :log [*] 启动 hostc 隧道（后台运行，不阻塞）...
 echo. > "file\tunnel_url.txt"
 start /b cmd /c "npx -y hostc@latest 8888 --local-host localhost >> file\tunnel_url.txt 2>&1" < nul
 call :log [*] hostc 已在后台启动，将在后续步骤中获取URL
@@ -627,16 +627,6 @@ if /i "!CHOICE!"=="Q" goto cleanup_exit
 :run_web
 call :log_blank
 call :log ========================================
-call :log 隧道服务配置
-call :log ========================================
-call :log_blank
-call :log 正在配置 hostc 隧道服务...
-call :log [*] 预启动隧道服务【加快首次启动速度】...
-call npx -y hostc@latest --help >nul 2>&1
-call :log 隧道服务就绪
-
-call :log_blank
-call :log ========================================
 call :log 启动Web服务和隧道...
 call :log ========================================
 
@@ -675,7 +665,7 @@ if not "!HTTP_CODE!"=="200" (
 
 set "LOG_FILE="
 call :log_console_only Web 服务已就绪，正在启动隧道...
-REM [已移至开头] hostc已在启动时预启动
+REM hostc已在脚本启动时启动
 
 call :log_blank_console_only
 call :log_console_only ========================================
