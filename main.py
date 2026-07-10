@@ -331,6 +331,26 @@ def safe_execute_func(func: Callable, default: Any = None, context: str = '') ->
     return handler.try_execute(func, default, context)
 
 
+def auto_clean_temp_dir():
+    """检查temp目录大小，超过3MB立即清理所有文件"""
+    temp_dir = os.path.join(PROJECT_DIR, 'temp')
+    if not os.path.isdir(temp_dir):
+        return
+    temp_size = 0
+    for f in os.listdir(temp_dir):
+        fp = os.path.join(temp_dir, f)
+        if os.path.isfile(fp):
+            temp_size += os.path.getsize(fp)
+    if temp_size > 3 * 1024 * 1024:
+        cleaned = 0
+        for f in os.listdir(temp_dir):
+            fp = os.path.join(temp_dir, f)
+            if os.path.isfile(fp):
+                safe_execute_func(lambda: os.remove(fp), context='auto_clean_temp_dir清理')
+                cleaned += 1
+        print(f"[Clean] temp目录超过3MB({temp_size / (1024 * 1024):.1f}MB)，已清理{cleaned}个文件")
+
+
 def safe_execute_with_error(func: Callable, context: str = '') -> Tuple[Any, str]:
     """统一异常处理包装器 - 用于需要获取错误信息的场景"""
     handler = ExceptionHandler()
@@ -3159,6 +3179,7 @@ class FileManager:
                     lambda: os.remove(temp_file),
                     context='清理临时Excel文件'
                 )
+            auto_clean_temp_dir()
         
         return None
 
@@ -4168,6 +4189,7 @@ class StockNumberComparator:
         finally:
             if temp_file and os.path.exists(temp_file):
                 safe_execute_func(lambda: os.remove(temp_file), context='load_excel_data清理临时文件')
+            auto_clean_temp_dir()
 
     def load_all_excel_data(self, remove_duplicates=True):
         all_stock_numbers = []
@@ -4222,6 +4244,7 @@ class StockNumberComparator:
             finally:
                 if temp_file and os.path.exists(temp_file):
                     safe_execute_func(lambda: os.remove(temp_file), context='load_all_excel_data清理临时文件')
+                auto_clean_temp_dir()
         
         if remove_duplicates:
             all_stock_numbers = list(set(all_stock_numbers))
@@ -7946,45 +7969,14 @@ if __name__ == '__main__':
         setup_web_logging()
         
         # 启动时清理 temp 目录（超过3MB则清理）
-        temp_dir = os.path.join(PROJECT_DIR, 'temp')
-        if os.path.isdir(temp_dir):
-            temp_size = 0
-            for f in os.listdir(temp_dir):
-                fp = os.path.join(temp_dir, f)
-                if os.path.isfile(fp):
-                    temp_size += os.path.getsize(fp)
-            temp_size_mb = temp_size / (1024 * 1024)
-            if temp_size_mb > 3:
-                cleaned = 0
-                for f in os.listdir(temp_dir):
-                    fp = os.path.join(temp_dir, f)
-                    if os.path.isfile(fp):
-                        safe_execute_func(lambda: os.remove(fp), context='启动清理temp文件')
-                        cleaned += 1
-                print(f"[Clean] temp目录超过3MB({temp_size_mb:.1f}MB)，已清理{cleaned}个文件")
-            else:
-                print(f"[Clean] temp目录未超过3MB({temp_size_mb:.1f}MB)，跳过清理")
+        auto_clean_temp_dir()
         
-       # 后台定期清理 temp 目录（每1分钟检查一次，超过3MB立即清理）
+        # 后台定期清理 temp 目录（每1分钟检查一次，超过3MB立即清理）
         def temp_cleanup_loop():
             while True:
                 time.sleep(60)
                 try:
-                    temp_dir_check = os.path.join(PROJECT_DIR, 'temp')
-                    if os.path.isdir(temp_dir_check):
-                        temp_size_check = 0
-                        for f in os.listdir(temp_dir_check):
-                            fp = os.path.join(temp_dir_check, f)
-                            if os.path.isfile(fp):
-                                temp_size_check += os.path.getsize(fp)
-                        if temp_size_check > 3 * 1024 * 1024:
-                            cleaned = 0
-                            for f in os.listdir(temp_dir_check):
-                                fp = os.path.join(temp_dir_check, f)
-                                if os.path.isfile(fp):
-                                    safe_execute_func(lambda: os.remove(fp), context='后台清理temp文件')
-                                    cleaned += 1
-                            print(f"[Clean] 后台清理temp目录：{cleaned}个文件")
+                    auto_clean_temp_dir()
                 except Exception:
                     pass
         
