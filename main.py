@@ -7138,7 +7138,7 @@ if __name__ == '__main__':
             # 从 tunnel_url.txt 检查是否有有效公网地址（权威源）
             web_url = PathManager.get_public_url_from_web_log(skip_validation=True)
             
-            # 如果有 hostc 进程在运行且 web_output.log 有有效 URL，复用现有隧道
+            # 如果有 hostc 进程在运行且 tunnel_url.txt 有有效 URL，复用现有隧道
             if has_hostc_process and web_url and not force_restart:
                 if verify_url(web_url):
                     print(f"[Tunnel] ✅ 复用已有隧道（由run.bat管理）: {web_url}")
@@ -7147,34 +7147,36 @@ if __name__ == '__main__':
                     old_tunnel_url = web_url
                     return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
 
-
-            # 🔧 新增：如果hostc进程已存在但URL还没准备好，等待URL生成（不再重复启动）
+            # 如果hostc进程已存在，等待URL就绪（不再重复启动）
             if has_hostc_process and not force_restart:
-                print(f"[Tunnel] 🔍 检测到hostc已在运行（由run.bat启动），等待URL生成...")
+                if web_url:
+                    print(f"[Tunnel] 🔍 检测到hostc已在运行，URL已获取但尚未就绪: {web_url}")
+                    print(f"[Tunnel] ⏳ 等待URL变为可访问...")
+                else:
+                    print(f"[Tunnel] 🔍 检测到hostc已在运行（由run.bat启动），等待URL生成...")
                 sys.stdout.flush()
 
-                max_wait = 30  # 最多等30秒
+                max_wait = 30
                 wait_count = 0
                 while wait_count < max_wait:
                     time.sleep(1)
                     wait_count += 1
 
-                    # 重新从 tunnel_url.txt 读取URL
                     current_url = PathManager.get_public_url_from_web_log(skip_validation=True)
                     if current_url and verify_url(current_url):
-                        print(f"[Tunnel] ✅ 成功获取到hostc生成的URL: {current_url} (耗时{wait_count}秒)")
+                        print(f"[Tunnel] ✅ URL已就绪: {current_url} (耗时{wait_count}秒)")
                         sys.stdout.flush()
                         tunnel_url = current_url
                         old_tunnel_url = current_url
                         return {'success': True, 'url': tunnel_url, 'message': f'获取外部hostc的URL，耗时{wait_count}秒'}
 
                     if wait_count % 5 == 0:
-                        print(f"[Tunnel] ⏳ 等待中... ({wait_count}/{max_wait}秒)")
+                        print(f"[Tunnel] ⏳ 等待URL就绪中... ({wait_count}/{max_wait}秒)")
                         sys.stdout.flush()
 
-                print(f"[Tunnel] ⚠️ 等待{max_wait}秒后仍未获取到URL")
+                print(f"[Tunnel] ⚠️ 等待{max_wait}秒后URL仍未就绪")
                 sys.stdout.flush()
-                return {'success': False, 'url': None, 'error': f'等待{max_wait}秒后hostc未生成URL'}
+                return {'success': False, 'url': None, 'error': f'等待{max_wait}秒后hostc URL仍未可访问'}
             
             try:
                 port = args.port
