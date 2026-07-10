@@ -14,7 +14,7 @@
 
 #### 🎯 核心改进
 - **🔧 safe_read_excel临时文件泄漏修复** - `ExceptionContext` 改为 `try/finally`，异常路径也清理临时文件；重试循环中清理上一轮残留
-- **🧹 Python侧temp目录自动清理** - Web服务启动时检查temp目录大小（超过3MB自动清理）+ 后台每1分钟定期清理，不再仅依赖run.sh/run.bat
+- **🧹 Python侧temp目录自动清理** - 提取`auto_clean_temp_dir()`函数，每次临时文件操作后立即检查，超过3MB自动清理；后台每1分钟兜底检查
 
 ---
 
@@ -62,18 +62,23 @@ temp/ 目录清理仅依赖 run.sh/run.bat 启动脚本
 启动时检查（三端一致）:
   → run.sh: du -sk temp > 3072KB → rm -rf temp/*
   → run.bat: dir size > 3145728B → del /f /s /q temp\*.*
-  → main.py: temp_size > 3MB → os.remove()
+  → main.py: auto_clean_temp_dir() → 超过3MB清理
 
-后台定期清理（三端一致，每1分钟）:
+即时清理（main.py，一旦超过3MB立即清理）:
+  → safe_read_excel() finally块 → 清理自身临时文件 → auto_clean_temp_dir()
+  → load_excel_data() finally块 → 清理自身临时文件 → auto_clean_temp_dir()
+  → load_all_excel_data() finally块 → 清理自身临时文件 → auto_clean_temp_dir()
+
+后台兜底（三端一致，每1分钟）:
   → run.sh: sleep 60 → 检查 → 超过3MB清理
   → run.bat: CHECK_INTERVAL=60 → 检查 → 超过3MB清理
-  → main.py: time.sleep(60) → 检查 → 超过3MB清理
-  → 无论通过哪种方式启动都有效
+  → main.py: time.sleep(60) → auto_clean_temp_dir()
 ```
 
 **关键修改**:
-- `main.py`: Web服务启动时新增 temp 目录大小检查和清理
-- `main.py`: 新增 `temp_cleanup_loop()` 后台守护线程（每1分钟检查一次，超过3MB立即清理）
+- `main.py`: 提取 `auto_clean_temp_dir()` 函数，检查temp目录大小超过3MB立即清理
+- `main.py`: `safe_read_excel()` / `load_excel_data()` / `load_all_excel_data()` 的 finally 块中调用 `auto_clean_temp_dir()`
+- `main.py`: 后台守护线程每1分钟调用 `auto_clean_temp_dir()` 兜底
 - `run.sh` / `run.bat`: 后台清理间隔已为60秒，与Python侧一致
 
 ---

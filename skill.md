@@ -2306,6 +2306,35 @@ finally:
 
 2. **三端temp目录自动清理**（run.sh + run.bat + main.py 一致）：
 
+**核心函数 `auto_clean_temp_dir()`**：检查temp目录大小，超过3MB立即清理所有文件
+```python
+def auto_clean_temp_dir():
+    """检查temp目录大小，超过3MB立即清理所有文件"""
+    temp_dir = os.path.join(PROJECT_DIR, 'temp')
+    if not os.path.isdir(temp_dir):
+        return
+    temp_size = 0
+    for f in os.listdir(temp_dir):
+        fp = os.path.join(temp_dir, f)
+        if os.path.isfile(fp):
+            temp_size += os.path.getsize(fp)
+    if temp_size > 3 * 1024 * 1024:
+        cleaned = 0
+        for f in os.listdir(temp_dir):
+            fp = os.path.join(temp_dir, f)
+            if os.path.isfile(fp):
+                safe_execute_func(lambda: os.remove(fp), context='auto_clean_temp_dir清理')
+                cleaned += 1
+        print(f"[Clean] temp目录超过3MB({temp_size / (1024 * 1024):.1f}MB)，已清理{cleaned}个文件")
+```
+
+**调用时机（一旦超过3MB立即清理）**：
+- `safe_read_excel()` finally块 → 清理自身临时文件 → `auto_clean_temp_dir()`
+- `load_excel_data()` finally块 → 清理自身临时文件 → `auto_clean_temp_dir()`
+- `load_all_excel_data()` finally块 → 清理自身临时文件 → `auto_clean_temp_dir()`
+- Web服务启动时 → `auto_clean_temp_dir()`
+- 后台守护线程每1分钟 → `auto_clean_temp_dir()` 兜底
+
 **启动时检查（三端一致，阈值3MB）**：
 ```bash
 # run.sh
@@ -2323,34 +2352,19 @@ if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
 )
 ```
 
-```python
-# main.py
-temp_size = sum(os.path.getsize(os.path.join(temp_dir, f))
-                for f in os.listdir(temp_dir)
-                if os.path.isfile(os.path.join(temp_dir, f)))
-if temp_size > 3 * 1024 * 1024:  # 3MB
-    # 清理所有文件
-```
-
-**后台定期清理（三端一致，每1分钟）**：
+**后台兜底（三端一致，每1分钟）**：
 ```bash
 # run.sh: sleep 60 → 检查 → 超过3MB清理
 # run.bat: CHECK_INTERVAL=60 → 检查 → 超过3MB清理
-```
-
-```python
-# main.py: time.sleep(60) → 检查 → 超过3MB清理
-def temp_cleanup_loop():
-    while True:
-        time.sleep(60)
-        # 检查 + 清理逻辑
+# main.py: time.sleep(60) → auto_clean_temp_dir()
 ```
 
 **关键规则**：
 - ✅ 临时文件创建必须用 `try/finally` 确保清理，禁止用 `ExceptionContext`
 - ✅ 重试循环中每轮开始前清理上一轮残留的临时文件
 - ✅ 三端（run.sh + run.bat + main.py）独立实现 temp 目录清理，阈值3MB，间隔1分钟
-- ✅ 后台守护线程每1分钟检查一次，超过3MB自动清理
+- ✅ `auto_clean_temp_dir()` 在每次临时文件操作后调用，一旦超过3MB立即清理
+- ✅ 后台守护线程每1分钟调用 `auto_clean_temp_dir()` 兜底
 - ❌ 禁止在 `with ExceptionContext` 块内创建临时文件而在块外清理
 
 ### 2.11 Flask API 路由规范
