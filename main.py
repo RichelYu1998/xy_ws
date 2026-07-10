@@ -6990,6 +6990,7 @@ if __name__ == '__main__':
             consecutive_failures = 0
             max_consecutive_failures = 5  # 连续失败5次才标记需要重启
             url_verify_failures = 0  # URL验证连续失败计数
+            _min_confirms = globals().get('stable_url_min_confirms', 3)
             max_url_verify_failures = 10  # URL验证允许连续失败10次（降低敏感度）
             heartbeat_interval = 60  # 心跳间隔60秒（大幅降低频率）
             last_log_time = 0
