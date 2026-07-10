@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.20
+> **版本**: v3.8.21
 > **更新日期**: 2026-07-10
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,69 @@
 ---
 
 ## 最新更新
+
+### v3.8.21 (2026-07-10) - 📦 Node.js依赖合并 + API范式文档完善
+
+#### 🎯 核心改进
+- **📦 Node.js依赖合并** - 根目录`node_modules/`和`dist/hostc/server/node_modules/`合并至`dist/hostc/node_modules/`，净减少418个文件
+- **📝 API范式文档完善** - skill.md新增`/api/changelog`、`/api/changelog-debug`、`/api/readme-sections`、`/api/url-source/*`、`/api/email/*`、`/api/server/info`共10个API端点的完整范式
+- **🔒 安全规范** - 新增密码脱敏、白名单过滤、敏感信息忽略等安全范式
+
+---
+
+#### 📦 Node.js依赖合并
+
+**问题描述**:
+```
+根目录 node_modules/ (22个文件)
+  └── acorn, acorn-loose (未被任何代码引用)
+
+dist/hostc/server/node_modules/ (400个文件)
+  ├── @hostc/protocol/ (运行时依赖)
+  ├── typescript/ (编译时依赖，本地不需要)
+  └── .bin/tsc, workerd, wrangler (构建工具)
+```
+
+**修复后**:
+```
+dist/hostc/node_modules/ (4个核心文件)
+  └── @hostc/protocol/
+      ├── dist/index.js (核心协议实现)
+      ├── dist/index.d.ts (类型定义)
+      ├── package.json (包元数据)
+      └── tsconfig.json (编译配置)
+```
+
+- **根目录 `node_modules/`** - 已删除（acorn/acorn-loose 无引用）
+- **`dist/hostc/server/node_modules/`** - 已删除（typescript 等编译时依赖）
+- **`@hostc/protocol`** - 提升至 `dist/hostc/node_modules/`（唯一运行时依赖）
+- **`package.json`** - dependencies 已清空
+- **`package-lock.json`** - 已删除
+- **`.gitignore`** - 新增 `dist/hostc/node_modules/`
+
+---
+
+#### 📝 API范式文档完善（skill.md）
+
+新增以下API端点的完整范式（含请求/响应格式、实现代码、数据流图）：
+
+| API端点 | 类型 | 新增章节 |
+|---------|------|---------|
+| `/api/changelog` | GET | 2.11.1 更新日志接口（完整范式）⭐ |
+| `/api/changelog-debug` | GET | 2.11.2 更新日志调试接口 |
+| `/api/readme-sections` | GET | 2.11.3 README章节解析接口 |
+| `/api/url-source/status` | GET | 2.12.1 URL源状态查询 |
+| `/api/url-source/configure` | POST | 2.12.2 URL源配置修改 |
+| `/api/url-source/health-check` | POST | 2.12.3 强制健康检查 |
+| `/api/email/config` | GET | 2.13.1 获取邮件配置（含密码脱敏） |
+| `/api/email/config` | POST | 2.13.2 保存邮件配置 |
+| `/api/email/test` | POST | 2.13.3 测试邮件发送 |
+| `/api/server/info` | GET | 2.14.1 服务器信息查询（含局域网IP获取） |
+
+新增规范章节：
+- **2.15 Node.js依赖管理规范** - 目录结构、依赖分类、.gitignore配置、清理最佳实践
+
+---
 
 ### v3.8.20 (2026-07-10) - 📧 隧道即时邮件通知 + 前端状态修复 + 验证加速
 

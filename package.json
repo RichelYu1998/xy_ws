@@ -18,8 +18,5 @@
     "url": "https://github.com/RichelYu1998/xy_ws/issues"
   },
   "homepage": "https://github.com/RichelYu1998/xy_ws#readme",
-  "dependencies": {
-    "marked": "^18.0.5",
-    "puppeteer-core": "^25.3.0"
-  }
+  "dependencies": {}
 }
