@@ -67,10 +67,25 @@ ping -n 2 127.0.0.1 >nul 2>&1
 call :log [*] 残留进程清理完成
 
 call :log_blank
+call :log [*] 检查 hostc 隧道工具...
+set "HOSTC_BIN=%CD%\dist\node_modules\.bin\hostc.cmd"
+if not exist "!HOSTC_BIN!" (
+    call :log [*] 本地未找到 hostc，开始安装...
+    call :install_hostc
+    if not exist "!HOSTC_BIN!" (
+        call :log [ERROR] hostc 安装失败，隧道将不可用
+        goto skip_tunnel
+    )
+)
+for /f "delims=" %%v in ('"!HOSTC_BIN!" --version 2^>nul') do set "HOSTC_VER=%%v"
+call :log [*] hostc v!HOSTC_VER! 已就绪
+
+call :log_blank
 call :log [*] 启动 hostc 隧道（后台运行，不阻塞）...
 echo. > "file\tunnel_url.txt"
-start /b cmd /c "npx -y hostc@latest 8888 --local-host localhost >> file\tunnel_url.txt 2>&1" < nul
+start /b cmd /c ""!HOSTC_BIN!" 8888 --local-host localhost >> file\tunnel_url.txt 2>&1" < nul
 call :log [*] hostc 已在后台启动，将在后续步骤中获取URL
+:skip_tunnel
 
 call :log_blank
 call :log [*] 清理临时文件...
@@ -415,6 +430,72 @@ if "!BEST_MIRROR!"=="" (
     set "FASTEST_PIP_MIRROR=!BEST_MIRROR!"
     call :log_blank
     call :log [*] 最快PIP镜像: !BEST_NAME! [!MIN_TIME!毫秒]
+)
+exit /b 0
+
+:install_hostc
+call :log [*] CDN轮询安装 hostc...
+
+set "HOSTC_MIRRORS[0]=https://registry.npmmirror.com|npmmirror淘宝"
+set "HOSTC_MIRRORS[1]=https://registry.npmmirror.com|华为云"
+set "HOSTC_MIRRORS[2]=https://registry.npmjs.org|官方源"
+
+set "HOSTC_BEST_MIRROR="
+set "HOSTC_BEST_NAME="
+set "HOSTC_MIN_TIME=9999"
+
+for /L %%i in (0,1,2) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!HOSTC_MIRRORS[%%i]!") do (
+        set "H_URL=%%a"
+        set "H_NAME=%%b"
+        call :log     测试 !H_NAME!...
+        
+        set "H_TIME=9999"
+        curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 3 "!H_URL!" > temp_h_time.txt 2>nul
+        if exist temp_h_time.txt (
+            set /p H_TIME=<temp_h_time.txt
+            del temp_h_time.txt 2>nul
+        )
+        
+        set "H_INT=9999"
+        if not "!H_TIME!"=="0" if not "!H_TIME!"=="0.000000" (
+            "!PYTHON_CMD!" -c "print(int(float('!H_TIME!')*1000))" > temp_h_int.txt 2>nul
+            if exist temp_h_int.txt (
+                set /p H_INT=<temp_h_int.txt
+                del temp_h_int.txt 2>nul
+            )
+        )
+        if "!H_INT!"=="" set "H_INT=9999"
+        if "!H_INT!"=="0" set "H_INT=9999"
+        
+        if !H_INT! equ 9999 (
+            call :log         !H_NAME!: 超时/失败
+        ) else (
+            call :log         !H_NAME!: !H_TIME!秒 [!H_INT!ms]
+            if !H_INT! LSS !HOSTC_MIN_TIME! (
+                set "HOSTC_MIN_TIME=!H_INT!"
+                set "HOSTC_BEST_MIRROR=!H_URL!"
+                set "HOSTC_BEST_NAME=!H_NAME!"
+            )
+        )
+    )
+)
+
+if exist temp_h_time.txt del temp_h_time.txt 2>nul
+if exist temp_h_int.txt del temp_h_int.txt 2>nul
+
+if "!HOSTC_BEST_MIRROR!"=="" (
+    call :log [WARNING] 所有CDN均不可用，尝试默认源安装...
+    set "HOSTC_BEST_MIRROR=https://registry.npmmirror.com"
+    set "HOSTC_BEST_NAME=npmmirror淘宝(fallback)"
+)
+
+call :log [*] 使用 !HOSTC_BEST_NAME! 安装 hostc...
+npm install hostc@latest --registry "!HOSTC_BEST_MIRROR!" --prefix dist 2>nul
+if errorlevel 1 (
+    call :log [ERROR] hostc 安装失败
+) else (
+    call :log [*] hostc 安装成功
 )
 exit /b 0
 

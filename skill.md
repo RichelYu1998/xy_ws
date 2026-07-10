@@ -1,4 +1,4 @@
-﻿# 项目代码规范与范式 (Skill)
+﻿﻿# 项目代码规范与范式 (Skill)
 
 > 本文档基于 xy_ws 项目提炼，可作为同类 Python + Flask + 原生JS 全栈项目的二开模版。
 
@@ -232,9 +232,12 @@
 │   ├── output.json            # 爬虫输出
 │   ├── tunnel_url.txt         # 隧道公网地址
 │   └── web_output.log         # Web 日志
-├── dist/                      # 前端构建产物（iframe 嵌入的独立应用）
+├── dist/                      # 前端构建产物 + hostc本地依赖
 │   ├── index.html
 │   ├── assets/
+│   ├── node_modules/          # hostc 本地依赖（.gitignore）
+│   ├── package.json           # hostc 依赖声明
+│   ├── package-lock.json
 │   └── ...
 └── .venv/                     # 虚拟环境（自动创建）
 ```
@@ -3401,72 +3404,49 @@ def get_server_info():
 
 ---
 
-### 2.15 Node.js 依赖管理规范（v3.8.21 新增）
+### 2.15 Node.js 依赖管理规范（v3.8.22 更新）
 
 #### 2.15.1 node_modules 目录结构规范
 
-**⚠️ 项目采用混合架构，Node.js 依赖分两层管理：**
+**⚠️ 项目 Node.js 依赖统一管理在 `dist/` 目录下：**
 
-##### 第一层：根目录 `node_modules/`（已废弃）
+##### `dist/node_modules/`（hostc 本地依赖，v3.8.22 新架构）
 
-**历史遗留**：
+**当前结构**:
 ```
-D:/ws/xy_ws/node_modules/
-├── .bin/acorn           # JavaScript 解析器工具
-├── acorn/               # AST 解析库
-└── acorn-loose/         # 宽松模式解析器
-```
-
-**状态**: ❌ **已删除**（v3.8.21 清理）
-
-**原因**:
-- `package.json` 声明的 `marked` 和 `puppeteer-core` 未安装
-- `acorn` 和 `acorn-loose` 是 npm 内部依赖残留
-- 项目代码中无任何引用
-
-**package.json 当前状态**:
-```json
-{
-  "dependencies": {}  // 已清空
-}
-```
-
-##### 第二层：`dist/hostc/node_modules/`（运行时依赖）
-
-**当前结构**（v3.8.21 合并后）:
-```
-D:/ws/_xy_ws/dist/hostc/
-├── cli/                           # CLI 客户端（通过 npx 远程运行）
-├── client/                        # 浏览器客户端（已打包）
-├── protocol/                      # 协议定义
-├── server/                        # Cloudflare Workers 服务端
-│   └── dist/                      # 构建产物
-│       ├── index.js               # 服务端入口
-│       ├── index.d.ts             # 类型定义
-│       └── *.js                   # 其他模块
-└── node_modules/                  # ✅ 统一管理的运行时依赖
-    └── @hostc/
-        └── protocol/              # hostc 协议库
-            ├── dist/
-            │   ├── index.js       # ← 核心协议实现（被 server 引用）
-            │   └── index.d.ts     # ← 类型定义
-            ├── package.json       # ← 包元数据
-            └── tsconfig.json      # ← 编译配置
+D:/ws/xy_ws/dist/
+├── package.json              # hostc 依赖声明
+├── package-lock.json         # 锁定版本
+├── node_modules/             # ✅ hostc 本地安装（.gitignore）
+│   ├── .bin/hostc.cmd        # ← Windows 入口
+│   ├── .bin/hostc            # ← Linux/Mac 入口
+│   └── hostc/                # ← hostc 包本体
+│       ├── cli/index.js      #   CLI 入口
+│       ├── client/           #   浏览器客户端
+│       ├── protocol/         #   协议定义
+│       ├── server/           #   Cloudflare Workers 服务端
+│       └── web/              #   Web UI
+├── assets/                   # 前端 JS/CSS/woff2 字体
+├── favicon/                  # 网站图标
+├── fonts/SF-Pro/             # SF Compact Rounded 字体
+├── screenshots/              # PWA 截图
+├── weather-icons/            # 天气图标
+├── index.html
+├── manifest.webmanifest
+└── ...
 ```
 
-**合并前的问题**（已解决）:
+**v3.8.22 架构变更**:
 ```
-❌ 三层嵌套: dist/hostc/server/dist/node_modules/@hostc/protocol
-❌ 冗余依赖: typescript（编译时不需要）
-❌ 冗余工具: .bin/tsc, .bin/workerd, .bin/wrangler
+❌ 旧: 根目录 package.json + 根目录 node_modules/ + npx hostc@latest
+✅ 新: dist/package.json + dist/node_modules/ + 直接执行本地 hostc
 ```
 
-**合并后的优化**:
-```
-✅ 扁平化: dist/hostc/node_modules/@hostc/protocol
-✅ 仅保留运行时: 删除 typescript 和构建工具
-✅ 减少文件数: 从 400+ 减少到 4 个核心文件
-```
+**优势**:
+- **零网络依赖**: 直接执行 `dist/node_modules/.bin/hostc`，无需 npx 中间层
+- **启动更快**: 跳过 npx 版本检查和网络请求
+- **CDN 轮询安装**: 首次安装自动测速选最快 CDN 源
+- **版本锁定**: `package-lock.json` 确保可复现构建
 
 ---
 
@@ -3474,16 +3454,14 @@ D:/ws/_xy_ws/dist/hostc/
 
 | 依赖类型 | 位置 | 运行时机 | 是否需要 |
 |---------|------|---------|---------|
-| **@hostc/protocol** | `dist/hostc/node_modules/` | Cloudflare Workers 运行时 | ✅ 必须 |
-| **typescript** | ~~`dist/hostc/server/node_modules/`~~ | Cloudflare Workers 构建 | ❌ 已删除 |
-| **workerd/wrangler** | ~~`dist/hostc/server/node_modules/.bin/`~~ | 本地开发部署 | ❌ 已删除 |
-| **marked/puppeteer-core** | ~~根目录 `node_modules/`~~ | 未使用 | ❌ 已删除 |
+| **hostc** | `dist/node_modules/` | 隧道启动 | ✅ 必须（本地安装） |
+| **@hostc/protocol** | `dist/node_modules/hostc/` | hostc 运行时 | ✅ 必须（hostc 子依赖） |
 
 **关键发现**:
-- **hostc CLI** 通过 `npx hostc@latest` 远程下载运行，不依赖本地 `node_modules`
-- **hostc client** 已打包为单文件 `cli/index.js`，不依赖外部模块
-- **hostc server** 部署在 Cloudflare Workers 上，本地不运行
-- **唯一运行时依赖** 是 `@hostc/protocol/dist/index.js`（被 `server/dist/*.js` 通过 `import` 引用）
+- **hostc CLI** 通过 `dist/node_modules/.bin/hostc` 本地运行，不再依赖 `npx`
+- **hostc 是云服务**: 本地只安装 CLI 客户端，服务端运行在 Cloudflare Workers 上
+- **CDN 轮询安装**: `run.bat` 的 `:install_hostc` 和 `run.sh` 的 `install_hostc()` 函数负责首次安装
+- **fallback**: 本地 hostc 不存在时回退到 `npx hostc`
 
 ---
 
@@ -3502,7 +3480,7 @@ __pycache__/
 frontend/
 node_modules/
 frontend/node_modules/
-dist/hostc/node_modules/  # ✅ v3.8.21 新增
+dist/node_modules/  # ✅ v3.8.22 更新
 
 # Backend
 backend/
@@ -6659,7 +6637,6 @@ check_config() {
 # ========================================
 run_web() {
     log "[*] 隧道服务已在脚本启动时启动"
-    npx -y hostc@latest --help >/dev/null 2>&1
     
     source "$VENV_PATH/bin/activate"
     
@@ -6681,8 +6658,13 @@ run_web() {
     LOG_FILE=""
     log_console_only "Web 服务已就绪，正在启动隧道..."
     
-    # 启动隧道
-    npx -y hostc@latest "$WEB_PORT" --local-host localhost > file/tunnel_url.txt 2>&1 &
+    # 启动隧道（本地优先，fallback npx）
+    HOSTC_BIN="$(pwd)/dist/node_modules/.bin/hostc"
+    if [ -f "$HOSTC_BIN" ]; then
+        "$HOSTC_BIN" "$WEB_PORT" --local-host localhost > file/tunnel_url.txt 2>&1 &
+    else
+        npx -y hostc@latest "$WEB_PORT" --local-host localhost > file/tunnel_url.txt 2>&1 &
+    fi
     TUNNEL_PID=$!
     
     log_console_only "启动完成！"
@@ -7056,7 +7038,6 @@ rem 启动Web服务和隧道
 rem ========================================
 :run_web
 call :log [*] 隧道服务已在脚本启动时启动
-npx -y hostc@latest --help >nul 2>&1
 
 set "WEB_PORT=8888"
 if defined WEB_PORT set "WEB_PORT=%WEB_PORT%"
@@ -7065,7 +7046,12 @@ if defined WEB_PORT set "WEB_PORT=%WEB_PORT%"
 set "LOG_FILE="
 
 call :log_console_only Web 服务已就绪，正在启动隧道...
-npx -y hostc@latest "!WEB_PORT!" --local-host localhost > file\tunnel_url.txt 2>&1
+set "HOSTC_BIN=%CD%\dist\node_modules\.bin\hostc.cmd"
+if exist "!HOSTC_BIN!" (
+    "!HOSTC_BIN!" "!WEB_PORT!" --local-host localhost > file\tunnel_url.txt 2>&1
+) else (
+    npx -y hostc@latest "!WEB_PORT!" --local-host localhost > file\tunnel_url.txt 2>&1
+)
 
 call :log_console_only 启动完成！
 call :log_console_only 本地访问: http://localhost:!WEB_PORT!
@@ -7285,9 +7271,46 @@ fi
 
 ### 6.1 隧道服务
 
-- 使用 `hostc` 隧道服务（`npx -y hostc@latest`）
+- 使用 `hostc` 隧道服务（本地安装 `dist/node_modules/.bin/hostc`，fallback `npx hostc`）
 - 公网地址写入 `file/tunnel_url.txt`（覆盖模式 `>`，只保留最新地址）
 - Flask 启动后自动启动隧道
+- **CDN 轮询安装**: 首次运行时 `run.bat`/`run.sh` 自动测速选最快 CDN 安装 hostc
+- **非阻塞启动（v3.8.23）**: `auto_start_tunnel(force_restart=False)` 零等待，URL验证和邮件通知交由心跳机制后台完成
+
+### 6.1.0 非阻塞启动规范（v3.8.23 新增）
+
+**核心原则**：`auto_start_tunnel()` 在 `app.run()` 之前调用，必须零阻塞，确保 Flask 5秒内启动。
+
+**`auto_start_tunnel()` 行为规范**:
+
+| 模式 | force_restart | 行为 | 阻塞时间 |
+|------|--------------|------|---------|
+| 启动时 | False | 有URL→直接返回；hostc在跑→直接返回；需启动→后台启动后返回 | 0秒 |
+| 手动触发 | True | 杀旧进程→启动新hostc→等待URL(最多10秒) | ≤10秒 |
+
+**启动流程（v3.8.23 非阻塞）**:
+```
+auto_start_tunnel(force_restart=False)
+  → 有URL → 直接返回（0秒，验证交心跳）
+  → hostc在运行 → 直接返回（0秒，URL交心跳）
+  → 需启动新hostc → 后台启动后立即返回（0秒）
+  → app.run() 立即启动
+  → 心跳机制后台验证URL + 发邮件
+```
+
+**API防误重启（v3.8.23 新增）**:
+```
+前端"启动隧道"按钮 → auto_start_tunnel(force_restart=False)
+  → 有URL → 返回URL
+  → 无URL但hostc在运行 → 返回"starting"状态（不触发force_restart）
+  → 无URL且无hostc → auto_start_tunnel(force_restart=True)
+```
+
+**禁止事项**:
+- ❌ 禁止在 `force_restart=False` 时调用 `verify_url()`（阻塞10秒）
+- ❌ 禁止在 `force_restart=False` 时使用 `while` 等待循环（阻塞15-30秒）
+- ❌ 禁止在 `force_restart=False` 时 `read_thread.join(timeout=10)`（阻塞10秒）
+- ✅ 所有验证和邮件通知由 `heartbeat_loop()` 后台完成
 
 ### 6.1.1 权威数据源规范（v3.8.18 新增）
 
@@ -7321,7 +7344,7 @@ def get_public_url_from_web_log(skip_validation=False, quiet=False):
 |--------|----------------|-------|------|
 | `heartbeat_loop()` | True | True | 自行做 verify_url()，高频调用需静默 |
 | `restart_tunnel()` | True | True | 重启流程自行验证 |
-| `auto_start_tunnel()` | True | False | 先验证URL可用性，可用才复用；不可用则等待或重启 |
+| `auto_start_tunnel()` | True | True | 非阻塞模式：有URL直接返回，验证交心跳；无URL也立即返回 |
 | `send_heartbeat()` | True | True | 仅做HEAD检测，无需验证 |
 | `tunnel_status()` API | True | True | API返回状态，无需验证 |
 | 前端初始化 | False | False | 首次获取需验证 |
