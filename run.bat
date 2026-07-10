@@ -723,7 +723,7 @@ call :log [!TIMESTAMP!] === Web服务启动 ===
 start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT!" < nul
 
 call :log 等待 Web 服务启动完成...
-ping -n 6 127.0.0.1 >nul 2>&1
+ping -n 2 127.0.0.1 >nul 2>&1
 
 set "FLASK_WAIT_COUNT=0"
 set "FLASK_MAX_WAIT=60"
@@ -739,7 +739,7 @@ for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" http://localhost
 if not defined HTTP_CODE set "HTTP_CODE=000"
 if not "!HTTP_CODE!"=="200" (
     if not "!HTTP_CODE!"=="302" (
-        ping -n 3 127.0.0.1 >nul 2>&1
+        ping -n 1 127.0.0.1 >nul 2>&1
         goto wait_flask
     )
 )

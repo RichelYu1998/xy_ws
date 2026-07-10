@@ -10,11 +10,12 @@
 
 ## 最新更新
 
-### v3.8.24 (2026-07-10) - 📂 tunnel_url.txt 权威数据源 + web_output.log 写入冲突修复
+### v3.8.24 (2026-07-10) - 📂 tunnel_url.txt 权威数据源 + web_output.log 写入冲突修复 + 启动加速
 
 #### 🎯 核心改进
 - **📂 tunnel_url.txt 权威数据源架构** - 明确数据流向：`run.bat` 写入 → `tunnel_url.txt` → `main.py` 读取
 - **🔧 web_output.log 写入冲突修复** - 移除 `run.bat`/`run.sh` 中 Python 输出重定向，由 `main.py` TeeOutput 独占写入，解决 `[Errno 13] Permission denied` 错误
+- **⚡ Flask 启动检测加速** - 初始等待从6秒降至1秒，检测间隔从3秒降至1秒，"启动完成"从~10秒降至~3秒
 
 ---
 
@@ -65,6 +66,30 @@ main.py: TeeOutput 独占写入 web_output.log  ← 无冲突
 - `run.sh` line 607: 移除 `>> "$LOG_FILE" 2>&1`
 - `main.py` TeeOutput 以追加模式 (`'a'`) 独占写入 `web_output.log`
 - `run.bat` 自身日志（`:log` 函数）在 Python 启动前写入，Python 启动后交由 TeeOutput
+
+---
+
+#### ⚡ Flask 启动检测加速
+
+**问题描述**:
+```
+Python 启动 → ping -n 6（固定等6秒）→ 第一次检查 Flask
+  → 没好 → ping -n 3（等3秒）→ 第二次检查
+  → 总计 ~10秒才显示"启动完成"
+  但 Flask 实际 2-3 秒就启动了！
+```
+
+**修复后**:
+```
+Python 启动 → ping -n 2（等1秒）→ 第一次检查 Flask
+  → 没好 → ping -n 1（等1秒）→ 第二次检查
+  → 总计 ~3秒显示"启动完成"
+  局域网地址 http://192.168.x.x:8888 不需要 hostc，Flask 启动即可用
+```
+
+**关键修改**:
+- `run.bat`: `ping -n 6` → `ping -n 2`，`ping -n 3` → `ping -n 1`
+- `run.sh`: `sleep 5` → `sleep 1`，`sleep 2` → `sleep 1`
 
 ---
 
