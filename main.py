@@ -7174,8 +7174,14 @@ if __name__ == '__main__':
 
                     def _wait_and_notify_hostc_url():
                         global tunnel_url, old_tunnel_url, stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time, last_email_sent_url
+                        global tunnel_need_restart
                         for _ in range(30):
                             time.sleep(2)
+                            has_hostc = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+                            if not has_hostc:
+                                print(f"[Tunnel] ❌ hostc进程已退出，标记需要重启")
+                                tunnel_need_restart = True
+                                return
                             found_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
                             if found_url:
                                 tunnel_url = found_url
@@ -7255,6 +7261,7 @@ if __name__ == '__main__':
                 def read_output():
                     global tunnel_url, url_ready, old_tunnel_url, tunnel_consecutive_failures
                     global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time, last_email_sent_url
+                    global tunnel_need_restart
                     if not tunnel_process or not tunnel_process.stdout:
                         return
                     
@@ -7263,7 +7270,9 @@ if __name__ == '__main__':
                         if tunnel_process is None:
                             break
                         if tunnel_process.poll() is not None:
-                            print(f"[Tunnel] hostc进程已退出")
+                            exit_code = tunnel_process.poll()
+                            print(f"[Tunnel] ❌ hostc进程已退出 (exit code: {exit_code})，标记需要重启")
+                            tunnel_need_restart = True
                             sys.stdout.flush()
                             break
                         
@@ -7378,6 +7387,56 @@ if __name__ == '__main__':
                     restart_wait_start = None  # 重置等待状态
                     tunnel_need_restart = False
                     time.sleep(1)
+                    continue
+                
+                # 如果 tunnel_need_restart 已被标记（hostc退出等），立即重启不等30秒
+                if tunnel_need_restart:
+                    restart_wait_start = None
+                    tunnel_restart_count += 1
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 tunnel_need_restart=True，立即执行重启 (第{tunnel_restart_count}次)")
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
+                    sys.stdout.flush()
+                    
+                    Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
+                    if tunnel_process:
+                        try:
+                            tunnel_process.terminate()
+                            tunnel_process.wait(timeout=2)
+                        except:
+                            try:
+                                tunnel_process.kill()
+                            except:
+                                pass
+                    
+                    saved_old_url = old_tunnel_url
+                    tunnel_process = None
+                    tunnel_url = None
+                    old_tunnel_url = None
+                    
+                    time.sleep(tunnel_restart_delay)
+                    
+                    if not tunnel_auto_restart:
+                        break
+                    
+                    try:
+                        result = auto_start_tunnel()
+                        if result['success']:
+                            new_url = result.get('url')
+                            if new_url and saved_old_url and saved_old_url != new_url:
+                                print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
+                            consecutive_restart_attempts = 0
+                        else:
+                            consecutive_restart_attempts += 1
+                    except Exception as e:
+                        consecutive_restart_attempts += 1
+                        print(f"[Tunnel] 重启失败: {e}")
+                    
+                    if consecutive_restart_attempts >= max_consecutive_restarts:
+                        print(f"[Tunnel] ❌ 连续重启失败{consecutive_restart_attempts}次，等待冷却...")
+                        time.sleep(restart_cooldown)
+                        consecutive_restart_attempts = 0
+                    
                     continue
                 
                 # 需要等待或重启

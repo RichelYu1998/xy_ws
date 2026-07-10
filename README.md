@@ -17,6 +17,7 @@
 - **🔧 web_output.log 写入冲突修复** - 移除 `run.bat`/`run.sh` 中 Python 输出重定向，由 `main.py` TeeOutput 独占写入，解决 `[Errno 13] Permission denied` 错误
 - **⚡ Flask 启动检测加速** - 初始等待从6秒降至1秒，检测间隔从3秒降至1秒，"启动完成"从~10秒降至~3秒
 - **📧 即时邮件通知** - `auto_start_tunnel()` 发现URL后后台验证+发邮件，不再等心跳2-3分钟
+- **🔄 hostc退出自动重启** - `read_output()` 和 `_wait_and_notify_hostc_url()` 检测到hostc退出后立即标记重启，`restart_tunnel()` 立即响应
 
 ---
 
@@ -120,6 +121,32 @@ verify_url() → 通过 → 立即发邮件！
 - `auto_start_tunnel()` 有URL时：启动 `_verify_and_notify_found_url` 后台线程，验证+发邮件
 - `auto_start_tunnel()` hostc在运行时：启动 `_wait_and_notify_hostc_url` 后台线程，等URL出现后验证+发邮件
 - 两种情况都不阻塞 Flask 启动，邮件在后台~10秒内发送
+
+---
+
+#### 🔄 hostc 退出自动重启
+
+**问题描述**:
+```
+hostc 进程退出 → read_output() 打印 "hostc进程已退出" → 什么都不做！
+    ↓
+restart_tunnel() 守护线程 → 检测到异常 → 等30秒 → 才重启
+    ↓
+或者 heartbeat_loop → 10次失败(600秒) → 才标记重启
+    ↓
+结果：hostc 退出后可能要等 30秒~10分钟 才重启！
+```
+
+**修复后**:
+```
+hostc 进程退出 → read_output() 设置 tunnel_need_restart = True
+    ↓
+restart_tunnel() 检测到 tunnel_need_restart=True → 立即重启（不等30秒）
+    ↓
+_wait_and_notify_hostc_url() 也会检测 hostc 进程 → 退出则标记重启
+    ↓
+结果：hostc 退出后 ~5秒内自动重启
+```
 
 ---
 
