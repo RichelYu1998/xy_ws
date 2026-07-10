@@ -23,7 +23,7 @@
 - **📝 写入顺序修正** - hostc输出解析处写入顺序从"先web_output.log后tunnel_url.txt"修正为"先tunnel_url.txt后web_output.log"
 - **🚀 启动顺序修正** - run.bat/run.sh 清理残留进程移至 hostc 预启动之前，避免刚启动的 hostc 被误杀
 - **📝 日志准确性修正** - `auto_start_tunnel()` 区分"URL已获取但尚未就绪"和"URL未生成"两种状态，避免误导性日志
-- **🚀 本地验证加速启动** - `auto_start_tunnel()` 去掉 `verify_url()` 和 `verify_local_server()` 验证，hostc在跑+tunnel_url.txt有URL直接用；公网验证交给心跳循环，通过后自动发邮件
+- **🚀 本地验证加速启动** - `auto_start_tunnel()` 去掉所有等待和验证逻辑，hostc在跑+tunnel_url.txt有URL直接用，没有URL也不等直接返回；公网验证和邮件通知全部交给心跳循环后台处理
 
 ---
 
