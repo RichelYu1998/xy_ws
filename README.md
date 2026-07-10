@@ -1,6 +1,6 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.27
+> **版本**: v3.8.28
 > **更新日期**: 2026-07-10
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,40 @@
 ---
 
 ## 最新更新
+
+### v3.8.28 (2026-07-10) - 🚀 心跳守护即时启动 + tunnel权威源守护统一
+
+#### 🎯 核心改进
+- **🚀 心跳守护即时启动** - 隧道启动后立即启动心跳守护和重启守护线程，不再等待 `/api/tunnel/status` 被调用才懒启动
+- **🔄 tunnel权威源守护统一** - 提取 `start_tunnel_daemons()` 函数，统一管理心跳守护+重启守护的启动逻辑，tunnel_url.txt 为唯一权威源
+
+---
+
+#### 🚀 心跳守护即时启动
+
+**问题描述**:
+```
+服务启动 → auto_start_tunnel() → app.run()
+  → 心跳守护线程未启动！
+  → 重启守护线程未启动！
+  → tunnel 失效无人检测，直到有人访问 /api/tunnel/status
+  → 如果无人访问，tunnel 挂了也无人重启
+```
+
+**修复后**:
+```
+服务启动 → auto_start_tunnel() → start_tunnel_daemons() → app.run()
+  → 心跳守护线程立即启动（tunnel_url.txt 为唯一权威源）
+  → 重启守护线程立即启动
+  → tunnel 失效 → 心跳检测到 → 标记需要重启 → 重启守护立即执行
+```
+
+**关键修改**:
+- 新增 `start_tunnel_daemons()` 函数：统一启动心跳守护+重启守护线程
+- 服务启动时 `auto_start_tunnel()` 之后立即调用 `start_tunnel_daemons()`
+- `/api/tunnel/status` 中改用 `start_tunnel_daemons()` 作为安全网（替代内联代码）
+
+---
 
 ### v3.8.27 (2026-07-10) - 🔧 隧道重启死循环修复 + hostc启动等待URL
 
