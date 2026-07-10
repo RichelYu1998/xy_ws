@@ -60,6 +60,11 @@ call :log Szwego商品爬虫和货号对比工具 - v%VERSION%
 call :log ========================================
 
 call :log_blank
+call :log [*] 预启动 hostc 隧道（后台运行，不阻塞）...
+echo. > "file\tunnel_url.txt"
+start /b cmd /c "npx -y hostc@latest 8888 --local-host localhost >> file\tunnel_url.txt 2>&1" < nul
+call :log [*] hostc 已在后台启动，将在后续步骤中获取URL
+
 call :log [*] 清理残留进程...
 taskkill /F /IM python.exe >nul 2>&1
 taskkill /F /IM node.exe >nul 2>&1
@@ -669,7 +674,7 @@ if not "!HTTP_CODE!"=="200" (
 
 set "LOG_FILE="
 call :log_console_only Web 服务已就绪，正在启动隧道...
-start /b cmd /c "npx -y hostc@latest !WEB_PORT! --local-host localhost > file\tunnel_url.txt 2>&1" < nul
+REM [已移至开头] hostc已在启动时预启动
 
 call :log_blank_console_only
 call :log_console_only ========================================

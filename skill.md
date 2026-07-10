@@ -938,7 +938,7 @@ cd /d "%~dp0"
 #### 检测流程
 
 ```
-[1/6] Python 环境检测 → [2/6] Node.js/NVM 检测 → [3/6] PIP 镜像源测速
+[Step 0] Pre-start hostc tunnel (background parallel) -> [1/6] Python 环境检测 → [2/6] Node.js/NVM 检测 → [3/6] PIP 镜像源测速
 → [4/6] NPM 镜像源测速 → [5/6] 虚拟环境管理 → [6/6] 依赖安装
 ```
 

@@ -1875,23 +1875,518 @@ class PathManager:
     def get_web_output_file():
         """获取Web输出日志文件路径"""
         return os.path.join(PathManager.get_file_dir(), 'web_output.log')
+    _url_source_config = {
+        'primary_source': 'tunnel_url.txt',
+        'fallback_source': 'web_output.log',
+        'enable_logging': True,
+        'enable_health_check': True,
+        'auto_sync_interval': 300,
+        'validate_url': True,
+        'url_validation_timeout': 5
+    }
+    
+    _last_url_source_log = {}
+    _url_health_check_time = 0
+    
     @staticmethod
     def get_public_url_from_web_log():
-        """从 web_output.log 读取公网地址（统一入口）- 返回最新（最后一个）URL"""
+        """获取公网地址（统一入口） - 以 tunnel_url.txt 为权威源
+        
+        数据流向：
+        hostc → tunnel_url.txt (权威源) → web_output.log (镜像) → 前端显示
+        
+        策略：
+        1. 优先从 tunnel_url.txt 读取（权威源）
+        2. 如果 tunnel_url.txt 的 URL 不可用，尝试 web_output.log
+        3. 两个都失败则返回 None
+        """
+        
+        config = PathManager._url_source_config
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        result_url = None
+        url_source = None
+        
+        if config['enable_logging']:
+            print(f"[{current_time}] [URL-Source] 🔍 开始获取公网地址...")
+        
+        # ========== 策略1：从 tunnel_url.txt 读取（权威源）==========
         try:
-            web_log_file = PathManager.get_web_output_file()
-            if os.path.exists(web_log_file):
-                with open(web_log_file, 'r', encoding='utf-8', errors='replace') as f:
+            tunnel_file = PathManager.get_tunnel_url_file()
+            
+            if config['enable_logging']:
+                print(f"[{current_time}] [URL-Source] 📂 尝试读取: {tunnel_file}")
+            
+            if os.path.exists(tunnel_file):
+                with open(tunnel_file, 'r', encoding='utf-8') as f:
+                    tunnel_content = f.read()
+                
+                if config['enable_logging']:
+                    print(f"[{current_time}] [URL-Source] 📄 文件大小: {len(tunnel_content)} 字符")
+                
+                # 匹配 "Public URL: https://..." 格式
+                tunnel_match = re.search(r'Public URL:\s*(https://[^\s]+)', tunnel_content)
+                if not tunnel_match:
+                    # 回退：匹配任意 hostc.dev URL
+                    tunnel_match = re.search(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', tunnel_content)
+                
+                if tunnel_match:
+                    candidate_url = tunnel_match.group(1).rstrip('/')
+                    
+                    if config['enable_logging']:
+                        print(f"[{current_time}] [URL-Source] ✅ 从 tunnel_url.txt 提取到候选URL: {candidate_url}")
+                    
+                    # 验证 URL 是否可用（如果启用验证）
+                    if config['validate_url'] and candidate_url:
+                        is_valid = PathManager._validate_url_accessibility(candidate_url, config['url_validation_timeout'])
+                        if is_valid:
+                            result_url = candidate_url
+                            url_source = 'tunnel_url.txt (validated)'
+                            
+                            if config['enable_logging']:
+                                print(f"[{current_time}] [URL-Source] ✅✅✅ URL验证通过！来源: tunnel_url.txt")
+                                print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
+                        else:
+                            if config['enable_logging']:
+                                print(f"[{current_time}] [URL-Source] ⚠️ tunnel_url.txt 中的URL不可用，尝试备用源...")
+                    else:
+                        # 不验证，直接使用
+                        result_url = candidate_url
+                        url_source = 'tunnel_url.txt (no validation)'
+                        
+                        if config['enable_logging']:
+                            print(f"[{current_time}] [URL-Source] ✅ 使用未验证的URL（验证已禁用）")
+                            print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
+                else:
+                    if config['enable_logging']:
+                        print(f"[{current_time}] [URL-Source] ❌ tunnel_url.txt 中未找到有效URL格式")
+            else:
+                if config['enable_logging']:
+                    print(f"[{current_time}] [URL-Source] ⚠️ tunnel_url.txt 文件不存在")
+                    
+        except Exception as e:
+            if config['enable_logging']:
+                print(f"[{current_time}] [URL-Source] ❌ 读取 tunnel_url.txt 失败: {str(e)[:100]}")
+        
+        # ========== 策略2：从 web_output.log 读取（备用方案）==========
+        if not result_url:
+            try:
+                web_log_file = PathManager.get_web_output_file()
+                
+                if config['enable_logging']:
+                    print(f"[{current_time}] [URL-Source] 📂 尝试备用源: {web_log_file}")
+                
+                if os.path.exists(web_log_file):
+                    with open(web_log_file, 'r', encoding='utf-8', errors='replace') as f:
+                        content = f.read()
+                    
+                    # 匹配 "Public URL: https://..." 格式
+                    matches = re.findall(r'Public URL:\s*(https?://[^\s]+)', content)
+                    if matches:
+                        candidate_url = matches[-1].rstrip('/')
+                        
+                        if config['enable_logging']:
+                            print(f"[{current_time}] [URL-Source] 📋 从 web_output.log 提取到候选URL: {candidate_url}")
+                        
+                        # 验证 URL
+                        if config['validate_url'] and candidate_url:
+                            is_valid = PathManager._validate_url_accessibility(candidate_url, config['url_validation_timeout'])
+                            if is_valid:
+                                result_url = candidate_url
+                                url_source = 'web_output.log (validated)'
+                                
+                                if config['enable_logging']:
+                                    print(f"[{current_time}] [URL-Source] ✅ 备用源URL验证通过！")
+                                    print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
+                                    print(f"[{current_time}] [URL-Source] 💡 建议: 应将此URL同步到 tunnel_url.txt")
+                                    
+                                # 自动同步：将可用的URL写回 tunnel_url.txt
+                                PathManager._sync_url_to_tunnel_file(result_url)
+                            else:
+                                if config['enable_logging']:
+                                    print(f"[{current_time}] [URL-Source] ⚠️ 备用源URL也不可用")
+                        else:
+                            result_url = candidate_url
+                            url_source = 'web_output.log (no validation)'
+                    else:
+                        # 回退：匹配任意 hostc.dev URL
+                        matches = re.findall(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', content)
+                        if matches:
+                            candidate_url = matches[-1].rstrip('/')
+                            
+                            if config['validate_url'] and candidate_url:
+                                is_valid = PathManager._validate_url_accessibility(candidate_url, config['url_validation_timeout'])
+                                if is_valid:
+                                    result_url = candidate_url
+                                    url_source = 'web_output.log.fallback (validated)'
+                                    
+                                    if config['enable_logging']:
+                                        print(f"[{current_time}] [URL-Source] ✅ 回退匹配成功并验证通过")
+                                        print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
+                                        
+                                    PathManager._sync_url_to_tunnel_file(result_url)
+                else:
+                    if config['enable_logging']:
+                        print(f"[{current_time}] [URL-Source] ⚠️ web_output.log 文件不存在")
+                        
+            except Exception as e:
+                if config['enable_logging']:
+                    print(f"[{current_time}] [URL-Source] ❌ 读取 web_output.log 失败: {str(e)[:100]}")
+        
+        # ========== 记录日志 ==========
+        if config['enable_logging']:
+            PathManager._last_url_source_log = {
+                'timestamp': current_time,
+                'url': result_url,
+                'source': url_source,
+                'success': result_url is not None
+            }
+            
+            if result_url:
+                print(f"[{current_time}] [URL-Source] 🎉 获取成功！来源: {url_source}")
+            else:
+                print(f"[{current_time}] [URL-Source] ❌ 所有数据源均无法提供有效URL")
+        
+        return result_url
+    
+    _url_validation_cache = {}
+    _cache_expiry_seconds = 60
+    
+    @staticmethod
+    def _validate_url_accessibility(url, timeout=5, max_retries=2):
+        """验证URL是否可访问（增强版）
+        
+        改进点：
+        1. 多种验证方式（GET + HEAD + TCP连接）
+        2. 自动重试机制
+        3. 缓存机制避免频繁验证
+        4. 更详细的错误分类
+        """
+        
+        current_time = time.time()
+        cache_key = url
+        
+        # 检查缓存（避免短时间内重复验证）
+        if cache_key in PathManager._url_validation_cache:
+            cached_result, cached_time = PathManager._url_validation_cache[cache_key]
+            if current_time - cached_time < PathManager._cache_expiry_seconds:
+                if PathManager._url_source_config.get('enable_logging'):
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [URL-Validate] 📦 使用缓存结果: {cached_result} (剩余{int(PathManager._cache_expiry_seconds - (current_time - cached_time))}秒)")
+                return cached_result
+        
+        validation_methods = [
+            ('GET', PathManager._validate_with_get),
+            ('HEAD', PathManager._validate_with_head),
+            ('TCP', PathManager._validate_with_tcp)
+        ]
+        
+        last_error = None
+        
+        for attempt in range(max_retries + 1):
+            for method_name, method_func in validation_methods:
+                try:
+                    is_valid, error_msg = method_func(url, timeout)
+                    
+                    if is_valid:
+                        # 缓存成功结果
+                        PathManager._url_validation_cache[cache_key] = (True, current_time)
+                        
+                        if PathManager._url_source_config.get('enable_logging'):
+                            log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            print(f"[{log_time}] [URL-Validate] ✅✅✅ URL验证成功!")
+                            print(f"[{log_time}] [URL-Validate]   方法: {method_name}")
+                            print(f"[{log_time}] [URL-Validate]   URL: {url}")
+                            if attempt > 0:
+                                print(f"[{log_time}] [URL-Validate]   重试次数: {attempt}")
+                        
+                        return True
+                    else:
+                        last_error = f"{method_name}: {error_msg}"
+                        
+                except Exception as e:
+                    last_error = f"{method_name} 异常: {str(e)[:80]}"
+            
+            # 重试前等待一小段时间
+            if attempt < max_retries:
+                time.sleep(0.5)
+        
+        # 所有方法都失败，缓存失败结果（较短时间）
+        PathManager._url_validation_cache[cache_key] = (False, current_time)
+        
+        if PathManager._url_source_config.get('enable_logging'):
+            log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{log_time}] [URL-Validate] ❌ URL验证失败")
+            print(f"[{log_time}] [URL-Validate]   URL: {url}")
+            print(f"[{log_time}] [URL-Validate]   最后错误: {last_error}")
+            print(f"[{log_time}] [URL-Validate]   重试次数: {max_retries}")
+            print(f"[{log_time}] [URL-Validate]   💡 提示: URL可能暂时不可用或网络波动")
+        
+        return False
+    
+    @staticmethod
+    def _validate_with_get(url, timeout):
+        """使用GET请求验证"""
+        try:
+            req = urllib.request.Request(url, method='GET')
+            req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+            req.add_header('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
+            req.add_header('Accept-Language', 'zh-CN,zh;q=0.9,en;q=0.8')
+            
+            response = urllib.request.urlopen(req, timeout=timeout)
+            
+            if response.status in [200, 301, 302, 303, 307, 308]:
+                return (True, None)
+            else:
+                return (False, f"HTTP状态码: {response.status}")
+                
+        except urllib.error.HTTPError as e:
+            if e.code in [401, 403, 404, 405]:
+                return (True, f"HTTP {e.code} (服务存在但受限)")  # 服务存在只是需要认证等
+            return (False, f"HTTP错误: {e.code}")
+        except urllib.error.URLError as e:
+            return (False, f"连接错误: {str(e.reason)[:50]}")
+        except socket.timeout:
+            return (False, "连接超时")
+        except Exception as e:
+            return (False, str(e)[:80])
+    
+    @staticmethod
+    def _validate_with_head(url, timeout):
+        """使用HEAD请求验证"""
+        try:
+            req = urllib.request.Request(url, method='HEAD')
+            req.add_header('User-Agent', 'Mozilla/5.0 (compatible; URLCheck/1.0)')
+            
+            response = urllib.request.urlopen(req, timeout=timeout)
+            
+            if response.status in [200, 301, 302, 303, 307, 308]:
+                return (True, None)
+            else:
+                return (False, f"HTTP状态码: {response.status}")
+                
+        except urllib.error.HTTPError as e:
+            if e.code in [401, 403, 404, 405]:
+                return (True, f"HTTP {e.code}")
+            return (False, f"HTTP错误: {e.code}")
+        except Exception as e:
+            return (False, str(e)[:80])
+    
+    @staticmethod
+    def _validate_with_tcp(url, timeout):
+        """使用TCP连接验证（最底层）"""
+        try:
+            parsed = urllib.parse.urlparse(url)
+            hostname = parsed.hostname
+            port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+            
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            
+            result = sock.connect_ex((hostname, port))
+            sock.close()
+            
+            if result == 0:
+                return (True, None)
+            else:
+                return (False, f"TCP连接失败 (错误码: {result})")
+                
+        except socket.gaierror:
+            return (False, "DNS解析失败")
+        except socket.timeout:
+            return (False, "TCP连接超时")
+        except Exception as e:
+            return (False, str(e)[:80])
+    
+    @staticmethod
+    def _sync_url_to_tunnel_file(url):
+        """将有效的URL同步到 tunnel_url.txt（确保权威源始终有最新可用URL）"""
+        try:
+            tunnel_file = PathManager.get_tunnel_url_file()
+            
+            # 读取现有内容
+            existing_content = ""
+            if os.path.exists(tunnel_file):
+                with open(tunnel_file, 'r', encoding='utf-8') as f:
+                    existing_content = f.read()
+            
+            # 检查是否需要更新
+            if re.search(re.escape(url), existing_content):
+                return False  # 已存在，无需更新
+            
+            # 更新或创建文件
+            with open(tunnel_file, 'w', encoding='utf-8') as f:
+                port = 8888
+                tunnel_name = url.split('//')[1].split('.')[0] if '//' in url else 'unknown'
+                
+                f.write(f"Success  Tunnel ready\n")
+                f.write(f"  Public URL: {url}\n")
+                f.write(f"  Local:      http://localhost:{port}/\n")
+                f.write(f"  Tunnel:     {tunnel_name}\n")
+                f.write(f"  Channels:   2\n")
+                f.write(f"\n# Auto-synced at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{current_time}] [URL-Sync] ✅ 已将URL同步到 tunnel_url.txt: {url}")
+            return True
+            
+        except Exception as e:
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{current_time}] [URL-Sync] ❌ 同步失败: {str(e)[:100]}")
+            return False
+    
+    @staticmethod
+    def check_url_files_health():
+        """检查两个URL文件的健康状态和一致性"""
+        
+        config = PathManager._url_source_config
+        current_time = time.time()
+        
+        # 控制检查频率（默认每5分钟检查一次）
+        if config['enable_health_check']:
+            if current_time - PathManager._url_health_check_time < config.get('auto_sync_interval', 300):
+                return {'status': 'skipped', 'reason': '检查间隔未到'}
+            
+            PathManager._url_health_check_time = current_time
+        
+        health_result = {
+            'timestamp': datetime.now().isoformat(),
+            'tunnel_file': {'exists': False, 'has_url': False, 'url': None, 'valid': False},
+            'weblog_file': {'exists': False, 'has_url': False, 'url': None, 'valid': False},
+            'consistent': False,
+            'action_taken': None
+        }
+        
+        try:
+            # 检查 tunnel_url.txt
+            tunnel_file = PathManager.get_tunnel_url_file()
+            if os.path.exists(tunnel_file):
+                health_result['tunnel_file']['exists'] = True
+                with open(tunnel_file, 'r', encoding='utf-8') as f:
                     content = f.read()
+                
+                match = re.search(r'Public URL:\s*(https://[^\s]+)', content)
+                if match:
+                    url = match.group(1).rstrip('/')
+                    health_result['tunnel_file']['has_url'] = True
+                    health_result['tunnel_file']['url'] = url
+                    health_result['tunnel_file']['valid'] = PathManager._validate_url_accessibility(url)
+            
+            # 检查 web_output.log
+            weblog_file = PathManager.get_web_output_file()
+            if os.path.exists(weblog_file):
+                health_result['weblog_file']['exists'] = True
+                with open(weblog_file, 'r', encoding='utf-8', errors='replace') as f:
+                    content = f.read()
+                
                 matches = re.findall(r'Public URL:\s*(https?://[^\s]+)', content)
                 if matches:
-                    return matches[-1].rstrip('/')
-                matches = re.findall(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', content)
-                if matches:
-                    return matches[-1].rstrip('/')
+                    url = matches[-1].rstrip('/')
+                    health_result['weblog_file']['has_url'] = True
+                    health_result['weblog_file']['url'] = url
+                    health_result['weblog_file']['valid'] = PathManager._validate_url_accessibility(url)
+            
+            # 检查一致性
+            tunnel_url = health_result['tunnel_file']['url']
+            weblog_url = health_result['weblog_file']['url']
+            
+            if tunnel_url and weblog_url:
+                health_result['consistent'] = (tunnel_url == weblog_url)
+            
+            # 自动修复不一致
+            if not health_result['consistent']:
+                if health_result['tunnel_file']['valid'] and not health_result['weblog_file']['valid']:
+                    # tunnel_url.txt 有效但 web_output.log 无效或不同步
+                    PathManager._sync_url_to_weblog(tunnel_url)
+                    health_result['action_taken'] = f'synced_to_weblog:{tunnel_url}'
+                elif health_result['weblog_file']['valid'] and not health_result['tunnel_file']['valid']:
+                    # web_output.log 有效但 tunnel_url.txt 无效
+                    PathManager._sync_url_to_tunnel_file(weblog_url)
+                    health_result['action_taken'] = f'synced_to_tunnel:{weblog_url}'
+            
+            log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if config['enable_logging']:
+                print(f"[{log_time}] [URL-Health] 📊 文件健康检查完成:")
+                print(f"[{log_time}] [URL-Health]   tunnel_url.txt: {'✅' if health_result['tunnel_file']['valid'] else '❌'} {health_result['tunnel_file']['url'] or '无'}")
+                print(f"[{log_time}] [URL-Health]   web_output.log: {'✅' if health_result['weblog_file']['valid'] else '❌'} {health_result['weblog_file']['url'] or '无'}")
+                print(f"[{log_time}] [URL-Health]   一致性: {'✅' if health_result['consistent'] else '⚠️ 不一致'}")
+                if health_result['action_taken']:
+                    print(f"[{log_time}] [URL-Health] 🔧 执行操作: {health_result['action_taken']}")
+            
         except Exception as e:
-            handle_exception(e, 'get_public_url_from_web_log')
-        return None
+            log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if config['enable_logging']:
+                print(f"[{log_time}] [URL-Health] ❌ 健康检查异常: {str(e)[:100]}")
+        
+        return health_result
+    
+    @staticmethod
+    def _sync_url_to_weblog(url):
+        """将URL同步到 web_output.log"""
+        try:
+            weblog_file = PathManager.get_web_output_file()
+            
+            # 读取现有内容
+            existing_lines = []
+            if os.path.exists(weblog_file):
+                with open(weblog_file, 'r', encoding='utf-8', errors='replace') as f:
+                    existing_lines = f.readlines()
+            
+            # 查找是否有 Public URL 行
+            updated = False
+            new_lines = []
+            for line in existing_lines:
+                if re.match(r'.*Public URL:.*', line):
+                    new_lines.append(f"  Public URL: {url}\n")
+                    updated = True
+                else:
+                    new_lines.append(line)
+            
+            if not updated:
+                # 在文件末尾添加
+                new_lines.append(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Auto-Sync] Public URL: {url}\n")
+            
+            with open(weblog_file, 'w', encoding='utf-8') as f:
+                f.writelines(new_lines)
+            
+            log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{log_time}] [URL-Sync] ✅ 已将URL同步到 web_output.log: {url}")
+            return True
+            
+        except Exception as e:
+            log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{log_time}] [URL-Sync] ❌ 同步到weblog失败: {str(e)[:100]}")
+            return False
+    
+    @staticmethod
+    def configure_url_source(**kwargs):
+        """配置URL获取策略
+        
+        参数:
+            primary_source: 主数据源 ('tunnel_url.txt' 或 'web_output.log')
+            fallback_source: 备用数据源
+            enable_logging: 是否启用日志 (True/False)
+            enable_health_check: 是否启用健康检查 (True/False)
+            auto_sync_interval: 自动同步间隔（秒）
+            validate_url: 是否验证URL可用性 (True/False)
+            url_validation_timeout: URL验证超时时间（秒）
+        """
+        for key, value in kwargs.items():
+            if key in PathManager._url_source_config:
+                old_value = PathManager._url_source_config[key]
+                PathManager._url_source_config[key] = value
+                
+                log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                print(f"[{log_time}] [URL-Config] ⚙️ 配置更新: {key} = {value} (原值: {old_value})")
+        
+        return PathManager._url_source_config.copy()
+    
+    @staticmethod
+    def get_url_source_status():
+        """获取当前URL获取状态和配置"""
+        return {
+            'config': PathManager._url_source_config.copy(),
+            'last_log': PathManager._last_url_source_log,
+            'last_health_check': datetime.fromtimestamp(PathManager._url_health_check_time).isoformat() if PathManager._url_health_check_time > 0 else None
+        }
     
     @staticmethod
     def get_lan_ip():
@@ -6558,11 +7053,40 @@ if __name__ == '__main__':
             # 如果有 hostc 进程在运行且 web_output.log 有有效 URL，复用现有隧道
             if has_hostc_process and web_url and not force_restart:
                 if verify_url(web_url):
-                    print(f"[Tunnel] 复用已有隧道: {web_url}")
+                    print(f"[Tunnel] ✅ 复用已有隧道（由run.bat管理）: {web_url}")
                     sys.stdout.flush()
                     tunnel_url = web_url
                     old_tunnel_url = web_url
                     return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
+
+
+            # 🔧 新增：如果hostc进程已存在但URL还没准备好，等待URL生成（不再重复启动）
+            if has_hostc_process and not force_restart:
+                print(f"[Tunnel] 🔍 检测到hostc已在运行（由run.bat启动），等待URL生成...")
+                sys.stdout.flush()
+
+                max_wait = 30  # 最多等30秒
+                wait_count = 0
+                while wait_count < max_wait:
+                    time.sleep(1)
+                    wait_count += 1
+
+                    # 重新读取URL
+                    current_url = PathManager.get_public_url_from_web_log()
+                    if current_url and verify_url(current_url):
+                        print(f"[Tunnel] ✅ 成功获取到hostc生成的URL: {current_url} (耗时{wait_count}秒)")
+                        sys.stdout.flush()
+                        tunnel_url = current_url
+                        old_tunnel_url = current_url
+                        return {'success': True, 'url': tunnel_url, 'message': f'获取外部hostc的URL，耗时{wait_count}秒'}
+
+                    if wait_count % 5 == 0:
+                        print(f"[Tunnel] ⏳ 等待中... ({wait_count}/{max_wait}秒)")
+                        sys.stdout.flush()
+
+                print(f"[Tunnel] ⚠️ 等待{max_wait}秒后仍未获取到URL")
+                sys.stdout.flush()
+                return {'success': False, 'url': None, 'error': f'等待{max_wait}秒后hostc未生成URL'}
             
             try:
                 port = args.port
@@ -6570,12 +7094,23 @@ if __name__ == '__main__':
                 url_ready = False
                 tunnel_last_error = None
                 tunnel_auto_restart = True
-                
+
                 print("[Tunnel] 启动 hostc 隧道")
                 sys.stdout.flush()
                 tunnel_type = 'hostc'
 
-                # 清理所有旧的 node.exe 进程
+                # Fix: Clear old tunnel URL to prevent reading stale URL
+                try:
+                    tunnel_file_to_clear = PathManager.get_tunnel_url_file()
+                    with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
+                        f.write('')
+                    print("[Tunnel] Cleared old URL file, waiting for new address...")
+                    sys.stdout.flush()
+                except Exception as clear_err:
+                    print(f"[Tunnel] Failed to clear old URL: {clear_err}")
+                    sys.stdout.flush()
+
+                # Clean up old node.exe processes
                 Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
 
                 # 等待2秒确保旧进程完全退出（避免端口冲突）
@@ -6875,6 +7410,94 @@ if __name__ == '__main__':
                 })
 
         last_url_invalid_log_time = 0  # 上次打印URL不可用日志的时间
+        
+        @app.route('/api/url-source/status', methods=['GET'])
+        def url_source_status():
+            """获取URL源状态和配置"""
+            try:
+                status = PathManager.get_url_source_status()
+                
+                # 执行健康检查（强制执行，忽略间隔）
+                health = PathManager.check_url_files_health()
+                
+                return jsonify({
+                    'success': True,
+                    'config': status['config'],
+                    'last_log': status['last_log'],
+                    'health_check': health,
+                    'timestamp': datetime.now().isoformat()
+                })
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': str(e)[:200]
+                }), 500
+        
+        @app.route('/api/url-source/configure', methods=['POST'])
+        def url_source_configure():
+            """配置URL获取策略"""
+            try:
+                data = request.get_json()
+                
+                if not data:
+                    return jsonify({
+                        'success': False,
+                        'error': '请提供配置数据'
+                    }), 400
+                
+                # 允许的配置项
+                allowed_keys = [
+                    'primary_source',
+                    'fallback_source', 
+                    'enable_logging',
+                    'enable_health_check',
+                    'auto_sync_interval',
+                    'validate_url',
+                    'url_validation_timeout'
+                ]
+                
+                # 过滤只允许的配置项
+                config_data = {k: v for k, v in data.items() if k in allowed_keys}
+                
+                if not config_data:
+                    return jsonify({
+                        'success': False,
+                        'error': '没有有效的配置项'
+                    }), 400
+                
+                # 应用配置
+                new_config = PathManager.configure_url_source(**config_data)
+                
+                return jsonify({
+                    'success': True,
+                    'message': '配置已更新',
+                    'config': new_config
+                })
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': str(e)[:200]
+                }), 500
+        
+        @app.route('/api/url-source/health-check', methods=['POST'])
+        def url_source_force_health_check():
+            """强制执行健康检查"""
+            try:
+                # 重置健康检查时间戳，强制执行检查
+                PathManager._url_health_check_time = 0
+                
+                health = PathManager.check_url_files_health()
+                
+                return jsonify({
+                    'success': True,
+                    'message': '健康检查已完成',
+                    'health_result': health
+                })
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': str(e)[:200]
+                }), 500
         
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():

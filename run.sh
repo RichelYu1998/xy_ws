@@ -53,6 +53,11 @@ log "Szwego商品爬虫和货号对比工具 - v${VERSION}"
 log "========================================"
 
 log_blank
+log "[*] 预启动 hostc 隧道（后台运行，不阻塞）..."
+echo -n > "file/tunnel_url.txt"
+npx -y hostc@latest 8888 --local-host localhost >> file/tunnel_url.txt 2>&1 < /dev/null &
+log "[*] hostc 已在后台启动，将在后续步骤中获取URL"
+
 log "[*] 清理残留进程..."
 pkill -9 -f "python.*main.py" 2>/dev/null || true
 pkill -9 -f "hostc" 2>/dev/null || true
@@ -570,7 +575,7 @@ run_web() {
 
     LOG_FILE=""
     log_console_only "Web 服务已就绪，正在启动隧道..."
-    npx -y hostc@latest "$WEB_PORT" --local-host localhost > file/tunnel_url.txt 2>&1 < /dev/null &
+# [已移至开头] hostc已在启动时预启动
     TUNNEL_PID=$!
 
     sleep 2
