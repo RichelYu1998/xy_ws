@@ -2268,6 +2268,68 @@ class FileCleaner:
         return cleaned_count
 ```
 
+### 2.10.2 temp目录自动清理规范（v3.8.29 新增）
+
+**问题根因**：`safe_read_excel()` 使用 `ExceptionContext` 上下文管理器，异常路径下临时文件不被清理，导致 temp/ 目录累积大量 `_temp_excel_*.xlsx` 文件。
+
+**修复方案**：
+
+1. **`safe_read_excel()` 临时文件泄漏修复**：
+```python
+# ❌ 旧代码：ExceptionContext 捕获异常后跳过清理
+temp_file = None
+with ExceptionContext(...) as ctx:
+    temp_file = os.path.join(temp_dir, f'_temp_excel_{uuid.uuid4().hex}.xlsx')
+    shutil.copy2(excel_file, temp_file)
+    ...
+    return dfs
+# 清理代码在 with 块外面，异常时不执行！
+
+# ✅ 新代码：try/finally 确保异常路径也清理
+temp_file = None
+try:
+    for attempt in range(max_retries):
+        if temp_file and os.path.exists(temp_file):
+            safe_execute_func(lambda: os.remove(temp_file), context='重试清理旧临时文件')
+            temp_file = None
+        try:
+            temp_file = os.path.join(temp_dir, f'_temp_excel_{uuid.uuid4().hex}.xlsx')
+            shutil.copy2(excel_file, temp_file)
+            ...
+            return dfs
+        except PermissionError:
+            ...
+finally:
+    if temp_file and os.path.exists(temp_file):
+        safe_execute_func(lambda: os.remove(temp_file), context='清理临时Excel文件')
+```
+
+2. **Python侧temp目录自动清理**（不再仅依赖 run.sh/run.bat）：
+```python
+# 启动时检查
+temp_dir = os.path.join(PROJECT_DIR, 'temp')
+if os.path.isdir(temp_dir):
+    temp_size = sum(os.path.getsize(os.path.join(temp_dir, f))
+                    for f in os.listdir(temp_dir)
+                    if os.path.isfile(os.path.join(temp_dir, f)))
+    if temp_size > 3 * 1024 * 1024:  # 3MB
+        # 清理所有文件
+        ...
+
+# 后台守护线程（每5分钟检查一次）
+def temp_cleanup_loop():
+    while True:
+        time.sleep(300)
+        # 检查 + 清理逻辑
+```
+
+**关键规则**：
+- ✅ 临时文件创建必须用 `try/finally` 确保清理，禁止用 `ExceptionContext`
+- ✅ 重试循环中每轮开始前清理上一轮残留的临时文件
+- ✅ Python侧独立实现 temp 目录清理，不依赖启动脚本
+- ✅ 后台守护线程每5分钟检查一次，超过3MB自动清理
+- ❌ 禁止在 `with ExceptionContext` 块内创建临时文件而在块外清理
+
 ### 2.11 Flask API 路由规范
 
 #### 2.11.1 路由命名

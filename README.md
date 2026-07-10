@@ -1,7 +1,7 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.28
-> **更新日期**: 2026-07-10
+> **版本**: v3.8.29
+> **更新日期**: 2026-07-11
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 
@@ -9,6 +9,72 @@
 ---
 
 ## 最新更新
+
+### v3.8.29 (2026-07-11) - 🔧 temp临时文件泄漏修复 + Python侧自动清理
+
+#### 🎯 核心改进
+- **🔧 safe_read_excel临时文件泄漏修复** - `ExceptionContext` 改为 `try/finally`，异常路径也清理临时文件；重试循环中清理上一轮残留
+- **🧹 Python侧temp目录自动清理** - Web服务启动时检查temp目录大小（超过3MB自动清理）+ 后台每5分钟定期清理，不再仅依赖run.sh/run.bat
+
+---
+
+#### 🔧 safe_read_excel临时文件泄漏修复
+
+**问题描述**:
+```
+safe_read_excel() 使用 ExceptionContext 上下文管理器
+  → shutil.copy2 创建临时文件 temp/_temp_excel_xxx.xlsx
+  → pd.ExcelFile 读取成功 → return dfs
+  → 临时文件清理代码在 with 块外面
+  → ExceptionContext 捕获异常后跳过清理代码
+  → 临时文件永久残留在 temp/ 目录！
+```
+
+**修复后**:
+```
+safe_read_excel() 使用 try/finally
+  → shutil.copy2 创建临时文件
+  → 读取成功 → return dfs → finally 块清理临时文件
+  → 读取失败 → 抛异常 → finally 块仍然清理临时文件
+  → 重试循环 → 每轮开始前清理上一轮残留
+  → 临时文件零泄漏！
+```
+
+**关键修改**:
+- `main.py`: `safe_read_excel()` 中 `with ExceptionContext` 改为 `try/finally`
+- 重试循环开头新增：`if temp_file and os.path.exists(temp_file): os.remove(temp_file)`
+
+---
+
+#### 🧹 Python侧temp目录自动清理
+
+**问题描述**:
+```
+temp/ 目录清理仅依赖 run.sh/run.bat 启动脚本
+  → 直接 python main.py 启动时无清理机制
+  → 运行期间 temp 文件不断累积
+  → 544个临时文件 × 72KB = 39MB 磁盘浪费
+  → run.sh 后台清理每60秒检查，但仅 run.sh 启动时有效
+```
+
+**修复后**:
+```
+main.py Web服务启动时:
+  → 检查 temp/ 目录大小
+  → 超过3MB → 清理所有文件 + 打印日志
+  → 未超过 → 跳过 + 打印日志
+
+后台守护线程（每5分钟）:
+  → 检查 temp/ 目录大小
+  → 超过3MB → 清理所有文件 + 打印日志
+  → 无论通过 run.sh 还是 python main.py 启动都有效
+```
+
+**关键修改**:
+- `main.py`: Web服务启动时新增 temp 目录大小检查和清理
+- `main.py`: 新增 `temp_cleanup_loop()` 后台守护线程（每5分钟检查一次）
+
+---
 
 ### v3.8.28 (2026-07-10) - 🚀 心跳守护即时启动 + tunnel权威源守护统一
 
