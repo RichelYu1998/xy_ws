@@ -1,6 +1,6 @@
-﻿﻿# xy_ws - Szwego商品爬虫系统
+﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.23
+> **版本**: v3.8.24
 > **更新日期**: 2026-07-10
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,64 @@
 ---
 
 ## 最新更新
+
+### v3.8.24 (2026-07-10) - 📂 tunnel_url.txt 权威数据源 + web_output.log 写入冲突修复
+
+#### 🎯 核心改进
+- **📂 tunnel_url.txt 权威数据源架构** - 明确数据流向：`run.bat` 写入 → `tunnel_url.txt` → `main.py` 读取
+- **🔧 web_output.log 写入冲突修复** - 移除 `run.bat`/`run.sh` 中 Python 输出重定向，由 `main.py` TeeOutput 独占写入，解决 `[Errno 13] Permission denied` 错误
+
+---
+
+#### 📂 tunnel_url.txt 权威数据源架构
+
+**数据流向（先写后读）**:
+```
+run.bat 启动 hostc（后台）
+    ↓ 输出写入
+tunnel_url.txt（权威源，先写）
+    ↓ main.py 读取
+get_public_url_from_web_log()（后读）
+    ↓
+前端/API 获取公网地址
+```
+
+**写入端（run.bat / run.sh）**:
+- `run.bat`: `start /b cmd /c "hostc 8888 >> file\tunnel_url.txt 2>&1"` — hostc 输出直接写入 `tunnel_url.txt`
+- `run.sh`: `hostc 8888 >> file/tunnel_url.txt 2>&1 &` — 同上
+- 写入时机：脚本启动时即写入，hostc 在后台慢慢启动
+
+**读取端（main.py）**:
+- `get_public_url_from_web_log()` 优先从 `tunnel_url.txt` 读取（权威源）
+- 正则匹配 `Public URL: https://xxx.hostc.dev` 或 `https://xxx.hostc.dev`
+- 备用源：`web_output.log`（仅当 `tunnel_url.txt` 无有效 URL 时使用）
+
+---
+
+#### 🔧 web_output.log 写入冲突修复
+
+**问题描述**:
+```
+run.bat: python main.py >> web_output.log 2>&1  ← 保持文件打开
+main.py: TeeOutput 尝试 open('web_output.log', 'a')  ← Permission denied!
+    → [Errno 13] Permission denied: 'web_output.log'
+    → 日志丢失，仅输出到控制台
+```
+
+**修复后**:
+```
+run.bat: python main.py  ← 不再重定向，输出到控制台
+main.py: TeeOutput 独占写入 web_output.log  ← 无冲突
+    → 日志正常写入文件 + 控制台双输出
+```
+
+**关键修改**:
+- `run.bat` line 723: 移除 `>> "!LOG_FILE!" 2>&1`
+- `run.sh` line 607: 移除 `>> "$LOG_FILE" 2>&1`
+- `main.py` TeeOutput 以追加模式 (`'a'`) 独占写入 `web_output.log`
+- `run.bat` 自身日志（`:log` 函数）在 Python 启动前写入，Python 启动后交由 TeeOutput
+
+---
 
 ### v3.8.23 (2026-07-10) - ⚡ Web服务秒级启动 + 隧道非阻塞优化
 

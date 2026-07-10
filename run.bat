@@ -720,7 +720,7 @@ call :log_blank
 if not defined WEB_PORT set "WEB_PORT=8888"
 call :ms_timestamp
 call :log [!TIMESTAMP!] === Web服务启动 ===
-start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT! >> "!LOG_FILE!" 2>&1" < nul
+start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT!" < nul
 
 call :log 等待 Web 服务启动完成...
 ping -n 6 127.0.0.1 >nul 2>&1
