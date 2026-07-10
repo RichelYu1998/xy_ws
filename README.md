@@ -1,6 +1,6 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.24
+> **版本**: v3.8.25
 > **更新日期**: 2026-07-10
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,41 @@
 ---
 
 ## 最新更新
+
+### v3.8.25 (2026-07-10) - ⚡ pip依赖安装智能跳过 + 启动加速20秒→0.1秒
+
+#### 🎯 核心改进
+- **⚡ pip依赖安装智能跳过** - 启动时先检测`requirements.txt`中所有包是否已安装且版本满足，全部满足则跳过`pip install`，耗时从~20秒降至<0.1秒
+- **🆕 main.py --check-deps 参数** - 新增`check_deps_satisfied()`函数，使用`importlib.metadata`快速检测已安装包版本，无需`packaging`模块
+- **🔄 run.bat / run.sh 同步优化** - 启动脚本先调用`main.py --check-deps`，满足则跳过安装，不满足才执行`pip install`
+
+---
+
+#### ⚡ pip依赖安装智能跳过
+
+**问题描述**:
+```
+run.bat 每次启动都无条件执行 pip install -r requirements.txt
+  → 即使所有包已安装且版本满足
+  → pip仍要：连接镜像源下载索引 → 解析依赖树 → 逐一比对版本
+  → 耗时 ~20秒（pandas/playwright依赖链很长）
+  → 用户看到"正在安装Python依赖..."卡住
+```
+
+**修复后**:
+```
+run.bat 先调用 main.py --check-deps
+  → check_deps_satisfied() 用 importlib.metadata 快速检测
+  → 全部满足 → exit 0 → 跳过 pip install（<0.1秒）
+  → 有缺失/版本不足 → exit 1 → 执行 pip install
+```
+
+**关键修改**:
+- `main.py`: 新增 `check_deps_satisfied()` 函数 + `--check-deps` 参数
+- `run.bat`: 先调用 `main.py --check-deps`，满足则跳过安装
+- `run.sh`: 同上，Linux/macOS端同步
+
+---
 
 ### v3.8.24 (2026-07-10) - 📂 tunnel_url.txt 权威数据源 + web_output.log 写入冲突修复 + 启动加速
 

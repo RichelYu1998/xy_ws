@@ -5065,6 +5065,48 @@ def select_pip_mirror(venv_path: str):
     print(f"[*] pip配置已写入: {conf_path}")
 
 
+def check_deps_satisfied(requirements_file="requirements.txt"):
+    import importlib.metadata as im
+
+    def ver_tuple(v):
+        return tuple(int(x) for x in re.split(r'[.\-]', v) if x.isdigit())
+
+    try:
+        with open(requirements_file, encoding="utf-8") as f:
+            lines = [l.strip() for l in f if l.strip() and not l.strip().startswith("#")]
+    except FileNotFoundError:
+        print(f"[!] {requirements_file} not found")
+        sys.exit(1)
+
+    missing = []
+    for line in lines:
+        parts = re.split(r"[><=!~\s;]+", line)
+        pkg_name = parts[0].replace("-", "_")
+        req_ver = parts[1] if len(parts) > 1 else None
+
+        installed_ver = None
+        try:
+            installed_ver = im.version(parts[0])
+        except im.PackageNotFoundError:
+            pass
+
+        if installed_ver is None:
+            missing.append(line)
+        elif req_ver:
+            try:
+                if ver_tuple(installed_ver) < ver_tuple(req_ver):
+                    missing.append(line)
+            except (ValueError, IndexError):
+                missing.append(line)
+
+    if missing:
+        print(f"[!] Missing/outdated: {missing}")
+        sys.exit(1)
+    else:
+        print("[OK] All dependencies satisfied")
+        sys.exit(0)
+
+
 def install_playwright_cdn():
     """Playwright CDN智能测速+安装"""
     CDNS = [
@@ -5132,12 +5174,17 @@ if __name__ == '__main__':
     parser.add_argument('--excel', '-e', help='Excel文件路径')
     parser.add_argument('--task', type=int, choices=[1, 2, 3, 4, 6], help='直接执行指定任务后退出 (1:爬虫, 2:货号对比, 3:Excel对比, 4:更新Cookie, 6:文件清理)')
     parser.add_argument('--install-playwright', action='store_true', help='Playwright CDN智能测速+安装浏览器')
+    parser.add_argument('--check-deps', action='store_true', help='检查requirements.txt依赖是否已满足')
     parser.add_argument('--select-pip-mirror', action='store_true', help='pip镜像智能测速并写入配置')
     args = parser.parse_args()
 
     if args.select_pip_mirror:
         venv_path = os.environ.get('VIRTUAL_ENV') or os.path.join(PROJECT_DIR, '.venv')
         select_pip_mirror(venv_path)
+        sys.exit(0)
+
+    if args.check_deps:
+        check_deps_satisfied()
         sys.exit(0)
 
     if args.install_playwright:
