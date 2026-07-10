@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.17
+> **版本**: v3.8.18
 > **更新日期**: 2026-07-10
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,117 @@
 ---
 
 ## 最新更新
+
+### v3.8.18 (2026-07-10) - 🔄 隧道权威数据源重构 + 公网地址不可用自动重启 + 邮件通知增强
+
+#### 🎯 核心改进
+- **📂 tunnel_url.txt 权威数据源** - 所有公网地址以 tunnel_url.txt 为唯一权威源，web_output.log 为镜像
+- **🔄 公网地址不可用自动重启** - 心跳检测发现公网地址不可用时，自动重启隧道服务器
+- **📝 重启后数据同步** - 重启成功后新URL先写入 tunnel_url.txt，再同步到 web_output.log
+- **📧 邮件通知增强** - 新增 `unavailable`（公网地址不可用）和 `restarted`（隧道已重启）两种邮件事件类型
+- **⚡ 消除双重验证** - 心跳循环调用 `get_public_url_from_web_log()` 时跳过内部验证，避免双重检查浪费
+- **🔇 心跳日志精简** - 心跳循环使用 `quiet=True` 模式，减少冗余日志输出
+
+---
+
+#### 📂 tunnel_url.txt 权威数据源重构
+
+**数据流向（修复后）**:
+```
+hostc 隧道启动
+    ↓
+新URL → 先写入 tunnel_url.txt（权威源）
+    ↓
+同步到 web_output.log（镜像）
+    ↓
+前端/API 从 tunnel_url.txt 读取最新可用公网地址
+```
+
+**关键修改**:
+- `get_public_url_from_web_log()` 新增 `skip_validation` 和 `quiet` 参数
+  - `skip_validation=True`: 跳过内部URL验证（调用方自行验证时使用，避免双重验证）
+  - `quiet=True`: 静默模式，减少日志输出（心跳循环等高频调用时使用）
+- 心跳循环、重启守护、状态API 均改为 `skip_validation=True, quiet=True`
+- `auto_start_tunnel()` 改为 `skip_validation=True`（自身会做 `verify_url`）
+
+**修复前问题**:
+```
+心跳循环每60秒调用 get_public_url_from_web_log()
+    → 内部做一次 URL 验证（5秒超时 × 3种方法 × 2次重试 = 最多30秒）
+    → heartbeat_loop 又做一次 verify_url()（10秒超时）
+    → 双重验证浪费资源，增加延迟
+```
+
+**修复后**:
+```
+心跳循环调用 get_public_url_from_web_log(skip_validation=True, quiet=True)
+    → 直接返回 tunnel_url.txt 中的URL（无验证，毫秒级）
+    → heartbeat_loop 自行 verify_url()（10秒超时）
+    → 单次验证，高效准确
+```
+
+---
+
+#### 🔄 公网地址不可用自动重启流程
+
+**完整流程**:
+```
+心跳检测 (每60秒)
+    ↓
+从 tunnel_url.txt 读取最新公网地址
+    ↓
+verify_url() 验证公网地址可用性
+    ↓ (连续失败10次)
+🚨 公网地址不可用
+    ↓
+📧 发送 unavailable 邮件通知
+    ↓
+标记 tunnel_need_restart = True
+    ↓
+restart_tunnel() 自动重启隧道
+    ↓
+auto_start_tunnel() 启动新隧道
+    ↓
+新URL → 先写入 tunnel_url.txt
+    ↓
+新URL → 同步写入 web_output.log
+    ↓
+📧 发送 restarted 邮件通知
+    ↓
+心跳检测确认稳定性（连续3次验证通过）
+    ↓
+📧 发送 stable_available 邮件通知
+```
+
+**新增处理**:
+- `web_url` 为 None 时：明确日志 `tunnel_url.txt 中未找到公网地址，隧道可能未启动`
+- URL连续不可用时：发送 `unavailable` 类型邮件通知
+- 重启成功后：发送 `restarted` 类型邮件通知
+- 心跳恢复时：同步更新 `tunnel_url.txt` 和 `web_output.log`
+
+---
+
+#### 📧 邮件通知增强：新增2种事件类型
+
+| 事件类型 | 标题 | 颜色 | 触发条件 |
+|---------|------|------|---------|
+| `unavailable` | 🚨 公网地址不可用 | 红色渐变 | URL连续验证失败10次 |
+| `restarted` | 🔄 隧道已重启 | 蓝色渐变 | 隧道重启成功获取新URL |
+| `stable_available` | ✅ 公网地址已稳定可用 | 紫色渐变 | 连续3次验证通过 |
+| `available` | ✅ 公网地址可用 | 紫色渐变 | URL从不可用恢复 |
+| `new` | ✅ 新公网地址 | 紫色渐变 | 首次获取到URL |
+
+**unavailable 邮件内容**:
+- 原公网地址
+- 当前状态：❌ 连续验证失败，正在重启隧道服务器
+- 处理措施：系统已自动触发隧道重启，重启成功后将发送新地址通知
+
+**restarted 邮件内容**:
+- 新公网地址
+- 当前状态：✅ 隧道重启成功
+- 数据同步：新地址已写入 tunnel_url.txt 和 web_output.log
+
+---
 
 ### v3.8.17 (2026-07-10) - 🚀 隧道启动优化：hostc预启动 + Python智能等待
 
