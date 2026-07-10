@@ -6327,7 +6327,7 @@ def get_public_url_from_web_log(skip_validation=False, quiet=False):
 |--------|----------------|-------|------|
 | `heartbeat_loop()` | True | True | 自行做 verify_url()，高频调用需静默 |
 | `restart_tunnel()` | True | True | 重启流程自行验证 |
-| `auto_start_tunnel()` | True | False | 自身做 verify_url，但需日志 |
+| `auto_start_tunnel()` | True | False | 不做任何验证，hostc在跑+有URL直接用，没有URL也不等 |
 | `send_heartbeat()` | True | True | 仅做HEAD检测，无需验证 |
 | `tunnel_status()` API | True | True | API返回状态，无需验证 |
 | 前端初始化 | False | False | 首次获取需验证 |
@@ -7152,12 +7152,13 @@ pkill -f hostc
 
 #### 为什么会频繁生成新URL？
 每次调用 `auto_start_tunnel()` 都会：
-1. 杀掉所有node/hostc进程（使用 `Environment.kill_process_by_name()`）
-2. 启动新的hostc实例
-3. 新实例连接到Cloudflare，获得新URL
-4. **旧URL立即失效**
+1. 检查hostc是否在运行 + tunnel_url.txt是否有URL
+2. hostc在跑+有URL → 直接复用（0秒，不做任何验证）
+3. hostc在跑+没URL → 直接返回成功（URL由心跳机制后台获取）
+4. hostc不在跑 → 杀残留进程 → 启动新hostc → 从输出解析URL
+5. **公网验证和邮件通知全部交给心跳循环后台处理**
 
-所以关键是：**减少不必要的重启！**
+所以关键是：**auto_start_tunnel() 不阻塞启动，公网验证交给心跳！**
 
 ### 10.7 最佳实践建议
 
@@ -9343,18 +9344,44 @@ web_url = PathManager.get_public_url_from_web_log()
 2. 连续失败达到阈值（默认10次）后，标记 `tunnel_need_restart = True`
 3. 发送 `unavailable` 类型邮件通知（`force_send=True`，不受冷却时间限制）
 4. 重启隧道后，新URL先写入 `tunnel_url.txt`，再同步 `web_output.log`
-5. 发送 `restarted` 类型邮件通知（`force_send=True`）
-6. 心跳恢复后，发送 `stable_available` 类型邮件通知
+5. 心跳恢复后，发送 `stable_available` 类型邮件通知
 
 **重启后数据同步顺序**:
 ```python
-# 1. 先写 tunnel_url.txt（权威源）
 with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
     tf.write(f"Public URL: {new_url}\n")
 
-# 2. 再同步 web_output.log（镜像）
 with open(web_output_file, 'a', encoding='utf-8') as wf:
     wf.write(f"Public URL: {new_url}\n")
+```
+
+### PY-STD-TUNNEL-003: auto_start_tunnel 不阻塞启动规范（v3.8.18 新增）
+
+**规范要求**:
+1. `auto_start_tunnel()` 在 `app.run()` 之前调用，不得做任何阻塞等待
+2. hostc在跑 + tunnel_url.txt有URL → 直接返回成功（0秒）
+3. hostc在跑 + tunnel_url.txt没URL → 直接返回成功（URL由心跳机制后台获取）
+4. **禁止**在 `auto_start_tunnel()` 中调用 `verify_url()` 或 `verify_local_server()`
+5. **禁止**在 `auto_start_tunnel()` 中使用 while 循环等待URL
+6. 公网验证和邮件通知全部交给 `heartbeat_loop()` 后台处理
+7. 心跳循环通过3次公网验证后发送 `stable_available` 邮件
+
+**错误做法** ❌:
+```python
+# 在 app.run() 之前阻塞等待
+while wait_count < 30:
+    if verify_url(current_url):  # 公网验证慢，最多等30秒
+        return success
+    time.sleep(1)
+```
+
+**正确做法** ✅:
+```python
+# 立即返回，不阻塞
+if has_hostc_process and web_url:
+    return {'success': True, 'url': web_url}
+if has_hostc_process:
+    return {'success': True, 'url': None}  # URL由心跳处理
 ```
 
 ### 测试验证清单
