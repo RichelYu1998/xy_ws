@@ -7040,16 +7040,13 @@ if __name__ == '__main__':
                                             print(f"[Tunnel] 📧 发送精准邮件通知...")
                                             send_tunnel_notification(web_url, 'stable_available', force_send=True)
                                             last_stable_notification_time = time.time()
-                                            last_email_sent_url = web_url
                                 else:
-                                    # URL已经是稳定的，保持计数
                                     if stable_url_confirm_count < stable_url_min_confirms:
                                         stable_url_confirm_count += 1
                                         if stable_url_confirm_count >= stable_url_min_confirms:
                                             print(f"[Tunnel] 🎯 稳定URL确认完成 ({stable_url_confirm_count}/{_min_confirms})")
                                             send_tunnel_notification(web_url, 'stable_available', force_send=True)
                                             last_stable_notification_time = time.time()
-                                            last_email_sent_url = web_url
                             else:
                                 url_verify_failures += 1
                                 # URL验证失败，重置稳定性计数
@@ -7161,7 +7158,6 @@ if __name__ == '__main__':
                             stable_url_confirm_count = stable_url_min_confirms
                             url_first_seen_time = time.time()
                             last_stable_notification_time = time.time()
-                            last_email_sent_url = url
                         else:
                             print(f"[Tunnel] ⏳ 公网地址暂不可用，将由心跳机制持续验证后发送邮件")
 
@@ -7198,7 +7194,6 @@ if __name__ == '__main__':
                                     stable_url_confirm_count = stable_url_min_confirms
                                     url_first_seen_time = time.time()
                                     last_stable_notification_time = time.time()
-                                    last_email_sent_url = found_url
                                 else:
                                     print(f"[Tunnel] ⏳ 公网地址暂不可用，将由心跳机制持续验证后发送邮件")
                                 return
@@ -7325,7 +7320,6 @@ if __name__ == '__main__':
                                             stable_url_confirm_count = stable_url_min_confirms
                                             url_first_seen_time = time.time()
                                             last_stable_notification_time = time.time()
-                                            last_email_sent_url = file_url
                                         else:
                                             print(f"[Tunnel] ⏳ 公网地址暂不可用，将由心跳机制持续验证后发送邮件")
                                         
