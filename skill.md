@@ -7407,10 +7407,80 @@ fi
 - **tunnel_url.txt 先写后读架构（v3.8.24）**: `run.bat`/`run.sh` 启动 hostc 时直接将输出写入 `tunnel_url.txt`（先写），`main.py` 的 `get_public_url_from_web_log()` 从 `tunnel_url.txt` 读取（后读）
 - **旧URL过期检测（v3.8.26）**: `auto_start_tunnel()` 发现旧URL时检查hostc进程是否存活，已退出则清除`tunnel_url.txt`并启动新隧道，避免复用死地址
 - **重启死循环修复（v3.8.27）**: `restart_tunnel()` 执行重启后立即重置`tunnel_need_restart=False`；hostc运行中但URL未就绪时等待120秒而非重启
+- **心跳守护即时启动（v3.8.28）**: 隧道启动后立即调用`start_tunnel_daemons()`启动心跳守护+重启守护线程，不再等待`/api/tunnel/status`被调用才懒启动
+- **守护统一管理（v3.8.28）**: 提取`start_tunnel_daemons()`函数统一管理守护线程启动逻辑，`/api/tunnel/status`中作为安全网调用
 
-### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.27 更新）
+### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.28 更新）
 
-**核心原则**：`auto_start_tunnel()` 在 `app.run()` 之前调用，必须零阻塞，确保 Flask 5秒内启动。邮件通知通过后台线程即时发送。
+**核心原则**：`auto_start_tunnel()` 在 `app.run()` 之前调用，必须零阻塞，确保 Flask 5秒内启动。邮件通知通过后台线程即时发送。隧道启动后立即调用 `start_tunnel_daemons()` 启动守护线程。
+
+**启动时序（v3.8.28 更新）**:
+```
+auto_start_tunnel()     ← 启动隧道（非阻塞）
+    ↓
+start_tunnel_daemons()  ← 立即启动心跳守护+重启守护
+    ↓
+app.run()               ← Flask 启动
+```
+
+**`start_tunnel_daemons()` 规范（v3.8.28 新增）**:
+
+```python
+def start_tunnel_daemons():
+    """统一启动心跳守护和重启守护线程（幂等，可安全重复调用）"""
+    global tunnel_restart_thread, tunnel_heartbeat_thread, tunnel_daemon_started
+    if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
+        if not tunnel_daemon_started:
+            tunnel_daemon_started = True
+            print(f"[Tunnel] 启动自动重启守护进程")
+        tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
+        tunnel_restart_thread.start()
+    if tunnel_heartbeat_thread is None or not tunnel_heartbeat_thread.is_alive():
+        tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+        tunnel_heartbeat_thread.start()
+        print(f"[Tunnel] 启动心跳守护进程（tunnel_url.txt 为唯一权威源）")
+```
+
+**调用点**:
+
+| 调用位置 | 时机 | 作用 |
+|---------|------|------|
+| `app.run()` 之前 | `auto_start_tunnel()` 之后 | **主启动点**：隧道启动后立即启动守护 |
+| `/api/tunnel/status` | API 被调用时 | **安全网**：确保守护线程始终在运行 |
+
+**守护线程职责**:
+
+| 线程 | 函数 | 职责 | 权威源 |
+|------|------|------|--------|
+| 心跳守护 | `heartbeat_loop()` | 从 `tunnel_url.txt` 读取URL，验证可用性，稳定性确认，发邮件 | `tunnel_url.txt` |
+| 重启守护 | `restart_tunnel()` | 监控 `tunnel_need_restart` 标志，检测异常状态，执行重启 | `tunnel_url.txt` |
+
+**心跳守护工作流**:
+```
+heartbeat_loop() 每60秒:
+  → 从 tunnel_url.txt 读取最新URL（权威源，skip_validation=True, quiet=True）
+  → verify_url(web_url) 验证可用性
+    → 验证通过 → 稳定性计数 → 达到阈值 → 发邮件通知
+    → 连续失败10次 → tunnel_need_restart = True → 重启守护立即执行重启
+  → send_heartbeat() HEAD 检测
+    → 连续失败5次 → tunnel_need_restart = True
+```
+
+**重启守护工作流**:
+```
+restart_tunnel() 持续循环:
+  → hostc运行 + URL有效 → 一切正常
+  → hostc运行 + URL无效 → 等待120秒让URL出现
+  → tunnel_need_restart=True → 立即执行重启 → 重置标志
+  → hostc未运行 + 无URL → 等待30秒后重启
+```
+
+**禁止事项**:
+- ❌ 禁止延迟启动守护线程（必须隧道启动后立即启动）
+- ❌ 禁止在 `start_tunnel_daemons()` 之外单独启动守护线程
+- ❌ 禁止心跳守护从 `web_output.log` 读取URL（`tunnel_url.txt` 是唯一权威源）
+- ✅ `start_tunnel_daemons()` 幂等设计：线程已存活则跳过，可安全重复调用
+- ✅ `/api/tunnel/status` 作为安全网调用，不依赖其作为唯一启动点
 
 **`auto_start_tunnel()` 行为规范**:
 
@@ -10772,5 +10842,9 @@ result = auto_start_tunnel(force_restart=True)  # 强制重启
 - [ ] 隧道单次启动验证：run.bat启动的hostc不被误杀（v3.8.19 新增）
 - [ ] 公网地址验证锁：邮件通知只在verify_url通过后发送（v3.8.19 新增）
 - [ ] 手动启动备用方案：优先复用成功，复用失败才强制重启（v3.8.19 新增）
+- [ ] 心跳守护即时启动：auto_start_tunnel()后立即调用start_tunnel_daemons()（v3.8.28 新增）
+- [ ] 重启守护即时启动：tunnel失效后重启守护立即响应（v3.8.28 新增）
+- [ ] start_tunnel_daemons()幂等性：重复调用不创建重复线程（v3.8.28 新增）
+- [ ] /api/tunnel/status安全网：守护线程意外退出时自动恢复（v3.8.28 新增）
 
 ---

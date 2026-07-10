@@ -1877,7 +1877,6 @@ class PathManager:
         return os.path.join(PathManager.get_file_dir(), 'web_output.log')
     _url_source_config = {
         'primary_source': 'tunnel_url.txt',
-        'fallback_source': 'web_output.log',
         'enable_logging': True,
         'enable_health_check': True,
         'auto_sync_interval': 300,
@@ -7176,6 +7175,19 @@ if __name__ == '__main__':
                                 pass
                 time.sleep(heartbeat_interval)
         
+        def start_tunnel_daemons():
+            global tunnel_restart_thread, tunnel_heartbeat_thread, tunnel_daemon_started
+            if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
+                if not tunnel_daemon_started:
+                    tunnel_daemon_started = True
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动自动重启守护进程")
+                tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
+                tunnel_restart_thread.start()
+            if tunnel_heartbeat_thread is None or not tunnel_heartbeat_thread.is_alive():
+                tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+                tunnel_heartbeat_thread.start()
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动心跳守护进程（tunnel_url.txt 为唯一权威源）")
+
         def auto_start_tunnel(force_restart=False):
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
 
@@ -7872,17 +7884,7 @@ if __name__ == '__main__':
                 detailed_status = 'stopped'
                 status_message = '⏹️ 隧道未运行'
             
-            # 确保守护线程在运行
-            if tunnel_restart_thread is None or not tunnel_restart_thread.is_alive():
-                if not tunnel_daemon_started:
-                    tunnel_daemon_started = True
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动自动重启守护进程")
-                tunnel_restart_thread = threading.Thread(target=restart_tunnel, daemon=True)
-                tunnel_restart_thread.start()
-            if tunnel_heartbeat_thread is None or not tunnel_heartbeat_thread.is_alive():
-                tunnel_heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
-                tunnel_heartbeat_thread.start()
-                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动心跳守护进程")
+            start_tunnel_daemons()
             
             # 返回状态 - 统一使用 web_url，包含详细的稳定性信息
             return jsonify({
@@ -7966,6 +7968,8 @@ if __name__ == '__main__':
                 print(f"[Tunnel] 隧道已就绪，公网地址将由心跳机制获取和验证")
         else:
             print(f"[Tunnel] 隧道启动失败: {tunnel_result.get('error', '未知错误')}")
+        
+        start_tunnel_daemons()
         
         print("按 Ctrl+C 停止服务")
         print("=" * 50)
