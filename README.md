@@ -1,6 +1,6 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.25
+> **版本**: v3.8.26
 > **更新日期**: 2026-07-10
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,41 @@
 ---
 
 ## 最新更新
+
+### v3.8.26 (2026-07-10) - 🔧 隧道旧URL复用Bug修复 + hostc进程存活检测
+
+#### 🎯 核心改进
+- **🔧 隧道旧URL复用Bug修复** - `auto_start_tunnel()` 发现旧URL时增加hostc进程存活检测，hostc已退出则清除旧URL并启动新隧道，避免复用死地址
+- **🛡️ tunnel_url.txt 过期清理** - hostc进程不在运行时自动清除`tunnel_url.txt`中的过期URL，确保下次启动获取新地址
+
+---
+
+#### 🔧 隧道旧URL复用Bug修复
+
+**问题描述**:
+```
+auto_start_tunnel(force_restart=False)
+  → 从 tunnel_url.txt 读到旧URL: https://t-zqvd2budzq.hostc.dev
+  → 直接返回"发现已有URL，后台验证中"
+  → 但 hostc 进程已经挂了！旧URL是死地址！
+  → 后台验证永远失败：502 Bad Gateway / SSL handshake timed out
+  → 永远不会启动新隧道获取新地址
+```
+
+**修复后**:
+```
+auto_start_tunnel(force_restart=False)
+  → 从 tunnel_url.txt 读到旧URL
+  → 检查 hostc 进程是否在运行
+  → hostc在运行 → 复用URL，后台验证（原有逻辑）
+  → hostc已退出 → 清除 tunnel_url.txt → 启动新隧道 → 获取新地址
+```
+
+**关键修改**:
+- `main.py`: `auto_start_tunnel()` 中 `if web_url:` 改为 `if web_url and has_hostc_process:`
+- `main.py`: 新增 `if web_url and not has_hostc_process:` 分支，清除过期URL后继续启动新隧道
+
+---
 
 ### v3.8.25 (2026-07-10) - ⚡ pip依赖安装智能跳过 + 启动加速20秒→0.1秒
 

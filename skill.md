@@ -5924,34 +5924,59 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
-### v3.8.25 (2026-07-10) - ⚡ pip依赖安装智能跳过   ← 标题2：最新版本
+### v3.8.26 (2026-07-10) - 🔧 隧道旧URL复用Bug修复   ← 标题2：最新版本
 
-- **⚡ pip依赖安装智能跳过** - 启动时先检测`requirements.txt`中所有包是否已安装且版本满足，全部满足则跳过`pip install`，耗时从~20秒降至<0.1秒
-- **🆕 main.py --check-deps** - 新增`check_deps_satisfied()`函数，使用`importlib.metadata`快速检测，无需`packaging`模块
-- **🔄 run.bat / run.sh 同步优化** - 启动脚本先调用`main.py --check-deps`，满足则跳过安装
+- **🔧 隧道旧URL复用Bug修复** - `auto_start_tunnel()` 发现旧URL时增加hostc进程存活检测，hostc已退出则清除旧URL并启动新隧道
+- **🛡️ tunnel_url.txt 过期清理** - hostc进程不在运行时自动清除`tunnel_url.txt`中的过期URL
 
 ---                                       ← 分隔符
 
-#### ⚡ pip依赖安装智能跳过（详细技术文档）
+#### 🔧 隧道旧URL复用Bug修复（详细技术文档）
 
 ##### 问题现象
 ```
-[6/6] 设置Python虚拟环境并安装依赖...
-正在安装Python依赖...
-        ↓
-⚠️ 卡住约20秒！所有包实际已安装！
-        ↓
-[*] 安装Playwright浏览器...
+auto_start_tunnel(force_restart=False)
+  → 从 tunnel_url.txt 读到旧URL: https://t-zqvd2budzq.hostc.dev
+  → 直接返回"发现已有URL，后台验证中"
+  → 但 hostc 进程已经挂了！旧URL是死地址！
+  → 后台验证永远失败：502 Bad Gateway / SSL handshake timed out
+  → 永远不会启动新隧道获取新地址
 ```
 
-##### 根本原因：无条件pip install
+##### 根本原因：缺少进程存活检测
 ```python
-# ❌ 旧代码 (v3.8.24)
-# run.bat / run.sh 每次启动都执行：
-pip install -r requirements.txt
-# → 即使所有包已安装，pip仍要：
-#   1. 连接镜像源下载索引
-#   2. 解析5个直接依赖 + 20+个间接依赖的版本约束
+# ❌ 旧代码 (v3.8.25)
+if web_url:  # 只要有URL就复用，不管hostc是否还在运行
+    tunnel_url = web_url
+    return {'success': True, 'url': tunnel_url}
+```
+
+##### 修复方案：URL + 进程双重检测
+```python
+# ✅ 新代码 (v3.8.26)
+if web_url and has_hostc_process:  # URL存在 且 hostc进程在运行 → 才复用
+    tunnel_url = web_url
+    return {'success': True, 'url': tunnel_url}
+
+if web_url and not has_hostc_process:  # URL存在 但 hostc已死 → 清除旧URL，启动新隧道
+    print(f"[Tunnel] ⚠️ 发现旧URL {web_url} 但 hostc 进程已不在运行，旧地址已失效")
+    # 清除 tunnel_url.txt 中的过期URL
+    with open(tunnel_file, 'w') as f:
+        f.write('')
+    # 不 return，继续往下走到启动新隧道的逻辑
+```
+
+##### 场景覆盖
+| 场景 | web_url | has_hostc_process | 修改前行为 | 修改后行为 |
+|------|---------|-------------------|-----------|-----------|
+| 正常运行 | ✅ | ✅ | 复用URL ✅ | 复用URL ✅ |
+| hostc挂了但URL残留 | ✅ | ❌ | 复用死URL ❌ | 清除+启动新隧道 ✅ |
+| hostc在跑但无URL | ❌ | ✅ | 等待URL ✅ | 等待URL ✅ |
+| 全新启动 | ❌ | ❌ | 启动新隧道 ✅ | 启动新隧道 ✅ |
+
+---
+
+### v3.8.25 (2026-07-10) - ⚡ pip依赖安装智能跳过   ← 标题2：版本
 #   3. 逐一比对已安装版本
 # → 耗时 ~20秒
 ```
@@ -7379,8 +7404,9 @@ fi
 - **CDN 轮询安装**: 首次运行时 `run.bat`/`run.sh` 自动测速选最快 CDN 安装 hostc
 - **非阻塞启动（v3.8.23）**: `auto_start_tunnel(force_restart=False)` 零等待，URL验证和邮件通知交由心跳机制后台完成
 - **tunnel_url.txt 先写后读架构（v3.8.24）**: `run.bat`/`run.sh` 启动 hostc 时直接将输出写入 `tunnel_url.txt`（先写），`main.py` 的 `get_public_url_from_web_log()` 从 `tunnel_url.txt` 读取（后读）
+- **旧URL过期检测（v3.8.26）**: `auto_start_tunnel()` 发现旧URL时检查hostc进程是否存活，已退出则清除`tunnel_url.txt`并启动新隧道，避免复用死地址
 
-### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.24 更新）
+### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.26 更新）
 
 **核心原则**：`auto_start_tunnel()` 在 `app.run()` 之前调用，必须零阻塞，确保 Flask 5秒内启动。邮件通知通过后台线程即时发送。
 
@@ -7388,17 +7414,20 @@ fi
 
 | 模式 | force_restart | 行为 | 阻塞时间 | 邮件通知 |
 |------|--------------|------|---------|---------|
-| 启动时(有URL) | False | 后台验证+发邮件，立即返回 | 0秒 | 后台~10秒内 |
-| 启动时(hostc在跑) | False | 后台等URL+验证+发邮件，立即返回 | 0秒 | 后台URL出现后~10秒 |
+| 启动时(有URL且hostc在跑) | False | 后台验证+发邮件，立即返回 | 0秒 | 后台~10秒内 |
+| 启动时(有URL但hostc已死) | False | 清除旧URL→启动新hostc，立即返回 | 0秒 | read_output()获取URL后 |
+| 启动时(hostc在跑无URL) | False | 后台等URL+验证+发邮件，立即返回 | 0秒 | 后台URL出现后~10秒 |
 | 启动时(需启动) | False | 后台启动hostc，立即返回 | 0秒 | read_output()获取URL后 |
 | 手动触发 | True | 杀旧进程→启动新hostc→等待URL(最多10秒) | ≤10秒 | read_output()获取URL后 |
 
-**启动流程（v3.8.24 即时邮件通知）**:
+**启动流程（v3.8.26 旧URL检测增强）**:
 ```
 auto_start_tunnel(force_restart=False)
-  → 有URL → 启动后台线程 _verify_and_notify_found_url → 立即返回（0秒）
+  → 有URL 且 hostc在运行 → 启动后台线程 _verify_and_notify_found_url → 立即返回（0秒）
     → 后台线程: verify_url() → 通过 → send_tunnel_notification() → ~10秒内发邮件
-  → hostc在运行 → 启动后台线程 _wait_and_notify_hostc_url → 立即返回（0秒）
+  → 有URL 但 hostc已退出（v3.8.26 新增）→ 清除 tunnel_url.txt → 继续往下启动新hostc
+    → read_output() 获取新URL → verify_url() → 发邮件
+  → hostc在运行但无URL → 启动后台线程 _wait_and_notify_hostc_url → 立即返回（0秒）
     → 后台线程: 每2秒检查tunnel_url.txt → 发现URL → verify_url() → 发邮件
   → 需启动新hostc → 后台启动后立即返回（0秒）
     → read_output() 获取URL → verify_url() → 发邮件
@@ -8145,6 +8174,11 @@ pypandoc.convert_file(
 **3. 多进程冲突** ✅ 已修复
 - **问题**：检测到4个node.exe进程同时运行（Windows）或多个hostc进程（Unix）
 - **修复**：清理后等待2秒确保完全退出 + 二次检查残留进程
+
+**4. 旧URL复用Bug** ✅ v3.8.26 已修复
+- **位置**：`main.py` `auto_start_tunnel()` 函数
+- **问题**：`tunnel_url.txt` 有旧URL但hostc进程已退出时，仍复用死地址，导致502/SSL超时
+- **修复**：增加 `has_hostc_process` 检测，hostc已退出则清除旧URL并启动新隧道
 
 ### 10.2 核心修改详情（跨平台实现）
 
