@@ -2480,9 +2480,24 @@ SzwegoSpider/
                                 sectionTitle.innerHTML = '<i class="fa fa-bookmark" style="color: #409EFF; margin-right: 6px;"></i>' + item.title;
                                 itemDiv.appendChild(sectionTitle);
                                 if (item.content && item.content.trim()) {
+                                    var rawContent = item.content.trim();
                                     var contentDiv = document.createElement('div');
-                                    contentDiv.style.cssText = 'padding: 10px 16px; color: #606266; font-size: 13px; line-height: 1.8; background: #fafafa; border-radius: 4px; white-space: pre-wrap; word-break: break-word;';
-                                    contentDiv.textContent = item.content.trim();
+                                    contentDiv.style.cssText = 'padding: 10px 16px; color: #606266; font-size: 13px; line-height: 1.8; background: #fafafa; border-radius: 4px; word-break: break-word;';
+                                    var codeBlockRegex = /```[\s\S]*?```/g;
+                                    var parts = rawContent.split(codeBlockRegex);
+                                    var codeBlocks = rawContent.match(codeBlockRegex) || [];
+                                    var html = '';
+                                    for (var pi = 0; pi < parts.length; pi++) {
+                                        var textPart = parts[pi].trim();
+                                        if (textPart) {
+                                            html += '<div style="margin-bottom: 8px;">' + textPart.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>') + '</div>';
+                                        }
+                                        if (pi < codeBlocks.length) {
+                                            var codeContent = codeBlocks[pi].replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
+                                            html += '<pre style="background: #1e1e1e; color: #d4d4d4; padding: 12px 16px; border-radius: 4px; font-size: 12px; line-height: 1.6; overflow-x: auto; margin: 8px 0; white-space: pre-wrap; word-break: break-all;">' + codeContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
+                                        }
+                                    }
+                                    contentDiv.innerHTML = html;
                                     itemDiv.appendChild(contentDiv);
                                 }
                                 if (item.sub_items && item.sub_items.length) {
