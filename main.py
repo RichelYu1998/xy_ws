@@ -6501,8 +6501,11 @@ if __name__ == '__main__':
                         elif current_section:
                             current_section['sub_items'].append(sub_match.group(1).strip())
                         continue
-                    if current_section and stripped and not in_code_block:
-                        current_section['content'] += line + '\n'
+                    if current_section:
+                        if in_code_block:
+                            current_section['content'] += line + '\n'
+                        elif stripped:
+                            current_section['content'] += line + '\n'
                 if current_section:
                     current_items.append(current_section)
                 elif current_item:
