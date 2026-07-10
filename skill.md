@@ -7300,25 +7300,29 @@ fi
 - **非阻塞启动（v3.8.23）**: `auto_start_tunnel(force_restart=False)` 零等待，URL验证和邮件通知交由心跳机制后台完成
 - **tunnel_url.txt 先写后读架构（v3.8.24）**: `run.bat`/`run.sh` 启动 hostc 时直接将输出写入 `tunnel_url.txt`（先写），`main.py` 的 `get_public_url_from_web_log()` 从 `tunnel_url.txt` 读取（后读）
 
-### 6.1.0 非阻塞启动规范（v3.8.23 新增）
+### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.24 更新）
 
-**核心原则**：`auto_start_tunnel()` 在 `app.run()` 之前调用，必须零阻塞，确保 Flask 5秒内启动。
+**核心原则**：`auto_start_tunnel()` 在 `app.run()` 之前调用，必须零阻塞，确保 Flask 5秒内启动。邮件通知通过后台线程即时发送。
 
 **`auto_start_tunnel()` 行为规范**:
 
-| 模式 | force_restart | 行为 | 阻塞时间 |
-|------|--------------|------|---------|
-| 启动时 | False | 有URL→直接返回；hostc在跑→直接返回；需启动→后台启动后返回 | 0秒 |
-| 手动触发 | True | 杀旧进程→启动新hostc→等待URL(最多10秒) | ≤10秒 |
+| 模式 | force_restart | 行为 | 阻塞时间 | 邮件通知 |
+|------|--------------|------|---------|---------|
+| 启动时(有URL) | False | 后台验证+发邮件，立即返回 | 0秒 | 后台~10秒内 |
+| 启动时(hostc在跑) | False | 后台等URL+验证+发邮件，立即返回 | 0秒 | 后台URL出现后~10秒 |
+| 启动时(需启动) | False | 后台启动hostc，立即返回 | 0秒 | read_output()获取URL后 |
+| 手动触发 | True | 杀旧进程→启动新hostc→等待URL(最多10秒) | ≤10秒 | read_output()获取URL后 |
 
-**启动流程（v3.8.23 非阻塞）**:
+**启动流程（v3.8.24 即时邮件通知）**:
 ```
 auto_start_tunnel(force_restart=False)
-  → 有URL → 直接返回（0秒，验证交心跳）
-  → hostc在运行 → 直接返回（0秒，URL交心跳）
+  → 有URL → 启动后台线程 _verify_and_notify_found_url → 立即返回（0秒）
+    → 后台线程: verify_url() → 通过 → send_tunnel_notification() → ~10秒内发邮件
+  → hostc在运行 → 启动后台线程 _wait_and_notify_hostc_url → 立即返回（0秒）
+    → 后台线程: 每2秒检查tunnel_url.txt → 发现URL → verify_url() → 发邮件
   → 需启动新hostc → 后台启动后立即返回（0秒）
+    → read_output() 获取URL → verify_url() → 发邮件
   → app.run() 立即启动
-  → 心跳机制后台验证URL + 发邮件
 ```
 
 **API防误重启（v3.8.23 新增）**:
@@ -7330,10 +7334,11 @@ auto_start_tunnel(force_restart=False)
 ```
 
 **禁止事项**:
-- ❌ 禁止在 `force_restart=False` 时调用 `verify_url()`（阻塞10秒）
-- ❌ 禁止在 `force_restart=False` 时使用 `while` 等待循环（阻塞15-30秒）
-- ❌ 禁止在 `force_restart=False` 时 `read_thread.join(timeout=10)`（阻塞10秒）
-- ✅ 所有验证和邮件通知由 `heartbeat_loop()` 后台完成
+- ❌ 禁止在 `force_restart=False` 时在主线程调用 `verify_url()`（阻塞10秒）
+- ❌ 禁止在 `force_restart=False` 时在主线程使用 `while` 等待循环（阻塞15-30秒）
+- ❌ 禁止在 `force_restart=False` 时在主线程 `read_thread.join(timeout=10)`（阻塞10秒）
+- ✅ 验证和邮件通知通过后台线程即时完成，不阻塞主线程
+- ✅ 后台线程设置 `stable_url_confirm_count = stable_url_min_confirms`，跳过心跳重复验证
 
 ### 6.1.1 权威数据源规范（v3.8.18 新增，v3.8.24 更新）
 

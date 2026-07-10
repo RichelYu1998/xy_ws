@@ -16,6 +16,7 @@
 - **📂 tunnel_url.txt 权威数据源架构** - 明确数据流向：`run.bat` 写入 → `tunnel_url.txt` → `main.py` 读取
 - **🔧 web_output.log 写入冲突修复** - 移除 `run.bat`/`run.sh` 中 Python 输出重定向，由 `main.py` TeeOutput 独占写入，解决 `[Errno 13] Permission denied` 错误
 - **⚡ Flask 启动检测加速** - 初始等待从6秒降至1秒，检测间隔从3秒降至1秒，"启动完成"从~10秒降至~3秒
+- **📧 即时邮件通知** - `auto_start_tunnel()` 发现URL后后台验证+发邮件，不再等心跳2-3分钟
 
 ---
 
@@ -90,6 +91,35 @@ Python 启动 → ping -n 2（等1秒）→ 第一次检查 Flask
 **关键修改**:
 - `run.bat`: `ping -n 6` → `ping -n 2`，`ping -n 3` → `ping -n 1`
 - `run.sh`: `sleep 5` → `sleep 1`，`sleep 2` → `sleep 1`
+
+---
+
+#### 📧 即时邮件通知
+
+**问题描述**:
+```
+auto_start_tunnel() 从 tunnel_url.txt 读到 URL → "验证将由心跳机制完成" → 不发邮件
+    ↓ 60秒后
+心跳第1次 → 跳过验证（skip_url_verify_max=1）
+    ↓ 60秒后
+心跳第2次 → verify_url() → 通过 → confirm_count = 1
+    ↓ 60秒后
+心跳第3次 → verify_url() → 通过 → confirm_count = 2 → 终于发邮件！
+总共等 2-3 分钟！
+```
+
+**修复后**:
+```
+auto_start_tunnel() 从 tunnel_url.txt 读到 URL
+    ↓ 后台线程（不阻塞 Flask）
+verify_url() → 通过 → 立即发邮件！
+    ↓ ~10秒内完成
+```
+
+**关键修改**:
+- `auto_start_tunnel()` 有URL时：启动 `_verify_and_notify_found_url` 后台线程，验证+发邮件
+- `auto_start_tunnel()` hostc在运行时：启动 `_wait_and_notify_hostc_url` 后台线程，等URL出现后验证+发邮件
+- 两种情况都不阻塞 Flask 启动，邮件在后台~10秒内发送
 
 ---
 
