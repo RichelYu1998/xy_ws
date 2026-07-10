@@ -7186,7 +7186,7 @@ if __name__ == '__main__':
                 has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
                 web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
 
-                if web_url:
+                if web_url and has_hostc_process:
                     tunnel_url = web_url
                     old_tunnel_url = web_url
                     print(f"[Tunnel] ✅ 发现公网地址: {web_url}，后台验证并发邮件")
@@ -7210,6 +7210,17 @@ if __name__ == '__main__':
 
                     threading.Thread(target=_verify_and_notify_found_url, args=(web_url,), daemon=True).start()
                     return {'success': True, 'url': tunnel_url, 'message': f'发现已有URL: {tunnel_url}，后台验证中'}
+
+                if web_url and not has_hostc_process:
+                    print(f"[Tunnel] ⚠️ 发现旧URL {web_url} 但 hostc 进程已不在运行，旧地址已失效，将启动新隧道")
+                    try:
+                        tunnel_file_to_clear = PathManager.get_tunnel_url_file()
+                        with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
+                            f.write('')
+                        print(f"[Tunnel] 已清除过期 tunnel_url.txt")
+                    except Exception as clear_err:
+                        print(f"[Tunnel] 清除 tunnel_url.txt 失败: {clear_err}")
+                    sys.stdout.flush()
 
                 if has_hostc_process:
                     print(f"[Tunnel] 🔍 hostc在运行，后台等待URL出现后验证发邮件")
