@@ -21,6 +21,7 @@
 - **🔇 心跳日志精简** - 心跳循环使用 `quiet=True` 模式，减少冗余日志输出
 - **🐛 NameError修复** - `heartbeat_loop()` 中 `_min_confirms` 变量未定义，改用 `globals().get('stable_url_min_confirms', 3)` 安全访问
 - **📝 写入顺序修正** - hostc输出解析处写入顺序从"先web_output.log后tunnel_url.txt"修正为"先tunnel_url.txt后web_output.log"
+- **🚀 启动顺序修正** - run.bat/run.sh 清理残留进程移至 hostc 预启动之前，避免刚启动的 hostc 被误杀
 
 ---
 

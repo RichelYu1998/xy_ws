@@ -60,16 +60,17 @@ call :log Szwego商品爬虫和货号对比工具 - v%VERSION%
 call :log ========================================
 
 call :log_blank
-call :log [*] 预启动 hostc 隧道（后台运行，不阻塞）...
-echo. > "file\tunnel_url.txt"
-start /b cmd /c "npx -y hostc@latest 8888 --local-host localhost >> file\tunnel_url.txt 2>&1" < nul
-call :log [*] hostc 已在后台启动，将在后续步骤中获取URL
-
 call :log [*] 清理残留进程...
 taskkill /F /IM python.exe >nul 2>&1
 taskkill /F /IM node.exe >nul 2>&1
 ping -n 2 127.0.0.1 >nul 2>&1
 call :log [*] 残留进程清理完成
+
+call :log_blank
+call :log [*] 预启动 hostc 隧道（后台运行，不阻塞）...
+echo. > "file\tunnel_url.txt"
+start /b cmd /c "npx -y hostc@latest 8888 --local-host localhost >> file\tunnel_url.txt 2>&1" < nul
+call :log [*] hostc 已在后台启动，将在后续步骤中获取URL
 
 call :log_blank
 call :log [*] 清理临时文件...
