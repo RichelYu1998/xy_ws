@@ -22,6 +22,7 @@
 - **🐛 NameError修复** - `heartbeat_loop()` 中 `_min_confirms` 变量未定义，改用 `globals().get('stable_url_min_confirms', 3)` 安全访问
 - **📝 写入顺序修正** - hostc输出解析处写入顺序从"先web_output.log后tunnel_url.txt"修正为"先tunnel_url.txt后web_output.log"
 - **🚀 启动顺序修正** - run.bat/run.sh 清理残留进程移至 hostc 预启动之前，避免刚启动的 hostc 被误杀
+- **📝 日志准确性修正** - `auto_start_tunnel()` 区分"URL已获取但尚未就绪"和"URL未生成"两种状态，避免误导性日志
 
 ---
 
