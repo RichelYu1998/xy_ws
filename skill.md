@@ -5342,12 +5342,12 @@ return str;
 `run.bat` 和 `run.sh` 必须保持逻辑一致，遵循以下六步：
 
 ```
-[0/6] 清理残留进程 → 预启动 hostc 隧道（后台）→ [1/6] 检测 Python 环境 → [2/6] 检测 Node.js/NVM 环境 → [3/6] 测速 PIP 镜像源
+[0/6] 清理残留进程 → 启动 hostc 隧道（后台）→ [1/6] 检测 Python 环境 → [2/6] 检测 Node.js/NVM 环境 → [3/6] 测速 PIP 镜像源
 → [4/6] 测速 NPM 镜像源 → [5/6] 检测/创建虚拟环境 + 安装依赖 → [6/6] 检测配置文件 → 启动Web服务
 ```
 
 **⚠️ 启动顺序关键约束（v3.8.18 修正）**：
-- **清理残留进程必须在 hostc 预启动之前执行**
+- **清理残留进程必须在 hostc 启动之前执行**
 - ❌ 错误顺序：启动 hostc → 清理残留进程（会误杀刚启动的 hostc）
 - ✅ 正确顺序：清理残留进程 → 启动 hostc（hostc 不被误杀，URL 更快可用）
 
@@ -5664,7 +5664,7 @@ check_config() {
 # 启动Web服务和隧道
 # ========================================
 run_web() {
-    log "[*] 预启动隧道服务【加快首次启动速度】..."
+    log "[*] 隧道服务已在脚本启动时启动"
     npx -y hostc@latest --help >/dev/null 2>&1
     
     source "$VENV_PATH/bin/activate"
@@ -6061,7 +6061,7 @@ rem ========================================
 rem 启动Web服务和隧道
 rem ========================================
 :run_web
-call :log [*] 预启动隧道服务【加快首次启动速度】...
+call :log [*] 隧道服务已在脚本启动时启动
 npx -y hostc@latest --help >nul 2>&1
 
 set "WEB_PORT=8888"
@@ -6131,10 +6131,10 @@ call :check_config
 
 ```batch
 :: ❌ 错误
-call :log 预启动隧道服务(加快首次启动速度)...
+call :log 启动隧道服务(加快首次启动速度)...
 
 :: ✅ 正确（使用全角方括号）
-call :log [*] 预启动隧道服务【加快首次启动速度】...
+call :log [*] 启动隧道服务【加快首次启动速度】...
 ```
 
 #### 4.5.3 毫秒显示格式与跨平台时间戳规范
@@ -6348,8 +6348,8 @@ def get_public_url_from_web_log(skip_validation=False, quiet=False):
     - Web 服务就绪后执行 `set "LOG_FILE="` 停止文件写入，后续用 `call :log_console_only`
   - SH: 定义 `log()`（双写）+ `log_console_only()`（仅控制台），Web 就绪后 `LOG_FILE=""`
   - **括号禁忌**：`call :log` / `log()` 参数中禁止使用 ASCII `( )`，CMD 会误解析为块语法
-    - ❌ `call :log 预启动隧道服务(加快首次启动速度)...` → `) was unexpected at this time`
-    - ✅ `call :log [*] 预启动隧道服务【加快首次启动速度】...` （全角方括号）
+    - ❌ `call :log 启动隧道服务(加快首次启动速度)...` → `) was unexpected at this time`
+    - ✅ `call :log [*] 启动隧道服务【加快首次启动速度】...` （全角方括号）
     - ✅ 毫秒显示用 `[34ms]` 而非 `(34ms)`
   - **Python 写入模式**：`web_output.log` 必须用 `'a'`（追加），禁止 `'w'`（覆盖）
     - ❌ `open(web_output_file, 'w')` → 清空shell脚本已写入的完整启动日志，丢失环境检测/镜像测速等记录
@@ -6406,6 +6406,40 @@ with open(web_output_file, 'a', encoding='utf-8') as wf:
 
 **核心原则**：获取到URL后立即验证并发邮件，不依赖心跳机制的延迟验证。
 
+**问题描述**:
+```
+原流程依赖心跳机制验证URL稳定性
+  → auto_start_tunnel() 获取URL后不立即发邮件
+  → 需等待心跳机制连续验证 stable_url_min_confirms(3)次通过
+  → 总等待时间 ≈ 3 × 60秒 = 180秒（约3分钟）
+  → 用户长时间收不到通知邮件
+  → restart_tunnel() 重启成功后又重复发送 update 邮件
+  → 同一URL收到 new + update 两封重复邮件
+```
+
+**修复后**:
+```python
+# read_output() - 获取URL后立即 verify_url() + send_tunnel_notification()
+if url_verified:
+    send_tunnel_notification(file_url, 'stable_available', force_send=True)
+    stable_url = file_url
+    stable_url_confirm_count = stable_url_min_confirms
+
+# 复用路径 - 复用已有可用URL时也立即发邮件
+send_tunnel_notification(file_url, 'available', force_send=True)
+
+# restart_tunnel() - 重启成功后立即验证新URL，通过则直接发邮件
+if url_verified:
+    send_tunnel_notification(file_url, 'stable_available', force_send=True)
+```
+
+**关键修改**:
+- `read_output()` - 获取URL后立即 `verify_url()` + `send_tunnel_notification()`
+- 复用路径 - 复用已有可用URL时也立即发邮件
+- `restart_tunnel()` - 重启成功后立即验证新URL，通过则直接发邮件
+- 心跳跳过次数 - `skip_url_verify_max` 从4减为1（auto_start_tunnel已做即时验证）
+- 稳定性确认 - `stable_url_min_confirms` 从3减为2（2次即确认稳定）
+
 **即时通知触发点**:
 
 | 触发场景 | 函数 | 验证方式 | 邮件事件 |
@@ -6432,16 +6466,15 @@ else:
     print(f"[Tunnel] ⏳ 公网地址暂不可用，将由心跳机制持续验证后发送邮件")
 ```
 
-### 6.3.2 隧道状态API规范（v3.8.20 新增）
+### 6.3.2 🖥️ 前端状态修复：不再误判"未连接"
 
-**核心原则**：`/api/tunnel/status` 不做阻塞式网络验证，用心跳缓存结果。
-
-**修复前问题**:
+**问题描述**:
 ```
-API每次调用 verify_url(web_url, timeout=5)
+原 /api/tunnel/status API 每次调用都执行 verify_url(web_url, timeout=5)
   → 一次网络波动 → url_valid=False → is_running=False
   → 前端显示"未连接"（实际隧道正常运行！）
   → 误触发 tunnel_need_restart=True
+  → 频繁误报导致用户体验极差
 ```
 
 **修复后**:
@@ -6450,12 +6483,37 @@ API每次调用 verify_url(web_url, timeout=5)
 is_running = process_running and web_url is not None
 
 # URL可用性：用心跳机制的缓存结果
-url_valid = (stable_url == web_url and 
-            stable_url_confirm_count >= stable_url_min_confirms and 
+url_valid = (stable_url == web_url and
+            stable_url_confirm_count >= stable_url_min_confirms and
             web_url is not None)
 ```
 
+**关键修改**:
+- API不再阻塞式调用 `verify_url()`，改用心跳缓存的验证结果
+- `is_running` 判断逻辑简化为：有进程 + 有URL = 运行中
+- `url_valid` 使用心跳机制维护的 `stable_url_confirm_count`
+- 避免单次网络波动导致前端误判"未连接"
+- 添加"已连接（验证中）"中间状态，提升用户体验
+
 **前端状态展示**:
+
+**问题描述**:
+```
+原前端只有两种状态：已连接 / 未连接
+  → URL验证中（心跳尚未确认稳定）时显示"未连接"
+  → 用户看到"未连接"误以为隧道故障
+  → 实际隧道正常运行，只是心跳确认尚未完成
+  → 缺少中间状态，无法区分"真正断开"和"验证中"
+```
+
+**修复后**:
+```
+新增"已连接（验证中）"中间状态
+  → 有进程 + 有URL = 已连接（验证中）蓝色 badge-info
+  → 心跳确认稳定后 = 已连接（已验证）绿色 badge-success
+  → 无进程或无URL = 未连接 红色 badge-danger
+  → 用户可清晰区分"验证中"和"真正断开"
+```
 
 | 状态 | Badge颜色 | 说明 |
 |------|----------|------|
@@ -9449,7 +9507,7 @@ if has_hostc_process and web_url:
     return {'success': True, 'url': web_url}  # web_url 可能已502
 
 # 检测到 hostc 在运行但没 URL，直接杀掉重启
-Environment.kill_process_by_name('node.exe')  # 杀掉了 run.bat 预启动的 hostc
+Environment.kill_process_by_name('node.exe')  # 杀掉了 run.bat 启动的 hostc
 ```
 
 **正确做法** ✅:
@@ -9500,7 +9558,7 @@ result = auto_start_tunnel(force_restart=True)  # 强制重启
 - [ ] tunnel_url.txt 权威数据源验证通过（v3.8.18 新增）
 - [ ] 重启后数据同步顺序验证通过（v3.8.18 新增）
 - [ ] 心跳循环 skip_validation + quiet 参数验证通过（v3.8.18 新增）
-- [ ] 隧道单次启动验证：run.bat预启动的hostc不被误杀（v3.8.19 新增）
+- [ ] 隧道单次启动验证：run.bat启动的hostc不被误杀（v3.8.19 新增）
 - [ ] 公网地址验证锁：邮件通知只在verify_url通过后发送（v3.8.19 新增）
 - [ ] 手动启动备用方案：优先复用成功，复用失败才强制重启（v3.8.19 新增）
 

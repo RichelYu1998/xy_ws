@@ -87,7 +87,7 @@ URL可用性状态用心跳机制的缓存结果（stable_url_confirm_count）
 ### v3.8.19 (2026-07-10) - 🔒 隧道单次启动 + 公网地址验证锁 + 手动启动备用方案
 
 #### 🎯 核心改进
-- **🔒 隧道单次启动** - 修复 run.bat 预启动的 hostc 被 main.py `auto_start_tunnel()` 误杀导致双重启动的问题
+- **🔒 隧道单次启动** - 修复 run.bat 启动的 hostc 被 main.py `auto_start_tunnel()` 误杀导致双重启动的问题
 - **🔐 公网地址验证锁** - `auto_start_tunnel()` 先验证公网地址可用性再决定是否重启，避免发邮件时地址不可用
 - **🔄 手动启动备用方案** - 前端"启动隧道"按钮优先复用已有可用隧道，只有确认不可用才走强制重启
 
@@ -97,13 +97,13 @@ URL可用性状态用心跳机制的缓存结果（stable_url_confirm_count）
 
 **问题描述**:
 ```
-run.bat 预启动 hostc（后台运行，URL写入 tunnel_url.txt）
+run.bat 启动 hostc（后台运行，URL写入 tunnel_url.txt）
     ↓
 main.py 启动 → auto_start_tunnel()
     ↓
 检测到 hostc 在运行但没有 URL（URL还没来得及写入）
     ↓
-杀掉所有 node.exe 进程（包括预启动的 hostc！）
+杀掉所有 node.exe 进程（包括已启动的 hostc！）
     ↓
 启动新的 hostc
     ↓
@@ -112,7 +112,7 @@ main.py 启动 → auto_start_tunnel()
 
 **修复后流程**:
 ```
-run.bat 预启动 hostc（后台运行）
+run.bat 启动 hostc（后台运行）
     ↓
 main.py 启动 → auto_start_tunnel()
     ↓
@@ -192,7 +192,7 @@ auto_start_tunnel() 先 verify_url() 确认可用
 - **🔇 心跳日志精简** - 心跳循环使用 `quiet=True` 模式，减少冗余日志输出
 - **🐛 NameError修复** - `heartbeat_loop()` 中 `_min_confirms` 变量未定义，改用 `globals().get('stable_url_min_confirms', 3)` 安全访问
 - **📝 写入顺序修正** - hostc输出解析处写入顺序从"先web_output.log后tunnel_url.txt"修正为"先tunnel_url.txt后web_output.log"
-- **🚀 启动顺序修正** - run.bat/run.sh 清理残留进程移至 hostc 预启动之前，避免刚启动的 hostc 被误杀
+- **🚀 启动顺序修正** - run.bat/run.sh 清理残留进程移至 hostc 启动之前，避免刚启动的 hostc 被误杀
 - **📝 日志准确性修正** - `auto_start_tunnel()` 区分"URL已获取但尚未就绪"和"URL未生成"两种状态，避免误导性日志
 - **🚀 本地验证加速启动** - `auto_start_tunnel()` 去掉所有等待和验证逻辑，hostc在跑+tunnel_url.txt有URL直接用，没有URL也不等直接返回；公网验证和邮件通知全部交给心跳循环后台处理
 
@@ -315,7 +315,7 @@ auto_start_tunnel() 在 app.run() 之前调用
 
 ---
 
-### v3.8.17 (2026-07-10) - 🚀 隧道启动优化：hostc预启动 + Python智能等待
+### v3.8.17 (2026-07-10) - 🚀 隧道启动优化：hostc启动 + Python智能等待
 
 #### 🎯 核心改进
 - **🐛 macOS时间戳Bug修复** - 修复 `date '+%3N'` 在BSD date上输出字面量 `3N` 的问题
