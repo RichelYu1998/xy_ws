@@ -7965,10 +7965,10 @@ if __name__ == '__main__':
             else:
                 print(f"[Clean] temp目录未超过3MB({temp_size_mb:.1f}MB)，跳过清理")
         
-        # 后台定期清理 temp 目录（每5分钟检查一次）
+       # 后台定期清理 temp 目录（每1分钟检查一次，超过3MB立即清理）
         def temp_cleanup_loop():
             while True:
-                time.sleep(300)
+                time.sleep(60)
                 try:
                     temp_dir_check = os.path.join(PROJECT_DIR, 'temp')
                     if os.path.isdir(temp_dir_check):
