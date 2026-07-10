@@ -1882,14 +1882,15 @@ class PathManager:
         'enable_health_check': True,
         'auto_sync_interval': 300,
         'validate_url': True,
-        'url_validation_timeout': 5
+        'url_validation_timeout': 5,
+        'skip_validation': False
     }
     
     _last_url_source_log = {}
     _url_health_check_time = 0
     
     @staticmethod
-    def get_public_url_from_web_log():
+    def get_public_url_from_web_log(skip_validation=False, quiet=False):
         """获取公网地址（统一入口） - 以 tunnel_url.txt 为权威源
         
         数据流向：
@@ -1899,28 +1900,33 @@ class PathManager:
         1. 优先从 tunnel_url.txt 读取（权威源）
         2. 如果 tunnel_url.txt 的 URL 不可用，尝试 web_output.log
         3. 两个都失败则返回 None
+        
+        Args:
+            skip_validation: 跳过URL可用性验证（调用方会自行验证时使用，避免双重验证）
+            quiet: 静默模式，减少日志输出（心跳循环等高频调用时使用）
         """
         
         config = PathManager._url_source_config
         current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         result_url = None
         url_source = None
+        should_log = config['enable_logging'] and not quiet
         
-        if config['enable_logging']:
+        if should_log:
             print(f"[{current_time}] [URL-Source] 🔍 开始获取公网地址...")
         
         # ========== 策略1：从 tunnel_url.txt 读取（权威源）==========
         try:
             tunnel_file = PathManager.get_tunnel_url_file()
             
-            if config['enable_logging']:
+            if should_log:
                 print(f"[{current_time}] [URL-Source] 📂 尝试读取: {tunnel_file}")
             
             if os.path.exists(tunnel_file):
                 with open(tunnel_file, 'r', encoding='utf-8') as f:
                     tunnel_content = f.read()
                 
-                if config['enable_logging']:
+                if should_log:
                     print(f"[{current_time}] [URL-Source] 📄 文件大小: {len(tunnel_content)} 字符")
                 
                 # 匹配 "Public URL: https://..." 格式
@@ -1932,39 +1938,39 @@ class PathManager:
                 if tunnel_match:
                     candidate_url = tunnel_match.group(1).rstrip('/')
                     
-                    if config['enable_logging']:
+                    if should_log:
                         print(f"[{current_time}] [URL-Source] ✅ 从 tunnel_url.txt 提取到候选URL: {candidate_url}")
                     
-                    # 验证 URL 是否可用（如果启用验证）
-                    if config['validate_url'] and candidate_url:
+                    should_validate = config['validate_url'] and candidate_url and not skip_validation
+                    
+                    if should_validate:
                         is_valid = PathManager._validate_url_accessibility(candidate_url, config['url_validation_timeout'])
                         if is_valid:
                             result_url = candidate_url
                             url_source = 'tunnel_url.txt (validated)'
                             
-                            if config['enable_logging']:
+                            if should_log:
                                 print(f"[{current_time}] [URL-Source] ✅✅✅ URL验证通过！来源: tunnel_url.txt")
                                 print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
                         else:
-                            if config['enable_logging']:
+                            if should_log:
                                 print(f"[{current_time}] [URL-Source] ⚠️ tunnel_url.txt 中的URL不可用，尝试备用源...")
                     else:
-                        # 不验证，直接使用
                         result_url = candidate_url
-                        url_source = 'tunnel_url.txt (no validation)'
+                        url_source = 'tunnel_url.txt' + (' (skip_validation)' if skip_validation else ' (no validation)')
                         
-                        if config['enable_logging']:
-                            print(f"[{current_time}] [URL-Source] ✅ 使用未验证的URL（验证已禁用）")
+                        if should_log:
+                            print(f"[{current_time}] [URL-Source] ✅ 跳过验证，直接使用URL")
                             print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
                 else:
-                    if config['enable_logging']:
+                    if should_log:
                         print(f"[{current_time}] [URL-Source] ❌ tunnel_url.txt 中未找到有效URL格式")
             else:
-                if config['enable_logging']:
+                if should_log:
                     print(f"[{current_time}] [URL-Source] ⚠️ tunnel_url.txt 文件不存在")
                     
         except Exception as e:
-            if config['enable_logging']:
+            if should_log:
                 print(f"[{current_time}] [URL-Source] ❌ 读取 tunnel_url.txt 失败: {str(e)[:100]}")
         
         # ========== 策略2：从 web_output.log 读取（备用方案）==========
@@ -1972,7 +1978,7 @@ class PathManager:
             try:
                 web_log_file = PathManager.get_web_output_file()
                 
-                if config['enable_logging']:
+                if should_log:
                     print(f"[{current_time}] [URL-Source] 📂 尝试备用源: {web_log_file}")
                 
                 if os.path.exists(web_log_file):
@@ -1984,56 +1990,58 @@ class PathManager:
                     if matches:
                         candidate_url = matches[-1].rstrip('/')
                         
-                        if config['enable_logging']:
+                        if should_log:
                             print(f"[{current_time}] [URL-Source] 📋 从 web_output.log 提取到候选URL: {candidate_url}")
                         
-                        # 验证 URL
-                        if config['validate_url'] and candidate_url:
+                        should_validate = config['validate_url'] and candidate_url and not skip_validation
+                        
+                        if should_validate:
                             is_valid = PathManager._validate_url_accessibility(candidate_url, config['url_validation_timeout'])
                             if is_valid:
                                 result_url = candidate_url
                                 url_source = 'web_output.log (validated)'
                                 
-                                if config['enable_logging']:
+                                if should_log:
                                     print(f"[{current_time}] [URL-Source] ✅ 备用源URL验证通过！")
                                     print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
                                     print(f"[{current_time}] [URL-Source] 💡 建议: 应将此URL同步到 tunnel_url.txt")
                                     
-                                # 自动同步：将可用的URL写回 tunnel_url.txt
                                 PathManager._sync_url_to_tunnel_file(result_url)
                             else:
-                                if config['enable_logging']:
+                                if should_log:
                                     print(f"[{current_time}] [URL-Source] ⚠️ 备用源URL也不可用")
                         else:
                             result_url = candidate_url
-                            url_source = 'web_output.log (no validation)'
+                            url_source = 'web_output.log' + (' (skip_validation)' if skip_validation else ' (no validation)')
                     else:
                         # 回退：匹配任意 hostc.dev URL
                         matches = re.findall(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', content)
                         if matches:
                             candidate_url = matches[-1].rstrip('/')
                             
-                            if config['validate_url'] and candidate_url:
+                            should_validate = config['validate_url'] and candidate_url and not skip_validation
+                            
+                            if should_validate:
                                 is_valid = PathManager._validate_url_accessibility(candidate_url, config['url_validation_timeout'])
                                 if is_valid:
                                     result_url = candidate_url
                                     url_source = 'web_output.log.fallback (validated)'
                                     
-                                    if config['enable_logging']:
+                                    if should_log:
                                         print(f"[{current_time}] [URL-Source] ✅ 回退匹配成功并验证通过")
                                         print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
                                         
                                     PathManager._sync_url_to_tunnel_file(result_url)
                 else:
-                    if config['enable_logging']:
+                    if should_log:
                         print(f"[{current_time}] [URL-Source] ⚠️ web_output.log 文件不存在")
                         
             except Exception as e:
-                if config['enable_logging']:
+                if should_log:
                     print(f"[{current_time}] [URL-Source] ❌ 读取 web_output.log 失败: {str(e)[:100]}")
         
         # ========== 记录日志 ==========
-        if config['enable_logging']:
+        if should_log:
             PathManager._last_url_source_log = {
                 'timestamp': current_time,
                 'url': result_url,
@@ -2511,7 +2519,9 @@ class EmailNotifier:
                 'new': '✅ 新公网地址',
                 'available': '✅ 公网地址可用',
                 'update': '✅ 公网地址已更新',
-                'stable_available': '✅ 公网地址已稳定可用'
+                'stable_available': '✅ 公网地址已稳定可用',
+                'unavailable': '🚨 公网地址不可用',
+                'restarted': '🔄 隧道已重启'
             }
             event_title = event_titles.get(event_type, f'{"✅ 新" if event_type == "new" else "✅"}公网地址')
             
@@ -2550,8 +2560,60 @@ class EmailNotifier:
 </table>
 </div>
 '''
+            elif event_type == 'unavailable':
+                status_note = f"""
+🚨 公网地址不可用
+原公网地址: {tunnel_url}
+当前状态: ❌ 连续验证失败，正在重启隧道服务器
+处理措施: 系统已自动触发隧道重启，重启成功后将发送新地址通知
+
+"""
+                html_status_note = f'''
+<div style="background-color: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin: 20px 0; border-radius: 4px;">
+<div style="color: #c62828; font-size: 16px; font-weight: bold; margin-bottom: 10px;">🚨 公网地址不可用</div>
+<table style="width: 100%; color: #333;">
+<tr><td style="padding: 3px 0;"><strong>原公网地址:</strong></td><td style="color: #c62828;">{tunnel_url}</td></tr>
+<tr><td style="padding: 3px 0;"><strong>当前状态:</strong></td><td style="color: #c62828; font-weight: bold;">❌ 连续验证失败，正在重启隧道服务器</td></tr>
+<tr><td style="padding: 3px 0;"><strong>处理措施:</strong></td><td>系统已自动触发隧道重启，重启成功后将发送新地址通知</td></tr>
+</table>
+</div>
+'''
+            elif event_type == 'restarted':
+                status_note = f"""
+🔄 隧道已重启
+新公网地址: {tunnel_url}
+当前状态: ✅ 隧道重启成功，新地址已写入 tunnel_url.txt 和 web_output.log
+
+"""
+                html_status_note = f'''
+<div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px;">
+<div style="color: #1565c0; font-size: 16px; font-weight: bold; margin-bottom: 10px;">🔄 隧道已重启</div>
+<table style="width: 100%; color: #333;">
+<tr><td style="padding: 3px 0;"><strong>新公网地址:</strong></td><td><a href="{tunnel_url}" target="_blank" style="color: #1976d2;">{tunnel_url}</a></td></tr>
+<tr><td style="padding: 3px 0;"><strong>当前状态:</strong></td><td style="color: #2e7d32; font-weight: bold;">✅ 隧道重启成功</td></tr>
+<tr><td style="padding: 3px 0;"><strong>数据同步:</strong></td><td>新地址已写入 tunnel_url.txt 和 web_output.log</td></tr>
+</table>
+</div>
+'''
             
-            body = f"""{event_title}
+            if event_type == 'unavailable':
+                body = f"""{event_title}
+
+时间: {current_time}
+原公网地址: {tunnel_url}
+{status_note}
+系统正在自动重启隧道服务器，重启成功后将发送新地址通知。
+"""
+            elif event_type == 'restarted':
+                body = f"""{event_title}
+
+时间: {current_time}
+新公网地址: {tunnel_url}
+{status_note}
+请使用新地址访问服务。
+"""
+            else:
+                body = f"""{event_title}
 
 时间: {current_time}
 公网地址: {tunnel_url}
@@ -2559,11 +2621,20 @@ class EmailNotifier:
 请妥善保管此地址。
 """
             
+            _header_gradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+            if event_type == 'unavailable':
+                _header_gradient = 'linear-gradient(135deg, #e53935 0%, #c62828 100%)'
+            elif event_type == 'restarted':
+                _header_gradient = 'linear-gradient(135deg, #1e88e5 0%, #1565c0 100%)'
+            
+            _url_label = '原公网地址' if event_type == 'unavailable' else '新公网地址' if event_type == 'restarted' else '公网地址'
+            _footer_text = '系统正在自动重启隧道服务器，重启成功后将发送新地址通知。' if event_type == 'unavailable' else '请使用新地址访问服务。' if event_type == 'restarted' else '请妥善保管此地址。'
+            
             html_body = f"""
 <html>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
 
-<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
+<div style="background: {_header_gradient}; color: white; padding: 30px; border-radius: 12px; margin-bottom: 25px; text-align: center;">
 <h1 style="margin: 0; font-size: 28px; font-weight: bold;">{event_title}</h1>
 <p style="margin: 10px 0 0 0; opacity: 0.9; font-size: 16px;">隧道服务通知</p>
 </div>
@@ -2575,7 +2646,7 @@ class EmailNotifier:
 <td style="padding: 12px 0; color: #333;">{current_time}</td>
 </tr>
 <tr>
-<td style="padding: 12px 0; font-weight: bold; color: #555;">公网地址:</td>
+<td style="padding: 12px 0; font-weight: bold; color: #555;">{_url_label}:</td>
 <td style="padding: 12px 0;">
 <a href="{tunnel_url}" target="_blank" style="color: #1976d2; text-decoration: none; word-break: break-all;">{tunnel_url}</a>
 <button onclick="window.open('{tunnel_url}', '_blank')" style="margin-left: 10px; background-color: #1976d2; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">点击访问</button>
@@ -2586,7 +2657,7 @@ class EmailNotifier:
 {html_status_note}
 
 <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #f0f0f0; text-align: center; color: #666; font-size: 14px;">
-请妥善保管此地址。
+{_footer_text}
 </div>
 </div>
 
@@ -6898,7 +6969,7 @@ if __name__ == '__main__':
         
         def send_heartbeat():
             global tunnel_last_heartbeat, tunnel_heartbeat_failed
-            web_url = PathManager.get_public_url_from_web_log()
+            web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
             if not web_url:
                 tunnel_heartbeat_failed = True
                 return False
@@ -6926,8 +6997,8 @@ if __name__ == '__main__':
             skip_url_verify_max = 4  # 前4次心跳跳过URL验证（给隧道启动时间）
             
             while tunnel_auto_restart:
-                # 从 web_output.log 获取 URL（唯一来源）
-                web_url = PathManager.get_public_url_from_web_log()
+                # 从 tunnel_url.txt 获取最新公网地址（权威源），跳过内部验证避免双重检查
+                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
                 is_tunnel_running = False
 
                 if web_url:
@@ -6979,16 +7050,17 @@ if __name__ == '__main__':
                                 url_verify_failures += 1
                                 # URL验证失败，重置稳定性计数
                                 if stable_url_confirm_count > 0:
-                                    print(f"[Tunnel] ⚠️ URL验证失败，重置稳定性计数 ({stable_url_confirm_count} -> 0): {web_url}")
+                                    print(f"[Tunnel] ⚠️ 公网地址不可用，重置稳定性计数 ({stable_url_confirm_count} -> 0): {web_url}")
                                     stable_url_confirm_count = 0
                                     stable_url = None
                                 
-                                if time.time() - last_log_time > 120:  # 2分钟才打印一次日志
-                                    print(f"[Tunnel] URL不可用 ({url_verify_failures}/{max_url_verify_failures}): {web_url}")
+                                if time.time() - last_log_time > 120:
+                                    print(f"[Tunnel] ⚠️ 公网地址不可用 (来自tunnel_url.txt: {web_url})，连续失败 {url_verify_failures}/{max_url_verify_failures} 次")
                                     last_log_time = time.time()
-                                # 只有连续失败达到阈值才标记重启
                                 if url_verify_failures >= max_url_verify_failures:
-                                    print(f"[Tunnel] URL连续验证失败{url_verify_failures}次，标记需要重启")
+                                    print(f"[Tunnel] 🚨 公网地址连续不可用{url_verify_failures}次，标记需要重启隧道服务器")
+                                    print(f"[Tunnel] 📧 发送公网地址不可用通知邮件...")
+                                    send_tunnel_notification(web_url, 'unavailable', force_send=True)
                                     tunnel_need_restart = True
                         except Exception as e:
                             url_verify_failures += 1
@@ -7002,6 +7074,15 @@ if __name__ == '__main__':
                                 last_log_time = time.time()
                             if url_verify_failures >= max_url_verify_failures:
                                 tunnel_need_restart = True
+                else:
+                    # tunnel_url.txt 中没有可用的公网地址
+                    if time.time() - last_log_time > 120:
+                        print(f"[Tunnel] ⚠️ tunnel_url.txt 中未找到公网地址，隧道可能未启动")
+                        last_log_time = time.time()
+                    url_verify_failures += 1
+                    if url_verify_failures >= max_url_verify_failures:
+                        print(f"[Tunnel] 🚨 长时间未获取到公网地址，标记需要重启隧道服务器")
+                        tunnel_need_restart = True
                 
                 if is_tunnel_running:
                     success = send_heartbeat()
@@ -7019,7 +7100,7 @@ if __name__ == '__main__':
                             print(f"[Tunnel] 心跳恢复，当前连续失败次数: {consecutive_failures}")
                             
                             if url_verify_failures > 0 and web_url:
-                                print(f"[Tunnel] 🎉 URL从不可用状态恢复，立即发送邮件通知...")
+                                print(f"[Tunnel] 🎉 公网地址从不可用状态恢复，立即发送邮件通知...")
                                 send_tunnel_notification(web_url, 'available', force_send=True)
                             
                             last_log_time = time.time()
@@ -7027,9 +7108,10 @@ if __name__ == '__main__':
                         
                         check_and_send_pending_email()
                         
-                        # 确保 tunnel_url.txt 和 web_output.log 一致
+                        # 确保 tunnel_url.txt 和 web_output.log 同步最新可用URL
                         if web_url:
                             tunnel_url_file = PathManager.get_tunnel_url_file()
+                            web_output_file = PathManager.get_web_output_file()
                             try:
                                 with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
                                     port_match = re.search(r'--port\s+(\d+)', ' '.join(sys.argv))
@@ -7037,6 +7119,11 @@ if __name__ == '__main__':
                                     tf.write(f"Public URL: {web_url}\n")
                                     tf.write(f"Local URL: http://localhost:{local_port}/\n")
                                     tf.write(f"Tunnel: {web_url.split('//')[1].split('.')[0]}\n")
+                            except Exception as e:
+                                pass
+                            try:
+                                with open(web_output_file, 'a', encoding='utf-8') as wf:
+                                    wf.write(f"Public URL: {web_url}\n")
                             except Exception as e:
                                 pass
                 time.sleep(heartbeat_interval)
@@ -7047,8 +7134,8 @@ if __name__ == '__main__':
             # 检查是否有 hostc 进程在运行
             has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
             
-            # 从 web_output.log 检查是否有有效 URL（统一入口）
-            web_url = PathManager.get_public_url_from_web_log()
+            # 从 tunnel_url.txt 检查是否有有效公网地址（权威源）
+            web_url = PathManager.get_public_url_from_web_log(skip_validation=True)
             
             # 如果有 hostc 进程在运行且 web_output.log 有有效 URL，复用现有隧道
             if has_hostc_process and web_url and not force_restart:
@@ -7071,8 +7158,8 @@ if __name__ == '__main__':
                     time.sleep(1)
                     wait_count += 1
 
-                    # 重新读取URL
-                    current_url = PathManager.get_public_url_from_web_log()
+                    # 重新从 tunnel_url.txt 读取URL
+                    current_url = PathManager.get_public_url_from_web_log(skip_validation=True)
                     if current_url and verify_url(current_url):
                         print(f"[Tunnel] ✅ 成功获取到hostc生成的URL: {current_url} (耗时{wait_count}秒)")
                         sys.stdout.flush()
@@ -7225,8 +7312,8 @@ if __name__ == '__main__':
             restart_wait_start = None  # 重启等待开始时间
             
             while tunnel_auto_restart:
-                # 从 web_output.log 获取公网地址（统一入口）
-                web_url = PathManager.get_public_url_from_web_log()
+                # 从 tunnel_url.txt 获取最新公网地址（权威源）
+                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
                 
                 # 检查是否有 hostc 进程在运行
                 has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
@@ -7315,7 +7402,28 @@ if __name__ == '__main__':
                                 print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
                                 sys.stdout.flush()
                             
-                            print(f"[Tunnel] 🔍 获取到新URL: {new_url}")
+                            print(f"[Tunnel] 🔍 获取到新公网地址: {new_url}")
+                            
+                            # 确保新URL写入 tunnel_url.txt（权威源）
+                            try:
+                                tunnel_url_file = PathManager.get_tunnel_url_file()
+                                with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
+                                    tf.write(f"Public URL: {new_url}\n")
+                                    tf.write(f"Local URL: http://localhost:{args.port}/\n")
+                                    tf.write(f"Tunnel: {new_url.split('//')[1].split('.')[0]}\n")
+                                print(f"[Tunnel] ✅ 新公网地址已写入 tunnel_url.txt")
+                            except Exception as e:
+                                print(f"[Tunnel] ⚠️ 写入 tunnel_url.txt 失败: {e}")
+                            
+                            # 确保新URL写入 web_output.log
+                            try:
+                                web_output_file = PathManager.get_web_output_file()
+                                with open(web_output_file, 'a', encoding='utf-8') as wf:
+                                    wf.write(f"Public URL: {new_url}\n")
+                                print(f"[Tunnel] ✅ 新公网地址已写入 web_output.log")
+                            except Exception as e:
+                                print(f"[Tunnel] ⚠️ 写入 web_output.log 失败: {e}")
+                            
                             _min_confirms_restart = globals().get('stable_url_min_confirms', 3)
                             print(f"[Tunnel] ⏳ 等待心跳检测确认稳定性（需要连续{_min_confirms_restart}次验证通过）...")
                             
@@ -7330,7 +7438,9 @@ if __name__ == '__main__':
                             tunnel_consecutive_failures = 0
                             consecutive_restart_attempts = 0
                             tunnel_restart_count = 0
-                            print(f"[Tunnel] 隧道重启成功! URL: {tunnel_url}")
+                            print(f"[Tunnel] 隧道重启成功! 新公网地址: {new_url}")
+                            print(f"[Tunnel] 📧 发送隧道重启成功邮件通知...")
+                            send_tunnel_notification(new_url, 'restarted', force_send=True)
                             sys.stdout.flush()
                         else:
                             print(f"[Tunnel] 隧道启动成功但URL未就绪，继续等待...")
@@ -7507,8 +7617,8 @@ if __name__ == '__main__':
             
             tunnel_type = 'hostc'
             
-            # 从 web_output.log 读取公网地址（唯一来源）
-            web_url = PathManager.get_public_url_from_web_log()
+            # 从 tunnel_url.txt 获取最新公网地址（权威源）
+            web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
             url_valid = False
             
             # 检测是否有 hostc 进程在运行

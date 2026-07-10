@@ -6290,6 +6290,49 @@ fi
 - 公网地址写入 `file/tunnel_url.txt`（覆盖模式 `>`，只保留最新地址）
 - Flask 启动后自动启动隧道
 
+### 6.1.1 权威数据源规范（v3.8.18 新增）
+
+**核心原则**：`tunnel_url.txt` 是公网地址的唯一权威源，`web_output.log` 为镜像。
+
+**数据流向**:
+```
+hostc 隧道启动
+    ↓
+新URL → 先写入 tunnel_url.txt（权威源，覆盖模式 'w'）
+    ↓
+同步到 web_output.log（镜像，追加模式 'a'）
+    ↓
+前端/API 从 tunnel_url.txt 读取最新可用公网地址
+```
+
+**`get_public_url_from_web_log()` 参数规范**:
+```python
+def get_public_url_from_web_log(skip_validation=False, quiet=False):
+    """获取公网地址（统一入口） - 以 tunnel_url.txt 为权威源"""
+```
+
+| 参数 | 类型 | 默认值 | 说明 | 使用场景 |
+|------|------|--------|------|---------|
+| `skip_validation` | bool | False | 跳过URL可用性验证 | 调用方自行验证时使用，避免双重验证 |
+| `quiet` | bool | False | 静默模式，减少日志 | 心跳循环等高频调用时使用 |
+
+**调用规范**:
+
+| 调用方 | skip_validation | quiet | 原因 |
+|--------|----------------|-------|------|
+| `heartbeat_loop()` | True | True | 自行做 verify_url()，高频调用需静默 |
+| `restart_tunnel()` | True | True | 重启流程自行验证 |
+| `auto_start_tunnel()` | True | False | 自身做 verify_url，但需日志 |
+| `send_heartbeat()` | True | True | 仅做HEAD检测，无需验证 |
+| `tunnel_status()` API | True | True | API返回状态，无需验证 |
+| 前端初始化 | False | False | 首次获取需验证 |
+
+**禁止事项**:
+- ❌ 禁止从 `web_output.log` 直接解析URL作为权威源
+- ❌ 禁止跳过 `tunnel_url.txt` 直接写入 `web_output.log`
+- ❌ 禁止在心跳循环中使用 `skip_validation=False`（导致双重验证浪费资源）
+- ✅ 新URL必须先写 `tunnel_url.txt`，再同步 `web_output.log`
+
 ### 6.2 Web 日志持久化
 
 - `file/web_output.log` 每次启动时**从头记录完整日志**（shell脚本阶段 + Python阶段）
@@ -6312,12 +6355,47 @@ fi
 - ✅ `tunnel_url.txt` 保持覆盖模式（`>`），只保留最新公网地址
 - ❌ 写入配置文件的 echo 不走日志（如 pip.ini/pip.conf 的 echo 重定向）
 
+### 6.2.1 重启后数据同步规范（v3.8.18 新增）
+
+**隧道重启成功后必须执行的数据同步**:
+```python
+# 1. 先写入 tunnel_url.txt（权威源，覆盖模式）
+with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
+    tf.write(f"Public URL: {new_url}\n")
+    tf.write(f"Local URL: http://localhost:{args.port}/\n")
+    tf.write(f"Tunnel: {new_url.split('//')[1].split('.')[0]}\n")
+
+# 2. 再同步到 web_output.log（镜像，追加模式）
+with open(web_output_file, 'a', encoding='utf-8') as wf:
+    wf.write(f"Public URL: {new_url}\n")
+```
+
+**写入顺序**:
+1. ✅ 先 `tunnel_url.txt`（权威源）→ 保证后续读取到最新地址
+2. ✅ 后 `web_output.log`（镜像）→ 日志记录
+
+**禁止事项**:
+- ❌ 禁止只写 `web_output.log` 不写 `tunnel_url.txt`
+- ❌ 禁止先写 `web_output.log` 再写 `tunnel_url.txt`（中间状态不一致）
+- ❌ 禁止用 `'w'` 模式写 `web_output.log`（会清空历史日志）
+
 ### 6.3 邮件通知
 
 - 隧道 URL 变化时自动发送邮件
 - **邮件去重**：`auto_start_tunnel()` 统一负责 `new` 事件发送，`restart_tunnel()` 仅打印日志不重复发 `update`
   - ❌ 同一 URL 收到两封邮件（`new` + `update`）
   - ✅ 每个新 URL 只发一封邮件（仅 `new` 事件）
+- **邮件事件类型**（v3.8.18 更新）:
+
+| 事件类型 | 标题 | 触发条件 | force_send |
+|---------|------|---------|------------|
+| `new` | ✅ 新公网地址 | 首次获取到URL | False |
+| `available` | ✅ 公网地址可用 | URL从不可用恢复 | False |
+| `update` | ✅ 公网地址已更新 | URL变更 | False |
+| `stable_available` | ✅ 公网地址已稳定可用 | 连续3次验证通过 | False |
+| `unavailable` | 🚨 公网地址不可用 | URL连续验证失败10次 | True |
+| `restarted` | 🔄 隧道已重启 | 隧道重启成功获取新URL | True |
+
 - **快速恢复机制**：URL 失效后 ~8秒内获取新公网地址并通知用户
 
 | 参数 | 值 | 说明 |
@@ -9230,14 +9308,63 @@ except (NameError, TypeError):
     _verify_dur = 0
 `
 
+### PY-STD-TUNNEL-001: 隧道权威数据源规范（v3.8.18 新增）
+
+**规范要求**:
+1. `tunnel_url.txt` 是公网地址的唯一权威源，`web_output.log` 为镜像
+2. 新URL必须先写入 `tunnel_url.txt`（覆盖模式 `'w'`），再同步到 `web_output.log`（追加模式 `'a'`）
+3. 所有读取公网地址的入口统一使用 `get_public_url_from_web_log()`
+4. 心跳循环等高频调用必须使用 `skip_validation=True, quiet=True`
+5. 禁止从 `web_output.log` 直接解析URL作为权威源
+
+**数据流向**:
+```
+hostc 隧道启动 → tunnel_url.txt（权威源）→ web_output.log（镜像）
+```
+
+**调用规范**:
+```python
+# 心跳循环 - 跳过验证 + 静默
+web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+
+# 前端初始化 - 完整验证
+web_url = PathManager.get_public_url_from_web_log()
+```
+
+### PY-STD-TUNNEL-002: 公网地址不可用自动重启规范（v3.8.18 新增）
+
+**规范要求**:
+1. 心跳检测发现公网地址不可用时，累计连续失败次数
+2. 连续失败达到阈值（默认10次）后，标记 `tunnel_need_restart = True`
+3. 发送 `unavailable` 类型邮件通知（`force_send=True`，不受冷却时间限制）
+4. 重启隧道后，新URL先写入 `tunnel_url.txt`，再同步 `web_output.log`
+5. 发送 `restarted` 类型邮件通知（`force_send=True`）
+6. 心跳恢复后，发送 `stable_available` 类型邮件通知
+
+**重启后数据同步顺序**:
+```python
+# 1. 先写 tunnel_url.txt（权威源）
+with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
+    tf.write(f"Public URL: {new_url}\n")
+
+# 2. 再同步 web_output.log（镜像）
+with open(web_output_file, 'a', encoding='utf-8') as wf:
+    wf.write(f"Public URL: {new_url}\n")
+```
+
 ### 测试验证清单
 
 - [ ] new 事件类型邮件发送测试通过
 - [ ] update 事件类型邮件发送测试通过
 - [ ] available 事件类型邮件发送测试通过
 - [ ] stable_available 事件类型邮件发送测试通过
+- [ ] unavailable 事件类型邮件发送测试通过（v3.8.18 新增）
+- [ ] restarted 事件类型邮件发送测试通过（v3.8.18 新增）
 - [ ] 所有事件类型均输出完整日志流
 - [ ] 线程ID标识清晰可见
 - [ ] 耗时统计准确
+- [ ] tunnel_url.txt 权威数据源验证通过（v3.8.18 新增）
+- [ ] 重启后数据同步顺序验证通过（v3.8.18 新增）
+- [ ] 心跳循环 skip_validation + quiet 参数验证通过（v3.8.18 新增）
 
 ---

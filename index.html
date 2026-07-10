@@ -2473,21 +2473,45 @@ SzwegoSpider/
                     if (latest.items && latest.items.length) {
                         latest.items.forEach(function(item) {
                             var itemDiv = document.createElement('div');
-                            itemDiv.style.cssText = 'margin-bottom: 6px;';
-                            var itemTitle = document.createElement('div');
-                            itemTitle.style.cssText = 'font-weight: 600; color: #303133; font-size: 14px;';
-                            itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' + item.title + (item.desc ? ' <span style="font-weight: 400; color: #606266;">- ' + item.desc + '</span>' : '');
-                            itemDiv.appendChild(itemTitle);
-                            if (item.sub_items && item.sub_items.length) {
-                                var subList = document.createElement('ul');
-                                subList.style.cssText = 'list-style: none; padding-left: 24px; margin: 4px 0 0 0;';
-                                item.sub_items.forEach(function(sub) {
-                                    var subLi = document.createElement('li');
-                                    subLi.style.cssText = 'font-size: 13px; color: #606266; line-height: 1.6; position: relative; padding-left: 12px;';
-                                    subLi.innerHTML = '<span style="position: absolute; left: 0; color: #c0c4cc;">·</span>' + sub;
-                                    subList.appendChild(subLi);
-                                });
-                                itemDiv.appendChild(subList);
+                            itemDiv.style.cssText = 'margin-bottom: 12px;';
+                            if (item.type === 'section') {
+                                var sectionTitle = document.createElement('div');
+                                sectionTitle.style.cssText = 'font-weight: 700; color: #303133; font-size: 15px; margin-bottom: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px;';
+                                sectionTitle.innerHTML = '<i class="fa fa-bookmark" style="color: #409EFF; margin-right: 6px;"></i>' + item.title;
+                                itemDiv.appendChild(sectionTitle);
+                                if (item.content && item.content.trim()) {
+                                    var contentDiv = document.createElement('div');
+                                    contentDiv.style.cssText = 'padding: 10px 16px; color: #606266; font-size: 13px; line-height: 1.8; background: #fafafa; border-radius: 4px; white-space: pre-wrap; word-break: break-word;';
+                                    contentDiv.textContent = item.content.trim();
+                                    itemDiv.appendChild(contentDiv);
+                                }
+                                if (item.sub_items && item.sub_items.length) {
+                                    var subList = document.createElement('ul');
+                                    subList.style.cssText = 'list-style: none; padding: 8px 16px; margin: 0;';
+                                    item.sub_items.forEach(function(sub) {
+                                        var subLi = document.createElement('li');
+                                        subLi.style.cssText = 'font-size: 13px; color: #606266; line-height: 1.8; position: relative; padding-left: 16px; margin-bottom: 4px;';
+                                        subLi.innerHTML = '<span style="position: absolute; left: 0; color: #409EFF;">•</span>' + sub;
+                                        subList.appendChild(subLi);
+                                    });
+                                    itemDiv.appendChild(subList);
+                                }
+                            } else {
+                                var itemTitle = document.createElement('div');
+                                itemTitle.style.cssText = 'font-weight: 600; color: #303133; font-size: 14px;';
+                                itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' + item.title + (item.desc ? ' <span style="font-weight: 400; color: #606266;">- ' + item.desc + '</span>' : '');
+                                itemDiv.appendChild(itemTitle);
+                                if (item.sub_items && item.sub_items.length) {
+                                    var subList = document.createElement('ul');
+                                    subList.style.cssText = 'list-style: none; padding-left: 24px; margin: 4px 0 0 0;';
+                                    item.sub_items.forEach(function(sub) {
+                                        var subLi = document.createElement('li');
+                                        subLi.style.cssText = 'font-size: 13px; color: #606266; line-height: 1.6; position: relative; padding-left: 12px;';
+                                        subLi.innerHTML = '<span style="position: absolute; left: 0; color: #c0c4cc;">·</span>' + sub;
+                                        subList.appendChild(subLi);
+                                    });
+                                    itemDiv.appendChild(subList);
+                                }
                             }
                             verCard.appendChild(itemDiv);
                         });
