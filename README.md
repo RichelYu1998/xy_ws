@@ -19,6 +19,8 @@
 - **📧 邮件通知增强** - 新增 `unavailable`（公网地址不可用）和 `restarted`（隧道已重启）两种邮件事件类型
 - **⚡ 消除双重验证** - 心跳循环调用 `get_public_url_from_web_log()` 时跳过内部验证，避免双重检查浪费
 - **🔇 心跳日志精简** - 心跳循环使用 `quiet=True` 模式，减少冗余日志输出
+- **🐛 NameError修复** - `heartbeat_loop()` 中 `_min_confirms` 变量未定义，改用 `globals().get('stable_url_min_confirms', 3)` 安全访问
+- **📝 写入顺序修正** - hostc输出解析处写入顺序从"先web_output.log后tunnel_url.txt"修正为"先tunnel_url.txt后web_output.log"
 
 ---
 
