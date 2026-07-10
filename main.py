@@ -7453,132 +7453,23 @@ if __name__ == '__main__':
             consecutive_restart_attempts = 0
             max_consecutive_restarts = 3
             restart_cooldown = 60
-            restart_wait_start = None  # 重启等待开始时间
+            restart_wait_start = None
+            grace_period_end = None
             
-            while tunnel_auto_restart:
-                # 从 tunnel_url.txt 获取最新公网地址（权威源）
-                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+            def _do_restart(has_hostc_process, web_url, is_url_valid):
+                nonlocal restart_wait_start, grace_period_end, consecutive_restart_attempts
+                global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay
                 
-                # 检查是否有 hostc 进程在运行
-                has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
-                
-                # 检查 URL 是否可用
-                is_url_valid = False
-                if web_url:
-                    try:
-                        if verify_url(web_url):
-                            is_url_valid = True
-                    except:
-                        pass
-                
-                # 状态判断
-                if has_hostc_process and is_url_valid:
-                    # 一切正常
-                    restart_wait_start = None  # 重置等待状态
-                    tunnel_need_restart = False
-                    time.sleep(1)
-                    continue
-                
-                if has_hostc_process and not is_url_valid:
-                    if restart_wait_start is None:
-                        restart_wait_start = time.time()
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ hostc运行中但URL未就绪，等待URL出现...")
-                        sys.stdout.flush()
-                    elapsed_waiting_url = time.time() - restart_wait_start
-                    if elapsed_waiting_url < 30:
-                        time.sleep(3)
-                        continue
-                    else:
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ hostc运行超过30秒仍无URL，触发重启")
-                        sys.stdout.flush()
-                        restart_wait_start = None
-
-                if tunnel_need_restart:
-                    restart_wait_start = None
-                    tunnel_need_restart = False
-                    tunnel_restart_count += 1
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 tunnel_need_restart=True，立即执行重启 (第{tunnel_restart_count}次)")
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
-                    sys.stdout.flush()
-                    
-                    Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
-                    if tunnel_process:
-                        try:
-                            tunnel_process.terminate()
-                            tunnel_process.wait(timeout=2)
-                        except:
-                            try:
-                                tunnel_process.kill()
-                            except:
-                                pass
-                    
-                    saved_old_url = old_tunnel_url
-                    tunnel_process = None
-                    tunnel_url = None
-                    old_tunnel_url = None
-                    
-                    time.sleep(tunnel_restart_delay)
-                    
-                    if not tunnel_auto_restart:
-                        break
-                    
-                    try:
-                        result = auto_start_tunnel()
-                        if result['success']:
-                            new_url = result.get('url')
-                            if new_url and saved_old_url and saved_old_url != new_url:
-                                print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
-                            consecutive_restart_attempts = 0
-                        else:
-                            consecutive_restart_attempts += 1
-                    except Exception as e:
-                        consecutive_restart_attempts += 1
-                        print(f"[Tunnel] 重启失败: {e}")
-                    
-                    if consecutive_restart_attempts >= max_consecutive_restarts:
-                        print(f"[Tunnel] ❌ 连续重启失败{consecutive_restart_attempts}次，等待冷却...")
-                        time.sleep(restart_cooldown)
-                        consecutive_restart_attempts = 0
-                    
-                    continue
-                
-                # 需要等待或重启
-                if restart_wait_start is None:
-                    restart_wait_start = time.time()
-                    elapsed = 0
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ 检测到异常状态，开始计时等待重启...")
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
-                    sys.stdout.flush()
-                else:
-                    elapsed = time.time() - restart_wait_start
-                
-                # 等待时间阈值：30秒（减少等待时间，更快响应问题）
-                wait_threshold = 30
-                
-                if elapsed < wait_threshold:
-                    # 每10秒打印一次等待状态
-                    if int(elapsed) % 10 == 0 and int(elapsed) > 0:
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ 等待重启中... ({int(elapsed)}/{wait_threshold}秒)")
-                        sys.stdout.flush()
-                    time.sleep(1)
-                    continue
-                
-                # 超过等待时间，触发重启
                 restart_wait_start = None
+                tunnel_need_restart = False
                 tunnel_restart_count += 1
-                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 检测到问题，立即执行重启 (第{tunnel_restart_count}次)")
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 立即执行重启 (第{tunnel_restart_count}次)")
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
                 sys.stdout.flush()
                 
-                # 清理所有 hostc/node 进程
                 Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
-                
-                # 重置状态
                 if tunnel_process:
                     try:
                         tunnel_process.terminate()
@@ -7590,7 +7481,6 @@ if __name__ == '__main__':
                             pass
                 
                 saved_old_url = old_tunnel_url
-                
                 tunnel_process = None
                 tunnel_url = None
                 old_tunnel_url = None
@@ -7598,84 +7488,83 @@ if __name__ == '__main__':
                 time.sleep(tunnel_restart_delay)
                 
                 if not tunnel_auto_restart:
-                    break
+                    return False
                 
                 try:
                     result = auto_start_tunnel()
-                    
                     if result['success']:
                         new_url = result.get('url')
-                        if new_url:
-                            if saved_old_url and saved_old_url != new_url:
-                                print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
-                                sys.stdout.flush()
-                            
-                            print(f"[Tunnel] 🔍 获取到新公网地址: {new_url}")
-                            
-                            # 确保新URL写入 tunnel_url.txt（权威源）
-                            try:
-                                tunnel_url_file = PathManager.get_tunnel_url_file()
-                                with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
-                                    tf.write(f"Public URL: {new_url}\n")
-                                    tf.write(f"Local URL: http://localhost:{args.port}/\n")
-                                    tf.write(f"Tunnel: {new_url.split('//')[1].split('.')[0]}\n")
-                                print(f"[Tunnel] ✅ 新公网地址已写入 tunnel_url.txt")
-                            except Exception as e:
-                                print(f"[Tunnel] ⚠️ 写入 tunnel_url.txt 失败: {e}")
-                            
-                            # 确保新URL写入 web_output.log
-                            try:
-                                web_output_file = PathManager.get_web_output_file()
-                                with open(web_output_file, 'a', encoding='utf-8') as wf:
-                                    wf.write(f"Public URL: {new_url}\n")
-                                print(f"[Tunnel] ✅ 新公网地址已写入 web_output.log")
-                            except Exception as e:
-                                print(f"[Tunnel] ⚠️ 写入 web_output.log 失败: {e}")
-                            
-                            _min_confirms_restart = globals().get('stable_url_min_confirms', 3)
-                            
-                            # 重置稳定性检测状态
-                            global stable_url, stable_url_confirm_count, url_first_seen_time
-                            stable_url = None
-                            stable_url_confirm_count = 0
-                            url_first_seen_time = time.time()
-                            
-                            # 立即验证新URL，通过则直接发邮件
-                            new_url_ok = False
-                            try:
-                                new_url_ok = verify_url(new_url, timeout=10, verbose=True)
-                            except:
-                                pass
-                            
-                            if new_url_ok:
-                                stable_url = new_url
-                                stable_url_confirm_count = stable_url_min_confirms
-                                print(f"[Tunnel] 隧道重启成功! 新公网地址: {new_url}")
-                                print(f"[Tunnel] 🎉 新地址验证通过，立即发送邮件通知...")
-                                send_tunnel_notification(new_url, 'stable_available', force_send=True)
-                            else:
-                                print(f"[Tunnel] ⏳ 等待心跳检测确认稳定性（需要连续{_min_confirms_restart}次验证通过）...")
-                                print(f"[Tunnel] 隧道重启成功! 新公网地址: {new_url}")
-                                print(f"[Tunnel] 📧 公网验证将由心跳机制完成，通过后自动发邮件")
-                            
-                            tunnel_last_error = None
-                            tunnel_need_restart = False
-                            tunnel_consecutive_failures = 0
-                            consecutive_restart_attempts = 0
-                            tunnel_restart_count = 0
-                            sys.stdout.flush()
-                        else:
-                            print(f"[Tunnel] 隧道启动成功但URL未就绪，继续等待...")
-                            sys.stdout.flush()
+                        if new_url and saved_old_url and saved_old_url != new_url:
+                            print(f"[Tunnel] 隧道URL已变化: {saved_old_url} -> {new_url}")
+                        consecutive_restart_attempts = 0
                     else:
-                        tunnel_last_error = result.get('error', '启动失败')
-                        print(f"[Tunnel] 重启失败: {tunnel_last_error}")
-                        sys.stdout.flush()
-                        
+                        consecutive_restart_attempts += 1
                 except Exception as e:
-                    tunnel_last_error = str(e)
+                    consecutive_restart_attempts += 1
                     print(f"[Tunnel] 重启失败: {e}")
+                
+                if consecutive_restart_attempts >= max_consecutive_restarts:
+                    print(f"[Tunnel] ❌ 连续重启失败{consecutive_restart_attempts}次，等待冷却...")
+                    time.sleep(restart_cooldown)
+                    consecutive_restart_attempts = 0
+                
+                grace_period_end = time.time() + 60
+                return True
+            
+            while tunnel_auto_restart:
+                now = time.time()
+                
+                if grace_period_end and now < grace_period_end:
+                    time.sleep(3)
+                    continue
+                grace_period_end = None
+                
+                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+                has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+                
+                is_url_valid = False
+                if web_url:
+                    try:
+                        if verify_url(web_url):
+                            is_url_valid = True
+                    except:
+                        pass
+                
+                if has_hostc_process and is_url_valid:
+                    restart_wait_start = None
+                    tunnel_need_restart = False
+                    time.sleep(1)
+                    continue
+                
+                if tunnel_need_restart:
+                    if not _do_restart(has_hostc_process, web_url, is_url_valid):
+                        break
+                    continue
+                
+                if not has_hostc_process or not is_url_valid:
+                    if restart_wait_start is None:
+                        restart_wait_start = time.time()
+                        reason = "hostc运行中但URL未就绪" if has_hostc_process else "hostc进程未运行"
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ {reason}，开始计时等待...")
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
+                        sys.stdout.flush()
+                    
+                    elapsed = now - restart_wait_start
+                    wait_threshold = 60
+                    
+                    if elapsed < wait_threshold:
+                        if int(elapsed) % 15 == 0 and int(elapsed) > 0:
+                            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ 等待中... ({int(elapsed)}/{wait_threshold}秒)")
+                            sys.stdout.flush()
+                        time.sleep(3)
+                        continue
+                    
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ 等待超过{wait_threshold}秒，触发重启")
                     sys.stdout.flush()
+                    if not _do_restart(has_hostc_process, web_url, is_url_valid):
+                        break
         
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():

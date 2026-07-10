@@ -6023,7 +6023,83 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
-### v3.8.27 (2026-07-10) - 🔧 隧道重启死循环修复   ← 标题2：最新版本
+### v3.8.30 (2026-07-11) - 🔧 隧道重启逻辑重构 + 宽限期机制
+
+- **🔧 隧道重启逻辑重构** - 合并两条重复重启路径为统一逻辑，消除"重启→异常等待→重启"死循环
+- **⏱️ 宽限期机制** - 重启后60秒内不检测异常，给新进程足够启动时间
+- **📊 统一等待阈值** - 所有异常状态统一等60秒后触发重启，不再有30秒/60秒两条路径
+
+---
+
+#### 🔧 隧道重启逻辑重构（详细技术文档）
+
+##### 问题现象
+```
+restart_tunnel() 有两条重启路径互相干扰：
+  路径1: hostc运行中 + URL无效 → 等60秒 → tunnel_need_restart=True → 重启
+  路径2: 异常状态(无进程或无URL) → 等30秒 → 直接重启
+
+重启后 continue 回到循环顶部：
+  → 新hostc刚启动还没URL
+  → has_hostc_process=False → 落入路径2
+  → 又等30秒 → 又重启 → 死循环！
+
+日志表现：
+  [Tunnel] ⚠️ hostc运行超过30秒仍无URL，触发重启
+  [Tunnel] ⚠️ 检测到异常状态，开始计时等待重启...  ← 又进入30秒等待！
+  [Tunnel] ⏳ 等待重启中... (10/30秒)  ← 用户看到的"5/10"
+```
+
+##### 根本原因：两条重启路径互相干扰
+```python
+# ❌ 旧代码 (v3.8.27-v3.8.29)
+if has_hostc_process and not is_url_valid:
+    # 路径1: 等60秒 → tunnel_need_restart=True
+    ...
+if tunnel_need_restart:
+    # 执行重启 → continue → 新进程还没起来 → 落入路径2
+    ...
+# 路径2: 异常状态 → 等30秒 → 又重启 → 死循环！
+if restart_wait_start is None:
+    print("检测到异常状态，开始计时等待重启...")
+```
+
+##### 修复：统一重启路径 + 宽限期机制
+```python
+# ✅ 新代码 (v3.8.30)
+grace_period_end = None
+
+def _do_restart(...):
+    # 统一重启逻辑
+    ...
+    grace_period_end = time.time() + 60  # 重启后60秒宽限期
+    return True
+
+while tunnel_auto_restart:
+    # 宽限期内跳过检测，给新进程启动时间
+    if grace_period_end and time.time() < grace_period_end:
+        time.sleep(3)
+        continue
+    grace_period_end = None
+    
+    # 正常状态
+    if has_hostc_process and is_url_valid:
+        continue
+    
+    # 立即重启信号
+    if tunnel_need_restart:
+        _do_restart(...)
+        continue
+    
+    # 统一异常等待（不再分两条路径）
+    if not has_hostc_process or not is_url_valid:
+        # 等60秒 → 重启 → 进入宽限期
+        ...
+```
+
+---
+
+### v3.8.27 (2026-07-10) - 🔧 隧道重启死循环修复
 
 - **🔧 隧道重启死循环修复** - `restart_tunnel()` 中 `tunnel_need_restart` 执行重启后立即重置为 False，防止无限重启循环
 - **⏳ hostc启动后等待URL** - hostc运行中但URL未就绪时，等待30秒让URL出现，而非立即重启杀掉刚启动的hostc
@@ -7505,7 +7581,8 @@ fi
 - **非阻塞启动（v3.8.23）**: `auto_start_tunnel(force_restart=False)` 零等待，URL验证和邮件通知交由心跳机制后台完成
 - **tunnel_url.txt 先写后读架构（v3.8.24）**: `run.bat`/`run.sh` 启动 hostc 时直接将输出写入 `tunnel_url.txt`（先写），`main.py` 的 `get_public_url_from_web_log()` 从 `tunnel_url.txt` 读取（后读）
 - **旧URL过期检测（v3.8.26）**: `auto_start_tunnel()` 发现旧URL时检查hostc进程是否存活，已退出则清除`tunnel_url.txt`并启动新隧道，避免复用死地址
-- **重启死循环修复（v3.8.27）**: `restart_tunnel()` 执行重启后立即重置`tunnel_need_restart=False`；hostc运行中但URL未就绪时等待30秒而非重启
+- **重启死循环修复（v3.8.27）**: `restart_tunnel()` 执行重启后立即重置`tunnel_need_restart=False`；hostc运行中但URL未就绪时等待60秒而非重启
+- **重启逻辑重构+宽限期（v3.8.30）**: 合并两条重复重启路径为统一逻辑；新增60秒宽限期机制，重启后跳过检测给新进程启动时间；消除"重启→异常等待→重启"死循环
 - **心跳守护即时启动（v3.8.28）**: 隧道启动后立即调用`start_tunnel_daemons()`启动心跳守护+重启守护线程，不再等待`/api/tunnel/status`被调用才懒启动
 - **守护统一管理（v3.8.28）**: 提取`start_tunnel_daemons()`函数统一管理守护线程启动逻辑，`/api/tunnel/status`中作为安全网调用
 
@@ -7565,13 +7642,13 @@ heartbeat_loop() 每60秒:
     → 连续失败5次 → tunnel_need_restart = True
 ```
 
-**重启守护工作流**:
+**重启守护工作流（v3.8.30 重构）**:
 ```
 restart_tunnel() 持续循环:
+  → 宽限期内 → sleep(3) 跳过检测，给新进程启动时间
   → hostc运行 + URL有效 → 一切正常
-  → hostc运行 + URL无效 → 等待30秒让URL出现
-  → tunnel_need_restart=True → 立即执行重启 → 重置标志
-  → hostc未运行 + 无URL → 等待30秒后重启
+  → tunnel_need_restart=True → 立即执行重启 → 进入60秒宽限期
+  → 异常状态(无进程或URL无效) → 等60秒 → 重启 → 进入60秒宽限期
 ```
 
 **禁止事项**:
@@ -7605,11 +7682,11 @@ auto_start_tunnel(force_restart=False)
     → read_output() 获取URL → verify_url() → 发邮件
   → app.run() 立即启动
 
-restart_tunnel() 循环（v3.8.27 死循环修复）:
+restart_tunnel() 循环（v3.8.30 重构+宽限期）:
+  → 宽限期内 → sleep(3) 跳过检测，给新进程启动时间
   → hostc运行 + URL有效 → 一切正常，继续
-  → hostc运行 + URL无效 → 等待30秒让URL出现，不重启（v3.8.27 新增）
-  → tunnel_need_restart=True → 执行重启 → 立即重置 tunnel_need_restart=False（v3.8.27 修复）
-  → hostc未运行 + 无URL → 等待30秒后重启
+  → tunnel_need_restart=True → 立即执行重启 → 进入60秒宽限期
+  → 异常状态(无进程或URL无效) → 等60秒 → 重启 → 进入60秒宽限期
 ```
 
 **API防误重启（v3.8.23 新增）**:
