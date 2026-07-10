@@ -608,7 +608,7 @@ run_web() {
     PYTHON_PID=$!
 
     log "等待 Web 服务启动完成..."
-    sleep 5
+    sleep 1
 
     FLASK_WAIT_COUNT=0
     FLASK_MAX_WAIT=30
@@ -622,7 +622,7 @@ run_web() {
             break
         fi
         FLASK_WAIT_COUNT=$((FLASK_WAIT_COUNT + 1))
-        sleep 2
+        sleep 1
     done
 
     if [ $FLASK_WAIT_COUNT -ge $FLASK_MAX_WAIT ]; then
