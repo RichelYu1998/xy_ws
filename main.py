@@ -7144,30 +7144,9 @@ if __name__ == '__main__':
                 return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
 
             if has_hostc_process and not force_restart:
-                print(f"[Tunnel] 🔍 hostc在运行，等待tunnel_url.txt生成URL...")
+                print(f"[Tunnel] 🔍 hostc在运行，URL将由心跳机制获取和验证")
                 sys.stdout.flush()
-
-                max_wait = 30
-                wait_count = 0
-                while wait_count < max_wait:
-                    time.sleep(1)
-                    wait_count += 1
-
-                    current_url = PathManager.get_public_url_from_web_log(skip_validation=True)
-                    if current_url:
-                        print(f"[Tunnel] ✅ 获取到URL: {current_url} (耗时{wait_count}秒)")
-                        sys.stdout.flush()
-                        tunnel_url = current_url
-                        old_tunnel_url = current_url
-                        return {'success': True, 'url': tunnel_url, 'message': f'获取外部hostc的URL，耗时{wait_count}秒'}
-
-                    if wait_count % 5 == 0:
-                        print(f"[Tunnel] ⏳ 等待URL生成... ({wait_count}/{max_wait}秒)")
-                        sys.stdout.flush()
-
-                print(f"[Tunnel] ⚠️ 等待{max_wait}秒后仍未获取到URL")
-                sys.stdout.flush()
-                return {'success': False, 'url': None, 'error': f'等待{max_wait}秒后hostc未生成URL'}
+                return {'success': True, 'url': None, 'message': 'hostc在运行，URL由心跳机制处理'}
             
             try:
                 port = args.port
@@ -7750,7 +7729,11 @@ if __name__ == '__main__':
         
         tunnel_result = auto_start_tunnel()
         if tunnel_result['success']:
-            print(f"[Tunnel] 隧道启动成功: {tunnel_result.get('url', '')}")
+            url = tunnel_result.get('url')
+            if url:
+                print(f"[Tunnel] 隧道启动成功: {url}")
+            else:
+                print(f"[Tunnel] 隧道已就绪，公网地址将由心跳机制获取和验证")
         else:
             print(f"[Tunnel] 隧道启动失败: {tunnel_result.get('error', '未知错误')}")
         
