@@ -49,12 +49,30 @@
     - [2.11.1 路由命名](#2111-路由命名)
     - [响应格式](#响应格式)
     - [静态资源服务（含 gzip）](#静态资源服务含-gzip)
+  - [2.11 更新日志 API](#211-更新日志-api)
+    - [2.11.1 /api/changelog 更新日志接口（完整范式）⭐](#2111-apichangelog-更新日志接口完整范式-核心api)
+    - [2.11.2 /api/changelog-debug 更新日志调试接口](#2112-apichangelog-debug-更新日志调试接口)
+    - [2.11.3 /api/readme-sections README章节解析接口](#2113-apireadme-sections-readme章节解析接口)
+  - [2.12 URL源管理 API（v3.8.18 新增）](#212-url源管理-apiv3818-新增)
+    - [2.12.1 /api/url-source/status URL源状态查询](#2121-apiurl-sourcestatus-url源状态查询)
+    - [2.12.2 /api/url-source/configure URL源配置修改](#2122-apiurl-sourceconfigure-url源配置修改)
+    - [2.12.3 /api/url-source/health-check 强制健康检查](#2123-apiurl-sourcehealth-check-强制健康检查)
+  - [2.13 邮件配置管理 API（v3.8.19 新增）](#213-邮件配置管理-apiv3819-新增)
+    - [2.13.1 /api/email/config GET 获取邮件配置](#2131-apiemailconfig-get-获取邮件配置)
+    - [2.13.2 /api/email/config POST 保存邮件配置](#2132-apiemailconfig-post-保存邮件配置)
+    - [2.13.3 /api/email/test 测试邮件发送](#2133-apiemailtest-测试邮件发送)
+  - [2.14 服务器信息 API](#214-服务器信息-api)
+    - [2.14.1 /api/server/info 服务器信息查询](#2141-apiserverinfo-服务器信息查询)
+  - [2.15 Node.js 依赖管理规范（v3.8.21 新增）](#215-nodejs-依赖管理规范v3821-新增)
+    - [2.15.1 node_modules 目录结构规范](#2151-node_modules-目录结构规范)
+    - [2.15.2 依赖分类与生命周期](#2152-依赖分类与生命周期)
+    - [2.15.3 .gitignore 配置规范](#2153-gitignore-配置规范)
+    - [2.15.4 依赖清理最佳实践](#2154-依赖清理最佳实践)
   - [2.12 EmailNotifier 邮件通知服务](#212-emailnotifier-邮件通知服务)
     - [2.12.1 配置规范](#2121-配置规范)
     - [2.12.2 QQ邮箱授权码配置](#2122-qq邮箱授权码配置)
-  - [2.13 完整 Flask API 端点列表（33个，与 main.py 代码完全一致）](#213-完整-flask-api-端点列表33个与-mainpy-代码完全一致)
+  - [2.13 完整 Flask API 端点列表（37个，与 main.py 代码完全一致）](#213-完整-flask-api-端点列表37个与-mainpy-代码完全一致)
   - [2.14 版本号管理](#214-版本号管理)
-  - [2.11 更新日志 API](#211-更新日志-api)
 - [最新更新](#最新更新)
   - [v3.6.0 (2026-06-11)](#v360-2026-06-11)
   - [2.10 日志输出规范](#210-日志输出规范)
@@ -2442,43 +2460,47 @@ Szwego商品爬虫 - 隧道状态通知
 4. 生成授权码（16位字符串）
 5. 将授权码填入 `email_smtp_password` 字段（不是QQ密码）
 
-### 2.13 完整 Flask API 端点列表（33个，与 main.py 代码完全一致）
+### 2.13 完整 Flask API 端点列表（37个，与 main.py 代码完全一致）
 
-| 序号 | 端点 | 方法 | 功能 | 参数 | 返回值 |
-|------|------|------|------|------|--------|
-| 1 | `/` | GET | 首页（注入版本号，无缓存头） | 无 | HTML页面 |
-| 2 | `/dist/<path:filename>` | GET | 静态资源（含gzip压缩） | 路径 | 文件流 |
-| 3 | `/run` | POST | 运行命令（跨系统进程管理） | `{command}` | `{success, task_id, message}` |
-| 4 | `/input` | POST | 发送输入到运行中进程 | `{task_id, input}` | `{success, message}` |
-| 5 | `/kill` | POST | 终止任务 | `{task_id}` | `{success, message}` |
-| 6 | `/output/<task_id>` | GET | 获取任务输出 | task_id | `{output, status, returncode}` |
-| 7 | `/api/cookie` | GET | 获取Cookie | 无 | Cookie JSON |
-| 8 | `/api/sku/compare` | GET | 货号对比(JSON) | `stock_numbers` | `{success, data}` |
-| 9 | `/api/sku/compare/txt` | GET/POST | 货号对比(文本) | `stock_numbers` | 文本/JSON |
-| 10 | `/api/sku/compare/excel` | GET | 货号对比(Excel下载) | 无 | Excel文件流 |
-| 11 | `/api/products` | GET | 获取商品列表 | `t`(时间戳) | `{success, data}` |
-| 12 | `/api/daily-profit` | GET | 每日利润报表 | 无 | `{success, data}` |
-| 13 | `/api/product` | GET | 获取商品详情 | `sku` | `{success, data}` |
-| 14 | `/api/product/search` | GET | 搜索商品 | `keyword` | `{success, data}` |
-| 15 | `/api/product/by-description` | GET | 按描述搜索商品 | `description` | `{success, data}` |
-| 16 | `/api/clean/list` | POST | 文件清理列表 | `{directory}` | `{success, output}` |
-| 17 | `/api/clean/group` | POST | 分组清理 | `{directory, dry_run}` | `{success, output}` |
-| 18 | `/api/clean/time` | POST | 按时间清理 | `{directory, minutes, dry_run}` | `{success, output}` |
-| 19 | `/api/clean/all` | POST | 全部清理 | `{directory, dry_run}` | `{success, output}` |
-| 20 | `/api/clean/png` | POST | PNG清理 | `{directory, dry_run}` | `{success, output}` |
-| 21 | `/api/clean/media` | POST | 媒体清理 | `{directory, dry_run}` | `{success, output}` |
-| 22 | `/api/version` | GET | 版本信息 | 无 | `{version}` |
-| 23 | `/api/changelog` | GET | 更新日志 | 无 | `{success, changelog}` |
-| 24 | `/api/readme-sections` | GET | README章节 | 无 | `{success, sections}` |
-| 25 | `/api/email/config` | GET | 获取邮件配置 | 无 | `{success, config}` |
-| 26 | `/api/email/config` | POST | 保存邮件配置 | `{smtp_host, smtp_port, ...}` | `{success, message}` |
-| 27 | `/api/email/test` | POST | 测试邮件 | `{smtp_host, smtp_port, ...}` | `{success, message}` |
-| 28 | `/api/server/info` | GET | 服务器信息（含局域网IP） | 无 | `{success, local_url, lan_url, ...}` |
-| 29 | `/api/tunnel/start` | POST | 启动隧道 | 无 | `{success, url}` |
-| 30 | `/api/tunnel/status` | GET | 隧道状态（含心跳检测） | 无 | `{running, url, url_valid, ...}` |
-| 31 | `/api/tunnel/stop` | POST | 停止隧道 | 无 | `{success, message}` |
-| 32 | `/<path:invalid_path>` | GET | 兜底404路由 | 无 | `{error: '页面不存在'}` |
-| 33 | `/favicon.ico` | GET | 网站图标 | 无 | 图标文件 |
+| 序号 | 端点 | 方法 | 功能 | 参数 | 返回值 | 范式章节 |
+|------|------|------|------|------|--------|---------|
+| 1 | `/` | GET | 首页（注入版本号，无缓存头） | 无 | HTML页面 | - |
+| 2 | `/dist/<path:filename>` | GET | 静态资源（含gzip压缩） | 路径 | 文件流 | 2.11.1 |
+| 3 | `/run` | POST | 运行命令（跨系统进程管理） | `{command}` | `{success, task_id, message}` | - |
+| 4 | `/input` | POST | 发送输入到运行中进程 | `{task_id, input}` | `{success, message}` | - |
+| 5 | `/kill` | POST | 终止任务 | `{task_id}` | `{success, message}` | - |
+| 6 | `/output/<task_id>` | GET | 获取任务输出 | task_id | `{output, status, returncode}` | - |
+| 7 | `/api/cookie` | GET | 获取Cookie | 无 | Cookie JSON | - |
+| 8 | `/api/sku/compare` | GET | 货号对比(JSON) | `stock_numbers` | `{success, data}` | - |
+| 9 | `/api/sku/compare/txt` | GET/POST | 货号对比(文本) | `stock_numbers` | 文本/JSON | - |
+| 10 | `/api/sku/compare/excel` | GET | 货号对比(Excel下载) | 无 | Excel文件流 | - |
+| 11 | `/api/products` | GET | 获取商品列表 | `t`(时间戳) | `{success, data}` | - |
+| 12 | `/api/daily-profit` | GET | 每日利润报表 | 无 | `{success, data}` | - |
+| 13 | `/api/product` | GET | 获取商品详情 | `sku` | `{success, data}` | - |
+| 14 | `/api/product/search` | GET | 搜索商品 | `keyword` | `{success, data}` | - |
+| 15 | `/api/product/by-description` | GET | 按描述搜索商品 | `description` | `{success, data}` | - |
+| 16 | `/api/clean/list` | POST | 文件清理列表 | `{directory}` | `{success, output}` | - |
+| 17 | `/api/clean/group` | POST | 分组清理 | `{directory, dry_run}` | `{success, output}` | - |
+| 18 | `/api/clean/time` | POST | 按时间清理 | `{directory, minutes, dry_run}` | `{success, output}` | - |
+| 19 | `/api/clean/all` | POST | 全部清理 | `{directory, dry_run}` | `{success, output}` | - |
+| 20 | `/api/clean/png` | POST | PNG清理 | `{directory, dry_run}` | `{success, output}` | - |
+| 21 | `/api/clean/media` | POST | 媒体清理 | `{directory, dry_run}` | `{success, output}` | - |
+| 22 | `/api/version` | GET | 版本信息 | 无 | `{version}` | 2.14 |
+| 23 | `/api/changelog` | GET | 更新日志（结构化JSON） | 无 | `{success, changelog}` | **2.11.1** ⭐ |
+| 24 | `/api/changelog-debug` | GET | 更新日志调试（行号预览） | 无 | `{success, total_lines, changelog_preview}` | **2.11.2** |
+| 25 | `/api/readme-sections` | GET | README章节解析 | 无 | `{success, sections, features}` | **2.11.3** |
+| 26 | `/api/email/config` | GET | 获取邮件配置（密码脱敏） | 无 | `{success, config}` | **2.13.1** |
+| 27 | `/api/email/config` | POST | 保存邮件配置 | `{smtp_host, smtp_port, ...}` | `{success, message}` | **2.13.2** |
+| 28 | `/api/email/test` | POST | 测试邮件发送 | `{smtp_host, smtp_port, ...}` | `{success, message}` | **2.13.3** |
+| 29 | `/api/server/info` | GET | 服务器信息（含局域网IP） | 无 | `{success, local_url, lan_url, ...}` | **2.14.1** |
+| 30 | `/api/url-source/status` | GET | URL源状态查询 | 无 | `{success, config, health_check, ...}` | **2.12.1** |
+| 31 | `/api/url-source/configure` | POST | URL源配置修改（白名单过滤） | `{primary_source, ...}` | `{success, message, config}` | **2.12.2** |
+| 32 | `/api/url-source/health-check` | POST | 强制健康检查 | 无 | `{success, health_result}` | **2.12.3** |
+| 33 | `/api/tunnel/start` | POST | 启动隧道 | 无 | `{success, url}` | - |
+| 34 | `/api/tunnel/status` | GET | 隧道状态（含心跳检测） | 无 | `{running, url, url_valid, ...}` | - |
+| 35 | `/api/tunnel/stop` | POST | 停止隧道 | 无 | `{success, message}` | - |
+| 36 | `/<path:invalid_path>` | GET | 兜底404路由 | 无 | `{error: '页面不存在'}` | - |
+| 37 | `/favicon.ico` | GET | 网站图标 | 无 | 图标文件 | - |
 
 ### 2.14 版本号管理
 
@@ -2593,6 +2615,978 @@ r'###\s+v(\d+\.\d+\.\d+)'
 - h2/h3 标题**必须独立成行**，不可合并，否则正则匹配和行级解析全部失效
 
 ### 2.11 更新日志 API
+
+#### 2.11.1 `/api/changelog` 更新日志接口（完整范式）⭐ 核心API
+
+**功能**: 解析 README.md "最新更新"章节，返回结构化 JSON 数据，支持子条目、代码块、章节嵌套。
+
+**API端点**: `GET /api/changelog`
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "changelog": [
+    {
+      "version": "3.8.20",
+      "date": "2026-07-10",
+      "items": [
+        {
+          "type": "section",
+          "title": "🎯 核心改进",
+          "content": "- **📧 即时邮件通知**...",
+          "sub_items": []
+        },
+        {
+          "type": "item",
+          "title": "📧 即时邮件通知：获取URL后立即发送",
+          "desc": "",
+          "sub_items": [
+            "**问题描述**: ...",
+            "**修复后**: ..."
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**实现范式** (main.py:6416-6535):
+```python
+@app.route('/api/changelog', methods=['GET'])
+def get_changelog():
+    try:
+        readme_path = os.path.join(PROJECT_DIR, 'README.md')
+        with open(readme_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        lines = content.split('\n')
+        changelog = []
+        current_version = None
+        current_date = None
+        current_items = []
+        current_item = None
+        current_section = None
+        in_changelog = False
+        in_code_block = False
+        
+        for line in lines:
+            # 1. 检测"最新更新"章节开始
+            if '最新更新' in line.strip() and line.strip().startswith('##'):
+                in_changelog = True
+                continue
+            
+            if not in_changelog:
+                continue
+            
+            stripped = line.strip()
+            
+            # 2. 匹配版本号行: ### v3.8.20 (2026-07-10)
+            version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
+            if version_match:
+                # 保存上一个版本
+                if current_version:
+                    if current_section:
+                        current_items.append(current_section)
+                        current_section = None
+                    elif current_item:
+                        current_items.append(current_item)
+                        current_item = None
+                    changelog.append({
+                        'version': current_version,
+                        'date': current_date,
+                        'items': current_items
+                    })
+                
+                # 开始新版本
+                current_version = version_match.group(1)
+                current_date = version_match.group(2)
+                current_items = []
+                current_item = None
+                current_section = None
+                in_code_block = False
+                continue
+            
+            # 3. 检测章节结束（下一个 ## 开头的标题）
+            if stripped.startswith('## ') and in_changelog and current_version:
+                break
+            
+            # 4. 处理代码块标记 ```
+            if stripped.startswith('```'):
+                in_code_block = not in_code_block
+                if current_section:
+                    current_section['content'] += line + '\n'
+                continue
+            
+            # 5. 匹配四级标题 #### 核心改进
+            section_match = re.match(r'^####\s+(.+)$', stripped)
+            if section_match and current_version:
+                if current_section:
+                    current_items.append(current_section)
+                elif current_item:
+                    current_items.append(current_item)
+                    current_item = None
+                
+                current_section = {
+                    'type': 'section',
+                    'title': section_match.group(1).strip(),
+                    'content': '',
+                    'sub_items': []
+                }
+                continue
+            
+            # 6. 匹配列表项 - **emoji标题** - 描述
+            item_match = re.match(r'^-\s+\*\*(.+?)\*\*\s*[-–]?\s*(.*)', stripped)
+            if item_match and current_version:
+                if current_section:
+                    current_items.append(current_section)
+                    current_section = None
+                elif current_item:
+                    current_items.append(current_item)
+                
+                current_item = {
+                    'type': 'item',
+                    'title': item_match.group(1),
+                    'desc': item_match.group(2).strip(),
+                    'sub_items': []
+                }
+                continue
+            
+            # 7. 匹配子列表项（缩进的 - 文本）
+            sub_match = re.match(r'^-\s+(.*)', stripped)
+            if sub_match and (current_item or current_section):
+                is_indented = line.startswith('  ') or line.startswith('\t')
+                if current_item and is_indented:
+                    current_item['sub_items'].append(sub_match.group(1).strip())
+                elif current_section:
+                    current_section['sub_items'].append(sub_match.group(1).strip())
+                continue
+            
+            # 8. 章节内容累积
+            if current_section:
+                if in_code_block:
+                    current_section['content'] += line + '\n'
+                elif stripped:
+                    current_section['content'] += line + '\n'
+        
+        # 保存最后一个版本
+        if current_section:
+            current_items.append(current_section)
+        elif current_item:
+            current_items.append(current_item)
+        if current_version:
+            changelog.append({
+                'version': current_version,
+                'date': current_date,
+                'items': current_items
+            })
+        
+        return jsonify({'success': True, 'changelog': changelog})
+    
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+```
+
+**关键设计要点**:
+
+| 特性 | 实现方式 | 说明 |
+|------|---------|------|
+| **状态机模式** | `in_changelog` + `in_code_block` | 精确控制解析范围 |
+| **层级结构** | section → item → sub_items | 支持三级嵌套 |
+| **正则匹配** | `re.match(r'###\s+v([\d.]+)')` | 版本号提取 |
+| **容错处理** | try-except + 500 返回 | 解析失败不崩溃 |
+| **调试日志** | stderr 输出统计信息 | 便于排查问题 |
+
+---
+
+#### 2.11.2 `/api/changelog-debug` 更新日志调试接口
+
+**功能**: 返回原始 README.md 行号 + 内容预览，用于调试 changelog 解析问题。
+
+**API端点**: `GET /api/changelog-debug`
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "total_lines": 2472,
+  "changelog_preview": "   10: ---\n   11: ## 最新更新\n   12: \n   13: ### v3.8.20 (2026-07-10)"
+}
+```
+
+**使用场景**:
+- 当 `/api/changelog` 返回空数据时
+- 当前端"最新更新"区域显示异常时
+- 需要查看原始 Markdown 格式是否正确时
+
+**实现范式** (main.py:6536-6615):
+```python
+@app.route('/api/changelog-debug', methods=['GET'])
+def get_changelog_debug():
+    try:
+        readme_path = os.path.join(PROJECT_DIR, 'README.md')
+        with open(readme_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        lines = content.split('\n')
+        debug_lines = []
+        in_changelog = False
+        
+        for i, line in enumerate(lines, 1):
+            if '最新更新' in line.strip() and line.strip().startswith('##'):
+                in_changelog = True
+            
+            if in_changelog:
+                debug_lines.append(f'{i:4d}: {line}')  # 带行号输出
+                
+                # 下一个 ## 标题或超过200行则停止
+                if line.strip().startswith('## ') and i > 10:
+                    break
+                if len(debug_lines) > 200:
+                    break
+        
+        return jsonify({
+            'success': True,
+            'total_lines': len(lines),
+            'changelog_preview': '\n'.join(debug_lines[:100])
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+```
+
+---
+
+#### 2.11.3 `/api/readme-sections` README 章节解析接口
+
+**功能**: 解析整个 README.md 的二级/三级标题结构，返回所有章节内容。
+
+**API端点**: `GET /api/readme-sections`
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "sections": {
+    "功能特性": {
+      "title": "功能特性",
+      "content": "...",
+      "subsections": {
+        "核心爬虫功能": "...",
+        "货号对比功能": "..."
+      }
+    },
+    "技术栈": {
+      "title": "技术栈",
+      "content": "..."
+    }
+  },
+  "features": [
+    {"title": "Szwego商品爬虫", "desc": "支持关键词搜索..."},
+    {"title": "货号对比", "desc": "自动对比差异..."}
+  ]
+}
+```
+
+**实现范式** (main.py:6616-6748):
+```python
+@app.route('/api/readme-sections', methods=['GET'])
+def get_readme_sections():
+    try:
+        readme_path = os.path.join(PROJECT_DIR, 'README.md')
+        with open(readme_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        lines = content.split('\n')
+        sections = {}
+        current_h2 = None
+        current_h3 = None
+        current_lines = []
+        
+        for line in lines:
+            h2_match = re.match(r'^##\s+(.+)', line)
+            h3_match = re.match(r'^###\s+(.+)', line)
+            
+            if h2_match:
+                # 保存上一级 H2 章节
+                if current_h2:
+                    sections[current_h2] = {
+                        'title': current_h2,
+                        'content': '\n'.join(current_lines).strip(),
+                        'subsections': {}
+                    }
+                
+                current_h2 = h2_match.group(1).strip()
+                current_h3 = None
+                current_lines = []
+                continue
+            
+            if h3_match:
+                # 保存 H3 子章节
+                if current_h3 and current_h2:
+                    sections[current_h2]['subsections'][current_h3] = '\n'.join(current_lines).strip()
+                
+                current_h3 = h3_match.group(1).strip()
+                current_lines = []
+                continue
+            
+            current_lines.append(line)
+        
+        # 提取"功能特性"中的特性列表
+        features = []
+        feat_section = sections.get('功能特性', {})
+        if feat_section:
+            for sub_title, sub_content in feat_section.get('subsections', {}).items():
+                items = []
+                for l in sub_content.split('\n'):
+                    m = re.match(r'-\s+\*\*(.+?)\*\*[:：]?\s*(.*)', l.strip())
+                    if m:
+                        items.append({
+                            'title': m.group(1),
+                            'desc': m.group(2).strip()
+                        })
+                features.extend(items)
+        
+        return jsonify({
+            'success': True,
+            'sections': sections,
+            'features': features
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+```
+
+**数据流图**:
+```
+README.md (Markdown)
+    ↓ 正则解析
+H2 标题数组 ["功能特性", "技术栈", ...]
+    ↓ 分组存储
+{
+  "功能特性": { title, content, subsections: {...} },
+  "技术栈": { title, content }
+}
+    ↓ JSON 序列化
+HTTP Response (JSON)
+```
+
+---
+
+### 2.12 URL源管理 API（v3.8.18 新增）
+
+#### 2.12.1 `/api/url-source/status` URL源状态查询
+
+**功能**: 获取当前 URL 获取策略的配置和健康检查结果。
+
+**API端点**: `GET /api/url-source/status`
+
+**请求参数**: 无
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "config": {
+    "primary_source": "tunnel_url.txt",
+    "fallback_source": "web_output.log",
+    "enable_logging": true,
+    "enable_health_check": true,
+    "auto_sync_interval": 60,
+    "validate_url": true,
+    "url_validation_timeout": 10
+  },
+  "last_log": "最后一条日志内容...",
+  "health_check": {
+    "status": "healthy",
+    "primary_exists": true,
+    "fallback_exists": true,
+    "sync_status": "in_sync"
+  },
+  "timestamp": "2026-07-10T16:30:01.123456"
+}
+```
+
+**实现范式** (main.py:7625-7650):
+```python
+@app.route('/api/url-source/status', methods=['GET'])
+def url_source_status():
+    """获取URL源状态和配置"""
+    try:
+        status = PathManager.get_url_source_status()
+        
+        # 执行健康检查（强制执行，忽略间隔）
+        health = PathManager.check_url_files_health()
+        
+        return jsonify({
+            'success': True,
+            'config': status['config'],
+            'last_log': status['last_log'],
+            'health_check': health,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)[:200]
+        }), 500
+```
+
+---
+
+#### 2.12.2 `/api/url-source/configure` URL源配置修改
+
+**功能**: 动态修改 URL 获取策略的运行时配置。
+
+**API端点**: `POST /api/url-source/configure`
+
+**请求参数** (JSON Body):
+```json
+{
+  "primary_source": "tunnel_url.txt",       // 主URL源
+  "fallback_source": "web_output.log",      // 备用URL源
+  "enable_logging": true,                   // 是否启用日志
+  "enable_health_check": true,              // 是否启用健康检查
+  "auto_sync_interval": 60,                 // 自动同步间隔（秒）
+  "validate_url": true,                     // 是否验证URL可用性
+  "url_validation_timeout": 10              // URL验证超时（秒）
+}
+```
+
+**安全机制**: 使用白名单过滤，只允许修改以下字段：
+```python
+allowed_keys = [
+    'primary_source',
+    'fallback_source', 
+    'enable_logging',
+    'enable_health_check',
+    'auto_sync_interval',
+    'validate_url',
+    'url_validation_timeout'
+]
+
+# 过滤只允许的配置项
+config_data = {k: v for k, v in data.items() if k in allowed_keys}
+```
+
+**实现范式** (main.py:7651-7712):
+```python
+@app.route('/api/url-source/configure', methods=['POST'])
+def url_source_configure():
+    """配置URL获取策略"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '请提供配置数据'
+            }), 400
+        
+        # 允许的配置项（白名单）
+        allowed_keys = [...]
+        
+        # 过滤只允许的配置项
+        config_data = {k: v for k, v in data.items() if k in allowed_keys}
+        
+        if not config_data:
+            return jsonify({
+                'success': False,
+                'error': '没有有效的配置项'
+            }), 400
+        
+        # 应用配置
+        new_config = PathManager.configure_url_source(**config_data)
+        
+        return jsonify({
+            'success': True,
+            'message': '配置已更新',
+            'config': new_config
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)[:200]
+        }), 500
+```
+
+---
+
+#### 2.12.3 `/api/url-source/health-check` 强制健康检查
+
+**功能**: 重置健康检查时间戳，强制执行一次完整的 URL 文件健康检查。
+
+**API端点**: `POST /api/url-source/health-check`
+
+**请求参数**: 无
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "message": "健康检查已完成",
+  "health_result": {
+    "status": "healthy",
+    "primary_exists": true,
+    "primary_size": 45,
+    "fallback_exists": true,
+    "fallback_size": 120,
+    "sync_status": "in_sync",
+    "check_time": "2026-07-10T16:30:01"
+  }
+}
+```
+
+**实现范式** (main.py:7713-7754):
+```python
+@app.route('/api/url-source/health-check', methods=['POST'])
+def url_source_force_health_check():
+    """强制执行健康检查"""
+    try:
+        # 重置健康检查时间戳，强制执行检查
+        PathManager._url_health_check_time = 0
+        
+        health = PathManager.check_url_files_health()
+        
+        return jsonify({
+            'success': True,
+            'message': '健康检查已完成',
+            'health_result': health
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)[:200]
+        }), 500
+```
+
+**使用场景**:
+- 手动触发健康检查（无需等待自动周期）
+- 排查 URL 同步问题时诊断
+- 配置修改后立即验证效果
+
+---
+
+### 2.13 邮件配置管理 API（v3.8.19 新增）
+
+#### 2.13.1 `/api/email/config` GET 获取邮件配置
+
+**功能**: 获取当前邮件通知服务的 SMTP 配置信息（密码已脱敏）。
+
+**API端点**: `GET /api/email/config`
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "config": {
+    "smtp_host": "smtp.qq.com",
+    "smtp_port": 587,
+    "smtp_user": "user@qq.com",
+    "smtp_password": "******",     // 已脱敏
+    "from_name": "公网IP监控",
+    "to_email": "980187223@qq.com",
+    "enabled": true
+  }
+}
+```
+
+**安全措施**: 密码字段返回 `"******"`，防止敏感信息泄露。
+
+**实现范式** (main.py:6649-6669):
+```python
+@app.route('/api/email/config', methods=['GET'])
+def get_email_config():
+    notifier = EmailNotifier()
+    config = notifier.get_email_config()
+    
+    # 安全处理：密码脱敏
+    if config['smtp_password']:
+        config['smtp_password'] = '******'
+    
+    return jsonify({'success': True, 'config': config})
+```
+
+---
+
+#### 2.13.2 `/api/email/config` POST 保存邮件配置
+
+**功能**: 动态修改邮件通知服务的 SMTP 配置，立即生效（无需重启服务）。
+
+**API端点**: `POST /api/email/config`
+
+**请求参数** (JSON Body):
+```json
+{
+  "smtp_host": "smtp.qq.com",
+  "smtp_port": 587,
+  "smtp_user": "your_qq@qq.com",
+  "smtp_password": "授权码",
+  "from_name": "公网IP监控",
+  "to_email": "recipient@example.com"
+}
+```
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "message": "邮件配置已保存"
+}
+```
+
+**实现范式** (main.py:6670-6700):
+```python
+@app.route('/api/email/config', methods=['POST'])
+def save_email_config():
+    try:
+        data = request.get_json()
+        notifier = EmailNotifier()
+        
+        # 保存配置到文件
+        notifier.save_email_config(
+            smtp_host=data.get('smtp_host', 'smtp.qq.com'),
+            smtp_port=int(data.get('smtp_port', 587)),
+            smtp_user=data.get('smtp_user', ''),
+            smtp_password=data.get('smtp_password', ''),
+            from_name=data.get('from_name', '公网IP监控'),
+            to_email=data.get('to_email', '980187223@qq.com')
+        )
+        
+        return jsonify({'success': True, 'message': '邮件配置已保存'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+```
+
+---
+
+#### 2.13.3 `/api/email/test` 测试邮件发送
+
+**功能**: 使用当前配置发送一封测试邮件，验证 SMTP 连接和认证是否正常。
+
+**API端点**: `POST /api/email/test`
+
+**请求参数** (JSON Body): 与 POST `/api/email/config` 相同
+
+**响应格式**:
+```json
+// 成功
+{ "success": true, "message": "测试邮件发送成功" }
+
+// 失败
+{ "success": false, "error": "请先启用邮件通知" }
+```
+
+**实现范式** (main.py:6701-6730):
+```python
+@app.route('/api/email/test', methods=['POST'])
+def test_email():
+    try:
+        data = request.get_json()
+        test_notifier = EmailNotifier()
+        
+        # 先保存配置
+        test_notifier.save_email_config(
+            smtp_host=data.get('smtp_host', 'smtp.qq.com'),
+            smtp_port=int(data.get('smtp_port', 587)),
+            smtp_user=data.get('smtp_user', ''),
+            smtp_password=data.get('smtp_password', ''),
+            from_name=data.get('from_name', '公网IP监控'),
+            to_email=data.get('to_email', '980187223@qq.com')
+        )
+        
+        # 发送测试邮件
+        success = test_notifier.send_tunnel_notification(
+            'https://test.example.com', 
+            'test'
+        )
+        
+        if success:
+            return jsonify({'success': True, 'message': '测试邮件发送成功'})
+        else:
+            return jsonify({'success': False, 'error': '请先启用邮件通知'})
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+```
+
+**工作流程**:
+```
+前端提交表单
+    ↓
+POST /api/email/test
+    ↓
+EmailNotifier.save_email_config()  ← 临时保存配置
+    ↓
+EmailNotifier.send_tunnel_notification()  ← 发送测试邮件
+    ↓
+SMTP 服务器验证
+    ├─ 成功 → 返回 {success: true}
+    └─ 失败 → 返回 {success: false, error: "..."}
+```
+
+---
+
+### 2.14 服务器信息 API
+
+#### 2.14.1 `/api/server/info` 服务器信息查询
+
+**功能**: 获取服务器的基本网络信息，包括本地访问地址、局域网地址、端口和版本号。
+
+**API端点**: `GET /api/server/info`
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "local_url": "http://localhost:8888",
+  "lan_url": "http://192.168.1.100:8888",
+  "lan_ip": "192.168.1.100",
+  "port": 8888,
+  "version": "3.8.20"
+}
+```
+
+**关键技术点**:
+
+1. **局域网 IP 获取方式**（UDP Socket 方案）:
+```python
+# 创建 UDP socket 连接到外部地址
+# 不实际发送数据，仅通过 getsockname() 获取本机 IP
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(('8.8.8.8', 80))  # Google DNS（可靠的外部地址）
+lan_ip = s.getsockname()[0]
+s.close()
+```
+
+2. **环境变量可配置性**:
+```python
+# 支持通过环境变量自定义检测目标
+os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8')      # 默认 Google DNS
+os.environ.get('LAN_IP_DETECT_PORT', '80')             # 默认 HTTP 端口
+```
+
+**实现范式** (main.py:6695-6728):
+```python
+@app.route('/api/server/info', methods=['GET'])
+def get_server_info():
+    port = args.port
+    
+    # 获取局域网 IP
+    lan_ip = None
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect((
+            os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'),
+            int(os.environ.get('LAN_IP_DETECT_PORT', '80'))
+        ))
+        lan_ip = s.getsockname()[0]
+        s.close()
+    except:
+        pass  # 获取失败不影响其他功能
+    
+    return jsonify({
+        'success': True,
+        'local_url': f'http://localhost:{port}',
+        'lan_url': f'http://{lan_ip}:{port}' if lan_ip else None,
+        'lan_ip': lan_ip,
+        'port': port,
+        'version': get_version_from_readme()  # 从 README.md 解析
+    })
+```
+
+**使用场景**:
+- 前端启动时加载服务器信息（[loadServerInfo()](index.html#L4398)）
+- 显示访问地址提示（局域网内其他设备访问）
+- 版本号展示
+
+---
+
+### 2.15 Node.js 依赖管理规范（v3.8.21 新增）
+
+#### 2.15.1 node_modules 目录结构规范
+
+**⚠️ 项目采用混合架构，Node.js 依赖分两层管理：**
+
+##### 第一层：根目录 `node_modules/`（已废弃）
+
+**历史遗留**：
+```
+D:/ws/xy_ws/node_modules/
+├── .bin/acorn           # JavaScript 解析器工具
+├── acorn/               # AST 解析库
+└── acorn-loose/         # 宽松模式解析器
+```
+
+**状态**: ❌ **已删除**（v3.8.21 清理）
+
+**原因**:
+- `package.json` 声明的 `marked` 和 `puppeteer-core` 未安装
+- `acorn` 和 `acorn-loose` 是 npm 内部依赖残留
+- 项目代码中无任何引用
+
+**package.json 当前状态**:
+```json
+{
+  "dependencies": {}  // 已清空
+}
+```
+
+##### 第二层：`dist/hostc/node_modules/`（运行时依赖）
+
+**当前结构**（v3.8.21 合并后）:
+```
+D:/ws/_xy_ws/dist/hostc/
+├── cli/                           # CLI 客户端（通过 npx 远程运行）
+├── client/                        # 浏览器客户端（已打包）
+├── protocol/                      # 协议定义
+├── server/                        # Cloudflare Workers 服务端
+│   └── dist/                      # 构建产物
+│       ├── index.js               # 服务端入口
+│       ├── index.d.ts             # 类型定义
+│       └── *.js                   # 其他模块
+└── node_modules/                  # ✅ 统一管理的运行时依赖
+    └── @hostc/
+        └── protocol/              # hostc 协议库
+            ├── dist/
+            │   ├── index.js       # ← 核心协议实现（被 server 引用）
+            │   └── index.d.ts     # ← 类型定义
+            ├── package.json       # ← 包元数据
+            └── tsconfig.json      # ← 编译配置
+```
+
+**合并前的问题**（已解决）:
+```
+❌ 三层嵌套: dist/hostc/server/dist/node_modules/@hostc/protocol
+❌ 冗余依赖: typescript（编译时不需要）
+❌ 冗余工具: .bin/tsc, .bin/workerd, .bin/wrangler
+```
+
+**合并后的优化**:
+```
+✅ 扁平化: dist/hostc/node_modules/@hostc/protocol
+✅ 仅保留运行时: 删除 typescript 和构建工具
+✅ 减少文件数: 从 400+ 减少到 4 个核心文件
+```
+
+---
+
+#### 2.15.2 依赖分类与生命周期
+
+| 依赖类型 | 位置 | 运行时机 | 是否需要 |
+|---------|------|---------|---------|
+| **@hostc/protocol** | `dist/hostc/node_modules/` | Cloudflare Workers 运行时 | ✅ 必须 |
+| **typescript** | ~~`dist/hostc/server/node_modules/`~~ | Cloudflare Workers 构建 | ❌ 已删除 |
+| **workerd/wrangler** | ~~`dist/hostc/server/node_modules/.bin/`~~ | 本地开发部署 | ❌ 已删除 |
+| **marked/puppeteer-core** | ~~根目录 `node_modules/`~~ | 未使用 | ❌ 已删除 |
+
+**关键发现**:
+- **hostc CLI** 通过 `npx hostc@latest` 远程下载运行，不依赖本地 `node_modules`
+- **hostc client** 已打包为单文件 `cli/index.js`，不依赖外部模块
+- **hostc server** 部署在 Cloudflare Workers 上，本地不运行
+- **唯一运行时依赖** 是 `@hostc/protocol/dist/index.js`（被 `server/dist/*.js` 通过 `import` 引用）
+
+---
+
+#### 2.15.3 .gitignore 配置规范
+
+**必须忽略的路径**:
+```gitignore
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Frontend build
+frontend/
+node_modules/
+frontend/node_modules/
+dist/hostc/node_modules/  # ✅ v3.8.21 新增
+
+# Backend
+backend/
+
+# Data files
+file/*.json
+
+# Tunnel URL (敏感信息)
+file/tunnel_url.txt
+
+# Web output log
+file/web_output.log
+
+# Sensitive config files
+config/cookies.json
+config/config.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+temp/
+*.tmp
+~$*
+
+# Log files
+*.log
+clean_files.log
+
+# Get scripts (not to be uploaded)
+get*.py
+
+# Playwright browsers (large files)
+playwright-browsers/
+```
+
+**忽略原因**:
+- `node_modules/`: 可通过 `npm install` 重新生成
+- `dist/hostc/node_modules/`: 仅用于 Cloudflare Workers 部署，本地开发不需要
+- `file/tunnel_url.txt`: 包含公网地址，属于动态生成的敏感信息
+- `config/cookies.json`: 包含登录凭证，不可提交
+
+---
+
+#### 2.15.4 依赖清理最佳实践
+
+**何时清理 node_modules**:
+
+| 场景 | 操作 | 说明 |
+|------|------|------|
+| **首次克隆仓库后** | `npm install`（如需要） | 安装声明在 package.json 的依赖 |
+| **发现无用残留** | 删除 `node_modules/` + 清空 `dependencies` | 减少仓库体积 |
+| **合并嵌套依赖** | 提取核心文件到统一位置 | 消除冗余，简化结构 |
+| **提交前检查** | 确认 `.gitignore` 包含相关路径 | 防止意外提交 |
+
+**清理命令示例**:
+```bash
+# 1. 备份 package.json
+cp package.json package.json.backup
+
+# 2. 删除根目录 node_modules（如果确认无用）
+rm -rf node_modules
+
+# 3. 清理 package.json 中的无用依赖
+# 手动编辑或使用脚本移除未使用的包
+
+# 4. 删除 package-lock.json（如果 dependencies 为空）
+rm package-lock.json
+
+# 5. 验证清理结果
+ls -la node_modules/  # 应该报错：No such file or directory
+```
+
+**v3.8.21 清理成果**:
+- ✅ 删除根目录 `node_modules/`（22 个文件）
+- ✅ 删除 `dist/hostc/server/node_modules/`（400 个文件）
+- ✅ 提取 `@hostc/protocol` 到 `dist/hostc/node_modules/`（4 个文件）
+- ✅ 清空 `package.json` 的 `dependencies`
+- ✅ 删除 `package-lock.json`
+- ✅ 更新 `.gitignore` 添加 `dist/hostc/node_modules/`
+- **净减少 418 个文件**
+
+---
 
 `/api/changelog` 接口解析 README "最新更新"章节，返回结构化 JSON，支持子条目：
 
