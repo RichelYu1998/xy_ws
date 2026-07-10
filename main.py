@@ -3124,8 +3124,11 @@ class FileManager:
             return None
         
         temp_file = None
-        with ExceptionContext(f"FileManager.safe_read_excel({excel_file})", default=None) as ctx:
+        try:
             for attempt in range(max_retries):
+                if temp_file and os.path.exists(temp_file):
+                    safe_execute_func(lambda: os.remove(temp_file), context='safe_read_excel重试清理旧临时文件')
+                    temp_file = None
                 try:
                     temp_dir = os.path.join(PROJECT_DIR, 'temp')
                     os.makedirs(temp_dir, exist_ok=True)
@@ -3150,12 +3153,12 @@ class FileManager:
                         raise
                 except Exception as e:
                     raise AppException.parse_error(f'读取Excel文件失败', data_type='excel', raw_data=str(e))
-        
-        if temp_file and os.path.exists(temp_file):
-            safe_execute_func(
-                lambda: os.remove(temp_file),
-                context='清理临时Excel文件'
-            )
+        finally:
+            if temp_file and os.path.exists(temp_file):
+                safe_execute_func(
+                    lambda: os.remove(temp_file),
+                    context='清理临时Excel文件'
+                )
         
         return None
 
@@ -7941,6 +7944,51 @@ if __name__ == '__main__':
 
         # 初始化日志输出到 web_output.log
         setup_web_logging()
+        
+        # 启动时清理 temp 目录（超过3MB则清理）
+        temp_dir = os.path.join(PROJECT_DIR, 'temp')
+        if os.path.isdir(temp_dir):
+            temp_size = 0
+            for f in os.listdir(temp_dir):
+                fp = os.path.join(temp_dir, f)
+                if os.path.isfile(fp):
+                    temp_size += os.path.getsize(fp)
+            temp_size_mb = temp_size / (1024 * 1024)
+            if temp_size_mb > 3:
+                cleaned = 0
+                for f in os.listdir(temp_dir):
+                    fp = os.path.join(temp_dir, f)
+                    if os.path.isfile(fp):
+                        safe_execute_func(lambda: os.remove(fp), context='启动清理temp文件')
+                        cleaned += 1
+                print(f"[Clean] temp目录超过3MB({temp_size_mb:.1f}MB)，已清理{cleaned}个文件")
+            else:
+                print(f"[Clean] temp目录未超过3MB({temp_size_mb:.1f}MB)，跳过清理")
+        
+        # 后台定期清理 temp 目录（每5分钟检查一次）
+        def temp_cleanup_loop():
+            while True:
+                time.sleep(300)
+                try:
+                    temp_dir_check = os.path.join(PROJECT_DIR, 'temp')
+                    if os.path.isdir(temp_dir_check):
+                        temp_size_check = 0
+                        for f in os.listdir(temp_dir_check):
+                            fp = os.path.join(temp_dir_check, f)
+                            if os.path.isfile(fp):
+                                temp_size_check += os.path.getsize(fp)
+                        if temp_size_check > 3 * 1024 * 1024:
+                            cleaned = 0
+                            for f in os.listdir(temp_dir_check):
+                                fp = os.path.join(temp_dir_check, f)
+                                if os.path.isfile(fp):
+                                    safe_execute_func(lambda: os.remove(fp), context='后台清理temp文件')
+                                    cleaned += 1
+                            print(f"[Clean] 后台清理temp目录：{cleaned}个文件")
+                except Exception:
+                    pass
+        
+        threading.Thread(target=temp_cleanup_loop, daemon=True).start()
         
         # 启动前获取一次局域网 IP 用于显示
         lan_ip_startup = None
