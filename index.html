@@ -5323,19 +5323,18 @@ SzwegoSpider/
             try {
                 const response = await fetch('/api/tunnel/status');
                 const data = await response.json();
-                updateTunnelUI(data.running, data.url, data.auto_restart, data.restart_count, data.last_error, data.tunnel_type);
+                updateTunnelUI(data.running, data.url, data.auto_restart, data.restart_count, data.last_error, data.tunnel_type, data.url_valid, data.detailed_status, data.status_message);
             } catch (e) {
                 console.error('检查隧道状态失败:', e);
             }
         }
-        function updateTunnelUI(running, url, autoRestart, restartCount, lastError, tunnelType) {
+        function updateTunnelUI(running, url, autoRestart, restartCount, lastError, tunnelType, urlValid, detailedStatus, statusMessage) {
             const btn = document.getElementById('btn-toggle-tunnel');
             const status = document.getElementById('tunnel-status');
             const urlDisplay = document.getElementById('tunnel-public-url');
             const restartInfo = document.getElementById('tunnel-restart-info');
             const tunnelTypeDisplay = document.getElementById('tunnel-type');
             
-            // 显示隧道类型
             if (tunnelTypeDisplay) {
                 tunnelTypeDisplay.innerHTML = '<span class="text-success"><i class="fa fa-bolt"></i> hostc</span>';
             }
@@ -5354,7 +5353,14 @@ SzwegoSpider/
             
             if (status) {
                 if (running && url) {
-                    status.innerHTML = '<span class="badge badge-success"><i class="fa fa-circle"></i> 已连接</span>';
+                    if (urlValid) {
+                        status.innerHTML = '<span class="badge badge-success"><i class="fa fa-circle"></i> 已连接（已验证）</span>';
+                    } else {
+                        status.innerHTML = '<span class="badge badge-info"><i class="fa fa-circle"></i> 已连接（验证中）</span>';
+                    }
+                    if (statusMessage) {
+                        status.innerHTML += '<br><small class="text-muted">' + statusMessage + '</small>';
+                    }
                 } else {
                     if (restartCount > 0) {
                         status.innerHTML = '<span class="badge badge-warning"><i class="fa fa-refresh fa-spin"></i> 正在重连...</span>';

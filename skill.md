@@ -6327,7 +6327,7 @@ def get_public_url_from_web_log(skip_validation=False, quiet=False):
 |--------|----------------|-------|------|
 | `heartbeat_loop()` | True | True | 自行做 verify_url()，高频调用需静默 |
 | `restart_tunnel()` | True | True | 重启流程自行验证 |
-| `auto_start_tunnel()` | True | False | 不做任何验证，hostc在跑+有URL直接用，没有URL也不等 |
+| `auto_start_tunnel()` | True | False | 先验证URL可用性，可用才复用；不可用则等待或重启 |
 | `send_heartbeat()` | True | True | 仅做HEAD检测，无需验证 |
 | `tunnel_status()` API | True | True | API返回状态，无需验证 |
 | 前端初始化 | False | False | 首次获取需验证 |
@@ -6387,38 +6387,108 @@ with open(web_output_file, 'a', encoding='utf-8') as wf:
 ### 6.3 邮件通知
 
 - 隧道 URL 变化时自动发送邮件
+- **即时邮件通知**（v3.8.20 新增）：获取到URL后立即 `verify_url()` 验证，通过则立即发邮件，不再等心跳机制7分钟
 - **邮件去重**：`auto_start_tunnel()` 统一负责 `new` 事件发送，`restart_tunnel()` 仅打印日志不重复发 `update`
   - ❌ 同一 URL 收到两封邮件（`new` + `update`）
   - ✅ 每个新 URL 只发一封邮件（仅 `new` 事件）
-- **邮件事件类型**（v3.8.18 更新）:
+- **邮件事件类型**（v3.8.20 更新）:
 
 | 事件类型 | 标题 | 触发条件 | force_send |
 |---------|------|---------|------------|
 | `new` | ✅ 新公网地址 | 首次获取到URL | False |
-| `available` | ✅ 公网地址可用 | URL从不可用恢复 | False |
+| `available` | ✅ 公网地址可用 | URL从不可用恢复 / 复用已有可用URL | True |
 | `update` | ✅ 公网地址已更新 | URL变更 | False |
-| `stable_available` | ✅ 公网地址已稳定可用 | 连续3次验证通过 | False |
+| `stable_available` | ✅ 公网地址已稳定可用 | 即时验证通过 / 连续2次验证通过 | True |
 | `unavailable` | 🚨 公网地址不可用 | URL连续验证失败10次 | True |
 | `restarted` | 🔄 隧道已重启 | 隧道重启成功获取新URL | True |
+
+### 6.3.1 即时邮件通知规范（v3.8.20 新增）
+
+**核心原则**：获取到URL后立即验证并发邮件，不依赖心跳机制的延迟验证。
+
+**即时通知触发点**:
+
+| 触发场景 | 函数 | 验证方式 | 邮件事件 |
+|---------|------|---------|---------|
+| 新启动隧道获取URL | `read_output()` | `verify_url(timeout=10)` | `stable_available` |
+| 复用已有可用URL | `auto_start_tunnel()` | `verify_url(timeout=10)` | `available` |
+| 等待后获取到可用URL | `auto_start_tunnel()` 等待循环 | `verify_url(timeout=10)` | `available` |
+| 重启后获取新URL | `restart_tunnel()` | `verify_url(timeout=10)` | `stable_available` |
+
+**验证通过后立即设置稳定状态**:
+```python
+if url_verified:
+    send_tunnel_notification(file_url, 'stable_available', force_send=True)
+    stable_url = file_url
+    stable_url_confirm_count = stable_url_min_confirms
+    url_first_seen_time = time.time()
+    last_stable_notification_time = time.time()
+    last_email_sent_url = file_url
+```
+
+**验证失败则交给心跳机制**:
+```python
+else:
+    print(f"[Tunnel] ⏳ 公网地址暂不可用，将由心跳机制持续验证后发送邮件")
+```
+
+### 6.3.2 隧道状态API规范（v3.8.20 新增）
+
+**核心原则**：`/api/tunnel/status` 不做阻塞式网络验证，用心跳缓存结果。
+
+**修复前问题**:
+```
+API每次调用 verify_url(web_url, timeout=5)
+  → 一次网络波动 → url_valid=False → is_running=False
+  → 前端显示"未连接"（实际隧道正常运行！）
+  → 误触发 tunnel_need_restart=True
+```
+
+**修复后**:
+```python
+# 判断运行状态：有进程 + 有URL = 运行中（不阻塞做网络验证）
+is_running = process_running and web_url is not None
+
+# URL可用性：用心跳机制的缓存结果
+url_valid = (stable_url == web_url and 
+            stable_url_confirm_count >= stable_url_min_confirms and 
+            web_url is not None)
+```
+
+**前端状态展示**:
+
+| 状态 | Badge颜色 | 说明 |
+|------|----------|------|
+| 已连接（已验证） | 绿色 `badge-success` | URL验证通过 |
+| 已连接（验证中） | 蓝色 `badge-info` | URL存在但心跳尚未确认稳定 |
 
 - **快速恢复机制**：URL 失效后 ~8秒内获取新公网地址并通知用户
 
 | 参数 | 值 | 说明 |
 |------|-----|------|
-| 心跳间隔 | 2秒 | 快速检测 URL 状态 |
-| 连续失败阈值 | 2次 | 4秒内触发重启 |
-| URL验证超时 | 2秒 | 快速判断可用性 |
+| 心跳间隔 | 60秒 | 降低频率，避免资源浪费 |
+| 心跳跳过验证次数 | 1次 | auto_start_tunnel已做即时验证 |
+| 稳定性确认次数 | 2次 | 连续2次验证通过即确认稳定 |
+| URL验证超时 | 10秒 | verify_url 默认超时 |
 | 心跳请求超时 | 3秒 | HEAD 请求超时 |
-| 重启等待阈值 | 3秒 | 检测到问题后立即响应 |
-| 重启延迟 | 0秒 | 无延迟立即重启 |
+| URL验证连续失败阈值 | 10次 | 触发重启 |
+| 心跳连续失败阈值 | 5次 | 触发重启 |
 | URL获取超时 | 10秒 | 新隧道启动超时 |
 
-- **恢复流程**：
+- **即时通知流程**（v3.8.20）：
   ```
-  T+0s   心跳检测失败 #1
-  T+2s   心跳检测失败 #2 → 触发重启
-  T+3s   清理旧进程，启动新 hostc
-  T+8s   获取新 URL + 发送邮件通知
+  T+0s   auto_start_tunnel() 获取到URL
+  T+0s   立即 verify_url() 验证
+  T+10s  验证通过 → 立即发送邮件通知
+  ```
+- **心跳恢复流程**（URL不可用时）：
+  ```
+  T+0s    心跳检测失败 #1
+  T+60s   心跳检测失败 #2
+  ...
+  T+600s  连续失败10次 → 触发重启
+  T+603s  清理旧进程，启动新 hostc
+  T+613s  获取新 URL + 即时验证 + 发送邮件通知
   ```
 - 支持 SMTP SSL/TLS
 - 敏感字段 API 返回时脱敏
@@ -9355,33 +9425,65 @@ with open(web_output_file, 'a', encoding='utf-8') as wf:
     wf.write(f"Public URL: {new_url}\n")
 ```
 
-### PY-STD-TUNNEL-003: auto_start_tunnel 不阻塞启动规范（v3.8.18 新增）
+### PY-STD-TUNNEL-003: auto_start_tunnel 单次启动规范（v3.8.19 更新）
 
 **规范要求**:
-1. `auto_start_tunnel()` 在 `app.run()` 之前调用，不得做任何阻塞等待
-2. hostc在跑 + tunnel_url.txt有URL → 直接返回成功（0秒）
-3. hostc在跑 + tunnel_url.txt没URL → 直接返回成功（URL由心跳机制后台获取）
-4. **禁止**在 `auto_start_tunnel()` 中调用 `verify_url()` 或 `verify_local_server()`
-5. **禁止**在 `auto_start_tunnel()` 中使用 while 循环等待URL
-6. 公网验证和邮件通知全部交给 `heartbeat_loop()` 后台处理
-7. 心跳循环通过3次公网验证后发送 `stable_available` 邮件
+1. `auto_start_tunnel()` 在 `app.run()` 之前调用，不得做长时间阻塞等待
+2. **优先复用已有隧道**：有公网地址时先 `verify_url()` 验证可用性，可用则直接复用
+3. **不可用时等待恢复**：公网地址不可用但 hostc 在运行时，等待15秒看是否自动恢复
+4. **无URL时等待出现**：hostc 在运行但 tunnel_url.txt 无 URL 时，等待30秒等 URL 出现
+5. **确认需要重启时才杀进程**：只有确认公网地址不可用且无法恢复，才执行 `kill_process_by_name` + 启动新 hostc
+6. **手动启动备用方案**：前端"启动隧道"按钮先 `force_restart=False`（优先复用），失败再 `force_restart=True`（备用重启）
+7. 公网验证和邮件通知全部交给 `heartbeat_loop()` 后台处理
 
 **错误做法** ❌:
 ```python
-# 在 app.run() 之前阻塞等待
-while wait_count < 30:
-    if verify_url(current_url):  # 公网验证慢，最多等30秒
+# 在 app.run() 之前阻塞等待30秒以上
+while wait_count < 60:
+    if verify_url(current_url):
         return success
     time.sleep(1)
+
+# 跳过验证直接复用，可能发邮件通知不可用地址
+if has_hostc_process and web_url:
+    return {'success': True, 'url': web_url}  # web_url 可能已502
+
+# 检测到 hostc 在运行但没 URL，直接杀掉重启
+Environment.kill_process_by_name('node.exe')  # 杀掉了 run.bat 预启动的 hostc
 ```
 
 **正确做法** ✅:
 ```python
-# 立即返回，不阻塞
-if has_hostc_process and web_url:
-    return {'success': True, 'url': web_url}
-if has_hostc_process:
-    return {'success': True, 'url': None}  # URL由心跳处理
+# 有URL时先验证可用性
+if web_url:
+    if verify_url(web_url, timeout=10):
+        return {'success': True, 'url': web_url}  # 确认可用才复用
+    elif has_hostc_process:
+        # 不可用但hostc在运行，等待恢复
+        for _ in range(15):
+            time.sleep(2)
+            web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+            if web_url and verify_url(web_url, timeout=10):
+                return {'success': True, 'url': web_url}
+# 无URL但hostc在运行，等待URL出现
+elif has_hostc_process:
+    for _ in range(30):
+        web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+        if web_url:
+            return {'success': True, 'url': web_url}
+        time.sleep(1)
+# 确认需要重启时才杀进程
+Environment.kill_process_by_name('node.exe')
+```
+
+**手动启动备用方案** ✅:
+```python
+# 前端"启动隧道"按钮
+result = auto_start_tunnel(force_restart=False)  # 优先复用
+if result['success'] and result.get('url'):
+    return result  # 复用成功
+# 复用失败，走备用方案
+result = auto_start_tunnel(force_restart=True)  # 强制重启
 ```
 
 ### 测试验证清单
@@ -9398,5 +9500,8 @@ if has_hostc_process:
 - [ ] tunnel_url.txt 权威数据源验证通过（v3.8.18 新增）
 - [ ] 重启后数据同步顺序验证通过（v3.8.18 新增）
 - [ ] 心跳循环 skip_validation + quiet 参数验证通过（v3.8.18 新增）
+- [ ] 隧道单次启动验证：run.bat预启动的hostc不被误杀（v3.8.19 新增）
+- [ ] 公网地址验证锁：邮件通知只在verify_url通过后发送（v3.8.19 新增）
+- [ ] 手动启动备用方案：优先复用成功，复用失败才强制重启（v3.8.19 新增）
 
 ---

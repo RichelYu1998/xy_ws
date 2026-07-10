@@ -6741,7 +6741,7 @@ if __name__ == '__main__':
         
         stable_url = None
         stable_url_confirm_count = 0
-        stable_url_min_confirms = 3  # 需要连续3次验证通过才认为稳定
+        stable_url_min_confirms = 2  # 需要连续2次验证通过才认为稳定
         url_first_seen_time = 0
         last_stable_notification_time = 0
         
@@ -6995,7 +6995,7 @@ if __name__ == '__main__':
             heartbeat_interval = 60  # 心跳间隔60秒（大幅降低频率）
             last_log_time = 0
             skip_url_verify_count = 0  # 跳过URL验证的次数计数
-            skip_url_verify_max = 4  # 前4次心跳跳过URL验证（给隧道启动时间）
+            skip_url_verify_max = 1  # 前1次心跳跳过URL验证（auto_start_tunnel已做即时验证）
             
             while tunnel_auto_restart:
                 # 从 tunnel_url.txt 获取最新公网地址（权威源），跳过内部验证避免双重检查
@@ -7132,21 +7132,97 @@ if __name__ == '__main__':
         def auto_start_tunnel(force_restart=False):
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
 
-            has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
-            
-            web_url = PathManager.get_public_url_from_web_log(skip_validation=True)
-
-            if has_hostc_process and web_url and not force_restart:
-                print(f"[Tunnel] ✅ hostc在运行 + tunnel_url.txt有URL，直接复用: {web_url}")
+            if force_restart:
+                print(f"[Tunnel] 🔄 强制重启模式，将清理旧进程并重新启动")
                 sys.stdout.flush()
-                tunnel_url = web_url
-                old_tunnel_url = web_url
-                return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
+            else:
+                has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+                web_url = PathManager.get_public_url_from_web_log(skip_validation=True)
 
-            if has_hostc_process and not force_restart:
-                print(f"[Tunnel] 🔍 hostc在运行，URL将由心跳机制获取和验证")
-                sys.stdout.flush()
-                return {'success': True, 'url': None, 'message': 'hostc在运行，URL由心跳机制处理'}
+                if web_url:
+                    url_ok = False
+                    try:
+                        url_ok = verify_url(web_url, timeout=10)
+                    except:
+                        pass
+                    if url_ok:
+                        print(f"[Tunnel] ✅ 公网地址可用，直接复用: {web_url}")
+                        sys.stdout.flush()
+                        tunnel_url = web_url
+                        old_tunnel_url = web_url
+                        send_tunnel_notification(web_url, 'available', force_send=True)
+                        return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
+                    else:
+                        if has_hostc_process:
+                            print(f"[Tunnel] ⚠️ 公网地址不可用但hostc在运行，等待新URL...")
+                            sys.stdout.flush()
+                            wait_start = time.time()
+                            while time.time() - wait_start < 15:
+                                time.sleep(2)
+                                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+                                if web_url:
+                                    try:
+                                        if verify_url(web_url, timeout=10):
+                                            print(f"[Tunnel] ✅ 等到可用URL: {web_url}")
+                                            sys.stdout.flush()
+                                            tunnel_url = web_url
+                                            old_tunnel_url = web_url
+                                            send_tunnel_notification(web_url, 'available', force_send=True)
+                                            return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
+                                    except:
+                                        pass
+                                if not Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc'):
+                                    print(f"[Tunnel] ⚠️ hostc进程已退出，需要重新启动")
+                                    sys.stdout.flush()
+                                    break
+                        print(f"[Tunnel] ❌ 公网地址不可用，需要重启隧道")
+                        sys.stdout.flush()
+                else:
+                    if has_hostc_process:
+                        print(f"[Tunnel] 🔍 hostc在运行，等待URL就绪...")
+                        sys.stdout.flush()
+                        wait_start = time.time()
+                        while time.time() - wait_start < 30:
+                            web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+                            if web_url:
+                                print(f"[Tunnel] ✅ 获取到URL: {web_url}")
+                                url_ok_wait = False
+                                try:
+                                    url_ok_wait = verify_url(web_url, timeout=10)
+                                except:
+                                    pass
+                                if url_ok_wait:
+                                    send_tunnel_notification(web_url, 'available', force_send=True)
+                                sys.stdout.flush()
+                                tunnel_url = web_url
+                                old_tunnel_url = web_url
+                                return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
+                            if not Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc'):
+                                print(f"[Tunnel] ⚠️ hostc进程已退出，需要重新启动")
+                                sys.stdout.flush()
+                                break
+                            time.sleep(1)
+                        web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+                        if web_url:
+                            tunnel_url = web_url
+                            old_tunnel_url = web_url
+                            print(f"[Tunnel] ✅ 复用已有隧道: {web_url}")
+                            url_ok_timeout = False
+                            try:
+                                url_ok_timeout = verify_url(web_url, timeout=10)
+                            except:
+                                pass
+                            if url_ok_timeout:
+                                send_tunnel_notification(web_url, 'available', force_send=True)
+                            else:
+                                print(f"[Tunnel] ⏳ URL暂不可用，将由心跳机制验证后发送邮件")
+                            sys.stdout.flush()
+                            return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
+                        print(f"[Tunnel] ⏳ 等待超时，URL将由心跳机制获取和验证")
+                        sys.stdout.flush()
+                        return {'success': True, 'url': None, 'message': 'hostc在运行，URL由心跳机制处理'}
+                    print(f"[Tunnel] 🔍 无hostc进程且无URL，需要启动新隧道")
+                    sys.stdout.flush()
             
             try:
                 port = args.port
@@ -7195,6 +7271,7 @@ if __name__ == '__main__':
 
                 def read_output():
                     global tunnel_url, url_ready, old_tunnel_url, tunnel_consecutive_failures
+                    global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time, last_email_sent_url
                     if not tunnel_process or not tunnel_process.stdout:
                         return
                     
@@ -7242,8 +7319,24 @@ if __name__ == '__main__':
                                         old_tunnel_url = file_url
 
                                         print(f"[Tunnel] ✅ URL已就绪: {tunnel_url}")
-                                        print(f"[Tunnel] 📧 公网验证将由心跳机制完成，通过后自动发邮件")
-
+                                        
+                                        url_verified = False
+                                        try:
+                                            url_verified = verify_url(file_url, timeout=10, verbose=True)
+                                        except:
+                                            pass
+                                        
+                                        if url_verified:
+                                            print(f"[Tunnel] 🎉 公网地址验证通过！立即发送邮件通知...")
+                                            send_tunnel_notification(file_url, 'stable_available', force_send=True)
+                                            stable_url = file_url
+                                            stable_url_confirm_count = stable_url_min_confirms
+                                            url_first_seen_time = time.time()
+                                            last_stable_notification_time = time.time()
+                                            last_email_sent_url = file_url
+                                        else:
+                                            print(f"[Tunnel] ⏳ 公网地址暂不可用，将由心跳机制持续验证后发送邮件")
+                                        
                                         sys.stdout.flush()
                                         return
                                 
@@ -7392,21 +7485,36 @@ if __name__ == '__main__':
                                 print(f"[Tunnel] ⚠️ 写入 web_output.log 失败: {e}")
                             
                             _min_confirms_restart = globals().get('stable_url_min_confirms', 3)
-                            print(f"[Tunnel] ⏳ 等待心跳检测确认稳定性（需要连续{_min_confirms_restart}次验证通过）...")
                             
-                            # 重置稳定性检测状态，让心跳机制处理
+                            # 重置稳定性检测状态
                             global stable_url, stable_url_confirm_count, url_first_seen_time
                             stable_url = None
                             stable_url_confirm_count = 0
                             url_first_seen_time = time.time()
+                            
+                            # 立即验证新URL，通过则直接发邮件
+                            new_url_ok = False
+                            try:
+                                new_url_ok = verify_url(new_url, timeout=10, verbose=True)
+                            except:
+                                pass
+                            
+                            if new_url_ok:
+                                stable_url = new_url
+                                stable_url_confirm_count = stable_url_min_confirms
+                                print(f"[Tunnel] 隧道重启成功! 新公网地址: {new_url}")
+                                print(f"[Tunnel] 🎉 新地址验证通过，立即发送邮件通知...")
+                                send_tunnel_notification(new_url, 'stable_available', force_send=True)
+                            else:
+                                print(f"[Tunnel] ⏳ 等待心跳检测确认稳定性（需要连续{_min_confirms_restart}次验证通过）...")
+                                print(f"[Tunnel] 隧道重启成功! 新公网地址: {new_url}")
+                                print(f"[Tunnel] 📧 公网验证将由心跳机制完成，通过后自动发邮件")
                             
                             tunnel_last_error = None
                             tunnel_need_restart = False
                             tunnel_consecutive_failures = 0
                             consecutive_restart_attempts = 0
                             tunnel_restart_count = 0
-                            print(f"[Tunnel] 隧道重启成功! 新公网地址: {new_url}")
-                            print(f"[Tunnel] 📧 公网验证将由心跳机制完成，通过后自动发邮件")
                             sys.stdout.flush()
                         else:
                             print(f"[Tunnel] 隧道启动成功但URL未就绪，继续等待...")
@@ -7435,7 +7543,7 @@ if __name__ == '__main__':
             stable_url_confirm_count = 0
             url_first_seen_time = time.time()
             
-            print(f"[Tunnel/API] 🚀 收到手动启动请求")
+            print(f"[Tunnel/API] 🚀 收到手动启动请求（优先复用，强制重启作为备用）")
             print(f"[Tunnel/API] 📊 重置稳定性检测 (旧URL: {old_stable_url})")
             
             if tunnel_process and tunnel_process.poll() is None:
@@ -7447,29 +7555,53 @@ if __name__ == '__main__':
                     'stable_confirmed': stable_url == tunnel_url and stable_url_confirm_count >= stable_url_min_confirms
                 })
 
-            result = auto_start_tunnel(force_restart=True)
+            result = auto_start_tunnel(force_restart=False)
+            if result['success'] and result.get('url'):
+                new_url = result.get('url')
+                _min_confirms_api = globals().get('stable_url_min_confirms', 3)
+                response_data = {
+                    'success': True,
+                    'url': new_url,
+                    'message': f'复用已有可用隧道地址 ({_min_confirms_api}次连续验证)',
+                    'status': 'verifying',
+                    'verify_progress': {
+                        'current': 0,
+                        'required': stable_url_min_confirms,
+                        'estimated_time_seconds': stable_url_min_confirms * 60
+                    },
+                    'next_notification': '等待稳定性确认后自动发送邮件通知'
+                }
+                print(f"[Tunnel/API] ✅ 复用可用隧道: {new_url}")
+                sys.stdout.flush()
+                return jsonify(response_data)
+
+            if not result.get('url'):
+                print(f"[Tunnel/API] ⚠️ 正常模式未获取到URL，启用备用：强制重启...")
+                sys.stdout.flush()
+                result = auto_start_tunnel(force_restart=True)
+
             if result['success']:
                 new_url = result.get('url')
                 _min_confirms_api = globals().get('stable_url_min_confirms', 3)
                 response_data = {
                     'success': True,
                     'url': new_url,
-                    'message': f'隧道已启动，正在验证稳定性 ({_min_confirms_api}次连续验证)',
+                    'message': f'备用方案：强制重启隧道，正在验证稳定性 ({_min_confirms_api}次连续验证)',
                     'status': 'verifying',
                     'verify_progress': {
                         'current': 0,
                         'required': stable_url_min_confirms,
-                        'estimated_time_seconds': stable_url_min_confirms * 60  # 每次心跳约60秒
+                        'estimated_time_seconds': stable_url_min_confirms * 60
                     },
                     'next_notification': '等待稳定性确认后自动发送邮件通知'
                 }
                 
                 if new_url:
-                    print(f"[Tunnel/API] ✅ 隧道启动成功: {new_url}")
+                    print(f"[Tunnel/API] ✅ 备用方案启动成功: {new_url}")
                     print(f"[Tunnel/API] ⏳ 进入稳定性验证模式 (需要{_min_confirms_api}次通过)")
                     print(f"[Tunnel/API] 📧 邮件将在验证通过后自动发送")
                 else:
-                    print(f"[Tunnel/API] ⚠️ 隧道启动成功但URL未就绪")
+                    print(f"[Tunnel/API] ⚠️ 隧道进程已启动但URL未就绪")
                     response_data['message'] = '隧道进程已启动，等待获取公网地址...'
                     response_data['status'] = 'waiting_for_url'
                 
@@ -7585,30 +7717,18 @@ if __name__ == '__main__':
             
             # 从 tunnel_url.txt 获取最新公网地址（权威源）
             web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
-            url_valid = False
             
             # 检测是否有 hostc 进程在运行
             process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
             
-            # 验证 URL 是否可用（5秒超时，更稳定的检测）
-            if web_url:
-                try:
-                    if verify_url(web_url, timeout=5):
-                        url_valid = True
-                    else:
-                        # URL不可用，延迟触发自动重启（避免过于敏感）
-                        if time.time() - last_url_invalid_log_time > 30:
-                            print(f"[Tunnel] 检测到URL不可用: {web_url}")
-                            last_url_invalid_log_time = time.time()
-                        tunnel_need_restart = True
-                except Exception as e:
-                    if time.time() - last_url_invalid_log_time > 10:
-                        print(f"[Tunnel] 验证URL失败: {e}")
-                        last_url_invalid_log_time = time.time()
-                    tunnel_need_restart = True
+            # 判断隧道是否在运行：有进程且有URL即认为运行中
+            # URL可用性验证由心跳机制负责，不在状态API中做（避免单次验证失败误判）
+            is_running = process_running and web_url is not None
             
-            # 判断隧道是否在运行
-            is_running = process_running and url_valid
+            # URL可用性状态：优先用心跳机制的稳定性检测结果
+            url_valid = (stable_url == web_url and 
+                        stable_url_confirm_count >= stable_url_min_confirms and 
+                        web_url is not None)
             
             # 计算稳定性验证状态
             stable_confirmed = (stable_url == web_url and 
