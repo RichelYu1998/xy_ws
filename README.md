@@ -89,8 +89,6 @@ auto_start_tunnel() 启动新隧道
     ↓
 新URL → 同步写入 web_output.log
     ↓
-📧 发送 restarted 邮件通知
-    ↓
 心跳检测确认稳定性（连续3次验证通过）
     ↓
 📧 发送 stable_available 邮件通知
@@ -109,7 +107,6 @@ auto_start_tunnel() 启动新隧道
 | 事件类型 | 标题 | 颜色 | 触发条件 |
 |---------|------|------|---------|
 | `unavailable` | 🚨 公网地址不可用 | 红色渐变 | URL连续验证失败10次 |
-| `restarted` | 🔄 隧道已重启 | 蓝色渐变 | 隧道重启成功获取新URL |
 | `stable_available` | ✅ 公网地址已稳定可用 | 紫色渐变 | 连续3次验证通过 |
 | `available` | ✅ 公网地址可用 | 紫色渐变 | URL从不可用恢复 |
 | `new` | ✅ 新公网地址 | 紫色渐变 | 首次获取到URL |
@@ -123,6 +120,27 @@ auto_start_tunnel() 启动新隧道
 - 新公网地址
 - 当前状态：✅ 隧道重启成功
 - 数据同步：新地址已写入 tunnel_url.txt 和 web_output.log
+
+---
+
+#### 🚀 auto_start_tunnel 不阻塞启动
+
+**修复前问题**:
+```
+auto_start_tunnel() 在 app.run() 之前调用
+  → verify_url() 公网验证 → 最多等30秒
+  → 或 while循环等URL → 最多等30秒
+  → app.run() 被阻塞，Web服务无法启动
+```
+
+**修复后**:
+```
+auto_start_tunnel() 在 app.run() 之前调用
+  → hostc在跑+有URL → 直接返回（0秒）
+  → hostc在跑+没URL → 直接返回（0秒，URL由心跳处理）
+  → app.run() 立即启动
+  → 心跳循环后台验证公网+发邮件
+```
 
 ---
 
