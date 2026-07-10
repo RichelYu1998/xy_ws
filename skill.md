@@ -2304,19 +2304,42 @@ finally:
         safe_execute_func(lambda: os.remove(temp_file), context='清理临时Excel文件')
 ```
 
-2. **Python侧temp目录自动清理**（不再仅依赖 run.sh/run.bat）：
-```python
-# 启动时检查
-temp_dir = os.path.join(PROJECT_DIR, 'temp')
-if os.path.isdir(temp_dir):
-    temp_size = sum(os.path.getsize(os.path.join(temp_dir, f))
-                    for f in os.listdir(temp_dir)
-                    if os.path.isfile(os.path.join(temp_dir, f)))
-    if temp_size > 3 * 1024 * 1024:  # 3MB
-        # 清理所有文件
-        ...
+2. **三端temp目录自动清理**（run.sh + run.bat + main.py 一致）：
 
-# 后台守护线程（每1分钟检查一次，超过3MB立即清理）
+**启动时检查（三端一致，阈值3MB）**：
+```bash
+# run.sh
+TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
+LIMIT_SIZE_KB=3072
+if [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
+    rm -rf temp/*
+fi
+
+# run.bat
+call :get_dir_size temp
+set "LIMIT_SIZE=3145728"
+if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
+    del /f /s /q temp\*.* >nul 2>&1
+)
+```
+
+```python
+# main.py
+temp_size = sum(os.path.getsize(os.path.join(temp_dir, f))
+                for f in os.listdir(temp_dir)
+                if os.path.isfile(os.path.join(temp_dir, f)))
+if temp_size > 3 * 1024 * 1024:  # 3MB
+    # 清理所有文件
+```
+
+**后台定期清理（三端一致，每1分钟）**：
+```bash
+# run.sh: sleep 60 → 检查 → 超过3MB清理
+# run.bat: CHECK_INTERVAL=60 → 检查 → 超过3MB清理
+```
+
+```python
+# main.py: time.sleep(60) → 检查 → 超过3MB清理
 def temp_cleanup_loop():
     while True:
         time.sleep(60)
@@ -2326,7 +2349,7 @@ def temp_cleanup_loop():
 **关键规则**：
 - ✅ 临时文件创建必须用 `try/finally` 确保清理，禁止用 `ExceptionContext`
 - ✅ 重试循环中每轮开始前清理上一轮残留的临时文件
-- ✅ Python侧独立实现 temp 目录清理，不依赖启动脚本
+- ✅ 三端（run.sh + run.bat + main.py）独立实现 temp 目录清理，阈值3MB，间隔1分钟
 - ✅ 后台守护线程每1分钟检查一次，超过3MB自动清理
 - ❌ 禁止在 `with ExceptionContext` 块内创建临时文件而在块外清理
 

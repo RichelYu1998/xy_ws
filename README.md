@@ -54,25 +54,27 @@ temp/ 目录清理仅依赖 run.sh/run.bat 启动脚本
   → 直接 python main.py 启动时无清理机制
   → 运行期间 temp 文件不断累积
   → 544个临时文件 × 72KB = 39MB 磁盘浪费
-  → run.sh 后台清理每60秒检查，但仅 run.sh 启动时有效
+  → run.sh/run.bat 后台清理每60秒检查，但仅启动脚本启动时有效
 ```
 
-**修复后**:
+**修复后（三端一致：run.sh + run.bat + main.py）**:
 ```
-main.py Web服务启动时:
-  → 检查 temp/ 目录大小
-  → 超过3MB → 清理所有文件 + 打印日志
-  → 未超过 → 跳过 + 打印日志
+启动时检查（三端一致）:
+  → run.sh: du -sk temp > 3072KB → rm -rf temp/*
+  → run.bat: dir size > 3145728B → del /f /s /q temp\*.*
+  → main.py: temp_size > 3MB → os.remove()
 
-后台守护线程（每1分钟）:
-  → 检查 temp/ 目录大小
-  → 超过3MB → 清理所有文件 + 打印日志
-  → 无论通过 run.sh 还是 python main.py 启动都有效
+后台定期清理（三端一致，每1分钟）:
+  → run.sh: sleep 60 → 检查 → 超过3MB清理
+  → run.bat: CHECK_INTERVAL=60 → 检查 → 超过3MB清理
+  → main.py: time.sleep(60) → 检查 → 超过3MB清理
+  → 无论通过哪种方式启动都有效
 ```
 
 **关键修改**:
 - `main.py`: Web服务启动时新增 temp 目录大小检查和清理
 - `main.py`: 新增 `temp_cleanup_loop()` 后台守护线程（每1分钟检查一次，超过3MB立即清理）
+- `run.sh` / `run.bat`: 后台清理间隔已为60秒，与Python侧一致
 
 ---
 
