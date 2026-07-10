@@ -604,7 +604,7 @@ run_web() {
 
     WEB_PORT="${WEB_PORT:-8888}"
     log "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ==="
-    "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" >> "$LOG_FILE" 2>&1 < /dev/null &
+    "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
     PYTHON_PID=$!
 
     log "等待 Web 服务启动完成..."

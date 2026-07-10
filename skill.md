@@ -1,4 +1,4 @@
-﻿﻿# 项目代码规范与范式 (Skill)
+﻿﻿﻿# 项目代码规范与范式 (Skill)
 
 > 本文档基于 xy_ws 项目提炼，可作为同类 Python + Flask + 原生JS 全栈项目的二开模版。
 
@@ -6641,7 +6641,7 @@ run_web() {
     source "$VENV_PATH/bin/activate"
     
     WEB_PORT="${WEB_PORT:-8888}"
-    "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" >> "$LOG_FILE" 2>&1 &
+    "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" &
     PYTHON_PID=$!
     
     # 等待Web服务启动
@@ -7042,7 +7042,7 @@ call :log [*] 隧道服务已在脚本启动时启动
 set "WEB_PORT=8888"
 if defined WEB_PORT set "WEB_PORT=%WEB_PORT%"
 
-"!VENV_PATH!\Scripts\python.exe" main.py --web --port "!WEB_PORT!" >> "!LOG_FILE!" 2>&1
+"!VENV_PATH!\Scripts\python.exe" main.py --web --port "!WEB_PORT!"
 set "LOG_FILE="
 
 call :log_console_only Web 服务已就绪，正在启动隧道...
@@ -7276,6 +7276,7 @@ fi
 - Flask 启动后自动启动隧道
 - **CDN 轮询安装**: 首次运行时 `run.bat`/`run.sh` 自动测速选最快 CDN 安装 hostc
 - **非阻塞启动（v3.8.23）**: `auto_start_tunnel(force_restart=False)` 零等待，URL验证和邮件通知交由心跳机制后台完成
+- **tunnel_url.txt 先写后读架构（v3.8.24）**: `run.bat`/`run.sh` 启动 hostc 时直接将输出写入 `tunnel_url.txt`（先写），`main.py` 的 `get_public_url_from_web_log()` 从 `tunnel_url.txt` 读取（后读）
 
 ### 6.1.0 非阻塞启动规范（v3.8.23 新增）
 
@@ -7312,9 +7313,38 @@ auto_start_tunnel(force_restart=False)
 - ❌ 禁止在 `force_restart=False` 时 `read_thread.join(timeout=10)`（阻塞10秒）
 - ✅ 所有验证和邮件通知由 `heartbeat_loop()` 后台完成
 
-### 6.1.1 权威数据源规范（v3.8.18 新增）
+### 6.1.1 权威数据源规范（v3.8.18 新增，v3.8.24 更新）
 
 **核心原则**：`tunnel_url.txt` 是公网地址的唯一权威源，`web_output.log` 为镜像。
+
+**先写后读架构（v3.8.24 明确）**:
+```
+┌─────────────────────────────────────────────────────┐
+│  先写（run.bat / run.sh）                            │
+│                                                     │
+│  run.bat:                                           │
+│    echo. > "file\tunnel_url.txt"                    │
+│    start /b cmd /c "hostc 8888                      │
+│      >> file\tunnel_url.txt 2>&1"                   │
+│                                                     │
+│  run.sh:                                            │
+│    echo -n > "file/tunnel_url.txt"                  │
+│    hostc 8888 >> file/tunnel_url.txt 2>&1 &         │
+│                                                     │
+│  → hostc 输出（含 Public URL）直接写入 tunnel_url.txt │
+│  → hostc 在后台慢慢启动，不阻塞 Web 服务              │
+└──────────────────────┬──────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────────┐
+│  后读（main.py）                                     │
+│                                                     │
+│  get_public_url_from_web_log()                      │
+│    → 优先从 tunnel_url.txt 读取（权威源）             │
+│    → 正则匹配: Public URL: https://xxx.hostc.dev    │
+│    → 备用: 匹配 https://xxx.hostc.dev               │
+│    → 备用源: web_output.log（仅 tunnel_url.txt 无效）│
+└─────────────────────────────────────────────────────┘
+```
 
 **数据流向**:
 ```
@@ -7373,7 +7403,14 @@ def get_public_url_from_web_log(skip_validation=False, quiet=False):
     - ❌ `open(web_output_file, 'w')` → 与 bat 追加写入锁冲突 `[Errno 13] Permission denied`
     - ✅ `open(web_output_file, 'a')` → 追加模式，保留shell脚本日志 + Python日志无缝衔接
     - ✅ `setup_web_logging()` 智能头部判断：文件已有内容则跳过Python头部，避免重复
-- Python 子进程输出追加到同一日志文件（`>> "!LOG_FILE!" 2>&1`）
+- **web_output.log 写入独占规范（v3.8.24 新增）**:
+  - `run.bat`/`run.sh` 启动 Python 时**不再重定向输出到 `web_output.log`**
+  - ❌ `python main.py >> web_output.log 2>&1` → 与 TeeOutput 冲突 `[Errno 13] Permission denied`
+  - ✅ `python main.py` → 输出到控制台，由 `main.py` TeeOutput 独占写入 `web_output.log`
+  - **写入职责分离**:
+    - `run.bat` `:log` 函数：Python 启动前写入（环境检测、镜像测速等）
+    - `main.py` TeeOutput：Python 启动后独占写入（Flask 日志、隧道状态等）
+    - 切换点：`set "LOG_FILE="`（BAT）/ `LOG_FILE=""`（SH）
 - ✅ `tunnel_url.txt` 保持覆盖模式（`>`），只保留最新公网地址
 - ❌ 写入配置文件的 echo 不走日志（如 pip.ini/pip.conf 的 echo 重定向）
 
