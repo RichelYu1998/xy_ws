@@ -7132,28 +7132,32 @@ if __name__ == '__main__':
         def auto_start_tunnel(force_restart=False):
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
 
-            # 检查是否有 hostc 进程在运行
             has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
             
-            # 从 tunnel_url.txt 检查是否有有效公网地址（权威源）
             web_url = PathManager.get_public_url_from_web_log(skip_validation=True)
-            
-            # 如果有 hostc 进程在运行且 tunnel_url.txt 有有效 URL，复用现有隧道
+
+            def verify_local_server(port, timeout=3):
+                try:
+                    req = urllib.request.Request(f'http://localhost:{port}/', method='HEAD')
+                    req.add_header('User-Agent', 'hostc-local-verify/1.0')
+                    urllib.request.urlopen(req, timeout=timeout)
+                    return True
+                except Exception:
+                    return False
+
             if has_hostc_process and web_url and not force_restart:
-                if verify_url(web_url):
-                    print(f"[Tunnel] ✅ 复用已有隧道（由run.bat管理）: {web_url}")
+                if verify_local_server(args.port):
+                    print(f"[Tunnel] ✅ 本地服务正常 + tunnel_url.txt有URL，直接复用: {web_url}")
                     sys.stdout.flush()
                     tunnel_url = web_url
                     old_tunnel_url = web_url
                     return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
 
-            # 如果hostc进程已存在，等待URL就绪（不再重复启动）
             if has_hostc_process and not force_restart:
                 if web_url:
-                    print(f"[Tunnel] 🔍 检测到hostc已在运行，URL已获取但尚未就绪: {web_url}")
-                    print(f"[Tunnel] ⏳ 等待URL变为可访问...")
+                    print(f"[Tunnel] 🔍 hostc在运行，URL: {web_url}，等待本地服务启动...")
                 else:
-                    print(f"[Tunnel] 🔍 检测到hostc已在运行（由run.bat启动），等待URL生成...")
+                    print(f"[Tunnel] 🔍 hostc在运行，等待URL生成...")
                 sys.stdout.flush()
 
                 max_wait = 30
@@ -7163,20 +7167,20 @@ if __name__ == '__main__':
                     wait_count += 1
 
                     current_url = PathManager.get_public_url_from_web_log(skip_validation=True)
-                    if current_url and verify_url(current_url):
-                        print(f"[Tunnel] ✅ URL已就绪: {current_url} (耗时{wait_count}秒)")
+                    if current_url and verify_local_server(args.port):
+                        print(f"[Tunnel] ✅ 本地服务已启动 + URL: {current_url} (耗时{wait_count}秒)")
                         sys.stdout.flush()
                         tunnel_url = current_url
                         old_tunnel_url = current_url
                         return {'success': True, 'url': tunnel_url, 'message': f'获取外部hostc的URL，耗时{wait_count}秒'}
 
                     if wait_count % 5 == 0:
-                        print(f"[Tunnel] ⏳ 等待URL就绪中... ({wait_count}/{max_wait}秒)")
+                        print(f"[Tunnel] ⏳ 等待本地服务启动... ({wait_count}/{max_wait}秒)")
                         sys.stdout.flush()
 
-                print(f"[Tunnel] ⚠️ 等待{max_wait}秒后URL仍未就绪")
+                print(f"[Tunnel] ⚠️ 等待{max_wait}秒后本地服务仍未启动")
                 sys.stdout.flush()
-                return {'success': False, 'url': None, 'error': f'等待{max_wait}秒后hostc URL仍未可访问'}
+                return {'success': False, 'url': None, 'error': f'等待{max_wait}秒后本地服务仍未启动'}
             
             try:
                 port = args.port
@@ -7270,15 +7274,13 @@ if __name__ == '__main__':
                                         url_ready = True
                                         tunnel_consecutive_failures = 0
                                         old_tunnel_url = file_url
-                                        
-                                        print(f"[Tunnel] 🔍 验证URL可用性: {tunnel_url}")
-                                        if verify_url(tunnel_url, timeout=5, verbose=True):
-                                            print(f"[Tunnel] ✅ URL验证通过，立即发送邮件通知...")
-                                            send_tunnel_notification(tunnel_url, 'new', force_send=True)
+
+                                        if verify_local_server(port):
+                                            print(f"[Tunnel] ✅ 本地服务正常，URL已就绪: {tunnel_url}")
+                                            print(f"[Tunnel] 📧 公网验证将由心跳机制完成，通过后自动发邮件")
                                         else:
-                                            print(f"[Tunnel] ⚠️ URL验证未通过，稍后重试发送邮件")
-                                            
-                                        print(f"[Tunnel] URL已就绪")
+                                            print(f"[Tunnel] ⚠️ 本地服务未响应，URL已记录: {tunnel_url}")
+
                                         sys.stdout.flush()
                                         return
                                 
@@ -7441,8 +7443,7 @@ if __name__ == '__main__':
                             consecutive_restart_attempts = 0
                             tunnel_restart_count = 0
                             print(f"[Tunnel] 隧道重启成功! 新公网地址: {new_url}")
-                            print(f"[Tunnel] 📧 发送隧道重启成功邮件通知...")
-                            send_tunnel_notification(new_url, 'restarted', force_send=True)
+                            print(f"[Tunnel] 📧 公网验证将由心跳机制完成，通过后自动发邮件")
                             sys.stdout.flush()
                         else:
                             print(f"[Tunnel] 隧道启动成功但URL未就绪，继续等待...")
