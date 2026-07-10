@@ -631,24 +631,36 @@ if defined FASTEST_PIP_MIRROR (
 )
 
 if exist requirements.txt (
-    call :log 正在安装Python依赖...
-    set "PIP_INSTALL_OK=0"
-    if defined FASTEST_PIP_MIRROR (
-        "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check -i "!FASTEST_PIP_MIRROR!"
-        if errorlevel 1 (
-            call :log WARNING: 使用镜像源安装失败，尝试默认源...
+    call :log [*] 检查Python依赖是否需要安装...
+    set "NEED_PIP_INSTALL=1"
+    "!VENV_PATH!\Scripts\python.exe" main.py --check-deps >nul 2>&1
+    if not errorlevel 1 (
+        call :log [*] 所有Python依赖已满足，跳过安装
+        set "NEED_PIP_INSTALL=0"
+    ) else (
+        call :log [*] 检测到缺失或版本不满足的依赖，开始安装...
+        set "NEED_PIP_INSTALL=1"
+    )
+
+    if "!NEED_PIP_INSTALL!"=="1" (
+        set "PIP_INSTALL_OK=0"
+        if defined FASTEST_PIP_MIRROR (
+            "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check -i "!FASTEST_PIP_MIRROR!"
+            if errorlevel 1 (
+                call :log WARNING: 使用镜像源安装失败，尝试默认源...
+                "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check
+                if errorlevel 1 set "PIP_INSTALL_OK=1"
+            )
+        ) else (
             "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check
             if errorlevel 1 set "PIP_INSTALL_OK=1"
         )
-    ) else (
-        "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check
-        if errorlevel 1 set "PIP_INSTALL_OK=1"
-    )
 
-    if "!PIP_INSTALL_OK!"=="1" (
-        call :log ERROR: 依赖安装完全失败
-        pause
-        exit /b 1
+        if "!PIP_INSTALL_OK!"=="1" (
+            call :log ERROR: 依赖安装完全失败
+            pause
+            exit /b 1
+        )
     )
 
     call :log [*] 安装Playwright浏览器...

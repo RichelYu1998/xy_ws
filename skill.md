@@ -960,7 +960,7 @@ cd /d "%~dp0"
 
 ```
 [Step 0] Pre-start hostc tunnel (background parallel) -> [1/6] Python 环境检测 → [2/6] Node.js/NVM 检测 → [3/6] PIP 镜像源测速
-→ [4/6] NPM 镜像源测速 → [5/6] 虚拟环境管理 → [6/6] 依赖安装
+→ [4/6] NPM 镜像源测速 → [5/6] 虚拟环境管理 → [6/6] 依赖安装（智能跳过：main.py --check-deps）
 ```
 
 #### Python 环境检测 + 全自动安装（跨平台）
@@ -5179,6 +5179,15 @@ def update_cookie():
 #### 2.15.6 镜像安装函数
 
 ```python
+def check_deps_satisfied(requirements_file="requirements.txt"):
+    """检查requirements.txt依赖是否已满足（v3.8.25新增）
+    - 使用 importlib.metadata 快速检测已安装包版本
+    - 无需 packaging 模块，使用 ver_tuple() 纯数字比较
+    - 全部满足 → exit 0（跳过 pip install）
+    - 有缺失/版本不足 → exit 1（触发 pip install）
+    - 启动加速：~20秒 → <0.1秒
+    """
+
 def select_pip_mirror(venv_path: str):
     """pip镜像智能测速+写入配置
     - 测试5个镜像源（阿里云/清华/腾讯云/中科大/豆瓣）
@@ -5207,6 +5216,7 @@ parser.add_argument('--url', '-l', help='目标店铺URL')
 parser.add_argument('--excel', '-e', help='Excel文件路径')
 parser.add_argument('--task', type=int, choices=[1,2,3,4,6], help='直接执行指定任务后退出')
 parser.add_argument('--install-playwright', action='store_true', help='Playwright CDN智能测速+安装浏览器')
+parser.add_argument('--check-deps', action='store_true', help='检查requirements.txt依赖是否已满足')
 parser.add_argument('--select-pip-mirror', action='store_true', help='pip镜像智能测速并写入配置')
 ```
 
@@ -5914,6 +5924,70 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.25 (2026-07-10) - ⚡ pip依赖安装智能跳过   ← 标题2：最新版本
+
+- **⚡ pip依赖安装智能跳过** - 启动时先检测`requirements.txt`中所有包是否已安装且版本满足，全部满足则跳过`pip install`，耗时从~20秒降至<0.1秒
+- **🆕 main.py --check-deps** - 新增`check_deps_satisfied()`函数，使用`importlib.metadata`快速检测，无需`packaging`模块
+- **🔄 run.bat / run.sh 同步优化** - 启动脚本先调用`main.py --check-deps`，满足则跳过安装
+
+---                                       ← 分隔符
+
+#### ⚡ pip依赖安装智能跳过（详细技术文档）
+
+##### 问题现象
+```
+[6/6] 设置Python虚拟环境并安装依赖...
+正在安装Python依赖...
+        ↓
+⚠️ 卡住约20秒！所有包实际已安装！
+        ↓
+[*] 安装Playwright浏览器...
+```
+
+##### 根本原因：无条件pip install
+```python
+# ❌ 旧代码 (v3.8.24)
+# run.bat / run.sh 每次启动都执行：
+pip install -r requirements.txt
+# → 即使所有包已安装，pip仍要：
+#   1. 连接镜像源下载索引
+#   2. 解析5个直接依赖 + 20+个间接依赖的版本约束
+#   3. 逐一比对已安装版本
+# → 耗时 ~20秒
+```
+
+##### 修复方案：智能检测 + 条件安装
+```python
+# ✅ 新代码 (v3.8.25)
+# main.py 新增 check_deps_satisfied() 函数
+def check_deps_satisfied(requirements_file="requirements.txt"):
+    import importlib.metadata as im
+
+    def ver_tuple(v):
+        return tuple(int(x) for x in re.split(r'[.\-]', v) if x.isdigit())
+
+    # 解析 requirements.txt
+    # → 用 importlib.metadata.version() 检测已安装版本
+    # → 用 ver_tuple() 比较版本号
+    # → 全部满足 → sys.exit(0)
+    # → 有缺失/不足 → sys.exit(1)
+
+# run.bat 先检测再安装
+"!VENV_PATH!\Scripts\python.exe" main.py --check-deps >nul 2>&1
+if errorlevel 1 (
+    pip install -r requirements.txt ...
+)
+```
+
+##### 预期效果对比
+| 场景 | 优化前 | 优化后 |
+|------|--------|--------|
+| 依赖已满足 | ~20秒（pip解析） | <0.1秒（跳过） |
+| 有缺失依赖 | ~20秒 | ~20秒（正常安装） |
+| 首次安装 | ~20秒 | ~20秒（正常安装） |
+
+---
+
 ### v3.8.14 (2026-07-08) - 🔒 致命死锁修复   ← 标题2：最新版本
 
 - **🚨 致命死锁修复** - 邮件发送线程完全死锁问题彻底解决
@@ -6604,10 +6678,13 @@ EOF
         export PIP_CONFIG_FILE="$VENV_PATH/pip_config/pip.conf"
     fi
     
-    # 安装依赖
+    # 安装依赖（智能跳过）
     if [ -f "requirements.txt" ]; then
-        pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --disable-pip-version-check || \
-        pip install -r requirements.txt --disable-pip-version-check
+        "$VENV_PATH/bin/python" main.py --check-deps > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --disable-pip-version-check || \
+            pip install -r requirements.txt --disable-pip-version-check
+        fi
         
         "$VENV_PATH/bin/python" main.py --install-playwright
     fi
@@ -7007,8 +7084,11 @@ if defined FASTEST_PIP_MIRROR (
 )
 
 if exist requirements.txt (
-    "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check -i "!FASTEST_PIP_MIRROR!" || ^
-    "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check
+    "!VENV_PATH!\Scripts\python.exe" main.py --check-deps >nul 2>&1
+    if errorlevel 1 (
+        "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check -i "!FASTEST_PIP_MIRROR!" || ^
+        "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check
+    )
     
     "!VENV_PATH!\Scripts\python.exe" main.py --install-playwright
 )

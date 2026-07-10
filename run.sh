@@ -511,28 +511,40 @@ EOF
     fi
 
     if [ -f "requirements.txt" ]; then
-        log "正在安装Python依赖..."
-        PIP_INSTALL_OK=0
-        
-        if [ -n "$FASTEST_PIP_MIRROR" ]; then
-            pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --disable-pip-version-check
-            if [ $? -ne 0 ]; then
-                log "WARNING: 使用镜像源安装失败，尝试默认源..."
+        log "[*] 检查Python依赖是否需要安装..."
+        NEED_PIP_INSTALL=1
+        "$VENV_PATH/bin/python" main.py --check-deps > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            log "[*] 所有Python依赖已满足，跳过安装"
+            NEED_PIP_INSTALL=0
+        else
+            log "[*] 检测到缺失或版本不满足的依赖，开始安装..."
+            NEED_PIP_INSTALL=1
+        fi
+
+        if [ "$NEED_PIP_INSTALL" -eq 1 ]; then
+            PIP_INSTALL_OK=0
+            
+            if [ -n "$FASTEST_PIP_MIRROR" ]; then
+                pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --disable-pip-version-check
+                if [ $? -ne 0 ]; then
+                    log "WARNING: 使用镜像源安装失败，尝试默认源..."
+                    pip install -r requirements.txt --disable-pip-version-check
+                    if [ $? -ne 0 ]; then
+                        PIP_INSTALL_OK=1
+                    fi
+                fi
+            else
                 pip install -r requirements.txt --disable-pip-version-check
                 if [ $? -ne 0 ]; then
                     PIP_INSTALL_OK=1
                 fi
             fi
-        else
-            pip install -r requirements.txt --disable-pip-version-check
-            if [ $? -ne 0 ]; then
-                PIP_INSTALL_OK=1
-            fi
-        fi
 
-        if [ "$PIP_INSTALL_OK" -ne 0 ]; then
-            log "ERROR: 依赖安装完全失败"
-            exit 1
+            if [ "$PIP_INSTALL_OK" -ne 0 ]; then
+                log "ERROR: 依赖安装完全失败"
+                exit 1
+            fi
         fi
 
         log "[*] 安装Playwright浏览器..."
