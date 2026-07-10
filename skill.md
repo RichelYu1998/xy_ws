@@ -5924,59 +5924,60 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
-### v3.8.26 (2026-07-10) - 🔧 隧道旧URL复用Bug修复   ← 标题2：最新版本
+### v3.8.27 (2026-07-10) - 🔧 隧道重启死循环修复   ← 标题2：最新版本
 
-- **🔧 隧道旧URL复用Bug修复** - `auto_start_tunnel()` 发现旧URL时增加hostc进程存活检测，hostc已退出则清除旧URL并启动新隧道
-- **🛡️ tunnel_url.txt 过期清理** - hostc进程不在运行时自动清除`tunnel_url.txt`中的过期URL
+- **🔧 隧道重启死循环修复** - `restart_tunnel()` 中 `tunnel_need_restart` 执行重启后立即重置为 False，防止无限重启循环
+- **⏳ hostc启动后等待URL** - hostc运行中但URL未就绪时，等待120秒让URL出现，而非立即重启杀掉刚启动的hostc
 
 ---                                       ← 分隔符
 
-#### 🔧 隧道旧URL复用Bug修复（详细技术文档）
+#### 🔧 隧道重启死循环修复（详细技术文档）
 
 ##### 问题现象
 ```
-auto_start_tunnel(force_restart=False)
-  → 从 tunnel_url.txt 读到旧URL: https://t-zqvd2budzq.hostc.dev
-  → 直接返回"发现已有URL，后台验证中"
-  → 但 hostc 进程已经挂了！旧URL是死地址！
-  → 后台验证永远失败：502 Bad Gateway / SSL handshake timed out
-  → 永远不会启动新隧道获取新地址
+restart_tunnel() 循环:
+  → tunnel_need_restart=True → 杀hostc → 启动新hostc → auto_start_tunnel()返回
+  → continue → 下一轮循环
+  → tunnel_need_restart 还是 True！（从未重置）
+  → 立即重启 → 杀掉刚启动的hostc → 又启动新的 → 又重启...
+  → 第42次、43次、44次... 无限循环！
 ```
 
-##### 根本原因：缺少进程存活检测
+##### 根本原因：tunnel_need_restart 从不重置
 ```python
-# ❌ 旧代码 (v3.8.25)
-if web_url:  # 只要有URL就复用，不管hostc是否还在运行
-    tunnel_url = web_url
-    return {'success': True, 'url': tunnel_url}
+# ❌ 旧代码 (v3.8.26)
+if tunnel_need_restart:
+    # ... 杀进程、启动新hostc ...
+    continue  # tunnel_need_restart 还是 True → 死循环！
 ```
 
-##### 修复方案：URL + 进程双重检测
+##### 修复1：重启后立即重置 tunnel_need_restart
 ```python
-# ✅ 新代码 (v3.8.26)
-if web_url and has_hostc_process:  # URL存在 且 hostc进程在运行 → 才复用
-    tunnel_url = web_url
-    return {'success': True, 'url': tunnel_url}
-
-if web_url and not has_hostc_process:  # URL存在 但 hostc已死 → 清除旧URL，启动新隧道
-    print(f"[Tunnel] ⚠️ 发现旧URL {web_url} 但 hostc 进程已不在运行，旧地址已失效")
-    # 清除 tunnel_url.txt 中的过期URL
-    with open(tunnel_file, 'w') as f:
-        f.write('')
-    # 不 return，继续往下走到启动新隧道的逻辑
+# ✅ 新代码 (v3.8.27)
+if tunnel_need_restart:
+    tunnel_need_restart = False  # 立即重置，防止死循环
+    # ... 杀进程、启动新hostc ...
+    continue
 ```
 
-##### 场景覆盖
-| 场景 | web_url | has_hostc_process | 修改前行为 | 修改后行为 |
-|------|---------|-------------------|-----------|-----------|
-| 正常运行 | ✅ | ✅ | 复用URL ✅ | 复用URL ✅ |
-| hostc挂了但URL残留 | ✅ | ❌ | 复用死URL ❌ | 清除+启动新隧道 ✅ |
-| hostc在跑但无URL | ❌ | ✅ | 等待URL ✅ | 等待URL ✅ |
-| 全新启动 | ❌ | ❌ | 启动新隧道 ✅ | 启动新隧道 ✅ |
+##### 修复2：hostc运行中但URL未就绪时等待而非重启
+```python
+# ❌ 旧逻辑：hostc在跑但没URL → 30秒后重启 → 杀掉刚启动的hostc
+# ✅ 新逻辑：hostc在跑但没URL → 等待120秒让URL出现
+if has_hostc_process and not is_url_valid:
+    if restart_wait_start is None:
+        restart_wait_start = time.time()
+    elapsed_waiting_url = time.time() - restart_wait_start
+    if elapsed_waiting_url < 120:
+        time.sleep(3)
+        continue
+    else:
+        # 超过120秒仍无URL，才触发重启
+```
 
 ---
 
-### v3.8.25 (2026-07-10) - ⚡ pip依赖安装智能跳过   ← 标题2：版本
+### v3.8.26 (2026-07-10) - 🔧 隧道旧URL复用Bug修复   ← 标题2：版本
 #   3. 逐一比对已安装版本
 # → 耗时 ~20秒
 ```
@@ -7405,8 +7406,9 @@ fi
 - **非阻塞启动（v3.8.23）**: `auto_start_tunnel(force_restart=False)` 零等待，URL验证和邮件通知交由心跳机制后台完成
 - **tunnel_url.txt 先写后读架构（v3.8.24）**: `run.bat`/`run.sh` 启动 hostc 时直接将输出写入 `tunnel_url.txt`（先写），`main.py` 的 `get_public_url_from_web_log()` 从 `tunnel_url.txt` 读取（后读）
 - **旧URL过期检测（v3.8.26）**: `auto_start_tunnel()` 发现旧URL时检查hostc进程是否存活，已退出则清除`tunnel_url.txt`并启动新隧道，避免复用死地址
+- **重启死循环修复（v3.8.27）**: `restart_tunnel()` 执行重启后立即重置`tunnel_need_restart=False`；hostc运行中但URL未就绪时等待120秒而非重启
 
-### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.26 更新）
+### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.27 更新）
 
 **核心原则**：`auto_start_tunnel()` 在 `app.run()` 之前调用，必须零阻塞，确保 Flask 5秒内启动。邮件通知通过后台线程即时发送。
 
@@ -7416,22 +7418,29 @@ fi
 |------|--------------|------|---------|---------|
 | 启动时(有URL且hostc在跑) | False | 后台验证+发邮件，立即返回 | 0秒 | 后台~10秒内 |
 | 启动时(有URL但hostc已死) | False | 清除旧URL→启动新hostc，立即返回 | 0秒 | read_output()获取URL后 |
-| 启动时(hostc在跑无URL) | False | 后台等URL+验证+发邮件，立即返回 | 0秒 | 后台URL出现后~10秒 |
+| 启动时(hostc在跑无URL) | False | 等待URL出现(最多120秒)，不重启 | 0秒 | URL出现后~10秒 |
 | 启动时(需启动) | False | 后台启动hostc，立即返回 | 0秒 | read_output()获取URL后 |
 | 手动触发 | True | 杀旧进程→启动新hostc→等待URL(最多10秒) | ≤10秒 | read_output()获取URL后 |
 
-**启动流程（v3.8.26 旧URL检测增强）**:
+**启动流程（v3.8.27 死循环修复+等待URL）**:
 ```
 auto_start_tunnel(force_restart=False)
   → 有URL 且 hostc在运行 → 启动后台线程 _verify_and_notify_found_url → 立即返回（0秒）
     → 后台线程: verify_url() → 通过 → send_tunnel_notification() → ~10秒内发邮件
-  → 有URL 但 hostc已退出（v3.8.26 新增）→ 清除 tunnel_url.txt → 继续往下启动新hostc
+  → 有URL 但 hostc已退出（v3.8.26）→ 清除 tunnel_url.txt → 继续往下启动新hostc
     → read_output() 获取新URL → verify_url() → 发邮件
-  → hostc在运行但无URL → 启动后台线程 _wait_and_notify_hostc_url → 立即返回（0秒）
-    → 后台线程: 每2秒检查tunnel_url.txt → 发现URL → verify_url() → 发邮件
+  → hostc在运行但无URL（v3.8.27）→ 等待最多120秒让URL出现，不重启
+    → URL出现 → verify_url() → 发邮件
+    → 超过120秒仍无URL → 触发重启
   → 需启动新hostc → 后台启动后立即返回（0秒）
     → read_output() 获取URL → verify_url() → 发邮件
   → app.run() 立即启动
+
+restart_tunnel() 循环（v3.8.27 死循环修复）:
+  → hostc运行 + URL有效 → 一切正常，继续
+  → hostc运行 + URL无效 → 等待120秒让URL出现，不重启（v3.8.27 新增）
+  → tunnel_need_restart=True → 执行重启 → 立即重置 tunnel_need_restart=False（v3.8.27 修复）
+  → hostc未运行 + 无URL → 等待30秒后重启
 ```
 
 **API防误重启（v3.8.23 新增）**:
@@ -8179,6 +8188,13 @@ pypandoc.convert_file(
 - **位置**：`main.py` `auto_start_tunnel()` 函数
 - **问题**：`tunnel_url.txt` 有旧URL但hostc进程已退出时，仍复用死地址，导致502/SSL超时
 - **修复**：增加 `has_hostc_process` 检测，hostc已退出则清除旧URL并启动新隧道
+
+**5. 隧道重启死循环** ✅ v3.8.27 已修复
+- **位置**：`main.py` `restart_tunnel()` 函数
+- **问题1**：`tunnel_need_restart` 执行重启后从未重置为 False，导致无限重启循环（第42次+）
+- **修复1**：重启后立即 `tunnel_need_restart = False`
+- **问题2**：hostc刚启动但URL未就绪时，代码视为"异常"触发重启，杀掉刚启动的hostc
+- **修复2**：`has_hostc_process=True` 且 `is_url_valid=False` 时，等待120秒让URL出现，不重启
 
 ### 10.2 核心修改详情（跨平台实现）
 

@@ -1,6 +1,6 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.26
+> **版本**: v3.8.27
 > **更新日期**: 2026-07-10
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,55 @@
 ---
 
 ## 最新更新
+
+### v3.8.27 (2026-07-10) - 🔧 隧道重启死循环修复 + hostc启动等待URL
+
+#### 🎯 核心改进
+- **🔧 隧道重启死循环修复** - `restart_tunnel()` 中 `tunnel_need_restart` 执行重启后立即重置为 False，防止无限重启循环
+- **⏳ hostc启动后等待URL** - hostc运行中但URL未就绪时，等待120秒让URL出现，而非立即重启杀掉刚启动的hostc
+
+---
+
+#### 🔧 隧道重启死循环修复
+
+**问题描述**:
+```
+restart_tunnel() 循环:
+  → tunnel_need_restart=True → 杀hostc → 启动新hostc → auto_start_tunnel()返回
+  → continue → 下一轮循环
+  → tunnel_need_restart 还是 True！（从未重置）
+  → 立即重启 → 杀掉刚启动的hostc → 又启动新的 → 又重启...
+  → 第42次、43次、44次... 无限循环！
+```
+
+**修复1：重启后立即重置 tunnel_need_restart**:
+```python
+# ❌ 旧代码
+if tunnel_need_restart:
+    # ... 杀进程、启动新hostc ...
+    continue  # tunnel_need_restart 还是 True → 死循环！
+
+# ✅ 新代码
+if tunnel_need_restart:
+    tunnel_need_restart = False  # 立即重置，防止死循环
+    # ... 杀进程、启动新hostc ...
+    continue
+```
+
+**修复2：hostc运行中但URL未就绪时等待而非重启**:
+```python
+# ❌ 旧逻辑：hostc在跑但没URL → 30秒后重启 → 杀掉刚启动的hostc
+# ✅ 新逻辑：hostc在跑但没URL → 等待120秒让URL出现
+if has_hostc_process and not is_url_valid:
+    # 等待最多120秒，每3秒检查一次
+    if elapsed < 120:
+        time.sleep(3)
+        continue
+    else:
+        # 超过120秒仍无URL，才触发重启
+```
+
+---
 
 ### v3.8.26 (2026-07-10) - 🔧 隧道旧URL复用Bug修复 + hostc进程存活检测
 
