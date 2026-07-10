@@ -1,4 +1,4 @@
-﻿import json
+﻿﻿import json
 import time
 import asyncio
 import os
@@ -7140,92 +7140,22 @@ if __name__ == '__main__':
                 sys.stdout.flush()
             else:
                 has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
-                web_url = PathManager.get_public_url_from_web_log(skip_validation=True)
+                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
 
                 if web_url:
-                    url_ok = False
-                    try:
-                        url_ok = verify_url(web_url, timeout=10)
-                    except:
-                        pass
-                    if url_ok:
-                        print(f"[Tunnel] ✅ 公网地址可用，直接复用: {web_url}")
-                        sys.stdout.flush()
-                        tunnel_url = web_url
-                        old_tunnel_url = web_url
-                        send_tunnel_notification(web_url, 'available', force_send=True)
-                        return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
-                    else:
-                        if has_hostc_process:
-                            print(f"[Tunnel] ⚠️ 公网地址不可用但hostc在运行，等待新URL...")
-                            sys.stdout.flush()
-                            wait_start = time.time()
-                            while time.time() - wait_start < 15:
-                                time.sleep(2)
-                                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
-                                if web_url:
-                                    try:
-                                        if verify_url(web_url, timeout=10):
-                                            print(f"[Tunnel] ✅ 等到可用URL: {web_url}")
-                                            sys.stdout.flush()
-                                            tunnel_url = web_url
-                                            old_tunnel_url = web_url
-                                            send_tunnel_notification(web_url, 'available', force_send=True)
-                                            return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
-                                    except:
-                                        pass
-                                if not Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc'):
-                                    print(f"[Tunnel] ⚠️ hostc进程已退出，需要重新启动")
-                                    sys.stdout.flush()
-                                    break
-                        print(f"[Tunnel] ❌ 公网地址不可用，需要重启隧道")
-                        sys.stdout.flush()
-                else:
-                    if has_hostc_process:
-                        print(f"[Tunnel] 🔍 hostc在运行，等待URL就绪...")
-                        sys.stdout.flush()
-                        wait_start = time.time()
-                        while time.time() - wait_start < 30:
-                            web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
-                            if web_url:
-                                print(f"[Tunnel] ✅ 获取到URL: {web_url}")
-                                url_ok_wait = False
-                                try:
-                                    url_ok_wait = verify_url(web_url, timeout=10)
-                                except:
-                                    pass
-                                if url_ok_wait:
-                                    send_tunnel_notification(web_url, 'available', force_send=True)
-                                sys.stdout.flush()
-                                tunnel_url = web_url
-                                old_tunnel_url = web_url
-                                return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
-                            if not Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc'):
-                                print(f"[Tunnel] ⚠️ hostc进程已退出，需要重新启动")
-                                sys.stdout.flush()
-                                break
-                            time.sleep(1)
-                        web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
-                        if web_url:
-                            tunnel_url = web_url
-                            old_tunnel_url = web_url
-                            print(f"[Tunnel] ✅ 复用已有隧道: {web_url}")
-                            url_ok_timeout = False
-                            try:
-                                url_ok_timeout = verify_url(web_url, timeout=10)
-                            except:
-                                pass
-                            if url_ok_timeout:
-                                send_tunnel_notification(web_url, 'available', force_send=True)
-                            else:
-                                print(f"[Tunnel] ⏳ URL暂不可用，将由心跳机制验证后发送邮件")
-                            sys.stdout.flush()
-                            return {'success': True, 'url': tunnel_url, 'message': f'复用已有隧道，URL: {tunnel_url}'}
-                        print(f"[Tunnel] ⏳ 等待超时，URL将由心跳机制获取和验证")
-                        sys.stdout.flush()
-                        return {'success': True, 'url': None, 'message': 'hostc在运行，URL由心跳机制处理'}
-                    print(f"[Tunnel] 🔍 无hostc进程且无URL，需要启动新隧道")
+                    tunnel_url = web_url
+                    old_tunnel_url = web_url
+                    print(f"[Tunnel] ✅ 发现公网地址: {web_url}，验证将由心跳机制完成")
                     sys.stdout.flush()
+                    return {'success': True, 'url': tunnel_url, 'message': f'发现已有URL: {tunnel_url}，验证将由心跳机制完成'}
+
+                if has_hostc_process:
+                    print(f"[Tunnel] 🔍 hostc在运行，URL将由心跳机制获取和验证")
+                    sys.stdout.flush()
+                    return {'success': True, 'url': None, 'message': 'hostc在运行，URL由心跳机制获取'}
+
+                print(f"[Tunnel] 🔍 无hostc进程且无URL，需要启动新隧道")
+                sys.stdout.flush()
             
             try:
                 port = args.port
@@ -7261,8 +7191,11 @@ if __name__ == '__main__':
                     Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
                     time.sleep(1)
 
+                hostc_bin = os.path.join(PROJECT_DIR, 'dist', 'node_modules', '.bin', 'hostc.cmd' if Environment.IS_WINDOWS else 'hostc')
+                if not os.path.isfile(hostc_bin):
+                    hostc_bin = 'npx hostc'
                 tunnel_process = subprocess.Popen(
-                    f'npx hostc@latest {port} --local-host localhost',
+                    f'{hostc_bin} {port} --local-host localhost',
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL,
@@ -7354,15 +7287,17 @@ if __name__ == '__main__':
                 read_thread = threading.Thread(target=read_output, daemon=True)
                 read_thread.start()
                 
-                # 等待 read_output 线程完成（获取到 URL 或超时，10秒快速获取）
-                read_thread.join(timeout=10)
-                
-                if tunnel_url:
-                    print(f"[Tunnel] 隧道启动成功: {tunnel_url}")
-                    return {'success': True, 'url': tunnel_url, 'message': f'隧道已启动，URL: {tunnel_url}'}
+                if force_restart:
+                    read_thread.join(timeout=10)
+                    if tunnel_url:
+                        print(f"[Tunnel] 隧道启动成功: {tunnel_url}")
+                        return {'success': True, 'url': tunnel_url, 'message': f'隧道已启动，URL: {tunnel_url}'}
+                    else:
+                        print(f"[Tunnel] 启动超时，未获取到URL，将由心跳机制继续获取")
+                        return {'success': True, 'url': None, 'message': '隧道已启动，URL由心跳机制获取'}
                 else:
-                    print(f"[Tunnel] 启动超时，未获取到URL")
-                    return {'success': False, 'url': None, 'error': '启动超时，未获取到URL'}
+                    print(f"[Tunnel] 🚀 hostc已启动，URL将由心跳机制获取和验证")
+                    return {'success': True, 'url': None, 'message': 'hostc已启动，URL由心跳机制获取'}
             except Exception as e:
                 return {'success': False, 'error': str(e)}
         

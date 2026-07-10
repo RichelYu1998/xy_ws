@@ -60,9 +60,28 @@ sleep 1
 log "[*] 残留进程清理完成"
 
 log_blank
+log "[*] 检查 hostc 隧道工具..."
+HOSTC_BIN="$(pwd)/dist/node_modules/.bin/hostc"
+if [ ! -f "$HOSTC_BIN" ]; then
+    log "[*] 本地未找到 hostc，开始安装..."
+    install_hostc
+    if [ ! -f "$HOSTC_BIN" ]; then
+        log "[WARNING] hostc 安装失败，隧道将不可用"
+    fi
+fi
+if [ -f "$HOSTC_BIN" ]; then
+    HOSTC_VER=$("$HOSTC_BIN" --version 2>/dev/null || echo "unknown")
+    log "[*] hostc v${HOSTC_VER} 已就绪"
+fi
+
+log_blank
 log "[*] 启动 hostc 隧道（后台运行，不阻塞）..."
 echo -n > "file/tunnel_url.txt"
-npx -y hostc@latest 8888 --local-host localhost >> file/tunnel_url.txt 2>&1 < /dev/null &
+if [ -f "$HOSTC_BIN" ]; then
+    "$HOSTC_BIN" 8888 --local-host localhost >> file/tunnel_url.txt 2>&1 < /dev/null &
+else
+    npx -y hostc@latest 8888 --local-host localhost >> file/tunnel_url.txt 2>&1 < /dev/null &
+fi
 log "[*] hostc 已在后台启动，将在后续步骤中获取URL"
 
 log_blank
@@ -336,6 +355,52 @@ test_pip_mirrors() {
     else
         log "[WARNING] 所有镜像测试失败，使用默认PyPI源"
         FASTEST_PIP_MIRROR="https://pypi.org/simple/"
+    fi
+}
+
+install_hostc() {
+    log "[*] CDN轮询安装 hostc..."
+
+    declare -a HOSTC_MIRRORS=(
+        "https://registry.npmmirror.com|npmmirror淘宝"
+        "https://registry.npmjs.org|官方源"
+    )
+
+    HOSTC_MIN_TIME=9999
+    HOSTC_BEST_MIRROR=""
+    HOSTC_BEST_NAME=""
+
+    for hostc_mirror_entry in "${HOSTC_MIRRORS[@]}"; do
+        IFS='|' read -r H_URL H_NAME <<< "$hostc_mirror_entry"
+        log "    测试 $H_NAME..."
+
+        H_TIME=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 "$H_URL" 2>/dev/null)
+
+        if [ -z "$H_TIME" ] || [ "$H_TIME" = "0.000" ] || [ "$H_TIME" = "0" ]; then
+            log "        $H_NAME: 超时/失败"
+        else
+            H_INT_TIME=$(echo "$H_TIME" | awk '{printf "%d", $1 * 1000}')
+            log "        $H_NAME: ${H_TIME}秒 [${H_INT_TIME}ms]"
+            if [ "$H_INT_TIME" -lt "$HOSTC_MIN_TIME" ] 2>/dev/null; then
+                HOSTC_MIN_TIME=$H_INT_TIME
+                HOSTC_BEST_MIRROR="$H_URL"
+                HOSTC_BEST_NAME="$H_NAME"
+            fi
+        fi
+    done
+
+    if [ -z "$HOSTC_BEST_MIRROR" ]; then
+        log "[WARNING] 所有CDN均不可用，尝试默认源安装..."
+        HOSTC_BEST_MIRROR="https://registry.npmmirror.com"
+        HOSTC_BEST_NAME="npmmirror淘宝(fallback)"
+    fi
+
+    log "[*] 使用 $HOSTC_BEST_NAME 安装 hostc..."
+    npm install hostc@latest --registry "$HOSTC_BEST_MIRROR" --prefix dist 2>/dev/null
+    if [ $? -ne 0 ]; then
+        log "[ERROR] hostc 安装失败"
+    else
+        log "[*] hostc 安装成功"
     fi
 }
 

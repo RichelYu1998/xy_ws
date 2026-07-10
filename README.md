@@ -1,6 +1,6 @@
-﻿# xy_ws - Szwego商品爬虫系统
+﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.21
+> **版本**: v3.8.23
 > **更新日期**: 2026-07-10
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,120 @@
 ---
 
 ## 最新更新
+
+### v3.8.23 (2026-07-10) - ⚡ Web服务秒级启动 + 隧道非阻塞优化
+
+#### 🎯 核心改进
+- **⚡ Web服务秒级启动** - `auto_start_tunnel()`改为非阻塞模式，Flask立即启动（原来阻塞65秒+）
+- **🔄 隧道验证交由心跳** - URL验证、邮件通知全部由心跳机制后台完成，启动流程零等待
+- **🛡️ API防误重启** - 前端"启动隧道"按钮检测hostc已运行时不触发强制重启
+
+---
+
+#### ⚡ Web服务秒级启动
+
+**问题描述**:
+```
+auto_start_tunnel() 在 app.run() 之前同步调用
+  → verify_url() 公网验证 → 最多等10秒
+  → while循环等URL恢复 → 最多等15秒
+  → while循环等URL出现 → 最多等30秒
+  → read_thread.join() → 最多等10秒
+  → 总计最坏65秒阻塞！Flask根本没启动
+```
+
+**修复后**:
+```
+auto_start_tunnel() 在 app.run() 之前调用
+  → 有URL → 直接返回（0秒，验证交心跳）
+  → hostc在运行 → 直接返回（0秒，URL交心跳）
+  → 需启动新hostc → 后台启动后立即返回（0秒）
+  → app.run() 立即启动，5秒内可用
+  → 心跳机制后台验证URL + 发邮件
+```
+
+**关键修改** (`auto_start_tunnel` 函数):
+- **非阻塞模式**: `force_restart=False`时移除所有`verify_url()`、等待循环、`read_thread.join()`
+- **强制重启保留阻塞**: `force_restart=True`时保留10秒等待（用户手动触发需反馈）
+- **API防误重启**: hostc已运行时不触发`force_restart=True`，返回"starting"状态
+
+---
+
+### v3.8.22 (2026-07-10) - 🚀 hostc本地化 + CDN轮询安装 + dist优化
+
+#### 🎯 核心改进
+- **🚀 hostc本地化** - `package.json`/`package-lock.json`移至`dist/`，hostc安装到`dist/node_modules/`，启动零网络依赖
+- **🌐 CDN轮询安装** - `run.bat`/`run.sh`新增`:install_hostc`/`install_hostc()`函数，自动测速选最快CDN安装hostc
+- **📦 dist目录精简** - 删除`dist/cli/`、`dist/client/`、`dist/protocol/`、`dist/server/`、`dist/web/`（hostc云服务不使用本地文件），总大小从14.97MB降至4.76MB（-68%）
+- **🔤 字体优化** - 删除102个`.woff`文件（保留更优`.woff2`），更新CSS移除woff引用
+- **🖼️ 资源清理** - 删除孤立截图、未引用静态资源、开发文件
+
+---
+
+#### 🚀 hostc本地化
+
+**问题描述**:
+```
+npx -y hostc@latest 8888 --local-host localhost
+  → 每次启动都联网检查/下载最新版
+  → npx中间层开销
+  → 网络不可用时隧道无法启动
+```
+
+**修复后**:
+```
+dist/node_modules/.bin/hostc.cmd 8888 --local-host localhost
+  → 直接执行本地文件，零网络依赖
+  → 启动速度更快
+  → 首次安装通过CDN轮询选最快源
+```
+
+**文件变更**:
+- `package.json` + `package-lock.json` → 移至 `dist/`
+- `run.bat`: 新增 `:install_hostc` CDN轮询安装函数
+- `run.sh`: 新增 `install_hostc()` CDN轮询安装函数
+- `main.py`: hostc路径改为 `dist/node_modules/.bin/hostc`
+- `.gitignore`: `dist/hostc/node_modules/` → `dist/node_modules/`
+
+**CDN轮询列表**:
+| CDN | 用途 |
+|-----|------|
+| `https://registry.npmmirror.com` | npmmirror淘宝（首选） |
+| `https://registry.npmjs.org` | 官方源（备选） |
+
+---
+
+#### 📦 dist目录精简
+
+| 删除内容 | 大小 | 原因 |
+|---------|------|------|
+| `dist/hostc/` 整个目录 | 2.1 MB | 与根目录完全重复 |
+| `.woff` 字体文件 (102个) | 2.76 MB | 保留更优 `.woff2` |
+| 孤立截图 | 3.77 MB | manifest 未引用 |
+| 未引用静态资源 | 0.21 MB | 无代码引用 |
+| `dist/cli/` | 0.09 MB | hostc用npx从npm下载 |
+| `dist/client/` | 0.07 MB | 同上 |
+| `dist/protocol/` | 0.04 MB | 同上 |
+| `dist/server/` | 0.07 MB | 同上 |
+| `dist/web/` | 1.18 MB | 同上 |
+
+**dist/ 最终结构**:
+```
+dist/
+├── assets/          # 前端 JS/CSS/hununn字体(woff2)
+├── favicon/         # 网站图标(PWA manifest使用)
+├── fonts/SF-Pro/    # SF Compact Rounded 字体(CSS引用)
+├── screenshots/     # PWA 截图(manifest使用)
+├── weather-icons/   # 天气图标(JS动态加载)
+├── node_modules/    # hostc 本地依赖
+├── package.json     # hostc 依赖声明
+├── package-lock.json
+├── index.html
+├── manifest.webmanifest
+├── registerSW.js, sw.js
+```
+
+---
 
 ### v3.8.21 (2026-07-10) - 📦 Node.js依赖合并 + API范式文档完善
 

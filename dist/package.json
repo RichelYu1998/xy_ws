@@ -1,0 +1,9 @@
+{
+  "name": "xy_ws-dist",
+  "version": "1.0.0",
+  "description": "xy_ws dist dependencies (hostc tunnel)",
+  "private": true,
+  "dependencies": {
+    "hostc": "^1.3.0"
+  }
+}
