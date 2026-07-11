@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.32
+> **版本**: v3.8.33
 > **更新日期**: 2026-07-11
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,41 @@
 ---
 
 ## 最新更新
+
+### v3.8.33 (2026-07-11) - 🔧 hostc CDN镜像源修正 + bat/sh镜像列表统一
+
+#### 🎯 核心改进
+- **🔧 华为云镜像地址修正** - `run.bat` 中 hostc CDN 列表的"华为云"条目实际指向 npmmirror（复制粘贴错误），已修正为真正的华为云镜像 `https://repo.huaweicloud.com/repository/npm/`
+- **🔄 bat/sh 镜像列表统一** - `run.sh` 的 hostc CDN 列表补充华为云镜像，与 `run.bat` 保持完全一致（3个镜像：npmmirror淘宝 → 华为云 → 官方源）
+
+#### 🔧 华为云镜像地址修正
+
+**问题描述**:
+```
+run.bat install_hostc 中:
+  HOSTC_MIRRORS[0]=https://registry.npmmirror.com|npmmirror淘宝
+  HOSTC_MIRRORS[1]=https://registry.npmmirror.com|华为云    ← URL和第1个完全一样！
+  HOSTC_MIRRORS[2]=https://registry.npmjs.org|官方源
+
+"华为云"名字配了 npmmirror 的地址，等于重复测试同一个源
+```
+
+**修复后**:
+```
+run.bat:
+  HOSTC_MIRRORS[0]=https://registry.npmmirror.com|npmmirror淘宝
+  HOSTC_MIRRORS[1]=https://repo.huaweicloud.com/repository/npm/|华为云  ← 真正的华为云
+  HOSTC_MIRRORS[2]=https://registry.npmjs.org|官方源
+
+run.sh:
+  HOSTC_MIRRORS=(
+      "https://registry.npmmirror.com|npmmirror淘宝"
+      "https://repo.huaweicloud.com/repository/npm/|华为云"  ← 新增，与bat一致
+      "https://registry.npmjs.org|官方源"
+  )
+```
+
+---
 
 ### v3.8.32 (2026-07-11) - 🛡️ 隧道守护二次验证 + 指数退避 + 心跳阈值优化
 

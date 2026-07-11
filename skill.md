@@ -1243,6 +1243,7 @@ elapsed = time.time() - start
 | 镜像名称 | URL | 特点 |
 |----------|-----|------|
 | npmmirror淘宝 | `https://registry.npmmirror.com` | 国内同步快 |
+| 华为云 | `https://repo.huaweicloud.com/repository/npm/` | 国内CDN |
 | 官方源 | `https://registry.npmjs.org` | 全球 CDN |
 
 #### 配置文件生成
@@ -3559,7 +3560,7 @@ D:/ws/xy_ws/dist/
 **关键发现**:
 - **hostc CLI** 通过 `dist/node_modules/.bin/hostc` 本地运行，不再依赖 `npx`
 - **hostc 是云服务**: 本地只安装 CLI 客户端，服务端运行在 Cloudflare Workers 上
-- **CDN 轮询安装**: `run.bat` 的 `:install_hostc` 和 `run.sh` 的 `install_hostc()` 函数负责首次安装
+- **CDN 轮询安装**: `run.bat` 的 `:install_hostc` 和 `run.sh` 的 `install_hostc()` 函数负责首次安装，测速3个CDN（npmmirror淘宝、华为云、官方源）
 - **fallback**: 本地 hostc 不存在时回退到 `npx hostc`
 
 ---
@@ -6023,6 +6024,13 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.33 (2026-07-11) - 🔧 hostc CDN镜像源修正 + bat/sh镜像列表统一
+
+- **🔧 华为云镜像地址修正** - `run.bat` 中 hostc CDN 列表的"华为云"条目实际指向 npmmirror（复制粘贴错误），已修正为真正的华为云镜像 `https://repo.huaweicloud.com/repository/npm/`
+- **🔄 bat/sh 镜像列表统一** - `run.sh` 的 hostc CDN 列表补充华为云镜像，与 `run.bat` 保持完全一致（3个镜像：npmmirror淘宝 → 华为云 → 官方源）
+
+---
+
 ### v3.8.32 (2026-07-11) - 🛡️ 隧道守护二次验证 + 指数退避 + 心跳阈值优化
 
 - **🛡️ 隧道守护二次验证** - `restart_tunnel()` 保留 `verify_url()` 网络验证，但连续2次失败才触发重启，避免瞬时波动误判
@@ -6844,6 +6852,7 @@ test_npm_mirrors() {
     
     declare -a NPM_MIRRORS=(
         "https://registry.npmmirror.com|npmmirror淘宝"
+        "https://repo.huaweicloud.com/repository/npm/|华为云"
         "https://registry.npmjs.org|官方源"
     )
     
@@ -7235,7 +7244,8 @@ where npm >nul 2>&1
 if errorlevel 1 exit /b 0
 
 set "NPM_MIRRORS[0]=https://registry.npmmirror.com|npmmirror淘宝"
-set "NPM_MIRRORS[1]=https://registry.npmjs.org|官方源"
+set "NPM_MIRRORS[1]=https://repo.huaweicloud.com/repository/npm/|华为云"
+set "NPM_MIRRORS[2]=https://registry.npmjs.org|官方源"
 
 set "NPM_MIN_TIME=9999"
 set "NPM_BEST_MIRROR="
@@ -7596,7 +7606,7 @@ fi
 - 使用 `hostc` 隧道服务（本地安装 `dist/node_modules/.bin/hostc`，fallback `npx hostc`）
 - 公网地址写入 `file/tunnel_url.txt`（覆盖模式 `>`，只保留最新地址）
 - Flask 启动后自动启动隧道
-- **CDN 轮询安装**: 首次运行时 `run.bat`/`run.sh` 自动测速选最快 CDN 安装 hostc
+- **CDN 轮询安装**: 首次运行时 `run.bat`/`run.sh` 自动测速选最快 CDN 安装 hostc（3个CDN：npmmirror淘宝、华为云、官方源）
 - **非阻塞启动（v3.8.23）**: `auto_start_tunnel(force_restart=False)` 零等待，URL验证和邮件通知交由心跳机制后台完成
 - **tunnel_url.txt 先写后读架构（v3.8.24）**: `run.bat`/`run.sh` 启动 hostc 时直接将输出写入 `tunnel_url.txt`（先写），`main.py` 的 `get_public_url_from_web_log()` 从 `tunnel_url.txt` 读取（后读）
 - **旧URL过期检测（v3.8.26）**: `auto_start_tunnel()` 发现旧URL时检查hostc进程是否存活，已退出则清除`tunnel_url.txt`并启动新隧道，避免复用死地址
