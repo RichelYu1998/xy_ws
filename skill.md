@@ -104,6 +104,17 @@
   - [3.2 API 调用模式](#32-api-调用模式)
   - [3.3 Toast 提示（替代 alert）](#33-toast-提示替代-alert)
   - [3.4 响应式设计规范](#34-响应式设计规范)
+    - [3.4.0 移动端适配完整范式](#340-移动端适配完整范式)
+      - [3.4.0.1 导航栏固定（5个断点全覆盖）](#3401-导航栏固定5个断点全覆盖)
+      - [3.4.0.2 输出面板移动端适配](#3402-输出面板移动端适配)
+      - [3.4.0.3 商品详情弹窗移动端](#3403-商品详情弹窗移动端)
+      - [3.4.0.4 图片预览移动端](#3404-图片预览移动端)
+      - [3.4.0.5 SKU 标签移动端](#3405-sku-标签移动端)
+      - [3.4.0.6 对比统计卡片移动端](#3406-对比统计卡片移动端)
+      - [3.4.0.7 利润浮动面板移动端](#3407-利润浮动面板移动端)
+      - [3.4.0.8 Hero 区域移动端](#3408-hero-区域移动端)
+      - [3.4.0.9 设备检测 JavaScript](#3409-设备检测-javascript)
+      - [3.4.0.10 移动端适配速查表](#34010-移动端适配速查表)
   - [3.4.1 功能按钮统一样式规范](#341-功能按钮统一样式规范)
   - [3.4.2 停止按钮全局化规范](#342-停止按钮全局化规范)
     - [停止栏 UI](#停止栏-ui)
@@ -5631,7 +5642,238 @@ input, textarea, select { font-size: 16px; }
 
 /* 4. body 顶部留白 56px（导航栏高度） */
 body { padding-top: 56px; }
+
+/* 5. 触摸滚动优化 */
+.overflow-scroll { -webkit-overflow-scrolling: touch; }
 ```
+
+### 3.4.0 移动端适配完整范式
+
+#### 3.4.0.1 导航栏固定（5个断点全覆盖）
+
+所有断点下导航栏必须固定顶部，确保滚动时始终可见：
+
+```css
+/* 所有断点通用 */
+.navbar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 9999 !important;
+    min-height: 56px !important;
+}
+
+body { padding-top: 56px; }
+
+/* 超小屏手机 (<576px) - 导航栏紧凑 */
+@media (max-width: 575.98px) {
+    .navbar .container { padding: 0 10px; }
+    .navbar-brand { font-size: 14px !important; padding: 5px 0; }
+    .navbar-brand i { font-size: 16px; }
+    #current-time, #cookie-status { font-size: 10px !important; margin-right: 8px !important; }
+    .navbar-toggler { padding: 4px 8px; font-size: 14px; }
+    .navbar-toggler-icon { width: 20px; height: 20px; }
+}
+```
+
+#### 3.4.0.2 输出面板移动端适配
+
+移动端输出面板从固定定位改为相对定位，限制最大高度：
+
+```css
+@media (max-width: 575.98px) {
+    #output-panel {
+        position: relative;        /* 移动端不固定 */
+        width: 100%;
+        margin: 20px 0;
+        border-radius: 8px;
+        max-height: none;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        background: #fff;
+        overflow: visible;
+    }
+    #output-panel .output-content {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;   /* iOS 惯性滚动 */
+        position: relative;
+        z-index: 5;
+        max-height: 60vh;                    /* 限制可视高度 */
+        padding: 15px 10px;
+        font-size: 12px;
+        white-space: normal;
+        word-break: break-word;
+    }
+}
+```
+
+#### 3.4.0.3 商品详情弹窗移动端
+
+弹窗宽度自适应，关闭按钮触摸友好：
+
+```css
+@media (max-width: 575.98px) {
+    .modal-dialog { max-width: 95%; margin: 10px auto; }
+    #productModal { padding: 10px !important; }
+    #productModal > div {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 15px !important;
+        margin: 0 !important;
+        max-height: 85vh !important;
+    }
+    #productModal h3 { font-size: 18px !important; padding-right: 30px !important; }
+    #productModal button:first-child {
+        font-size: 28px !important;     /* 触摸友好关闭按钮 */
+        top: 8px !important;
+        right: 10px !important;
+    }
+    #productModal img, #productModal video {
+        width: 100px !important;
+        height: 100px !important;
+    }
+}
+```
+
+#### 3.4.0.4 图片预览移动端
+
+全屏预览 + 大号关闭按钮（触摸友好）：
+
+```css
+@media (max-width: 575.98px) {
+    #imagePreview { padding: 10px !important; }
+    #imagePreview img { max-width: 100% !important; max-height: 85vh !important; }
+    #imagePreview button {
+        top: 10px !important;
+        right: 10px !important;
+        font-size: 28px !important;     /* 触摸友好 */
+        width: 36px !important;
+        height: 36px !important;
+    }
+}
+```
+
+#### 3.4.0.5 SKU 标签移动端
+
+竖排布局 + 全宽标签：
+
+```css
+@media (max-width: 575.98px) {
+    .sku-container {
+        flex-direction: column !important;
+        align-items: center !important;
+    }
+    .sku-tag {
+        font-size: 11px !important;
+        padding: 4px 8px !important;
+        width: calc(100% - 20px) !important;
+        text-align: center !important;
+    }
+}
+```
+
+#### 3.4.0.6 对比统计卡片移动端
+
+2列网格 + 最后一个元素100%宽度：
+
+```css
+@media (max-width: 575.98px) {
+    .comparison-body .comparison-stats {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        margin: 10px 0 !important;
+    }
+    .comparison-body .comparison-stats .stat-item {
+        width: calc(50% - 4px) !important;
+        min-width: calc(50% - 4px) !important;
+        padding: 12px 10px !important;
+    }
+    .comparison-body .comparison-stats .stat-item:last-child {
+        width: 100% !important;         /* 最后一个占满整行 */
+        min-width: 100% !important;
+    }
+    .comparison-body .comparison-stats .stat-value {
+        font-size: 18px !important;
+        word-break: break-all !important;
+    }
+    .comparison-body .comparison-stats .stat-label {
+        font-size: 10px !important;
+        line-height: 1.3 !important;
+    }
+}
+```
+
+#### 3.4.0.7 利润浮动面板移动端
+
+面板宽度自适应屏幕：
+
+```css
+/* 超小屏手机 (<576px) */
+@media (max-width: 575.98px) {
+    .profit-fab-btn { right: 1rem; bottom: 4rem; width: 3rem; height: 3rem; font-size: 1rem; }
+    .profit-floating-panel { left: 5vw !important; right: 5vw !important; width: 90vw !important; max-width: 90vw !important; }
+}
+
+/* 小平板 (576px - 767px) */
+@media (min-width: 576px) and (max-width: 767.98px) {
+    .profit-fab-btn { right: 1.25rem; bottom: 4.5rem; }
+    .profit-floating-panel { left: 10vw !important; width: 80vw !important; max-width: 80vw !important; }
+}
+```
+
+#### 3.4.0.8 Hero 区域移动端
+
+```css
+@media (max-width: 575.98px) {
+    .hero-section { padding: 60px 0; margin-bottom: 30px; }
+    .hero-section h1 { font-size: 1.8rem; }
+    .hero-section .lead { font-size: 1rem; }
+}
+@media (min-width: 576px) and (max-width: 767.98px) {
+    .hero-section h1 { font-size: 2.2rem; }
+}
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .hero-section h1 { font-size: 2.5rem; }
+}
+@media (min-width: 992px) and (max-width: 1199.98px) {
+    .hero-section h1 { font-size: 2.8rem; }
+}
+```
+
+#### 3.4.0.9 设备检测 JavaScript
+
+```javascript
+function detectDevice() {
+    const width = window.innerWidth;
+    if (width < 576) return 'mobile';
+    if (width < 992) return 'tablet';
+    return 'desktop';
+}
+
+// mobile: 按钮全宽、字号放大、间距调整
+// tablet: 按钮半宽、适度缩放
+// desktop: 完整布局
+```
+
+#### 3.4.0.10 移动端适配速查表
+
+| 组件 | 手机 (<576px) | 平板 (576-991px) | 桌面 (≥992px) |
+|------|--------------|-----------------|--------------|
+| 导航栏 | 固定56px，紧凑字号 | 固定56px | 固定56px |
+| 按钮网格 | 4列居中，max-width:600px | 4列 | 8列 |
+| 输出面板 | 相对定位，max-height:60vh | 固定定位 | 固定定位 |
+| 商品弹窗 | max-width:100%，大号关闭按钮 | max-width:95% | 默认 |
+| 图片预览 | max-height:85vh，36px关闭按钮 | 默认 | 默认 |
+| SKU标签 | 竖排全宽 | 默认 | 默认 |
+| 统计卡片 | 2列+最后100% | 默认 | 默认 |
+| 利润面板 | 90vw | 80vw | 默认 |
+| Hero标题 | 1.8rem | 2.2-2.5rem | 2.8rem+ |
+| 触摸滚动 | `-webkit-overflow-scrolling:touch` | 可选 | 不需要 |
 
 ### 3.4.1 功能按钮统一样式规范
 
@@ -6023,6 +6265,13 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
+
+### v3.8.34 (2026-07-11) - 📱 移动端适配范式文档化
+
+- **📱 移动端适配完整范式写入 skill.md** - 新增 `3.4.0 移动端适配完整范式`，包含10个子章节：导航栏固定、输出面板、商品弹窗、图片预览、SKU标签、统计卡片、利润面板、Hero区域、设备检测JS、速查表
+- **📖 README.md 新增移动端适配规范章节** - 在"开发指南"下补充5断点说明 + 7条核心适配规则 + 设备检测代码
+
+---
 
 ### v3.8.33 (2026-07-11) - 🔧 hostc CDN镜像源修正 + bat/sh镜像列表统一
 
