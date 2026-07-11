@@ -7066,7 +7066,7 @@ if __name__ == '__main__':
             consecutive_failures = 0
             max_consecutive_failures = 5
             url_verify_failures = 0
-            max_url_verify_failures = 10
+            max_url_verify_failures = 3
             heartbeat_interval = 60
             last_log_time = 0
             grace_end_time = time.time() + 60
@@ -7443,10 +7443,9 @@ if __name__ == '__main__':
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay
             
             consecutive_restart_attempts = 0
-            max_consecutive_restarts = 3
-            restart_cooldown = 60
             restart_wait_start = None
             grace_period_end = None
+            verify_fail_count = 0
             
             def _do_restart(has_hostc_process, web_url, is_url_valid):
                 nonlocal restart_wait_start, grace_period_end, consecutive_restart_attempts
@@ -7455,7 +7454,14 @@ if __name__ == '__main__':
                 restart_wait_start = None
                 tunnel_need_restart = False
                 tunnel_restart_count += 1
-                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 立即执行重启 (第{tunnel_restart_count}次)")
+                
+                if consecutive_restart_attempts > 0:
+                    backoff = min(60 * (2 ** (consecutive_restart_attempts - 1)), 300)
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 连续重启失败{consecutive_restart_attempts}次，退避{backoff}秒后重试 (第{tunnel_restart_count}次)")
+                    time.sleep(backoff)
+                else:
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 🔄 立即执行重启 (第{tunnel_restart_count}次)")
+                
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
@@ -7495,11 +7501,6 @@ if __name__ == '__main__':
                     consecutive_restart_attempts += 1
                     print(f"[Tunnel] 重启失败: {e}")
                 
-                if consecutive_restart_attempts >= max_consecutive_restarts:
-                    print(f"[Tunnel] ❌ 连续重启失败{consecutive_restart_attempts}次，等待冷却...")
-                    time.sleep(restart_cooldown)
-                    consecutive_restart_attempts = 0
-                
                 grace_period_end = time.time() + 60
                 return True
             
@@ -7514,48 +7515,59 @@ if __name__ == '__main__':
                 web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
                 has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
                 
-                is_url_valid = False
-                if web_url:
-                    try:
-                        if verify_url(web_url):
-                            is_url_valid = True
-                    except:
-                        pass
-                
-                if has_hostc_process and is_url_valid:
-                    restart_wait_start = None
-                    tunnel_need_restart = False
-                    time.sleep(1)
-                    continue
-                
-                if tunnel_need_restart:
-                    if not _do_restart(has_hostc_process, web_url, is_url_valid):
+                if has_hostc_process and web_url:
+                    is_url_valid = False
+                    if web_url:
+                        try:
+                            is_url_valid = verify_url(web_url)
+                        except:
+                            pass
+                    
+                    if is_url_valid:
+                        verify_fail_count = 0
+                        restart_wait_start = None
+                        tunnel_need_restart = False
+                        time.sleep(1)
+                        continue
+                    
+                    verify_fail_count += 1
+                    if verify_fail_count < 2:
+                        time.sleep(5)
+                        continue
+                    
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ URL连续{verify_fail_count}次验证失败，触发重启")
+                    sys.stdout.flush()
+                    verify_fail_count = 0
+                    if not _do_restart(has_hostc_process, web_url, False):
                         break
                     continue
                 
-                if not has_hostc_process or not is_url_valid:
+                if tunnel_need_restart:
+                    if not _do_restart(has_hostc_process, web_url, False):
+                        break
+                    continue
+                
+                if not has_hostc_process:
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ❌ hostc进程已退出，立即重启")
+                    sys.stdout.flush()
+                    if not _do_restart(False, web_url, False):
+                        break
+                    continue
+                
+                if not web_url:
                     if restart_wait_start is None:
                         restart_wait_start = time.time()
-                        reason = "hostc运行中但URL未就绪" if has_hostc_process else "hostc进程未运行"
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ {reason}，开始计时等待...")
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - hostc进程: {'运行中' if has_hostc_process else '未运行'}")
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - 公网URL: {web_url if web_url else '无'}")
-                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
+                        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ hostc运行中但URL未就绪，等待...")
                         sys.stdout.flush()
                     
                     elapsed = now - restart_wait_start
-                    wait_threshold = 60
-                    
-                    if elapsed < wait_threshold:
-                        if int(elapsed) % 15 == 0 and int(elapsed) > 0:
-                            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ 等待中... ({int(elapsed)}/{wait_threshold}秒)")
-                            sys.stdout.flush()
+                    if elapsed < 30:
                         time.sleep(3)
                         continue
                     
-                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ 等待超过{wait_threshold}秒，触发重启")
+                    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ 等待超过30秒URL仍未就绪，触发重启")
                     sys.stdout.flush()
-                    if not _do_restart(has_hostc_process, web_url, is_url_valid):
+                    if not _do_restart(True, None, False):
                         break
         
         @app.route('/api/tunnel/start', methods=['POST'])
