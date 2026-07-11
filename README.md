@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.34
+> **版本**: v3.8.35
 > **更新日期**: 2026-07-11
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,26 @@
 ---
 
 ## 最新更新
+
+### v3.8.35 (2026-07-11) - 📝 核心范式文档补全（7项）
+
+#### 🎯 核心改进
+- **🔧 后端 Flask 路由范式补全** - skill.md 新增 `2.17 Flask 路由核心范式`（3个子章节）：首页版本注入+无缓存、静态资源gzip压缩、后台命令执行系统
+- **📱 前端交互范式补全** - skill.md 新增 `3.12 前端交互范式`（4个子章节）：下拉刷新、图片/视频预览+滑动切换、可拖拽浮动面板、剪贴板复制
+
+#### 📋 新增范式清单
+
+| 范式 | 章节 | 核心内容 |
+|------|------|---------|
+| 首页版本注入+无缓存 | 2.17.1 | `get_version_from_readme()` + 三重无缓存头 |
+| 静态资源gzip压缩 | 2.17.2 | `Accept-Encoding` 检测 + `compresslevel=6` + `Vary` 头 |
+| 后台命令执行系统 | 2.17.3 | `/run`→`/output`→`/input`→`/kill` 四端点协作 + 跨系统读取 |
+| 下拉刷新 | 3.12.1 | IIFE闭包 + 50px阈值 + 仅移动端启用 |
+| 图片/视频预览 | 3.12.2 | 触摸滑动50px + 键盘←→Esc + 视频自动检测 |
+| 可拖拽浮动面板 | 3.12.3 | 鼠标+触摸双支持 + 边界限制 + 设备自适应定位 |
+| 剪贴板复制 | 3.12.4 | Clipboard API + `execCommand` 回退 |
+
+---
 
 ### v3.8.34 (2026-07-11) - 📱 移动端适配范式文档化
 
@@ -2286,6 +2306,27 @@ function detectDevice() {
 ```
 
 **完整移动端适配范式请查看 [skill.md 3.4.0](skill.md#340-移动端适配完整范式)**
+
+### 🔧 Flask 路由核心范式
+
+| 范式 | 说明 | 关键规则 |
+|------|------|---------|
+| 首页版本注入 | `get_version_from_readme()` 动态注入版本号 | 三重无缓存头（Cache-Control+Pragma+Expires） |
+| 静态资源gzip | `/dist/<path>` 自动压缩文本资源 | 仅 `.js/.css/.html/.json/.svg`，compresslevel=6 |
+| 后台命令执行 | `/run`→`/output`→`/input`→`/kill` 四端点 | `stdin=DEVNULL`，Windows用sleep/readline，Unix用select |
+
+**完整路由范式请查看 [skill.md 2.17](skill.md#217-flask-路由核心范式)**
+
+### 🖱️ 前端交互范式
+
+| 范式 | 说明 | 关键规则 |
+|------|------|---------|
+| 下拉刷新 | IIFE闭包，仅移动端 `<576px` | 50px触发阈值，`scrollTop>0`不触发 |
+| 图片/视频预览 | 触摸滑动+键盘导航 | 滑动50px切换，Esc关闭，关闭时removeEventListener |
+| 可拖拽面板 | 鼠标+触摸双支持 | 边界限制，`transition:none`拖拽时禁用动画 |
+| 剪贴板复制 | Clipboard API + execCommand回退 | HTTPS用Clipboard API，HTTP自动回退 |
+
+**完整交互范式请查看 [skill.md 3.12](skill.md#312-前端交互范式)**
 
 ---
 

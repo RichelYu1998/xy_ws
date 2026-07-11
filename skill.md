@@ -99,6 +99,10 @@
     - [2.16.12 天气时钟（2个）](#21612-天气时钟2个)
     - [2.16.13 拖拽功能（3个，利润报表浮动面板）](#21613-拖拽功能3个利润报表浮动面板)
     - [2.16.14 表格渲染与联动（2个）](#21614-表格渲染与联动2个)
+  - [2.17 Flask 路由核心范式](#217-flask-路由核心范式)
+    - [2.17.1 首页版本注入 + 无缓存范式](#2171-首页版本注入--无缓存范式)
+    - [2.17.2 静态资源 gzip 压缩范式](#2172-静态资源-gzip-压缩范式)
+    - [2.17.3 后台命令执行系统范式](#2173-后台命令执行系统范式)
 - [三、前端规范](#三前端规范)
   - [3.1 技术栈](#31-技术栈)
   - [3.2 API 调用模式](#32-api-调用模式)
@@ -139,6 +143,11 @@
   - [3.9 动态展开行规范](#39-动态展开行规范)
   - [3.10 ECharts 图表与表格联动规范](#310-echarts-图表与表格联动规范)
   - [3.11 日期格式化规范](#311-日期格式化规范)
+  - [3.12 前端交互范式](#312-前端交互范式)
+    - [3.12.1 下拉刷新范式（移动端专属）](#3121-下拉刷新范式移动端专属)
+    - [3.12.2 图片/视频预览 + 滑动切换范式](#3122-图片视频预览--滑动切换范式)
+    - [3.12.3 可拖拽浮动面板范式](#3123-可拖拽浮动面板范式)
+    - [3.12.4 剪贴板复制范式](#3124-剪贴板复制范式)
 - [四、启动脚本规范](#四启动脚本规范)
   - [4.1 六步启动流程](#41-六步启动流程)
   - [4.2 关键差异对照](#42-关键差异对照)
@@ -5554,6 +5563,180 @@ function syncScroll(sourceContainer, sourceIndex) {
 }
 ```
 
+### 2.17 Flask 路由核心范式
+
+#### 2.17.1 首页版本注入 + 无缓存范式
+
+首页路由从 `README.md` 读取版本号注入 HTML，并设置无缓存头确保用户始终获取最新页面：
+
+```python
+@app.route('/')
+def index():
+    current_version = get_version_from_readme()
+    with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
+        content = f.read()
+    content = re.sub(r'版本:\s*[\d.]+', f'版本: {current_version}', content)
+    response = Response(content, mimetype='text/html')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+```
+
+**关键规则**：
+- 版本号唯一来源：`get_version_from_readme()`（从 README.md 解析）
+- 正则替换：`r'版本:\s*[\d.]+'` 匹配 HTML 中的版本占位符
+- 三重无缓存头：`Cache-Control` + `Pragma` + `Expires`，确保代理/CDN/浏览器均不缓存
+- ❌ 禁止硬编码版本号到 HTML，必须动态注入
+
+#### 2.17.2 静态资源 gzip 压缩范式
+
+`/dist/<path:filename>` 路由对文本类资源自动 gzip 压缩，非文本资源直传：
+
+```python
+@app.route('/dist/<path:filename>')
+def dist_files(filename):
+    file_path = os.path.join(PROJECT_DIR, 'dist', filename)
+    if not os.path.isfile(file_path):
+        return "File not found", 404
+
+    mimetype_map = {
+        '.js': 'application/javascript',
+        '.css': 'text/css',
+        '.html': 'text/html',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+    }
+    ext = os.path.splitext(filename)[1].lower()
+    mimetype = mimetype_map.get(ext, 'application/octet-stream')
+
+    accept_encoding = request.headers.get('Accept-Encoding', '')
+    gzip_enabled = 'gzip' in accept_encoding.lower()
+
+    GZIP_EXTENSIONS = ['.js', '.css', '.html', '.json', '.svg']
+    if gzip_enabled and ext in GZIP_EXTENSIONS:
+        with open(file_path, 'rb') as f:
+            content = f.read()
+        gzip_content = gzip.compress(content, compresslevel=6)
+        response = Response(gzip_content, mimetype=mimetype)
+        response.headers['Content-Encoding'] = 'gzip'
+        response.headers['Vary'] = 'Accept-Encoding'
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+        return response
+    else:
+        response = send_file(file_path, mimetype=mimetype)
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+        return response
+```
+
+**关键规则**：
+- 检测 `Accept-Encoding: gzip` 请求头判断客户端是否支持
+- 仅对文本类资源（`.js/.css/.html/.json/.svg`）启用 gzip，二进制资源直传
+- `compresslevel=6`：压缩率与CPU开销的平衡点
+- `Vary: Accept-Encoding`：防止 CDN 返回压缩版给不支持的客户端
+- 静态资源 `Cache-Control: public, max-age=86400`（1天缓存），与首页无缓存形成互补
+- ❌ 禁止对图片/字体/视频做 gzip（反而会增大体积）
+
+#### 2.17.3 后台命令执行系统范式
+
+四端点协作实现后台命令执行：`/run` → `/output` → `/input` → `/kill`
+
+```python
+tasks = {}       # {task_id: {command, status, output, returncode, error}}
+processes = {}   # {task_id: subprocess.Popen}
+
+@app.route('/run', methods=['POST'])
+def run_command():
+    data = request.get_json()
+    command = data.get('command', '')
+    if command.startswith('python '):
+        command = command.replace('python ', VENV_PYTHON + ' ', 1)
+    if command.startswith('python3 '):
+        command = command.replace('python3 ', VENV_PYTHON + ' ', 1)
+    task_id = str(uuid.uuid4())[:8]
+    tasks[task_id] = {'command': command, 'status': 'starting', 'output': '', 'returncode': None, 'error': None}
+    thread = threading.Thread(target=run_command_background, args=(task_id, command))
+    thread.start()
+    return jsonify({'success': True, 'task_id': task_id})
+
+@app.route('/output/<task_id>', methods=['GET'])
+def get_output(task_id):
+    task = tasks.get(task_id, {})
+    return jsonify({'output': task.get('output', ''), 'status': task.get('status'), 'returncode': task.get('returncode')})
+
+@app.route('/input', methods=['POST'])
+def send_input():
+    data = request.get_json()
+    task_id, user_input = data.get('task_id', ''), data.get('input', '')
+    if task_id not in processes:
+        return jsonify({'error': '没有正在运行的进程'}), 404
+    process = processes[task_id]
+    process.stdin.write(user_input + '\n')
+    process.stdin.flush()
+    return jsonify({'success': True, 'message': '输入已发送'})
+
+@app.route('/kill', methods=['POST'])
+def kill_task():
+    data = request.get_json()
+    task_id = data.get('task_id', '')
+    if task_id in processes:
+        process = processes[task_id]
+        process.terminate()
+        try: process.wait(timeout=3)
+        except subprocess.TimeoutExpired: process.kill()
+    return jsonify({'success': True, 'message': '进程已结束'})
+```
+
+**`run_command_background` 跨系统读取规范**：
+
+```python
+def run_command_background(task_id, command):
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+    process = subprocess.Popen(
+        command, shell=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,    # 避免 input() 导致 I/O error
+        cwd=PROJECT_DIR, text=True,
+        encoding='utf-8', errors='replace',
+        bufsize=1, env=env
+    )
+    processes[task_id] = process
+    stdout_lines = []
+    while True:
+        if process.poll() is not None:
+            remaining = process.stdout.read()
+            if remaining: stdout_lines.append(remaining)
+            break
+        if Environment.IS_WINDOWS:
+            time.sleep(0.1)
+            line = process.stdout.readline()
+            if line: stdout_lines.append(line)
+        else:
+            readable, _, _ = select.select([process.stdout], [], [], 0.1)
+            if readable:
+                line = process.stdout.readline()
+                if line: stdout_lines.append(line)
+        tasks[task_id]['output'] = ''.join(stdout_lines)
+    process.wait()
+    tasks[task_id]['returncode'] = process.returncode
+    tasks[task_id]['output'] = ''.join(stdout_lines)
+    tasks[task_id]['status'] = 'completed'
+```
+
+**关键规则**：
+- `python`/`python3` 命令自动替换为 `VENV_PYTHON`，确保使用虚拟环境
+- `stdin=subprocess.DEVNULL`：防止子进程 `input()` 调用导致 `Input/output error`
+- Windows 用 `time.sleep(0.1)` + `readline()`（不支持 `select`），Unix 用 `select` 非阻塞读取
+- `stderr=subprocess.STDOUT`：合并错误输出到标准输出
+- `task_id = uuid.uuid4()[:8]`：8位短ID，足够唯一
+- ❌ 禁止 `process.communicate()`（会阻塞直到进程结束，无法实时获取输出）
+
 ---
 
 ## 三、前端规范
@@ -6266,6 +6449,13 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.35 (2026-07-11) - 📝 核心范式文档补全（7项）
+
+- **🔧 后端 Flask 路由范式补全** - skill.md 新增 `2.17 Flask 路由核心范式`（3个子章节）：首页版本注入+无缓存、静态资源gzip压缩、后台命令执行系统
+- **📱 前端交互范式补全** - skill.md 新增 `3.12 前端交互范式`（4个子章节）：下拉刷新、图片/视频预览+滑动切换、可拖拽浮动面板、剪贴板复制
+
+---
+
 ### v3.8.34 (2026-07-11) - 📱 移动端适配范式文档化
 
 - **📱 移动端适配完整范式写入 skill.md** - 新增 `3.4.0 移动端适配完整范式`，包含10个子章节：导航栏固定、输出面板、商品弹窗、图片预览、SKU标签、统计卡片、利润面板、Hero区域、设备检测JS、速查表
@@ -6855,6 +7045,274 @@ return str;
 - 年份验证阈值 `>= 2000`，拒绝2000年以前的Excel序列号日期
 - 后端 `table_data` 必须在 `jsonify` 前预处理日期，避免前端收到datetime对象或原始序列号
 - 图表渲染使用 `requestAnimationFrame` 替代 `setTimeout`，确保DOM就绪
+
+### 3.12 前端交互范式
+
+#### 3.12.1 下拉刷新范式（移动端专属）
+
+仅移动端（`<576px`）启用，使用 IIFE 闭包封装，不污染全局作用域：
+
+```javascript
+(function initPullRefresh() {
+    if (window.innerWidth >= 576) return;  // 仅移动端
+    let touchStartY = 0, touchCurrentY = 0;
+    let isPulling = false, isRefreshing = false;
+    let indicatorEl = null, containerEl = null;
+
+    function createIndicator() {
+        indicatorEl = document.createElement('div');
+        indicatorEl.className = 'pull-refresh-indicator';
+        indicatorEl.innerHTML = '<div class="spinner"></div><span>下拉刷新</span>';
+        return indicatorEl;
+    }
+
+    function findScrollableContainer() {
+        const candidates = [
+            document.getElementById('output-panel'),
+            document.querySelector('.container'),
+            document.body
+        ];
+        for (const el of candidates) {
+            if (el && el.scrollHeight > el.clientHeight) return el;
+        }
+        return null;
+    }
+
+    function handleTouchStart(e) {
+        if (isRefreshing || containerEl.scrollTop > 0) return;
+        touchStartY = e.touches[0].clientY;
+    }
+
+    function handleTouchMove(e) {
+        if (isRefreshing || containerEl.scrollTop > 0) return;
+        touchCurrentY = e.touches[0].clientY;
+        const pullDistance = touchCurrentY - touchStartY;
+        if (pullDistance > 0) {
+            e.preventDefault();
+            const distance = Math.min(pullDistance, 100);
+            indicatorEl.style.top = (distance - 60) + 'px';
+            isPulling = true;
+            if (distance >= 50) {
+                indicatorEl.innerHTML = '<div class="spinner"></div><span>释放刷新</span>';
+            } else {
+                indicatorEl.innerHTML = '<div class="spinner"></div><span>下拉刷新</span>';
+            }
+        }
+    }
+
+    function handleTouchEnd() {
+        if (!isPulling) return;
+        const pullDistance = touchCurrentY - touchStartY;
+        if (pullDistance >= 50) {
+            performRefresh();
+        } else {
+            resetIndicator();
+        }
+        isPulling = false;
+    }
+
+    function performRefresh() {
+        isRefreshing = true;
+        indicatorEl.innerHTML = '<div class="spinner"></div><span>正在刷新...</span>';
+        showToast('正在刷新...');
+        setTimeout(() => {
+            // 执行刷新逻辑（如重新加载商品）
+            resetIndicator();
+            isRefreshing = false;
+        }, 1500);
+    }
+
+    function resetIndicator() {
+        indicatorEl.style.top = '-60px';
+        indicatorEl.innerHTML = '<div class="spinner"></div><span>下拉刷新</span>';
+    }
+
+    // 初始化
+    containerEl = findScrollableContainer();
+    if (!containerEl) return;
+    const parent = containerEl.parentElement || document.body;
+    parent.insertBefore(createIndicator(), parent.firstChild);
+    containerEl.addEventListener('touchstart', handleTouchStart, { passive: true });
+    containerEl.addEventListener('touchmove', handleTouchMove, { passive: true });
+    containerEl.addEventListener('touchend', handleTouchEnd, { passive: true });
+})();
+```
+
+**关键规则**：
+- `window.innerWidth >= 576` 时直接 `return`，桌面端不启用
+- 阈值 50px 触发刷新，最大下拉 100px（`Math.min` 限制）
+- `scrollTop > 0` 时不触发（页面已向下滚动）
+- IIFE 闭包封装，所有变量和函数不污染全局
+- ✅ `passive: true` 优化滚动性能（`touchstart`/`touchmove` 不调用 `preventDefault` 时）
+
+#### 3.12.2 图片/视频预览 + 滑动切换范式
+
+支持触摸滑动切换、键盘导航、视频自动播放：
+
+```javascript
+function showImagePreview(imageUrl, index) {
+    window.currentImageIndex = index;
+    const decodedUrl = decodeBase64Url(imageUrl);
+    const isVideo = decodedUrl.includes('/pvod/') || /\.(mp4|webm|ogg|mov)(\?|$)/i.test(decodedUrl);
+
+    let mediaContent;
+    if (isVideo) {
+        mediaContent = `<video id="previewImage" src="${decodedUrl}" controls autoplay
+            style="max-width:95%;max-height:90%;object-fit:contain;background:#000;"
+            onclick="event.stopPropagation()"
+            onerror="handleVideoError(this, '${decodedUrl}', true)">`;
+    } else {
+        mediaContent = `<img id="previewImage" src="${decodedUrl}"
+            style="max-width:95%;max-height:90%;object-fit:contain;"
+            onclick="event.stopPropagation()">`;
+    }
+
+    const previewHtml = `
+        <div id="imagePreview" onclick="if(event.target===this)this.remove()"
+             style="position:fixed;z-index:10000;top:0;left:0;width:100%;height:100%;
+                    background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;">
+            <button onclick="prevImage()" class="image-nav-btn">❮</button>
+            <button onclick="nextImage()" class="image-nav-btn">❯</button>
+            <span id="imageCounter">${index+1} / ${window.currentProductImages.length}</span>
+            ${mediaContent}
+            <button onclick="this.parentElement.remove()" class="image-close-btn">&times;</button>
+        </div>`;
+    document.body.insertAdjacentHTML('beforeend', previewHtml);
+
+    // 触摸滑动
+    const preview = document.getElementById('imagePreview');
+    let touchStartX = 0;
+    preview.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; });
+    preview.addEventListener('touchend', (e) => {
+        const diff = touchStartX - e.changedTouches[0].screenX;
+        if (Math.abs(diff) > 50) { diff > 0 ? nextImage() : prevImage(); }
+    });
+
+    // 键盘导航
+    document.addEventListener('keydown', handleKeyDown);
+}
+
+function handleKeyDown(e) {
+    const preview = document.getElementById('imagePreview');
+    if (!preview) { document.removeEventListener('keydown', handleKeyDown); return; }
+    if (e.key === 'ArrowLeft') prevImage();
+    else if (e.key === 'ArrowRight') nextImage();
+    else if (e.key === 'Escape') { preview.remove(); document.removeEventListener('keydown', handleKeyDown); }
+}
+```
+
+**关键规则**：
+- 触摸滑动阈值 50px，左滑→下一张，右滑→上一张
+- 键盘支持：← → 切换，Esc 关闭
+- 视频自动检测：URL 包含 `/pvod/` 或视频扩展名
+- `event.stopPropagation()`：防止点击媒体内容时关闭预览
+- 点击背景关闭：`if(event.target===this)this.remove()`
+- 关闭时必须 `removeEventListener('keydown')`，防止内存泄漏
+
+#### 3.12.3 可拖拽浮动面板范式
+
+支持鼠标 + 触摸拖拽，边界限制，设备自适应定位：
+
+```javascript
+// 定位（根据设备类型）
+if (isMobile) {
+    panel.style.left = '5vw'; panel.style.width = '90vw'; panel.style.maxWidth = '90vw';
+} else if (isTablet) {
+    panel.style.left = '10vw'; panel.style.width = '80vw'; panel.style.maxWidth = '80vw';
+} else {
+    const panelW = Math.min(600, viewportW - 40);
+    panel.style.width = panelW + 'px';
+    // 居中定位，边界检测
+    let left = event.clientX - panelW / 2;
+    if (left < 10) left = 10;
+    if (left + panelW > viewportW - 10) left = viewportW - panelW - 10;
+    panel.style.left = left + 'px';
+}
+
+// 拖拽（鼠标 + 触摸双支持）
+var isDragging = false, dragStartX = 0, dragStartY = 0, panelStartX = 0, panelStartY = 0;
+
+function onDragStart(clientX, clientY) {
+    isDragging = true;
+    dragStartX = clientX; dragStartY = clientY;
+    panelStartX = parseInt(panel.style.left) || 0;
+    panelStartY = parseInt(panel.style.top) || 0;
+    panel.style.right = ''; panel.style.transition = 'none';
+}
+
+function onDragMove(clientX, clientY) {
+    if (!isDragging) return;
+    var newLeft = panelStartX + (clientX - dragStartX);
+    var newTop = panelStartY + (clientY - dragStartY);
+    // 边界限制
+    newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - panel.offsetWidth));
+    newTop = Math.max(0, Math.min(newTop, window.innerHeight - panel.offsetHeight));
+    panel.style.left = newLeft + 'px'; panel.style.top = newTop + 'px';
+}
+
+function onDragEnd() { isDragging = false; panel.style.transition = ''; }
+
+// 鼠标事件
+dragHandle.onmousedown = function(e) { e.preventDefault(); onDragStart(e.clientX, e.clientY); };
+window._panelDragMove = function(e) { onDragMove(e.clientX, e.clientY); };
+window._panelDragEnd = onDragEnd;
+document.addEventListener('mousemove', window._panelDragMove);
+document.addEventListener('mouseup', window._panelDragEnd);
+
+// 触摸事件
+dragHandle.ontouchstart = function(e) { var t = e.touches[0]; onDragStart(t.clientX, t.clientY); };
+window._panelDragMoveTouch = function(e) { var t = e.touches[0]; onDragMove(t.clientX, t.clientY); };
+document.addEventListener('touchmove', window._panelDragMoveTouch, { passive: false });
+document.addEventListener('touchend', window._panelDragEnd);
+```
+
+**关键规则**：
+- 拖拽函数挂载到 `window`（`document` 事件处理器需要全局访问）
+- `panel.style.right = ''`：拖拽时清除 right 定位，改用 left
+- `panel.style.transition = 'none'`：拖拽时禁用动画，松手后恢复
+- 边界限制：`Math.max(0, Math.min(newLeft, vw - pw))`，防止拖出视口
+- 关闭面板时必须 `removeEventListener` 防止内存泄漏
+- ❌ 禁止拖拽按钮区域触发拖拽（`if (e.target.closest('span[onclick]')) return;`）
+
+#### 3.12.4 剪贴板复制范式
+
+双重方案：优先 Clipboard API，回退 `execCommand`：
+
+```javascript
+function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            showToast('链接已复制到剪贴板');
+        }, function() {
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
+}
+
+function fallbackCopy(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        showToast('链接已复制到剪贴板');
+    } catch (err) {
+        showToast('复制失败，请手动复制', 'warning');
+    }
+    document.body.removeChild(textarea);
+}
+```
+
+**关键规则**：
+- `navigator.clipboard` 需要 HTTPS 或 localhost，HTTP 环境下自动回退
+- `textarea.style.position = 'fixed'; opacity = '0'`：隐藏但可聚焦，避免页面跳动
+- `document.body.appendChild` → `select()` → `execCommand('copy')` → `removeChild()`：同步操作
+- ❌ 禁止使用 `window.clipboardData`（IE only，已废弃）
 
 ---
 
