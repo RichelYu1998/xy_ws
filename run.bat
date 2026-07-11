@@ -437,7 +437,7 @@ exit /b 0
 call :log [*] CDN轮询安装 hostc...
 
 set "HOSTC_MIRRORS[0]=https://registry.npmmirror.com|npmmirror淘宝"
-set "HOSTC_MIRRORS[1]=https://registry.npmmirror.com|华为云"
+set "HOSTC_MIRRORS[1]=https://repo.huaweicloud.com/repository/npm/|华为云"
 set "HOSTC_MIRRORS[2]=https://registry.npmjs.org|官方源"
 
 set "HOSTC_BEST_MIRROR="

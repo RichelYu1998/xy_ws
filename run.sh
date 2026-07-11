@@ -363,6 +363,7 @@ install_hostc() {
 
     declare -a HOSTC_MIRRORS=(
         "https://registry.npmmirror.com|npmmirror淘宝"
+        "https://repo.huaweicloud.com/repository/npm/|华为云"
         "https://registry.npmjs.org|官方源"
     )
 
