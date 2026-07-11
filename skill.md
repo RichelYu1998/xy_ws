@@ -6023,6 +6023,15 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.32 (2026-07-11) - 🛡️ 隧道守护二次验证 + 指数退避 + 心跳阈值优化
+
+- **🛡️ 隧道守护二次验证** - `restart_tunnel()` 保留 `verify_url()` 网络验证，但连续2次失败才触发重启，避免瞬时波动误判
+- **📈 重启指数退避** - 连续重启失败时指数退避（60s→120s→240s→300s上限），成功后归零，防止反复重启死循环
+- **⚡ 心跳失败阈值降低** - `max_url_verify_failures` 从10次降至3次，隧道挂了3分钟内触发重启（原10分钟）
+- **🔄 守护职责明确** - `restart_tunnel()` 不再做URL有效性判断，只管进程状态+URL文件+二次验证；URL可用性完全由心跳负责
+
+---
+
 ### v3.8.31 (2026-07-11) - 🚀 心跳逻辑5项优化 + 宽限期重构
 
 - **⏱️ 时间宽限期替代计数跳过** - 启动后60秒宽限期（替代仅跳1次心跳），隧道启动慢时不再误判
@@ -7593,6 +7602,7 @@ fi
 - **旧URL过期检测（v3.8.26）**: `auto_start_tunnel()` 发现旧URL时检查hostc进程是否存活，已退出则清除`tunnel_url.txt`并启动新隧道，避免复用死地址
 - **重启死循环修复（v3.8.27）**: `restart_tunnel()` 执行重启后立即重置`tunnel_need_restart=False`；hostc运行中但URL未就绪时等待60秒而非重启
 - **重启逻辑重构+宽限期（v3.8.30）**: 合并两条重复重启路径为统一逻辑；新增60秒宽限期机制，重启后跳过检测给新进程启动时间；消除"重启→异常等待→重启"死循环
+- **守护二次验证+指数退避（v3.8.32）**: `restart_tunnel()` 保留网络验证但连续2次失败才重启（避免瞬时波动误判）；重启失败指数退避（60s→120s→240s→300s上限）；心跳失败阈值从10次降至3次（3分钟触发重启）
 - **心跳守护即时启动（v3.8.28）**: 隧道启动后立即调用`start_tunnel_daemons()`启动心跳守护+重启守护线程，不再等待`/api/tunnel/status`被调用才懒启动
 - **守护统一管理（v3.8.28）**: 提取`start_tunnel_daemons()`函数统一管理守护线程启动逻辑，`/api/tunnel/status`中作为安全网调用
 
@@ -7649,18 +7659,23 @@ heartbeat_loop() 每60秒:
   → 宽限期内（启动后60秒 / URL变化后60秒）→ 跳过验证，send_heartbeat()轻量检测
   → 宽限期外 → verify_url(web_url) 验证可用性
     → 验证成功 → 直接视为心跳（省1次HTTP请求）→ 稳定性计数 → 达到阈值 → 发邮件通知
-    → 连续失败10次 → tunnel_need_restart = True → 重启守护立即执行重启
+    → 连续失败3次 → tunnel_need_restart = True → 重启守护立即执行重启
   → 宽限期内 → send_heartbeat() HEAD 检测
     → 连续失败5次 → tunnel_need_restart = True
 ```
 
-**重启守护工作流（v3.8.30 重构）**:
+**重启守护工作流（v3.8.32 重构+二次验证+指数退避）**:
 ```
 restart_tunnel() 持续循环:
   → 宽限期内 → sleep(3) 跳过检测，给新进程启动时间
-  → hostc运行 + URL有效 → 一切正常
+  → hostc运行 + URL验证通过 → 一切正常，verify_fail_count归零
+  → hostc运行 + URL第1次验证失败 → 等5秒再测1次（瞬时波动容忍）
+  → hostc运行 + URL连续2次验证失败 → 触发重启
+  → hostc进程退出 → 立即重启（不等验证）
+  → URL文件为空 → 等30秒给hostc启动时间 → 超时重启
   → tunnel_need_restart=True → 立即执行重启 → 进入60秒宽限期
-  → 异常状态(无进程或URL无效) → 等60秒 → 重启 → 进入60秒宽限期
+  → 重启失败 → 指数退避（60s→120s→240s→300s上限）
+  → 重启成功 → 退避归零，进入60秒宽限期
 ```
 
 **禁止事项**:
@@ -7697,11 +7712,16 @@ auto_start_tunnel(force_restart=False)
     → read_output() 获取URL → verify_url() → 发邮件
   → app.run() 立即启动
 
-restart_tunnel() 循环（v3.8.30 重构+宽限期）:
+restart_tunnel() 循环（v3.8.32 重构+二次验证+指数退避）:
   → 宽限期内 → sleep(3) 跳过检测，给新进程启动时间
-  → hostc运行 + URL有效 → 一切正常，继续
+  → hostc运行 + URL验证通过 → 一切正常，verify_fail_count归零
+  → hostc运行 + URL第1次验证失败 → 等5秒再测1次（瞬时波动容忍）
+  → hostc运行 + URL连续2次验证失败 → 触发重启
+  → hostc进程退出 → 立即重启（不等验证）
+  → URL文件为空 → 等30秒给hostc启动时间 → 超时重启
   → tunnel_need_restart=True → 立即执行重启 → 进入60秒宽限期
-  → 异常状态(无进程或URL无效) → 等60秒 → 重启 → 进入60秒宽限期
+  → 重启失败 → 指数退避（60s→120s→240s→300s上限）
+  → 重启成功 → 退避归零，进入60秒宽限期
 ```
 
 **API防误重启（v3.8.23 新增）**:
@@ -7989,7 +8009,7 @@ url_valid = (stable_url == web_url and
 | 稳定性确认次数 | 2次 | 连续2次验证通过即确认稳定 |
 | URL验证超时 | 10秒 | verify_url 默认超时 |
 | 心跳请求超时 | 3秒 | HEAD 请求超时（仅宽限期内使用） |
-| URL验证连续失败阈值 | 10次 | 触发重启 |
+| URL验证连续失败阈值 | 3次 | 触发重启（v3.8.32从10次降至3次） |
 | 心跳连续失败阈值 | 5次 | 触发重启 |
 | URL获取超时 | 10秒 | 新隧道启动超时 |
 | URL文件同步间隔 | 300秒 | 每5分钟同步一次（v3.8.31，原每次心跳） |
@@ -8004,10 +8024,9 @@ url_valid = (stable_url == web_url and
   ```
   T+0s    心跳检测失败 #1
   T+60s   心跳检测失败 #2
-  ...
-  T+600s  连续失败10次 → 触发重启
-  T+603s  清理旧进程，启动新 hostc
-  T+613s  获取新 URL + 即时验证 + 发送邮件通知
+  T+120s  心跳检测失败 #3 → 触发重启（v3.8.32优化，原10次=600秒）
+  T+123s  清理旧进程，启动新 hostc
+  T+133s  获取新 URL + 即时验证 + 发送邮件通知
   ```
 - 支持 SMTP SSL/TLS
 - 敏感字段 API 返回时脱敏
@@ -8866,6 +8885,9 @@ pkill -f hostc
 - [x] 心跳宽限期机制（启动+URL变化自动保护，v3.8.31）
 - [x] 消除冗余HTTP请求（verify_url成功即心跳，v3.8.31）
 - [x] 文件I/O优化（URL同步从每次心跳改为每5分钟，v3.8.31）
+- [x] 隧道守护二次验证（连续2次失败才重启，v3.8.32）
+- [x] 重启指数退避（60s→120s→240s→300s上限，v3.8.32）
+- [x] 心跳失败阈值优化（10次→3次，3分钟触发重启，v3.8.32）
 
 ---
 
@@ -8875,7 +8897,7 @@ pkill -f hostc
 |--------|------|------|
 | `verify_url()` | main.py:7019 | URL可用性验证（HEAD请求） |
 | `heartbeat_loop()` | main.py:7062 | 心跳检测循环（含宽限期+稳定性确认，v3.8.31优化） |
-| `restart_tunnel()` | main.py:6289 | 隧道重启逻辑（60秒等待） |
+| `restart_tunnel()` | main.py:7442 | 隧道重启逻辑（二次验证+指数退避，v3.8.32优化） |
 | `send_tunnel_email_with_verification()` | main.py:5923 | 带验证的邮件发送 |
 | `send_with_circuit_breaker()` | main.py:5950 | 带熔断保护的邮件发送 |
 | `get_public_url_from_web_log()` | main.py:1800 | 从日志获取最新URL |
@@ -8890,11 +8912,11 @@ pkill -f hostc
 |--------|--------|--------|------|----------|
 | `verify_url.timeout` | 5秒 | 2秒 | URL验证超时时间 | main.py:6034 |
 | `heartbeat_interval` | 60秒 | 5秒 | 心跳检测间隔 | main.py:7072 |
-| `max_url_verify_failures` | 10次 | 1次 | URL验证允许最大连续失败次数 | main.py:7075 |
+| `max_url_verify_failures` | 3次 | 1次 | URL验证允许最大连续失败次数 | main.py:7075 |
 | `max_consecutive_failures` | 5次 | 5次 | 心跳允许最大连续失败次数 | main.py:7073 |
 | `grace_period` | 60秒 | 0秒 | 启动后/URL变化后宽限期 | main.py:7078 |
 | `url_sync_interval` | 300秒 | 0秒 | URL文件同步间隔 | main.py:7079 |
-| `wait_threshold` | 60秒 | 15秒 | 重启等待时间阈值 | main.py:6289 |
+| `wait_threshold` | 30秒 | 15秒 | URL文件为空时等待阈值 | main.py:7442 |
 | `last_log_interval` | 30秒 | 10秒 | 日志打印最小间隔 | main.py:6088 |
 | `email_max_retries` | 3次 | 1次 | 邮件URL验证最大重试次数 | main.py:5940 |
 | `email_retry_interval` | 5秒 | 0秒 | 邮件验证重试间隔 | main.py:5941 |
