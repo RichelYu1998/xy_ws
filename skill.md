@@ -6023,6 +6023,16 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.31 (2026-07-11) - 🚀 心跳逻辑5项优化 + 宽限期重构
+
+- **⏱️ 时间宽限期替代计数跳过** - 启动后60秒宽限期（替代仅跳1次心跳），隧道启动慢时不再误判
+- **🔄 URL变化自动宽限期** - 已确认稳定的URL变化时自动进入60秒宽限期，覆盖隧道重启场景
+- **⚡ 消除冗余心跳请求** - `verify_url` 成功即视为心跳，不再重复调用 `send_heartbeat`，每次心跳省1次HTTP请求
+- **🔧 简化稳定性状态机** - 消除死代码（嵌套if中永远为True的条件），3分支线性逻辑替代嵌套if/else
+- **📉 降低文件同步频率** - URL同步从每次心跳改为每5分钟一次，每天减少约2880次文件I/O
+
+---
+
 ### v3.8.30 (2026-07-11) - 🔧 隧道重启逻辑重构 + 宽限期机制
 
 - **🔧 隧道重启逻辑重构** - 合并两条重复重启路径为统一逻辑，消除"重启→异常等待→重启"死循环
@@ -7631,14 +7641,16 @@ def start_tunnel_daemons():
 | 心跳守护 | `heartbeat_loop()` | 从 `tunnel_url.txt` 读取URL，验证可用性，稳定性确认，发邮件 | `tunnel_url.txt` |
 | 重启守护 | `restart_tunnel()` | 监控 `tunnel_need_restart` 标志，检测异常状态，执行重启 | `tunnel_url.txt` |
 
-**心跳守护工作流**:
+**心跳守护工作流（v3.8.31 优化）**:
 ```
 heartbeat_loop() 每60秒:
   → 从 tunnel_url.txt 读取最新URL（权威源，skip_validation=True, quiet=True）
-  → verify_url(web_url) 验证可用性
-    → 验证通过 → 稳定性计数 → 达到阈值 → 发邮件通知
+  → URL变化检测：已确认稳定的URL变化时自动进入60秒宽限期
+  → 宽限期内（启动后60秒 / URL变化后60秒）→ 跳过验证，send_heartbeat()轻量检测
+  → 宽限期外 → verify_url(web_url) 验证可用性
+    → 验证成功 → 直接视为心跳（省1次HTTP请求）→ 稳定性计数 → 达到阈值 → 发邮件通知
     → 连续失败10次 → tunnel_need_restart = True → 重启守护立即执行重启
-  → send_heartbeat() HEAD 检测
+  → 宽限期内 → send_heartbeat() HEAD 检测
     → 连续失败5次 → tunnel_need_restart = True
 ```
 
@@ -7655,8 +7667,11 @@ restart_tunnel() 持续循环:
 - ❌ 禁止延迟启动守护线程（必须隧道启动后立即启动）
 - ❌ 禁止在 `start_tunnel_daemons()` 之外单独启动守护线程
 - ❌ 禁止心跳守护从 `web_output.log` 读取URL（`tunnel_url.txt` 是唯一权威源）
+- ❌ 禁止 `verify_url` 成功后再调 `send_heartbeat`（冗余请求，v3.8.31已消除）
+- ❌ 禁止每次心跳都写文件同步（改为每5分钟一次，v3.8.31）
 - ✅ `start_tunnel_daemons()` 幂等设计：线程已存活则跳过，可安全重复调用
 - ✅ `/api/tunnel/status` 作为安全网调用，不依赖其作为唯一启动点
+- ✅ URL变化时自动进入宽限期（v3.8.31），覆盖隧道重启场景
 
 **`auto_start_tunnel()` 行为规范**:
 
@@ -7882,7 +7897,7 @@ if url_verified:
 - `read_output()` - 获取URL后立即 `verify_url()` + `send_tunnel_notification()`
 - 复用路径 - 复用已有可用URL时也立即发邮件
 - `restart_tunnel()` - 重启成功后立即验证新URL，通过则直接发邮件
-- 心跳跳过次数 - `skip_url_verify_max` 从4减为1（auto_start_tunnel已做即时验证）
+- 心跳宽限期 - 启动后60秒宽限期替代计数跳过，URL变化自动进入宽限期（v3.8.31）
 - 稳定性确认 - `stable_url_min_confirms` 从3减为2（2次即确认稳定）
 
 **即时通知触发点**:
@@ -7970,13 +7985,14 @@ url_valid = (stable_url == web_url and
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | 心跳间隔 | 60秒 | 降低频率，避免资源浪费 |
-| 心跳跳过验证次数 | 1次 | auto_start_tunnel已做即时验证 |
+| 宽限期 | 60秒 | 启动后/URL变化后跳过验证的时间窗口（v3.8.31） |
 | 稳定性确认次数 | 2次 | 连续2次验证通过即确认稳定 |
 | URL验证超时 | 10秒 | verify_url 默认超时 |
-| 心跳请求超时 | 3秒 | HEAD 请求超时 |
+| 心跳请求超时 | 3秒 | HEAD 请求超时（仅宽限期内使用） |
 | URL验证连续失败阈值 | 10次 | 触发重启 |
 | 心跳连续失败阈值 | 5次 | 触发重启 |
 | URL获取超时 | 10秒 | 新隧道启动超时 |
+| URL文件同步间隔 | 300秒 | 每5分钟同步一次（v3.8.31，原每次心跳） |
 
 - **即时通知流程**（v3.8.20）：
   ```
@@ -8846,7 +8862,10 @@ pkill -f hostc
 - [x] 日志输出合理（30秒间隔，无刷屏）
 - [x] CPU/内存占用优化（减少无效重启）
 - [x] 熔断机制完善（避免雪崩效应）
-- [x] 验证机制健壮（3轮验证+容错计数器）
+- [x] 验证机制健壮（2轮验证+容错计数器）
+- [x] 心跳宽限期机制（启动+URL变化自动保护，v3.8.31）
+- [x] 消除冗余HTTP请求（verify_url成功即心跳，v3.8.31）
+- [x] 文件I/O优化（URL同步从每次心跳改为每5分钟，v3.8.31）
 
 ---
 
@@ -8854,8 +8873,8 @@ pkill -f hostc
 
 | 函数名 | 位置 | 用途 |
 |--------|------|------|
-| `verify_url()` | main.py:6034 | URL可用性验证（HEAD请求） |
-| `heartbeat_loop()` | main.py:6078 | 心跳检测循环（含容错机制） |
+| `verify_url()` | main.py:7019 | URL可用性验证（HEAD请求） |
+| `heartbeat_loop()` | main.py:7062 | 心跳检测循环（含宽限期+稳定性确认，v3.8.31优化） |
 | `restart_tunnel()` | main.py:6289 | 隧道重启逻辑（60秒等待） |
 | `send_tunnel_email_with_verification()` | main.py:5923 | 带验证的邮件发送 |
 | `send_with_circuit_breaker()` | main.py:5950 | 带熔断保护的邮件发送 |
@@ -8870,9 +8889,11 @@ pkill -f hostc
 | 参数名 | 当前值 | 默认值 | 说明 | 修改位置 |
 |--------|--------|--------|------|----------|
 | `verify_url.timeout` | 5秒 | 2秒 | URL验证超时时间 | main.py:6034 |
-| `heartbeat_interval` | 15秒 | 5秒 | 心跳检测间隔 | main.py:6078 |
-| `max_url_verify_failures` | 3次 | 1次 | URL验证允许最大连续失败次数 | main.py:6082 |
-| `max_consecutive_failures` | 3次 | 5次 | 心跳允许最大连续失败次数 | main.py:6079 |
+| `heartbeat_interval` | 60秒 | 5秒 | 心跳检测间隔 | main.py:7072 |
+| `max_url_verify_failures` | 10次 | 1次 | URL验证允许最大连续失败次数 | main.py:7075 |
+| `max_consecutive_failures` | 5次 | 5次 | 心跳允许最大连续失败次数 | main.py:7073 |
+| `grace_period` | 60秒 | 0秒 | 启动后/URL变化后宽限期 | main.py:7078 |
+| `url_sync_interval` | 300秒 | 0秒 | URL文件同步间隔 | main.py:7079 |
 | `wait_threshold` | 60秒 | 15秒 | 重启等待时间阈值 | main.py:6289 |
 | `last_log_interval` | 30秒 | 10秒 | 日志打印最小间隔 | main.py:6088 |
 | `email_max_retries` | 3次 | 1次 | 邮件URL验证最大重试次数 | main.py:5940 |
@@ -10175,59 +10196,60 @@ else:  # URL验证失败
 
 **功能**: 将稳定性检测逻辑无缝集成到现有的心跳循环中
 
-**集成点位置**:
+**集成点位置（v3.8.31 优化后）**:
 ```python
 def heartbeat_loop():
     global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
-    global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time  # 新增
-    
+    global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time
+    global tunnel_last_heartbeat, tunnel_heartbeat_failed
+
+    grace_end_time = time.time() + 60  # 启动后60秒宽限期
+    prev_web_url = None
+
     while tunnel_auto_restart:
-        web_url = PathManager.get_public_url_from_web_log()
-        
+        web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+        url_verified = False
+
         if web_url:
-            try:
-                if verify_url(web_url, timeout=10):
+            # URL变化自动宽限期（v3.8.31）
+            if web_url != prev_web_url and prev_web_url is not None and stable_url_confirm_count >= stable_url_min_confirms:
+                grace_end_time = time.time() + 60
+                stable_url_confirm_count = 0
+                stable_url = None
+            prev_web_url = web_url
+
+            if time.time() < grace_end_time:
+                is_tunnel_running = True  # 宽限期内跳过验证
+            else:
+                url_verified = verify_url(web_url, timeout=10)
+                if url_verified:
                     is_tunnel_running = True
-                    url_verify_failures = 0
-                    
-                    # ★★★ 新增：精准稳定性检测 ★★★
+                    # 3分支线性稳定性状态机（v3.8.31，消除死代码）
                     if web_url != stable_url:
-                        # 新URL出现
                         stable_url = web_url
                         stable_url_confirm_count = 1
-                        url_first_seen_time = time.time()
-                        print(f"[Tunnel] 🔍 检测到新URL...")
-                    else:
-                        # 同一URL继续验证
+                    elif stable_url_confirm_count < stable_url_min_confirms:
                         stable_url_confirm_count += 1
-                        
                         if stable_url_confirm_count >= stable_url_min_confirms:
-                            # 达到稳定阈值，发送邮件
                             send_tunnel_notification(web_url, 'stable_available', force_send=True)
-                
-                else:
-                    # 验证失败，重置稳定性
-                    if stable_url_confirm_count > 0:
-                        stable_url_confirm_count = 0
-                        stable_url = None
-            
-            except Exception as e:
-                # 异常也重置
-                if stable_url_confirm_count > 0:
-                    stable_url_confirm_count = 0
-                    stable_url = None
-        
+
+        if is_tunnel_running:
+            if url_verified:
+                tunnel_last_heartbeat = time.time()  # verify_url成功即心跳，省1次HTTP
+            else:
+                send_heartbeat()  # 仅宽限期内使用
+
         time.sleep(heartbeat_interval)  # 60秒
 ```
 
 **日志输出示例**:
 ```
-[Tunnel] 🔍 检测到新URL，开始稳定性验证 (1/3): https://t-xxx.hostc.dev
-[Tunnel] ✅ URL稳定性验证 (2/3): https://t-xxx.hostc.dev
-[Tunnel] 🎯 URL已确认为稳定！持续验证3次，耗时180秒
+[Tunnel] ⏳ 宽限期中（58秒），跳过URL验证
+[Tunnel] 🔍 检测到新URL，开始稳定性验证 (1/2): https://t-xxx.hostc.dev
+[Tunnel] ✅ URL稳定性验证 (2/2): https://t-xxx.hostc.dev
+[Tunnel] 🎯 URL已确认为稳定！持续验证2次，耗时60秒
 [Tunnel] 📧 发送精准邮件通知...
-[Email] 正在连接SMTP服务器...
-[Email] 已成功发送邮件通知到 980187223@qq.com
+[Tunnel] 🔄 URL变化(https://t-old.hostc.dev → https://t-new.hostc.dev)，进入60秒宽限期
 ```
 
 **符合性检查**:

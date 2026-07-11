@@ -1,0 +1,29 @@
+diff --git a/node_modules/hostc/dist/index.js b/node_modules/hostc/dist/index.js
+index c3907f7..9467ab3 100644
+--- a/node_modules/hostc/dist/index.js
++++ b/node_modules/hostc/dist/index.js
+@@ -1086,6 +1086,7 @@ function openWebSocket(url, token) {
+     });
+     const timeout = setTimeout(() => {
+       cleanup();
++      socket.once("error", () => {});
+       safeCloseWebSocket2(socket, CLOSE_INTERNAL_ERROR, "connect timeout");
+       reject(new Error("WebSocket connect timed out"));
+     }, WEBSOCKET_CONNECT_TIMEOUT_MS);
+@@ -1138,9 +1139,14 @@ function safeCloseWebSocket2(socket, code, reason) {
+     return;
+   }
+   try {
+-    socket.close(normalizeWebSocketCloseCode(code), normalizeWebSocketCloseReason(reason));
++    if (socket.readyState === import_ws2.default.CONNECTING) {
++      socket.once("error", () => {});
++      socket.terminate();
++    } else {
++      socket.close(normalizeWebSocketCloseCode(code), normalizeWebSocketCloseReason(reason));
++    }
+   } catch {
+-    socket.terminate();
++    try { socket.terminate(); } catch {}
+   }
+ }
+ function sleep(ms) {

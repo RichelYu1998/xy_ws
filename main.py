@@ -7062,143 +7062,135 @@ if __name__ == '__main__':
         def heartbeat_loop():
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time
+            global tunnel_last_heartbeat, tunnel_heartbeat_failed
             consecutive_failures = 0
-            max_consecutive_failures = 5  # 连续失败5次才标记需要重启
-            url_verify_failures = 0  # URL验证连续失败计数
-            _min_confirms = globals().get('stable_url_min_confirms', 3)
-            max_url_verify_failures = 10  # URL验证允许连续失败10次（降低敏感度）
-            heartbeat_interval = 60  # 心跳间隔60秒（大幅降低频率）
+            max_consecutive_failures = 5
+            url_verify_failures = 0
+            max_url_verify_failures = 10
+            heartbeat_interval = 60
             last_log_time = 0
-            skip_url_verify_count = 0  # 跳过URL验证的次数计数
-            skip_url_verify_max = 1  # 前1次心跳跳过URL验证（auto_start_tunnel已做即时验证）
+            grace_end_time = time.time() + 60
+            last_url_sync_time = 0
+            prev_web_url = None
             
             while tunnel_auto_restart:
-                # 从 tunnel_url.txt 获取最新公网地址（权威源），跳过内部验证避免双重检查
                 web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
                 is_tunnel_running = False
+                url_verified = False
 
                 if web_url:
-                    # 前几次心跳跳过URL验证，避免刚启动时误判
-                    if skip_url_verify_count < skip_url_verify_max:
-                        skip_url_verify_count += 1
-                        is_tunnel_running = True  # 假设隧道正常
-                        if skip_url_verify_count == 1:
-                            print(f"[Tunnel] 心跳启动，前{skip_url_verify_max}次将跳过URL验证")
+                    if web_url != prev_web_url and prev_web_url is not None and stable_url_confirm_count >= stable_url_min_confirms:
+                        grace_end_time = time.time() + 60
+                        stable_url_confirm_count = 0
+                        stable_url = None
+                        print(f"[Tunnel] 🔄 URL变化({prev_web_url} → {web_url})，进入60秒宽限期")
+                    prev_web_url = web_url
+
+                    if time.time() < grace_end_time:
+                        is_tunnel_running = True
+                        remaining = int(grace_end_time - time.time())
+                        if remaining >= 55:
+                            print(f"[Tunnel] ⏳ 宽限期中（{remaining}秒），跳过URL验证")
                     else:
                         try:
-                            # 使用更长的超时时间，并只在verbose模式输出日志
-                            if verify_url(web_url, timeout=10):
+                            url_verified = verify_url(web_url, timeout=10)
+                            if url_verified:
                                 is_tunnel_running = True
-                                url_verify_failures = 0  # 验证成功，重置计数
-                                
-                                # 精准稳定性检测：跟踪URL是否真正稳定
+                                url_verify_failures = 0
+
                                 if web_url != stable_url:
-                                    # 新URL出现，开始计数
-                                    if stable_url_confirm_count == 0 or web_url != stable_url:
-                                        # 完全新的URL或URL变化了
-                                        stable_url = web_url
-                                        stable_url_confirm_count = 1
-                                        url_first_seen_time = time.time()
-                                        print(f"[Tunnel] 🔍 检测到新URL，开始稳定性验证 (1/{_min_confirms}): {web_url}")
-                                    else:
-                                        # 同一URL继续验证
-                                        stable_url_confirm_count += 1
-                                        print(f"[Tunnel] ✅ URL稳定性验证 ({stable_url_confirm_count}/{_min_confirms}): {web_url}")
-                                        
-                                        # 达到稳定阈值，发送精准邮件通知
-                                        if stable_url_confirm_count >= stable_url_min_confirms:
-                                            time_since_first_seen = int(time.time() - url_first_seen_time)
-                                            print(f"[Tunnel] 🎯 URL已确认为稳定！持续验证{stable_url_confirm_count}次，耗时{time_since_first_seen}秒")
-                                            print(f"[Tunnel] 📧 发送精准邮件通知...")
-                                            send_tunnel_notification(web_url, 'stable_available', force_send=True)
-                                            last_stable_notification_time = time.time()
-                                else:
-                                    if stable_url_confirm_count < stable_url_min_confirms:
-                                        stable_url_confirm_count += 1
-                                        if stable_url_confirm_count >= stable_url_min_confirms:
-                                            print(f"[Tunnel] 🎯 稳定URL确认完成 ({stable_url_confirm_count}/{_min_confirms})")
-                                            send_tunnel_notification(web_url, 'stable_available', force_send=True)
-                                            last_stable_notification_time = time.time()
+                                    stable_url = web_url
+                                    stable_url_confirm_count = 1
+                                    url_first_seen_time = time.time()
+                                    print(f"[Tunnel] 🔍 检测到新URL，开始稳定性验证 (1/{stable_url_min_confirms}): {web_url}")
+                                elif stable_url_confirm_count < stable_url_min_confirms:
+                                    stable_url_confirm_count += 1
+                                    print(f"[Tunnel] ✅ URL稳定性验证 ({stable_url_confirm_count}/{stable_url_min_confirms}): {web_url}")
+                                    if stable_url_confirm_count >= stable_url_min_confirms:
+                                        elapsed = int(time.time() - url_first_seen_time)
+                                        print(f"[Tunnel] 🎯 URL已确认为稳定！持续验证{stable_url_confirm_count}次，耗时{elapsed}秒")
+                                        send_tunnel_notification(web_url, 'stable_available', force_send=True)
+                                        last_stable_notification_time = time.time()
                             else:
                                 url_verify_failures += 1
-                                # URL验证失败，重置稳定性计数
                                 if stable_url_confirm_count > 0:
-                                    print(f"[Tunnel] ⚠️ 公网地址不可用，重置稳定性计数 ({stable_url_confirm_count} -> 0): {web_url}")
+                                    print(f"[Tunnel] ⚠️ 公网地址不可用，重置稳定性计数 ({stable_url_confirm_count} -> 0)")
                                     stable_url_confirm_count = 0
                                     stable_url = None
-                                
                                 if time.time() - last_log_time > 120:
-                                    print(f"[Tunnel] ⚠️ 公网地址不可用 (来自tunnel_url.txt: {web_url})，连续失败 {url_verify_failures}/{max_url_verify_failures} 次")
+                                    print(f"[Tunnel] ⚠️ 公网地址不可用: {web_url}，连续失败 {url_verify_failures}/{max_url_verify_failures} 次")
                                     last_log_time = time.time()
                                 if url_verify_failures >= max_url_verify_failures:
-                                    print(f"[Tunnel] 🚨 公网地址连续不可用{url_verify_failures}次，标记需要重启隧道服务器")
-                                    print(f"[Tunnel] 📧 发送公网地址不可用通知邮件...")
+                                    print(f"[Tunnel] 🚨 公网地址连续不可用{url_verify_failures}次，标记需要重启")
                                     send_tunnel_notification(web_url, 'unavailable', force_send=True)
                                     tunnel_need_restart = True
                         except Exception as e:
                             url_verify_failures += 1
-                            # 异常也重置稳定性计数
                             if stable_url_confirm_count > 0:
                                 stable_url_confirm_count = 0
                                 stable_url = None
-                            
                             if time.time() - last_log_time > 120:
                                 print(f"[Tunnel] URL验证异常: {e}")
                                 last_log_time = time.time()
                             if url_verify_failures >= max_url_verify_failures:
                                 tunnel_need_restart = True
                 else:
-                    # tunnel_url.txt 中没有可用的公网地址
                     if time.time() - last_log_time > 120:
                         print(f"[Tunnel] ⚠️ tunnel_url.txt 中未找到公网地址，隧道可能未启动")
                         last_log_time = time.time()
                     url_verify_failures += 1
                     if url_verify_failures >= max_url_verify_failures:
-                        print(f"[Tunnel] 🚨 长时间未获取到公网地址，标记需要重启隧道服务器")
+                        print(f"[Tunnel] 🚨 长时间未获取到公网地址，标记需要重启")
                         tunnel_need_restart = True
                 
                 if is_tunnel_running:
-                    success = send_heartbeat()
-                    if not success:
-                        consecutive_failures += 1
-                        if consecutive_failures >= max_consecutive_failures:
-                            print(f"[Tunnel] 心跳连续失败 {consecutive_failures} 次，立即触发重启")
-                            tunnel_need_restart = True
-                            last_log_time = time.time()
-                        elif consecutive_failures == 1 and time.time() - last_log_time > 10:
-                            print(f"[Tunnel] 心跳检测异常: 网络连接不稳定 ({consecutive_failures}/{max_consecutive_failures})")
-                            last_log_time = time.time()
-                    else:
+                    if url_verified:
+                        tunnel_last_heartbeat = time.time()
+                        tunnel_heartbeat_failed = False
                         if consecutive_failures > 0:
-                            print(f"[Tunnel] 心跳恢复，当前连续失败次数: {consecutive_failures}")
-                            
+                            print(f"[Tunnel] 心跳恢复")
                             if url_verify_failures > 0 and web_url:
-                                print(f"[Tunnel] 🎉 公网地址从不可用状态恢复，立即发送邮件通知...")
+                                print(f"[Tunnel] 🎉 公网地址恢复，发送通知")
                                 send_tunnel_notification(web_url, 'available', force_send=True)
-                            
                             last_log_time = time.time()
                         consecutive_failures = 0
-                        
                         check_and_send_pending_email()
-                        
-                        # 确保 tunnel_url.txt 和 web_output.log 同步最新可用URL
-                        if web_url:
-                            tunnel_url_file = PathManager.get_tunnel_url_file()
-                            web_output_file = PathManager.get_web_output_file()
-                            try:
-                                with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
-                                    port_match = re.search(r'--port\s+(\d+)', ' '.join(sys.argv))
-                                    local_port = port_match.group(1) if port_match else str(args.port)
-                                    tf.write(f"Public URL: {web_url}\n")
-                                    tf.write(f"Local URL: http://localhost:{local_port}/\n")
-                                    tf.write(f"Tunnel: {web_url.split('//')[1].split('.')[0]}\n")
-                            except Exception as e:
-                                pass
-                            try:
-                                with open(web_output_file, 'a', encoding='utf-8') as wf:
-                                    wf.write(f"Public URL: {web_url}\n")
-                            except Exception as e:
-                                pass
+                    else:
+                        success = send_heartbeat()
+                        if not success:
+                            consecutive_failures += 1
+                            if consecutive_failures >= max_consecutive_failures:
+                                print(f"[Tunnel] 心跳连续失败 {consecutive_failures} 次，触发重启")
+                                tunnel_need_restart = True
+                                last_log_time = time.time()
+                            elif consecutive_failures == 1 and time.time() - last_log_time > 10:
+                                print(f"[Tunnel] 心跳异常: 网络不稳定 ({consecutive_failures}/{max_consecutive_failures})")
+                                last_log_time = time.time()
+                        else:
+                            if consecutive_failures > 0:
+                                print(f"[Tunnel] 心跳恢复")
+                                last_log_time = time.time()
+                            consecutive_failures = 0
+                            check_and_send_pending_email()
+
+                    if web_url and time.time() - last_url_sync_time > 300:
+                        last_url_sync_time = time.time()
+                        tunnel_url_file = PathManager.get_tunnel_url_file()
+                        web_output_file = PathManager.get_web_output_file()
+                        try:
+                            with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
+                                port_match = re.search(r'--port\s+(\d+)', ' '.join(sys.argv))
+                                local_port = port_match.group(1) if port_match else str(args.port)
+                                tf.write(f"Public URL: {web_url}\n")
+                                tf.write(f"Local URL: http://localhost:{local_port}/\n")
+                                tf.write(f"Tunnel: {web_url.split('//')[1].split('.')[0]}\n")
+                        except Exception:
+                            pass
+                        try:
+                            with open(web_output_file, 'a', encoding='utf-8') as wf:
+                                wf.write(f"Public URL: {web_url}\n")
+                        except Exception:
+                            pass
                 time.sleep(heartbeat_interval)
         
         def start_tunnel_daemons():

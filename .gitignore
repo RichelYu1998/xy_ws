@@ -47,5 +47,11 @@ clean_files.log
 # Get scripts (not to be uploaded)
 get*.py
 
+# Fix scripts (temporary, not to be uploaded)
+fix*.py
+
+# Version file (managed in code, not standalone)
+version.txt
+
 # Playwright browsers (large files, should be downloaded on first run)
 playwright-browsers/
