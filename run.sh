@@ -48,70 +48,72 @@ log_blank_console_only() {
     echo ""
 }
 
-log "========================================"
-log "Szwego商品爬虫和货号对比工具 - v${VERSION}"
-log "========================================"
-
-log_blank
-log "[*] 清理残留进程..."
-pkill -9 -f "python.*main.py" 2>/dev/null || true
-pkill -9 -f "hostc" 2>/dev/null || true
-sleep 1
-log "[*] 残留进程清理完成"
-
-log_blank
-log "[*] 检查 hostc 隧道工具..."
-HOSTC_BIN="$(pwd)/dist/node_modules/.bin/hostc"
-if [ ! -f "$HOSTC_BIN" ]; then
-    log "[*] 本地未找到 hostc，开始安装..."
-    install_hostc
-    if [ ! -f "$HOSTC_BIN" ]; then
-        log "[WARNING] hostc 安装失败，隧道将不可用"
-    fi
-fi
-if [ -f "$HOSTC_BIN" ]; then
-    HOSTC_VER=$("$HOSTC_BIN" --version 2>/dev/null || echo "unknown")
-    log "[*] hostc v${HOSTC_VER} 已就绪"
-fi
-
-log_blank
-log "[*] 启动 hostc 隧道（后台运行，不阻塞）..."
-echo -n > "file/tunnel_url.txt"
-if [ -f "$HOSTC_BIN" ]; then
-    "$HOSTC_BIN" 8888 --local-host localhost >> file/tunnel_url.txt 2>&1 < /dev/null &
-else
-    npx -y hostc@latest 8888 --local-host localhost >> file/tunnel_url.txt 2>&1 < /dev/null &
-fi
-log "[*] hostc 已在后台启动，将在后续步骤中获取URL"
-
-log_blank
-log "[*] 清理临时文件..."
-if [ -d "temp" ]; then
-    TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
-    LIMIT_SIZE_KB=3072
-    if [ -n "$TOTAL_SIZE_KB" ] && [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
-        rm -rf temp/*
-        log "[*] temp目录超过3MB，已清理所有文件"
-    else
-        log "[*] temp目录未超过3MB，跳过清理"
-    fi
-else
-    log "[*] temp目录不存在，跳过清理"
-fi
-
-log "[*] 清理浏览器临时文件..."
-if [ -d "playwright-browsers" ]; then
-    log "[*] 删除playwright-browsers目录中的临时zip文件..."
-    rm -f playwright-browsers/*.zip
-    log "[*] 浏览器临时文件清理完成"
-else
-    log "[*] playwright-browsers目录不存在，跳过清理"
-fi
-
 VENV_PATH=".venv"
 NODE_ENV_PATH=".node_env"
 FASTEST_PIP_MIRROR=""
 FASTEST_NPM_MIRROR=""
+
+pre_launch() {
+    log "========================================"
+    log "Szwego商品爬虫和货号对比工具 - v${VERSION}"
+    log "========================================"
+
+    log_blank
+    log "[*] 清理残留进程..."
+    pkill -9 -f "python.*main.py" 2>/dev/null || true
+    pkill -9 -f "hostc" 2>/dev/null || true
+    sleep 1
+    log "[*] 残留进程清理完成"
+
+    log_blank
+    log "[*] 检查 hostc 隧道工具..."
+    HOSTC_BIN="$(pwd)/dist/node_modules/.bin/hostc"
+    if [ ! -f "$HOSTC_BIN" ]; then
+        log "[*] 本地未找到 hostc，开始安装..."
+        install_hostc
+        if [ ! -f "$HOSTC_BIN" ]; then
+            log "[WARNING] hostc 安装失败，隧道将不可用"
+        fi
+    fi
+    if [ -f "$HOSTC_BIN" ]; then
+        HOSTC_VER=$("$HOSTC_BIN" --version 2>/dev/null || echo "unknown")
+        log "[*] hostc v${HOSTC_VER} 已就绪"
+    fi
+
+    log_blank
+    log "[*] 启动 hostc 隧道（后台运行，不阻塞）..."
+    echo -n > "file/tunnel_url.txt"
+    if [ -f "$HOSTC_BIN" ]; then
+        "$HOSTC_BIN" 8888 --local-host localhost >> file/tunnel_url.txt 2>&1 < /dev/null &
+    else
+        npx -y hostc@latest 8888 --local-host localhost >> file/tunnel_url.txt 2>&1 < /dev/null &
+    fi
+    log "[*] hostc 已在后台启动，将在后续步骤中获取URL"
+
+    log_blank
+    log "[*] 清理临时文件..."
+    if [ -d "temp" ]; then
+        TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
+        LIMIT_SIZE_KB=3072
+        if [ -n "$TOTAL_SIZE_KB" ] && [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
+            rm -rf temp/*
+            log "[*] temp目录超过3MB，已清理所有文件"
+        else
+            log "[*] temp目录未超过3MB，跳过清理"
+        fi
+    else
+        log "[*] temp目录不存在，跳过清理"
+    fi
+
+    log "[*] 清理浏览器临时文件..."
+    if [ -d "playwright-browsers" ]; then
+        log "[*] 删除playwright-browsers目录中的临时zip文件..."
+        rm -f playwright-browsers/*.zip
+        log "[*] 浏览器临时文件清理完成"
+    else
+        log "[*] playwright-browsers目录不存在，跳过清理"
+    fi
+}
 
 detect_python_env() {
     log_blank
@@ -714,4 +716,5 @@ main() {
 
 trap cleanup_exit INT TERM EXIT
 
+pre_launch
 main
