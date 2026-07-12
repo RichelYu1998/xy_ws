@@ -6825,7 +6825,7 @@ if __name__ == '__main__':
         
         stable_url = None
         stable_url_confirm_count = 0
-        stable_url_min_confirms = 2  # 需要连续2次验证通过才认为稳定
+        stable_url_min_confirms = 1  # 需要连续1次验证通过才认为稳定
         url_first_seen_time = 0
         last_stable_notification_time = 0
         
@@ -7075,8 +7075,8 @@ if __name__ == '__main__':
             consecutive_failures = 0
             max_consecutive_failures = 5
             url_verify_failures = 0
-            max_url_verify_failures = 3
-            heartbeat_interval = 60
+            max_url_verify_failures = 2
+            heartbeat_interval = 30
             last_log_time = 0
             grace_end_time = time.time() + 60
             last_url_sync_time = 0
@@ -7617,7 +7617,7 @@ if __name__ == '__main__':
                     'verify_progress': {
                         'current': 0,
                         'required': stable_url_min_confirms,
-                        'estimated_time_seconds': stable_url_min_confirms * 60
+                        'estimated_time_seconds': stable_url_min_confirms * 30
                     },
                     'next_notification': '等待稳定性确认后自动发送邮件通知'
                 }
@@ -7641,7 +7641,7 @@ if __name__ == '__main__':
                     'verify_progress': {
                         'current': 0,
                         'required': stable_url_min_confirms,
-                        'estimated_time_seconds': stable_url_min_confirms * 60
+                        'estimated_time_seconds': stable_url_min_confirms * 30
                     },
                     'next_notification': '等待稳定性确认后自动发送邮件通知'
                 }
@@ -7792,7 +7792,7 @@ if __name__ == '__main__':
                 'progress_percent': int((stable_url_confirm_count / stable_url_min_confirms) * 100) if stable_url_min_confirms > 0 else 0,
                 'stable_url': stable_url,
                 'time_elapsed_seconds': int(time.time() - url_first_seen_time) if url_first_seen_time > 0 and stable_url_confirm_count > 0 else 0,
-                'estimated_remaining_seconds': max(0, (stable_url_min_confirms - stable_url_confirm_count) * 60) if stable_url_confirm_count < stable_url_min_confirms else 0
+                'estimated_remaining_seconds': max(0, (stable_url_min_confirms - stable_url_confirm_count) * 30) if stable_url_confirm_count < stable_url_min_confirms else 0
             }
             
             # 确定详细状态描述
