@@ -159,6 +159,8 @@
     - [4.5.3 毫秒显示格式](#453-毫秒显示格式)
     - [4.5.4 延迟扩展](#454-延迟扩展)
     - [4.5.5 空值兜底](#455-空值兜底)
+    - [4.5.6 Flask 启动检测间隔规范（v3.8.24 新增）](#456-flask-启动检测间隔规范v3824-新增)
+    - [4.5.7 函数定义顺序规范（v3.8.36 新增）](#457-函数定义顺序规范v3836-新增)
   - [4.6 自动安装策略汇总](#46-自动安装策略汇总)
     - [Python 安装优先级](#python-安装优先级)
     - [Node.js 安装优先级](#nodejs-安装优先级)
@@ -6449,6 +6451,14 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.36 (2026-07-12) - 🔧 run.sh 函数定义顺序修复 + pre_launch 函数化重构
+
+- **🔧 run.sh 函数定义顺序修复** - `install_hostc` 函数在第361行定义，却在第67行被调用（Bash 要求函数先定义后调用），导致 `install_hostc: command not found`，hostc 安装步骤失败
+- **📦 pre_launch 函数化重构** - 将原来在脚本顶层直接执行的代码（清理进程、安装hostc、启动隧道、清理临时文件）封装为 `pre_launch()` 函数，在所有函数定义完成后再调用
+- **📋 skill.md 新增 4.5.7 函数定义顺序规范** - 明确 Bash/Batch 跨平台函数调用机制差异，规定 run.sh 禁止在顶层代码中调用尚未定义的函数
+
+---
+
 ### v3.8.35 (2026-07-11) - 📝 核心范式文档补全（7项）
 
 - **🔧 后端 Flask 路由范式补全** - skill.md 新增 `2.17 Flask 路由核心范式`（3个子章节）：首页版本注入+无缓存、静态资源gzip压缩、后台命令执行系统
@@ -7511,6 +7521,56 @@ detect_node_env() {
 }
 
 # ========================================
+# hostc CDN轮询安装
+# ========================================
+install_hostc() {
+    log "[*] CDN轮询安装 hostc..."
+
+    declare -a HOSTC_MIRRORS=(
+        "https://registry.npmmirror.com|npmmirror淘宝"
+        "https://repo.huaweicloud.com/repository/npm/|华为云"
+        "https://registry.npmjs.org|官方源"
+    )
+
+    HOSTC_MIN_TIME=9999
+    HOSTC_BEST_MIRROR=""
+    HOSTC_BEST_NAME=""
+
+    for hostc_mirror_entry in "${HOSTC_MIRRORS[@]}"; do
+        IFS='|' read -r H_URL H_NAME <<< "$hostc_mirror_entry"
+        log "    测试 $H_NAME..."
+
+        H_TIME=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 "$H_URL" 2>/dev/null)
+
+        if [ -z "$H_TIME" ] || [ "$H_TIME" = "0.000" ] || [ "$H_TIME" = "0" ]; then
+            log "        $H_NAME: 超时/失败"
+        else
+            H_INT_TIME=$(echo "$H_TIME" | awk '{printf "%d", $1 * 1000}')
+            log "        $H_NAME: ${H_TIME}秒 [${H_INT_TIME}ms]"
+            if [ "$H_INT_TIME" -lt "$HOSTC_MIN_TIME" ] 2>/dev/null; then
+                HOSTC_MIN_TIME=$H_INT_TIME
+                HOSTC_BEST_MIRROR="$H_URL"
+                HOSTC_BEST_NAME="$H_NAME"
+            fi
+        fi
+    done
+
+    if [ -z "$HOSTC_BEST_MIRROR" ]; then
+        log "[WARNING] 所有CDN均不可用，尝试默认源安装..."
+        HOSTC_BEST_MIRROR="https://registry.npmmirror.com"
+        HOSTC_BEST_NAME="npmmirror淘宝(fallback)"
+    fi
+
+    log "[*] 使用 $HOSTC_BEST_NAME 安装 hostc..."
+    npm install hostc@latest --registry "$HOSTC_BEST_MIRROR" --prefix dist 2>/dev/null
+    if [ $? -ne 0 ]; then
+        log "[ERROR] hostc 安装失败"
+    else
+        log "[*] hostc 安装成功"
+    fi
+}
+
+# ========================================
 # [3/6] PIP 镜像源轮询测速
 # ========================================
 test_pip_mirrors() {
@@ -7688,13 +7748,11 @@ run_web() {
 }
 
 # ========================================
-# 主流程
+# 主流程（所有函数定义完成后调用）
 # ========================================
-log "========================================"
-log "Szwego商品爬虫和货号对比工具 - v${VERSION}"
-log "========================================"
+trap cleanup_exit INT TERM EXIT
 
-cleanup_temp
+pre_launch
 detect_python_env || { log "[ERROR] Python安装失败"; exit 1; }
 detect_node_env
 test_pip_mirrors
@@ -9605,6 +9663,8 @@ pkill -f hostc
 - [x] 隧道守护二次验证（连续2次失败才重启，v3.8.32）
 - [x] 重启指数退避（60s→120s→240s→300s上限，v3.8.32）
 - [x] 心跳失败阈值优化（10次→3次，3分钟触发重启，v3.8.32）
+- [x] run.sh 函数定义顺序正确（先定义后调用，pre_launch 函数化重构，v3.8.36）
+- [x] run.sh 禁止在顶层代码中调用尚未定义的函数（v3.8.36）
 
 ---
 
