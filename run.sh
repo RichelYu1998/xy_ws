@@ -63,6 +63,22 @@ pre_launch() {
     pkill -9 -f "python.*main.py" 2>/dev/null || true
     pkill -9 -f "hostc" 2>/dev/null || true
     sleep 1
+
+    PORT_WAIT_COUNT=0
+    PORT_MAX_WAIT=10
+    while [ $PORT_WAIT_COUNT -lt $PORT_MAX_WAIT ]; do
+        if ! lsof -i :8888 -sTCP:LISTEN &>/dev/null; then
+            break
+        fi
+        PORT_WAIT_COUNT=$((PORT_WAIT_COUNT + 1))
+        log "[*] 端口8888仍被占用，等待释放... ($PORT_WAIT_COUNT/$PORT_MAX_WAIT)"
+        sleep 1
+    done
+    if [ $PORT_WAIT_COUNT -ge $PORT_MAX_WAIT ]; then
+        log "[WARNING] 端口8888等待超时，强制清理占用进程..."
+        lsof -t -i :8888 -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
     log "[*] 残留进程清理完成"
 
     log_blank

@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.37
+> **版本**: v3.8.38
 > **更新日期**: 2026-07-12
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,48 @@
 ---
 
 ## 最新更新
+
+### v3.8.38 (2026-07-12) - 🔧 端口8888占用竞态条件修复
+
+#### 🎯 核心改进
+- **🔧 端口占用竞态条件修复** - `pkill -9` 杀掉旧 Flask 进程后，TCP 端口 8888 可能仍处于 LISTEN/TIME_WAIT 状态，新 Flask 进程立即启动时 `Address already in use` 导致服务启动失败退出
+- **🔄 run.sh + run.bat 双平台同步修复** - 新增端口释放等待循环（最多10秒），超时后强制清理占用进程
+
+#### 🔧 端口占用竞态条件修复
+
+**问题描述**:
+```
+启动流程（修复前）:
+  1. pkill -9 -f "python.*main.py"   ← 杀掉旧 Flask 进程
+  2. sleep 1                          ← 仅等1秒
+  3. python main.py --web --port 8888 ← ❌ Address already in use!
+  4. exit 1                           ← 脚本退出
+
+根因：pkill -9 强制杀进程，但 TCP 端口释放需要时间
+     → 端口 8888 仍处于 LISTEN 状态
+     → 新 Flask 绑定端口失败
+     → Web 服务进程退出
+     → 心跳检测到 URL 验证失败，触发不必要的隧道重启
+```
+
+**修复后**:
+```
+启动流程（修复后）:
+  1. pkill -9 -f "python.*main.py"   ← 杀掉旧 Flask 进程
+  2. sleep 1                          ← 基础等待
+  3. while lsof -i :8888 LISTEN:      ← ✅ 循环等待端口释放（最多10秒）
+  4. 超时则强制 kill 占用进程          ← ✅ 兜底清理
+  5. python main.py --web --port 8888 ← ✅ 端口已释放，正常启动
+```
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| run.sh | `pre_launch` 新增端口 8888 释放等待循环 + 超时强制清理 |
+| run.bat | `:main_start` 新增端口 8888 释放等待循环 + 超时强制清理 |
+
+---
 
 ### v3.8.37 (2026-07-12) - 🐛 /api/readme-sections 500 错误修复
 
