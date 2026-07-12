@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.36
+> **版本**: v3.8.37
 > **更新日期**: 2026-07-12
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,54 @@
 ---
 
 ## 最新更新
+
+### v3.8.37 (2026-07-12) - 🐛 /api/readme-sections 500 错误修复
+
+#### 🎯 核心改进
+- **🐛 h3 解析 KeyError 修复** - `get_readme_sections()` 解析 README.md 时，遇到 h3 标题访问 `sections[current_h2]` 但 `current_h2` 尚未保存到字典中（只有遇到下一个 h2 时才保存），导致 `KeyError` → 500 错误
+- **🏷️ Section 名称匹配修复** - 代码中查找的 section 名称（如 `功能特性`、`使用方法`、`安装和配置`）与 README.md 中实际的名称（如 `📋 项目简介`、`🚀 快速启动`、`⚙️ 配置说明`）不匹配，导致前端功能特性卡片始终为空
+
+#### 🐛 h3 解析 KeyError 修复
+
+**问题描述**:
+```python
+# 修复前：h3 处理时 current_h2 还没被添加到 sections 字典
+if h3_match:
+    if current_h3 and current_h2:
+        sections[current_h2]['subsections'][sub_key] = ...  # ❌ KeyError!
+    # current_h2 只在遇到下一个 h2 时才保存到 sections
+
+# README.md 结构：
+## 最新更新          ← current_h2 = "最新更新"，但未保存到 sections
+### v3.8.36 ...     ← 访问 sections["最新更新"] → KeyError → 500
+```
+
+**修复后**:
+```python
+# 修复后：h3 处理时先确保 current_h2 已存在于 sections 中
+if h3_match:
+    if current_h3 and current_h2:
+        if current_h2 not in sections:  # ✅ 先检查并创建
+            sections[current_h2] = {'title': current_h2, 'content': '', 'subsections': {}}
+        sections[current_h2]['subsections'][sub_key] = ...  # ✅ 安全访问
+```
+
+#### 🏷️ Section 名称匹配修复
+
+| 代码中查找的（修复前） | README.md 中实际的 | 代码中查找的（修复后） |
+|----------------------|-------------------|----------------------|
+| `功能特性` | `📋 项目简介` | `📋 项目简介`（fallback `功能特性`） |
+| `技术特点` | `🔧 核心模块说明` | `🔧 核心模块说明`（fallback `技术特点`） |
+| `使用方法` | `🚀 快速启动` | `🚀 快速启动`（fallback `使用方法`） |
+| `安装和配置` | `⚙️ 配置说明` | `⚙️ 配置说明`（fallback `安装和配置`） |
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | `get_readme_sections()` h3 解析 KeyError 修复 + section 名称匹配修复 |
+
+---
 
 ### v3.8.36 (2026-07-12) - 🔧 run.sh 函数定义顺序修复 + pre_launch 函数化重构
 

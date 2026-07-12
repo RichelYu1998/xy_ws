@@ -6451,6 +6451,13 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.37 (2026-07-12) - 🐛 /api/readme-sections 500 错误修复
+
+- **🐛 h3 解析 KeyError 修复** - `get_readme_sections()` 解析 README.md 时，遇到 h3 标题访问 `sections[current_h2]` 但 `current_h2` 尚未保存到字典中，导致 `KeyError` → 500 错误
+- **🏷️ Section 名称匹配修复** - 代码中查找的 section 名称（如 `功能特性`、`使用方法`、`安装和配置`）与 README.md 中实际的名称（如 `📋 项目简介`、`🚀 快速启动`、`⚙️ 配置说明`）不匹配，导致前端功能特性卡片始终为空
+
+---
+
 ### v3.8.36 (2026-07-12) - 🔧 run.sh 函数定义顺序修复 + pre_launch 函数化重构
 
 - **🔧 run.sh 函数定义顺序修复** - `install_hostc` 函数在第361行定义，却在第67行被调用（Bash 要求函数先定义后调用），导致 `install_hostc: command not found`，hostc 安装步骤失败
@@ -9665,6 +9672,8 @@ pkill -f hostc
 - [x] 心跳失败阈值优化（10次→3次，3分钟触发重启，v3.8.32）
 - [x] run.sh 函数定义顺序正确（先定义后调用，pre_launch 函数化重构，v3.8.36）
 - [x] run.sh 禁止在顶层代码中调用尚未定义的函数（v3.8.36）
+- [x] /api/readme-sections h3 解析时先确保 current_h2 已存在于 sections 字典中（v3.8.37）
+- [x] /api/readme-sections section 名称与 README.md 实际标题匹配（含 emoji fallback）（v3.8.37）
 
 ---
 
