@@ -6660,8 +6660,12 @@ if __name__ == '__main__':
                     if h3_match:
                         if current_h3 and current_h2:
                             sub_key = current_h3
-                            if 'subsections' not in sections.get(current_h2, {}):
-                                sections[current_h2]['subsections'] = {}
+                            if current_h2 not in sections:
+                                sections[current_h2] = {
+                                    'title': current_h2,
+                                    'content': '',
+                                    'subsections': {}
+                                }
                             sections[current_h2]['subsections'][sub_key] = '\n'.join(current_lines).strip()
                         current_h3 = h3_match.group(1).strip()
                         current_lines = []
@@ -6677,7 +6681,7 @@ if __name__ == '__main__':
                     elif current_h3:
                         sections[current_h2]['subsections'][current_h3] = '\n'.join(current_lines).strip()
                 features = []
-                feat_section = sections.get('功能特性', {})
+                feat_section = sections.get('📋 项目简介', sections.get('功能特性', {}))
                 if feat_section:
                     for sub_title, sub_content in feat_section.get('subsections', {}).items():
                         items = []
@@ -6690,19 +6694,24 @@ if __name__ == '__main__':
                         clean_title = re.sub(r'^\d+\.\s*', '', sub_title)
                         features.append({'title': clean_title, 'items': items})
                 tech_features = []
-                tech_section = sections.get('技术特点', {})
+                tech_section = sections.get('🔧 核心模块说明', sections.get('技术特点', {}))
                 if tech_section:
+                    for sub_title, sub_content in tech_section.get('subsections', {}).items():
+                        for l in sub_content.split('\n'):
+                            m = re.match(r'-\s+\*\*(.+?)\*\*[:：]?\s*(.*)', l.strip())
+                            if m:
+                                tech_features.append({'title': m.group(1), 'desc': m.group(2).strip()})
                     for l in tech_section.get('content', '').split('\n'):
                         m = re.match(r'-\s+\*\*(.+?)\*\*[:：]?\s*(.*)', l.strip())
                         if m:
                             tech_features.append({'title': m.group(1), 'desc': m.group(2).strip()})
                 usage_steps = []
-                usage_section = sections.get('使用方法', {})
+                usage_section = sections.get('🚀 快速启动', sections.get('使用方法', {}))
                 if usage_section:
                     for sub_title, sub_content in usage_section.get('subsections', {}).items():
                         clean_title = re.sub(r'^方法\d+[：:]\s*', '', sub_title)
                         usage_steps.append({'title': clean_title, 'content': sub_content})
-                install_section = sections.get('安装和配置', {})
+                install_section = sections.get('⚙️ 配置说明', sections.get('安装和配置', {}))
                 install_steps = []
                 if install_section:
                     for sub_title, sub_content in install_section.get('subsections', {}).items():
