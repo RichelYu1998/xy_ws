@@ -64,6 +64,23 @@ call :log [*] 清理残留进程...
 taskkill /F /IM python.exe >nul 2>&1
 taskkill /F /IM node.exe >nul 2>&1
 ping -n 2 127.0.0.1 >nul 2>&1
+
+set PORT_WAIT_COUNT=0
+set PORT_MAX_WAIT=10
+:port_wait_loop
+if %PORT_WAIT_COUNT% geq %PORT_MAX_WAIT% goto port_wait_done
+netstat -ano | findstr ":8888.*LISTENING" >nul 2>&1
+if errorlevel 1 goto port_wait_done
+set /a PORT_WAIT_COUNT+=1
+call :log [*] 端口8888仍被占用，等待释放... (%PORT_WAIT_COUNT%/%PORT_MAX_WAIT%)
+ping -n 2 127.0.0.1 >nul 2>&1
+goto port_wait_loop
+:port_wait_done
+if %PORT_WAIT_COUNT% geq %PORT_MAX_WAIT% (
+    call :log [WARNING] 端口8888等待超时，强制清理占用进程...
+    for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8888.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
+    ping -n 2 127.0.0.1 >nul 2>&1
+)
 call :log [*] 残留进程清理完成
 
 call :log_blank

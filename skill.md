@@ -161,6 +161,7 @@
     - [4.5.5 空值兜底](#455-空值兜底)
     - [4.5.6 Flask 启动检测间隔规范（v3.8.24 新增）](#456-flask-启动检测间隔规范v3824-新增)
     - [4.5.7 函数定义顺序规范（v3.8.36 新增）](#457-函数定义顺序规范v3836-新增)
+    - [4.5.8 端口释放等待规范（v3.8.38 新增）](#458-端口释放等待规范v3838-新增)
   - [4.6 自动安装策略汇总](#46-自动安装策略汇总)
     - [Python 安装优先级](#python-安装优先级)
     - [Node.js 安装优先级](#nodejs-安装优先级)
@@ -6451,6 +6452,13 @@ document.addEventListener('DOMContentLoaded', function() {   // 第1层
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.38 (2026-07-12) - 🔧 端口8888占用竞态条件修复
+
+- **🔧 端口占用竞态条件修复** - `pkill -9` 杀掉旧 Flask 进程后，TCP 端口 8888 可能仍处于 LISTEN 状态，新 Flask 启动时 `Address already in use` 导致服务退出
+- **🔄 run.sh + run.bat 双平台同步修复** - 新增端口释放等待循环（最多10秒），超时后强制清理占用进程
+
+---
+
 ### v3.8.37 (2026-07-12) - 🐛 /api/readme-sections 500 错误修复
 
 - **🐛 h3 解析 KeyError 修复** - `get_readme_sections()` 解析 README.md 时，遇到 h3 标题访问 `sections[current_h2]` 但 `current_h2` 尚未保存到字典中，导致 `KeyError` → 500 错误
@@ -8278,6 +8286,64 @@ if "!VAR!"=="" set "VAR=default_value"
 - ❌ 禁止使用 `ping -n 3` 或 `sleep 2` 作为检测间隔（太慢）
 - ✅ 初始等待 `ping -n 2` / `sleep 1`，检测间隔 `ping -n 1` / `sleep 1`
 
+#### 4.5.8 端口释放等待规范（v3.8.38 新增）
+
+**核心原则**：`pkill -9` / `taskkill /F` 强制杀进程后，TCP 端口可能仍处于 LISTEN/TIME_WAIT 状态，必须等待端口释放后再启动新服务。
+
+**Bash (run.sh) 端口释放等待范式**：
+
+```bash
+pkill -9 -f "python.*main.py" 2>/dev/null || true
+pkill -9 -f "hostc" 2>/dev/null || true
+sleep 1
+
+PORT_WAIT_COUNT=0
+PORT_MAX_WAIT=10
+while [ $PORT_WAIT_COUNT -lt $PORT_MAX_WAIT ]; do
+    if ! lsof -i :8888 -sTCP:LISTEN &>/dev/null; then
+        break
+    fi
+    PORT_WAIT_COUNT=$((PORT_WAIT_COUNT + 1))
+    log "[*] 端口8888仍被占用，等待释放... ($PORT_WAIT_COUNT/$PORT_MAX_WAIT)"
+    sleep 1
+done
+if [ $PORT_WAIT_COUNT -ge $PORT_MAX_WAIT ]; then
+    log "[WARNING] 端口8888等待超时，强制清理占用进程..."
+    lsof -t -i :8888 -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true
+    sleep 1
+fi
+```
+
+**Batch (run.bat) 端口释放等待范式**：
+
+```batch
+taskkill /F /IM python.exe >nul 2>&1
+taskkill /F /IM node.exe >nul 2>&1
+ping -n 2 127.0.0.1 >nul 2>&1
+
+set PORT_WAIT_COUNT=0
+set PORT_MAX_WAIT=10
+:port_wait_loop
+if %PORT_WAIT_COUNT% geq %PORT_MAX_WAIT% goto port_wait_done
+netstat -ano | findstr ":8888.*LISTENING" >nul 2>&1
+if errorlevel 1 goto port_wait_done
+set /a PORT_WAIT_COUNT+=1
+call :log [*] 端口8888仍被占用，等待释放... (%PORT_WAIT_COUNT%/%PORT_MAX_WAIT%)
+ping -n 2 127.0.0.1 >nul 2>&1
+goto port_wait_loop
+:port_wait_done
+if %PORT_WAIT_COUNT% geq %PORT_MAX_WAIT% (
+    call :log [WARNING] 端口8888等待超时，强制清理占用进程...
+    for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8888.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
+    ping -n 2 127.0.0.1 >nul 2>&1
+)
+```
+
+**关键参数**：
+- 端口检测工具：macOS/Linux 用 `lsof -i :PORT -sTCP:LISTEN`，Windows 用 `netstat -ano | findstr ":PORT.*LISTENING"`
+- 最大等待次数：10次（每次1秒，共10秒）
+- 超时兜底：强制 kill 占用端口的进程
+
 ### 4.6 自动安装策略汇总
 
 #### Python 安装优先级
@@ -9674,6 +9740,7 @@ pkill -f hostc
 - [x] run.sh 禁止在顶层代码中调用尚未定义的函数（v3.8.36）
 - [x] /api/readme-sections h3 解析时先确保 current_h2 已存在于 sections 字典中（v3.8.37）
 - [x] /api/readme-sections section 名称与 README.md 实际标题匹配（含 emoji fallback）（v3.8.37）
+- [x] 启动前端口8888释放等待（lsof/netstat 循环检测，最多10秒，超时强制清理）（v3.8.38）
 
 ---
 
