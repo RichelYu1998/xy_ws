@@ -171,6 +171,8 @@
   - [5.2 模板机制](#52-模板机制)
 - [六、隧道与公网访问规范](#六隧道与公网访问规范)
   - [6.1 隧道服务](#61-隧道服务)
+  - [6.1.1 Cloudflare Tunnel 跨平台支持](#611-cloudflare-tunnel-跨平台支持v3843-新增)
+  - [6.1.2 Cloudflare Named Tunnel + 自定义域名 + 自动降级](#612-cloudflare-named-tunnel--自定义域名--自动降级v3844-新增)
   - [6.2 Web 日志持久化](#62-web-日志持久化)
   - [6.3 邮件通知](#63-邮件通知)
 - [编码风格速查表](#编码风格速查表)
@@ -8661,6 +8663,109 @@ def get_tunnel_status():
 - 支持代理加速
 - 自动解压 `.tgz` 文件
 - 重命名为统一命名规范
+
+### 6.1.2 Cloudflare Named Tunnel + 自定义域名 + 自动降级（v3.8.44 新增）
+
+**双模式架构（Plan A + Plan B）**:
+
+```
+config.cloudflare_tunnel.enabled AND use_named_tunnel?
+  ├─ Yes → 尝试 Plan B: Named Tunnel (自定义域名, 永久不变)
+  │   ├─ 成功 → 使用 https://test12138.cn.mt
+  │   └─ 失败 → 自动降级到 Plan A: Quick Tunnel (临时域名)
+  └─ No → Plan A: Quick Tunnel (临时域名, *.trycloudflare.com)
+```
+
+**两种模式对比**:
+
+| 特性 | Plan A: Quick Tunnel | Plan B: Named Tunnel |
+|------|---------------------|---------------------|
+| 域名 | `https://xxx.trycloudflare.com` | `https://test12138.cn.mt` |
+| 重启后 | ❌ 每次变 | ✅ 永久不变 |
+| 前提条件 | 无 | 域名托管在 Cloudflare + NS 已生效 |
+| 配置复杂度 | 零配置 | 需先完成 Cloudflare 域名托管 |
+| 适用场景 | 临时测试、快速启动 | 生产环境、长期服务 |
+
+**配置规范** (`config.json`):
+```json
+{
+  "cloudflare_tunnel": {
+    "enabled": true,
+    "custom_domain": "test12138.cn.mt",
+    "tunnel_name": "xy-ws-tunnel",
+    "use_named_tunnel": true
+  }
+}
+```
+
+| 配置项 | 类型 | 说明 | 默认值 |
+|--------|------|------|--------|
+| `enabled` | bool | 是否启用 Cloudflare Tunnel | `true` |
+| `use_named_tunnel` | bool | `true`=Named Tunnel(永久域名), `false`=Quick Tunnel(临时域名) | `false` |
+| `custom_domain` | string | 自定义域名（需已托管在 Cloudflare） | `""` |
+| `tunnel_name` | string | Tunnel 名称标识 | `"xy-ws-tunnel"` |
+
+**首次自动配置流程** (Named Tunnel):
+```
+_ensure_named_tunnel_ready(cf_binary, tunnel_name, custom_domain, port):
+  1. 检查 .cloudflared/{tunnel_name}.json 是否存在（已配置则跳过）
+  2. cloudflared tunnel create {tunnel_name}    ← 创建 tunnel
+  3. cloudflared tunnel route dns {tunnel_name} {custom_domain}  ← DNS 路由
+  4. 生成 .cloudflared/config.yml               ← 配置文件
+  返回: (tunnel_id, config_yml_path) 或 (None, None) 表示失败
+```
+
+**config.yml 生成范式**:
+```yaml
+tunnel: xy-ws-tunnel
+credentials-file: /path/to/.cloudflared/xy-ws-tunnel.json
+
+ingress:
+  - hostname: test12138.cn.mt
+    service: http://localhost:8888
+  - service: http_status:404
+```
+
+**自动降级代码范式**:
+```python
+def start_cloudflare_tunnel(port=8888, timeout=120):
+    cf_config = _get_cloudflare_tunnel_config()
+    use_named = cf_config['enabled'] and cf_config['use_named_tunnel'] and cf_config['custom_domain']
+    
+    if use_named:
+        # Plan B: 尝试 Named Tunnel
+        tunnel_id, config_yml_path = _ensure_named_tunnel_ready(...)
+        if tunnel_id and config_yml_path:
+            # 启动 named tunnel
+            cmd = [cf_binary, "tunnel", "run", tunnel_name, "--config", config_yml_path]
+            tunnel_process = subprocess.Popen(cmd, ...)
+            if tunnel_process.poll() is None:
+                return {"success": True, "url": f"https://{custom_domain}", "mode": "named"}
+            else:
+                # 进程退出，降级
+                print("[Cloudflare] ⚠️ 降级到 Plan A: Quick Tunnel...")
+        else:
+            # 配置失败，降级
+            print("[Cloudflare] ⚠️ Named Tunnel 未就绪，降级到 Plan A...")
+    
+    # Plan A: Quick Tunnel (临时域名)
+    cmd = [cf_binary, "tunnel", "--url", f"http://localhost:{port}"]
+    tunnel_process = subprocess.Popen(cmd, ...)
+    # 等待 https://xxx.trycloudflare.com 出现
+    return {"success": True, "url": tunnel_url, "mode": "quick"}
+```
+
+**Named Tunnel 前提条件**:
+1. 域名已添加到 Cloudflare Dashboard
+2. 域名 NS 已指向 Cloudflare（如 `xxx.ns.cloudflare.com`）
+3. 已执行 `cloudflared tunnel login` 完成授权
+4. `config.json` 中 `use_named_tunnel: true` 且 `custom_domain` 非空
+
+**降级触发条件**:
+- `_ensure_named_tunnel_ready()` 返回 `(None, None)`
+- `cloudflared tunnel create` 失败（未登录/NS未生效）
+- `cloudflared tunnel route dns` 失败（域名不在 Cloudflare）
+- Named Tunnel 进程启动后立即退出
 
 ### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.28 更新）
 

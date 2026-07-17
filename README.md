@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.43
+> **版本**: v3.8.44
 > **更新日期**: 2026-07-17
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,70 @@
 ---
 
 ## 最新更新
+
+### v3.8.44 (2026-07-17) - 🏠 Cloudflare Named Tunnel + 自定义域名 + 自动降级
+
+#### 🎯 核心改进
+- **🏠 Named Tunnel 支持** - 新增 Cloudflare Named Tunnel 模式，支持自定义域名（如 `test12138.cn.mt`），重启后域名不变
+- **🔄 自动降级机制** - Named Tunnel 不可用时自动降级到 Quick Tunnel（临时域名），确保服务始终可用
+- **🔧 首次自动配置** - 首次使用 Named Tunnel 时自动创建 tunnel、配置 DNS 路由、生成 config.yml
+- **📋 双模式配置** - `config.json` 新增 `use_named_tunnel`、`custom_domain`、`tunnel_name` 配置项
+
+#### 🏠 Named Tunnel + 自动降级
+
+**启动逻辑**:
+```
+config.cloudflare_tunnel.enabled AND use_named_tunnel?
+  ├─ Yes → 尝试 Plan B: Named Tunnel (自定义域名)
+  │   ├─ 成功 → 使用 https://test12138.cn.mt (永久域名)
+  │   └─ 失败 → 自动降级到 Plan A: Quick Tunnel (临时域名)
+  └─ No → Plan A: Quick Tunnel (临时域名, *.trycloudflare.com)
+```
+
+**首次自动配置流程** (Named Tunnel):
+```
+1. cloudflared tunnel create xy-ws-tunnel    ← 创建 tunnel
+2. cloudflared tunnel route dns xy-ws-tunnel test12138.cn.mt  ← DNS 路由
+3. 生成 .cloudflared/config.yml              ← 配置文件
+4. cloudflared tunnel run xy-ws-tunnel       ← 启动 tunnel
+```
+
+**配置说明** (`config.json`):
+```json
+{
+  "cloudflare_tunnel": {
+    "enabled": true,
+    "custom_domain": "test12138.cn.mt",
+    "tunnel_name": "xy-ws-tunnel",
+    "use_named_tunnel": true
+  }
+}
+```
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `enabled` | 是否启用 Cloudflare Tunnel | `true` |
+| `use_named_tunnel` | `true`=Named Tunnel(永久域名), `false`=Quick Tunnel(临时域名) | `false` |
+| `custom_domain` | 自定义域名（需已托管在 Cloudflare） | `""` |
+| `tunnel_name` | Tunnel 名称标识 | `"xy-ws-tunnel"` |
+
+**两种模式对比**:
+
+| 特性 | Plan A: Quick Tunnel | Plan B: Named Tunnel |
+|------|---------------------|---------------------|
+| 域名 | `https://xxx.trycloudflare.com` | `https://test12138.cn.mt` |
+| 重启后 | ❌ 每次变 | ✅ 永久不变 |
+| 前提条件 | 无 | 域名托管在 Cloudflare + NS 已生效 |
+| 配置复杂度 | 零配置 | 需先完成 Cloudflare 域名托管 |
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | 新增 `_get_cloudflare_tunnel_config()`、`_ensure_named_tunnel_ready()` 函数；`start_cloudflare_tunnel()` 支持 named tunnel + 自动降级 |
+| config/config.json | 新增 `cloudflare_tunnel` 配置块 |
+
+---
 
 ### v3.8.43 (2026-07-17) - 🚀 Cloudflare Tunnel 跨平台支持 + 隧道切换优化
 
