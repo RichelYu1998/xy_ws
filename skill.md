@@ -11934,5 +11934,80 @@ result = auto_start_tunnel(force_restart=True)  # 强制重启
 - [ ] 重启守护即时启动：tunnel失效后重启守护立即响应（v3.8.28 新增）
 - [ ] start_tunnel_daemons()幂等性：重复调用不创建重复线程（v3.8.28 新增）
 - [ ] /api/tunnel/status安全网：守护线程意外退出时自动恢复（v3.8.28 新增）
+- [ ] 进程竞态条件修复：启动后不检查残留进程，避免杀死新进程（v3.8.40 新增）
+- [ ] HOSTC_DEBUG 环境变量：启用 hostc 调试模式（v3.8.40 新增）
+- [ ] 实时打印 hostc 输出：`[hostc]` 前缀日志（v3.8.40 新增）
+
+### PY-STD-TUNNEL-004: 进程竞态条件修复规范（v3.8.40 新增）
+
+**规范要求**:
+1. **启动前清理，启动后不检查**：清理旧进程在启动新进程之前完成，启动后不再检查残留进程
+2. **避免竞态条件**：刚启动的进程可能被误判为"残留进程"而被杀死
+3. **添加调试环境变量**：`HOSTC_DEBUG=1` 启用 hostc 调试模式
+4. **实时打印输出**：进程输出实时打印（`[hostc]` 前缀），方便排查问题
+5. **进程退出时打印错误**：捕获并打印进程退出时的剩余输出
+
+**错误做法** ❌:
+```python
+# 启动后立即检查残留进程
+Environment.kill_process_by_name('node.exe')  # 清理旧进程
+time.sleep(2)
+tunnel_process = subprocess.Popen(...)        # 启动新进程
+
+# 检查残留进程 - 把刚启动的 hostc 当作残留进程！
+if Environment.check_process_running('node.exe'):
+    Environment.kill_process_by_name('node.exe')  # ❌ 杀死刚启动的进程！
+    time.sleep(1)
+```
+
+**正确做法** ✅:
+```python
+# 启动前清理，启动后不检查
+Environment.kill_process_by_name('node.exe')  # 清理旧进程
+time.sleep(2)
+
+# 直接启动，不再检查
+env = os.environ.copy()
+env['HOSTC_DEBUG'] = '1'  # 启用调试模式
+
+tunnel_process = subprocess.Popen(
+    f'{hostc_bin} {port} --local-host localhost',
+    stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT,
+    stdin=subprocess.DEVNULL,
+    text=True,
+    bufsize=0,
+    shell=True,
+    env=env,  # 传入调试环境变量
+    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
+)
+
+print(f"[Tunnel] 🆔 hostc进程已启动，PID: {tunnel_process.pid}")
+```
+
+**实时输出打印规范**:
+```python
+def read_output():
+    buffer = ''
+    while True:
+        if tunnel_process.poll() is not None:
+            exit_code = tunnel_process.poll()
+            print(f"[Tunnel] ❌ hostc进程已退出 (exit code: {exit_code})")
+            # 打印剩余输出（包含错误信息）
+            if buffer.strip():
+                print(f"[Tunnel] 📋 hostc输出内容:\n{buffer.strip()}")
+            break
+        
+        char = tunnel_process.stdout.read(1)
+        if char:
+            buffer += char
+            # 遇到换行符时打印
+            if '\n' in buffer:
+                lines = buffer.split('\n')
+                for line in lines[:-1]:
+                    if line.strip():
+                        print(f"[hostc] {line.strip()}")  # 实时打印
+                buffer = lines[-1]
+```
 
 ---
