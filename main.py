@@ -7324,21 +7324,19 @@ if __name__ == '__main__':
                     print(f"[Tunnel] Failed to clear old URL: {clear_err}")
                     sys.stdout.flush()
 
-                # Clean up old node.exe processes
+                # Clean up old node.exe processes BEFORE starting new one
                 Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
 
                 # 等待2秒确保旧进程完全退出（避免端口冲突）
                 time.sleep(2)
 
-                # 再次检查并清理残留进程
-                if Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc'):
-                    print("[Tunnel] 检测到残留node进程，再次清理...")
-                    Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
-                    time.sleep(1)
-
                 hostc_bin = os.path.join(PROJECT_DIR, 'dist', 'node_modules', '.bin', 'hostc.cmd' if Environment.IS_WINDOWS else 'hostc')
                 if not os.path.isfile(hostc_bin):
                     hostc_bin = 'npx hostc'
+                
+                env = os.environ.copy()
+                env['HOSTC_DEBUG'] = '1'
+                
                 tunnel_process = subprocess.Popen(
                     f'{hostc_bin} {port} --local-host localhost',
                     stdout=subprocess.PIPE,
@@ -7347,8 +7345,12 @@ if __name__ == '__main__':
                     text=True,
                     bufsize=0,
                     shell=True,
+                    env=env,
                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
                 )
+                
+                print(f"[Tunnel] 🆔 hostc进程已启动，PID: {tunnel_process.pid}")
+                sys.stdout.flush()
 
                 def read_output():
                     global tunnel_url, url_ready, old_tunnel_url, tunnel_consecutive_failures
@@ -7364,6 +7366,8 @@ if __name__ == '__main__':
                         if tunnel_process.poll() is not None:
                             exit_code = tunnel_process.poll()
                             print(f"[Tunnel] ❌ hostc进程已退出 (exit code: {exit_code})，标记需要重启")
+                            if buffer.strip():
+                                print(f"[Tunnel] 📋 hostc输出内容:\n{buffer.strip()}")
                             tunnel_need_restart = True
                             sys.stdout.flush()
                             break
@@ -7372,7 +7376,12 @@ if __name__ == '__main__':
                             char = tunnel_process.stdout.read(1)
                             if char:
                                 buffer += char
-                                # 查找 URL
+                                if '\n' in buffer:
+                                    lines = buffer.split('\n')
+                                    for line in lines[:-1]:
+                                        if line.strip():
+                                            print(f"[hostc] {line.strip()}")
+                                    buffer = lines[-1]
                                 match = re.search(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', buffer)
                                 if match:
                                     file_url = match.group(1).rstrip('/')
@@ -7423,7 +7432,6 @@ if __name__ == '__main__':
                                         sys.stdout.flush()
                                         return
                                 
-                                # 保持 buffer 不超过 1000 字符
                                 if len(buffer) > 1000:
                                     buffer = buffer[-500:]
                             else:
