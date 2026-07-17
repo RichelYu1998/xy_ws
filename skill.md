@@ -172,8 +172,7 @@
 - [六、隧道与公网访问规范](#六隧道与公网访问规范)
   - [6.1 隧道服务](#61-隧道服务)
   - [6.1.1 Cloudflare Tunnel 跨平台支持](#611-cloudflare-tunnel-跨平台支持v3843-新增)
-  - [6.1.2 Cloudflare Named Tunnel + 自定义域名 + 自动降级](#612-cloudflare-named-tunnel--自定义域名--自动降级v3844-新增)
-  - [6.1.3 NS 升级自动监控](#613-ns-升级自动监控v3845-新增)
+  - [6.1.2 Cloudflare Named Tunnel + 自定义域名](#612-cloudflare-named-tunnel--自定义域名v3844-新增v3846-更新)
   - [6.2 Web 日志持久化](#62-web-日志持久化)
   - [6.3 邮件通知](#63-邮件通知)
 - [编码风格速查表](#编码风格速查表)
@@ -8762,67 +8761,11 @@ def start_cloudflare_tunnel(port=8888, timeout=120):
 3. 已执行 `cloudflared tunnel login` 完成授权
 4. `config.json` 中 `use_named_tunnel: true` 且 `custom_domain` 非空
 
-**降级触发条件**:
+**Plan A 失败条件**:
 - `_ensure_named_tunnel_ready()` 返回 `(None, None)`
 - `cloudflared tunnel create` 失败（未登录/NS未生效）
 - `cloudflared tunnel route dns` 失败（域名不在 Cloudflare）
 - Named Tunnel 进程启动后立即退出
-
-### 6.1.3 NS 升级自动监控（v3.8.45 新增）
-
-**核心机制**：当 Quick Tunnel 降级运行时，后台守护线程 `ns_upgrade_monitor()` 每 120 秒检测 NS 是否指向 Cloudflare，一旦生效自动升级到 Named Tunnel。
-
-**运行流程**:
-```
-项目启动 → start_cloudflare_tunnel()
-  ├─ Named Tunnel 成功 → tunnel_mode='named', 监控不启动
-  └─ 降级到 Quick Tunnel → tunnel_mode='quick', 启动 ns_upgrade_monitor()
-       │
-       ├─ 每 120 秒检查 NS（dig @8.8.8.8 cn.mt NS +short）
-       ├─ NS 指向 Cloudflare?
-       │   ├─ Yes → 停止 Quick Tunnel → 启动 Named Tunnel → 发邮件 → 监控退出
-       │   └─ No → 继续监控（每 10 分钟打印一次日志）
-       └─ 永不超时，直到升级成功或用户切换隧道类型
-```
-
-**关键特性**:
-- **♾️ 永不超时** - 监控随项目启动而启动，无超时限制
-- **🔄 自动升级** - NS 一变即触发，无需手动重启
-- **📧 邮件通知** - 升级成功后自动发送邮件
-- **🛡️ 安全退出** - 用户切换隧道类型或已升级成功时监控自动退出
-
-**NS 检测代码范式**:
-```python
-def _check_ns_pointed_to_cloudflare(domain):
-    """检查域名 NS 是否已指向 Cloudflare"""
-    root_domain = domain
-    parts = domain.split('.')
-    if len(parts) > 2:
-        root_domain = '.'.join(parts[-2:])  # test12138.cn.mt → cn.mt
-    result = subprocess.run(
-        ['dig', '@8.8.8.8', root_domain, 'NS', '+short'],
-        capture_output=True, text=True, timeout=10
-    )
-    return 'cloudflare' in result.stdout.lower()
-```
-
-**API 状态新增字段** (`/api/tunnel/status`):
-```json
-{
-  "tunnel_mode": "quick",
-  "ns_monitor": {
-    "active": true,
-    "target_domain": "test12138.cn.mt",
-    "message": "等待 NS 指向 Cloudflare 后自动升级到永久域名"
-  }
-}
-```
-
-| `tunnel_mode` 值 | 含义 |
-|-----------------|------|
-| `null` | 未使用 Cloudflare Tunnel |
-| `"quick"` | Quick Tunnel 临时域名（降级模式，NS 监控运行中） |
-| `"named"` | Named Tunnel 永久域名（NS 已生效） |
 
 ### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.28 更新）
 

@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.45
+> **版本**: v3.8.46
 > **更新日期**: 2026-07-17
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -10,66 +10,64 @@
 
 ## 最新更新
 
-### v3.8.45 (2026-07-17) - 🔄 NS 升级自动监控 + Quick Tunnel 自动升级到 Named Tunnel
+### v3.8.46 (2026-07-17) - 🔀 Cloudflare Tunnel Plan A/B 二选一 + 删除 NS 监控
 
 #### 🎯 核心改进
-- **🔄 NS 升级自动监控** - 当 Quick Tunnel 降级运行时，后台守护线程每 2 分钟检测 NS 是否指向 Cloudflare
-- **⬆️ 自动升级** - NS 生效后自动停止 Quick Tunnel，启动 Named Tunnel（永久域名），发邮件通知
-- **♾️ 永不超时** - 监控随项目启动而启动，无超时限制，NS 一变即触发升级
-- **📊 状态可查** - `/api/tunnel/status` 新增 `tunnel_mode` 和 `ns_monitor` 字段
+- **🔀 Plan A/B 二选一** - Named Tunnel (Plan A) 和 Quick Tunnel (Plan B) 是独立方案，不再自动降级，哪个成功就发邮件通知
+- **📧 即时邮件通知** - Plan A 或 Plan B 成功后立即发送邮件，不再等待心跳验证
+- **🗑️ 删除 NS 监控** - 移除 `_check_ns_pointed_to_cloudflare()`、`ns_upgrade_monitor()`、`start_ns_upgrade_monitor()` 及 `ns_monitor_thread` 全局变量
+- **🗑️ 删除 ns_monitor API 字段** - `/api/tunnel/status` 不再返回 `ns_monitor` 字段
 
-#### 🔄 NS 升级自动监控
+#### 🔀 Plan A/B 二选一架构
 
 **运行流程**:
 ```
-项目启动 → start_cloudflare_tunnel()
-  ├─ Named Tunnel 成功 → tunnel_mode='named', 监控不启动
-  └─ 降级到 Quick Tunnel → tunnel_mode='quick', 启动 ns_upgrade_monitor()
-       │
-       ├─ 每 120 秒检查 NS
-       ├─ NS 指向 Cloudflare?
-       │   ├─ Yes → 停止 Quick Tunnel → 启动 Named Tunnel → 发邮件 → 监控退出
-       │   └─ No → 继续监控
-       └─ 永不超时，直到升级成功或用户切换隧道类型
+start_cloudflare_tunnel()
+  ├─ use_named_tunnel=true?
+  │   ├─ Yes → Plan A: Named Tunnel (自定义域名, 永久不变)
+  │   │   ├─ 成功 → 发邮件 → 返回成功
+  │   │   └─ 失败 → 返回失败（不降级）
+  │   └─ No → Plan B: Quick Tunnel (临时域名)
+  │       ├─ 成功 → 发邮件 → 返回成功
+  │       └─ 失败 → 返回失败
 ```
 
-**API 状态新增字段**:
-```json
-{
-  "tunnel_mode": "quick",
-  "ns_monitor": {
-    "active": true,
-    "target_domain": "test12138.cn.mt",
-    "message": "等待 NS 指向 Cloudflare 后自动升级到永久域名"
-  }
-}
-```
+**两种模式对比**:
+
+| 特性 | Plan A: Named Tunnel | Plan B: Quick Tunnel |
+|------|---------------------|---------------------|
+| 域名 | `https://test12138.cn.mt` | `https://xxx.trycloudflare.com` |
+| 重启后 | ✅ 永久不变 | ❌ 每次变 |
+| 前提条件 | 域名托管在 Cloudflare + NS 已生效 | 无 |
+| 配置复杂度 | 需先完成 Cloudflare 域名托管 | 零配置 |
+| 失败行为 | 返回错误，不降级 | 返回错误 |
 
 #### 📋 修改文件清单
 
 | 文件 | 修改内容 |
 |------|---------|
-| main.py | 新增 `_check_ns_pointed_to_cloudflare()`、`ns_upgrade_monitor()`、`start_ns_upgrade_monitor()`；`tunnel_status` API 新增 mode/ns_monitor 字段 |
+| main.py | Plan A/B 二选一逻辑；成功后即时发邮件；删除 NS 监控相关函数和变量；删除 `ns_monitor` API 字段 |
 
 ---
 
-### v3.8.44 (2026-07-17) - 🏠 Cloudflare Named Tunnel + 自定义域名 + 自动降级
+### v3.8.44 (2026-07-17) - 🏠 Cloudflare Named Tunnel + 自定义域名
 
 #### 🎯 核心改进
 - **🏠 Named Tunnel 支持** - 新增 Cloudflare Named Tunnel 模式，支持自定义域名（如 `test12138.cn.mt`），重启后域名不变
-- **🔄 自动降级机制** - Named Tunnel 不可用时自动降级到 Quick Tunnel（临时域名），确保服务始终可用
 - **🔧 首次自动配置** - 首次使用 Named Tunnel 时自动创建 tunnel、配置 DNS 路由、生成 config.yml
 - **📋 双模式配置** - `config.json` 新增 `use_named_tunnel`、`custom_domain`、`tunnel_name` 配置项
 
-#### 🏠 Named Tunnel + 自动降级
+#### 🏠 Named Tunnel
 
 **启动逻辑**:
 ```
 config.cloudflare_tunnel.enabled AND use_named_tunnel?
-  ├─ Yes → 尝试 Plan B: Named Tunnel (自定义域名)
-  │   ├─ 成功 → 使用 https://test12138.cn.mt (永久域名)
-  │   └─ 失败 → 自动降级到 Plan A: Quick Tunnel (临时域名)
-  └─ No → Plan A: Quick Tunnel (临时域名, *.trycloudflare.com)
+  ├─ Yes → Plan A: Named Tunnel (自定义域名, 永久不变)
+  │   ├─ 成功 → 发邮件通知
+  │   └─ 失败 → 返回错误
+  └─ No → Plan B: Quick Tunnel (临时域名, *.trycloudflare.com)
+      ├─ 成功 → 发邮件通知
+      └─ 失败 → 返回错误
 ```
 
 **首次自动配置流程** (Named Tunnel):
@@ -101,12 +99,12 @@ config.cloudflare_tunnel.enabled AND use_named_tunnel?
 
 **两种模式对比**:
 
-| 特性 | Plan A: Quick Tunnel | Plan B: Named Tunnel |
+| 特性 | Plan A: Named Tunnel | Plan B: Quick Tunnel |
 |------|---------------------|---------------------|
-| 域名 | `https://xxx.trycloudflare.com` | `https://test12138.cn.mt` |
-| 重启后 | ❌ 每次变 | ✅ 永久不变 |
-| 前提条件 | 无 | 域名托管在 Cloudflare + NS 已生效 |
-| 配置复杂度 | 零配置 | 需先完成 Cloudflare 域名托管 |
+| 域名 | `https://test12138.cn.mt` | `https://xxx.trycloudflare.com` |
+| 重启后 | ✅ 永久不变 | ❌ 每次变 |
+| 前提条件 | 域名托管在 Cloudflare + NS 已生效 | 无 |
+| 配置复杂度 | 需先完成 Cloudflare 域名托管 | 零配置 |
 
 #### 📋 修改文件清单
 
