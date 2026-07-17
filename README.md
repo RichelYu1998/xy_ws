@@ -10,46 +10,49 @@
 
 ## 最新更新
 
-### v3.8.46 (2026-07-17) - 🔀 Cloudflare Tunnel Plan A→B 保底 + 删除 NS 监控 + 删除 cloudflare_tunnel 配置
+### v3.8.46 (2026-07-17) - 🔀 CF + hostc 双隧道并行 + 心跳验证 + 删除 NS 监控
 
 #### 🎯 核心改进
-- **🔀 Plan A→B 保底机制** - 先试 Plan A (Named Tunnel)，失败自动回退 Plan B (Quick Tunnel)，保底至少成功一个
-- **📧 即时邮件通知** - Plan A 或 Plan B 成功后立即发送邮件，不再等待心跳验证
+- **🔀 双隧道并行** - CF 和 hostc 同时启动，各自独立运行、独立心跳验证、独立发邮件
+- **📧 心跳验证后发邮件** - CF 和 hostc 都需要通过心跳验证后才发邮件通知，不再跳过验证
+- **📧 都成功都发邮件** - CF 和 hostc 都验证通过就都发邮件，只成功一个就只发一个
 - **🔍 自动检测** - 不再依赖 config.json 配置，自动检测 `.cloudflared/` 目录下的 Named Tunnel 凭证
-- **🗑️ 删除 cloudflare_tunnel 配置** - 移除 `config.json` 中的 `cloudflare_tunnel` 配置块，改为自动检测
-- **🗑️ 删除 NS 监控** - 移除 `_check_ns_pointed_to_cloudflare()`、`ns_upgrade_monitor()`、`start_ns_upgrade_monitor()` 及 `ns_monitor_thread` 全局变量
-- **🗑️ 删除 ns_monitor API 字段** - `/api/tunnel/status` 不再返回 `ns_monitor` 字段
+- **🗑️ 删除 cloudflare_tunnel 配置** - 移除 `config.json` 中的 `cloudflare_tunnel` 配置块
+- **🗑️ 删除 NS 监控** - 移除 NS 升级监控相关函数和变量
+- **🗑️ 删除隧道类型切换** - 不再需要选择 hostc 或 cloudflare，两者同时运行
 
-#### 🔀 Plan A→B 保底架构
+#### 🔀 双隧道并行架构
 
 **运行流程**:
 ```
-start_cloudflare_tunnel()
-  ├─ 检测到 .cloudflared/ Named Tunnel 配置?
-  │   ├─ Yes → Plan A: Named Tunnel (自定义域名, 永久不变)
-  │   │   ├─ 成功 → 发邮件 → 返回成功 ✅
-  │   │   └─ 失败 → 回退到 Plan B
-  │   └─ No → 跳过 Plan A，直接 Plan B
-  └─ Plan B: Quick Tunnel (临时域名)
-      ├─ 成功 → 发邮件 → 返回成功 ✅
-      └─ 失败 → 返回失败（两个都失败）❌
+auto_start_tunnel()
+  ├─ 启动 Cloudflare Tunnel (Plan A→B 保底)
+  │   ├─ Plan A: Named Tunnel (自定义域名)
+  │   │   ├─ 成功 → cf_heartbeat_loop 验证 → 发邮件 ✅
+  │   │   └─ 失败 → 回退 Plan B
+  │   └─ Plan B: Quick Tunnel (临时域名)
+  │       ├─ 成功 → cf_heartbeat_loop 验证 → 发邮件 ✅
+  │       └─ 失败 → CF 不可用 ❌
+  └─ 启动 hostc 隧道
+      ├─ 成功 → heartbeat_loop 验证 → 发邮件 ✅
+      └─ 失败 → 标记需要重启
 ```
 
-**两种模式对比**:
+**两种隧道对比**:
 
-| 特性 | Plan A: Named Tunnel | Plan B: Quick Tunnel |
-|------|---------------------|---------------------|
-| 域名 | `https://test12138.cn.mt` | `https://xxx.trycloudflare.com` |
-| 重启后 | ✅ 永久不变 | ❌ 每次变 |
-| 前提条件 | `.cloudflared/` 下有凭证+config.yml | 无 |
-| 配置方式 | 自动检测，无需 config.json | 零配置 |
-| 失败行为 | 自动回退到 Plan B | 返回错误（保底失败） |
+| 特性 | Cloudflare Tunnel | hostc Tunnel |
+|------|-------------------|--------------|
+| 域名 | `https://xxx.trycloudflare.com` 或自定义 | `https://xxx.hostc.dev` |
+| 重启后 | Named: ✅不变 / Quick: ❌每次变 | ❌ 每次变 |
+| 心跳验证 | `cf_heartbeat_loop` 独立验证 | `heartbeat_loop` 独立验证 |
+| 邮件通知 | 验证通过后独立发送 | 验证通过后独立发送 |
+| 进程变量 | `cf_process` | `tunnel_process` |
 
 #### 📋 修改文件清单
 
 | 文件 | 修改内容 |
 |------|---------|
-| main.py | Plan A→B 保底逻辑；`_detect_named_tunnel_config()` 替代 `_get_cloudflare_tunnel_config()`；成功后即时发邮件；删除 NS 监控；删除 cloudflare_tunnel 配置依赖 |
+| main.py | 双隧道并行；CF 独立心跳 `cf_heartbeat_loop()`；删除 `user_selected_tunnel_type` 切换逻辑；`/api/tunnel/status` 新增 `cloudflare` 字段；`/api/tunnel/type` 改为只读状态 |
 | config/config.json | 删除 `cloudflare_tunnel` 配置块 |
 | config/config.json.example | 删除 `cloudflare_tunnel` 配置块 |
 

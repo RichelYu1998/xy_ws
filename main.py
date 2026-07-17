@@ -1,4 +1,4 @@
-﻿的import json
+﻿import json
 import time
 import asyncio
 import os
@@ -6832,7 +6832,6 @@ if __name__ == '__main__':
         tunnel_need_restart = False
         tunnel_daemon_started = False
         tunnel_type = 'hostc'
-        tunnel_type = 'hostc'
         user_selected_tunnel_type = 'hostc'
         tunnel_current_mode = None
         email_notifier = EmailNotifier()
@@ -6851,9 +6850,20 @@ if __name__ == '__main__':
         
         stable_url = None
         stable_url_confirm_count = 0
-        stable_url_min_confirms = 1  # 需要连续1次验证通过才认为稳定
+        stable_url_min_confirms = 1
         url_first_seen_time = 0
         last_stable_notification_time = 0
+
+        cf_process = None
+        cf_url = None
+        cf_mode = None
+        cf_stable_url = None
+        cf_stable_confirm_count = 0
+        cf_stable_min_confirms = 1
+        cf_url_first_seen_time = 0
+        cf_last_stable_notification_time = 0
+        cf_heartbeat_thread = None
+        cf_last_email_sent_url = None
         
         def send_tunnel_notification(new_url, event_type='new', force_send=False):
             global last_email_sent_time, email_fail_count, last_email_sent_url, pending_email_url
@@ -7257,10 +7267,19 @@ if __name__ == '__main__':
         def auto_start_tunnel(force_restart=False):
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
 
-            # 根据用户选择启动对应隧道
-            if user_selected_tunnel_type == "cloudflare":
-                print(f"[Tunnel] 用户选择 Cloudflare Tunnel，正在启动...")
-                return start_cloudflare_tunnel(port=args.port if "args" in globals() and hasattr(args, "port") else 8888)
+            cf_binary = find_cloudflared_binary()
+            if cf_binary:
+                port = args.port if "args" in globals() and hasattr(args, "port") else 8888
+                print(f"[Tunnel] 🚀 同时启动 Cloudflare Tunnel...")
+                cf_result = start_cloudflare_tunnel(port=port)
+                if cf_result and cf_result.get('success'):
+                    print(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
+                    start_cf_heartbeat()
+                else:
+                    cf_err = cf_result.get('error', '未知') if cf_result else '未知'
+                    print(f"[Tunnel] ⚠️ Cloudflare Tunnel 启动失败: {cf_err}")
+            else:
+                print(f"[Tunnel] ⏭️ 未找到 cloudflared，跳过 Cloudflare Tunnel")
 
             if force_restart:
                 print(f"[Tunnel] 🔄 强制重启模式，将清理旧进程并重新启动")
@@ -7827,8 +7846,9 @@ ingress:
             return tunnel_id, config_yml_path
 
         def start_cloudflare_tunnel(port=8888, timeout=120):
-            """启动 Cloudflare Tunnel（Plan A: Named Tunnel → Plan B: Quick Tunnel，保底至少成功一个）"""
-            global tunnel_process, tunnel_url, tunnel_current_mode
+            """启动 Cloudflare Tunnel（Plan A: Named Tunnel → Plan B: Quick Tunnel，保底至少成功一个）
+            启动成功后由 cf_heartbeat_loop 独立验证并发邮件"""
+            global cf_process, cf_url, cf_mode
 
             cf_binary = find_cloudflared_binary()
             if not cf_binary:
@@ -7842,7 +7862,7 @@ ingress:
                     print(f"[Cloudflare] 启动 Named Tunnel: {named_config['tunnel_name']}...")
                     cmd = [cf_binary, "tunnel", "run", named_config['tunnel_name'], "--config", named_config['config_yml_path'], "--no-autoupdate"]
 
-                    tunnel_process = subprocess.Popen(
+                    cf_process = subprocess.Popen(
                         cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
@@ -7853,32 +7873,31 @@ ingress:
                     named_url = f"https://{named_config['custom_domain']}"
                     start_time = time.time()
                     while time.time() - start_time < 15:
-                        if tunnel_process.poll() is not None:
+                        if cf_process.poll() is not None:
                             break
                         time.sleep(1)
 
-                    if tunnel_process.poll() is None:
-                        tunnel_url = named_url
-                        tunnel_current_mode = 'named'
-                        print(f"[Cloudflare] ✅ Plan A 成功: Named Tunnel {tunnel_url}")
-                        send_tunnel_notification(tunnel_url, 'stable_available', force_send=True)
+                    if cf_process.poll() is None:
+                        cf_url = named_url
+                        cf_mode = 'named'
+                        print(f"[Cloudflare] ✅ Plan A 成功: Named Tunnel {cf_url}，等待心跳验证后发邮件")
 
                         try:
                             tunnel_file = PathManager.get_tunnel_url_file()
                             with open(tunnel_file, "w", encoding="utf-8") as f:
-                                f.write(f"Public URL: {tunnel_url}\n")
+                                f.write(f"Public URL: {cf_url}\n")
                                 f.write(f"Local URL: http://localhost:{port}/\n")
                                 f.write(f"Tunnel: {named_config['tunnel_name']} (named)\n")
                         except Exception as e:
                             print(f"[Cloudflare] 写入文件失败: {e}")
 
-                        return {"success": True, "url": tunnel_url, "type": "cloudflare", "mode": "named"}
+                        return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "named"}
                     else:
-                        print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 进程退出 (code: {tunnel_process.returncode})，回退到 Plan B...")
-                        tunnel_process = None
+                        print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 进程退出 (code: {cf_process.returncode})，回退到 Plan B...")
+                        cf_process = None
                 except Exception as e:
                     print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 启动异常: {e}，回退到 Plan B...")
-                    tunnel_process = None
+                    cf_process = None
             else:
                 print(f"[Cloudflare] ⏭️ Plan A 跳过: 未检测到 Named Tunnel 配置，直接 Plan B...")
 
@@ -7886,7 +7905,7 @@ ingress:
             try:
                 cmd = [cf_binary, "tunnel", "--url", f"http://localhost:{port}", "--no-autoupdate"]
 
-                tunnel_process = subprocess.Popen(
+                cf_process = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -7898,26 +7917,25 @@ ingress:
                 start_time = time.time()
 
                 while time.time() - start_time < timeout:
-                    if tunnel_process.poll() is not None:
-                        return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 进程退出 (code: {tunnel_process.returncode})"}
+                    if cf_process.poll() is not None:
+                        return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 进程退出 (code: {cf_process.returncode})"}
 
-                    line = tunnel_process.stdout.readline()
+                    line = cf_process.stdout.readline()
                     if line:
                         match = re.search(url_pattern, line)
                         if match:
-                            tunnel_url = match.group(0)
-                            tunnel_current_mode = 'quick'
-                            print(f"[Cloudflare] ✅ Plan B 成功: Quick Tunnel {tunnel_url}")
-                            send_tunnel_notification(tunnel_url, 'stable_available', force_send=True)
+                            cf_url = match.group(0)
+                            cf_mode = 'quick'
+                            print(f"[Cloudflare] ✅ Plan B 成功: Quick Tunnel {cf_url}，等待心跳验证后发邮件")
 
                             try:
                                 tunnel_file = PathManager.get_tunnel_url_file()
                                 with open(tunnel_file, "w", encoding="utf-8") as f:
-                                    f.write(tunnel_url + "\n")
+                                    f.write(cf_url + "\n")
                             except Exception as e:
                                 print(f"[Cloudflare] 写入文件失败: {e}")
 
-                            return {"success": True, "url": tunnel_url, "type": "cloudflare", "mode": "quick"}
+                            return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "quick"}
 
                     time.sleep(0.5)
 
@@ -7926,93 +7944,78 @@ ingress:
             except Exception as e:
                 return {"success": False, "error": f"Plan B 也失败了: {str(e)}"}
 
+        def cf_heartbeat_loop():
+            """Cloudflare Tunnel 独立心跳验证 - 验证通过后发邮件通知"""
+            global cf_process, cf_url, cf_mode
+            global cf_stable_url, cf_stable_confirm_count, cf_url_first_seen_time, cf_last_stable_notification_time, cf_last_email_sent_url
+
+            interval = 30
+            last_log_time = 0
+
+            while True:
+                time.sleep(interval)
+
+                if cf_process is None or cf_process.poll() is not None:
+                    if cf_url:
+                        print(f"[CF-Heartbeat] ⚠️ CF 隧道进程已退出")
+                        cf_url = None
+                        cf_mode = None
+                        cf_stable_url = None
+                        cf_stable_confirm_count = 0
+                    continue
+
+                if not cf_url:
+                    continue
+
+                try:
+                    url_verified = verify_url(cf_url, timeout=10)
+                except Exception:
+                    url_verified = False
+
+                if url_verified:
+                    if cf_url != cf_stable_url:
+                        cf_stable_url = cf_url
+                        cf_stable_confirm_count = 1
+                        cf_url_first_seen_time = time.time()
+                        print(f"[CF-Heartbeat] 🔍 CF 新URL，开始稳定性验证 (1/{cf_stable_min_confirms}): {cf_url}")
+                    elif cf_stable_confirm_count < cf_stable_min_confirms:
+                        cf_stable_confirm_count += 1
+                        print(f"[CF-Heartbeat] ✅ CF 稳定性验证 ({cf_stable_confirm_count}/{cf_stable_min_confirms}): {cf_url}")
+                        if cf_stable_confirm_count >= cf_stable_min_confirms:
+                            elapsed = int(time.time() - cf_url_first_seen_time)
+                            print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
+                            if cf_url != cf_last_email_sent_url:
+                                send_tunnel_notification(cf_url, 'stable_available', force_send=True)
+                                cf_last_stable_notification_time = time.time()
+                                cf_last_email_sent_url = cf_url
+                            else:
+                                print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
+                else:
+                    if cf_stable_confirm_count > 0:
+                        print(f"[CF-Heartbeat] ⚠️ CF URL 不可用，重置稳定性计数 ({cf_stable_confirm_count} -> 0)")
+                        cf_stable_confirm_count = 0
+                        cf_stable_url = None
+                    if time.time() - last_log_time > 120:
+                        print(f"[CF-Heartbeat] ⚠️ CF URL 不可用: {cf_url}")
+                        last_log_time = time.time()
+
+        def start_cf_heartbeat():
+            """启动 CF 心跳守护线程"""
+            global cf_heartbeat_thread
+            if cf_heartbeat_thread is None or not cf_heartbeat_thread.is_alive():
+                cf_heartbeat_thread = threading.Thread(target=cf_heartbeat_loop, daemon=True)
+                cf_heartbeat_thread.start()
+                print(f"[CF-Heartbeat] 启动 Cloudflare Tunnel 心跳守护进程")
+
         @app.route('/api/tunnel/type', methods=['GET', 'POST'])
         def tunnel_type_api():
-            """获取或设置隧道类型"""
-            global user_selected_tunnel_type, tunnel_process
-            
-            if request.method == 'GET':
-                cf_available = find_cloudflared_binary() is not None
-                return jsonify({
-                    'current': user_selected_tunnel_type,
-                    'available': {'hostc': True, 'cloudflare': cf_available}
-                })
-            
-            elif request.method == 'POST':
-                data = request.get_json(silent=True) or {}
-                new_type = data.get('type', '').lower()
-                
-                if new_type not in ['hostc', 'cloudflare']:
-                    return jsonify({
-                        'success': False, 
-                        'error': '无效的隧道类型',
-                        'current': user_selected_tunnel_type
-                    }), 400
-                
-                if new_type == 'cloudflare' and not find_cloudflared_binary():
-                    return jsonify({
-                        'success': False, 
-                        'error': 'Cloudflare 不可用，请先安装 cloudflared',
-                        'current': user_selected_tunnel_type
-                    }), 400
-                
-                # 停止当前隧道
-                if tunnel_process and tunnel_process.poll() is None:
-                    print(f"[Tunnel/API] 停止当前隧道...")
-                    tunnel_process.terminate()
-                    try:
-                        tunnel_process.wait(timeout=5)
-                    except:
-                        tunnel_process.kill()
-                    tunnel_process = None
-                    tunnel_url = None
-                
-                # 清除旧的 tunnel_url.txt 文件，防止显示旧URL
-                try:
-                    tunnel_file_to_clear = PathManager.get_tunnel_url_file()
-                    with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
-                        f.write('')
-                    print(f"[Tunnel/API] 已清除旧的 tunnel_url.txt")
-                except Exception as clear_err:
-                    print(f"[Tunnel/API] 清除 tunnel_url.txt 失败: {clear_err}")
-                
-                old_type = user_selected_tunnel_type
-                user_selected_tunnel_type = new_type
-                print(f"[Tunnel/API] 隧道类型已更改: {old_type} -> {new_type}")
-                
-                # 启动新隧道
-                print(f"[Tunnel/API] 正在启动 {new_type} 隧道...")
-                result = auto_start_tunnel(force_restart=True)
-                
-                if result and result.get('success'):
-                    new_url = result.get('url')
-                    print(f"[Tunnel/API] {new_type} 隧道启动成功: {new_url}")
-                    
-                    # 重置稳定性检测状态
-                    global stable_url, stable_url_confirm_count, url_first_seen_time
-                    stable_url = new_url
-                    stable_url_confirm_count = 1
-                    url_first_seen_time = time.time()
-                    
-                    # 发送邮件通知
-                    print(f"[Tunnel/API] 🎉 隧道切换成功，发送邮件通知...")
-                    send_tunnel_notification(new_url, 'stable_available', force_send=True)
-                    
-                    return jsonify({
-                        'success': True, 
-                        'old_type': old_type, 
-                        'new_type': new_type,
-                        'url': new_url,
-                        'message': f'已切换到 {new_type} 隧道'
-                    })
-                else:
-                    print(f"[Tunnel/API] {new_type} 隧道启动失败: {result.get('error') if result else '未知错误'}")
-                    return jsonify({
-                        'success': False,
-                        'error': f'{new_type} 隧道启动失败: {result.get("error") if result else "未知错误"}',
-                        'current': user_selected_tunnel_type
-                    }), 500
-        
+            """获取隧道类型状态（CF 和 hostc 同时运行）"""
+            cf_available = find_cloudflared_binary() is not None
+            return jsonify({
+                'mode': 'dual',
+                'hostc': {'available': True, 'running': Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')},
+                'cloudflare': {'available': cf_available, 'running': cf_process is not None and cf_process.poll() is None}
+            })
 
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
@@ -8194,35 +8197,24 @@ ingress:
         
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat, tunnel_daemon_started, tunnel_restart_thread, tunnel_heartbeat_thread, tunnel_need_restart, last_url_invalid_log_time, user_selected_tunnel_type
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat, tunnel_daemon_started, tunnel_restart_thread, tunnel_heartbeat_thread, tunnel_need_restart, last_url_invalid_log_time
             
             heartbeat_str = datetime.fromtimestamp(tunnel_last_heartbeat).strftime('%Y-%m-%d %H:%M:%S') if tunnel_last_heartbeat > 0 else None
             
-            tunnel_type = user_selected_tunnel_type
-            
-            # 优先使用内存中的 tunnel_url（解决文件被锁定时的问题）
-            # 只有内存中没有时，才从文件读取
             if tunnel_url:
                 web_url = tunnel_url
             else:
                 web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
             
-            # 根据隧道类型检测对应的进程
-            if user_selected_tunnel_type == 'cloudflare':
-                process_running = tunnel_process is not None and tunnel_process.poll() is None
-            else:
-                process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+            hostc_process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+            cf_process_running = cf_process is not None and cf_process.poll() is None
             
-            # 判断隧道是否在运行：有进程且有URL即认为运行中
-            # URL可用性验证由心跳机制负责，不在状态API中做（避免单次验证失败误判）
-            is_running = process_running and web_url is not None
+            is_running = hostc_process_running and web_url is not None
             
-            # URL可用性状态：优先用心跳机制的稳定性检测结果
             url_valid = (stable_url == web_url and 
                         stable_url_confirm_count >= stable_url_min_confirms and 
                         web_url is not None)
             
-            # 计算稳定性验证状态
             stable_confirmed = (stable_url == web_url and 
                               stable_url_confirm_count >= stable_url_min_confirms and 
                               url_valid)
@@ -8237,7 +8229,6 @@ ingress:
                 'estimated_remaining_seconds': max(0, (stable_url_min_confirms - stable_url_confirm_count) * 30) if stable_url_confirm_count < stable_url_min_confirms else 0
             }
             
-            # 确定详细状态描述
             if stable_confirmed:
                 detailed_status = 'stable'
                 status_message = f'✅ 公网地址已稳定可用 (已连续验证{stable_url_confirm_count}次)'
@@ -8247,13 +8238,26 @@ ingress:
             elif web_url and not url_valid:
                 detailed_status = 'unstable'
                 status_message = '⚠️ URL不可用，等待重新获取...'
-            elif process_running and not web_url:
+            elif hostc_process_running and not web_url:
                 detailed_status = 'starting'
                 status_message = '🔄 隧道启动中，等待获取公网地址...'
             else:
                 detailed_status = 'stopped'
                 status_message = '⏹️ 隧道未运行'
-            
+
+            cf_stable_confirmed = (cf_stable_url == cf_url and 
+                                   cf_stable_confirm_count >= cf_stable_min_confirms and 
+                                   cf_url is not None)
+
+            cf_status = {
+                'running': cf_process_running,
+                'url': cf_url,
+                'mode': cf_mode,
+                'stable': cf_stable_confirmed,
+                'verify_count': cf_stable_confirm_count,
+                'verify_required': cf_stable_min_confirms
+            }
+
             start_tunnel_daemons()
 
             return jsonify({
@@ -8264,12 +8268,12 @@ ingress:
                 'restart_count': tunnel_restart_count,
                 'last_error': tunnel_last_error or ('URL无效，正在重启...' if tunnel_need_restart else None),
                 'last_heartbeat': heartbeat_str,
-                'tunnel_type': tunnel_type,
-                'tunnel_mode': tunnel_current_mode,
+                'tunnel_type': 'hostc',
                 'detailed_status': detailed_status,
                 'status_message': status_message,
                 'stable_confirmed': stable_confirmed,
                 'verify_progress': verify_status,
+                'cloudflare': cf_status,
                 'email_notification_status': {
                     'will_notify': not stable_confirmed and web_url is not None,
                     'notification_type': 'stable_available',
@@ -8293,6 +8297,7 @@ ingress:
         @app.route('/api/tunnel/stop', methods=['POST'])
         def stop_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_need_restart, tunnel_restart_count, tunnel_last_error, tunnel_consecutive_failures
+            global cf_process, cf_url, cf_mode
             tunnel_auto_restart = False
             tunnel_need_restart = False
             Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
@@ -8307,7 +8312,19 @@ ingress:
                         pass
             tunnel_process = None
             tunnel_url = None
-            return jsonify({'success': True, 'message': '隧道已停止'})
+            if cf_process:
+                try:
+                    cf_process.terminate()
+                    cf_process.wait(timeout=2)
+                except:
+                    try:
+                        cf_process.kill()
+                    except:
+                        pass
+            cf_process = None
+            cf_url = None
+            cf_mode = None
+            return jsonify({'success': True, 'message': '所有隧道已停止'})
 
         # 初始化日志输出到 web_output.log
         setup_web_logging()

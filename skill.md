@@ -8664,31 +8664,76 @@ def get_tunnel_status():
 - 自动解压 `.tgz` 文件
 - 重命名为统一命名规范
 
-### 6.1.2 Cloudflare Named Tunnel + 自定义域名（v3.8.44 新增，v3.8.46 更新）
+### 6.1.2 CF + hostc 双隧道并行（v3.8.44 新增，v3.8.46 重构）
 
-**Plan A→B 保底架构**:
+**双隧道并行架构**:
 
 ```
-_detect_named_tunnel_config() 检测 .cloudflared/ 目录?
-  ├─ 有凭证 → Plan A: Named Tunnel (自定义域名, 永久不变)
-  │   ├─ 成功 → 发邮件 → 返回成功 ✅
-  │   └─ 失败 → 回退到 Plan B
-  └─ 无凭证 → 跳过 Plan A，直接 Plan B
-      └─ Plan B: Quick Tunnel (临时域名)
-          ├─ 成功 → 发邮件 → 返回成功 ✅
-          └─ 失败 → 返回错误（保底失败）❌
+auto_start_tunnel()
+  ├─ 启动 Cloudflare Tunnel (Plan A→B 保底)
+  │   ├─ Plan A: Named Tunnel (自定义域名)
+  │   │   ├─ 成功 → cf_heartbeat_loop 验证 → 发邮件 ✅
+  │   │   └─ 失败 → 回退 Plan B
+  │   └─ Plan B: Quick Tunnel (临时域名)
+  │       ├─ 成功 → cf_heartbeat_loop 验证 → 发邮件 ✅
+  │       └─ 失败 → CF 不可用 ❌
+  └─ 启动 hostc 隧道
+      ├─ 成功 → heartbeat_loop 验证 → 发邮件 ✅
+      └─ 失败 → 标记需要重启
 ```
 
-**两种模式对比**:
+**两种隧道对比**:
 
-| 特性 | Plan A: Named Tunnel | Plan B: Quick Tunnel |
-|------|---------------------|---------------------|
-| 域名 | `https://test12138.cn.mt` | `https://xxx.trycloudflare.com` |
-| 重启后 | ✅ 永久不变 | ❌ 每次变 |
-| 前提条件 | `.cloudflared/` 下有凭证+config.yml | 无 |
-| 配置方式 | 自动检测，无需 config.json | 零配置 |
-| 适用场景 | 生产环境、长期服务 | 临时测试、快速启动 |
-| 失败行为 | 自动回退到 Plan B | 返回错误（保底失败） |
+| 特性 | Cloudflare Tunnel | hostc Tunnel |
+|------|-------------------|--------------|
+| 域名 | `https://xxx.trycloudflare.com` 或自定义 | `https://xxx.hostc.dev` |
+| 重启后 | Named: ✅不变 / Quick: ❌每次变 | ❌ 每次变 |
+| 心跳验证 | `cf_heartbeat_loop` 独立验证 | `heartbeat_loop` 独立验证 |
+| 邮件通知 | 验证通过后独立发送 | 验证通过后独立发送 |
+| 进程变量 | `cf_process` | `tunnel_process` |
+| URL变量 | `cf_url` | `tunnel_url` |
+| 稳定状态 | `cf_stable_url`, `cf_stable_confirm_count` | `stable_url`, `stable_url_confirm_count` |
+
+**独立状态变量**:
+```python
+# CF 隧道独立状态
+cf_process = None
+cf_url = None
+cf_mode = None  # 'named' 或 'quick'
+cf_stable_url = None
+cf_stable_confirm_count = 0
+cf_stable_min_confirms = 1
+cf_url_first_seen_time = 0
+cf_last_stable_notification_time = 0
+cf_heartbeat_thread = None
+cf_last_email_sent_url = None
+```
+
+**CF 心跳验证代码范式**:
+```python
+def cf_heartbeat_loop():
+    """Cloudflare Tunnel 独立心跳验证 - 验证通过后发邮件通知"""
+    while True:
+        time.sleep(30)
+        if cf_process is None or cf_process.poll() is not None:
+            cf_url = None  # 进程退出，清空URL
+            continue
+        if not cf_url:
+            continue
+        url_verified = verify_url(cf_url, timeout=10)
+        if url_verified:
+            if cf_url != cf_stable_url:
+                cf_stable_url = cf_url
+                cf_stable_confirm_count = 1
+            elif cf_stable_confirm_count < cf_stable_min_confirms:
+                cf_stable_confirm_count += 1
+                if cf_stable_confirm_count >= cf_stable_min_confirms:
+                    # 验证通过，发邮件
+                    send_tunnel_notification(cf_url, 'stable_available', force_send=True)
+        else:
+            cf_stable_confirm_count = 0
+            cf_stable_url = None
+```
 
 **自动检测代码范式**:
 ```python
@@ -8701,31 +8746,8 @@ def _detect_named_tunnel_config():
     # 解析 config.yml → tunnel_name, custom_domain
     # 读取 {tunnel_name}.json → tunnel_id
     if tunnel_name and custom_domain and tunnel_id:
-        return {'available': True, 'tunnel_name': ..., 'custom_domain': ..., ...}
+        return {'available': True, ...}
     return {'available': False, ...}
-```
-
-**保底启动代码范式**:
-```python
-def start_cloudflare_tunnel(port=8888, timeout=120):
-    named_config = _detect_named_tunnel_config()
-    
-    if named_config['available']:
-        # Plan A: Named Tunnel
-        cmd = [cf_binary, "tunnel", "run", tunnel_name, "--config", config_yml_path]
-        tunnel_process = subprocess.Popen(cmd, ...)
-        if tunnel_process.poll() is None:
-            send_tunnel_notification(tunnel_url, 'stable_available', force_send=True)
-            return {"success": True, "url": f"https://{custom_domain}", "mode": "named"}
-        else:
-            # Plan A 失败，回退到 Plan B
-            print("[Cloudflare] ❌ Plan A 失败，回退到 Plan B...")
-    
-    # Plan B: Quick Tunnel (保底)
-    cmd = [cf_binary, "tunnel", "--url", f"http://localhost:{port}"]
-    tunnel_process = subprocess.Popen(cmd, ...)
-    send_tunnel_notification(tunnel_url, 'stable_available', force_send=True)
-    return {"success": True, "url": tunnel_url, "mode": "quick"}
 ```
 
 **config.yml 生成范式** (首次手动配置时使用):
@@ -8745,10 +8767,23 @@ ingress:
 3. 已执行 `cloudflared tunnel login` 完成授权
 4. `.cloudflared/` 目录下存在 `{tunnel_name}.json` 和 `config.yml`
 
-**Plan A 失败条件** (自动回退到 Plan B):
-- `_detect_named_tunnel_config()` 返回 `available=False`
-- Named Tunnel 进程启动后立即退出
-- Named Tunnel 启动异常
+**API 状态新增字段** (`/api/tunnel/status`):
+```json
+{
+  "cloudflare": {
+    "running": true,
+    "url": "https://xxx.trycloudflare.com",
+    "mode": "quick",
+    "stable": true,
+    "verify_count": 1,
+    "verify_required": 1
+  }
+}
+```
+
+**`/api/tunnel/type` 变更**:
+- 不再支持 POST 切换隧道类型
+- GET 返回双隧道状态: `{"mode": "dual", "hostc": {...}, "cloudflare": {...}}`
 
 ### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.28 更新）
 
