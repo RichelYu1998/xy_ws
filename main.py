@@ -7081,8 +7081,17 @@ if __name__ == '__main__':
             grace_end_time = time.time() + 60
             last_url_sync_time = 0
             prev_web_url = None
+            last_restart_state = False
             
             while tunnel_auto_restart:
+                if tunnel_need_restart and not last_restart_state:
+                    url_verify_failures = 0
+                    stable_url_confirm_count = 0
+                    stable_url = None
+                    grace_end_time = time.time() + 60
+                    print(f"[Tunnel] 🔄 检测到隧道重启，重置失败计数并进入60秒宽限期")
+                last_restart_state = tunnel_need_restart
+                
                 web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
                 is_tunnel_running = False
                 url_verified = False

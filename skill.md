@@ -11937,6 +11937,54 @@ result = auto_start_tunnel(force_restart=True)  # 强制重启
 - [ ] 进程竞态条件修复：启动后不检查残留进程，避免杀死新进程（v3.8.40 新增）
 - [ ] HOSTC_DEBUG 环境变量：启用 hostc 调试模式（v3.8.40 新增）
 - [ ] 实时打印 hostc 输出：`[hostc]` 前缀日志（v3.8.40 新增）
+- [ ] 心跳循环状态重置：隧道重启后重置失败计数并进入宽限期（v3.8.41 新增）
+
+### PY-STD-TUNNEL-005: 心跳循环状态重置规范（v3.8.41 新增）
+
+**规范要求**:
+1. **隧道重启后重置状态**：心跳循环检测到 `tunnel_need_restart` 变化时，重置 `url_verify_failures`、`stable_url_confirm_count`、`stable_url`
+2. **进入宽限期**：隧道重启后自动进入60秒宽限期，给新URL足够的稳定时间
+3. **避免重复邮件**：防止新URL验证成功后仍发送旧URL的 unavailable 邮件
+
+**错误做法** ❌:
+```python
+# 心跳循环不检测隧道重启，失败计数持续累积
+def heartbeat_loop():
+    url_verify_failures = 0
+    while True:
+        web_url = get_url()
+        if not verify_url(web_url):
+            url_verify_failures += 1  # 隧道重启后仍累积
+            if url_verify_failures >= 2:
+                tunnel_need_restart = True  # 不必要的重启
+                send_unavailable_email(web_url)  # 发送旧URL的邮件
+```
+
+**正确做法** ✅:
+```python
+# 心跳循环检测隧道重启并重置状态
+def heartbeat_loop():
+    url_verify_failures = 0
+    last_restart_state = False
+    
+    while True:
+        # 检测隧道重启事件
+        if tunnel_need_restart and not last_restart_state:
+            url_verify_failures = 0  # 重置失败计数
+            stable_url_confirm_count = 0
+            stable_url = None
+            grace_end_time = time.time() + 60  # 进入宽限期
+            print("[Tunnel] 🔄 检测到隧道重启，重置失败计数并进入60秒宽限期")
+        last_restart_state = tunnel_need_restart
+        
+        web_url = get_url()
+        # 宽限期内跳过验证
+        if time.time() < grace_end_time:
+            continue
+        
+        if not verify_url(web_url):
+            url_verify_failures += 1
+```
 
 ### PY-STD-TUNNEL-004: 进程竞态条件修复规范（v3.8.40 新增）
 
