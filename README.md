@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.46
+> **版本**: v3.8.47
 > **更新日期**: 2026-07-17
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,39 @@
 ---
 
 ## 最新更新
+
+### v3.8.47 (2026-07-17) - 🔄 双隧道互为备用通知 + fallback_available 邮件类型
+
+#### 🎯 核心改进
+- **🔄 互为备用通知** - CF 和 hostc 任一隧道不可用时，自动发送另一条隧道的可用地址作为备用
+- **📧 fallback_available 邮件类型** - 新增 `fallback_available` 事件类型，备用地址通知有独立的邮件样式（橙色主题）
+- **📧 邮件去重豁免** - `fallback_available` 类型不受 URL 去重限制，确保备用通知一定能送达
+
+#### 🔄 互为备用通知逻辑
+
+```
+hostc 不可用 + CF 仍可用 → 发送 CF 地址 (fallback_available) 📧
+CF 不可用 + hostc 仍可用 → 发送 hostc 地址 (fallback_available) 📧
+两者都不可用 → 标记需要重启
+两者都可用 → 各自独立发 stable_available 邮件
+```
+
+**邮件事件类型**:
+
+| 事件类型 | 标题 | 颜色 | 说明 |
+|---------|------|------|------|
+| `stable_available` | ✅ 公网地址已稳定可用 | 绿色 | 隧道验证通过 |
+| `fallback_available` | 🔄 备用公网地址可用 | 橙色 | 原隧道不可用，切换到备用 |
+| `unavailable` | 🚨 公网地址不可用 | 红色 | 隧道失效 |
+| `restarted` | 🔄 隧道已重启 | 蓝色 | 隧道重启成功 |
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | `EmailNotifier` 新增 `fallback_available` 事件类型；`heartbeat_loop` hostc 不可用时发 CF 备用通知；`cf_heartbeat_loop` CF 不可用时发 hostc 备用通知；邮件去重豁免 `fallback_available` |
+
+---
 
 ### v3.8.46 (2026-07-17) - 🔀 CF + hostc 双隧道并行 + 心跳验证 + 删除 NS 监控
 

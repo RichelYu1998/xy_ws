@@ -2562,6 +2562,7 @@ class EmailNotifier:
                 'available': '✅ 公网地址可用',
                 'update': '✅ 公网地址已更新',
                 'stable_available': '✅ 公网地址已稳定可用',
+                'fallback_available': '🔄 备用公网地址可用',
                 'unavailable': '🚨 公网地址不可用',
                 'restarted': '🔄 隧道已重启'
             }
@@ -2599,6 +2600,22 @@ class EmailNotifier:
 <tr><td style="padding: 3px 0;"><strong>验证次数:</strong></td><td>{_min_confirms} 次连续通过</td></tr>
 <tr><td style="padding: 3px 0;"><strong>验证耗时:</strong></td><td>{verify_duration} 秒</td></tr>
 <tr><td style="padding: 3px 0;"><strong>当前状态:</strong></td><td style="color: #2e7d32; font-weight: bold;">🎯 确认稳定可用</td></tr>
+</table>
+</div>
+'''
+            elif event_type == 'fallback_available':
+                status_note = f"""
+🔄 原隧道不可用，已切换到备用地址
+当前可用地址: {tunnel_url}
+当前状态: ✅ 备用地址已验证可用，可放心使用
+
+"""
+                html_status_note = f'''
+<div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; border-radius: 4px;">
+<div style="color: #e65100; font-size: 16px; font-weight: bold; margin-bottom: 10px;">🔄 原隧道不可用，已切换到备用地址</div>
+<table style="width: 100%; color: #333;">
+<tr><td style="padding: 3px 0;"><strong>当前可用地址:</strong></td><td><a href="{tunnel_url}" target="_blank" style="color: #1976d2;">{tunnel_url}</a></td></tr>
+<tr><td style="padding: 3px 0;"><strong>当前状态:</strong></td><td style="color: #2e7d32; font-weight: bold;">✅ 备用地址已验证可用</td></tr>
 </table>
 </div>
 '''
@@ -2654,6 +2671,14 @@ class EmailNotifier:
 {status_note}
 请使用新地址访问服务。
 """
+            elif event_type == 'fallback_available':
+                body = f"""{event_title}
+
+时间: {current_time}
+当前可用地址: {tunnel_url}
+{status_note}
+备用地址已验证可用，可放心使用。
+"""
             else:
                 body = f"""{event_title}
 
@@ -2668,9 +2693,11 @@ class EmailNotifier:
                 _header_gradient = 'linear-gradient(135deg, #e53935 0%, #c62828 100%)'
             elif event_type == 'restarted':
                 _header_gradient = 'linear-gradient(135deg, #1e88e5 0%, #1565c0 100%)'
+            elif event_type == 'fallback_available':
+                _header_gradient = 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)'
             
-            _url_label = '原公网地址' if event_type == 'unavailable' else '新公网地址' if event_type == 'restarted' else '公网地址'
-            _footer_text = '系统正在自动重启隧道服务器，重启成功后将发送新地址通知。' if event_type == 'unavailable' else '请使用新地址访问服务。' if event_type == 'restarted' else '请妥善保管此地址。'
+            _url_label = '原公网地址' if event_type == 'unavailable' else '新公网地址' if event_type == 'restarted' else '当前可用地址' if event_type == 'fallback_available' else '公网地址'
+            _footer_text = '系统正在自动重启隧道服务器，重启成功后将发送新地址通知。' if event_type == 'unavailable' else '请使用新地址访问服务。' if event_type == 'restarted' else '备用地址已验证可用，可放心使用。' if event_type == 'fallback_available' else '请妥善保管此地址。'
             
             html_body = f"""
 <html>
@@ -6896,9 +6923,12 @@ if __name__ == '__main__':
                 if new_url == last_email_sent_url:
                     time_since_last_send = current_time - last_email_sent_time
                     if time_since_last_send < url_dedup_interval:
-                        print(f"[Email] ⏭️ URL去重：相同地址{int(time_since_last_send)}秒内已发送过，跳过重复发送: {new_url}")
-                        print(f"[Email] 📋 去重规则：同一公网地址在{int(url_dedup_interval/60)}分钟内只发送1次邮件")
-                        return
+                        if event_type == 'fallback_available':
+                            print(f"[Email] 🔄 备用地址通知：不同事件类型，允许发送")
+                        else:
+                            print(f"[Email] ⏭️ URL去重：相同地址{int(time_since_last_send)}秒内已发送过，跳过重复发送: {new_url}")
+                            print(f"[Email] 📋 去重规则：同一公网地址在{int(url_dedup_interval/60)}分钟内只发送1次邮件")
+                            return
                     elif force_send:
                         print(f"[Email] 🔄 强制发送模式：相同地址但已超过{int(url_dedup_interval/60)}分钟，允许重新发送")
                     else:
@@ -7175,6 +7205,9 @@ if __name__ == '__main__':
                                     print(f"[Tunnel] ⚠️ 公网地址不可用，重置稳定性计数 ({stable_url_confirm_count} -> 0)")
                                     stable_url_confirm_count = 0
                                     stable_url = None
+                                    if cf_stable_url and cf_stable_confirm_count >= cf_stable_min_confirms:
+                                        print(f"[Tunnel] 🔄 hostc 不可用，CF 仍有可用地址: {cf_stable_url}，发送备用地址通知")
+                                        send_tunnel_notification(cf_stable_url, 'fallback_available', force_send=True)
                                 if time.time() - last_log_time > 120:
                                     print(f"[Tunnel] ⚠️ 公网地址不可用: {web_url}，连续失败 {url_verify_failures}/{max_url_verify_failures} 次")
                                     last_log_time = time.time()
@@ -7995,6 +8028,9 @@ ingress:
                         print(f"[CF-Heartbeat] ⚠️ CF URL 不可用，重置稳定性计数 ({cf_stable_confirm_count} -> 0)")
                         cf_stable_confirm_count = 0
                         cf_stable_url = None
+                        if stable_url and stable_url_confirm_count >= stable_url_min_confirms:
+                            print(f"[CF-Heartbeat] 🔄 CF 不可用，hostc 仍有可用地址: {stable_url}，发送备用地址通知")
+                            send_tunnel_notification(stable_url, 'fallback_available', force_send=True)
                     if time.time() - last_log_time > 120:
                         print(f"[CF-Heartbeat] ⚠️ CF URL 不可用: {cf_url}")
                         last_log_time = time.time()

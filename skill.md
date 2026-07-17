@@ -8664,7 +8664,7 @@ def get_tunnel_status():
 - 自动解压 `.tgz` 文件
 - 重命名为统一命名规范
 
-### 6.1.2 CF + hostc 双隧道并行（v3.8.44 新增，v3.8.46 重构）
+### 6.1.2 CF + hostc 双隧道并行（v3.8.44 新增，v3.8.46 重构，v3.8.47 新增互为备用通知）
 
 **双隧道并行架构**:
 
@@ -8733,6 +8733,41 @@ def cf_heartbeat_loop():
         else:
             cf_stable_confirm_count = 0
             cf_stable_url = None
+```
+
+**互为备用通知（v3.8.47 新增）**:
+
+当一条隧道不可用时，自动发送另一条隧道的可用地址作为备用：
+
+```python
+# heartbeat_loop 中 - hostc 不可用时发 CF 备用通知
+if cf_stable_url and cf_stable_confirm_count >= cf_stable_min_confirms:
+    send_tunnel_notification(cf_stable_url, 'fallback_available', force_send=True)
+
+# cf_heartbeat_loop 中 - CF 不可用时发 hostc 备用通知
+if stable_url and stable_url_confirm_count >= stable_url_min_confirms:
+    send_tunnel_notification(stable_url, 'fallback_available', force_send=True)
+```
+
+**fallback_available 邮件事件类型**:
+
+| 事件类型 | 标题 | 颜色 | header_gradient | 说明 |
+|---------|------|------|----------------|------|
+| `stable_available` | ✅ 公网地址已稳定可用 | 绿色 | `#43a047 → #2e7d32` | 隧道验证通过 |
+| `fallback_available` | 🔄 备用公网地址可用 | 橙色 | `#ff9800 → #f57c00` | 原隧道不可用，切换到备用 |
+| `unavailable` | 🚨 公网地址不可用 | 红色 | `#e53935 → #c62828` | 隧道失效 |
+| `restarted` | 🔄 隧道已重启 | 蓝色 | `#1e88e5 → #1565c0` | 隧道重启成功 |
+
+**邮件去重豁免**: `fallback_available` 类型不受 URL 去重时间窗口限制，确保备用通知一定能送达：
+```python
+# send_tunnel_notification 中
+if new_url == last_email_sent_url:
+    if time_since_last_send < url_dedup_interval:
+        if event_type == 'fallback_available':
+            # 备用地址通知：不同事件类型，允许发送
+            pass
+        else:
+            return  # 其他类型走正常去重
 ```
 
 **自动检测代码范式**:
