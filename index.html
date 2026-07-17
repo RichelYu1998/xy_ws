@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -5297,8 +5297,103 @@ SzwegoSpider/
         }
         
         // ==================== Hostc Tunnel ====================
+        async function loadTunnelTypeInfo() {
+            try {
+                const response = await fetch('/api/tunnel/type');
+                const data = await response.json();
+                const selector = document.getElementById('tunnel-type-selector');
+                const statusEl = document.getElementById('tunnel-type-status');
+                
+                if (selector && data.current) {
+                    selector.value = data.current;
+                    
+                    if (data.available) {
+                        const hostcOption = selector.querySelector('option[value="hostc"]');
+                        const cfOption = selector.querySelector('option[value="cloudflare"]');
+                        
+                        if (hostcOption && !data.available.hostc) {
+                            hostcOption.disabled = true;
+                            hostcOption.textContent = 'hostc (不可用)';
+                        }
+                        
+                        if (cfOption) {
+                            if (!data.available.cloudflare) {
+                                cfOption.disabled = true;
+                                cfOption.textContent = 'Cloudflare (未安装)';
+                            } else {
+                                cfOption.disabled = false;
+                                cfOption.textContent = 'Cloudflare Tunnel';
+                            }
+                        }
+                    }
+                }
+                
+                if (statusEl && data.current) {
+                    const typeLabels = {
+                        'hostc': '<i class="fa fa-bolt"></i> hostc',
+                        'cloudflare': '<i class="fa fa-cloud"></i> Cloudflare'
+                    };
+                    statusEl.innerHTML = typeLabels[data.current] || data.current;
+                }
+            } catch (e) {
+                console.error('获取隧道类型信息失败:', e);
+            }
+        }
+        
+        window.changeTunnelType = async function(type) {
+            const selector = document.getElementById('tunnel-type-selector');
+            const statusEl = document.getElementById('tunnel-type-status');
+            
+            if (!type || !['hostc', 'cloudflare'].includes(type)) {
+                showToast('无效的隧道类型', 'error');
+                return;
+            }
+            
+            if (statusEl) {
+                statusEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 切换中...';
+            }
+            
+            try {
+                const response = await fetch('/api/tunnel/type', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ type: type })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast('隧道类型已切换为: ' + type, 'success');
+                    
+                    const typeLabels = {
+                        'hostc': '<i class="fa fa-bolt"></i> hostc',
+                        'cloudflare': '<i class="fa fa-cloud"></i> Cloudflare'
+                    };
+                    if (statusEl) {
+                        statusEl.innerHTML = typeLabels[type] || type;
+                    }
+                    
+                    checkTunnelStatus();
+                } else {
+                    showToast('切换失败: ' + (data.error || '未知错误'), 'error');
+                    
+                    if (selector && data.current) {
+                        selector.value = data.current;
+                    }
+                    
+                    loadTunnelTypeInfo();
+                }
+            } catch (e) {
+                showToast('切换失败: ' + e.message, 'error');
+                loadTunnelTypeInfo();
+            }
+        }
+        
         function initHostcTunnel() {
             loadServerInfo();
+            loadTunnelTypeInfo();
             checkTunnelStatus();
             setInterval(checkTunnelStatus, 2000);
         }
@@ -5353,10 +5448,19 @@ SzwegoSpider/
             const status = document.getElementById('tunnel-status');
             const urlDisplay = document.getElementById('tunnel-public-url');
             const restartInfo = document.getElementById('tunnel-restart-info');
-            const tunnelTypeDisplay = document.getElementById('tunnel-type');
+            const tunnelTypeSelector = document.getElementById('tunnel-type-selector');
+            const tunnelTypeStatus = document.getElementById('tunnel-type-status');
             
-            if (tunnelTypeDisplay) {
-                tunnelTypeDisplay.innerHTML = '<span class="text-success"><i class="fa fa-bolt"></i> hostc</span>';
+            if (tunnelTypeSelector && tunnelType) {
+                tunnelTypeSelector.value = tunnelType;
+            }
+            
+            if (tunnelTypeStatus && tunnelType) {
+                const typeLabels = {
+                    'hostc': '<i class="fa fa-bolt"></i> hostc',
+                    'cloudflare': '<i class="fa fa-cloud"></i> Cloudflare'
+                };
+                tunnelTypeStatus.innerHTML = typeLabels[tunnelType] || tunnelType;
             }
             
             if (btn) {
@@ -5495,7 +5599,11 @@ SzwegoSpider/
                                     <h5><i class="fa fa-cloud"></i> 公网隧道</h5>
                                     <div class="alert alert-light border mb-2">
                                         <i class="fa fa-info-circle"></i> <strong>隧道类型:</strong> 
-                                        <span id="tunnel-type" class="font-weight-bold">加载中...</span>
+                                        <select id="tunnel-type-selector" class="form-control form-control-sm d-inline-block" style="width: auto; max-width: 200px;" onchange="changeTunnelType(this.value)">
+                                            <option value="hostc">hostc (默认)</option>
+                                            <option value="cloudflare">Cloudflare Tunnel</option>
+                                        </select>
+                                        <span id="tunnel-type-status" class="ml-2 text-muted" style="font-size: 0.85rem;"></span>
                                     </div>
                                     <div id="tunnel-status-display" class="mb-2">
                                         <span id="tunnel-status"><span class="badge badge-secondary"><i class="fa fa-circle"></i> 未连接</span></span>

@@ -8534,6 +8534,134 @@ fi
 - **心跳守护即时启动（v3.8.28）**: 隧道启动后立即调用`start_tunnel_daemons()`启动心跳守护+重启守护线程，不再等待`/api/tunnel/status`被调用才懒启动
 - **守护统一管理（v3.8.28）**: 提取`start_tunnel_daemons()`函数统一管理守护线程启动逻辑，`/api/tunnel/status`中作为安全网调用
 
+### 6.1.1 Cloudflare Tunnel 跨平台支持（v3.8.43 新增）
+
+**文件夹结构规范**:
+```
+tools/cloudflared/
+├── windows/
+│   └── cloudflared.exe          # Windows amd64
+├── linux/
+│   └── cloudflared              # Linux amd64
+├── macos/
+│   ├── cloudflared-amd64        # macOS Intel (x86_64)
+│   └── cloudflared-arm64        # macOS Apple Silicon (ARM64)
+├── download_cloudflared.ps1     # 下载脚本
+└── README.md                    # 说明文档
+```
+
+**二进制文件查找优先级**:
+```python
+def find_cloudflared_binary():
+    """跨平台 cloudflared 二进制文件检测"""
+    import platform
+    import shutil
+    
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    
+    # 1. 优先检查项目目录（按操作系统分类）
+    project_cf = None
+    if system == "windows":
+        project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                                   "tools", "cloudflared", "windows", "cloudflared.exe")
+    elif system == "linux":
+        project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                                   "tools", "cloudflared", "linux", "cloudflared")
+    elif system == "darwin":
+        # macOS: 根据架构选择对应版本
+        if machine in ["arm64", "aarch64"]:
+            project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                                       "tools", "cloudflared", "macos", "cloudflared-arm64")
+        else:
+            project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                                       "tools", "cloudflared", "macos", "cloudflared-amd64")
+    
+    if project_cf and os.path.exists(project_cf):
+        print(f"[Cloudflare] 在项目目录找到: {project_cf}")
+        return project_cf
+    
+    # 2. 检查系统 PATH
+    system_cf = shutil.which("cloudflared")
+    if system_cf:
+        print(f"[Cloudflare] 在系统PATH找到: {system_cf}")
+        return system_cf
+    
+    # 3. Windows 常见安装路径
+    if system == "windows":
+        common_paths = [
+            os.path.expandvars(r"%PROGRAMFILES%\cloudflared\cloudflared.exe"),
+            os.path.expandvars(r"%LOCALAPPDATA%\cloudflared\cloudflared.exe"),
+        ]
+        for path in common_paths:
+            if os.path.exists(path):
+                print(f"[Cloudflare] 在常见路径找到: {path}")
+                return path
+    
+    return None
+```
+
+**隧道切换规范（v3.8.43）**:
+
+| 操作 | 规范 |
+|------|------|
+| 切换隧道类型 | ✅ 必须清除旧的 `tunnel_url.txt` |
+| URL 来源优先级 | 内存 > 文件（解决文件锁定问题） |
+| 进程检测 | 根据隧道类型检测对应进程 |
+| 邮件发送 | 隧道切换成功后立即发送，不等待心跳 |
+
+**隧道切换代码范式**:
+```python
+# 1. 清除旧的 tunnel_url.txt 文件
+try:
+    tunnel_file_to_clear = PathManager.get_tunnel_url_file()
+    with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
+        f.write('')
+    print(f"[Tunnel/API] 已清除旧的 tunnel_url.txt")
+except Exception as clear_err:
+    print(f"[Tunnel/API] 清除 tunnel_url.txt 失败: {clear_err}")
+
+# 2. 停止旧隧道进程
+if old_tunnel_type == 'hostc':
+    Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
+elif old_tunnel_type == 'cloudflare':
+    if tunnel_process and tunnel_process.poll() is None:
+        tunnel_process.terminate()
+
+# 3. 启动新隧道
+if new_tunnel_type == 'cloudflare':
+    cloudflared_path = find_cloudflared_binary()
+    if cloudflared_path:
+        tunnel_process = subprocess.Popen(
+            [cloudflared_path, "tunnel", "--url", f"http://localhost:{port}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+        # 立即发送邮件通知
+        send_tunnel_email(tunnel_url, "cloudflare")
+
+# 4. 内存优先策略
+def get_tunnel_status():
+    # 优先使用内存中的 tunnel_url（解决文件被锁定时的问题）
+    if tunnel_url:
+        web_url = tunnel_url
+    else:
+        web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+    
+    # 根据隧道类型检测对应的进程
+    if user_selected_tunnel_type == 'cloudflare':
+        process_running = tunnel_process is not None and tunnel_process.poll() is None
+    else:
+        process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+```
+
+**下载脚本规范** (`download_cloudflared.ps1`):
+- 使用 GitHub 官方 releases 下载
+- 支持代理加速
+- 自动解压 `.tgz` 文件
+- 重命名为统一命名规范
+
 ### 6.1.0 非阻塞启动规范（v3.8.23 新增，v3.8.28 更新）
 
 **核心原则**：`auto_start_tunnel()` 在 `app.run()` 之前调用，必须零阻塞，确保 Flask 5秒内启动。邮件通知通过后台线程即时发送。隧道启动后立即调用 `start_tunnel_daemons()` 启动守护线程。

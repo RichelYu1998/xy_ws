@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.42
+> **版本**: v3.8.43
 > **更新日期**: 2026-07-17
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,75 @@
 ---
 
 ## 最新更新
+
+### v3.8.43 (2026-07-17) - 🚀 Cloudflare Tunnel 跨平台支持 + 隧道切换优化
+
+#### 🎯 核心改进
+- **🚀 Cloudflare Tunnel 跨平台支持** - 新增 Windows/Linux/macOS 全平台 cloudflared 二进制文件，按操作系统分类存储
+- **🔧 隧道切换修复** - 切换隧道类型时清除旧的 `tunnel_url.txt`，避免显示旧URL
+- **📧 邮件发送优化** - 隧道切换成功后立即发送邮件通知，不再等待心跳验证
+- **💾 内存优先策略** - 优先使用内存中的 URL，解决文件锁定时无法读取的问题
+- **🔍 进程检测优化** - 根据隧道类型检测对应的进程（cloudflare/hostc）
+
+#### 🚀 Cloudflare Tunnel 跨平台支持
+
+**文件夹结构**:
+```
+tools/cloudflared/
+├── windows/
+│   └── cloudflared.exe          # Windows amd64 (51.65 MB)
+├── linux/
+│   └── cloudflared              # Linux amd64 (37.44 MB)
+├── macos/
+│   ├── cloudflared-amd64        # macOS Intel (39.28 MB)
+│   └── cloudflared-arm64        # macOS Apple Silicon (36.61 MB)
+├── download_cloudflared.ps1     # 下载脚本
+└── README.md                    # 说明文档
+```
+
+**自动检测逻辑**:
+- **Windows**: `tools/cloudflared/windows/cloudflared.exe`
+- **Linux**: `tools/cloudflared/linux/cloudflared`
+- **macOS Intel**: `tools/cloudflared/macos/cloudflared-amd64`
+- **macOS Apple Silicon**: `tools/cloudflared/macos/cloudflared-arm64`
+
+#### 🔧 隧道切换修复
+
+**问题描述**:
+```
+切换隧道类型（hostc → cloudflare）时：
+  1. 停止旧隧道进程
+  2. ❌ 未清除旧的 tunnel_url.txt
+  3. 前端读取到旧的 hostc URL
+  4. 显示错误的地址
+```
+
+**修复后**:
+```
+切换隧道类型时：
+  1. 停止旧隧道进程
+  2. ✅ 清除旧的 tunnel_url.txt
+  3. 启动新隧道
+  4. ✅ 立即发送邮件通知
+  5. 前端显示正确的新 URL
+```
+
+#### 📧 邮件发送优化
+
+| 场景 | 修复前 | 修复后 |
+|------|--------|--------|
+| 隧道切换成功 | 等待心跳验证（可能失败） | ✅ 立即发送邮件 |
+| 文件被锁定 | 无法写入，邮件发送失败 | ✅ 使用内存中的 URL |
+| 进程检测 | 仅检测 hostc 进程 | ✅ 根据类型检测对应进程 |
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | 隧道切换时清除旧文件、内存优先策略、进程检测优化、邮件立即发送 |
+| tools/cloudflared/* | 新增 Windows/Linux/macOS 二进制文件 |
+
+---
 
 ### v3.8.42 (2026-07-17) - 🔧 Flask访问日志格式优化
 
