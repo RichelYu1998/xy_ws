@@ -10,26 +10,29 @@
 
 ## 最新更新
 
-### v3.8.46 (2026-07-17) - 🔀 Cloudflare Tunnel Plan A/B 二选一 + 删除 NS 监控
+### v3.8.46 (2026-07-17) - 🔀 Cloudflare Tunnel Plan A→B 保底 + 删除 NS 监控 + 删除 cloudflare_tunnel 配置
 
 #### 🎯 核心改进
-- **🔀 Plan A/B 二选一** - Named Tunnel (Plan A) 和 Quick Tunnel (Plan B) 是独立方案，不再自动降级，哪个成功就发邮件通知
+- **🔀 Plan A→B 保底机制** - 先试 Plan A (Named Tunnel)，失败自动回退 Plan B (Quick Tunnel)，保底至少成功一个
 - **📧 即时邮件通知** - Plan A 或 Plan B 成功后立即发送邮件，不再等待心跳验证
+- **🔍 自动检测** - 不再依赖 config.json 配置，自动检测 `.cloudflared/` 目录下的 Named Tunnel 凭证
+- **🗑️ 删除 cloudflare_tunnel 配置** - 移除 `config.json` 中的 `cloudflare_tunnel` 配置块，改为自动检测
 - **🗑️ 删除 NS 监控** - 移除 `_check_ns_pointed_to_cloudflare()`、`ns_upgrade_monitor()`、`start_ns_upgrade_monitor()` 及 `ns_monitor_thread` 全局变量
 - **🗑️ 删除 ns_monitor API 字段** - `/api/tunnel/status` 不再返回 `ns_monitor` 字段
 
-#### 🔀 Plan A/B 二选一架构
+#### 🔀 Plan A→B 保底架构
 
 **运行流程**:
 ```
 start_cloudflare_tunnel()
-  ├─ use_named_tunnel=true?
+  ├─ 检测到 .cloudflared/ Named Tunnel 配置?
   │   ├─ Yes → Plan A: Named Tunnel (自定义域名, 永久不变)
-  │   │   ├─ 成功 → 发邮件 → 返回成功
-  │   │   └─ 失败 → 返回失败（不降级）
-  │   └─ No → Plan B: Quick Tunnel (临时域名)
-  │       ├─ 成功 → 发邮件 → 返回成功
-  │       └─ 失败 → 返回失败
+  │   │   ├─ 成功 → 发邮件 → 返回成功 ✅
+  │   │   └─ 失败 → 回退到 Plan B
+  │   └─ No → 跳过 Plan A，直接 Plan B
+  └─ Plan B: Quick Tunnel (临时域名)
+      ├─ 成功 → 发邮件 → 返回成功 ✅
+      └─ 失败 → 返回失败（两个都失败）❌
 ```
 
 **两种模式对比**:
@@ -38,15 +41,17 @@ start_cloudflare_tunnel()
 |------|---------------------|---------------------|
 | 域名 | `https://test12138.cn.mt` | `https://xxx.trycloudflare.com` |
 | 重启后 | ✅ 永久不变 | ❌ 每次变 |
-| 前提条件 | 域名托管在 Cloudflare + NS 已生效 | 无 |
-| 配置复杂度 | 需先完成 Cloudflare 域名托管 | 零配置 |
-| 失败行为 | 返回错误，不降级 | 返回错误 |
+| 前提条件 | `.cloudflared/` 下有凭证+config.yml | 无 |
+| 配置方式 | 自动检测，无需 config.json | 零配置 |
+| 失败行为 | 自动回退到 Plan B | 返回错误（保底失败） |
 
 #### 📋 修改文件清单
 
 | 文件 | 修改内容 |
 |------|---------|
-| main.py | Plan A/B 二选一逻辑；成功后即时发邮件；删除 NS 监控相关函数和变量；删除 `ns_monitor` API 字段 |
+| main.py | Plan A→B 保底逻辑；`_detect_named_tunnel_config()` 替代 `_get_cloudflare_tunnel_config()`；成功后即时发邮件；删除 NS 监控；删除 cloudflare_tunnel 配置依赖 |
+| config/config.json | 删除 `cloudflare_tunnel` 配置块 |
+| config/config.json.example | 删除 `cloudflare_tunnel` 配置块 |
 
 ---
 
@@ -59,12 +64,12 @@ start_cloudflare_tunnel()
 
 #### 🏠 Named Tunnel
 
-**启动逻辑**:
+**启动逻辑** (v3.8.46 更新: 自动检测，无需 config.json):
 ```
-config.cloudflare_tunnel.enabled AND use_named_tunnel?
+检测 .cloudflared/ 目录下是否有 Named Tunnel 凭证?
   ├─ Yes → Plan A: Named Tunnel (自定义域名, 永久不变)
   │   ├─ 成功 → 发邮件通知
-  │   └─ 失败 → 返回错误
+  │   └─ 失败 → 回退到 Plan B
   └─ No → Plan B: Quick Tunnel (临时域名, *.trycloudflare.com)
       ├─ 成功 → 发邮件通知
       └─ 失败 → 返回错误
@@ -78,33 +83,14 @@ config.cloudflare_tunnel.enabled AND use_named_tunnel?
 4. cloudflared tunnel run xy-ws-tunnel       ← 启动 tunnel
 ```
 
-**配置说明** (`config.json`):
-```json
-{
-  "cloudflare_tunnel": {
-    "enabled": true,
-    "custom_domain": "test12138.cn.mt",
-    "tunnel_name": "xy-ws-tunnel",
-    "use_named_tunnel": true
-  }
-}
-```
-
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| `enabled` | 是否启用 Cloudflare Tunnel | `true` |
-| `use_named_tunnel` | `true`=Named Tunnel(永久域名), `false`=Quick Tunnel(临时域名) | `false` |
-| `custom_domain` | 自定义域名（需已托管在 Cloudflare） | `""` |
-| `tunnel_name` | Tunnel 名称标识 | `"xy-ws-tunnel"` |
-
 **两种模式对比**:
 
 | 特性 | Plan A: Named Tunnel | Plan B: Quick Tunnel |
 |------|---------------------|---------------------|
 | 域名 | `https://test12138.cn.mt` | `https://xxx.trycloudflare.com` |
 | 重启后 | ✅ 永久不变 | ❌ 每次变 |
-| 前提条件 | 域名托管在 Cloudflare + NS 已生效 | 无 |
-| 配置复杂度 | 需先完成 Cloudflare 域名托管 | 零配置 |
+| 前提条件 | `.cloudflared/` 下有凭证+config.yml | 无 |
+| 配置方式 | 自动检测，无需 config.json | 零配置 |
 
 #### 📋 修改文件清单
 
