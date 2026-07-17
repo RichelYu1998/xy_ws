@@ -7682,19 +7682,48 @@ if __name__ == '__main__':
             print(f"[Cloudflare] 未找到 cloudflared (系统: {system})")
             return None
 
-        def _get_cloudflare_tunnel_config():
-            """读取 cloudflare_tunnel 配置"""
+        def _detect_named_tunnel_config():
+            """自动检测 .cloudflared 目录下的 Named Tunnel 配置
+            返回: {'available': bool, 'tunnel_name': str, 'custom_domain': str, 'tunnel_id': str, 'config_yml_path': str}"""
+            tunnel_dir = os.path.join(PROJECT_DIR, '.cloudflared')
+            config_yml_path = os.path.join(tunnel_dir, 'config.yml')
+
+            if not os.path.exists(config_yml_path):
+                return {'available': False, 'tunnel_name': '', 'custom_domain': '', 'tunnel_id': '', 'config_yml_path': ''}
+
             try:
-                config_manager = ConfigManager()
-                cf_config = config_manager.config.get('cloudflare_tunnel', {})
-                return {
-                    'enabled': cf_config.get('enabled', False),
-                    'use_named_tunnel': cf_config.get('use_named_tunnel', False),
-                    'custom_domain': cf_config.get('custom_domain', ''),
-                    'tunnel_name': cf_config.get('tunnel_name', 'xy-ws-tunnel'),
-                }
+                with open(config_yml_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                tunnel_name = ''
+                custom_domain = ''
+                tunnel_id = ''
+
+                for line in content.split('\n'):
+                    line = line.strip()
+                    if line.startswith('tunnel:'):
+                        tunnel_name = line.split(':', 1)[1].strip()
+                    elif line.startswith('hostname:'):
+                        custom_domain = line.split(':', 1)[1].strip()
+
+                credentials_path = os.path.join(tunnel_dir, f'{tunnel_name}.json')
+                if os.path.exists(credentials_path):
+                    with open(credentials_path, 'r') as f:
+                        cred = json.load(f)
+                    tunnel_id = cred.get('TunnelID') or cred.get('tunnel_id', '')
+
+                if tunnel_name and custom_domain and tunnel_id:
+                    return {
+                        'available': True,
+                        'tunnel_name': tunnel_name,
+                        'custom_domain': custom_domain,
+                        'tunnel_id': tunnel_id,
+                        'config_yml_path': config_yml_path
+                    }
             except Exception:
-                return {'enabled': False, 'use_named_tunnel': False, 'custom_domain': '', 'tunnel_name': 'xy-ws-tunnel'}
+                pass
+
+            return {'available': False, 'tunnel_name': '', 'custom_domain': '', 'tunnel_id': '', 'config_yml_path': ''}
 
         def _ensure_named_tunnel_ready(cf_binary, tunnel_name, custom_domain, port):
             """确保 named tunnel 已创建并配置好 DNS 路由（首次运行时自动设置）
@@ -7798,66 +7827,60 @@ ingress:
             return tunnel_id, config_yml_path
 
         def start_cloudflare_tunnel(port=8888, timeout=120):
-            """启动 Cloudflare Tunnel（Plan A: Named Tunnel / Plan B: Quick Tunnel，二选一）"""
+            """启动 Cloudflare Tunnel（Plan A: Named Tunnel → Plan B: Quick Tunnel，保底至少成功一个）"""
             global tunnel_process, tunnel_url, tunnel_current_mode
 
             cf_binary = find_cloudflared_binary()
             if not cf_binary:
                 return {"success": False, "error": "未找到 cloudflared"}
 
-            cf_config = _get_cloudflare_tunnel_config()
-            use_named = cf_config['enabled'] and cf_config['use_named_tunnel'] and cf_config['custom_domain']
+            named_config = _detect_named_tunnel_config()
 
-            if use_named:
-                print(f"[Cloudflare] 🏠 Plan A: Named Tunnel (自定义域名: {cf_config['custom_domain']})...")
-                tunnel_id, config_yml_path = _ensure_named_tunnel_ready(
-                    cf_binary, cf_config['tunnel_name'], cf_config['custom_domain'], port
-                )
-                if tunnel_id and config_yml_path:
-                    try:
-                        print(f"[Cloudflare] 启动 Named Tunnel: {cf_config['tunnel_name']}...")
-                        cmd = [cf_binary, "tunnel", "run", cf_config['tunnel_name'], "--config", config_yml_path, "--no-autoupdate"]
+            if named_config['available']:
+                print(f"[Cloudflare] 🏠 Plan A: Named Tunnel (自定义域名: {named_config['custom_domain']})...")
+                try:
+                    print(f"[Cloudflare] 启动 Named Tunnel: {named_config['tunnel_name']}...")
+                    cmd = [cf_binary, "tunnel", "run", named_config['tunnel_name'], "--config", named_config['config_yml_path'], "--no-autoupdate"]
 
-                        tunnel_process = subprocess.Popen(
-                            cmd,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT,
-                            text=True,
-                            bufsize=1
-                        )
+                    tunnel_process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1
+                    )
 
-                        named_url = f"https://{cf_config['custom_domain']}"
-                        start_time = time.time()
-                        while time.time() - start_time < 15:
-                            if tunnel_process.poll() is not None:
-                                break
-                            time.sleep(1)
+                    named_url = f"https://{named_config['custom_domain']}"
+                    start_time = time.time()
+                    while time.time() - start_time < 15:
+                        if tunnel_process.poll() is not None:
+                            break
+                        time.sleep(1)
 
-                        if tunnel_process.poll() is None:
-                            tunnel_url = named_url
-                            tunnel_current_mode = 'named'
-                            print(f"[Cloudflare] ✅ Plan A 成功: Named Tunnel {tunnel_url}")
-                            send_tunnel_notification(tunnel_url, 'stable_available', force_send=True)
+                    if tunnel_process.poll() is None:
+                        tunnel_url = named_url
+                        tunnel_current_mode = 'named'
+                        print(f"[Cloudflare] ✅ Plan A 成功: Named Tunnel {tunnel_url}")
+                        send_tunnel_notification(tunnel_url, 'stable_available', force_send=True)
 
-                            try:
-                                tunnel_file = PathManager.get_tunnel_url_file()
-                                with open(tunnel_file, "w", encoding="utf-8") as f:
-                                    f.write(f"Public URL: {tunnel_url}\n")
-                                    f.write(f"Local URL: http://localhost:{port}/\n")
-                                    f.write(f"Tunnel: {cf_config['tunnel_name']} (named)\n")
-                            except Exception as e:
-                                print(f"[Cloudflare] 写入文件失败: {e}")
+                        try:
+                            tunnel_file = PathManager.get_tunnel_url_file()
+                            with open(tunnel_file, "w", encoding="utf-8") as f:
+                                f.write(f"Public URL: {tunnel_url}\n")
+                                f.write(f"Local URL: http://localhost:{port}/\n")
+                                f.write(f"Tunnel: {named_config['tunnel_name']} (named)\n")
+                        except Exception as e:
+                            print(f"[Cloudflare] 写入文件失败: {e}")
 
-                            return {"success": True, "url": tunnel_url, "type": "cloudflare", "mode": "named"}
-                        else:
-                            print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 进程退出 (code: {tunnel_process.returncode})")
-                            return {"success": False, "error": f"Named Tunnel 进程退出 (code: {tunnel_process.returncode})"}
-                    except Exception as e:
-                        print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 启动异常: {e}")
-                        return {"success": False, "error": str(e)}
-                else:
-                    print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 未就绪（NS可能未生效或未登录）")
-                    return {"success": False, "error": "Named Tunnel 未就绪"}
+                        return {"success": True, "url": tunnel_url, "type": "cloudflare", "mode": "named"}
+                    else:
+                        print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 进程退出 (code: {tunnel_process.returncode})，回退到 Plan B...")
+                        tunnel_process = None
+                except Exception as e:
+                    print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 启动异常: {e}，回退到 Plan B...")
+                    tunnel_process = None
+            else:
+                print(f"[Cloudflare] ⏭️ Plan A 跳过: 未检测到 Named Tunnel 配置，直接 Plan B...")
 
             print(f"[Cloudflare] 🚀 Plan B: Quick Tunnel (临时域名, 端口 {port})...")
             try:
@@ -7876,7 +7899,7 @@ ingress:
 
                 while time.time() - start_time < timeout:
                     if tunnel_process.poll() is not None:
-                        return {"success": False, "error": f"Quick Tunnel 进程退出 (code: {tunnel_process.returncode})"}
+                        return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 进程退出 (code: {tunnel_process.returncode})"}
 
                     line = tunnel_process.stdout.readline()
                     if line:
@@ -7898,10 +7921,10 @@ ingress:
 
                     time.sleep(0.5)
 
-                return {"success": False, "error": f"Quick Tunnel 等待 URL 超时 ({timeout}秒)"}
+                return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 等待 URL 超时 ({timeout}秒)"}
 
             except Exception as e:
-                return {"success": False, "error": str(e)}
+                return {"success": False, "error": f"Plan B 也失败了: {str(e)}"}
 
         @app.route('/api/tunnel/type', methods=['GET', 'POST'])
         def tunnel_type_api():
