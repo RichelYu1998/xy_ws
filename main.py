@@ -575,15 +575,38 @@ class TeeOutput:
                 text.strip().startswith(f'[{_full_timestamp[:4]}')
             )
             
+            _is_flask_access_log = (
+                ' - - [' in text and 
+                ('"GET ' in text or '"POST ' in text or '"HEAD ' in text or 
+                 '"PUT ' in text or '"DELETE ' in text or '"PATCH ' in text or
+                 '"OPTIONS ' in text)
+            )
+            
             if not _has_timestamp:
-                _lines = text.split('\n')
-                _timestamped_lines = []
-                for _line in _lines:
-                    if _line.strip():
-                        _timestamped_lines.append(f"[{_full_timestamp}] {_line}")
+                if _is_flask_access_log:
+                    import re as _re
+                    _access_match = _re.search(r'^(\S+)\s+-\s+-\s+\[([^\]]+)\]\s+"([^"]+)"\s+(\d+)\s*(.*)', text.strip())
+                    if _access_match:
+                        _client_ip, _flask_time, _request_line, _status_code, _extra = _access_match.groups()
+                        _output_text = f"[{_full_timestamp}] {_client_ip} {_request_line} {_status_code}\n"
                     else:
-                        _timestamped_lines.append(_line)
-                _output_text = '\n'.join(_timestamped_lines)
+                        _lines = text.split('\n')
+                        _timestamped_lines = []
+                        for _line in _lines:
+                            if _line.strip():
+                                _timestamped_lines.append(f"[{_full_timestamp}] {_line}")
+                            else:
+                                _timestamped_lines.append(_line)
+                        _output_text = '\n'.join(_timestamped_lines)
+                else:
+                    _lines = text.split('\n')
+                    _timestamped_lines = []
+                    for _line in _lines:
+                        if _line.strip():
+                            _timestamped_lines.append(f"[{_full_timestamp}] {_line}")
+                        else:
+                            _timestamped_lines.append(_line)
+                    _output_text = '\n'.join(_timestamped_lines)
         
         self.original.write(_output_text)
         

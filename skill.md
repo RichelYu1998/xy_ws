@@ -638,7 +638,7 @@ def send_email(to, subject, body):
 
 ```python
 class TeeOutput:
-    """同时输出到控制台和文件"""
+    """同时输出到控制台 + 文件，自动添加时间戳 + 简化Flask访问日志"""
     
     def __init__(self, original, log_file_path=None):
         self.original = original
@@ -651,10 +651,58 @@ class TeeOutput:
             )
     
     def write(self, text):
-        self.original.write(text)
+        _output_text = text
+        
+        if text.strip():
+            _full_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            
+            _has_timestamp = (
+                text.strip().startswith(f'[{_full_timestamp[:10]}') or 
+                text.strip().startswith(f'[{_full_timestamp[:4]}')
+            )
+            
+            # 检测Flask/Werkzeug访问日志格式：IP - - [时间] "请求行" 状态码
+            _is_flask_access_log = (
+                ' - - [' in text and 
+                ('"GET ' in text or '"POST ' in text or '"HEAD ' in text or 
+                 '"PUT ' in text or '"DELETE ' in text or '"PATCH ' in text or
+                 '"OPTIONS ' in text)
+            )
+            
+            if not _has_timestamp:
+                if _is_flask_access_log:
+                    import re as _re
+                    # 解析Flask默认格式并简化为：[时间] IP 请求行 状态码
+                    _access_match = _re.search(r'^(\S+)\s+-\s+-\s+\[([^\]]+)\]\s+"([^"]+)"\s+(\d+)\s*(.*)', text.strip())
+                    if _access_match:
+                        _client_ip, _flask_time, _request_line, _status_code, _extra = _access_match.groups()
+                        _output_text = f"[{_full_timestamp}] {_client_ip} {_request_line} {_status_code}\n"
+                    else:
+                        # 解析失败时使用原始文本添加时间戳
+                        _lines = text.split('\n')
+                        _timestamped_lines = []
+                        for _line in _lines:
+                            if _line.strip():
+                                _timestamped_lines.append(f"[{_full_timestamp}] {_line}")
+                            else:
+                                _timestamped_lines.append(_line)
+                        _output_text = '\n'.join(_timestamped_lines)
+                else:
+                    # 普通日志：每行添加时间戳
+                    _lines = text.split('\n')
+                    _timestamped_lines = []
+                    for _line in _lines:
+                        if _line.strip():
+                            _timestamped_lines.append(f"[{_full_timestamp}] {_line}")
+                        else:
+                            _timestamped_lines.append(_line)
+                    _output_text = '\n'.join(_timestamped_lines)
+        
+        self.original.write(_output_text)
+        
         if self.file:
             safe_execute_func(
-                lambda: (self.file.write(text), self.file.flush()),
+                lambda: (self.file.write(_output_text), self.file.flush()),
                 context='TeeOutput写入'
             )
     
@@ -680,7 +728,23 @@ class TeeOutput:
 # 替换sys.stdout和sys.stderr，实现双输出
 sys.stdout = TeeOutput(sys.stdout, 'file/web_output.log')
 sys.stderr = TeeOutput(sys.stderr, 'file/web_output.log')
+
+# 日志格式示例：
+# 普通日志：[2026-07-17 16:00:22.620] [Tunnel] 宽限期中（59秒），跳过URL验证
+# Flask访问日志：[2026-07-17 16:04:08.100] 192.168.31.36 GET /api/tunnel/status HTTP/1.1 200
 ```
+
+**Flask访问日志处理规范（v3.8.42 新增）**：
+
+| 场景 | 格式 |
+|------|------|
+| Flask 默认格式 | `192.168.31.36 - - [17/Jul/2026 16:04:08] "GET /api/tunnel/status HTTP/1.1" 200 -` |
+| 简化后格式 | `[2026-07-17 16:04:08.100] 192.168.31.36 GET /api/tunnel/status HTTP/1.1 200` |
+
+**关键规则**：
+1. **检测特征**：` - - [` + `"GET/POST/HEAD...` 组合识别为 Flask 访问日志
+2. **去除冗余**：删除 `- - [Flask时间]` 和请求行的引号
+3. **统一时间戳**：使用 `[YYYY-MM-DD HH:MM:SS.mmm]` 格式
 
 ### 2.3.2 Web日志系统
 
@@ -11938,6 +12002,27 @@ result = auto_start_tunnel(force_restart=True)  # 强制重启
 - [ ] HOSTC_DEBUG 环境变量：启用 hostc 调试模式（v3.8.40 新增）
 - [ ] 实时打印 hostc 输出：`[hostc]` 前缀日志（v3.8.40 新增）
 - [ ] 心跳循环状态重置：隧道重启后重置失败计数并进入宽限期（v3.8.41 新增）
+- [ ] Flask访问日志简化：TeeOutput检测Flask访问日志并去除冗余时间戳（v3.8.42 新增）
+
+### PY-STD-LOG-001: Flask访问日志格式规范（v3.8.42 新增）
+
+**规范要求**:
+1. **检测Flask访问日志**：通过 ` - - [` + `"GET/POST/HEAD...` 特征识别
+2. **简化输出格式**：`[时间] IP 请求行 状态码`，删除 `- - [Flask时间]` 和引号
+3. **统一时间戳**：使用 `[YYYY-MM-DD HH:MM:SS.mmm]` 格式
+4. **避免重复时间戳**：Flask默认格式和TeeOutput时间戳不能同时出现
+
+**错误做法** ❌:
+```
+# 时间戳重复，难以阅读
+[2026-07-17 16:04:08.100] 192.168.31.36 - - [17/Jul/2026 16:04:08] "GET /api/tunnel/status HTTP/1.1[2026-07-17 16:04:08.100] " 200 -
+```
+
+**正确做法** ✅:
+```
+# 简洁清晰，只有一个时间戳
+[2026-07-17 16:04:08.100] 192.168.31.36 GET /api/tunnel/status HTTP/1.1 200
+```
 
 ### PY-STD-TUNNEL-005: 心跳循环状态重置规范（v3.8.41 新增）
 
