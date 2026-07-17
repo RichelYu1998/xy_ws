@@ -1,6 +1,6 @@
 ﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.44
+> **版本**: v3.8.45
 > **更新日期**: 2026-07-17
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,49 @@
 ---
 
 ## 最新更新
+
+### v3.8.45 (2026-07-17) - 🔄 NS 升级自动监控 + Quick Tunnel 自动升级到 Named Tunnel
+
+#### 🎯 核心改进
+- **🔄 NS 升级自动监控** - 当 Quick Tunnel 降级运行时，后台守护线程每 2 分钟检测 NS 是否指向 Cloudflare
+- **⬆️ 自动升级** - NS 生效后自动停止 Quick Tunnel，启动 Named Tunnel（永久域名），发邮件通知
+- **♾️ 永不超时** - 监控随项目启动而启动，无超时限制，NS 一变即触发升级
+- **📊 状态可查** - `/api/tunnel/status` 新增 `tunnel_mode` 和 `ns_monitor` 字段
+
+#### 🔄 NS 升级自动监控
+
+**运行流程**:
+```
+项目启动 → start_cloudflare_tunnel()
+  ├─ Named Tunnel 成功 → tunnel_mode='named', 监控不启动
+  └─ 降级到 Quick Tunnel → tunnel_mode='quick', 启动 ns_upgrade_monitor()
+       │
+       ├─ 每 120 秒检查 NS
+       ├─ NS 指向 Cloudflare?
+       │   ├─ Yes → 停止 Quick Tunnel → 启动 Named Tunnel → 发邮件 → 监控退出
+       │   └─ No → 继续监控
+       └─ 永不超时，直到升级成功或用户切换隧道类型
+```
+
+**API 状态新增字段**:
+```json
+{
+  "tunnel_mode": "quick",
+  "ns_monitor": {
+    "active": true,
+    "target_domain": "test12138.cn.mt",
+    "message": "等待 NS 指向 Cloudflare 后自动升级到永久域名"
+  }
+}
+```
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | 新增 `_check_ns_pointed_to_cloudflare()`、`ns_upgrade_monitor()`、`start_ns_upgrade_monitor()`；`tunnel_status` API 新增 mode/ns_monitor 字段 |
+
+---
 
 ### v3.8.44 (2026-07-17) - 🏠 Cloudflare Named Tunnel + 自定义域名 + 自动降级
 

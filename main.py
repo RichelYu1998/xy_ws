@@ -6825,7 +6825,7 @@ if __name__ == '__main__':
         tunnel_restart_thread = None
         tunnel_last_error = None
         tunnel_restart_count = 0
-        tunnel_restart_delay = 0  # 立即重启，3秒级快速响应
+        tunnel_restart_delay = 0
         tunnel_heartbeat_thread = None
         tunnel_last_heartbeat = 0
         tunnel_heartbeat_failed = False
@@ -6833,7 +6833,9 @@ if __name__ == '__main__':
         tunnel_daemon_started = False
         tunnel_type = 'hostc'
         tunnel_type = 'hostc'
-        user_selected_tunnel_type = 'hostc'  # 用户选择的隧道类型
+        user_selected_tunnel_type = 'hostc'
+        tunnel_current_mode = None
+        ns_monitor_thread = None
         email_notifier = EmailNotifier()
         old_tunnel_url = None
         tunnel_consecutive_failures = 0
@@ -7798,7 +7800,7 @@ ingress:
 
         def start_cloudflare_tunnel(port=8888, timeout=120):
             """启动 Cloudflare Tunnel（支持 named tunnel + 自动降级到 quick tunnel）"""
-            global tunnel_process, tunnel_url
+            global tunnel_process, tunnel_url, tunnel_current_mode
 
             cf_binary = find_cloudflared_binary()
             if not cf_binary:
@@ -7834,6 +7836,7 @@ ingress:
 
                         if tunnel_process.poll() is None:
                             tunnel_url = named_url
+                            tunnel_current_mode = 'named'
                             print(f"[Cloudflare] ✅ Named Tunnel 启动成功: {tunnel_url}")
 
                             try:
@@ -7879,6 +7882,7 @@ ingress:
                         match = re.search(url_pattern, line)
                         if match:
                             tunnel_url = match.group(0)
+                            tunnel_current_mode = 'quick'
                             print(f"[Cloudflare] ✅ Quick Tunnel 地址: {tunnel_url}")
 
                             try:
@@ -7888,6 +7892,8 @@ ingress:
                             except Exception as e:
                                 print(f"[Cloudflare] 写入文件失败: {e}")
 
+                            start_ns_upgrade_monitor()
+
                             return {"success": True, "url": tunnel_url, "type": "cloudflare", "mode": "quick"}
 
                     time.sleep(0.5)
@@ -7896,6 +7902,112 @@ ingress:
 
             except Exception as e:
                 return {"success": False, "error": str(e)}
+
+        def _check_ns_pointed_to_cloudflare(domain):
+            """检查域名 NS 是否已指向 Cloudflare"""
+            try:
+                root_domain = domain
+                parts = domain.split('.')
+                if len(parts) > 2:
+                    root_domain = '.'.join(parts[-2:])
+                result = subprocess.run(
+                    ['dig', '@8.8.8.8', root_domain, 'NS', '+short'],
+                    capture_output=True, text=True, timeout=10
+                )
+                return 'cloudflare' in result.stdout.lower()
+            except Exception:
+                return False
+
+        def ns_upgrade_monitor():
+            """NS 升级监控守护线程 - 当 NS 指向 Cloudflare 后自动从 Quick Tunnel 升级到 Named Tunnel
+            
+            运行条件：
+            1. 当前隧道类型为 cloudflare
+            2. config 中 use_named_tunnel=true 且 custom_domain 非空
+            3. 当前运行在 quick tunnel 模式（降级状态）
+            
+            一旦检测到 NS 指向 Cloudflare：
+            1. 停止当前 quick tunnel
+            2. 重新启动为 named tunnel（永久域名）
+            3. 发送邮件通知
+            4. 监控线程退出（任务完成）
+            """
+            global tunnel_process, tunnel_url, tunnel_current_mode, user_selected_tunnel_type
+            global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time
+
+            cf_config = _get_cloudflare_tunnel_config()
+            if not (cf_config['enabled'] and cf_config['use_named_tunnel'] and cf_config['custom_domain']):
+                return
+
+            custom_domain = cf_config['custom_domain']
+            check_interval = 120
+            log_interval = 600
+            last_log_time = 0
+
+            print(f"[NS-Monitor] 🔄 启动 NS 升级监控 (域名: {custom_domain})")
+            print(f"[NS-Monitor] ⏳ 当前为 Quick Tunnel 临时域名，等待 NS 指向 Cloudflare 后自动升级...")
+
+            while True:
+                time.sleep(check_interval)
+
+                if user_selected_tunnel_type != 'cloudflare':
+                    print(f"[NS-Monitor] 隧道类型已切换为 {user_selected_tunnel_type}，监控退出")
+                    break
+
+                if tunnel_current_mode == 'named':
+                    print(f"[NS-Monitor] ✅ 已在 Named Tunnel 模式，监控退出")
+                    break
+
+                if _check_ns_pointed_to_cloudflare(custom_domain):
+                    print(f"[NS-Monitor] 🎉 检测到 NS 已指向 Cloudflare！开始升级到 Named Tunnel...")
+
+                    if tunnel_process and tunnel_process.poll() is None:
+                        try:
+                            tunnel_process.terminate()
+                            tunnel_process.wait(timeout=5)
+                        except:
+                            try:
+                                tunnel_process.kill()
+                            except:
+                                pass
+                        tunnel_process = None
+
+                    try:
+                        tunnel_file_to_clear = PathManager.get_tunnel_url_file()
+                        with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
+                            f.write('')
+                    except:
+                        pass
+
+                    port = args.port if "args" in globals() and hasattr(args, "port") else 8888
+                    result = start_cloudflare_tunnel(port=port)
+
+                    if result and result.get('success') and result.get('mode') == 'named':
+                        new_url = result.get('url')
+                        print(f"[NS-Monitor] ✅ 升级成功！永久域名: {new_url}")
+                        send_tunnel_notification(new_url, 'stable_available', force_send=True)
+                        stable_url = new_url
+                        stable_url_confirm_count = stable_url_min_confirms
+                        url_first_seen_time = time.time()
+                        last_stable_notification_time = time.time()
+                        break
+                    else:
+                        err = result.get('error', '未知') if result else '未知'
+                        print(f"[NS-Monitor] ⚠️ 升级失败: {err}，继续监控...")
+                        tunnel_current_mode = 'quick'
+                else:
+                    now = time.time()
+                    if now - last_log_time > log_interval:
+                        print(f"[NS-Monitor] ⏳ NS 尚未指向 Cloudflare，继续监控...")
+                        last_log_time = now
+
+        def start_ns_upgrade_monitor():
+            """启动 NS 升级监控（仅在 quick tunnel 降级模式下启动）"""
+            global ns_monitor_thread
+            if ns_monitor_thread and ns_monitor_thread.is_alive():
+                return
+            ns_monitor_thread = threading.Thread(target=ns_upgrade_monitor, daemon=True)
+            ns_monitor_thread.start()
 
         @app.route('/api/tunnel/type', methods=['GET', 'POST'])
         def tunnel_type_api():
@@ -8226,8 +8338,9 @@ ingress:
                 status_message = '⏹️ 隧道未运行'
             
             start_tunnel_daemons()
-            
-            # 返回状态 - 统一使用 web_url，包含详细的稳定性信息
+
+            ns_monitor_active = ns_monitor_thread is not None and ns_monitor_thread.is_alive()
+
             return jsonify({
                 'running': is_running,
                 'url': web_url,
@@ -8237,6 +8350,12 @@ ingress:
                 'last_error': tunnel_last_error or ('URL无效，正在重启...' if tunnel_need_restart else None),
                 'last_heartbeat': heartbeat_str,
                 'tunnel_type': tunnel_type,
+                'tunnel_mode': tunnel_current_mode,
+                'ns_monitor': {
+                    'active': ns_monitor_active,
+                    'target_domain': _get_cloudflare_tunnel_config().get('custom_domain', '') if ns_monitor_active else '',
+                    'message': '等待 NS 指向 Cloudflare 后自动升级到永久域名' if ns_monitor_active else ('已使用永久域名' if tunnel_current_mode == 'named' else '')
+                },
                 'detailed_status': detailed_status,
                 'status_message': status_message,
                 'stable_confirmed': stable_confirmed,
