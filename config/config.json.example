@@ -86,5 +86,11 @@
   "email_smtp_user": "your_email@qq.com",
   "email_smtp_password": "your_email_password",
   "email_from_name": "公网IP监控",
-  "email_to": "980187223@qq.com"
+  "email_to": "980187223@qq.com",
+  "cloudflare_tunnel": {
+    "enabled": false,
+    "custom_domain": "",
+    "tunnel_name": "xy-ws-tunnel",
+    "use_named_tunnel": false
+  }
 }
