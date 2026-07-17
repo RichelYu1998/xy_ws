@@ -1,4 +1,4 @@
-import json
+﻿import json
 import time
 import asyncio
 import os
@@ -6832,6 +6832,8 @@ if __name__ == '__main__':
         tunnel_need_restart = False
         tunnel_daemon_started = False
         tunnel_type = 'hostc'
+        tunnel_type = 'hostc'
+        user_selected_tunnel_type = 'hostc'  # 用户选择的隧道类型
         email_notifier = EmailNotifier()
         old_tunnel_url = None
         tunnel_consecutive_failures = 0
@@ -7115,7 +7117,11 @@ if __name__ == '__main__':
                     print(f"[Tunnel] 🔄 检测到隧道重启，重置失败计数并进入60秒宽限期")
                 last_restart_state = tunnel_need_restart
                 
-                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+                # 优先使用内存中的 tunnel_url（解决文件锁定问题）
+                if tunnel_url:
+                    web_url = tunnel_url
+                else:
+                    web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
                 is_tunnel_running = False
                 url_verified = False
 
@@ -7250,6 +7256,11 @@ if __name__ == '__main__':
         def auto_start_tunnel(force_restart=False):
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
 
+            # 根据用户选择启动对应隧道
+            if user_selected_tunnel_type == "cloudflare":
+                print(f"[Tunnel] 用户选择 Cloudflare Tunnel，正在启动...")
+                return start_cloudflare_tunnel(port=args.port if "args" in globals() and hasattr(args, "port") else 8888)
+
             if force_restart:
                 print(f"[Tunnel] 🔄 强制重启模式，将清理旧进程并重新启动")
                 sys.stdout.flush()
@@ -7331,7 +7342,7 @@ if __name__ == '__main__':
                     threading.Thread(target=_wait_and_notify_hostc_url, daemon=True).start()
                     return {'success': True, 'url': None, 'message': 'hostc在运行，后台等待URL'}
 
-                print(f"[Tunnel] 🔍 无hostc进程且无URL，需要启动新隧道")
+                print(f"[Tunnel] 无hostc进程且无URL，需要启动新隧道")
                 sys.stdout.flush()
             
             try:
@@ -7619,6 +7630,195 @@ if __name__ == '__main__':
                     if not _do_restart(True, None, False):
                         break
         
+
+        # ========================================
+        # Cloudflare Tunnel 支持
+        # ========================================
+
+        def find_cloudflared_binary():
+            """跨平台 cloudflared 二进制文件检测"""
+            import platform
+            import shutil
+            
+            system = platform.system().lower()
+            machine = platform.machine().lower()
+            
+            # 1. 优先检查项目目录（按操作系统分类）
+            project_cf = None
+            if system == "windows":
+                project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "cloudflared", "windows", "cloudflared.exe")
+            elif system == "linux":
+                project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "cloudflared", "linux", "cloudflared")
+            elif system == "darwin":
+                # macOS: 根据架构选择对应版本
+                if machine in ["arm64", "aarch64"]:
+                    project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "cloudflared", "macos", "cloudflared-arm64")
+                else:
+                    project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "cloudflared", "macos", "cloudflared-amd64")
+            
+            if project_cf and os.path.exists(project_cf):
+                print(f"[Cloudflare] 在项目目录找到: {project_cf}")
+                return project_cf
+            
+            # 2. 检查系统 PATH
+            cf_in_path = shutil.which("cloudflared")
+            if cf_in_path:
+                print(f"[Cloudflare] 在系统 PATH 中找到: {cf_in_path}")
+                return cf_in_path
+            
+            # 3. 检查 Windows 常见路径
+            if system == "windows":
+                common_paths = [
+                    r"C:\Program Files (x86)\cloudflared\cloudflared.exe",
+                    r"C:\Program Files\cloudflared\cloudflared.exe",
+                    os.path.expanduser(r"~\AppData\Local\cloudflared\cloudflared.exe"),
+                ]
+                for path in common_paths:
+                    if os.path.exists(path):
+                        print(f"[Cloudflare] 在常见路径找到: {path}")
+                        return path
+            
+            print(f"[Cloudflare] 未找到 cloudflared (系统: {system})")
+            return None
+
+        def start_cloudflare_tunnel(port=8888, timeout=120):
+            """启动 Cloudflare Tunnel"""
+            global tunnel_process, tunnel_url
+            
+            cf_binary = find_cloudflared_binary()
+            if not cf_binary:
+                return {"success": False, "error": "未找到 cloudflared"}
+            
+            try:
+                print(f"[Cloudflare] 启动 Tunnel (端口 {port})...")
+                cmd = [cf_binary, "tunnel", "--url", f"http://localhost:{port}", "--no-autoupdate"]
+                
+                tunnel_process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+                
+                url_pattern = r"https://[a-z0-9\-]+\.trycloudflare\.com"
+                start_time = time.time()
+                
+                while time.time() - start_time < timeout:
+                    if tunnel_process.poll() is not None:
+                        return {"success": False, "error": f"进程退出 (code: {tunnel_process.returncode})"}
+                    
+                    line = tunnel_process.stdout.readline()
+                    if line:
+                        match = re.search(url_pattern, line)
+                        if match:
+                            tunnel_url = match.group(0)
+                            print(f"[Cloudflare] 获取到地址: {tunnel_url}")
+                            
+                            try:
+                                tunnel_file = PathManager.get_tunnel_url_file()
+                                with open(tunnel_file, "w", encoding="utf-8") as f:
+                                    f.write(tunnel_url + "\n")
+                            except Exception as e:
+                                print(f"[Cloudflare] 写入文件失败: {e}")
+                            
+                            return {"success": True, "url": tunnel_url, "type": "cloudflare"}
+                    
+                    time.sleep(0.5)
+                
+                return {"success": False, "error": f"等待 URL 超时 ({timeout}秒)"}
+                
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
+        @app.route('/api/tunnel/type', methods=['GET', 'POST'])
+        def tunnel_type_api():
+            """获取或设置隧道类型"""
+            global user_selected_tunnel_type, tunnel_process
+            
+            if request.method == 'GET':
+                cf_available = find_cloudflared_binary() is not None
+                return jsonify({
+                    'current': user_selected_tunnel_type,
+                    'available': {'hostc': True, 'cloudflare': cf_available}
+                })
+            
+            elif request.method == 'POST':
+                data = request.get_json(silent=True) or {}
+                new_type = data.get('type', '').lower()
+                
+                if new_type not in ['hostc', 'cloudflare']:
+                    return jsonify({
+                        'success': False, 
+                        'error': '无效的隧道类型',
+                        'current': user_selected_tunnel_type
+                    }), 400
+                
+                if new_type == 'cloudflare' and not find_cloudflared_binary():
+                    return jsonify({
+                        'success': False, 
+                        'error': 'Cloudflare 不可用，请先安装 cloudflared',
+                        'current': user_selected_tunnel_type
+                    }), 400
+                
+                # 停止当前隧道
+                if tunnel_process and tunnel_process.poll() is None:
+                    print(f"[Tunnel/API] 停止当前隧道...")
+                    tunnel_process.terminate()
+                    try:
+                        tunnel_process.wait(timeout=5)
+                    except:
+                        tunnel_process.kill()
+                    tunnel_process = None
+                    tunnel_url = None
+                
+                # 清除旧的 tunnel_url.txt 文件，防止显示旧URL
+                try:
+                    tunnel_file_to_clear = PathManager.get_tunnel_url_file()
+                    with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
+                        f.write('')
+                    print(f"[Tunnel/API] 已清除旧的 tunnel_url.txt")
+                except Exception as clear_err:
+                    print(f"[Tunnel/API] 清除 tunnel_url.txt 失败: {clear_err}")
+                
+                old_type = user_selected_tunnel_type
+                user_selected_tunnel_type = new_type
+                print(f"[Tunnel/API] 隧道类型已更改: {old_type} -> {new_type}")
+                
+                # 启动新隧道
+                print(f"[Tunnel/API] 正在启动 {new_type} 隧道...")
+                result = auto_start_tunnel(force_restart=True)
+                
+                if result and result.get('success'):
+                    new_url = result.get('url')
+                    print(f"[Tunnel/API] {new_type} 隧道启动成功: {new_url}")
+                    
+                    # 重置稳定性检测状态
+                    global stable_url, stable_url_confirm_count, url_first_seen_time
+                    stable_url = new_url
+                    stable_url_confirm_count = 1
+                    url_first_seen_time = time.time()
+                    
+                    # 发送邮件通知
+                    print(f"[Tunnel/API] 🎉 隧道切换成功，发送邮件通知...")
+                    send_tunnel_notification(new_url, 'stable_available', force_send=True)
+                    
+                    return jsonify({
+                        'success': True, 
+                        'old_type': old_type, 
+                        'new_type': new_type,
+                        'url': new_url,
+                        'message': f'已切换到 {new_type} 隧道'
+                    })
+                else:
+                    print(f"[Tunnel/API] {new_type} 隧道启动失败: {result.get('error') if result else '未知错误'}")
+                    return jsonify({
+                        'success': False,
+                        'error': f'{new_type} 隧道启动失败: {result.get("error") if result else "未知错误"}',
+                        'current': user_selected_tunnel_type
+                    }), 500
+        
+
         @app.route('/api/tunnel/start', methods=['POST'])
         def start_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, tunnel_consecutive_failures
@@ -7799,17 +7999,24 @@ if __name__ == '__main__':
         
         @app.route('/api/tunnel/status', methods=['GET'])
         def tunnel_status():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat, tunnel_daemon_started, tunnel_restart_thread, tunnel_heartbeat_thread, tunnel_need_restart, last_url_invalid_log_time
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat, tunnel_daemon_started, tunnel_restart_thread, tunnel_heartbeat_thread, tunnel_need_restart, last_url_invalid_log_time, user_selected_tunnel_type
             
             heartbeat_str = datetime.fromtimestamp(tunnel_last_heartbeat).strftime('%Y-%m-%d %H:%M:%S') if tunnel_last_heartbeat > 0 else None
             
-            tunnel_type = 'hostc'
+            tunnel_type = user_selected_tunnel_type
             
-            # 从 tunnel_url.txt 获取最新公网地址（权威源）
-            web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+            # 优先使用内存中的 tunnel_url（解决文件被锁定时的问题）
+            # 只有内存中没有时，才从文件读取
+            if tunnel_url:
+                web_url = tunnel_url
+            else:
+                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
             
-            # 检测是否有 hostc 进程在运行
-            process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+            # 根据隧道类型检测对应的进程
+            if user_selected_tunnel_type == 'cloudflare':
+                process_running = tunnel_process is not None and tunnel_process.poll() is None
+            else:
+                process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
             
             # 判断隧道是否在运行：有进程且有URL即认为运行中
             # URL可用性验证由心跳机制负责，不在状态API中做（避免单次验证失败误判）
