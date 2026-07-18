@@ -3998,6 +3998,29 @@ def send_tunnel_notification(...):
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.53 (2026-07-18) - 🔧 修复双隧道地址写入冲突
+
+- **🔧 修复写入冲突** - 解决 `run.bat`/`run.sh` 直接写入原始日志导致 `tunnel_url.txt` 格式混乱的问题
+- **📂 分离输出文件** - hostc 原始输出改为写入 `hostc_output.txt`，Python 统一管理 `tunnel_url.txt`
+- **✅ 双隧道地址正确存储** - 确保 hostc 和 Cloudflare 地址同时正确写入 `tunnel_url.txt`
+
+**数据流向优化**:
+```
+run.bat/run.sh → hostc_output.txt (原始日志)
+                        ↓
+              Python 读取并提取 URL
+                        ↓
+              tunnel_url.txt (格式化的双隧道地址)
+```
+
+**修改文件**:
+- `run.bat`: hostc 输出改为 `file\hostc_output.txt`
+- `run.sh`: hostc 输出改为 `file/hostc_output.txt`
+- `main.py`: `get_public_url_from_web_log()` 添加从 `hostc_output.txt` 读取 URL 的策略
+- `main.py`: 所有 `write_tunnel_urls_file()` 调用同时传入 hostc 和 CF 的 URL
+
+----
+
 ### v3.8.52 (2026-07-18) - 📧 双隧道独立发邮件 + 心跳写入修复
 
 - **📧 双隧道独立发邮件** - CF 和 hostc 验证通过后独立发送邮件，不再互相排队等待

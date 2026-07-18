@@ -2026,6 +2026,63 @@ class PathManager:
             if should_log:
                 print(f"[{current_time}] [URL-Source] ❌ 读取 tunnel_url.txt 失败: {str(e)[:100]}")
         
+        # ========== 策略1.5：从 hostc_output.txt 读取（run.bat 输出源）==========
+        if not result_url:
+            try:
+                hostc_output_file = os.path.join(PathManager.get_file_dir(), 'hostc_output.txt')
+                
+                if should_log:
+                    print(f"[{current_time}] [URL-Source] 📂 尝试读取: {hostc_output_file}")
+                
+                if os.path.exists(hostc_output_file):
+                    with open(hostc_output_file, 'r', encoding='utf-8', errors='replace') as f:
+                        hostc_content = f.read()
+                    
+                    if should_log:
+                        print(f"[{current_time}] [URL-Source] 📄 文件大小: {len(hostc_content)} 字符")
+                    
+                    tunnel_match = re.search(r'Public URL:\s*(https://[^\s]+)', hostc_content)
+                    if not tunnel_match:
+                        tunnel_match = re.search(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', hostc_content)
+                    
+                    if tunnel_match:
+                        candidate_url = tunnel_match.group(1).rstrip('/')
+                        
+                        if should_log:
+                            print(f"[{current_time}] [URL-Source] ✅ 从 hostc_output.txt 提取到候选URL: {candidate_url}")
+                        
+                        should_validate = config['validate_url'] and candidate_url and not skip_validation
+                        
+                        if should_validate:
+                            is_valid = PathManager._validate_url_accessibility(candidate_url, config['url_validation_timeout'])
+                            if is_valid:
+                                result_url = candidate_url
+                                url_source = 'hostc_output.txt (validated)'
+                                
+                                if should_log:
+                                    print(f"[{current_time}] [URL-Source] ✅✅✅ URL验证通过！来源: hostc_output.txt")
+                                    print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
+                            else:
+                                if should_log:
+                                    print(f"[{current_time}] [URL-Source] ⚠️ hostc_output.txt 中的URL不可用，尝试备用源...")
+                        else:
+                            result_url = candidate_url
+                            url_source = 'hostc_output.txt' + (' (skip_validation)' if skip_validation else ' (no validation)')
+                            
+                            if should_log:
+                                print(f"[{current_time}] [URL-Source] ✅ 跳过验证，直接使用URL")
+                                print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
+                    else:
+                        if should_log:
+                            print(f"[{current_time}] [URL-Source] ❌ hostc_output.txt 中未找到有效URL格式")
+                else:
+                    if should_log:
+                        print(f"[{current_time}] [URL-Source] ⚠️ hostc_output.txt 文件不存在")
+                        
+            except Exception as e:
+                if should_log:
+                    print(f"[{current_time}] [URL-Source] ❌ 读取 hostc_output.txt 失败: {str(e)[:100]}")
+        
         # ========== 策略2：从 web_output.log 读取（备用方案）==========
         if not result_url:
             try:
@@ -6922,6 +6979,10 @@ if __name__ == '__main__':
                             result['hostc'] = hostc_match.group(1).rstrip('/')
                         if cf_match:
                             result['cloudflare'] = cf_match.group(1).rstrip('/')
+                        if not result['hostc']:
+                            old_hostc_match = re.search(r'Public URL:\s*(https://[a-zA-Z0-9_-]+\.hostc\.dev)', content)
+                            if old_hostc_match:
+                                result['hostc'] = old_hostc_match.group(1).rstrip('/')
             except Exception:
                 pass
             return result
@@ -7101,7 +7162,7 @@ if __name__ == '__main__':
         def heartbeat_loop():
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time
-            global tunnel_last_heartbeat, tunnel_heartbeat_failed
+            global tunnel_last_heartbeat, tunnel_heartbeat_failed, cf_url
             consecutive_failures = 0
             max_consecutive_failures = 5
             url_verify_failures = 0
@@ -7161,7 +7222,7 @@ if __name__ == '__main__':
                                     if stable_url_confirm_count >= stable_url_min_confirms:
                                         elapsed = int(time.time() - url_first_seen_time)
                                         print(f"[Tunnel] 🎯 URL已确认为稳定！持续验证{stable_url_confirm_count}次，耗时{elapsed}秒")
-                                        write_tunnel_urls_file(hostc_url=web_url)
+                                        write_tunnel_urls_file(hostc_url=web_url, cf_url=cf_url)
                                         send_tunnel_notification(web_url, 'stable_available', force_send=True)
                                         last_stable_notification_time = time.time()
                             else:
@@ -7440,7 +7501,7 @@ if __name__ == '__main__':
                                     if file_url and file_url != tunnel_url:
                                         print(f"[Tunnel] 从 hostc 输出获取到URL: {file_url}")
                                         
-                                        write_tunnel_urls_file(hostc_url=file_url)
+                                        write_tunnel_urls_file(hostc_url=file_url, cf_url=cf_url)
                                         
                                         try:
                                             web_output_file = PathManager.get_web_output_file()
@@ -7501,7 +7562,7 @@ if __name__ == '__main__':
                 return {'success': False, 'error': str(e)}
         
         def restart_tunnel():
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay, cf_url
             
             consecutive_restart_attempts = 0
             restart_wait_start = None
@@ -7863,7 +7924,8 @@ ingress:
                         cf_mode = 'named'
                         print(f"[Cloudflare] ✅ Plan A 成功: Named Tunnel {cf_url}，等待心跳验证后发邮件")
 
-                        write_tunnel_urls_file(cf_url=cf_url)
+                        existing = read_tunnel_urls_file()
+                        write_tunnel_urls_file(hostc_url=existing.get('hostc'), cf_url=cf_url)
 
                         return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "named"}
                     else:
@@ -7902,7 +7964,8 @@ ingress:
                             cf_mode = 'quick'
                             print(f"[Cloudflare] ✅ Plan B 成功: Quick Tunnel {cf_url}，等待心跳验证后发邮件")
 
-                            write_tunnel_urls_file(cf_url=cf_url)
+                            existing = read_tunnel_urls_file()
+                            write_tunnel_urls_file(hostc_url=existing.get('hostc'), cf_url=cf_url)
 
                             return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "quick"}
 
@@ -7917,6 +7980,7 @@ ingress:
             """Cloudflare Tunnel 独立心跳验证 - 验证通过后发邮件通知"""
             global cf_process, cf_url, cf_mode
             global cf_stable_url, cf_stable_confirm_count, cf_url_first_seen_time, cf_last_stable_notification_time, cf_last_email_sent_url
+            global stable_url
 
             interval = 30
             last_log_time = 0
@@ -7955,7 +8019,7 @@ ingress:
                         if cf_stable_confirm_count >= cf_stable_min_confirms:
                             elapsed = int(time.time() - cf_url_first_seen_time)
                             print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
-                            write_tunnel_urls_file(cf_url=cf_url)
+                            write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
                             if cf_url != cf_last_email_sent_url:
                                 send_tunnel_notification(cf_url, 'stable_available', force_send=True, tunnel_type='cloudflare')
                                 cf_last_stable_notification_time = time.time()
