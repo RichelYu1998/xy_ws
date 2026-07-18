@@ -3998,6 +3998,29 @@ def send_tunnel_notification(...):
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.49 (2026-07-18) - 🎯 前端同时显示双隧道地址
+
+- **🎯 双隧道地址同时显示** - Web页面公网地址区域同时显示 Cloudflare 和 hostc 两个隧道的地址，不再只显示单一地址
+- **✅ 状态标识清晰** - 每个地址都有独立的状态标识（✅ 已验证 / ⏳ 验证中）
+- **🎨 图标区分** - 使用不同图标区分两个隧道（☁️ Cloudflare / ⚡ hostc）
+
+----
+
+#### 🎯 显示效果
+
+**Web页面公网地址区域**:
+```
+公网地址:
+
+☁️ Cloudflare: https://xxx.trycloudflare.com ✅
+⚡ hostc: https://xxx.hostc.dev ⏳
+```
+
+**修改文件**:
+- `index.html`: `updateTunnelUI()` 函数新增 `cloudflare` 参数，同时显示两个隧道的地址和状态
+
+----
+
 ### v3.8.48 (2026-07-18) - 🎯 隧道类型选择器动态默认值
 
 - **🎯 智能默认值选择** - Web页面隧道类型选择器默认值根据实际运行状态动态变化，不再固定为 hostc

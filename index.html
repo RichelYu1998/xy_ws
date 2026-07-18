@@ -5438,12 +5438,12 @@ SzwegoSpider/
             try {
                 const response = await fetch('/api/tunnel/status');
                 const data = await response.json();
-                updateTunnelUI(data.running, data.url, data.auto_restart, data.restart_count, data.last_error, data.tunnel_type, data.url_valid, data.detailed_status, data.status_message);
+                updateTunnelUI(data.running, data.url, data.auto_restart, data.restart_count, data.last_error, data.tunnel_type, data.url_valid, data.detailed_status, data.status_message, data.cloudflare);
             } catch (e) {
                 console.error('检查隧道状态失败:', e);
             }
         }
-        function updateTunnelUI(running, url, autoRestart, restartCount, lastError, tunnelType, urlValid, detailedStatus, statusMessage) {
+        function updateTunnelUI(running, url, autoRestart, restartCount, lastError, tunnelType, urlValid, detailedStatus, statusMessage, cloudflare) {
             const btn = document.getElementById('btn-toggle-tunnel');
             const status = document.getElementById('tunnel-status');
             const urlDisplay = document.getElementById('tunnel-public-url');
@@ -5495,8 +5495,28 @@ SzwegoSpider/
             }
             
             if (urlDisplay) {
+                let urlsHtml = '';
+                
+                if (cloudflare && cloudflare.url) {
+                    const cfStatus = cloudflare.stable ? '✅' : '⏳';
+                    urlsHtml += `<div class="mb-2">
+                        <strong><i class="fa fa-cloud"></i> Cloudflare:</strong> 
+                        <a href="${cloudflare.url}" target="_blank" class="text-primary font-weight-bold">${cloudflare.url}</a>
+                        <span class="badge badge-${cloudflare.stable ? 'success' : 'info'} ml-1">${cfStatus}</span>
+                    </div>`;
+                }
+                
                 if (url) {
-                    urlDisplay.innerHTML = `<a href="${url}" target="_blank" class="text-primary font-weight-bold">${url}</a>`;
+                    const hostcStatus = urlValid ? '✅' : '⏳';
+                    urlsHtml += `<div class="mb-2">
+                        <strong><i class="fa fa-bolt"></i> hostc:</strong> 
+                        <a href="${url}" target="_blank" class="text-primary font-weight-bold">${url}</a>
+                        <span class="badge badge-${urlValid ? 'success' : 'info'} ml-1">${hostcStatus}</span>
+                    </div>`;
+                }
+                
+                if (urlsHtml) {
+                    urlDisplay.innerHTML = urlsHtml;
                     if (urlDisplay.parentElement) {
                         urlDisplay.parentElement.style.display = 'block';
                     }
