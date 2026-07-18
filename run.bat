@@ -99,8 +99,8 @@ call :log [*] hostc v!HOSTC_VER! 已就绪
 
 call :log_blank
 call :log [*] 启动 hostc 隧道（后台运行，不阻塞）...
-echo. > "file\tunnel_url.txt"
-start /b cmd /c ""!HOSTC_BIN!" 8888 --local-host localhost >> file\tunnel_url.txt 2>&1" < nul
+echo. > "file\hostc_output.txt"
+start /b cmd /c ""!HOSTC_BIN!" 8888 --local-host localhost >> file\hostc_output.txt 2>&1" < nul
 call :log [*] hostc 已在后台启动，将在后续步骤中获取URL
 :skip_tunnel
 
