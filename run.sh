@@ -98,11 +98,10 @@ pre_launch() {
 
     log_blank
     log "[*] 启动 hostc 隧道（后台运行，不阻塞）..."
-    echo -n > "file/hostc_output.txt"
     if [ -f "$HOSTC_BIN" ]; then
-        "$HOSTC_BIN" 8888 --local-host localhost >> file/hostc_output.txt 2>&1 < /dev/null &
+        "$HOSTC_BIN" 8888 --local-host localhost < /dev/null &
     else
-        npx -y hostc@latest 8888 --local-host localhost >> file/hostc_output.txt 2>&1 < /dev/null &
+        npx -y hostc@latest 8888 --local-host localhost < /dev/null &
     fi
     log "[*] hostc 已在后台启动，将在后续步骤中获取URL"
 
