@@ -5458,7 +5458,7 @@ SzwegoSpider/
         function updateTunnelUI(running, url, autoRestart, restartCount, lastError, tunnelType, urlValid, detailedStatus, statusMessage, cloudflare) {
             const btn = document.getElementById('btn-toggle-tunnel');
             const status = document.getElementById('tunnel-status');
-            const urlDisplay = document.getElementById('tunnel-public-url');
+            const urlDisplay = document.getElementById('tunnel-panel-urls');
             const restartInfo = document.getElementById('tunnel-restart-info');
             const tunnelTypeSelector = document.getElementById('tunnel-type-selector');
             const tunnelTypeStatus = document.getElementById('tunnel-type-status');
@@ -5645,7 +5645,7 @@ SzwegoSpider/
                                     </div>
                                     <div class="alert alert-success" id="tunnel-url-section" style="display: none;">
                                         <i class="fa fa-link"></i> <strong>公网地址:</strong><br>
-                                        <span id="tunnel-public-url"></span>
+                                        <span id="tunnel-panel-urls"></span>
                                         <small class="text-muted d-block mt-1">复制链接分享给其他人，他们可以通过这个地址访问你的本地服务</small>
                                     </div>
                                 </div>
