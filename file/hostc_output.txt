@@ -1,0 +1,8 @@
+ 
+Warning  Local service localhost:8888 is not accepting connections yet.
+         The tunnel will still start.
+Success  Tunnel ready
+  Public URL: https://t-ihmnyb070t.hostc.dev
+  Local:      http://localhost:8888/
+  Tunnel:     t-ihmnyb070t
+  Channels:   2
