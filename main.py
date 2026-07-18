@@ -7289,7 +7289,7 @@ if __name__ == '__main__':
                 existing_cf = existing_urls.get('cloudflare')
                 if existing_cf:
                     try:
-                        is_cf_valid = verify_url(existing_cf, timeout=5, quiet=True)
+                        is_cf_valid = verify_url(existing_cf, timeout=5, verbose=False)
                         if is_cf_valid:
                             print(f"[Tunnel] ✅ 发现可用CF地址，直接复用: {existing_cf}")
                             cf_url = existing_cf
