@@ -6882,6 +6882,10 @@ if __name__ == '__main__':
         last_email_sent_url = None
         pending_email_url = None
         email_send_lock = threading.Lock()
+        global_email_cooldown = 300
+        global_last_email_sent_time = 0
+        recent_sent_urls = {}
+        url_dedup_window = 600
         
         stable_url = None
         stable_url_confirm_count = 0
@@ -6973,6 +6977,7 @@ if __name__ == '__main__':
             """
             global last_email_sent_time, email_fail_count, last_email_sent_url, pending_email_url
             global cf_last_email_sent_time, cf_last_email_sent_url
+            global global_last_email_sent_time, recent_sent_urls
             
             if tunnel_type == 'cloudflare':
                 _last_sent_time = cf_last_email_sent_time
@@ -6994,16 +6999,33 @@ if __name__ == '__main__':
                         print(f"[Email] 邮件发送失败冷却期已过，重置失败计数")
                         email_fail_count = 0
 
-                if not force_send and current_time - _last_sent_time < email_cooldown:
-                    print(f"[Email-{tunnel_type}] 邮件冷却中，跳过发送: {new_url}")
+                expired_urls = [url for url, sent_time in recent_sent_urls.items() if current_time - sent_time > url_dedup_window]
+                for url in expired_urls:
+                    del recent_sent_urls[url]
+                
+                if new_url in recent_sent_urls:
+                    sent_time = recent_sent_urls[new_url]
+                    elapsed = int(current_time - sent_time)
+                    print(f"[Email-{tunnel_type}] ⏭️ URL在去重窗口内已发送过，跳过: {new_url} (距上次{elapsed}秒)")
                     return
                 
                 if new_url == _last_sent_url and event_type != 'fallback_available':
                     print(f"[Email-{tunnel_type}] ⏭️ 相同URL已发送过，跳过: {new_url}")
                     return
                 
-                if force_send:
-                    print(f"[Email-{tunnel_type}] ✨ 强制发送模式")
+                if not force_send:
+                    if current_time - global_last_email_sent_time < global_email_cooldown:
+                        elapsed = int(current_time - global_last_email_sent_time)
+                        remaining = int(global_email_cooldown - elapsed)
+                        print(f"[Email-{tunnel_type}] ⏳ 全局冷却中，跳过发送: {new_url} (剩余{remaining}秒)")
+                        return
+                    
+                    if current_time - _last_sent_time < email_cooldown:
+                        print(f"[Email-{tunnel_type}] 邮件冷却中，跳过发送: {new_url}")
+                        return
+                else:
+                    if event_type not in ['unavailable', 'fallback_available']:
+                        print(f"[Email-{tunnel_type}] ⚠️ 强制发送模式（事件: {event_type}）")
                 
                 should_send = True
 
@@ -7013,6 +7035,7 @@ if __name__ == '__main__':
             def verify_and_send():
                 global last_email_sent_time, email_fail_count, last_email_sent_url
                 global cf_last_email_sent_time, cf_last_email_sent_url
+                global global_last_email_sent_time, recent_sent_urls
                 import datetime
                 import threading as _threading
                 current_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -7028,6 +7051,8 @@ if __name__ == '__main__':
                         
                         if success:
                             send_time = time.time()
+                            global_last_email_sent_time = send_time
+                            recent_sent_urls[new_url] = send_time
                             if tunnel_type == 'cloudflare':
                                 cf_last_email_sent_time = send_time
                                 cf_last_email_sent_url = new_url
@@ -7164,7 +7189,7 @@ if __name__ == '__main__':
                                         elapsed = int(time.time() - url_first_seen_time)
                                         print(f"[Tunnel] 🎯 URL已确认为稳定！持续验证{stable_url_confirm_count}次，耗时{elapsed}秒")
                                         write_tunnel_urls_file(hostc_url=web_url, cf_url=cf_url)
-                                        send_tunnel_notification(web_url, 'stable_available', force_send=True)
+                                        send_tunnel_notification(web_url, 'stable_available')
                                         last_stable_notification_time = time.time()
                             else:
                                 url_verify_failures += 1
@@ -7209,7 +7234,7 @@ if __name__ == '__main__':
                             print(f"[Tunnel] 心跳恢复")
                             if url_verify_failures > 0 and web_url:
                                 print(f"[Tunnel] 🎉 公网地址恢复，发送通知")
-                                send_tunnel_notification(web_url, 'available', force_send=True)
+                                send_tunnel_notification(web_url, 'available')
                             last_log_time = time.time()
                         consecutive_failures = 0
                         check_and_send_pending_email()
@@ -7293,7 +7318,7 @@ if __name__ == '__main__':
                             url_verified = False
                         if url_verified:
                             print(f"[Tunnel] 🎉 公网地址验证通过！立即发送邮件通知...")
-                            send_tunnel_notification(url, 'stable_available', force_send=True)
+                            send_tunnel_notification(url, 'stable_available')
                             stable_url = url
                             stable_url_confirm_count = stable_url_min_confirms
                             url_first_seen_time = time.time()
@@ -7340,7 +7365,7 @@ if __name__ == '__main__':
                                     url_verified = False
                                 if url_verified:
                                     print(f"[Tunnel] 🎉 公网地址验证通过！立即发送邮件通知...")
-                                    send_tunnel_notification(found_url, 'stable_available', force_send=True)
+                                    send_tunnel_notification(found_url, 'stable_available')
                                     stable_url = found_url
                                     stable_url_confirm_count = stable_url_min_confirms
                                     url_first_seen_time = time.time()
@@ -7467,7 +7492,7 @@ if __name__ == '__main__':
                                         
                                         if url_verified:
                                             print(f"[Tunnel] 🎉 公网地址验证通过！立即发送邮件通知...")
-                                            send_tunnel_notification(file_url, 'stable_available', force_send=True)
+                                            send_tunnel_notification(file_url, 'stable_available')
                                             stable_url = file_url
                                             stable_url_confirm_count = stable_url_min_confirms
                                             url_first_seen_time = time.time()
@@ -7964,7 +7989,7 @@ ingress:
                         write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
                         if cf_url != cf_last_email_sent_url:
                             print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
-                            send_tunnel_notification(cf_url, 'stable_available', force_send=True, tunnel_type='cloudflare')
+                            send_tunnel_notification(cf_url, 'stable_available', tunnel_type='cloudflare')
                             cf_last_stable_notification_time = time.time()
                             cf_last_email_sent_url = cf_url
                         else:
@@ -7977,7 +8002,7 @@ ingress:
                         write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
                         if cf_url != cf_last_email_sent_url:
                             print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
-                            send_tunnel_notification(cf_url, 'stable_available', force_send=True, tunnel_type='cloudflare')
+                            send_tunnel_notification(cf_url, 'stable_available', tunnel_type='cloudflare')
                             cf_last_stable_notification_time = time.time()
                             cf_last_email_sent_url = cf_url
                         else:
