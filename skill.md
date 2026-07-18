@@ -8701,6 +8701,124 @@ fi
 - **心跳守护即时启动（v3.8.28）**: 隧道启动后立即调用`start_tunnel_daemons()`启动心跳守护+重启守护线程，不再等待`/api/tunnel/status`被调用才懒启动
 - **守护统一管理（v3.8.28）**: 提取`start_tunnel_daemons()`函数统一管理守护线程启动逻辑，`/api/tunnel/status`中作为安全网调用
 
+### 6.1.2 CF隧道独立性保证机制（v3.8.65 新增）⭐
+
+**核心原则**: Cloudflare Tunnel 和 hostc Tunnel 必须**完全独立管理**，任一方的失效不得影响另一方。
+
+#### 🔒 双层保护机制
+
+**第一层：hostc 失效时保留 CF 地址**
+```python
+# ✅ 正确做法（v3.8.65）
+if web_url and not has_hostc_process:
+    existing_urls = read_tunnel_urls_file()
+    cf_url = existing_urls.get('cloudflare')
+    if cf_url:
+        # 只清除 hostc，保留 CF
+        write_tunnel_urls_file(hostc_url=None, cf_url=cf_url)
+        print(f"[Tunnel] ✅ 已保留CF地址，仅清除hostc: {cf_url}")
+    else:
+        # 无 CF 地址才清空文件
+        with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
+            f.write('')
+
+# ❌ 错误做法（v3.8.64 及之前）
+if web_url and not has_hostc_process:
+    # 直接清空整个文件，包括 CF 地址
+    with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
+        f.write('')
+```
+
+**第二层：智能复用可用 CF 地址**
+```python
+def auto_start_tunnel(force_restart=False):
+    cf_binary = find_cloudflared_binary()
+    
+    if cf_binary and not force_restart:
+        # ✅ 先检查是否有可复用的 CF 地址
+        existing_urls = read_tunnel_urls_file()
+        existing_cf = existing_urls.get('cloudflare')
+        
+        if existing_cf:
+            try:
+                is_cf_valid = verify_url(existing_cf, timeout=5, quiet=True)
+                if is_cf_valid:
+                    print(f"[Tunnel] ✅ 发现可用CF地址，直接复用: {existing_cf}")
+                    cf_url = existing_cf
+                    start_cf_heartbeat()
+                    return  # 直接返回，不创建新隧道
+                else:
+                    print(f"[Tunnel] ⚠️ 已有CF地址不可用: {existing_cf}，将启动新CF隧道")
+                    existing_cf = None
+            except Exception as e:
+                print(f"[Tunnel] ⚠️ 验证已有CF地址失败: {e}，将启动新CF隧道")
+                existing_cf = None
+        
+        # 只有在无可复用地址时才启动新 CF 隧道
+        if not existing_cf:
+            port = args.port if "args" in globals() and hasattr(args, 'port') else 8888
+            print(f"[Tunnel] 🚀 启动新的 Cloudflare Tunnel...")
+            cf_result = start_cloudflare_tunnel(port=port)
+            # ... 处理结果
+```
+
+#### 📊 独立性验证清单
+
+| 场景 | hostc 行为 | CF 行为 | 是否符合规范 |
+|------|-----------|---------|-------------|
+| hostc 502 错误 | 重启 hostc | **保持不变** | ✅ |
+| hostc 进程退出 | 重启 hostc | **保持不变** | ✅ |
+| hostc URL 超时 | 标记失效并重启 | **保持不变** | ✅ |
+| CF 验证失败 | 不受影响 | 重启 CF | ✅ |
+| CF 进程退出 | 不受影响 | 重启 CF | ✅ |
+| 手动强制重启 (`force_restart=True`) | 重启 hostc | **重启 CF** | ✅ (唯一例外) |
+
+#### ⚠️ 关键规则
+
+1. **禁止全局清除**: 任何情况下都不得因为 hostc 问题而清除 `tunnel_url.txt` 中的 CF 地址
+2. **必须先验后用**: 启动新 CF 隧道前**必须**先检查并验证已有地址
+3. **独立生命周期**: CF 和 hostc 有独立的进程变量、心跳循环、邮件通知逻辑
+4. **唯一例外**: 只有 `force_restart=True` 时才重启 CF（手动强制重启场景）
+
+#### 🐛 常见反模式（禁止）
+
+```python
+# ❌ 反模式1：无条件清空 tunnel_url.txt
+with open(tunnel_file, 'w') as f:
+    f.write('')  # 这会同时删除 CF 地址！
+
+# ❌ 反模式2：不检查就创建新 CF 隧道
+cf_result = start_cloudflare_tunnel(port=port)  # 浪费资源，可能创建无用隧道
+
+# ❌ 反模式3：hostc 失效时连带重启 CF
+Environment.kill_process_by_name('node.exe')
+if cf_process:
+    cf_process.terminate()  # 错误！hostc 失效不应终止 CF
+```
+
+#### ✅ 推荐范式
+
+```python
+def handle_hostc_failure(web_url, has_hostc_process):
+    """处理 hostc 失效的标准范式"""
+    if web_url and not has_hostc_process:
+        # Step 1: 读取现有配置
+        existing_urls = read_tunnel_urls_file()
+        cf_url = existing_urls.get('cloudflare')
+        
+        # Step 2: 只更新 hostc 部分
+        if cf_url:
+            write_tunnel_urls_file(hostc_url=None, cf_url=cf_url)
+            print(f"[Tunnel] ✅ 已保留CF地址: {cf_url}")
+        else:
+            clear_tunnel_url_file()
+        
+        # Step 3: 只重启 hostc，不动 CF
+        restart_hostc_only()
+```
+
+---
+
 ### 6.1.1 Cloudflare Tunnel 跨平台支持（v3.8.43 新增）
 
 **文件夹结构规范**:
