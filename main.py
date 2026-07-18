@@ -8027,6 +8027,7 @@ ingress:
                             print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
                             write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
                             if cf_url != cf_last_email_sent_url:
+                                print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
                                 send_tunnel_notification(cf_url, 'stable_available', force_send=True, tunnel_type='cloudflare')
                                 cf_last_stable_notification_time = time.time()
                                 cf_last_email_sent_url = cf_url
