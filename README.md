@@ -1,6 +1,6 @@
 ﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.56
+> **版本**: v3.8.57
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,56 @@
 ---
 
 ## 最新更新
+
+### v3.8.57 (2026-07-18) - 📧 Cloudflare 邮件通知修复 + 日志格式统一
+
+#### 🎯 核心改进
+- **📧 CF邮件通知修复** - 修复 Cloudflare 隧道验证成功后不发送邮件的问题
+- **📋 日志格式统一** - CF 和 hostc 使用相同的详细日志格式（线程ID、SMTP连接过程等）
+- **✅ 立即发送邮件** - CF 地址验证成功后立即发送邮件通知（无需等待多次验证）
+
+#### 📋 日志输出示例
+
+**修改前（CF）**：
+```
+[CF-Heartbeat] 🔍 CF 新URL，开始稳定性验证 (1/1): https://xxx.trycloudflare.com
+[Email] ✅ URL验证成功: https://xxx.trycloudflare.com
+```
+
+**修改后（CF）**：
+```
+[CF-Heartbeat] 🔍 CF 新URL，开始稳定性验证 (1/1): https://xxx.trycloudflare.com
+[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证1次，耗时0秒
+[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📧 开始发送邮件通知
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🎯 目标URL: https://xxx.trycloudflare.com
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📋 事件类型: stable_available
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🏷️ 隧道类型: cloudflare
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🖥️ SMTP服务器: smtp.qq.com:587
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 👤 发送人: 980187223@qq.com
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📬 接收人: 980187223@qq.com
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🔌 正在连接SMTP服务器 (超时: 30秒)...
+[2026-07-18 12:40:14] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ✅ SMTP连接成功 (耗时: 2.65秒)
+[2026-07-18 12:40:14] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🔐 正在登录SMTP服务器...
+[2026-07-18 12:40:15] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ✅ SMTP登录成功 (耗时: 0.79秒)
+[2026-07-18 12:40:15] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📤 正在发送邮件...
+[2026-07-18 12:40:16] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ✅✅✅ 邮件发送成功！
+[2026-07-18 12:40:16] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📬 收件人: 980187223@qq.com
+[2026-07-18 12:40:16] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ⏱️ 发送耗时: 0.62秒
+[2026-07-18 12:40:16] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ✅ SMTP连接已关闭
+[2026-07-18 12:40:16] [Email-cloudflare] ✅✅✅ 邮件发送成功！
+[2026-07-18 12:40:16] [Email-cloudflare] 🔗 隧道地址: https://xxx.trycloudflare.com
+```
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | `cf_heartbeat_loop()` 修复 CF 验证成功后立即发送邮件的逻辑 |
+| main.py | `send_tunnel_notification()` 统一日志格式，添加线程ID和隧道类型 |
+| main.py | `EmailNotifier.send_tunnel_notification()` 优化日志输出，避免重复 |
+
+---
 
 ### v3.8.56 (2026-07-18) - 🗑️ 移除 hostc_output.txt，简化隧道管理
 
