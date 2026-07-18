@@ -4609,7 +4609,15 @@ SzwegoSpider/
         }
         function handleCopyUrl(btn) {
             const url = btn.getAttribute('data-url');
-            copyToClipboard(url);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(function() {
+                    showToast(url + ' 链接已复制到剪贴板');
+                }, function() {
+                    fallbackCopy(url);
+                });
+            } else {
+                fallbackCopy(url);
+            }
             btn.innerHTML = '<i class="fa fa-check"></i> 已复制';
             btn.classList.remove('btn-light');
             btn.classList.add('btn-success');
