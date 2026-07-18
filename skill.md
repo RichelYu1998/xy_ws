@@ -93,7 +93,7 @@
     - [2.16.6 命令执行（4个）](#2166-命令执行4个)
     - [2.16.7 货号对比（2个）](#2167-货号对比2个)
     - [2.16.8 利润报表（8个）](#2168-利润报表8个)
-    - [2.16.9 隧道管理（5个）](#2169-隧道管理5个)
+    - [2.16.9 隧道管理（6个）](#2169-隧道管理6个)
     - [2.16.10 文件清理（2个）](#21610-文件清理2个)
     - [2.16.11 工具函数（8个）](#21611-工具函数8个)
     - [2.16.12 天气时钟（2个）](#21612-天气时钟2个)
@@ -5726,16 +5726,17 @@ function formatDate(value) { /* 日期格式化（9种格式，含Excel序列号
 function formatNumber(value, isMoney) { /* 数字格式化（千分位+货币符号） */ }
 ```
 
-#### 2.16.9 隧道管理（5个）
+#### 2.16.9 隧道管理（6个）
 
 ```javascript
 function initHostcTunnel() { /* 初始化Hostc隧道 */ }
 async function loadServerInfo() { /* 加载服务器信息（/api/server/info） */ }
 async function checkTunnelStatus() { /* 检查隧道状态（/api/tunnel/status） */ }
 function updateTunnelUI(running, url, autoRestart, restartCount, lastError, tunnelType) {
-    // 更新隧道UI状态（按钮、URL显示、状态指示灯）
+    // 更新隧道UI状态（按钮、URL显示、状态指示灯、复制按钮）
 }
 async function startTunnelAndShow() { /* 启动隧道并显示URL */ }
+function handleCopyUrl(btn) { /* 复制隧道URL到剪贴板，按钮反馈✓→恢复 */ }
 window.showTunnelSection = function() { /* 显示隧道面板（全局） */ }
 ```
 
