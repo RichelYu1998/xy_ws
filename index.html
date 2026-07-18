@@ -4531,9 +4531,15 @@ SzwegoSpider/
                             ` : ''}
                             <div class="form-group">
                                 <label><strong><i class="fa fa-globe"></i> 公网地址:</strong></label>
-                                <div class="p-2 bg-success text-white rounded" id="tunnel-public-url-container">
-                                    <i class="fa fa-spinner fa-spin"></i> <span id="tunnel-public-url">获取中...</span>
+                                <div id="tunnel-share-urls-container">
+                                    <div class="p-2 bg-success text-white rounded mb-2" id="tunnel-share-hostc">
+                                        <i class="fa fa-spinner fa-spin"></i> <span>hostc 获取中...</span>
+                                    </div>
+                                    <div class="p-2 bg-info text-white rounded" id="tunnel-share-cf" style="display:none;">
+                                        <i class="fa fa-spinner fa-spin"></i> <span>Cloudflare 获取中...</span>
+                                    </div>
                                 </div>
+                                <small class="text-muted d-block mt-1">复制链接分享给其他人，他们可以通过这个地址访问你的本地服务</small>
                             </div>
                             <div class="text-center mt-3">
                                 <button class="btn btn-info btn-lg" onclick="showTunnelSection()">
@@ -4553,36 +4559,43 @@ SzwegoSpider/
                         if (statusData.url && statusData.url.startsWith('http')) {
                             clearInterval(tunnelPollInterval);
                             tunnelPollInterval = null;
-                            const urlContainer = document.getElementById('tunnel-public-url-container');
-                            if (urlContainer) {
-                                urlContainer.className = 'p-2 bg-success text-white rounded';
-                                urlContainer.innerHTML = `
-                                    <i class="fa fa-check-circle"></i>
+                            const hostcContainer = document.getElementById('tunnel-share-hostc');
+                            if (hostcContainer) {
+                                hostcContainer.className = 'p-2 bg-success text-white rounded mb-2';
+                                hostcContainer.innerHTML = `
+                                    <i class="fa fa-bolt"></i> <strong>hostc:</strong>
                                     <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
-                                        <i class="fa fa-external-link"></i> ${statusData.url}
+                                        ${statusData.url}
                                     </a>
-                                    <button class="btn btn-sm btn-light ml-2 btn-copy-tunnel-url" id="btn-copy-tunnel-url" data-url="${statusData.url}">
+                                    <button class="btn btn-sm btn-light ml-2 btn-copy-url" data-url="${statusData.url}" onclick="handleCopyUrl(this)">
                                         <i class="fa fa-copy"></i> 复制
                                     </button>
                                 `;
-                                const newCopyBtn = document.getElementById('btn-copy-tunnel-url');
-                                if (newCopyBtn) {
-                                    newCopyBtn.onclick = function() {
-                                        console.log('[按钮点击] 复制隧道URL:', this.dataset.url);
-                                        copyToClipboard(this.dataset.url);
-                                        this.innerHTML = '<i class="fa fa-check"></i> 已复制';
-                                        setTimeout(() => {
-                                            this.innerHTML = '<i class="fa fa-copy"></i> 复制';
-                                        }, 2000);
-                                    };
+                            }
+                            if (statusData.cloudflare && statusData.cloudflare.url) {
+                                const cfContainer = document.getElementById('tunnel-share-cf');
+                                if (cfContainer) {
+                                    cfContainer.style.display = 'block';
+                                    const cfStatus = statusData.cloudflare.stable ? '✅' : '⏳';
+                                    cfContainer.className = 'p-2 bg-info text-white rounded mb-2';
+                                    cfContainer.innerHTML = `
+                                        <i class="fa fa-cloud"></i> <strong>Cloudflare:</strong>
+                                        <a href="${statusData.cloudflare.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
+                                            ${statusData.cloudflare.url}
+                                        </a>
+                                        <span class="badge badge-${statusData.cloudflare.stable ? 'success' : 'info'} ml-1">${cfStatus}</span>
+                                        <button class="btn btn-sm btn-light ml-2 btn-copy-url" data-url="${statusData.cloudflare.url}" onclick="handleCopyUrl(this)">
+                                            <i class="fa fa-copy"></i> 复制
+                                        </button>
+                                    `;
                                 }
                             }
                         } else if (retryCount >= maxRetries) {
                             console.log('[隧道共享] 达到最大重试次数，停止轮询');
                             clearInterval(tunnelPollInterval);
                             tunnelPollInterval = null;
-                            const pubUrl = document.getElementById('tunnel-public-url');
-                            if (pubUrl) pubUrl.textContent = '获取失败，请检查网络连接';
+                            const hostcContainer = document.getElementById('tunnel-share-hostc');
+                            if (hostcContainer) hostcContainer.innerHTML = '<i class="fa fa-times-circle"></i> 获取失败，请检查网络连接';
                         }
                     } catch (e) {
                         console.error('[隧道共享] 获取状态失败:', e);

@@ -1,6 +1,6 @@
 ﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.62
+> **版本**: v3.8.63
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,22 @@
 ---
 
 ## 最新更新
+
+### v3.8.63 (2026-07-18) - 🌐 隧道共享弹窗显示双公网地址
+
+#### 🎯 核心改进
+- **🌐 双公网地址** - 隧道共享弹窗同时显示 hostc（绿色）和 Cloudflare（蓝色）两个公网地址
+- **📋 各自复制按钮** - 每个 URL 旁都有独立的"复制"按钮，Toast 显示具体复制的 URL
+- **⏳ 加载状态** - hostc 和 Cloudflare 分别显示"获取中..."加载动画
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| index.html | 隧道共享弹窗公网地址区域改为双URL布局（`tunnel-share-hostc` + `tunnel-share-cf`） |
+| index.html | 轮询成功后同时渲染 hostc 和 Cloudflare URL，复用 `handleCopyUrl()` |
+
+---
 
 ### v3.8.62 (2026-07-18) - 📋 Toast显示复制URL
 
