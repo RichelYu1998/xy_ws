@@ -2533,6 +2533,8 @@ class EmailNotifier:
     - 熔断保护（连续失败后冷却）
     - 邮件去重（相同URL只发一次）
     - 冷却时间控制（避免频繁发送）
+    - 多线程发送（不阻塞主线程）
+    - 详细日志输出（线程ID、SMTP连接过程）
     """
     
     def __init__(self):
@@ -2541,10 +2543,9 @@ class EmailNotifier:
         self.last_email_sent_url = None
         self.email_fail_count = 0
         
-        # 配置参数
-        self.COOLDOWN_PERIOD = 60  # 邮件发送冷却时间（秒）
-        self.FAILURE_THRESHOLD = 3  # 熔断触发阈值
-        self.CIRCUIT_COOLDOWN = 300  # 熔断冷却时间（秒）
+        self.COOLDOWN_PERIOD = 60
+        self.FAILURE_THRESHOLD = 3
+        self.CIRCUIT_COOLDOWN = 300
     
     def _get_config(self):
         """获取邮件配置"""
@@ -2560,39 +2561,30 @@ class EmailNotifier:
     
     def send_tunnel_notification(self, url, event_type='new'):
         """
-        发送隧道通知邮件
+        发送隧道通知邮件（多线程，不阻塞主线程）
         
         Args:
             url: 公网URL
-            event_type: 事件类型（new/update）
+            event_type: 事件类型（new/update/stable_available/fallback_available）
         
         Returns:
             bool: 是否发送成功
         """
         config = self._get_config()
         
-        # 检查是否启用
         if not config['enabled']:
-            print("[Email] 邮件通知未启用")
             return False
         
-        # 检查去重（同一URL只发一次）
         if url == self.last_email_sent_url:
-            print("[Email] 同一URL已发送过，跳过")
             return False
         
-        # 检查冷却时间
         now = time.time()
         if now - self.last_email_sent_time < self.COOLDOWN_PERIOD:
-            print(f"[Email] 冷却时间内，{self.COOLDOWN_PERIOD - (now - self.last_email_sent_time):.0f}秒后重试")
             return False
         
-        # 检查熔断
         if self.email_fail_count >= self.FAILURE_THRESHOLD:
-            print(f"[Email] 熔断中，{self.CIRCUIT_COOLDOWN}秒后恢复")
             return False
         
-        # 发送邮件
         try:
             import smtplib
             from email.mime.text import MIMEText
@@ -2631,7 +2623,37 @@ Szwego商品爬虫 - 隧道状态通知
             return False
 ```
 
-#### 2.12.2 QQ邮箱授权码配置
+#### 2.12.2 多线程邮件发送（v3.8.57 新增）
+
+**关键改进：**
+- **多线程发送** - 不阻塞主线程，提升用户体验
+- **详细日志** - 包含线程ID、SMTP连接过程、耗时统计
+- **跨系统兼容** - Windows/Linux/macOS 统一行为
+
+**日志格式示例：**
+
+```
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📧 开始发送邮件通知
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🎯 目标URL: https://xxx.trycloudflare.com
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📋 事件类型: stable_available
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🏷️ 隧道类型: cloudflare
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🖥️ SMTP服务器: smtp.qq.com:587
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 👤 发送人: 980187223@qq.com
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📬 接收人: 980187223@qq.com
+[2026-07-18 12:40:11] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🔌 正在连接SMTP服务器 (超时: 30秒)...
+[2026-07-18 12:40:14] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ✅ SMTP连接成功 (耗时: 2.65秒)
+[2026-07-18 12:40:14] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 🔐 正在登录SMTP服务器...
+[2026-07-18 12:40:15] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ✅ SMTP登录成功 (耗时: 0.79秒)
+[2026-07-18 12:40:15] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📤 正在发送邮件...
+[2026-07-18 12:40:16] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ✅✅✅ 邮件发送成功！
+[2026-07-18 12:40:16] [EmailNotifier-Thread:Thread-23 (verify_and_send)] 📬 收件人: 980187223@qq.com
+[2026-07-18 12:40:16] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ⏱️ 发送耗时: 0.62秒
+[2026-07-18 12:40:16] [EmailNotifier-Thread:Thread-23 (verify_and_send)] ✅ SMTP连接已关闭
+[2026-07-18 12:40:16] [Email-cloudflare] ✅✅✅ 邮件发送成功！
+[2026-07-18 12:40:16] [Email-cloudflare] 🔗 隧道地址: https://xxx.trycloudflare.com
+```
+
+#### 2.12.3 QQ邮箱授权码配置
 
 ```json
 {
