@@ -2026,63 +2026,6 @@ class PathManager:
             if should_log:
                 print(f"[{current_time}] [URL-Source] ❌ 读取 tunnel_url.txt 失败: {str(e)[:100]}")
         
-        # ========== 策略1.5：从 hostc_output.txt 读取（run.bat 输出源）==========
-        if not result_url:
-            try:
-                hostc_output_file = os.path.join(PathManager.get_file_dir(), 'hostc_output.txt')
-                
-                if should_log:
-                    print(f"[{current_time}] [URL-Source] 📂 尝试读取: {hostc_output_file}")
-                
-                if os.path.exists(hostc_output_file):
-                    with open(hostc_output_file, 'r', encoding='utf-8', errors='replace') as f:
-                        hostc_content = f.read()
-                    
-                    if should_log:
-                        print(f"[{current_time}] [URL-Source] 📄 文件大小: {len(hostc_content)} 字符")
-                    
-                    tunnel_match = re.search(r'Public URL:\s*(https://[^\s]+)', hostc_content)
-                    if not tunnel_match:
-                        tunnel_match = re.search(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', hostc_content)
-                    
-                    if tunnel_match:
-                        candidate_url = tunnel_match.group(1).rstrip('/')
-                        
-                        if should_log:
-                            print(f"[{current_time}] [URL-Source] ✅ 从 hostc_output.txt 提取到候选URL: {candidate_url}")
-                        
-                        should_validate = config['validate_url'] and candidate_url and not skip_validation
-                        
-                        if should_validate:
-                            is_valid = PathManager._validate_url_accessibility(candidate_url, config['url_validation_timeout'])
-                            if is_valid:
-                                result_url = candidate_url
-                                url_source = 'hostc_output.txt (validated)'
-                                
-                                if should_log:
-                                    print(f"[{current_time}] [URL-Source] ✅✅✅ URL验证通过！来源: hostc_output.txt")
-                                    print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
-                            else:
-                                if should_log:
-                                    print(f"[{current_time}] [URL-Source] ⚠️ hostc_output.txt 中的URL不可用，尝试备用源...")
-                        else:
-                            result_url = candidate_url
-                            url_source = 'hostc_output.txt' + (' (skip_validation)' if skip_validation else ' (no validation)')
-                            
-                            if should_log:
-                                print(f"[{current_time}] [URL-Source] ✅ 跳过验证，直接使用URL")
-                                print(f"[{current_time}] [URL-Source] 🎯 最终URL: {result_url}")
-                    else:
-                        if should_log:
-                            print(f"[{current_time}] [URL-Source] ❌ hostc_output.txt 中未找到有效URL格式")
-                else:
-                    if should_log:
-                        print(f"[{current_time}] [URL-Source] ⚠️ hostc_output.txt 文件不存在")
-                        
-            except Exception as e:
-                if should_log:
-                    print(f"[{current_time}] [URL-Source] ❌ 读取 hostc_output.txt 失败: {str(e)[:100]}")
-        
         # ========== 策略2：从 web_output.log 读取（备用方案）==========
         if not result_url:
             try:

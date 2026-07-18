@@ -4015,25 +4015,38 @@ def send_tunnel_notification(...):
 
 ----
 
-### v3.8.53 (2026-07-18) - 🔧 修复双隧道地址写入冲突
+### v3.8.56 (2026-07-18) - 🗑️ 移除 hostc_output.txt，简化隧道管理
 
-- **🔧 修复写入冲突** - 解决 `run.bat`/`run.sh` 直接写入原始日志导致 `tunnel_url.txt` 格式混乱的问题
-- **📂 分离输出文件** - hostc 原始输出改为写入 `hostc_output.txt`，Python 统一管理 `tunnel_url.txt`
-- **✅ 双隧道地址正确存储** - 确保 hostc 和 Cloudflare 地址同时正确写入 `tunnel_url.txt`
+- **🗑️ 移除冗余文件** - 删除 `hostc_output.txt`，不再生成中间文件
+- **✅ 统一管理** - 所有隧道地址统一由 Python 写入 `tunnel_url.txt`
+- **🚀 简化流程** - 减少文件 I/O，提高效率
 
 **数据流向优化**:
 ```
-run.bat/run.sh → hostc_output.txt (原始日志)
+修改前:
+run.bat/run.sh → hostc_output.txt → Python读取 → tunnel_url.txt
+
+修改后:
+run.bat/run.sh → hostc 进程输出（控制台）
                         ↓
-              Python 读取并提取 URL
-                        ↓
-              tunnel_url.txt (格式化的双隧道地址)
+              Python 直接管理 tunnel_url.txt
 ```
 
 **修改文件**:
-- `run.bat`: hostc 输出改为 `file\hostc_output.txt`
-- `run.sh`: hostc 输出改为 `file/hostc_output.txt`
-- `main.py`: `get_public_url_from_web_log()` 添加从 `hostc_output.txt` 读取 URL 的策略
+- `run.bat`: 移除 `hostc_output.txt` 重定向
+- `run.sh`: 移除 `hostc_output.txt` 重定向
+- `main.py`: 删除从 `hostc_output.txt` 读取 URL 的策略
+
+----
+
+### v3.8.53 (2026-07-18) - 🔧 修复双隧道地址写入冲突
+
+- **🔧 修复写入冲突** - 解决 `run.bat`/`run.sh` 直接写入原始日志导致 `tunnel_url.txt` 格式混乱的问题
+- **✅ 双隧道地址正确存储** - 确保 hostc 和 Cloudflare 地址同时正确写入 `tunnel_url.txt`
+
+> ⚠️ **注意**: v3.8.56 已移除 `hostc_output.txt`，改用 Python 直接管理 `tunnel_url.txt`
+
+**修改文件**:
 - `main.py`: 所有 `write_tunnel_urls_file()` 调用同时传入 hostc 和 CF 的 URL
 
 ----

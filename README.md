@@ -1,6 +1,6 @@
 ﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.55
+> **版本**: v3.8.56
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,37 @@
 ---
 
 ## 最新更新
+
+### v3.8.56 (2026-07-18) - 🗑️ 移除 hostc_output.txt，简化隧道管理
+
+#### 🎯 核心改进
+- **🗑️ 移除冗余文件** - 删除 `hostc_output.txt`，不再生成中间文件
+- **✅ 统一管理** - 所有隧道地址统一由 Python 写入 `tunnel_url.txt`
+- **🚀 简化流程** - 减少文件 I/O，提高效率
+
+#### 📋 数据流向优化
+
+**修改前**：
+```
+run.bat/run.sh → hostc_output.txt → Python读取 → tunnel_url.txt
+```
+
+**修改后**：
+```
+run.bat/run.sh → hostc 进程输出（控制台）
+                        ↓
+              Python 直接管理 tunnel_url.txt
+```
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| run.bat | 移除 `hostc_output.txt` 重定向 |
+| run.sh | 移除 `hostc_output.txt` 重定向 |
+| main.py | 删除从 `hostc_output.txt` 读取 URL 的策略 |
+
+---
 
 ### v3.8.55 (2026-07-18) - 📧 Cloudflare 邮件通知日志统一
 
@@ -64,26 +95,14 @@
 
 #### 🎯 核心改进
 - **🔧 修复写入冲突** - 解决 `run.bat`/`run.sh` 直接写入原始日志导致 `tunnel_url.txt` 格式混乱的问题
-- **📂 分离输出文件** - hostc 原始输出改为写入 `hostc_output.txt`，Python 统一管理 `tunnel_url.txt`
 - **✅ 双隧道地址正确存储** - 确保 hostc 和 Cloudflare 地址同时正确写入 `tunnel_url.txt`
 
-#### 📋 数据流向优化
-
-```
-run.bat/run.sh → hostc_output.txt (原始日志)
-                        ↓
-              Python 读取并提取 URL
-                        ↓
-              tunnel_url.txt (格式化的双隧道地址)
-```
+> ⚠️ **注意**: v3.8.56 已移除 `hostc_output.txt`，改用 Python 直接管理 `tunnel_url.txt`
 
 #### 📋 修改文件清单
 
 | 文件 | 修改内容 |
 |------|---------|
-| run.bat | hostc 输出改为 `file\hostc_output.txt` |
-| run.sh | hostc 输出改为 `file/hostc_output.txt` |
-| main.py | `get_public_url_from_web_log()` 添加从 `hostc_output.txt` 读取 URL 的策略 |
 | main.py | 所有 `write_tunnel_urls_file()` 调用同时传入 hostc 和 CF 的 URL |
 
 ---
