@@ -2558,9 +2558,6 @@ class EmailNotifier:
             return False
         
         try:
-            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 📧 开始发送邮件通知")
-            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 🎯 目标URL: {tunnel_url}")
-            print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 📋 事件类型: {event_type}")
             print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 🖥️ SMTP服务器: {config['smtp_host']}:{config['smtp_port']}")
             print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 👤 发送人: {config['smtp_user']}")
             print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 📬 接收人: {config['to_email']}")
@@ -7021,9 +7018,10 @@ if __name__ == '__main__':
                 current_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 thread_id = _threading.current_thread().name
                 try:
-                    print(f"[{current_time_str}] [Email-{tunnel_type}] 📧 开始发送邮件")
-                    print(f"[{current_time_str}] [Email-{tunnel_type}] 目标URL: {new_url}")
-                    print(f"[{current_time_str}] [Email-{tunnel_type}] 事件类型: {event_type}")
+                    print(f"[{current_time_str}] [EmailNotifier-Thread:{thread_id}] 📧 开始发送邮件通知")
+                    print(f"[{current_time_str}] [EmailNotifier-Thread:{thread_id}] 🎯 目标URL: {new_url}")
+                    print(f"[{current_time_str}] [EmailNotifier-Thread:{thread_id}] 📋 事件类型: {event_type}")
+                    print(f"[{current_time_str}] [EmailNotifier-Thread:{thread_id}] 🏷️ 隧道类型: {tunnel_type}")
                     
                     with email_send_lock:
                         success = email_notifier.send_tunnel_notification(new_url, event_type)
@@ -7962,20 +7960,28 @@ ingress:
                         cf_stable_confirm_count = 1
                         cf_url_first_seen_time = time.time()
                         print(f"[CF-Heartbeat] 🔍 CF 新URL，开始稳定性验证 (1/{cf_stable_min_confirms}): {cf_url}")
+                        print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时0秒")
+                        write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
+                        if cf_url != cf_last_email_sent_url:
+                            print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
+                            send_tunnel_notification(cf_url, 'stable_available', force_send=True, tunnel_type='cloudflare')
+                            cf_last_stable_notification_time = time.time()
+                            cf_last_email_sent_url = cf_url
+                        else:
+                            print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
                     elif cf_stable_confirm_count < cf_stable_min_confirms:
                         cf_stable_confirm_count += 1
                         print(f"[CF-Heartbeat] ✅ CF 稳定性验证 ({cf_stable_confirm_count}/{cf_stable_min_confirms}): {cf_url}")
-                        if cf_stable_confirm_count >= cf_stable_min_confirms:
-                            elapsed = int(time.time() - cf_url_first_seen_time)
-                            print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
-                            write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
-                            if cf_url != cf_last_email_sent_url:
-                                print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
-                                send_tunnel_notification(cf_url, 'stable_available', force_send=True, tunnel_type='cloudflare')
-                                cf_last_stable_notification_time = time.time()
-                                cf_last_email_sent_url = cf_url
-                            else:
-                                print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
+                        elapsed = int(time.time() - cf_url_first_seen_time)
+                        print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
+                        write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
+                        if cf_url != cf_last_email_sent_url:
+                            print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
+                            send_tunnel_notification(cf_url, 'stable_available', force_send=True, tunnel_type='cloudflare')
+                            cf_last_stable_notification_time = time.time()
+                            cf_last_email_sent_url = cf_url
+                        else:
+                            print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
                 else:
                     if cf_stable_confirm_count > 0:
                         print(f"[CF-Heartbeat] ⚠️ CF URL 不可用，重置稳定性计数 ({cf_stable_confirm_count} -> 0)")
