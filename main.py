@@ -1,4 +1,4 @@
-﻿import json
+﻿ import json
 import time
 import asyncio
 import os
@@ -7105,8 +7105,11 @@ if __name__ == '__main__':
                     
                     response = urllib.request.urlopen(req, timeout=timeout, context=ctx)
                     if response.status in [200, 301, 302, 307, 308]:
-                        if verbose and attempt > 0:
-                            print(f"[Email] ✅ URL验证成功 (第{attempt+1}次尝试): {url}")
+                        if verbose:
+                            if attempt > 0:
+                                print(f"[Email] ✅ URL验证成功 (第{attempt+1}次尝试): {url}")
+                            else:
+                                print(f"[Email] ✅ URL验证成功: {url}")
                         return True
                     return False
                 except Exception as e:
