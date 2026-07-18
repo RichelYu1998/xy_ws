@@ -8001,8 +8001,9 @@ ingress:
                     continue
 
                 try:
-                    url_verified = verify_url(cf_url, timeout=10)
-                except Exception:
+                    url_verified = verify_url(cf_url, timeout=10, verbose=True)
+                except Exception as e:
+                    print(f"[CF-Heartbeat] ❌ CF URL 验证异常: {str(e)[:100]}")
                     url_verified = False
 
                 if url_verified:
