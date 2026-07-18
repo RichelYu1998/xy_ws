@@ -8701,15 +8701,63 @@ fi
 - **心跳守护即时启动（v3.8.28）**: 隧道启动后立即调用`start_tunnel_daemons()`启动心跳守护+重启守护线程，不再等待`/api/tunnel/status`被调用才懒启动
 - **守护统一管理（v3.8.28）**: 提取`start_tunnel_daemons()`函数统一管理守护线程启动逻辑，`/api/tunnel/status`中作为安全网调用
 
-### 6.1.2 CF隧道独立性保证机制（v3.8.65 新增）⭐
+### 6.1.2 CF隧道独立性保证机制（v3.8.66 更新）⭐⭐
 
 **核心原则**: Cloudflare Tunnel 和 hostc Tunnel 必须**完全独立管理**，任一方的失效不得影响另一方。
+
+#### 🧪 测试验证结果 (2026-07-18)
+
+**测试方法**: 强制终止 hostc 进程 (`taskkill /F /PID xxx`)
+
+| 项目 | 测试前 | 测试后 | 结果 |
+|------|--------|--------|------|
+| **hostc URL** | `https://t-mwkgyhyxgu.hostc.dev` | `https://t-itdzmmnwaj.hostc.dev` | ✅ 正常变化 |
+| **cloudflare URL** | `https://constantly-chronicle-cars-spyware.trycloudflare.com` | `https://constantly-chronicle-cars-spyware.trycloudflare.com` | 🔒 **保持不变！** |
+
+**日志证据**:
+```
+[15:50:07.719] [Tunnel] ✅ 已写入 tunnel_url.txt 
+  (hostc: https://t-itdzmmnwaj.hostc.dev, 
+   cf: https://constantly-chronicle-cars-spyware.trycloudflare.com)
+```
+
+#### ⚠️ verify_url() 函数签名规范（v3.8.66 重要更新）
+
+```python
+def verify_url(url, timeout=10, verbose=False, max_retries=3):
+    """
+    验证 URL 是否可访问
+    
+    Args:
+        url (str): 要验证的 URL
+        timeout (int): 超时时间（秒），默认 10 秒
+        verbose (bool): 是否输出详细日志，默认 False（静默模式）
+        max_retries (int): 最大重试次数，默认 3 次
+    
+    Returns:
+        bool: True 表示 URL 可访问，False 表示不可访问
+    """
+```
+
+**❌ 常见错误（禁止）**:
+```python
+# 错误：使用不存在的 quiet 参数
+is_valid = verify_url(url, timeout=5, quiet=True)  
+# 报错：verify_url() got an unexpected keyword argument 'quiet'
+```
+
+**✅ 正确用法**:
+```python
+# 正确：使用 verbose 参数控制日志输出
+is_valid = verify_url(url, timeout=5, verbose=False)  # 静默模式
+is_valid = verify_url(url, timeout=10, verbose=True)   # 详细模式
+```
 
 #### 🔒 双层保护机制
 
 **第一层：hostc 失效时保留 CF 地址**
 ```python
-# ✅ 正确做法（v3.8.65）
+# ✅ 正确做法（v3.8.65+）
 if web_url and not has_hostc_process:
     existing_urls = read_tunnel_urls_file()
     cf_url = existing_urls.get('cloudflare')
@@ -8741,7 +8789,8 @@ def auto_start_tunnel(force_restart=False):
         
         if existing_cf:
             try:
-                is_cf_valid = verify_url(existing_cf, timeout=5, quiet=True)
+                # ✅ 使用正确的 verbose 参数（v3.8.66 修复）
+                is_cf_valid = verify_url(existing_cf, timeout=5, verbose=False)
                 if is_cf_valid:
                     print(f"[Tunnel] ✅ 发现可用CF地址，直接复用: {existing_cf}")
                     cf_url = existing_cf
