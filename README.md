@@ -1,6 +1,6 @@
 ﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.63
+> **版本**: v3.8.64
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,21 @@
 ---
 
 ## 最新更新
+
+### v3.8.64 (2026-07-18) - 🌐 隧道共享弹窗恢复原始样式+双公网地址
+
+#### 🎯 核心改进
+- **🌐 hostc保持原样** - 保留原始弹窗样式（✅ + 🔗 + URL + 复制按钮），使用 `copyToClipboard()` + Toast
+- **☁️ Cloudflare新增** - 在 hostc 下方新增蓝色 Cloudflare URL 区域（☁️ + 🔗 + URL + 状态徽章 + 复制按钮）
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| index.html | hostc 恢复原始 `fa-check-circle` + `fa-external-link` 样式 + `copyToClipboard()` |
+| index.html | Cloudflare 新增 `fa-cloud` + `fa-external-link` 样式 + `copyToClipboard()` |
+
+---
 
 ### v3.8.63 (2026-07-18) - 🌐 隧道共享弹窗显示双公网地址
 
