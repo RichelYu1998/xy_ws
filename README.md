@@ -1,6 +1,6 @@
 ﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.64
+> **版本**: v3.8.65
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,64 @@
 ---
 
 ## 最新更新
+
+### v3.8.65 (2026-07-18) - 🔒 CF隧道独立性优化+智能复用机制
+
+#### 🎯 核心改进
+- **🔒 CF隧道完全独立** - hostc 失效不再影响 Cloudflare Tunnel，两者完全独立管理
+- **🔄 智能地址复用** - 启动新 CF 隧道前先检查已有可用地址，验证通过则直接复用
+- **✅ 减少无效重启** - hostc 频繁重启时 CF 地址保持不变，提升稳定性
+
+#### 📋 核心修改点
+
+| 修改位置 | 修改内容 | 效果 |
+|---------|---------|------|
+| `auto_start_tunnel()` Line 7286-7318 | 新增 CF 地址复用逻辑 | 已验证的 CF 地址被保留和复用 |
+| hostc 失效处理 Line 7340-7353 | 只清除 hostc URL，保留 CF URL | 不再清除整个 tunnel_url.txt |
+
+#### 🔒 独立性保证机制
+
+**第一层保护：hostc 失效时不影响 CF**
+```python
+# 旧逻辑：清除整个 tunnel_url.txt（包括CF）❌
+# 新逻辑：只清除 hostc URL，保留 CF URL ✅
+if web_url and not has_hostc_process:
+    existing_urls = read_tunnel_urls_file()
+    cf_url = existing_urls.get('cloudflare')
+    if cf_url:
+        write_tunnel_urls_file(hostc_url=None, cf_url=cf_url)  # ✅ 保留CF
+```
+
+**第二层保护：智能复用可用 CF**
+```python
+def auto_start_tunnel(force_restart=False):
+    # 启动新 CF 前，先检查是否有可用地址
+    existing_cf = existing_urls.get('cloudflare')
+    if existing_cf:
+        is_cf_valid = verify_url(existing_cf, timeout=5)
+        if is_cf_valid:
+            # ✅ 直接复用，不创建新隧道
+            cf_url = existing_cf  
+            start_cf_heartbeat()
+```
+
+#### 📊 实际效果对比
+
+| 场景 | 修改前 | 修改后 |
+|------|--------|--------|
+| **hostc 502 错误** | 清除配置 → 重启所有隧道 | 只重启 hostc，**CF 保持不变** ✅ |
+| **hostc 进程退出** | 清除 CF 地址 → 创建新 CF 隧道 | **保留 CF 地址** → 只重启 hostc ✅ |
+| **hostc 超时** | 触发全局重启 → CF 地址变化 | **CF 继续使用旧地址** ✅ |
+| **CF 本身失效** | （正常行为） | （正常行为）独立处理 |
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | `auto_start_tunnel()` 新增 CF 地址复用逻辑（Line 7286-7318）|
+| main.py | hostc 失效处理改为只清除 hostc URL（Line 7340-7353）|
+
+---
 
 ### v3.8.64 (2026-07-18) - 🌐 隧道共享弹窗恢复原始样式+双公网地址
 

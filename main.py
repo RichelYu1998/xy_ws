@@ -7281,12 +7281,41 @@ if __name__ == '__main__':
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动心跳守护进程（tunnel_url.txt 为唯一权威源）")
 
         def auto_start_tunnel(force_restart=False):
-            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url
+            global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url, cf_url
 
             cf_binary = find_cloudflared_binary()
-            if cf_binary:
+            if cf_binary and not force_restart:
+                existing_urls = read_tunnel_urls_file()
+                existing_cf = existing_urls.get('cloudflare')
+                if existing_cf:
+                    try:
+                        is_cf_valid = verify_url(existing_cf, timeout=5, quiet=True)
+                        if is_cf_valid:
+                            print(f"[Tunnel] ✅ 发现可用CF地址，直接复用: {existing_cf}")
+                            cf_url = existing_cf
+                            start_cf_heartbeat()
+                        else:
+                            print(f"[Tunnel] ⚠️ 已有CF地址不可用: {existing_cf}，将启动新CF隧道")
+                            existing_cf = None
+                    except Exception as e:
+                        print(f"[Tunnel] ⚠️ 验证已有CF地址失败: {e}，将启动新CF隧道")
+                        existing_cf = None
+                
+                if existing_cf:
+                    pass
+                else:
+                    port = args.port if "args" in globals() and hasattr(args, "port") else 8888
+                    print(f"[Tunnel] 🚀 启动新的 Cloudflare Tunnel...")
+                    cf_result = start_cloudflare_tunnel(port=port)
+                    if cf_result and cf_result.get('success'):
+                        print(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
+                        start_cf_heartbeat()
+                    else:
+                        cf_err = cf_result.get('error', '未知') if cf_result else '未知'
+                        print(f"[Tunnel] ⚠️ Cloudflare Tunnel 启动失败: {cf_err}")
+            elif cf_binary:
                 port = args.port if "args" in globals() and hasattr(args, "port") else 8888
-                print(f"[Tunnel] 🚀 同时启动 Cloudflare Tunnel...")
+                print(f"[Tunnel] 🚀 强制重启 Cloudflare Tunnel...")
                 cf_result = start_cloudflare_tunnel(port=port)
                 if cf_result and cf_result.get('success'):
                     print(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
@@ -7330,14 +7359,20 @@ if __name__ == '__main__':
                     return {'success': True, 'url': tunnel_url, 'message': f'发现已有URL: {tunnel_url}，后台验证中'}
 
                 if web_url and not has_hostc_process:
-                    print(f"[Tunnel] ⚠️ 发现旧URL {web_url} 但 hostc 进程已不在运行，旧地址已失效，将启动新隧道")
+                    print(f"[Tunnel] ⚠️ 发现旧URL {web_url} 但 hostc 进程已不在运行，hostc地址已失效")
                     try:
-                        tunnel_file_to_clear = PathManager.get_tunnel_url_file()
-                        with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
-                            f.write('')
-                        print(f"[Tunnel] 已清除过期 tunnel_url.txt")
+                        existing_urls = read_tunnel_urls_file()
+                        cf_url = existing_urls.get('cloudflare')
+                        if cf_url:
+                            write_tunnel_urls_file(hostc_url=None, cf_url=cf_url)
+                            print(f"[Tunnel] ✅ 已保留CF地址，仅清除hostc: {cf_url}")
+                        else:
+                            tunnel_file_to_clear = PathManager.get_tunnel_url_file()
+                            with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
+                                f.write('')
+                            print(f"[Tunnel] 已清除过期 tunnel_url.txt (无CF地址)")
                     except Exception as clear_err:
-                        print(f"[Tunnel] 清除 tunnel_url.txt 失败: {clear_err}")
+                        print(f"[Tunnel] 清除 hostc URL 失败: {clear_err}")
                     sys.stdout.flush()
 
                 if has_hostc_process:
