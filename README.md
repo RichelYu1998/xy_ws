@@ -1,6 +1,6 @@
 ﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.58
+> **版本**: v3.8.59
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,22 @@
 ---
 
 ## 最新更新
+
+### v3.8.59 (2026-07-18) - 📋 公网地址复制按钮
+
+#### 🎯 核心改进
+- **📋 复制按钮** - Cloudflare 和 hostc 公网地址旁新增复制按钮，点击即可复制链接到剪贴板
+- **✅ 复制反馈** - 点击复制后按钮变为 ✓ 绿色，2秒后恢复，配合 Toast 提示
+- **📱 响应式布局** - 使用 `d-flex align-items-center flex-wrap` 适配移动端
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| index.html | `updateTunnelUI()` Cloudflare/hostc URL 旁新增复制按钮 |
+| index.html | 新增 `handleCopyUrl()` 函数，复用已有 `copyToClipboard()` |
+
+---
 
 ### v3.8.58 (2026-07-18) - 📧 邮件防重复发送修复
 
