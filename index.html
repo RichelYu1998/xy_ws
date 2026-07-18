@@ -4531,13 +4531,11 @@ SzwegoSpider/
                             ` : ''}
                             <div class="form-group">
                                 <label><strong><i class="fa fa-globe"></i> 公网地址:</strong></label>
-                                <div id="tunnel-share-urls-container">
-                                    <div class="p-2 bg-success text-white rounded mb-2" id="tunnel-share-hostc">
-                                        <i class="fa fa-spinner fa-spin"></i> <span>hostc 获取中...</span>
-                                    </div>
-                                    <div class="p-2 bg-info text-white rounded" id="tunnel-share-cf" style="display:none;">
-                                        <i class="fa fa-spinner fa-spin"></i> <span>Cloudflare 获取中...</span>
-                                    </div>
+                                <div class="p-2 bg-success text-white rounded mb-2" id="tunnel-share-hostc">
+                                    <i class="fa fa-spinner fa-spin"></i> <span>获取中...</span>
+                                </div>
+                                <div class="p-2 bg-info text-white rounded mb-2" id="tunnel-share-cf" style="display:none;">
+                                    <i class="fa fa-spinner fa-spin"></i> <span>Cloudflare 获取中...</span>
                                 </div>
                                 <small class="text-muted d-block mt-1">复制链接分享给其他人，他们可以通过这个地址访问你的本地服务</small>
                             </div>
@@ -4563,14 +4561,24 @@ SzwegoSpider/
                             if (hostcContainer) {
                                 hostcContainer.className = 'p-2 bg-success text-white rounded mb-2';
                                 hostcContainer.innerHTML = `
-                                    <i class="fa fa-bolt"></i> <strong>hostc:</strong>
+                                    <i class="fa fa-check-circle"></i>
                                     <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
-                                        ${statusData.url}
+                                        <i class="fa fa-external-link"></i> ${statusData.url}
                                     </a>
-                                    <button class="btn btn-sm btn-light ml-2 btn-copy-url" data-url="${statusData.url}" onclick="handleCopyUrl(this)">
+                                    <button class="btn btn-sm btn-light ml-2" id="btn-copy-hostc-url" data-url="${statusData.url}">
                                         <i class="fa fa-copy"></i> 复制
                                     </button>
                                 `;
+                                const hostcCopyBtn = document.getElementById('btn-copy-hostc-url');
+                                if (hostcCopyBtn) {
+                                    hostcCopyBtn.onclick = function() {
+                                        copyToClipboard(this.dataset.url);
+                                        this.innerHTML = '<i class="fa fa-check"></i> 已复制';
+                                        setTimeout(() => {
+                                            this.innerHTML = '<i class="fa fa-copy"></i> 复制';
+                                        }, 2000);
+                                    };
+                                }
                             }
                             if (statusData.cloudflare && statusData.cloudflare.url) {
                                 const cfContainer = document.getElementById('tunnel-share-cf');
@@ -4579,15 +4587,25 @@ SzwegoSpider/
                                     const cfStatus = statusData.cloudflare.stable ? '✅' : '⏳';
                                     cfContainer.className = 'p-2 bg-info text-white rounded mb-2';
                                     cfContainer.innerHTML = `
-                                        <i class="fa fa-cloud"></i> <strong>Cloudflare:</strong>
+                                        <i class="fa fa-cloud"></i>
                                         <a href="${statusData.cloudflare.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
-                                            ${statusData.cloudflare.url}
+                                            <i class="fa fa-external-link"></i> ${statusData.cloudflare.url}
                                         </a>
                                         <span class="badge badge-${statusData.cloudflare.stable ? 'success' : 'info'} ml-1">${cfStatus}</span>
-                                        <button class="btn btn-sm btn-light ml-2 btn-copy-url" data-url="${statusData.cloudflare.url}" onclick="handleCopyUrl(this)">
+                                        <button class="btn btn-sm btn-light ml-2" id="btn-copy-cf-url" data-url="${statusData.cloudflare.url}">
                                             <i class="fa fa-copy"></i> 复制
                                         </button>
                                     `;
+                                    const cfCopyBtn = document.getElementById('btn-copy-cf-url');
+                                    if (cfCopyBtn) {
+                                        cfCopyBtn.onclick = function() {
+                                            copyToClipboard(this.dataset.url);
+                                            this.innerHTML = '<i class="fa fa-check"></i> 已复制';
+                                            setTimeout(() => {
+                                                this.innerHTML = '<i class="fa fa-copy"></i> 复制';
+                                            }, 2000);
+                                        };
+                                    }
                                 }
                             }
                         } else if (retryCount >= maxRetries) {
