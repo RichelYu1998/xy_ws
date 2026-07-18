@@ -4610,13 +4610,13 @@ SzwegoSpider/
         function handleCopyUrl(btn) {
             const url = btn.getAttribute('data-url');
             copyToClipboard(url);
-            btn.innerHTML = '<i class="fa fa-check"></i>';
-            btn.classList.remove('btn-outline-secondary');
-            btn.classList.add('btn-outline-success');
+            btn.innerHTML = '<i class="fa fa-check"></i> 已复制';
+            btn.classList.remove('btn-light');
+            btn.classList.add('btn-success');
             setTimeout(() => {
-                btn.innerHTML = '<i class="fa fa-copy"></i>';
-                btn.classList.remove('btn-outline-success');
-                btn.classList.add('btn-outline-secondary');
+                btn.innerHTML = '<i class="fa fa-copy"></i> 复制';
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-light');
             }, 2000);
         }
         function copyToClipboard(text) {
@@ -5515,7 +5515,7 @@ SzwegoSpider/
                         <strong><i class="fa fa-cloud"></i> Cloudflare:</strong>&nbsp;
                         <a href="${cloudflare.url}" target="_blank" class="text-primary font-weight-bold" style="word-break:break-all;">${cloudflare.url}</a>
                         <span class="badge badge-${cloudflare.stable ? 'success' : 'info'} ml-1">${cfStatus}</span>
-                        <button class="btn btn-sm btn-outline-secondary ml-2 btn-copy-url" data-url="${cloudflare.url}" onclick="handleCopyUrl(this)" title="复制链接"><i class="fa fa-copy"></i></button>
+                        <button class="btn btn-sm btn-light ml-2 btn-copy-url" data-url="${cloudflare.url}" onclick="handleCopyUrl(this)"><i class="fa fa-copy"></i> 复制</button>
                     </div>`;
                 }
                 
@@ -5525,7 +5525,7 @@ SzwegoSpider/
                         <strong><i class="fa fa-bolt"></i> hostc:</strong>&nbsp;
                         <a href="${url}" target="_blank" class="text-primary font-weight-bold" style="word-break:break-all;">${url}</a>
                         <span class="badge badge-${urlValid ? 'success' : 'info'} ml-1">${hostcStatus}</span>
-                        <button class="btn btn-sm btn-outline-secondary ml-2 btn-copy-url" data-url="${url}" onclick="handleCopyUrl(this)" title="复制链接"><i class="fa fa-copy"></i></button>
+                        <button class="btn btn-sm btn-light ml-2 btn-copy-url" data-url="${url}" onclick="handleCopyUrl(this)"><i class="fa fa-copy"></i> 复制</button>
                     </div>`;
                 }
                 
