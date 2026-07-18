@@ -8047,10 +8047,26 @@ ingress:
         def tunnel_type_api():
             """获取隧道类型状态（CF 和 hostc 同时运行）"""
             cf_available = find_cloudflared_binary() is not None
+            hostc_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+            cf_running = cf_process is not None and cf_process.poll() is None
+            
+            current = 'hostc'
+            if cf_running and hostc_running:
+                current = 'cloudflare'
+            elif cf_running:
+                current = 'cloudflare'
+            elif hostc_running:
+                current = 'hostc'
+            elif cf_available:
+                current = 'cloudflare'
+            else:
+                current = 'hostc'
+            
             return jsonify({
                 'mode': 'dual',
-                'hostc': {'available': True, 'running': Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')},
-                'cloudflare': {'available': cf_available, 'running': cf_process is not None and cf_process.poll() is None}
+                'current': current,
+                'hostc': {'available': True, 'running': hostc_running},
+                'cloudflare': {'available': cf_available, 'running': cf_running}
             })
 
         @app.route('/api/tunnel/start', methods=['POST'])
