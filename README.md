@@ -1,6 +1,6 @@
 ﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.60
+> **版本**: v3.8.61
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,21 @@
 ---
 
 ## 最新更新
+
+### v3.8.61 (2026-07-18) - 🐛 隧道管理面板复制按钮修复
+
+#### 🎯 核心修复
+- **🐛 ID冲突修复** - 隧道管理面板的公网URL容器ID从 `tunnel-public-url` 改为 `tunnel-panel-urls`，解决与隧道共享弹窗的ID冲突
+- **📋 Toast弹窗恢复** - 修复复制按钮点击后无"链接已复制到剪贴板"Toast提示的问题（之前 `getElementById` 错误地找到了弹窗里的元素）
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| index.html | 隧道管理面板 `<span id="tunnel-panel-urls">` 替换重复ID |
+| index.html | `updateTunnelUI()` 使用 `tunnel-panel-urls` 获取正确元素 |
+
+---
 
 ### v3.8.60 (2026-07-18) - 📋 公网地址复制按钮样式统一
 
