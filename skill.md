@@ -9249,16 +9249,21 @@ with open(web_output_file, 'a', encoding='utf-8') as wf:
 - **邮件去重**：`auto_start_tunnel()` 统一负责 `new` 事件发送，`restart_tunnel()` 仅打印日志不重复发 `update`
   - ❌ 同一 URL 收到两封邮件（`new` + `update`）
   - ✅ 每个新 URL 只发一封邮件（仅 `new` 事件）
-- **邮件事件类型**（v3.8.20 更新）:
+- **URL去重窗口**（v3.8.58 新增）：`recent_sent_urls` 字典记录每个URL的发送时间，同一URL在 `url_dedup_window=600`（10分钟）内不重复发送
+- **全局冷却期**（v3.8.58 新增）：`global_email_cooldown=300`（5分钟），任何邮件发送后5分钟内不再发，防止短时间内发多封邮件
+- **减少强制发送**（v3.8.58 新增）：`force_send=True` 仅保留给 `unavailable` 和 `fallback_available` 两种紧急事件
+- **防重复逻辑优先级**（v3.8.58 新增）：URL去重(10分钟) → 同类型URL去重 → 全局冷却(5分钟) → 类型冷却(60秒)
+- **邮件事件类型**（v3.8.58 更新）:
 
 | 事件类型 | 标题 | 触发条件 | force_send |
 |---------|------|---------|------------|
 | `new` | ✅ 新公网地址 | 首次获取到URL | False |
-| `available` | ✅ 公网地址可用 | URL从不可用恢复 / 复用已有可用URL | True |
+| `available` | ✅ 公网地址可用 | URL从不可用恢复 / 复用已有可用URL | False |
 | `update` | ✅ 公网地址已更新 | URL变更 | False |
-| `stable_available` | ✅ 公网地址已稳定可用 | 即时验证通过 / 连续1次验证通过 | True |
+| `stable_available` | ✅ 公网地址已稳定可用 | 即时验证通过 / 连续1次验证通过 | False |
 | `unavailable` | 🚨 公网地址不可用 | URL连续验证失败10次 | True |
-| `restarted` | 🔄 隧道已重启 | 隧道重启成功获取新URL | True |
+| `fallback_available` | 🔄 备用公网地址可用 | 原隧道不可用，切换到备用 | True |
+| `restarted` | 🔄 隧道已重启 | 隧道重启成功获取新URL | False |
 
 ### 6.3.1 即时邮件通知规范（v3.8.20 新增）
 
@@ -9279,16 +9284,16 @@ with open(web_output_file, 'a', encoding='utf-8') as wf:
 ```python
 # read_output() - 获取URL后立即 verify_url() + send_tunnel_notification()
 if url_verified:
-    send_tunnel_notification(file_url, 'stable_available', force_send=True)
+    send_tunnel_notification(file_url, 'stable_available')
     stable_url = file_url
     stable_url_confirm_count = stable_url_min_confirms
 
 # 复用路径 - 复用已有可用URL时也立即发邮件
-send_tunnel_notification(file_url, 'available', force_send=True)
+send_tunnel_notification(file_url, 'available')
 
 # restart_tunnel() - 重启成功后立即验证新URL，通过则直接发邮件
 if url_verified:
-    send_tunnel_notification(file_url, 'stable_available', force_send=True)
+    send_tunnel_notification(file_url, 'stable_available')
 ```
 
 **关键修改**:
@@ -9310,7 +9315,7 @@ if url_verified:
 **验证通过后立即设置稳定状态**:
 ```python
 if url_verified:
-    send_tunnel_notification(file_url, 'stable_available', force_send=True)
+    send_tunnel_notification(file_url, 'stable_available')
     stable_url = file_url
     stable_url_confirm_count = stable_url_min_confirms
     url_first_seen_time = time.time()

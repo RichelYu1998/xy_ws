@@ -1,6 +1,6 @@
 ﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.57
+> **版本**: v3.8.58
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,40 @@
 ---
 
 ## 最新更新
+
+### v3.8.58 (2026-07-18) - 📧 邮件防重复发送修复
+
+#### 🎯 核心改进
+- **📧 URL去重窗口** - 新增 `recent_sent_urls` 字典，同一URL在10分钟（`url_dedup_window=600`）内不重复发送邮件
+- **⏳ 全局冷却期** - 新增 `global_email_cooldown=300`（5分钟），任何邮件发送后5分钟内不再发，防止短时间内发多封邮件
+- **⚠️ 减少强制发送** - `force_send=True` 仅保留给 `unavailable` 和 `fallback_available` 两种紧急事件，其余 `stable_available`/`available` 事件走正常冷却逻辑
+- **🗑️ 过期清理** - 每次发送前自动清理 `recent_sent_urls` 中超过去重窗口的过期记录
+
+#### 📋 防重复逻辑优先级
+
+```
+URL去重(10分钟) → 同类型URL去重 → 全局冷却(5分钟) → 类型冷却(60秒)
+```
+
+#### 📋 邮件事件类型更新
+
+| 事件类型 | 标题 | force_send | 说明 |
+|---------|------|-----------|------|
+| `stable_available` | ✅ 公网地址已稳定可用 | ❌ False | 走正常冷却逻辑 |
+| `available` | ✅ 公网地址可用 | ❌ False | 走正常冷却逻辑 |
+| `unavailable` | 🚨 公网地址不可用 | ✅ True | 紧急通知，强制发送 |
+| `fallback_available` | 🔄 备用公网地址可用 | ✅ True | 紧急通知，强制发送 |
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | 新增 `global_email_cooldown`、`global_last_email_sent_time`、`recent_sent_urls`、`url_dedup_window` 变量 |
+| main.py | `send_tunnel_notification()` 新增URL去重窗口检查、全局冷却期检查 |
+| main.py | `verify_and_send()` 发送成功后更新 `global_last_email_sent_time` 和 `recent_sent_urls` |
+| main.py | 移除 `stable_available`/`available` 事件的 `force_send=True`，仅保留 `unavailable`/`fallback_available` |
+
+---
 
 ### v3.8.57 (2026-07-18) - 📧 Cloudflare 邮件通知修复 + 日志格式统一
 
