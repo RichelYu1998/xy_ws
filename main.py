@@ -7950,6 +7950,7 @@ ingress:
                 )
 
                 url_pattern = r"https://[a-z0-9\-]+\.trycloudflare\.com"
+                rate_limit_pattern = r"(429|error code: 1015|Too Many Requests)"
                 start_time = time.time()
 
                 while time.time() - start_time < timeout:
@@ -7958,6 +7959,11 @@ ingress:
 
                     line = cf_process.stdout.readline()
                     if line:
+                        if re.search(rate_limit_pattern, line, re.IGNORECASE):
+                            print(f"[Cloudflare] ⚠️ Quick Tunnel 请求被限流 (429 Too Many Requests)")
+                            print(f"[Cloudflare] 💡 建议: 等待 5-10 分钟后重试，或配置 Named Tunnel")
+                            return {"success": False, "error": "Quick Tunnel 限流，请稍后重试"}
+                        
                         match = re.search(url_pattern, line)
                         if match:
                             cf_url = match.group(0)

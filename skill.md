@@ -3998,6 +3998,23 @@ def send_tunnel_notification(...):
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.54 (2026-07-18) - 🔧 Cloudflare 限流检测与友好提示
+
+- **🔧 Cloudflare 限流检测** - 识别 Quick Tunnel 的 429 错误（Too Many Requests）
+- **💡 友好提示** - 限流时给出明确的等待建议和替代方案
+- **✅ 不影响 hostc** - Cloudflare 启动失败不影响 hostc 隧道的正常运行
+
+**限流时的日志输出**:
+```
+[Cloudflare] ⚠️ Quick Tunnel 请求被限流 (429 Too Many Requests)
+[Cloudflare] 💡 建议: 等待 5-10 分钟后重试，或配置 Named Tunnel
+```
+
+**修改文件**:
+- `main.py`: `start_cloudflare_tunnel()` 添加限流检测和友好提示
+
+----
+
 ### v3.8.53 (2026-07-18) - 🔧 修复双隧道地址写入冲突
 
 - **🔧 修复写入冲突** - 解决 `run.bat`/`run.sh` 直接写入原始日志导致 `tunnel_url.txt` 格式混乱的问题
