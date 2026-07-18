@@ -1,6 +1,6 @@
 ﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.51
+> **版本**: v3.8.52
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,25 @@
 ---
 
 ## 最新更新
+
+### v3.8.52 (2026-07-18) - 📧 双隧道独立发邮件 + 心跳写入修复
+
+#### 🎯 核心改进
+- **📧 双隧道独立发邮件** - CF 和 hostc 验证通过后独立发送邮件，不再互相排队等待
+- **📝 心跳写入修复** - CF/hostc 心跳循环验证通过后，立即写入 `tunnel_url.txt`
+- **🔄 智能保留地址** - 写入时自动保留另一个隧道的地址，不会互相覆盖
+
+#### 📋 修改内容
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | `send_tunnel_notification()` 新增 `tunnel_type` 参数，CF/hostc 独立去重 |
+| main.py | `cf_heartbeat_loop()` 验证通过后调用 `write_tunnel_urls_file(cf_url=cf_url)` |
+| main.py | `heartbeat_loop()` 验证通过后调用 `write_tunnel_urls_file(hostc_url=web_url)` |
+| main.py | 新增 `read_tunnel_urls_file()` 函数，读取已有隧道地址 |
+| main.py | `write_tunnel_urls_file()` 支持 None 参数，自动保留已有值 |
+
+---
 
 ### v3.8.51 (2026-07-18) - 📝 tunnel_url.txt同时存储双隧道地址
 

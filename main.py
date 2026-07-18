@@ -6902,15 +6902,45 @@ if __name__ == '__main__':
         cf_last_stable_notification_time = 0
         cf_heartbeat_thread = None
         cf_last_email_sent_url = None
+        cf_last_email_sent_time = 0
+        
+        def read_tunnel_urls_file():
+            """读取 tunnel_url.txt 中已有的隧道 URL
+            
+            Returns:
+                dict: {'hostc': url or None, 'cloudflare': url or None}
+            """
+            result = {'hostc': None, 'cloudflare': None}
+            try:
+                tunnel_file = PathManager.get_tunnel_url_file()
+                if os.path.exists(tunnel_file):
+                    with open(tunnel_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        hostc_match = re.search(r'hostc:\s*(https?://[^\s]+)', content)
+                        cf_match = re.search(r'cloudflare:\s*(https?://[^\s]+)', content)
+                        if hostc_match:
+                            result['hostc'] = hostc_match.group(1).rstrip('/')
+                        if cf_match:
+                            result['cloudflare'] = cf_match.group(1).rstrip('/')
+            except Exception:
+                pass
+            return result
         
         def write_tunnel_urls_file(hostc_url=None, cf_url=None):
             """同时写入两个隧道的地址到 tunnel_url.txt
             
             Args:
-                hostc_url: hostc 隧道的 URL（可选）
-                cf_url: Cloudflare 隧道的 URL（可选）
+                hostc_url: hostc 隧道的 URL（可选，None 表示保留已有值）
+                cf_url: Cloudflare 隧道的 URL（可选，None 表示保留已有值）
             """
             try:
+                existing = read_tunnel_urls_file()
+                
+                if hostc_url is None:
+                    hostc_url = existing.get('hostc')
+                if cf_url is None:
+                    cf_url = existing.get('cloudflare')
+                
                 tunnel_file = PathManager.get_tunnel_url_file()
                 with open(tunnel_file, 'w', encoding='utf-8') as f:
                     f.write(f"# Tunnel URLs - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -6931,8 +6961,24 @@ if __name__ == '__main__':
                 print(f"[Tunnel] ❌ 写入 tunnel_url.txt 失败: {e}")
                 return False
         
-        def send_tunnel_notification(new_url, event_type='new', force_send=False):
+        def send_tunnel_notification(new_url, event_type='new', force_send=False, tunnel_type='hostc'):
+            """发送隧道通知邮件
+            
+            Args:
+                new_url: 隧道 URL
+                event_type: 事件类型 (new, stable_available, available, fallback_available, unavailable)
+                force_send: 是否强制发送（跳过冷却期）
+                tunnel_type: 隧道类型 (hostc, cloudflare)，用于独立去重
+            """
             global last_email_sent_time, email_fail_count, last_email_sent_url, pending_email_url
+            global cf_last_email_sent_time, cf_last_email_sent_url
+            
+            if tunnel_type == 'cloudflare':
+                _last_sent_time = cf_last_email_sent_time
+                _last_sent_url = cf_last_email_sent_url
+            else:
+                _last_sent_time = last_email_sent_time
+                _last_sent_url = last_email_sent_url
             
             should_send = False
             
@@ -6947,37 +6993,17 @@ if __name__ == '__main__':
                         print(f"[Email] 邮件发送失败冷却期已过，重置失败计数")
                         email_fail_count = 0
 
-                remaining_cooldown = email_cooldown - (current_time - last_email_sent_time)
-
-                if not force_send and current_time - last_email_sent_time < email_cooldown:
-                    if new_url != last_email_sent_url:
-                        pending_email_url = new_url
-                        print(f"[Email] 邮件发送冷却中，距离上次发送仅 {int(current_time - last_email_sent_time)} 秒，已记录待发送URL: {new_url}")
-                    else:
-                        print(f"[Email] ⏭️ 相同URL已在冷却期内发送过，跳过重复发送: {new_url}")
+                if not force_send and current_time - _last_sent_time < email_cooldown:
+                    print(f"[Email-{tunnel_type}] 邮件冷却中，跳过发送: {new_url}")
                     return
                 
-                url_dedup_interval = 1800  # URL去重时间窗口：30分钟（同一地址30分钟内只发1次）
-                
-                if new_url == last_email_sent_url:
-                    time_since_last_send = current_time - last_email_sent_time
-                    if time_since_last_send < url_dedup_interval:
-                        if event_type == 'fallback_available':
-                            print(f"[Email] 🔄 备用地址通知：不同事件类型，允许发送")
-                        else:
-                            print(f"[Email] ⏭️ URL去重：相同地址{int(time_since_last_send)}秒内已发送过，跳过重复发送: {new_url}")
-                            print(f"[Email] 📋 去重规则：同一公网地址在{int(url_dedup_interval/60)}分钟内只发送1次邮件")
-                            return
-                    elif force_send:
-                        print(f"[Email] 🔄 强制发送模式：相同地址但已超过{int(url_dedup_interval/60)}分钟，允许重新发送")
-                    else:
-                        print(f"[Email] ⏭️ URL去重：相同地址未超过{int(url_dedup_interval/60)}分钟间隔，跳过发送")
-                        return
+                if new_url == _last_sent_url and event_type != 'fallback_available':
+                    print(f"[Email-{tunnel_type}] ⏭️ 相同URL已发送过，跳过: {new_url}")
+                    return
                 
                 if force_send:
-                    print(f"[Email] ✨ 强制发送模式：跳过冷却期检查，立即处理")
+                    print(f"[Email-{tunnel_type}] ✨ 强制发送模式")
                 
-                pending_email_url = None
                 should_send = True
 
             if not should_send:
@@ -6985,150 +7011,46 @@ if __name__ == '__main__':
 
             def verify_and_send():
                 global last_email_sent_time, email_fail_count, last_email_sent_url
+                global cf_last_email_sent_time, cf_last_email_sent_url
                 import datetime
                 import threading as _threading
                 current_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 thread_id = _threading.current_thread().name
                 try:
-                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 📧 开始处理邮件发送任务")
-                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 目标URL: {new_url}")
-                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 事件类型: {event_type}")
-                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 上次发送URL: {last_email_sent_url}")
-                    print(f"[{current_time_str}] [Email-Thread:{thread_id}] 🔒 准备获取邮件发送锁...")
+                    print(f"[{current_time_str}] [Email-{tunnel_type}] 📧 开始发送邮件")
+                    print(f"[{current_time_str}] [Email-{tunnel_type}] 目标URL: {new_url}")
+                    print(f"[{current_time_str}] [Email-{tunnel_type}] 事件类型: {event_type}")
                     
                     with email_send_lock:
-                        lock_acquired_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        print(f"[{lock_acquired_time}] [Email-Thread:{thread_id}] 🔒 已获取邮件发送锁")
+                        success = email_notifier.send_tunnel_notification(new_url, event_type)
                         
-                        if new_url != last_email_sent_url:
-                            print(f"[{lock_acquired_time}] [Email-Thread:{thread_id}] ✅ URL校验通过，准备调用SMTP服务...")
-                            print(f"[{lock_acquired_time}] [Email-Thread:{thread_id}] ⏳ 调用 EmailNotifier.send_tunnel_notification()...")
-                            call_start = datetime.datetime.now()
-                            
-                            success = email_notifier.send_tunnel_notification(new_url, event_type)
-                            
-                            call_end = datetime.datetime.now()
-                            call_duration = (call_end - call_start).total_seconds()
-                            print(f"[{call_end.strftime('%Y-%m-%d %H:%M:%S')}] [Email-Thread:{thread_id}] ⏱️ SMTP调用完成，耗时 {call_duration:.2f} 秒")
-                            
-                            if success:
-                                last_email_sent_time = time.time()
-                                email_fail_count = 0
-                                last_email_sent_url = new_url
-                                _recipient_email = email_notifier.config.get('to_email', '980187223@qq.com') if hasattr(email_notifier, 'config') else '980187223@qq.com'
-                                send_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] ✅✅✅ 邮件发送成功！")
-                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 📨 收件人: {_recipient_email}")
-                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 🔗 隧道地址: {new_url}")
-                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] ⏰ 发送时间: {send_time_str}")
-                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 📊 失败计数已重置为0")
-                                print(f"[{send_time_str}] [Email-Thread:{thread_id}] 🔓 准备释放邮件发送锁...")
+                        if success:
+                            send_time = time.time()
+                            if tunnel_type == 'cloudflare':
+                                cf_last_email_sent_time = send_time
+                                cf_last_email_sent_url = new_url
                             else:
-                                email_fail_count += 1
-                                last_email_sent_url = None
-                                fail_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] ❌❌❌ 邮件发送失败！")
-                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] 💥 失败原因: SMTP服务返回错误或网络异常")
-                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] 📈 当前累计失败次数: {email_fail_count}/{email_max_fail_count}")
-                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] 🔄 已标记URL可重试，等待下次发送")
-                                print(f"[{fail_time_str}] [Email-Thread:{thread_id}] 🔓 准备释放邮件发送锁...")
+                                last_email_sent_time = send_time
+                                last_email_sent_url = new_url
+                            email_fail_count = 0
+                            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] ✅✅✅ 邮件发送成功！")
+                            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] 🔗 隧道地址: {new_url}")
                         else:
-                            skip_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] ⏭️ 邮件发送被跳过")
-                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] 原因: 该URL已在之前发送过")
-                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] 已发送URL: {last_email_sent_url}")
-                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] 待发送URL: {new_url}")
-                            print(f"[{skip_time_str}] [Email-Thread:{thread_id}] 🔓 准备释放邮件发送锁...")
-                    
-                    print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-Thread:{thread_id}] 🔓 已释放邮件发送锁")
+                            email_fail_count += 1
+                            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] ❌❌❌ 邮件发送失败！")
+                            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] 📈 失败次数: {email_fail_count}/{email_max_fail_count}")
 
                 except Exception as e:
                     email_fail_count += 1
-                    last_email_sent_url = None
                     error_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] 💥💥💥 邮件发送发生异常！")
-                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] ❌ 异常类型: {type(e).__name__}")
-                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] ❌ 错误详情: {str(e)[:200]}")
-                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] 📋 异常堆栈:")
-                    import traceback as _tb
-                    _tb.print_exc()
-                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] 📈 当前累计失败次数: {email_fail_count}/{email_max_fail_count}")
-                    print(f"[{error_time_str}] [Email-Thread:{thread_id}] 🔄 已标记可重试")
-                
-                end_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                print(f"[{end_time_str}] [Email-Thread:{thread_id}] ✅ 邮件发送任务执行完毕")
-            
-            import datetime as _dt
-            thread_start_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            print(f"[{thread_start_time}] [Email] 🚀 启动邮件发送线程...")
-            email_thread = threading.Thread(target=verify_and_send, daemon=True, name=f"EmailSender-{_dt.datetime.now().strftime('%H%M%S')}")
-            email_thread.start()
-            print(f"[{thread_start_time}] [Email] ✅ 邮件发送线程已启动: {email_thread.name}")
+                    print(f"[{error_time_str}] [Email-{tunnel_type}] 💥💥💥 邮件发送异常！")
+                    print(f"[{error_time_str}] [Email-{tunnel_type}] 异常信息: {str(e)[:200]}")
+
+            thread = threading.Thread(target=verify_and_send, daemon=True)
+            thread.start()
         
         def check_and_send_pending_email():
-            global pending_email_url, last_email_sent_time, email_fail_count, last_email_sent_url
-            import datetime
-            current_time = time.time()
-            current_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
-            should_send_pending = False
-            url_to_send = None
-            
-            with email_send_lock:
-                if pending_email_url and (current_time - last_email_sent_time) >= email_cooldown:
-                    url_to_send = pending_email_url
-                    pending_email_url = None
-                    last_email_sent_url = url_to_send
-                    should_send_pending = True
-            
-            if not should_send_pending or not url_to_send:
-                if pending_email_url:
-                    remaining_cooldown = int(email_cooldown - (current_time - last_email_sent_time))
-                    print(f"[{current_time_str}] [Email] ⏳ 待发邮件等待冷却中...")
-                    print(f"[{current_time_str}] [Email] 剩余冷却时间: {remaining_cooldown}秒")
-                return
-            
-            print(f"[{current_time_str}] [Email] 📋 检测到待发送邮件")
-            print(f"[{current_time_str}] [Email] ⏱️ 冷却期已结束，准备发送")
-            print(f"[{current_time_str}] [Email] 🎯 目标URL: {url_to_send}")
-            
-            def send_pending():
-                global last_email_sent_time, email_fail_count, last_email_sent_url
-                try:
-                    with email_send_lock:
-                        pending_start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        print(f"[{pending_start_time}] [Email] 🚀 开始发送待发邮件...")
-                        
-                        success = email_notifier.send_tunnel_notification(url_to_send, 'pending')
-                        
-                        pending_end_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        
-                        if success:
-                            last_email_sent_time = time.time()
-                            email_fail_count = 0
-                            last_email_sent_url = url_to_send
-                            print(f"[{pending_end_time}] [Email] ✅✅✅ 待发邮件发送成功！")
-                            print(f"[{pending_end_time}] [Email] 🔗 隧道地址: {url_to_send}")
-                            print(f"[{pending_end_time}] [Email] ⏰ 完成时间: {pending_end_time}")
-                        else:
-                            email_fail_count += 1
-                            pending_email_url = url_to_send
-                            print(f"[{pending_end_time}] [Email] ❌❌❌ 待发邮件发送失败！")
-                            print(f"[{pending_end_time}] [Email] 💥 失败原因: SMTP服务异常")
-                            print(f"[{pending_end_time}] [Email] 📈 累计失败次数: {email_fail_count}/{email_max_fail_count}")
-                            print(f"[{pending_end_time}] [Email] 🔄 已重新加入待发送队列")
-                except Exception as e:
-                    with email_send_lock:
-                        email_fail_count += 1
-                        pending_email_url = url_to_send
-                    error_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    print(f"[{error_time}] [Email] 💥💥💥 待发邮件发送发生异常！")
-                    print(f"[{error_time}] [Email] ❌ 异常类型: {type(e).__name__}")
-                    print(f"[{error_time}] [Email] ❌ 错误详情: {str(e)[:200]}")
-                    print(f"[{error_time}] [Email] 📈 累计失败次数: {email_fail_count}/{email_max_fail_count}")
-                    print(f"[{error_time}] [Email] 🔄 已重新加入待发送队列")
-            
-            threading.Thread(target=send_pending, daemon=True).start()
+            pass
         
         def verify_url(url, timeout=10, verbose=False, max_retries=3):
             import time as _time
@@ -7239,6 +7161,7 @@ if __name__ == '__main__':
                                     if stable_url_confirm_count >= stable_url_min_confirms:
                                         elapsed = int(time.time() - url_first_seen_time)
                                         print(f"[Tunnel] 🎯 URL已确认为稳定！持续验证{stable_url_confirm_count}次，耗时{elapsed}秒")
+                                        write_tunnel_urls_file(hostc_url=web_url)
                                         send_tunnel_notification(web_url, 'stable_available', force_send=True)
                                         last_stable_notification_time = time.time()
                             else:
@@ -7308,17 +7231,8 @@ if __name__ == '__main__':
 
                     if web_url and time.time() - last_url_sync_time > 300:
                         last_url_sync_time = time.time()
-                        tunnel_url_file = PathManager.get_tunnel_url_file()
+                        write_tunnel_urls_file(hostc_url=web_url, cf_url=cf_url)
                         web_output_file = PathManager.get_web_output_file()
-                        try:
-                            with open(tunnel_url_file, 'w', encoding='utf-8') as tf:
-                                port_match = re.search(r'--port\s+(\d+)', ' '.join(sys.argv))
-                                local_port = port_match.group(1) if port_match else str(args.port)
-                                tf.write(f"Public URL: {web_url}\n")
-                                tf.write(f"Local URL: http://localhost:{local_port}/\n")
-                                tf.write(f"Tunnel: {web_url.split('//')[1].split('.')[0]}\n")
-                        except Exception:
-                            pass
                         try:
                             with open(web_output_file, 'a', encoding='utf-8') as wf:
                                 wf.write(f"Public URL: {web_url}\n")
@@ -7526,11 +7440,10 @@ if __name__ == '__main__':
                                     if file_url and file_url != tunnel_url:
                                         print(f"[Tunnel] 从 hostc 输出获取到URL: {file_url}")
                                         
-                                        web_output_file = PathManager.get_web_output_file()
-                                        tunnel_url_file = PathManager.get_tunnel_url_file()
-                                        write_tunnel_urls_file(hostc_url=file_url, cf_url=cf_url)
+                                        write_tunnel_urls_file(hostc_url=file_url)
                                         
                                         try:
+                                            web_output_file = PathManager.get_web_output_file()
                                             with open(web_output_file, 'a', encoding='utf-8') as wf:
                                                 wf.write(f"Public URL: {file_url}\n")
                                             print(f"[Tunnel] 已写入 web_output.log")
@@ -7950,7 +7863,7 @@ ingress:
                         cf_mode = 'named'
                         print(f"[Cloudflare] ✅ Plan A 成功: Named Tunnel {cf_url}，等待心跳验证后发邮件")
 
-                        write_tunnel_urls_file(hostc_url=tunnel_url, cf_url=cf_url)
+                        write_tunnel_urls_file(cf_url=cf_url)
 
                         return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "named"}
                     else:
@@ -7989,7 +7902,7 @@ ingress:
                             cf_mode = 'quick'
                             print(f"[Cloudflare] ✅ Plan B 成功: Quick Tunnel {cf_url}，等待心跳验证后发邮件")
 
-                            write_tunnel_urls_file(hostc_url=tunnel_url, cf_url=cf_url)
+                            write_tunnel_urls_file(cf_url=cf_url)
 
                             return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "quick"}
 
@@ -8018,6 +7931,7 @@ ingress:
                         cf_mode = None
                         cf_stable_url = None
                         cf_stable_confirm_count = 0
+                        cf_last_email_sent_url = None
                     continue
 
                 if not cf_url:
@@ -8041,8 +7955,9 @@ ingress:
                         if cf_stable_confirm_count >= cf_stable_min_confirms:
                             elapsed = int(time.time() - cf_url_first_seen_time)
                             print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
+                            write_tunnel_urls_file(cf_url=cf_url)
                             if cf_url != cf_last_email_sent_url:
-                                send_tunnel_notification(cf_url, 'stable_available', force_send=True)
+                                send_tunnel_notification(cf_url, 'stable_available', force_send=True, tunnel_type='cloudflare')
                                 cf_last_stable_notification_time = time.time()
                                 cf_last_email_sent_url = cf_url
                             else:
