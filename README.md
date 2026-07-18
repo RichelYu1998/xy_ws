@@ -1,6 +1,6 @@
 ﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.53
+> **版本**: v3.8.54
 > **更新日期**: 2026-07-18
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -9,6 +9,29 @@
 ---
 
 ## 最新更新
+
+### v3.8.54 (2026-07-18) - 🔧 Cloudflare 限流检测与友好提示
+
+#### 🎯 核心改进
+- **🔧 Cloudflare 限流检测** - 识别 Quick Tunnel 的 429 错误（Too Many Requests）
+- **💡 友好提示** - 限流时给出明确的等待建议和替代方案
+- **✅ 不影响 hostc** - Cloudflare 启动失败不影响 hostc 隧道的正常运行
+
+#### 📋 错误处理优化
+
+**限流时的日志输出**：
+```
+[Cloudflare] ⚠️ Quick Tunnel 请求被限流 (429 Too Many Requests)
+[Cloudflare] 💡 建议: 等待 5-10 分钟后重试，或配置 Named Tunnel
+```
+
+#### 📋 修改文件清单
+
+| 文件 | 修改内容 |
+|------|---------|
+| main.py | `start_cloudflare_tunnel()` 添加限流检测和友好提示 |
+
+---
 
 ### v3.8.53 (2026-07-18) - 🔧 修复双隧道地址写入冲突
 
