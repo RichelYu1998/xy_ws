@@ -1,6 +1,6 @@
-﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
+﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.67
+> **版本**: v3.8.73
 > **更新日期**: 2026-07-19
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
