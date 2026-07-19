@@ -1761,8 +1761,12 @@ def handle_api_exception(e):
     error_msg = handle_exception(e, 'Flask API')
     return jsonify({'error': error_msg, 'success': False, 'code': getattr(e, 'code', 'UNKNOWN')}), 500
 
+import threading
+
 processes = {}
 tasks = {}
+_processes_lock = threading.Lock()
+_tasks_lock = threading.Lock()
 
 def run_command_background(task_id, command):
     try:
@@ -5581,6 +5585,8 @@ if __name__ == '__main__':
         @app.route('/run', methods=['POST'])
         def run_command():
             data = request.get_json()
+            if not data:
+                return jsonify({'error': '请求体不能为空'}), 400
             command = data.get('command', '')
             if not command:
                 return jsonify({'error': '命令不能为空'}), 400
@@ -5599,6 +5605,8 @@ if __name__ == '__main__':
         @app.route('/input', methods=['POST'])
         def send_input():
             data = request.get_json()
+            if not data:
+                return jsonify({'error': '请求体不能为空'}), 400
             task_id, user_input = data.get('task_id', ''), data.get('input', '')
             if task_id not in processes:
                 return jsonify({'error': '没有正在运行的进程'}), 404
@@ -5613,6 +5621,8 @@ if __name__ == '__main__':
         @app.route('/kill', methods=['POST'])
         def kill_task():
             data = request.get_json()
+            if not data:
+                return jsonify({'error': '请求体不能为空'}), 400
             task_id = data.get('task_id', '')
             if task_id not in processes:
                 return jsonify({'success': True, 'message': '进程已结束'})
@@ -5740,6 +5750,8 @@ if __name__ == '__main__':
                 txt_stock_numbers_raw = []
                 if request.method == 'POST':
                     req_data = request.get_json()
+                    if not req_data:
+                        return jsonify({'error': '请求体不能为空'}), 400
                     input_skus = req_data.get('skus', '')
                     txt_stock_numbers_raw = [s.strip() for s in re.split(r'[\s,\n\r\t]+', input_skus) if s.strip()]
                 else:
@@ -5778,7 +5790,7 @@ if __name__ == '__main__':
                 high_price_existing = sorted(list(high_price_set & txt_set))
                 high_price_extra_in_json = sorted(list(high_price_set - txt_set))
 
-                xiaoji_records = data.get('小计', []) if isinstance(data, dict) else []
+                xiaoji_records = data.get('小计', []) if isinstance(data, dict) and isinstance(data.get('小计'), list) else []
                 today_xiaoji = None
                 for record in reversed(xiaoji_records):
                     if record.get('timestamp', '').startswith(today):
@@ -5790,12 +5802,15 @@ if __name__ == '__main__':
                 added_high_price = []
 
                 if os.path.exists(diff_log_file):
-                    with open(diff_log_file, 'r', encoding='utf-8') as f:
-                        diff_data = json.load(f)
-                    if diff_data.get('logs'):
-                        last_log = diff_data['logs'][-1]
-                        added_products_all = last_log.get('added', [])
-                        removed_products = last_log.get('removed', [])
+                    try:
+                        with open(diff_log_file, 'r', encoding='utf-8') as f:
+                            diff_data = json.load(f)
+                        if isinstance(diff_data, dict) and diff_data.get('logs') and len(diff_data['logs']) > 0:
+                            last_log = diff_data['logs'][-1]
+                            added_products_all = last_log.get('added', [])
+                            removed_products = last_log.get('removed', [])
+                    except (json.JSONDecodeError, IOError) as e:
+                        print(f'⚠️ 读取差异日志失败: {e}')
 
                 if today_xiaoji:
                     added_products_all = today_xiaoji.get('added', [])
@@ -5956,7 +5971,7 @@ if __name__ == '__main__':
                 high_price_extra_in_json = sorted(list(high_price_set - excel_set))
                 
                 # 判断今天是否运行过爬虫：从 JSON 的"小计"中查找今天的记录
-                xiaoji_records = data.get('小计', []) if isinstance(data, dict) else []
+                xiaoji_records = data.get('小计', []) if isinstance(data, dict) and isinstance(data.get('小计'), list) else []
                 today_xiaoji = None
                 for record in reversed(xiaoji_records):
                     if record.get('timestamp', '').startswith(today):
@@ -5969,12 +5984,15 @@ if __name__ == '__main__':
                 added_high_price = []
                 
                 if os.path.exists(diff_log_file):
-                    with open(diff_log_file, 'r', encoding='utf-8') as f:
-                        diff_data = json.load(f)
-                    if diff_data.get('logs'):
-                        last_log = diff_data['logs'][-1]
-                        added_products_all = last_log.get('added', [])
-                        removed_products = last_log.get('removed', [])
+                    try:
+                        with open(diff_log_file, 'r', encoding='utf-8') as f:
+                            diff_data = json.load(f)
+                        if isinstance(diff_data, dict) and diff_data.get('logs') and len(diff_data['logs']) > 0:
+                            last_log = diff_data['logs'][-1]
+                            added_products_all = last_log.get('added', [])
+                            removed_products = last_log.get('removed', [])
+                    except (json.JSONDecodeError, IOError) as e:
+                        print(f'⚠️ 读取差异日志失败: {e}')
                 
                 # 如果今天运行过爬虫（有小计记录），使用小计的数据
                 if today_xiaoji:

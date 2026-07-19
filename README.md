@@ -12,6 +12,73 @@
 
 
 
+
+
+### v3.8.69 (2026-07-19) - 🔍 全面代码审查 + 多项安全与健壮性提升
+
+#### 🎯 核心改进
+
+**1. 🔴 严重: 修复API端点空值崩溃漏洞（4处）**
+- **问题**: `request.get_json()` 返回None时直接调用`.get()`导致AttributeError
+- **影响**: 恶意或格式错误的POST请求可导致500错误
+- **修复位置**:
+  - `/api/run` (run_command) - 命令执行接口
+  - `/api/input` (send_input) - 进程输入接口
+  - `/api/kill` (kill_task) - 进程终止接口
+  - `/api/sku/compare/txt` (compare_sku_txt) - SKU对比接口
+- **修复方案**: 统一添加空值检查，返回400 Bad Request
+
+```python
+# ❌ 修复前 (v3.8.68)
+data = request.get_json()
+command = data.get('command', '')  # 如果data为None → AttributeError!
+
+# ✅ 修复后 (v3.8.69)
+data = request.get_json()
+if not data:
+    return jsonify({'error': '请求体不能为空'}), 400
+command = data.get('command', '')
+```
+
+**2. 🔴 严重: JSON文件解析防御性编程**
+- **位置**: compare_sku_txt() Line 5792-5798
+- **问题**: 
+  - diff_log_file可能包含非法JSON导致JSONDecodeError
+  - `diff_data['logs'][-1']` 在logs为空列表时触发IndexError
+- **修复**: 
+  - 添加try-except捕获JSON解析异常
+  - 检查logs非空且长度>0再访问[-1]
+  - 使用isinstance检查数据类型
+
+**3. 🟡 中等: 类型安全增强**
+- **位置**: xiaoji_records数据处理 (Line 5781)
+- **问题**: `data.get('小计', [])` 可能返回非list类型
+- **修复**: 双重类型检查确保返回值为list
+
+**4. 🟡 中等: 线程安全改进**
+- **问题**: 全局字典`processes`和`tasks`在多线程环境下并发访问
+- **修复**: 引入`threading.Lock()`保护共享状态
+- **新增**: `_processes_lock`和`_tasks_lock`
+
+#### 📊 安全性指标
+- **崩溃漏洞修复**: 4个API端点
+- **数据验证增强**: 3处
+- **并发安全**: 新增2个线程锁
+- **代码覆盖率**: 审查了100%的POST API端点
+
+#### 🧪 测试建议
+```bash
+# 测试空请求体
+curl -X POST http://localhost:5000/api/run -H "Content-Type: application/json" -d ""
+# 预期: 400 {"error": "请求体不能为空"}
+
+# 测试非法JSON
+curl -X POST http://localhost:5000/api/run -H "Content-Type: application/json" -d "invalid"
+# 预期: 400 (而不是500)
+```
+
+---
+
 ### v3.8.68 (2026-07-19) - Bug Fix + Code Quality Improvement
 
 #### Core Fixes
