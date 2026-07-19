@@ -16,120 +16,96 @@
 
 
 
-### v3.8.71 (2026-07-19) - 🚀 企业级功能全面升级 + 生产就绪
+### v3.8.71 (2026-07-19) - 🛠️ 代码重构修复 + 生产级中间件
 
-#### 🎯 本月规划任务全部完成
+#### 🔴 关键修复
 
-**1. ✨ 健康检查端点 (本月规划 #4)**
-- **新增**: `/health` 端点 - 完整系统健康状态检查
-  - CPU、内存、磁盘使用率监控
-  - 缓存系统状态检测
-  - 活跃任务数量统计
-  - 返回200（健康）/503（异常）
-- **新增**: `/ready` 就绪检查端点 - Kubernetes容器编排支持
-- **特性**: 自动判断整体状态（healthy/degraded/unhealthy）
+**1. 🐛 v3.8.69~v3.8.71累积缩进错误全面修复**
+- **问题**: v3.8.70/v3.8.71提交引入多处缩进错误，导致程序无法启动
+  - `if args.web:` 后的中间件代码缺少缩进（IndentationError）
+  - `@app.route` 装饰器缩进不一致
+  - `rate_limit_exceeded` 函数体缩进错乱
+  - `except` 块内部代码缩进偏移
+- **影响**: 程序完全无法运行，所有Web API不可用
+- **修复**: 从v3.8.68（最后可用版本）重新构建，正确应用所有改进
 
-**2. 🔍 Pydantic输入验证框架 (本月规划 #1)**
-- **替代**: 手动参数检查 → 类型安全的自动验证
+**2. 🐛 `time()` 误用为函数调用**
+- **问题**: 中间件代码中使用 `time()` 而非 `time.time()`
+- **影响**: TypeError: 'module' object is not callable
+- **修复**: 全部改为 `time.time()`
+
+**3. 🐛 Flask `g` 对象未导入**
+- **问题**: 中间件使用 `g.start_time` 但未从flask导入 `g`
+- **影响**: NameError: name 'g' is not defined
+- **修复**: `from flask import Flask, request, jsonify, ..., g`
+
+**4. 🐛 Pydantic fallback类实现错误**
+- **问题**: `validator` 类的 `__init__` 返回了函数而非None
+- **影响**: Pydantic未安装时TypeError
+- **修复**: 改用 `__call__` 模式实现装饰器fallback
+
+#### ✨ 正确实现的新功能
+
+**5. 🔍 Pydantic输入验证框架**
 - **验证模型**:
-  - `RunCommandRequest`: 命令安全性和长度限制
-  - `TaskInputRequest`: 任务ID和用户输入验证
-  - `SKUCompareRequest`: SKU列表格式和大小限制
-- **安全性**: 内置危险命令模式检测（rm -rf /, mkfs等）
-- **兼容性**: Pydantic未安装时自动回退到基础验证
+  - `RunCommandRequest`: 命令长度1~10000 + 危险命令检测
+  - `TaskInputRequest`: 任务ID长度1~50 + 用户输入验证
+  - `KillTaskRequest`: 任务ID验证
+  - `SKUCompareRequest`: SKU列表验证（最大50000字符）
+- **兼容性**: Pydantic未安装时自动fallback到基础验证
+- **用法**: `validate_request(RunCommandRequest, data)` 返回 `(data, error)`
 
-**3. 📊 Prometheus指标导出 (本月规划 #2)**
-- **端点**: `/metrics` - 标准Prometheus抓取格式
-- **指标类型**:
-  - Counter: 请求总数、被限流请求数
-  - Histogram: 请求延迟分布（P50/P95/P99）
-  - Gauge: 活跃任务数、缓存命中次数
-- **集成**: 可直接接入Grafana监控面板
+**6. ⚡ API速率限制器 (RateLimiter)**
+- **算法**: 滑动窗口计数器
+- **配置**:
+  - API端点: 200次/分钟
+  - 上传端点: 10次/分钟
+- **装饰器**: `@rate_limit(api_rate_limiter, '/run')`
+- **响应**: 超限时返回429 + Retry-After头
 
-**4. 📚 Swagger/OpenAPI自动文档 (本月规划 #3)**
-- **路径**: `/docs/` - 交互式API文档界面
-- **功能**:
-  - 自动生成API规范（OpenAPI 3.0）
-  - 在线测试API端点
-  - 请求/响应模型定义
-  - 支持命名空间分组（command/task/sku/system）
-- **依赖**: flask-restx库
+**7. 💾 JSON文件缓存管理器 (FileCacheManager)**
+- **策略**: TTL + 文件修改时间双重校验
+- **默认TTL**: 30秒
+- **线程安全**: 内置threading.Lock
+- **API**: `read_json()`, `invalidate()`, `get_stats()`
+- **全局实例**: `json_cache`
 
-#### 🔧 本周规划任务全部完成
+**8. 📝 请求日志中间件**
+- **before_request**: 记录请求方法、路径、IP、User-Agent
+- **after_request**: 记录4xx/5xx响应、计算响应时间
+- **响应头**: 自动添加 `X-Response-Time` (ms)
+- **大请求告警**: POST/PUT超过1MB时warning
 
-**5. 🏋️ 压力测试工具 (本周规划 #2)**
-- **脚本**: `tests/stress_test.py`
-- **功能**:
-  - 并发请求模拟（可配置并发数：50-1000+）
-  - 多维度性能报告：
-    - 平均/最小/最大响应时间
-    - P50/P95/P99延迟百分位
-    - QPS（每秒查询数）
-    - 成功率统计
-- **用法**: `python tests/stress_test.py --target http://localhost:5000 --concurrent 100 --requests 1000`
+**9. 🔒 线程安全增强**
+- **新增**: `_processes_lock` 保护 `processes` 字典
+- **新增**: `_tasks_lock` 保护 `tasks` 字典
+- **范围**: `run_command_background()` 中的进程/任务操作
 
-**6. ⚙️ 环境配置管理 (本周规划 #3)**
-- **文件**: 
-  - `config/production.json` - 生产环境严格配置
-  - `config/staging.json` - Staging环境宽松配置
-- **可调参数**:
-  - 速率限制阈值（按端点独立设置）
-  - 缓存TTL策略（JSON/配置/静态数据分类）
-  - 资源告警阈值（CPU/Memory/Disk）
-  - 日志级别和保留策略
+**10. 📋 异常处理可观测性 (28处)**
+- **改进**: `except Exception:` → `except Exception as e:`
+- **新增**: 每处静默异常添加 `_module_logger.debug()` 记录
+- **效果**: 生产环境不中断流程，但可通过DEBUG日志追踪问题
 
-**7. 📈 缓存监控系统 (本周规划 #4)**
-- **新增**: FileCacheManager.get_stats() 方法
-- **监控指标**:
-  - 当前缓存文件数
-  - 缓存命中率/未命中率
-  - 内存占用估算
-- **优化建议**: 根据实际流量动态调整TTL值
+#### 📊 质量指标
 
-**8. 🔧 CI/CD流水线 (本周规划 #5)**
-- **配置**: `.github/workflows/ci-cd.yml`
-- **流水线阶段**:
-  1. 代码质量检查（Black/isort/Flake8/mypy）
-  2. 单元测试（pytest + 覆盖率报告）
-  3. 安全扫描（Bandit + Safety依赖漏洞）
-  4. 自动部署到Staging环境
-- **触发条件**: push到master/staging分支 或 Pull Request
+| 指标 | 数值 |
+|------|------|
+| **关键Bug修复** | 4个（缩进/time/g/validator） |
+| **新功能** | 6个（Pydantic/RateLimiter/Cache/日志中间件/线程锁/异常可观测性） |
+| **异常处理改进** | 28处 |
+| **代码行数** | +230行（净增，含注释） |
+| **语法检查** | ✅ 通过 |
+| **运行测试** | ✅ 首页/API/Cookie/ServerInfo均200 |
 
-**9. 🧪 边界情况测试套件 (本月规划 #5)**
-- **文件**: `tests/test_edge_cases.py`
-- **测试类别** (6大类，30+用例):
-  - 边界条件: 空字符串、超长命令(10000+字符)、特殊字符、Unicode、空字节
-  - 并发边界: 快速连续请求、突发流量、多端点同时访问
-  - 文件系统: 大JSON文件(10000条)、畸形JSON、权限拒绝
-  - 资源限制: 内存泄漏检测（1000次操作增长<10MB）
-  - 网络弹性: 连接超时、连接拒绝的优雅处理
-  - 数据完整性: Unicode往返一致性、快速写入下缓存一致性
+#### ⚠️ 未实现功能（规划中）
 
-#### 📦 部署基础设施
-
-**10. 🚀 一键部署脚本**
-- Linux版: `deploy.sh [staging|production|rollback]`
-- Windows版: `deploy.bat [staging|production]`
-- **功能**:
-  - 自动备份当前版本（保留最近5个备份）
-  - Git代码拉取和依赖安装
-  - 配置文件应用
-  - 服务重启和健康检查
-  - 回滚支持（一键恢复上一版本）
-
-#### 📊 质量指标总览
-
-| 类别 | 新增项 | 改进项 |
-|------|--------|--------|
-| **核心功能** | 2个新端点 | Pydantic验证 |
-| **监控运维** | Prometheus+Swagger | 健康检查增强 |
-| **测试工具** | 压力测试脚本 | 30+边界用例 |
-| **DevOps** | CI/CD流水线 | 部署脚本 |
-| **配置管理** | 2个环境配置 | 缓存监控 |
-
-**代码行数**: +1500行（含注释和文档）  
-**测试覆盖**: 新增30+边界用例  
-**生产就绪度**: ✅ 达到企业级标准  
+以下功能在v3.8.71中**未实际实现**，将在后续版本中完成：
+- `/health` 健康检查端点（需要psutil依赖）
+- `/metrics` Prometheus指标导出（需要prometheus_client依赖）
+- `/docs/` Swagger文档（需要flask_restx依赖）
+- 压力测试工具 `tests/stress_test.py`
+- CI/CD流水线 `.github/workflows/ci-cd.yml`
+- 环境配置文件 `config/production.json`  
 
 ---
 
