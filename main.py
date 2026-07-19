@@ -1722,18 +1722,7 @@ else:
     ACTIVE_TASKS_GAUGE = None
 
 if FLASK_RESTX_AVAILABLE:
-    _api = Api(app, version='3.8.71', title='Szwego商品爬虫API', description='API文档', doc='/docs/', prefix='/api')
-    _ns_command = Namespace('command', description='命令管理')
-    _ns_task = Namespace('task', description='任务管理')
-    _ns_system = Namespace('system', description='系统管理')
-    _api.add_namespace(_ns_command, path='/api/command')
-    _api.add_namespace(_ns_task, path='/api/task')
-    _api.add_namespace(_ns_system, path='/api/system')
-else:
     _api = None
-    _ns_command = None
-    _ns_task = None
-    _ns_system = None
 
 def get_daily_profit_report_from_excel(excel_file):
     """从Excel的'每日利润'sheet的A列中查找以'截止'开头的报表文本
@@ -1849,7 +1838,11 @@ upload_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
 # Pydantic输入验证 (v3.8.71)
 # ============================================================
 try:
-    from pydantic import BaseModel, Field, validator, ValidationError
+    from pydantic import BaseModel, Field, ValidationError
+    try:
+        from pydantic import field_validator
+    except ImportError:
+        from pydantic import validator as field_validator
     PYDANTIC_AVAILABLE = True
 except ImportError:
     PYDANTIC_AVAILABLE = False
@@ -1861,11 +1854,12 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             pass
 
-    class validator:
+    class field_validator:
         def __init__(self, *args, **kwargs):
             pass
         def __call__(self, f):
             return f
+    validator = field_validator
 
     class ValidationError(Exception):
         pass
@@ -1874,7 +1868,7 @@ except ImportError:
 class RunCommandRequest(BaseModel):
     command: str = Field(..., min_length=1, max_length=10000)
 
-    @validator('command')
+    @field_validator('command')
     def validate_command_safe(cls, v):
         dangerous = ['rm -rf /', 'mkfs', 'shutdown', 'reboot', 'format', 'del /f /q C:\\']
         for p in dangerous:
@@ -5855,6 +5849,62 @@ if __name__ == '__main__':
                 return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
+
+        @app.route('/api/swagger.json')
+        def swagger_spec():
+            spec = {
+                'openapi': '3.0.0',
+                'info': {'title': 'Szwego商品爬虫API', 'version': '3.8.71', 'description': 'Szwego商品爬虫Web服务API文档'},
+                'servers': [{'url': '/api'}],
+                'paths': {
+                    '/version': {'get': {'summary': '获取版本信息', 'tags': ['系统'], 'responses': {'200': {'description': '版本信息'}}}},
+                    '/health': {'get': {'summary': '健康检查', 'description': 'CPU/内存/磁盘/缓存状态', 'tags': ['系统'], 'responses': {'200': {'description': '健康'}, '503': {'description': '异常'}}}},
+                    '/ready': {'get': {'summary': '就绪检查', 'description': 'Kubernetes就绪探针', 'tags': ['系统'], 'responses': {'200': {'description': '就绪'}}}},
+                    '/server/info': {'get': {'summary': '获取服务器信息', 'tags': ['系统'], 'responses': {'200': {'description': '服务器信息'}}}},
+                    '/cookie': {'get': {'summary': '获取Cookie状态', 'tags': ['系统'], 'responses': {'200': {'description': 'Cookie状态'}}}},
+                    '/changelog': {'get': {'summary': '获取更新日志', 'tags': ['系统'], 'responses': {'200': {'description': '更新日志'}}}},
+                    '/run': {'post': {'summary': '执行命令', 'tags': ['任务'], 'requestBody': {'content': {'application/json': {'schema': {'type': 'object', 'required': ['command'], 'properties': {'command': {'type': 'string', 'description': '要执行的命令'}}}}}}, 'responses': {'200': {'description': '执行结果'}}}},
+                    '/products': {'get': {'summary': '获取商品列表', 'tags': ['商品'], 'parameters': [{'name': 'date', 'in': 'query', 'schema': {'type': 'string'}, 'description': '日期'}], 'responses': {'200': {'description': '商品列表'}}}},
+                    '/product/search': {'get': {'summary': '搜索商品', 'tags': ['商品'], 'parameters': [{'name': 'keyword', 'in': 'query', 'schema': {'type': 'string'}, 'description': '搜索关键词'}], 'responses': {'200': {'description': '搜索结果'}}}},
+                    '/daily-profit': {'get': {'summary': '获取每日利润', 'tags': ['商品'], 'responses': {'200': {'description': '利润数据'}}}},
+                    '/sku/compare': {'get': {'summary': 'SKU对比', 'tags': ['商品'], 'responses': {'200': {'description': '对比结果'}}}},
+                    '/tunnel/status': {'get': {'summary': '获取隧道状态', 'tags': ['隧道'], 'responses': {'200': {'description': '隧道状态'}}}},
+                    '/tunnel/start': {'post': {'summary': '启动隧道', 'tags': ['隧道'], 'responses': {'200': {'description': '启动结果'}}}},
+                    '/tunnel/stop': {'post': {'summary': '停止隧道', 'tags': ['隧道'], 'responses': {'200': {'description': '停止结果'}}}},
+                    '/email/config': {'get': {'summary': '获取邮件配置', 'tags': ['邮件'], 'responses': {'200': {'description': '邮件配置'}}}, 'post': {'summary': '保存邮件配置', 'tags': ['邮件'], 'responses': {'200': {'description': '保存结果'}}}},
+                    '/email/test': {'post': {'summary': '测试邮件发送', 'tags': ['邮件'], 'responses': {'200': {'description': '测试结果'}}}},
+                },
+                'tags': [
+                    {'name': '系统', 'description': '系统管理相关接口'},
+                    {'name': '商品', 'description': '商品管理相关接口'},
+                    {'name': '任务', 'description': '任务管理相关接口'},
+                    {'name': '隧道', 'description': '隧道管理相关接口'},
+                    {'name': '邮件', 'description': '邮件管理相关接口'},
+                ]
+            }
+            return jsonify(spec)
+
+        @app.route('/docs/')
+        def swagger_ui():
+            return '''<!DOCTYPE html>
+<html>
+<head>
+    <title>Szwego商品爬虫API文档</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+    SwaggerUIBundle({
+        url: "/api/swagger.json",
+        dom_id: '#swagger-ui',
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+        layout: "BaseLayout"
+    })
+    </script>
+</body>
+</html>'''
 
         @app.route('/')
         def index():

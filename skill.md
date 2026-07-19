@@ -14366,13 +14366,58 @@ ACTIVE_TASKS_GAUGE = Gauge('active_tasks', '活跃任务数')
 ### 2.15.11 Swagger/OpenAPI文档规范
 
 #### 端点
-- `/docs/` - 交互式API文档
+- `/docs/` - 交互式API文档（Swagger UI 5.x）
+- `/api/swagger.json` - OpenAPI 3.0规范JSON
 
-#### 命名空间定义
+#### ⚠️ 禁止使用flask-restx注册路由
+flask-restx的`_api.route()`会覆盖原有`@app.route()`，导致500错误。
+正确做法：只使用手动构建的swagger.json + 纯HTML Swagger UI。
+
+#### 正确实现方式
 ```python
-_ns_command = Namespace('command', description='命令管理')
-_ns_task = Namespace('task', description='任务管理')
-_ns_system = Namespace('system', description='系统管理')
+# 1. 手动构建swagger.json
+@app.route('/api/swagger.json')
+def swagger_spec():
+    spec = {
+        'openapi': '3.0.0',
+        'info': {'title': 'API', 'version': '3.8.71'},
+        'paths': {
+            '/version': {'get': {'summary': '获取版本', 'tags': ['系统']}},
+            # ...
+        },
+        'tags': [
+            {'name': '系统', 'description': '系统管理'},
+            # ...
+        ]
+    }
+    return jsonify(spec)
+
+# 2. 纯HTML Swagger UI
+@app.route('/docs/')
+def swagger_ui():
+    return '''<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+    SwaggerUIBundle({url: "/api/swagger.json", dom_id: '#swagger-ui'})
+    </script>
+</body>
+</html>'''
+```
+
+#### ❌ 禁止
+```python
+# flask-restx路由注册会覆盖@app.route
+_api = Api(app, ...)
+@_api.route('/api/version')  # ❌ 覆盖原有路由
+class VersionResource(Resource):
+    def get(self):
+        pass
 ```
 
 ### 2.15.12 环境配置规范
