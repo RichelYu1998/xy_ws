@@ -533,7 +533,7 @@ class TeeOutput:
                         try:
                             os.rename(log_file_path, backup_path)
                             print(f"[TeeOutput] ⚠️ 日志文件被锁定，已备份为: {backup_path}")
-                        except:
+                        except Exception:
                             pass
                         _t.sleep(0.5 * (retry_count + 1))
                         return self._init_log_file(log_file_path, retry_count + 1)
@@ -1561,7 +1561,7 @@ class Environment:
             urllib.request.urlopen(mirror_url, timeout=timeout)
             elapsed_time = time.time() - start_time
             return elapsed_time
-        except:
+        except (urllib.error.URLError, urllib.error.HTTPError, socket.timeout, OSError) as e:
             return None
     
     @staticmethod
@@ -1594,8 +1594,8 @@ class Environment:
                 subprocess.run(f'taskkill /F /IM {process_name}', shell=True, capture_output=True, timeout=10)
             else:
                 subprocess.run(f'pkill -f "{process_name}"', shell=True, capture_output=True, timeout=10)
-        except:
-            pass
+        except (subprocess.SubprocessError, OSError, FileNotFoundError) as e:
+            print(f"⚠️ 终止进程失败: {e}")
     
     @staticmethod
     def get_default_viewport():
@@ -1612,10 +1612,11 @@ class Environment:
                     match = re.search(r'dimensions:\s*(\d+)\s*x\s*(\d+)', result.stdout)
                     if match:
                         return {'width': min(int(match.group(1)), 1920), 'height': min(int(match.group(2)) - 100, 1080)}
-                except:
-                    pass
-            return {'width': 1920, 'height': 1080}
-        except:
+                except (subprocess.SubprocessError, OSError, FileNotFoundError) as e:
+                    print(f"⚠️ 获取屏幕分辨率失败: {e}")
+                return {'width': 1920, 'height': 1080}
+        except Exception as e:
+            print(f"⚠️ 获取默认视口失败: {e}")
             return {'width': 1920, 'height': 1080}
 
     @staticmethod
@@ -1628,7 +1629,8 @@ class Environment:
             else:
                 result = subprocess.run(f'pgrep -f "{process_name}"', shell=True, capture_output=True, text=True, timeout=3)
                 return result.returncode == 0
-        except:
+        except (subprocess.SubprocessError, OSError, FileNotFoundError) as e:
+            print(f"⚠️ 检查进程运行状态失败: {e}")
             return False
 
 # Windows上的emoji安全打印
@@ -2451,15 +2453,22 @@ class PathManager:
     
     @staticmethod
     def get_lan_ip():
+        s = None
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(2)
             s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
             ip = s.getsockname()[0]
-            s.close()
             return ip
-        except:
+        except (socket.error, OSError, ValueError, TypeError) as e:
+            print(f"⚠️ 获取局域网IP失败: {e}")
             return ''
+        finally:
+            if s:
+                try:
+                    s.close()
+                except Exception:
+                    pass
 
     @staticmethod
     def sync_web_output_from_tunnel_url():
@@ -3487,7 +3496,7 @@ class WegoScraper:
                 element_id = None
                 try:
                     element_id = await element.get_attribute('data-id')
-                except:
+                except Exception:
                     pass
                 if not element_id:
                     try:
@@ -3496,12 +3505,12 @@ class WegoScraper:
                             href_match = re.search(r'/(\d+)(?:\?|$)', href)
                             if href_match:
                                 element_id = href_match.group(1)
-                    except:
+                    except Exception:
                         pass
                 if not element_id:
                     try:
                         element_id = await element.get_attribute('data-goods-id')
-                    except:
+                    except Exception:
                         pass
 
                 if not element_text or not element_text.strip():
@@ -5127,7 +5136,7 @@ def update_cookie():
                         print('✓ 检测到登录成功，自动关闭浏览器...')
                         login_detected = True
                         break
-                except:
+                except Exception:
                     pass
                 
                 await asyncio.sleep(5)
@@ -5412,7 +5421,7 @@ if __name__ == '__main__':
                             print('\n✓ 检测到登录成功！正在获取Cookie...')
                             login_detected = True
                             break
-                    except:
+                    except Exception:
                         pass
                     await asyncio.sleep(3)
                     elapsed = int(time.time() - start_time)
@@ -5615,14 +5624,14 @@ if __name__ == '__main__':
                         process.wait(timeout=3)
                     except subprocess.TimeoutExpired:
                         process.kill()
-                except:
+                except Exception:
                     pass
                 if task_id in tasks:
                     tasks[task_id]['status'] = 'killed'
                 if task_id in processes:
                     del processes[task_id]
                 return jsonify({'success': True, 'message': '进程已终止'})
-            except:
+            except Exception:
                 return jsonify({'success': True, 'message': '操作完成'})
 
         @app.route('/output/<task_id>', methods=['GET'])
@@ -5799,7 +5808,7 @@ if __name__ == '__main__':
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
                                         added_high_price.append(sku)
-                                except:
+                                except Exception:
                                     pass
                                 break
 
@@ -5980,7 +5989,7 @@ if __name__ == '__main__':
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
                                         added_high_price.append(sku)
-                                except:
+                                except Exception:
                                     pass
                                 break
                 
@@ -6041,14 +6050,14 @@ if __name__ == '__main__':
                                 for b64_str in img_data:
                                     try:
                                         media_result.append(base64.b64decode(b64_str).decode('utf-8'))
-                                    except:
+                                    except Exception:
                                         media_result.append(b64_str)
                             else:
                                 try:
                                     media_result = base64.b64decode(img_data).decode('utf-8')
-                                except:
+                                except Exception:
                                     media_result = img_data
-                        except:
+                        except Exception:
                             media_result = img_data
                     p['图片'] = media_result if media_result else img_data
                 
@@ -6154,7 +6163,7 @@ if __name__ == '__main__':
                                                     record_date = datetime.strptime(date_str.split()[0], fmt)
                                                     record_date_str = record_date.strftime('%Y-%m-%d')
                                                     break
-                                                except:
+                                                except Exception:
                                                     continue
                                             if record_date_str is None:
                                                 parts = date_str.split()
@@ -6188,7 +6197,7 @@ if __name__ == '__main__':
                                                         elif 'Nov' in date_str:
                                                             record_date = record_date.replace(month=11)
                                                         record_date_str = record_date.strftime('%Y-%m-%d')
-                                                    except:
+                                                    except Exception:
                                                         pass
                                                 if record_date_str is None:
                                                     continue
@@ -6198,7 +6207,7 @@ if __name__ == '__main__':
                                                 if record_date.year < 2000:
                                                     continue
                                                 record_date_str = record_date.strftime('%Y-%m-%d')
-                                            except:
+                                            except Exception:
                                                 continue
                                         else:
                                             continue
@@ -6226,13 +6235,13 @@ if __name__ == '__main__':
                 if start_date:
                     try:
                         all_records = [r for r in all_records if r['日期'] >= start_date]
-                    except:
+                    except Exception:
                         pass
                 
                 if end_date:
                     try:
                         all_records = [r for r in all_records if r['日期'] <= end_date]
-                    except:
+                    except Exception:
                         pass
                 
                 summary = {}
@@ -6271,7 +6280,7 @@ if __name__ == '__main__':
                                     converted = datetime(1899, 12, 30) + timedelta(days=int(cell_val))
                                     if converted.year >= 2000:
                                         row_data[col_idx] = converted.strftime('%Y-%m-%d')
-                                except:
+                                except Exception:
                                     pass
                 
                 result = {
@@ -6309,14 +6318,14 @@ if __name__ == '__main__':
                                 for b64_str in img_data:
                                     try:
                                         media_result.append(base64.b64decode(b64_str).decode('utf-8'))
-                                    except:
+                                    except Exception:
                                         media_result.append(b64_str)
                             else:
                                 try:
                                     media_result = base64.b64decode(img_data).decode('utf-8')
-                                except:
+                                except Exception:
                                     media_result = img_data
-                        except:
+                        except Exception:
                             media_result = img_data
                     p['图片'] = media_result if media_result else img_data
                 
@@ -6399,14 +6408,14 @@ if __name__ == '__main__':
                                     try:
                                         decoded = base64.b64decode(img).decode('utf-8')
                                         decoded_images.append(decoded)
-                                    except:
+                                    except Exception:
                                         decoded_images.append(img)
                                 p['图片'] = decoded_images
                             elif isinstance(images, str):
                                 try:
                                     decoded = base64.b64decode(images).decode('utf-8')
                                     p['图片'] = [decoded]
-                                except:
+                                except Exception:
                                     p['图片'] = [images]
                             else:
                                 p['图片'] = []
@@ -6459,7 +6468,7 @@ if __name__ == '__main__':
                                             media_result.append(decoded_url)
                                         else:
                                             media_result.append(b64_str)
-                                    except:
+                                    except Exception:
                                         media_result.append(b64_str)
                             else:
                                 try:
@@ -6468,7 +6477,7 @@ if __name__ == '__main__':
                                         media_result = [decoded_url]
                                     else:
                                         media_result = [img_data]
-                                except:
+                                except Exception:
                                     media_result = [img_data]
                         p['图片'] = media_result
                         return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
@@ -6500,14 +6509,14 @@ if __name__ == '__main__':
                                     try:
                                         decoded = base64.b64decode(img).decode('utf-8')
                                         decoded_images.append(decoded)
-                                    except:
+                                    except Exception:
                                         decoded_images.append(img)
                                 p['图片'] = decoded_images
                             elif isinstance(images, str):
                                 try:
                                     decoded = base64.b64decode(images).decode('utf-8')
                                     p['图片'] = [decoded]
-                                except:
+                                except Exception:
                                     p['图片'] = [images]
                             else:
                                 p['图片'] = []
@@ -6939,15 +6948,8 @@ if __name__ == '__main__':
         def get_server_info():
             port = args.port
             
-            # 获取局域网 IP
-            lan_ip = None
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
-                lan_ip = s.getsockname()[0]
-                s.close()
-            except:
-                pass
+                # 获取局域网 IP（复用PathManager的方法）
+            lan_ip = PathManager.get_lan_ip() or None
             
             return jsonify({
                 'success': True,
@@ -7626,7 +7628,7 @@ if __name__ == '__main__':
                                         url_verified = False
                                         try:
                                             url_verified = verify_url(file_url, timeout=10, verbose=True)
-                                        except:
+                                        except Exception:
                                             pass
                                         
                                         if url_verified:
@@ -7699,10 +7701,10 @@ if __name__ == '__main__':
                     try:
                         tunnel_process.terminate()
                         tunnel_process.wait(timeout=2)
-                    except:
+                    except Exception:
                         try:
                             tunnel_process.kill()
-                        except:
+                        except Exception:
                             pass
                 
                 saved_old_url = old_tunnel_url
@@ -7747,7 +7749,7 @@ if __name__ == '__main__':
                     if web_url:
                         try:
                             is_url_valid = verify_url(web_url)
-                        except:
+                        except Exception:
                             pass
                     
                     if is_url_valid:
@@ -8480,10 +8482,10 @@ ingress:
                 try:
                     tunnel_process.terminate()
                     tunnel_process.wait(timeout=2)
-                except:
+                except Exception:
                     try:
                         tunnel_process.kill()
-                    except:
+                    except Exception:
                         pass
             tunnel_process = None
             tunnel_url = None
@@ -8491,10 +8493,10 @@ ingress:
                 try:
                     cf_process.terminate()
                     cf_process.wait(timeout=2)
-                except:
+                except Exception:
                     try:
                         cf_process.kill()
-                    except:
+                    except Exception:
                         pass
             cf_process = None
             cf_url = None
@@ -8525,7 +8527,7 @@ ingress:
             s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
             lan_ip_startup = s.getsockname()[0]
             s.close()
-        except:
+        except Exception:
             pass
         
         print("=" * 50)
