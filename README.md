@@ -10,6 +10,39 @@
 
 ## 最新更新
 
+
+
+### v3.8.68 (2026-07-19) - Bug Fix + Code Quality Improvement
+
+#### Core Fixes
+
+**1. CRITICAL: kill_process_by_name indentation error (Line 1593-1598)**
+- **Issue**: try-except block indentation error caused exception handling to fail completely
+- **Impact**: Unhandled exceptions when process termination fails, potential crashes
+- **Fixed**: Corrected all 6 indentation errors, restored normal exception handling flow
+
+**2. CRITICAL: Socket resource leak fix**
+- **Location**: get_lan_ip() method (Line 2455-2470)
+- **Issue**: socket object not closed on exceptions, causing file descriptor leak
+- **Fixed**: Added finally block to ensure socket is always properly closed
+
+**3. MEDIUM: Eliminated duplicate code**
+- **Location**: get_server_info() function (Line 6948-6960)
+- **Optimization**: Reuse PathManager.get_lan_ip() method, eliminated duplicate socket code
+- **Effect**: Improved code maintainability, unified IP retrieval logic
+
+**4. MEDIUM: Fixed bare except statements (38 occurrences)**
+- **Issue**: Using except: catches all exceptions including SystemExit and KeyboardInterrupt
+- **Fixed**: All changed to except Exception: to only catch business exceptions
+- **Scope**: Exception handling points throughout the entire codebase
+
+#### Code Quality Metrics
+- **Bugs Fixed**: 4 (1 critical, 2 medium, 1 code standard)
+- **Lines Affected**: ~50 lines
+- **Testing Recommendation**: Focus testing on process management and network functionality modules
+
+---
+
 ### v3.8.67 (2026-07-19) - 🛡️ API响应解析全面健壮性提升+Bug修复
 
 #### 🎯 核心改进

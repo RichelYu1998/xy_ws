@@ -13014,3 +13014,201 @@ def read_output():
 ```
 
 ---
+
+## 2.12 异常处理规范（v3.8.68 新增）
+
+### 2.12.1 基本原则
+
+1. **禁止使用裸except语句**
+   ```python
+   # ❌ 错误：捕获所有异常包括SystemExit和KeyboardInterrupt
+   try:
+       do_something()
+   except:
+       pass
+   
+   # ✅ 正确：只捕获业务异常
+   try:
+       do_something()
+   except Exception:
+       pass
+   ```
+
+2. **资源管理必须使用finally或with语句**
+   ```python
+   # ❌ 错误：资源可能泄漏
+   def get_data():
+       s = socket.socket(...)
+       s.connect(...)
+       data = s.recv(1024)
+       s.close()  # 如果上面抛出异常，这行不会执行
+       return data
+   
+   # ✅ 正确：确保资源释放
+   def get_data():
+       s = None
+       try:
+           s = socket.socket(...)
+           s.connect(...)
+           data = s.recv(1024)
+           return data
+       except Exception as e:
+           return None
+       finally:
+           if s:
+               try:
+                   s.close()
+               except Exception:
+                   pass
+   ```
+
+3. **缩进必须严格遵循PEP 8**
+   - 使用4个空格作为缩进单位
+   - 同一级别的代码块必须保持一致缩进
+   - try-except-finally块的缩进必须正确匹配
+
+### 2.12.2 异常处理最佳实践
+
+**Socket操作示例**：
+```python
+@staticmethod
+def get_lan_ip():
+    s = None  # 初始化为None，防止UnboundLocalError
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(2)
+        s.connect((host, port))
+        ip = s.getsockname()[0]
+        return ip
+    except (socket.error, OSError, ValueError, TypeError) as e:
+        print(f"Operation failed: {e}")
+        return ''
+    finally:  # 必须有finally块
+        if s:
+            try:
+                s.close()  # 安全关闭
+            except Exception:
+                pass  # 关闭失败不应影响主逻辑
+```
+
+**进程管理示例**：
+```python
+@staticmethod
+def kill_process_by_name(process_name):
+    try:
+        if Environment.IS_WINDOWS:
+            subprocess.run(
+                f'taskkill /F /IM {process_name}',
+                shell=True,
+                capture_output=True,
+                timeout=10
+            )
+        else:
+            subprocess.run(
+                f'pkill -f "{process_name}"',
+                shell=True,
+                capture_output=True,
+                timeout=10
+            )
+    except (subprocess.SubprocessError, OSError, FileNotFoundError) as e:
+        print(f"Failed to kill process: {e}")
+        # 注意：except必须与try对齐，不能有多余缩进
+```
+
+### 2.12.3 代码审查清单
+
+在提交代码前，必须检查以下项：
+
+- [ ] 所有try块都有对应的except和/或finally
+- [ ] 不存在裸`except:`语句（必须是`except Exception:`）
+- [ ] 所有socket、file、database连接等资源都在finally中关闭
+- [ ] 缩进严格符合PEP 8规范（特别是try-except-finally块）
+- [ ] 没有重复的代码逻辑（应提取为公共方法）
+- [ ] 异常消息包含足够的上下文信息便于调试
+
+### 2.12.4 常见反模式
+
+| 反模式 | 问题 | 正确做法 |
+|--------|------|----------|
+| `except:` | 捕获系统退出信号 | `except Exception:` |
+| 资源不在finally中关闭 | 异常时资源泄漏 | 使用finally或with语句 |
+| try-except缩进错误 | 异常处理失效 | 确保正确的4空格缩进 |
+| 重复代码 | 维护困难 | 提取为公共方法复用 |
+
+---
+
+## 附录A: v3.8.68 Bug修复案例
+
+### 案例1: 缩进错误导致异常处理失效
+
+**问题代码** (Line 1593-1598):
+```python
+def kill_process_by_name(process_name):
+    try:
+            if Environment.IS_WINDOWS:  # 16个空格（应该是12个）
+                subprocess.run(...)     # 20个空格（应该是16个）
+        except Exception as e:         # 12个空格（应该是8个）❌ 缩进不匹配
+```
+
+**症状**: 
+- 进程终止失败时异常未被捕获
+- 可能导致整个程序崩溃
+
+**根本原因**: 
+- 复制粘贴代码时引入了多余缩进
+- IDE或编辑器未配置自动格式化检查
+
+**修复方案**:
+```python
+def kill_process_by_name(process_name):
+    try:
+        if Environment.IS_WINDOWS:     # 12个空格 ✅
+            subprocess.run(...)        # 16个空格 ✅
+    except Exception as e:             # 8个空格 ✅
+        print(f"Process kill failed: {e}")
+```
+
+**预防措施**:
+1. 配置IDE启用flake8/pylint检查
+2. 提交前运行`python -m py_compile main.py`检查语法
+3. 使用pre-commit钩子进行自动化检查
+
+### 案例2: Socket资源泄漏
+
+**问题代码** (Line 2455-2465):
+```python
+def get_lan_ip():
+    try:
+        s = socket.socket(...)  # 如果这里成功
+        s.connect(...)          # 但这里抛出异常
+        ip = s.getsockname()[0]
+        s.close()               # 这行不会执行！❌ 资源泄漏
+        return ip
+    except Exception as e:
+        return ''               # socket未关闭就返回了
+```
+
+**症状**:
+- 长时间运行后文件描述符耗尽
+- "Too many open files"错误
+- 系统性能逐渐下降
+
+**修复方案**:
+```python
+def get_lan_ip():
+    s = None  # 初始化
+    try:
+        s = socket.socket(...)
+        s.connect(...)
+        ip = s.getsockname()[0]
+        return ip
+    except Exception as e:
+        return ''
+    finally:                    # ✅ 无论是否异常都会执行
+        if s:
+            try:
+                s.close()      # ✅ 确保资源释放
+            except Exception:
+                pass
+```
+
