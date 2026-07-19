@@ -3,8 +3,10 @@ import argparse
 import asyncio
 import base64
 import ctypes
+import datetime as _dt
 import glob
 import gzip
+import importlib.metadata as im
 import io
 import json
 import logging
@@ -16,10 +18,13 @@ import select
 import shutil
 import smtplib
 import socket
+import ssl
 import subprocess
 import sys
 import threading
+import threading as _threading
 import time
+import time as _time
 import traceback
 import urllib.request
 import uuid
@@ -2833,8 +2838,6 @@ class EmailNotifier:
     
     def send_tunnel_notification(self, tunnel_url, event_type='new'):
         """发送隧道URL变化通知邮件"""
-        import datetime as _dt
-        import threading as _threading
         _current_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         _thread_id = _threading.current_thread().name
         
@@ -5533,8 +5536,6 @@ def select_pip_mirror(venv_path: str):
 
 
 def check_deps_satisfied(requirements_file="requirements.txt"):
-    import importlib.metadata as im
-
     def ver_tuple(v):
         return tuple(int(x) for x in re.split(r'[.\-]', v) if x.isdigit())
 
@@ -7657,10 +7658,8 @@ if __name__ == '__main__':
             pass
         
         def verify_url(url, timeout=10, verbose=False, max_retries=3):
-            import time as _time
             for attempt in range(max_retries):
                 try:
-                    import ssl
                     ctx = ssl.create_default_context()
                     ctx.check_hostname = False
                     ctx.verify_mode = ssl.CERT_NONE

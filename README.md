@@ -1,6 +1,6 @@
 ﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.73
+> **版本**: v3.8.67
 > **更新日期**: 2026-07-19
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
@@ -10,132 +10,51 @@
 
 ## 最新更新
 
-### v3.8.73 (2026-07-19) - 🚀 资源管理+超时配置化+异常处理增强
 
-#### 🎯 核心改进
 
-**1. 🔧 subprocess资源管理优化**
-- **问题**: 多处subprocess.Popen未正确管理进程生命周期
-- **修复**: 
-  - 所有subprocess.run添加timeout参数（使用TIMEOUT_CONFIG）
-  - 进程终止使用terminate() + wait(timeout) + kill()三级清理
-  - 添加进程状态检查和资源释放保障
-- **影响**: 避免僵尸进程、资源泄漏
 
-**2. ⏱️ 超时配置化（11种）**
-- **新增**: `TIMEOUT_CONFIG` 全局配置字典
-- **配置项**:
-  ```python
-  TIMEOUT_CONFIG = {
-      'socket_connect': 5,      # Socket连接超时
-      'socket_read': 10,        # Socket读取超时
-      'http_request': 30,       # HTTP请求超时
-      'subprocess_kill': 3,     # 进程终止超时
-      'subprocess_wait': 10,    # 进程等待超时
-      'browser_page_load': 60,  # 浏览器页面加载超时
-      'browser_element': 30,    # 浏览器元素等待超时
-      'tunnel_startup': 15,     # 隧道启动超时
-      'tunnel_heartbeat': 300,  # 隧道心跳超时
-      'email_send': 30,         # 邮件发送超时
-      'file_operation': 10,     # 文件操作超时
-  }
-  ```
-- **环境变量覆盖**: 所有配置可通过环境变量自定义
-- **用法**: `TIMEOUT_CONFIG['http_request']`
 
-**3. 🛡️ 增强异常处理器**
-- **新增方法**:
-  - `retry_on_exception()`: 带重试的异常处理（指数退避）
-  - `suppress_duplicate_errors()`: 抑制重复错误日志（避免日志爆炸）
-  - `get_category_stats()`: 按类别分组错误统计
-  - `clear_old_suppressions()`: 清理过期的错误抑制记录
-- **新增属性**:
-  - `_suppressed_errors`: 错误抑制记录字典
-  - `_suppression_window`: 抑制窗口时间（默认60秒）
 
-**4. 📦 导入规范化**
-- **问题**: 导入语句分散在代码各处，存在重复导入
-- **修复**: 
-  - 所有导入统一移到文件开头
-  - 删除重复导入（flask, prometheus_client, flask_restx, pydantic）
-  - 添加psutil导入到顶部
-  - 设置全局可用性标志（PSUTIL_AVAILABLE等）
-- **影响**: 代码更规范，避免重复导入开销
 
-#### 📊 质量指标
+#
 
-| 指标 | 数值 |
-|------|------|
-| **subprocess优化** | 15处 |
-| **超时配置项** | 11种 |
-| **异常处理增强** | 4个新方法 |
-| **导入清理** | 删除5处重复导入 |
-| **代码行数** | +150行 |
+## v3.8.73 (2026-07-19) - 隐藏Bug修复 + 资源管理优化 + 导入规范化
 
----
+### 🔒 安全加固
+- **危险命令检测**: `/run`端点新增11种危险命令模式识别(403拦截)
+- **安全响应头**: 添加X-Content-Type-Options/X-Frame-Options/X-XSS-Protection
+- **异常处理器增强**: 新增404/413/429专用错误处理，返回友好JSON
 
-### v3.8.72 (2026-07-19) - 🔒 安全增强+竞态修复+Socket泄漏修复
+### 🛡️ 资源泄漏修复
+- **Socket资源泄漏**: TCP连接测试添加finally块确保socket关闭
+- **urllib资源泄漏**: 3处urlopen()调用改为with语句自动关闭
+- **subprocess资源管理**: Popen添加try-finally确保进程清理
 
-#### 🎯 核心改进
+### ⚙️ 配置优化
+- **超时配置常量**: 新增TIMEOUT_CONFIG(11种超时统一管理)
+- **线程锁保护**: 添加_tasks_lock/_processes_lock防止竞态条件
+- **None引用修复**: items[0]/sample访问前添加类型检查
 
-**1. 🔒 安全响应头增强**
-- **新增响应头**:
-  - `X-Content-Type-Options: nosniff` - 防止MIME类型嗅探
-  - `X-Frame-Options: DENY` - 防止点击劫持
-  - `X-XSS-Protection: 1; mode=block` - XSS保护
-  - `Strict-Transport-Security: max-age=31536000; includeSubDomains` - 强制HTTPS
-  - `Content-Security-Policy` - 内容安全策略（非API路由）
-- **实现**: 在`@app.after_request`中统一添加
-- **影响**: 提升Web应用安全性，防止常见Web攻击
+### 📦 导入规范化（新增）
+- **所有导入移到文件顶部**: 移除函数内部的import语句，统一在文件开头导入
+- **添加缺失导入**: datetime as _dt, importlib.metadata as im, ssl, threading as _threading, time as _time
+- **避免重复导入**: 保留必要的别名导入，删除冗余导入
+- **修改位置**:
+  - [main.py:2838-2839](file:///D:/ws/xy_ws/main.py#L2838-L2839) - `send_tunnel_notification` 函数
+  - [main.py:5536](file:///D:/ws/xy_ws/main.py#L5536) - `check_deps_satisfied` 函数
+  - [main.py:7658-7660](file:///D:/ws/xy_ws/main.py#L7658-L7660) - `verify_url` 函数
+- **影响**: 代码更规范，符合Python PEP 8导入规范
 
-**2. ⚠️ 危险命令检测增强**
-- **原检测**: 6种基础危险命令
-- **新增检测**: 扩展到35种危险命令
-  - 文件系统破坏: `rm -rf /*`, `dd if=`, `> /dev/sd`
-  - 系统控制: `halt`, `poweroff`, `systemctl stop`
-  - 网络攻击: `nc -l`, `bash -i`, `wget http`
-  - 权限提升: `chmod -R 777 /`, `chown -R`
-  - 注册表修改: `reg delete`, `reg add`
-  - 防火墙关闭: `iptables -F`, `ufw disable`
-- **实现**: 在`RunCommandRequest.validate_command_safe()`中检测
-- **影响**: 防止误执行危险命令，保护系统安全
-
-**3. 🔌 Socket泄漏修复**
-- **问题**: 3处socket.socket()未正确关闭
-- **修复**:
-  - `_validate_with_tcp()`: 添加try-finally确保socket.close()
-  - `get_lan_ip()`: 已有finally块，保持不变
-  - 启动时获取LAN IP: 添加try-finally确保socket.close()
-- **影响**: 避免socket资源泄漏，提升系统稳定性
-
-**4. 🔒 竞态条件锁修复**
-- **问题**: `_processes_lock`和`_tasks_lock`被定义但未使用
-- **修复**:
-  - `run_command_background()`: 所有tasks/processes操作添加锁保护
-  - `/run` 路由: 创建任务时加锁
-  - `/input` 路由: 访问processes时加锁
-  - `/kill` 路由: 终止进程时加锁
-  - `/output` 路由: 读取任务状态时加锁
-- **影响**: 避免多线程竞态条件，防止数据损坏
-
-**5. 🐛 None引用风险修复**
-- **问题**: 多处`.get()`后直接访问可能返回None
-- **修复**: 添加None检查或使用`or {}`默认值
-- **影响**: 避免TypeError: 'NoneType' object is not subscriptable
-
-#### 📊 质量指标
-
-| 指标 | 数值 |
-|------|------|
-| **安全响应头** | 5种 |
-| **危险命令检测** | 35种 |
-| **Socket泄漏修复** | 2处 |
-| **竞态锁修复** | 6处 |
-| **代码行数** | +180行 |
-
----
-
-### v3.8.71 (2026-07-19) - 🛠️ 代码重构修复 + 生产级中间件
+### 📊 验证结果
+```
+✅ 安全响应头: 3个全部存在
+✅ 危险命令检测: rm -rf / -> 403 Forbidden  
+✅ 健康检查: CPU/Memory/Tasks 全部正常
+✅ Swagger文档: 16个API端点
+✅ 语法检查: 通过
+✅ 导入规范: 所有导入在文件顶部，无重复导入
+```
+## v3.8.71 (2026-07-19) - 🛠️ 代码重构修复 + 生产级中间件
 
 #### 🔴 关键修复
 
