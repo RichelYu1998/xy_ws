@@ -1,39 +1,30 @@
 {
-  "version": "3.8.71",
   "environment": "staging",
-  "rate_limiting": {
-    "api_endpoints": {
-      "max_requests_per_minute": 1000,
-      "window_seconds": 60,
-      "enabled": true
-    },
-    "upload_endpoints": {
-      "max_requests_per_minute": 10,
-      "window_seconds": 60,
-      "enabled": true
-    }
+  "rate_limit": {
+    "api_max_requests": 200,
+    "api_window_seconds": 60,
+    "upload_max_requests": 10,
+    "upload_window_seconds": 60
   },
-  "caching": {
-    "json_files": {
-      "ttl_seconds": 30,
-      "max_cache_size_mb": 100,
-      "enabled": true,
-      "monitoring": {
-        "log_cache_hits": true,
-        "log_cache_misses": true
-      }
-    }
+  "cache": {
+    "json_ttl_seconds": 30,
+    "config_ttl_seconds": 120,
+    "static_ttl_seconds": 1800
+  },
+  "alerts": {
+    "cpu_percent_threshold": 90,
+    "memory_percent_threshold": 90,
+    "disk_percent_threshold": 95
   },
   "logging": {
     "level": "DEBUG",
-    "file": "logs/app.log"
+    "max_file_size_mb": 100,
+    "backup_count": 3
   },
-  "health_check": {
-    "cpu_warning_threshold_percent": 80,
-    "memory_warning_threshold_percent": 80
-  },
-  "monitoring": {
-    "prometheus_enabled": true,
-    "metrics_endpoint": "/metrics"
+  "server": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "debug": true,
+    "threaded": true
   }
 }

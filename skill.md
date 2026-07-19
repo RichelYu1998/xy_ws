@@ -14323,3 +14323,67 @@ except Exception as e:
 8. ✅ Flask `g` 对象已在import中
 9. ✅ Pydantic fallback类不会抛出TypeError
 10. ✅ README.md更新日志使用中文
+
+### 2.15.9 健康检查端点规范
+
+#### 端点定义
+- `/health` - 完整健康检查（CPU/内存/磁盘/缓存/任务数）
+- `/ready` - 轻量就绪检查（Kubernetes就绪探针）
+
+#### 状态判断逻辑
+```python
+# CPU > 95% 或 内存 > 95% → unhealthy (503)
+# CPU > 90% 或 内存 > 90% 或 磁盘 > 95% → degraded (200)
+# 其他 → healthy (200)
+```
+
+#### psutil兼容性
+```python
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+# 未安装时返回基本信息，不报错
+```
+
+### 2.15.10 Prometheus指标规范
+
+#### 端点
+- `/metrics` - 标准Prometheus文本格式
+
+#### 指标定义
+```python
+REQUEST_COUNT = Counter('http_requests_total', '总请求数', ['method', 'endpoint', 'status'])
+REQUEST_LATENCY = Histogram('http_request_duration_seconds', '请求延迟', ['method', 'endpoint'])
+ACTIVE_TASKS_GAUGE = Gauge('active_tasks', '活跃任务数')
+```
+
+#### 指标收集位置
+- `after_request` 中自动收集请求计数和延迟
+- `/metrics` 端点中更新活跃任务数
+
+### 2.15.11 Swagger/OpenAPI文档规范
+
+#### 端点
+- `/docs/` - 交互式API文档
+
+#### 命名空间定义
+```python
+_ns_command = Namespace('command', description='命令管理')
+_ns_task = Namespace('task', description='任务管理')
+_ns_system = Namespace('system', description='系统管理')
+```
+
+### 2.15.12 环境配置规范
+
+#### 配置文件
+- `config/production.json` - 生产环境（严格限制）
+- `config/staging.json` - 测试环境（宽松限制）
+
+#### 配置项
+- `rate_limit` - 速率限制参数
+- `cache` - 缓存TTL策略
+- `alerts` - 资源告警阈值
+- `logging` - 日志级别和保留策略
+- `server` - 服务器配置
