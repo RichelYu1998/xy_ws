@@ -1562,7 +1562,9 @@ def get_version_from_readme():
     try:
         with open(readme_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        match = re.search(r'###\s+v(\d+\.\d+\.\d+)', content)
+        match = re.search(r'##\s+v(\d+\.\d+\.\d+)', content)
+        if not match:
+            match = re.search(r'###\s+v(\d+\.\d+\.\d+)', content)
         if match:
             return match.group(1)
     except Exception as e:
