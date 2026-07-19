@@ -365,10 +365,10 @@ def send_tunnel_notification(self, tunnel_url, event_type='new'):
 ### 2.0.1 CSP策略配置（v3.8.73 新增）
 
 **问题背景**：
-v3.8.73添加的CSP（内容安全策略）阻止了/docs/端点加载CDN的Swagger UI资源。
+v3.8.73添加的CSP（内容安全策略）阻止了/docs/端点和主页加载CDN资源。
 
 **修复方案**：
-为/docs/端点单独配置CSP策略，允许加载cdn.jsdelivr.net的脚本和样式。
+为/docs/端点和主页单独配置CSP策略，允许加载必要的CDN资源。
 
 **代码示例**：
 ```python
@@ -381,9 +381,13 @@ def _log_response_info(response):
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     
-    # 为/docs/端点单独配置CSP策略
+    # 为/docs/端点单独配置CSP策略（Swagger UI）
     if request.path == '/docs/':
         response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' data:;"
+    # 为主页单独配置CSP策略（Bootstrap + Font Awesome + jQuery）
+    elif request.path == '/':
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://code.jquery.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: https:;"
+    # 其他端点保持原有的严格CSP策略
     elif not request.path.startswith('/api/'):
         response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
     
@@ -391,9 +395,14 @@ def _log_response_info(response):
 ```
 
 **关键点**：
-- `/docs/`端点需要加载CDN资源（https://cdn.jsdelivr.net）
-- CSP策略必须明确允许CDN域名
+- `/docs/`端点需要加载Swagger UI的CDN资源（https://cdn.jsdelivr.net）
+- 主页（`/`）需要加载Bootstrap、Font Awesome和jQuery的CDN资源
+- CSP策略必须明确允许每个CDN域名
 - 其他端点保持原有的严格CSP策略
+
+**CDN域名列表**：
+- https://cdn.jsdelivr.net（Bootstrap、Font Awesome、Swagger UI）
+- https://code.jquery.com（jQuery）
 
 ### 2.1 统一异常体系
 
