@@ -14149,149 +14149,177 @@ pytest tests/test_security_fixes.py::TestAPIInputValidation -v
 
 
 
-## 2.15 企业级运维标准（v3.8.71 新增）
+## 2.15 代码集成与中间件规范（v3.8.71 修订）
 
-### 2.15.1 健康检查端点规范
+### 2.15.1 代码插入位置规范
 
-#### 端点定义
+#### ❌ 禁止：在 `if args.web:` 块外插入Flask路由
 ```python
-# /health - 完整健康状态检查
-GET /health
+if args.web:
+    @app.route('/')      # ✅ 正确：在块内
+    def index():
+        ...
 
-响应格式:
-{
-    "status": "healthy | degraded | unhealthy",
-    "timestamp": "2026-07-19T14:30:00",
-    "version": "3.8.71",
-    "checks": {
-        "cpu": {"status": "healthy", "usage_percent": 45.2},
-        "memory": {"status": "healthy", "percent": 62.5},
-        "disk": {"status": "warning", "percent": 88.3}
-    }
-}
+# ❌ 错误：在块外插入中间件
+@app.before_request      # 缩进错误！
+def log_request():
+    ...
+```
 
-HTTP状态码:
-- 200: healthy 或 degraded
-- 503: unhealthy
+#### ✅ 正确：所有Flask路由和中间件必须在 `if args.web:` 块内
+```python
+if args.web:
+    # 中间件（8空格缩进）
+    @app.before_request
+    def _log_request_info():
+        g.start_time = time.time()
+        ...
+
+    @app.after_request
+    def _log_response_info(response):
+        if hasattr(g, 'start_time'):
+            duration = (time.time() - g.start_time) * 1000
+            response.headers['X-Response-Time'] = f'{duration:.2f}ms'
+        return response
+
+    # 路由（8空格缩进）
+    @app.route('/')
+    def index():
+        ...
+else:
+    main()
+```
+
+### 2.15.2 `time` 模块调用规范
+
+#### ❌ 禁止：将 `time` 模块当作函数调用
+```python
+g.start_time = time()           # ❌ TypeError: 'module' object is not callable
+duration = time() - g.start_time  # ❌ 同上
+```
+
+#### ✅ 正确：使用 `time.time()` 获取时间戳
+```python
+g.start_time = time.time()              # ✅
+duration = (time.time() - g.start_time)  # ✅
+```
+
+### 2.15.3 Pydantic fallback 规范
+
+#### 当Pydantic未安装时的兼容性处理
+```python
+try:
+    from pydantic import BaseModel, Field, validator, ValidationError
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+
+    # ✅ 正确：提供空实现，不破坏类定义
+    class BaseModel:
+        pass
+
+    class Field:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class validator:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __call__(self, f):    # ✅ 用__call__实现装饰器
+            return f
+
+    class ValidationError(Exception):
+        pass
+```
+
+### 2.15.4 Flask `g` 对象使用规范
+
+#### 必须确保导入
+```python
+# ✅ 正确：在flask import中包含g
+from flask import Flask, request, jsonify, send_file, send_from_directory, Response, g
 ```
 
 #### 使用场景
 ```python
-# 负载均衡器健康检查
-# Kubernetes liveness/readiness probes
-# 监控系统定时探测
+@app.before_request
+def _log_request_info():
+    g.start_time = time.time()    # 存储请求开始时间
+
+@app.after_request
+def _log_response_info(response):
+    if hasattr(g, 'start_time'):  # 安全检查
+        duration = (time.time() - g.start_time) * 1000
+        response.headers['X-Response-Time'] = f'{duration:.2f}ms'
+    return response
 ```
 
-### 2.15.2 Prometheus指标集成
+### 2.15.5 速率限制器使用规范
 
-#### 必需指标
+#### 装饰器用法
 ```python
-from prometheus_client import Counter, Histogram, Gauge
+# 全局实例
+api_rate_limiter = RateLimiter(max_requests=200, window_seconds=60)
 
-# 请求计数器
-REQUEST_COUNT = Counter(
-    'flask_requests_total',
-    '请求总数',
-    ['method', 'endpoint', 'http_status']
-)
-
-# 延迟直方图
-REQUEST_LATENCY = Histogram(
-    'flask_request_duration_seconds',
-    '请求延迟',
-    buckets=(0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 10.0)
-)
-
-# 活跃任务数
-ACTIVE_TASKS_GAUGE = Gauge('flask_active_tasks', '活跃任务数')
+# 在路由上使用
+@app.route('/api/run', methods=['POST'])
+@rate_limit(api_rate_limiter, '/run')   # 限制器在路由装饰器之后
+def run_command():
+    ...
 ```
 
-### 2.15.3 Pydantic验证模型示例
+### 2.15.6 文件缓存使用规范
 
+#### 读取缓存
 ```python
-from pydantic import BaseModel, Field, validator
+# ✅ 使用缓存读取JSON（减少IO）
+data = json_cache.read_json(file_path, default={'logs': []})
 
-class RunCommandRequest(BaseModel):
-    """命令执行请求"""
-    command: str = Field(..., min_length=1, max_length=10000)
-    
-    @validator('command')
-    def validate_command_safe(cls, v):
-        dangerous = ['rm -rf /', 'mkfs', 'shutdown']
-        for pattern in dangerous:
-            if pattern.lower() in v.lower():
-                raise ValueError(f"危险命令: {pattern}")
-        return v.strip()
-
-# 使用方式
-data, error = validate_request(RunCommandRequest, request_data)
-if error:
-    return jsonify({'error': error}), 400
+# ✅ 写入后手动失效
+safe_write_json(file_path, new_data)
+json_cache.invalidate(file_path)
 ```
 
-### 2.15.4 环境配置管理
-
-#### 配置文件结构
-```json
-// config/production.json
-{
-    "environment": "production",
-    "rate_limiting": {
-        "api_endpoints": {
-            "max_requests_per_minute": 200,
-            "window_seconds": 60,
-            "enabled": true
-        }
-    },
-    "caching": {
-        "json_files": {
-            "ttl_seconds": 30,
-            "monitoring": {
-                "log_cache_hits": true,
-                "report_interval_seconds": 300
-            }
-        }
-    },
-    "monitoring": {
-        "prometheus_enabled": true,
-        "metrics_endpoint": "/metrics"
-    }
-}
+#### 监控缓存状态
+```python
+stats = json_cache.get_stats()
+# {'cached_files': 5, 'files': ['/path/to/file1.json', ...]}
 ```
 
-#### 部署流程
-```bash
-# Staging环境部署（包含测试）
-./deploy.sh staging
+### 2.15.7 异常处理可观测性规范
 
-# Production环境部署（跳过测试）
-./deploy.sh production
-
-# 回滚到上一版本
-./deploy.sh rollback
+#### 模块级logger定义
+```python
+# 在文件顶部import区域
+import logging
+_module_logger = logging.getLogger(__name__)
 ```
 
-### 2.15.5 性能测试基准
+#### 静默异常记录
+```python
+# ✅ 正确：记录但不中断
+try:
+    risky_operation()
+except Exception as e:
+    _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+    pass
 
-#### 压力测试命令
-```bash
-# 基础测试：100并发，1000请求
-python tests/stress_test.py --target http://localhost:5000 --concurrent 100 --requests 1000
-
-# 高负载测试：500并发，10000请求
-python tests/stress_test.py --target http://localhost:5000 --concurrent 500 --requests 10000
-
-# 测试特定端点
-python tests/stress_test.py --target http://localhost:5000 --endpoint /health --method GET --requests 1000
+# ❌ 错误：在函数内部import logging
+except Exception as e:
+    import logging                                          # ❌ 性能差
+    logging.getLogger(__name__).debug(f'异常: {e}')         # ❌ 每次创建logger
+    pass
 ```
 
-#### 性能目标
-| 指标 | Staging | Production |
-|------|---------|------------|
-| 平均响应时间 | <200ms | <100ms |
-| P99延迟 | <1000ms | <500ms |
-| 成功率 | >95% | >99% |
-| QPS支持 | >100 | >500 |
+### 2.15.8 代码提交前检查清单
 
----
-
+1. ✅ `py_compile.compile('main.py', doraise=True)` 语法检查通过
+2. ✅ `python main.py --web` 启动无报错
+3. ✅ 首页 `/` 返回200
+4. ✅ `/api/version` 返回正确版本号
+5. ✅ 所有新增代码缩进与现有代码一致
+6. ✅ Flask路由和中间件在 `if args.web:` 块内
+7. ✅ `time()` 调用全部为 `time.time()`
+8. ✅ Flask `g` 对象已在import中
+9. ✅ Pydantic fallback类不会抛出TypeError
+10. ✅ README.md更新日志使用中文
