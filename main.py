@@ -1828,6 +1828,72 @@ class RateLimiter:
 api_rate_limiter = RateLimiter(max_requests=200, window_seconds=60)  # 每分钟200次
 upload_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)  # 上传限流更严格
 
+# ============================================================
+# Pydantic 输入验证模型 (v3.8.71)
+# ============================================================
+try:
+    from pydantic import BaseModel, Field, validator, ValidationError
+    from typing import Optional, List
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+    print("⚠️ Pydantic未安装，将使用基础验证。安装命令: pip install pydantic")
+
+
+class RunCommandRequest(BaseModel):
+    """运行命令请求验证模型"""
+    command: str = Field(..., min_length=1, max_length=10000, 
+                        description="要执行的命令")
+    
+    @validator('command')
+    def validate_command_safe(cls, v):
+        """验证命令安全性"""
+        dangerous_patterns = ['rm -rf /', 'mkfs', 'shutdown', 'reboot', 
+                            'format', 'del /f /q C:\\']
+        for pattern in dangerous_patterns:
+            if pattern.lower() in v.lower():
+                raise ValueError(f"检测到危险命令模式: {pattern}")
+        return v.strip()
+
+
+class TaskInputRequest(BaseModel):
+    """任务输入请求验证模型"""
+    task_id: str = Field(..., min_length=1, max_length=50,
+                        description="任务ID")
+    user_input: str = Field("", max_length=10000,
+                           description="用户输入内容")
+
+
+class KillTaskRequest(BaseModel):
+    """终止任务请求验证模型"""
+    task_id: str = Field(..., min_length=1, max_length=50)
+
+
+class SKUCompareRequest(BaseModel):
+    """SKU对比请求验证模型"""
+    skus: Optional[str] = Field(None, max_length=50000,
+                               description="SKU列表，支持空格/逗号/换行分隔")
+
+
+def validate_request(model_class, data):
+    """通用请求验证函数"""
+    if not PYDANTIC_AVAILABLE:
+        # 回退到基础验证
+        if not data:
+            return None, "请求体不能为空"
+        return data, None
+    
+    try:
+        validated_data = model_class(**data)
+        return validated_data.dict(), None
+    except ValidationError as e:
+        error_msg = "; ".join([f"{err['loc'][0]}: {err['msg']}" for err in e.errors()])
+        return None, f"输入验证失败: {error_msg}"
+
+
+
+
+
 def rate_limit(limiter, endpoint_name='API'):
     """速率限制装饰器"""
     def decorator(f):

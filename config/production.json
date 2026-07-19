@@ -1,0 +1,39 @@
+{
+  "version": "3.8.71",
+  "environment": "production",
+  "rate_limiting": {
+    "api_endpoints": {
+      "max_requests_per_minute": 200,
+      "window_seconds": 60,
+      "enabled": true
+    },
+    "upload_endpoints": {
+      "max_requests_per_minute": 10,
+      "window_seconds": 60,
+      "enabled": true
+    }
+  },
+  "caching": {
+    "json_files": {
+      "ttl_seconds": 30,
+      "max_cache_size_mb": 100,
+      "enabled": true,
+      "monitoring": {
+        "log_cache_hits": true,
+        "log_cache_misses": true
+      }
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/app.log"
+  },
+  "health_check": {
+    "cpu_warning_threshold_percent": 80,
+    "memory_warning_threshold_percent": 80
+  },
+  "monitoring": {
+    "prometheus_enabled": true,
+    "metrics_endpoint": "/metrics"
+  }
+}
