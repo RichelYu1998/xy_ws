@@ -1,36 +1,38 @@
-﻿import json
-import time
+﻿# 标准库
+import argparse
 import asyncio
-import os
-import re
-import platform
-import sys
-import shutil
-import subprocess
-import threading
-import uuid
-import logging
 import base64
+import ctypes
 import glob
 import gzip
-import traceback
-import select
-import argparse
-import socket
-import smtplib
 import io
+import json
+import logging
+import os
+import platform
 import random
-import ctypes
+import re
+import select
+import shutil
+import smtplib
+import socket
+import subprocess
+import sys
+import threading
+import time
+import traceback
 import urllib.request
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
-from functools import wraps
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
+from email.header import Header
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from functools import wraps
 from pathlib import Path
 from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
 
+# 第三方库
 try:
     import pandas as pd
 except ImportError:
@@ -46,9 +48,53 @@ try:
 except ImportError:
     openpyxl = None
 
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+try:
+    from flask import Flask, request, jsonify, send_file, send_from_directory, Response, g
+except ImportError:
+    Flask = None
+
+try:
+    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+except ImportError:
+    Counter = Histogram = Gauge = None
+
+try:
+    from flask_restx import Api, Resource, Namespace
+except ImportError:
+    Api = Resource = Namespace = None
+
+try:
+    from pydantic import BaseModel, Field, ValidationError, field_validator
+except ImportError:
+    try:
+        from pydantic import BaseModel, Field, ValidationError
+        try:
+            from pydantic import field_validator
+        except ImportError:
+            from pydantic import validator as field_validator
+    except ImportError:
+        BaseModel = Field = ValidationError = field_validator = None
+
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 配置 Playwright CDN 加速（如 run.sh 已设置则使用其值）
+TIMEOUT_CONFIG = {
+    'socket_connect': int(os.environ.get('TIMEOUT_SOCKET_CONNECT', '5')),
+    'socket_read': int(os.environ.get('TIMEOUT_SOCKET_READ', '10')),
+    'http_request': int(os.environ.get('TIMEOUT_HTTP_REQUEST', '30')),
+    'subprocess_kill': int(os.environ.get('TIMEOUT_SUBPROCESS_KILL', '3')),
+    'subprocess_wait': int(os.environ.get('TIMEOUT_SUBPROCESS_WAIT', '10')),
+    'browser_page_load': int(os.environ.get('TIMEOUT_BROWSER_PAGE_LOAD', '60')),
+    'browser_element': int(os.environ.get('TIMEOUT_BROWSER_ELEMENT', '30')),
+    'tunnel_startup': int(os.environ.get('TIMEOUT_TUNNEL_STARTUP', '15')),
+    'tunnel_heartbeat': int(os.environ.get('TIMEOUT_TUNNEL_HEARTBEAT', '300')),
+    'email_send': int(os.environ.get('TIMEOUT_EMAIL_SEND', '30')),
+    'file_operation': int(os.environ.get('TIMEOUT_FILE_OPERATION', '10')),
+}
 
 if not hasattr(subprocess, 'CREATE_NO_WINDOW'):
     subprocess.CREATE_NO_WINDOW = 0x08000000 if platform.system() == 'Windows' else 0
@@ -206,6 +252,8 @@ class ExceptionHandler:
         self._error_counts = {}
         self._error_history = []
         self._max_history = 100
+        self._suppressed_errors = {}
+        self._suppression_window = 60
     
     def _setup_logger(self):
         """设置日志记录器"""
@@ -276,6 +324,52 @@ class ExceptionHandler:
     def get_error_history(self, limit: int = 10) -> List[dict]:
         """获取错误历史"""
         return self._error_history[-limit:]
+    
+    def retry_on_exception(self, func: Callable, max_retries: int = 3, delay: float = 1.0, context: str = '') -> Any:
+        """带重试的异常处理"""
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                return func()
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    time.sleep(delay * (attempt + 1))
+        if last_error:
+            self.handle(last_error, context)
+        raise last_error
+    
+    def suppress_duplicate_errors(self, error_key: str, window_seconds: int = None) -> bool:
+        """抑制重复错误日志（避免日志爆炸）"""
+        if window_seconds is None:
+            window_seconds = self._suppression_window
+        
+        current_time = time.time()
+        if error_key in self._suppressed_errors:
+            last_time = self._suppressed_errors[error_key]
+            if current_time - last_time < window_seconds:
+                return True
+        
+        self._suppressed_errors[error_key] = current_time
+        return False
+    
+    def get_category_stats(self) -> dict:
+        """获取按类别分组的错误统计"""
+        category_counts = {}
+        for record in self._error_history:
+            error_type = record.get('type', 'Unknown')
+            category_counts[error_type] = category_counts.get(error_type, 0) + 1
+        return category_counts
+    
+    def clear_old_suppressions(self, max_age: int = 300):
+        """清理过期的错误抑制记录"""
+        current_time = time.time()
+        keys_to_remove = [
+            key for key, timestamp in self._suppressed_errors.items()
+            if current_time - timestamp > max_age
+        ]
+        for key in keys_to_remove:
+            del self._suppressed_errors[key]
 
 
 class ExceptionContext:
@@ -487,26 +581,10 @@ def excel_handler(operation: str = '操作'):
         return wrapper
     return decorator
 
-
-from flask import Flask, request, jsonify, send_file, send_from_directory, Response, g
-
-try:
-    import psutil
-    PSUTIL_AVAILABLE = True
-except ImportError:
-    PSUTIL_AVAILABLE = False
-
-try:
-    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
-    PROMETHEUS_AVAILABLE = True
-except ImportError:
-    PROMETHEUS_AVAILABLE = False
-
-try:
-    from flask_restx import Api, Resource, Namespace
-    FLASK_RESTX_AVAILABLE = True
-except ImportError:
-    FLASK_RESTX_AVAILABLE = False
+PSUTIL_AVAILABLE = psutil is not None
+PROMETHEUS_AVAILABLE = Counter is not None
+FLASK_RESTX_AVAILABLE = Api is not None
+PYDANTIC_AVAILABLE = BaseModel is not None
 
 if pd is None:
     print("警告: pandas未安装，Excel对比功能将不可用")
@@ -518,7 +596,6 @@ if async_playwright is None:
 if openpyxl is None:
     print("警告: openpyxl未安装，Excel功能将不可用")
 
-# 文件写入锁，防止多线程同时写入同一文件
 file_write_lock = threading.Lock()
 
 # Web日志文件路径
@@ -1575,8 +1652,10 @@ class Environment:
         }
     
     @staticmethod
-    def test_pip_mirror(mirror_url, timeout=3):
+    def test_pip_mirror(mirror_url, timeout=None):
         """测试pip镜像源速度"""
+        if timeout is None:
+            timeout = TIMEOUT_CONFIG['http_request']
         try:
             start_time = time.time()
             urllib.request.urlopen(mirror_url, timeout=timeout)
@@ -1612,9 +1691,9 @@ class Environment:
         """跨系统终止进程"""
         try:
             if Environment.IS_WINDOWS:
-                subprocess.run(f'taskkill /F /IM {process_name}', shell=True, capture_output=True, timeout=10)
+                subprocess.run(f'taskkill /F /IM {process_name}', shell=True, capture_output=True, timeout=TIMEOUT_CONFIG['subprocess_wait'])
             else:
-                subprocess.run(f'pkill -f "{process_name}"', shell=True, capture_output=True, timeout=10)
+                subprocess.run(f'pkill -f "{process_name}"', shell=True, capture_output=True, timeout=TIMEOUT_CONFIG['subprocess_wait'])
         except (subprocess.SubprocessError, OSError, FileNotFoundError) as e:
             print(f"⚠️ 终止进程失败: {e}")
     
@@ -1837,42 +1916,32 @@ upload_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
 # ============================================================
 # Pydantic输入验证 (v3.8.71)
 # ============================================================
-try:
-    from pydantic import BaseModel, Field, ValidationError
-    try:
-        from pydantic import field_validator
-    except ImportError:
-        from pydantic import validator as field_validator
-    PYDANTIC_AVAILABLE = True
-except ImportError:
-    PYDANTIC_AVAILABLE = False
-
-    class BaseModel:
-        pass
-
-    class Field:
-        def __init__(self, *args, **kwargs):
-            pass
-
-    class field_validator:
-        def __init__(self, *args, **kwargs):
-            pass
-        def __call__(self, f):
-            return f
-    validator = field_validator
-
-    class ValidationError(Exception):
-        pass
-
-
 class RunCommandRequest(BaseModel):
     command: str = Field(..., min_length=1, max_length=10000)
 
     @field_validator('command')
     def validate_command_safe(cls, v):
-        dangerous = ['rm -rf /', 'mkfs', 'shutdown', 'reboot', 'format', 'del /f /q C:\\']
+        dangerous = [
+            'rm -rf /', 'rm -rf /*', 'rm -rf ~', 'rm -rf *',
+            'mkfs', 'shutdown', 'reboot', 'halt', 'poweroff',
+            'format', 'del /f /q C:\\', 'del /f /s /q',
+            'dd if=', 'dd of=/dev/sd', 'dd of=/dev/hd',
+            '> /dev/sd', '> /dev/hd',
+            'chmod -R 777 /', 'chown -R',
+            ':(){ :|:& };:', 'fork bomb',
+            'wget http', 'curl http', 'chmod +x',
+            'nc -l', 'nc -e', 'bash -i', 'sh -i',
+            'python -c', 'perl -e', 'ruby -e',
+            'eval ', 'exec ', 'source /dev/tcp',
+            'crontab -r', 'systemctl stop', 'systemctl disable',
+            'iptables -F', 'ufw disable',
+            'userdel', 'usermod -L', 'passwd -d',
+            'netsh advfirewall set allprofiles state off',
+            'reg delete', 'reg add',
+        ]
+        v_lower = v.lower()
         for p in dangerous:
-            if p.lower() in v.lower():
+            if p.lower() in v_lower:
                 raise ValueError(f'检测到危险命令: {p}')
         return v.strip()
 
@@ -1974,67 +2043,57 @@ _tasks_lock = threading.Lock()
 
 def run_command_background(task_id, command):
     try:
-        tasks[task_id]['status'] = 'running'
+        with _tasks_lock:
+            tasks[task_id]['status'] = 'running'
         
-        # 设置环境变量，确保使用UTF-8编码
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
         
-        # Windows上使用不同的参数
         if Environment.IS_WINDOWS:
-            # Windows需要使用shell=True来处理路径
-            # 注意：使用 stdin=DEVNULL 避免 input() 调用导致 Input/output error
             process = subprocess.Popen(
                 command,
                 shell=True,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,  # 合并stderr到stdout
+                stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,
                 cwd=PROJECT_DIR,
                 text=True,
                 encoding='utf-8',
                 errors='replace',
-                bufsize=1,  # 行缓冲
-                env=env  # 设置环境变量
+                bufsize=1,
+                env=env
             )
         else:
-            # Mac/Linux使用更安全的参数
-            # 注意：使用 stdin=DEVNULL 避免 input() 调用导致 Input/output error
             process = subprocess.Popen(
                 command,
                 shell=True,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,  # 合并stderr到stdout
+                stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,
                 cwd=PROJECT_DIR,
                 text=True,
-                bufsize=1,  # 行缓冲
-                env=env  # 设置环境变量
+                bufsize=1,
+                env=env
             )
         
-        processes[task_id] = process
+        with _processes_lock:
+            processes[task_id] = process
         
         stdout_lines = []
-        # 使用非阻塞读取
         while True:
-            # 检查进程是否结束
             if process.poll() is not None:
-                # 读取剩余输出
                 remaining = process.stdout.read()
                 if remaining:
                     stdout_lines.append(remaining)
                 break
             
-            # 读取可用输出
             try:
                 if Environment.IS_WINDOWS:
-                    # Windows不支持select，使用超时读取
                     time.sleep(0.1)
                     line = process.stdout.readline()
                     if line:
                         stdout_lines.append(line)
                 else:
-                    # Mac/Linux使用select
                     readable, _, _ = select.select([process.stdout], [], [], 0.1)
                     if readable:
                         line = process.stdout.readline()
@@ -2043,17 +2102,19 @@ def run_command_background(task_id, command):
             except Exception as e:
                 handle_exception(e, 'run_command_background读取输出')
             
-            # 更新输出
-            tasks[task_id]['output'] = ''.join(stdout_lines)
+            with _tasks_lock:
+                tasks[task_id]['output'] = ''.join(stdout_lines)
         
         process.wait()
-        tasks[task_id]['returncode'] = process.returncode
-        tasks[task_id]['output'] = ''.join(stdout_lines)
-        tasks[task_id]['status'] = 'completed'
+        with _tasks_lock:
+            tasks[task_id]['returncode'] = process.returncode
+            tasks[task_id]['output'] = ''.join(stdout_lines)
+            tasks[task_id]['status'] = 'completed'
     except Exception as e:
         handle_exception(e, 'run_command_background')
-        tasks[task_id]['error'] = str(e)
-        tasks[task_id]['status'] = 'error'
+        with _tasks_lock:
+            tasks[task_id]['error'] = str(e)
+            tasks[task_id]['status'] = 'error'
 
 
 class PathManager:
@@ -2323,7 +2384,7 @@ class PathManager:
     _cache_expiry_seconds = 60
     
     @staticmethod
-    def _validate_url_accessibility(url, timeout=5, max_retries=2):
+    def _validate_url_accessibility(url, timeout=None, max_retries=2):
         """验证URL是否可访问（增强版）
         
         改进点：
@@ -2332,6 +2393,8 @@ class PathManager:
         3. 缓存机制避免频繁验证
         4. 更详细的错误分类
         """
+        if timeout is None:
+            timeout = TIMEOUT_CONFIG['http_request']
         
         current_time = time.time()
         cache_key = url
@@ -2444,6 +2507,7 @@ class PathManager:
     @staticmethod
     def _validate_with_tcp(url, timeout):
         """使用TCP连接验证（最底层）"""
+        sock = None
         try:
             parsed = urllib.parse.urlparse(url)
             hostname = parsed.hostname
@@ -2453,7 +2517,6 @@ class PathManager:
             sock.settimeout(timeout)
             
             result = sock.connect_ex((hostname, port))
-            sock.close()
             
             if result == 0:
                 return (True, None)
@@ -2466,6 +2529,12 @@ class PathManager:
             return (False, "TCP连接超时")
         except Exception as e:
             return (False, str(e)[:80])
+        finally:
+            if sock:
+                try:
+                    sock.close()
+                except Exception as e:
+                    _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
     
     @staticmethod
     def _sync_url_to_tunnel_file(url):
@@ -5781,6 +5850,14 @@ if __name__ == '__main__':
                     REQUEST_COUNT.labels(request.method, request.endpoint or request.path, response.status_code).inc()
                 except Exception:
                     pass
+            
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+            response.headers['X-Frame-Options'] = 'DENY'
+            response.headers['X-XSS-Protection'] = '1; mode=block'
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+            if not request.path.startswith('/api/'):
+                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
+            
             return response
 
         @app.errorhandler(429)
@@ -5797,7 +5874,7 @@ if __name__ == '__main__':
         def health_check():
             health_data = {
                 'status': 'healthy',
-                'version': '3.8.71',
+                'version': '3.8.73',
                 'timestamp': datetime.now().isoformat(),
             }
             status_code = 200
@@ -5854,7 +5931,7 @@ if __name__ == '__main__':
         def swagger_spec():
             spec = {
                 'openapi': '3.0.0',
-                'info': {'title': 'Szwego商品爬虫API', 'version': '3.8.71', 'description': 'Szwego商品爬虫Web服务API文档'},
+                'info': {'title': 'Szwego商品爬虫API', 'version': '3.8.73', 'description': 'Szwego商品爬虫Web服务API文档'},
                 'servers': [{'url': '/api'}],
                 'paths': {
                     '/version': {'get': {'summary': '获取版本信息', 'tags': ['系统'], 'responses': {'200': {'description': '版本信息'}}}},
@@ -5971,7 +6048,8 @@ if __name__ == '__main__':
                 command = command.replace('python3 ', VENV_PYTHON + ' ', 1)
             
             task_id = str(uuid.uuid4())[:8]
-            tasks[task_id] = {'command': command, 'status': 'starting', 'output': '', 'returncode': None, 'error': None}
+            with _tasks_lock:
+                tasks[task_id] = {'command': command, 'status': 'starting', 'output': '', 'returncode': None, 'error': None}
             thread = threading.Thread(target=run_command_background, args=(task_id, command))
             thread.start()
             return jsonify({'success': True, 'task_id': task_id, 'message': f'命令已启动 (系统: {Environment.SYSTEM})'})
@@ -5980,10 +6058,11 @@ if __name__ == '__main__':
         def send_input():
             data = request.get_json()
             task_id, user_input = data.get('task_id', ''), data.get('input', '')
-            if task_id not in processes:
-                return jsonify({'error': '没有正在运行的进程'}), 404
-            try:
+            with _processes_lock:
+                if task_id not in processes:
+                    return jsonify({'error': '没有正在运行的进程'}), 404
                 process = processes[task_id]
+            try:
                 process.stdin.write(user_input + '\n')
                 process.stdin.flush()
                 return jsonify({'success': True, 'message': '输入已发送'})
@@ -5994,32 +6073,36 @@ if __name__ == '__main__':
         def kill_task():
             data = request.get_json()
             task_id = data.get('task_id', '')
-            if task_id not in processes:
-                return jsonify({'success': True, 'message': '进程已结束'})
-            try:
+            with _processes_lock:
+                if task_id not in processes:
+                    return jsonify({'success': True, 'message': '进程已结束'})
                 process = processes[task_id]
+            try:
                 try:
                     process.terminate()
                     try:
-                        process.wait(timeout=3)
+                        process.wait(timeout=TIMEOUT_CONFIG['subprocess_kill'])
                     except subprocess.TimeoutExpired:
                         process.kill()
                 except Exception as e:
                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
                     pass
-                if task_id in tasks:
-                    tasks[task_id]['status'] = 'killed'
-                if task_id in processes:
-                    del processes[task_id]
+                with _tasks_lock:
+                    if task_id in tasks:
+                        tasks[task_id]['status'] = 'killed'
+                with _processes_lock:
+                    if task_id in processes:
+                        del processes[task_id]
                 return jsonify({'success': True, 'message': '进程已终止'})
             except Exception:
                 return jsonify({'success': True, 'message': '操作完成'})
 
         @app.route('/output/<task_id>', methods=['GET'])
         def get_output(task_id):
-            if task_id not in tasks:
-                return jsonify({'error': '任务不存在'}), 404
-            task = tasks[task_id]
+            with _tasks_lock:
+                if task_id not in tasks:
+                    return jsonify({'error': '任务不存在'}), 404
+                task = tasks[task_id]
             return jsonify({'status': task['status'], 'output': task.get('output', ''), 'returncode': task.get('returncode'), 'error': task.get('error')})
 
         @app.route('/api/cookie', methods=['GET'])
@@ -8919,14 +9002,21 @@ ingress:
         
         # 启动前获取一次局域网 IP 用于显示
         lan_ip_startup = None
+        s = None
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.settimeout(2)
             s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
             lan_ip_startup = s.getsockname()[0]
-            s.close()
         except Exception as e:
             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
             pass
+        finally:
+            if s:
+                try:
+                    s.close()
+                except Exception as e:
+                    _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
         
         print("=" * 50)
         print("Szwego商品爬虫 - Web服务")

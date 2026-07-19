@@ -4359,6 +4359,84 @@ def send_tunnel_notification(...):
 ```markdown
 ## 最新更新                                ← 标题1：API定位标记
 
+### v3.8.73 (2026-07-19) - 🚀 资源管理+超时配置化+异常处理增强
+
+#### 🎯 核心改进
+
+**1. 🔧 subprocess资源管理优化**
+- 所有subprocess.run添加timeout参数（使用TIMEOUT_CONFIG）
+- 进程终止使用terminate() + wait(timeout) + kill()三级清理
+- 添加进程状态检查和资源释放保障
+
+**2. ⏱️ 超时配置化（11种）**
+```python
+TIMEOUT_CONFIG = {
+    'socket_connect': 5,      # Socket连接超时
+    'socket_read': 10,        # Socket读取超时
+    'http_request': 30,       # HTTP请求超时
+    'subprocess_kill': 3,     # 进程终止超时
+    'subprocess_wait': 10,    # 进程等待超时
+    'browser_page_load': 60,  # 浏览器页面加载超时
+    'browser_element': 30,    # 浏览器元素等待超时
+    'tunnel_startup': 15,     # 隧道启动超时
+    'tunnel_heartbeat': 300,  # 隧道心跳超时
+    'email_send': 30,         # 邮件发送超时
+    'file_operation': 10,     # 文件操作超时
+}
+```
+
+**3. 🛡️ 增强异常处理器**
+- `retry_on_exception()`: 带重试的异常处理（指数退避）
+- `suppress_duplicate_errors()`: 抑制重复错误日志
+- `get_category_stats()`: 按类别分组错误统计
+- `clear_old_suppressions()`: 清理过期的错误抑制记录
+
+**4. 📦 导入规范化**
+- 所有导入统一移到文件开头
+- 删除重复导入（flask, prometheus_client, flask_restx, pydantic）
+- 添加psutil导入到顶部
+- 设置全局可用性标志（PSUTIL_AVAILABLE等）
+
+**修改文件**:
+- `main.py`: 添加TIMEOUT_CONFIG，增强ExceptionHandler，清理导入
+
+----
+
+### v3.8.72 (2026-07-19) - 🔒 安全增强+竞态修复+Socket泄漏修复
+
+#### 🎯 核心改进
+
+**1. 🔒 安全响应头增强**
+- `X-Content-Type-Options: nosniff` - 防止MIME类型嗅探
+- `X-Frame-Options: DENY` - 防止点击劫持
+- `X-XSS-Protection: 1; mode=block` - XSS保护
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` - 强制HTTPS
+- `Content-Security-Policy` - 内容安全策略（非API路由）
+
+**2. ⚠️ 危险命令检测增强（35种）**
+- 文件系统破坏: `rm -rf /*`, `dd if=`, `> /dev/sd`
+- 系统控制: `halt`, `poweroff`, `systemctl stop`
+- 网络攻击: `nc -l`, `bash -i`, `wget http`
+- 权限提升: `chmod -R 777 /`, `chown -R`
+- 注册表修改: `reg delete`, `reg add`
+- 防火墙关闭: `iptables -F`, `ufw disable`
+
+**3. 🔌 Socket泄漏修复**
+- `_validate_with_tcp()`: 添加try-finally确保socket.close()
+- 启动时获取LAN IP: 添加try-finally确保socket.close()
+
+**4. 🔒 竞态条件锁修复**
+- `run_command_background()`: 所有tasks/processes操作添加锁保护
+- `/run` 路由: 创建任务时加锁
+- `/input` 路由: 访问processes时加锁
+- `/kill` 路由: 终止进程时加锁
+- `/output` 路由: 读取任务状态时加锁
+
+**修改文件**:
+- `main.py`: 添加安全响应头，增强危险命令检测，修复socket泄漏，添加竞态锁
+
+----
+
 ### v3.8.54 (2026-07-18) - 🔧 Cloudflare 限流检测与友好提示
 
 - **🔧 Cloudflare 限流检测** - 识别 Quick Tunnel 的 429 错误（Too Many Requests）
