@@ -1,4 +1,4 @@
-﻿﻿﻿# 项目代码规范与范式 (Skill)
+﻿ ﻿﻿# 项目代码规范与范式 (Skill)
 
 > 本文档基于 xy_ws 项目提炼，可作为同类 Python + Flask + 原生JS 全栈项目的二开模版。
 
@@ -361,6 +361,39 @@ def send_tunnel_notification(self, tunnel_url, event_type='new'):
 **例外情况**：
 - 第三方库的try-except导入可以保留在原位置（Python最佳实践）
 - 原因：避免未安装时影响程序启动
+
+### 2.0.1 CSP策略配置（v3.8.73 新增）
+
+**问题背景**：
+v3.8.73添加的CSP（内容安全策略）阻止了/docs/端点加载CDN的Swagger UI资源。
+
+**修复方案**：
+为/docs/端点单独配置CSP策略，允许加载cdn.jsdelivr.net的脚本和样式。
+
+**代码示例**：
+```python
+@app.after_request
+def _log_response_info(response):
+    # ... 其他代码 ...
+    
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    
+    # 为/docs/端点单独配置CSP策略
+    if request.path == '/docs/':
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' data:;"
+    elif not request.path.startswith('/api/'):
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
+    
+    return response
+```
+
+**关键点**：
+- `/docs/`端点需要加载CDN资源（https://cdn.jsdelivr.net）
+- CSP策略必须明确允许CDN域名
+- 其他端点保持原有的严格CSP策略
 
 ### 2.1 统一异常体系
 

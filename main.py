@@ -5856,7 +5856,9 @@ if __name__ == '__main__':
             response.headers['X-Frame-Options'] = 'DENY'
             response.headers['X-XSS-Protection'] = '1; mode=block'
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-            if not request.path.startswith('/api/'):
+            if request.path == '/docs/':
+                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; font-src 'self' data:;"
+            elif not request.path.startswith('/api/'):
                 response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;"
             
             return response
