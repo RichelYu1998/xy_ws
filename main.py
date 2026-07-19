@@ -533,7 +533,12 @@ class TeeOutput:
                         try:
                             os.rename(log_file_path, backup_path)
                             print(f"[TeeOutput] ⚠️ 日志文件被锁定，已备份为: {backup_path}")
-                        except Exception:
+                        except Exception as e:
+
+                            import logging
+
+                            logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                             pass
                         _t.sleep(0.5 * (retry_count + 1))
                         return self._init_log_file(log_file_path, retry_count + 1)
@@ -645,7 +650,12 @@ def setup_web_logging():
                 content = f.read().strip()
             if content:
                 need_header = False
-        except Exception:
+        except Exception as e:
+
+            import logging
+
+            logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
             pass
     if need_header:
         safe_execute_func(
@@ -1463,7 +1473,12 @@ def get_version_from_readme():
         match = re.search(r'###\s+v(\d+\.\d+\.\d+)', content)
         if match:
             return match.group(1)
-    except Exception:
+    except Exception as e:
+
+        import logging
+
+        logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
         pass
     return "0.0.0"
 
@@ -1763,6 +1778,83 @@ def handle_api_exception(e):
 
 import threading
 
+
+# ============================================================
+# API Rate Limiting Middleware (v3.8.70)
+# ============================================================
+from functools import wraps
+from collections import defaultdict
+from time import time
+
+class RateLimiter:
+    """简单的IP级别速率限制器"""
+    
+    def __init__(self, max_requests=100, window_seconds=60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.requests = defaultdict(list)
+        self._lock = threading.Lock()
+    
+    def is_allowed(self, client_ip):
+        """检查是否允许请求"""
+        current_time = time()
+        
+        with self._lock:
+            # 清理过期记录
+            self.requests[client_ip] = [
+                req_time for req_time in self.requests[client_ip]
+                if current_time - req_time < self.window_seconds
+            ]
+            
+            # 检查是否超过限制
+            if len(self.requests[client_ip]) >= self.max_requests:
+                return False
+            
+            # 记录本次请求
+            self.requests[client_ip].append(current_time)
+            return True
+    
+    def get_retry_after(self, client_ip):
+        """获取重试等待时间（秒）"""
+        with self._lock:
+            if not self.requests[client_ip]:
+                return 0
+            
+            oldest_request = min(self.requests[client_ip])
+            wait_time = self.window_seconds - (time() - oldest_request)
+            return max(0, int(wait_time) + 1)
+
+# 全局速率限制器实例
+api_rate_limiter = RateLimiter(max_requests=200, window_seconds=60)  # 每分钟200次
+upload_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)  # 上传限流更严格
+
+def rate_limit(limiter, endpoint_name='API'):
+    """速率限制装饰器"""
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            client_ip = request.remote_addr or 'unknown'
+            
+            if not limiter.is_allowed(client_ip):
+                retry_after = limiter.get_retry_after(client_ip)
+                response = jsonify({
+                    'error': f'请求过于频繁，请稍后再试',
+                    'code': 'RATE_LIMIT_EXCEEDED',
+                    'retry_after': retry_after,
+                    'endpoint': endpoint_name,
+                    'limit': limiter.max_requests,
+                    'window': limiter.window_seconds
+                })
+                response.headers['Retry-After'] = str(retry_after)
+                response.headers['X-RateLimit-Limit'] = str(limiter.max_requests)
+                return response, 429  # Too Many Requests
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+
+
 processes = {}
 tasks = {}
 _processes_lock = threading.Lock()
@@ -1808,7 +1900,8 @@ def run_command_background(task_id, command):
                 env=env  # 设置环境变量
             )
         
-        processes[task_id] = process
+        with _processes_lock:
+            processes[task_id] = process
         
         stdout_lines = []
         # 使用非阻塞读取
@@ -1840,7 +1933,8 @@ def run_command_background(task_id, command):
                 handle_exception(e, 'run_command_background读取输出')
             
             # 更新输出
-            tasks[task_id]['output'] = ''.join(stdout_lines)
+            with _tasks_lock:
+                tasks[task_id]['output'] = ''.join(stdout_lines)
         
         process.wait()
         tasks[task_id]['returncode'] = process.returncode
@@ -1850,6 +1944,68 @@ def run_command_background(task_id, command):
         handle_exception(e, 'run_command_background')
         tasks[task_id]['error'] = str(e)
         tasks[task_id]['status'] = 'error'
+
+
+
+# ============================================================
+# File Cache Manager (v3.8.70)
+# ============================================================
+class FileCacheManager:
+    """JSON文件缓存管理器 - 减少重复IO操作"""
+    
+    def __init__(self, ttl_seconds=30):
+        self._cache = {}
+        self._ttl = ttl_seconds
+        self._lock = threading.Lock()
+    
+    def read_json(self, file_path, default=None):
+        """带缓存的JSON读取"""
+        if default is None:
+            default = {}
+        
+        current_time = time()
+        
+        with self._lock:
+            # 检查缓存是否有效
+            if file_path in self._cache:
+                cached_data, cache_time = self._cache[file_path]
+                
+                # 检查TTL和文件修改时间
+                if current_time - cache_time < self._ttl:
+                    if os.path.exists(file_path):
+                        file_mtime = os.path.getmtime(file_path)
+                        if file_mtime <= cache_time:
+                            return cached_data
+                
+                # 缓存过期或文件已更新，删除旧缓存
+                del self._cache[file_path]
+        
+        # 从磁盘读取
+        data = safe_read_json(file_path, default)
+        
+        with self._lock:
+            self._cache[file_path] = (data, current_time)
+        
+        return data
+    
+    def invalidate(self, file_path=None):
+        """清除缓存"""
+        with self._lock:
+            if file_path:
+                self._cache.pop(file_path, None)
+            else:
+                self._cache.clear()
+    
+    def get_stats(self):
+        """获取缓存统计信息"""
+        with self._lock:
+            return {
+                'cached_files': len(self._cache),
+                'files': list(self._cache.keys())
+            }
+
+# 全局缓存实例
+json_cache = FileCacheManager(ttl_seconds=30)  # 30秒缓存有效期
 
 
 class PathManager:
@@ -2471,7 +2627,12 @@ class PathManager:
             if s:
                 try:
                     s.close()
-                except Exception:
+                except Exception as e:
+
+                    import logging
+
+                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                     pass
 
     @staticmethod
@@ -3500,7 +3661,12 @@ class WegoScraper:
                 element_id = None
                 try:
                     element_id = await element.get_attribute('data-id')
-                except Exception:
+                except Exception as e:
+
+                    import logging
+
+                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                     pass
                 if not element_id:
                     try:
@@ -3509,12 +3675,22 @@ class WegoScraper:
                             href_match = re.search(r'/(\d+)(?:\?|$)', href)
                             if href_match:
                                 element_id = href_match.group(1)
-                    except Exception:
+                    except Exception as e:
+
+                        import logging
+
+                        logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                         pass
                 if not element_id:
                     try:
                         element_id = await element.get_attribute('data-goods-id')
-                    except Exception:
+                    except Exception as e:
+
+                        import logging
+
+                        logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                         pass
 
                 if not element_text or not element_text.strip():
@@ -3562,7 +3738,12 @@ class WegoScraper:
                                 print(f'  拿货价: {result["拿货价"]}')
                                 print(f'  货号: {result["货号"]}')
                                 print(f'  data-id: {elements_data[i][2]}\n')
-                except Exception:
+                except Exception as e:
+
+                    import logging
+
+                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                     pass
         
         # 第二轮：通过API获取缺失拿货价的商品
@@ -5140,7 +5321,12 @@ def update_cookie():
                         print('✓ 检测到登录成功，自动关闭浏览器...')
                         login_detected = True
                         break
-                except Exception:
+                except Exception as e:
+
+                    import logging
+
+                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                     pass
                 
                 await asyncio.sleep(5)
@@ -5425,7 +5611,12 @@ if __name__ == '__main__':
                             print('\n✓ 检测到登录成功！正在获取Cookie...')
                             login_detected = True
                             break
-                    except Exception:
+                    except Exception as e:
+
+                        import logging
+
+                        logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                         pass
                     await asyncio.sleep(3)
                     elapsed = int(time.time() - start_time)
@@ -5530,7 +5721,77 @@ if __name__ == '__main__':
         sys.exit(0)
     
     if args.web:
-        @app.route('/')
+        
+# ============================================================
+# Request Logging Middleware (v3.8.70)
+# ============================================================
+import logging
+
+request_logger = logging.getLogger('api_requests')
+request_logger.setLevel(logging.INFO)
+
+# 如果还没有handler，添加控制台handler
+if not request_logger.handlers:
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    ))
+    request_logger.addHandler(console_handler)
+
+@app.before_request
+def log_request_info():
+    """记录每个请求的基本信息"""
+    if request.path.startswith('/static') or request.path.startswith('/favicon'):
+        return
+    
+    request_logger.info(
+        f"[{request.method}] {request.path} | "
+        f"IP: {request.remote_addr} | "
+        f"User-Agent: {str(request.user_agent)[:50]}..."
+    )
+    
+    # 记录请求大小（对于POST/PUT）
+    if request.method in ['POST', 'PUT', 'PATCH']:
+        content_length = request.content_length or 0
+        if content_length > 1024 * 1024:  # > 1MB
+            request_logger.warning(
+                f"⚠️ 大请求体: {content_length / 1024:.1f}KB"
+            )
+
+@app.after_request
+def log_response_info(response):
+    """记录响应信息"""
+    if request.path.startswith('/static'):
+        return response
+    
+    # 只记录非成功响应的详细信息
+    if response.status_code >= 400:
+        request_logger.warning(
+            f"[{response.status_code}] {request.path} | "
+            f"Duration: {response.headers.get("X-Response-Time", "N/A")}"
+        )
+    
+    # 添加响应时间头（如果计算了）
+    if hasattr(g, 'start_time'):
+        duration = (time() - g.start_time) * 1000
+        response.headers['X-Response-Time'] = f'{duration:.2f}ms'
+    
+    return response
+
+@app.errorhandler(429)
+def rate_limit_exceeded(error):
+    """429错误自定义响应"""
+    return jsonify({
+        'error': '请求过于频繁，请稍后再试',
+        'code': 'RATE_LIMIT_EXCEEDED',
+        'retry_after': error.description.get('retry_after', 60),
+        'hint': '请降低请求频率或联系管理员提升限额'
+    }), 429
+
+
+
+@app.route('/')
         def index():
             current_version = get_version_from_readme()
             with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
@@ -5582,7 +5843,8 @@ if __name__ == '__main__':
                 response.headers['Cache-Control'] = 'public, max-age=86400'
                 return response
 
-        @app.route('/run', methods=['POST'])
+        @rate_limit(api_rate_limiter, '/run')
+    @app.route('/run', methods=['POST'])
         def run_command():
             data = request.get_json()
             if not data:
@@ -5602,7 +5864,8 @@ if __name__ == '__main__':
             thread.start()
             return jsonify({'success': True, 'task_id': task_id, 'message': f'命令已启动 (系统: {Environment.SYSTEM})'})
 
-        @app.route('/input', methods=['POST'])
+        @rate_limit(api_rate_limiter, '/input')
+    @app.route('/input', methods=['POST'])
         def send_input():
             data = request.get_json()
             if not data:
@@ -5618,7 +5881,8 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        @app.route('/kill', methods=['POST'])
+        @rate_limit(api_rate_limiter, '/kill')
+    @app.route('/kill', methods=['POST'])
         def kill_task():
             data = request.get_json()
             if not data:
@@ -5634,7 +5898,12 @@ if __name__ == '__main__':
                         process.wait(timeout=3)
                     except subprocess.TimeoutExpired:
                         process.kill()
-                except Exception:
+                except Exception as e:
+
+                    import logging
+
+                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                     pass
                 if task_id in tasks:
                     tasks[task_id]['status'] = 'killed'
@@ -5801,10 +6070,10 @@ if __name__ == '__main__':
                 removed_products = []
                 added_high_price = []
 
-                if os.path.exists(diff_log_file):
-                    try:
-                        with open(diff_log_file, 'r', encoding='utf-8') as f:
-                            diff_data = json.load(f)
+                # 使用缓存读取差异日志（减少IO）
+                diff_data = json_cache.read_json(diff_log_file, {'logs': []}) if os.path.exists(diff_log_file) else {'logs': []}
+                
+                if isinstance(diff_data, dict):
                         if isinstance(diff_data, dict) and diff_data.get('logs') and len(diff_data['logs']) > 0:
                             last_log = diff_data['logs'][-1]
                             added_products_all = last_log.get('added', [])
@@ -5823,7 +6092,12 @@ if __name__ == '__main__':
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
                                         added_high_price.append(sku)
-                                except Exception:
+                                except Exception as e:
+
+                                    import logging
+
+                                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                                     pass
                                 break
 
@@ -5983,10 +6257,10 @@ if __name__ == '__main__':
                 removed_products = []
                 added_high_price = []
                 
-                if os.path.exists(diff_log_file):
-                    try:
-                        with open(diff_log_file, 'r', encoding='utf-8') as f:
-                            diff_data = json.load(f)
+                # 使用缓存读取差异日志（减少IO）
+                diff_data = json_cache.read_json(diff_log_file, {'logs': []}) if os.path.exists(diff_log_file) else {'logs': []}
+                
+                if isinstance(diff_data, dict):
                         if isinstance(diff_data, dict) and diff_data.get('logs') and len(diff_data['logs']) > 0:
                             last_log = diff_data['logs'][-1]
                             added_products_all = last_log.get('added', [])
@@ -6007,7 +6281,12 @@ if __name__ == '__main__':
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
                                         added_high_price.append(sku)
-                                except Exception:
+                                except Exception as e:
+
+                                    import logging
+
+                                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                                     pass
                                 break
                 
@@ -6215,7 +6494,12 @@ if __name__ == '__main__':
                                                         elif 'Nov' in date_str:
                                                             record_date = record_date.replace(month=11)
                                                         record_date_str = record_date.strftime('%Y-%m-%d')
-                                                    except Exception:
+                                                    except Exception as e:
+
+                                                        import logging
+
+                                                        logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                                                         pass
                                                 if record_date_str is None:
                                                     continue
@@ -6253,13 +6537,23 @@ if __name__ == '__main__':
                 if start_date:
                     try:
                         all_records = [r for r in all_records if r['日期'] >= start_date]
-                    except Exception:
+                    except Exception as e:
+
+                        import logging
+
+                        logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                         pass
                 
                 if end_date:
                     try:
                         all_records = [r for r in all_records if r['日期'] <= end_date]
-                    except Exception:
+                    except Exception as e:
+
+                        import logging
+
+                        logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                         pass
                 
                 summary = {}
@@ -6298,7 +6592,12 @@ if __name__ == '__main__':
                                     converted = datetime(1899, 12, 30) + timedelta(days=int(cell_val))
                                     if converted.year >= 2000:
                                         row_data[col_idx] = converted.strftime('%Y-%m-%d')
-                                except Exception:
+                                except Exception as e:
+
+                                    import logging
+
+                                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                                     pass
                 
                 result = {
@@ -7051,7 +7350,12 @@ if __name__ == '__main__':
                             old_hostc_match = re.search(r'Public URL:\s*(https://[a-zA-Z0-9_-]+\.hostc\.dev)', content)
                             if old_hostc_match:
                                 result['hostc'] = old_hostc_match.group(1).rstrip('/')
-            except Exception:
+            except Exception as e:
+
+                import logging
+
+                logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                 pass
             return result
         
@@ -7387,7 +7691,12 @@ if __name__ == '__main__':
                         try:
                             with open(web_output_file, 'a', encoding='utf-8') as wf:
                                 wf.write(f"Public URL: {web_url}\n")
-                        except Exception:
+                        except Exception as e:
+
+                            import logging
+
+                            logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                             pass
                 time.sleep(heartbeat_interval)
         
@@ -7646,7 +7955,12 @@ if __name__ == '__main__':
                                         url_verified = False
                                         try:
                                             url_verified = verify_url(file_url, timeout=10, verbose=True)
-                                        except Exception:
+                                        except Exception as e:
+
+                                            import logging
+
+                                            logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                                             pass
                                         
                                         if url_verified:
@@ -7722,7 +8036,12 @@ if __name__ == '__main__':
                     except Exception:
                         try:
                             tunnel_process.kill()
-                        except Exception:
+                        except Exception as e:
+
+                            import logging
+
+                            logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                             pass
                 
                 saved_old_url = old_tunnel_url
@@ -7767,7 +8086,12 @@ if __name__ == '__main__':
                     if web_url:
                         try:
                             is_url_valid = verify_url(web_url)
-                        except Exception:
+                        except Exception as e:
+
+                            import logging
+
+                            logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                             pass
                     
                     if is_url_valid:
@@ -7906,7 +8230,12 @@ if __name__ == '__main__':
                         'tunnel_id': tunnel_id,
                         'config_yml_path': config_yml_path
                     }
-            except Exception:
+            except Exception as e:
+
+                import logging
+
+                logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                 pass
 
             return {'available': False, 'tunnel_name': '', 'custom_domain': '', 'tunnel_id': '', 'config_yml_path': ''}
@@ -7927,7 +8256,12 @@ if __name__ == '__main__':
                     if tunnel_id:
                         print(f"[Cloudflare] ✅ Named tunnel 已存在: {tunnel_name} (ID: {tunnel_id})")
                         return tunnel_id, config_yml_path
-                except Exception:
+                except Exception as e:
+
+                    import logging
+
+                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                     pass
 
             print(f"[Cloudflare] 🔧 首次使用 named tunnel，开始自动配置...")
@@ -8503,7 +8837,12 @@ ingress:
                 except Exception:
                     try:
                         tunnel_process.kill()
-                    except Exception:
+                    except Exception as e:
+
+                        import logging
+
+                        logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                         pass
             tunnel_process = None
             tunnel_url = None
@@ -8514,7 +8853,12 @@ ingress:
                 except Exception:
                     try:
                         cf_process.kill()
-                    except Exception:
+                    except Exception as e:
+
+                        import logging
+
+                        logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                         pass
             cf_process = None
             cf_url = None
@@ -8533,7 +8877,12 @@ ingress:
                 time.sleep(60)
                 try:
                     auto_clean_temp_dir()
-                except Exception:
+                except Exception as e:
+
+                    import logging
+
+                    logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
                     pass
         
         threading.Thread(target=temp_cleanup_loop, daemon=True).start()
@@ -8545,7 +8894,12 @@ ingress:
             s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
             lan_ip_startup = s.getsockname()[0]
             s.close()
-        except Exception:
+        except Exception as e:
+
+            import logging
+
+            logging.getLogger(__name__).debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+
             pass
         
         print("=" * 50)
