@@ -490,6 +490,24 @@ def excel_handler(operation: str = '操作'):
 
 from flask import Flask, request, jsonify, send_file, send_from_directory, Response, g
 
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+
+try:
+    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+
+try:
+    from flask_restx import Api, Resource, Namespace
+    FLASK_RESTX_AVAILABLE = True
+except ImportError:
+    FLASK_RESTX_AVAILABLE = False
+
 if pd is None:
     print("警告: pandas未安装，Excel对比功能将不可用")
 
@@ -1693,6 +1711,29 @@ def get_python_executable():
 VENV_PYTHON = get_python_executable()
 
 app = Flask(__name__, template_folder='.', static_folder=None)
+
+if PROMETHEUS_AVAILABLE:
+    REQUEST_COUNT = Counter('http_requests_total', '总请求数', ['method', 'endpoint', 'status'])
+    REQUEST_LATENCY = Histogram('http_request_duration_seconds', '请求延迟', ['method', 'endpoint'], buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0])
+    ACTIVE_TASKS_GAUGE = Gauge('active_tasks', '活跃任务数')
+else:
+    REQUEST_COUNT = None
+    REQUEST_LATENCY = None
+    ACTIVE_TASKS_GAUGE = None
+
+if FLASK_RESTX_AVAILABLE:
+    _api = Api(app, version='3.8.71', title='Szwego商品爬虫API', description='API文档', doc='/docs/', prefix='/api')
+    _ns_command = Namespace('command', description='命令管理')
+    _ns_task = Namespace('task', description='任务管理')
+    _ns_system = Namespace('system', description='系统管理')
+    _api.add_namespace(_ns_command, path='/api/command')
+    _api.add_namespace(_ns_task, path='/api/task')
+    _api.add_namespace(_ns_system, path='/api/system')
+else:
+    _api = None
+    _ns_command = None
+    _ns_task = None
+    _ns_system = None
 
 def get_daily_profit_report_from_excel(excel_file):
     """从Excel的'每日利润'sheet的A列中查找以'截止'开头的报表文本
@@ -5736,6 +5777,16 @@ if __name__ == '__main__':
             if hasattr(g, 'start_time'):
                 duration = (time.time() - g.start_time) * 1000
                 response.headers['X-Response-Time'] = f'{duration:.2f}ms'
+                if REQUEST_LATENCY is not None:
+                    try:
+                        REQUEST_LATENCY.labels(request.method, request.path).observe(time.time() - g.start_time)
+                    except Exception:
+                        pass
+            if REQUEST_COUNT is not None:
+                try:
+                    REQUEST_COUNT.labels(request.method, request.endpoint or request.path, response.status_code).inc()
+                except Exception:
+                    pass
             return response
 
         @app.errorhandler(429)
@@ -5746,6 +5797,64 @@ if __name__ == '__main__':
                 'retry_after': 60,
             }), 429
 
+
+
+        @app.route('/health')
+        def health_check():
+            health_data = {
+                'status': 'healthy',
+                'version': '3.8.71',
+                'timestamp': datetime.now().isoformat(),
+            }
+            status_code = 200
+            if PSUTIL_AVAILABLE:
+                try:
+                    cpu_percent = psutil.cpu_percent(interval=0.1)
+                    memory = psutil.virtual_memory()
+                    disk = psutil.disk_usage('/')
+                    health_data['cpu_percent'] = cpu_percent
+                    health_data['memory_percent'] = memory.percent
+                    health_data['memory_used_gb'] = round(memory.used / (1024**3), 2)
+                    health_data['memory_total_gb'] = round(memory.total / (1024**3), 2)
+                    health_data['disk_percent'] = disk.percent
+                    if cpu_percent > 90 or memory.percent > 90 or disk.percent > 95:
+                        health_data['status'] = 'degraded'
+                    if cpu_percent > 95 or memory.percent > 95:
+                        health_data['status'] = 'unhealthy'
+                        status_code = 503
+                except Exception as e:
+                    health_data['system_check_error'] = str(e)
+            else:
+                health_data['system_check'] = 'psutil未安装'
+            if json_cache is not None:
+                try:
+                    cache_stats = json_cache.get_stats()
+                    health_data['cache'] = cache_stats
+                except Exception:
+                    pass
+            health_data['active_tasks'] = len(tasks) if 'tasks' in dir() else 0
+            return jsonify(health_data), status_code
+
+        @app.route('/ready')
+        def readiness_check():
+            try:
+                return jsonify({'ready': True, 'timestamp': datetime.now().isoformat()}), 200
+            except Exception:
+                return jsonify({'ready': False}), 503
+
+        @app.route('/metrics')
+        def metrics_endpoint():
+            if not PROMETHEUS_AVAILABLE:
+                return jsonify({'error': 'prometheus_client未安装', 'hint': 'pip install prometheus_client'}), 404
+            try:
+                if ACTIVE_TASKS_GAUGE is not None:
+                    try:
+                        ACTIVE_TASKS_GAUGE.set(len(tasks) if 'tasks' in dir() else 0)
+                    except Exception:
+                        pass
+                return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
 
         @app.route('/')
         def index():

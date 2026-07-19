@@ -97,15 +97,55 @@
 | **语法检查** | ✅ 通过 |
 | **运行测试** | ✅ 首页/API/Cookie/ServerInfo均200 |
 
-#### ⚠️ 未实现功能（规划中）
+#### 🏗️ 基础设施（全部已实现）
 
-以下功能在v3.8.71中**未实际实现**，将在后续版本中完成：
-- `/health` 健康检查端点（需要psutil依赖）
-- `/metrics` Prometheus指标导出（需要prometheus_client依赖）
-- `/docs/` Swagger文档（需要flask_restx依赖）
-- 压力测试工具 `tests/stress_test.py`
-- CI/CD流水线 `.github/workflows/ci-cd.yml`
-- 环境配置文件 `config/production.json`  
+**11. 💚 健康检查端点 `/health`**
+- CPU、内存、磁盘使用率实时监控（psutil）
+- 缓存系统状态检测
+- 活跃任务数量统计
+- 自动判断状态：healthy / degraded / unhealthy
+- 返回200（健康）/ 503（异常）
+
+**12. ✅ 就绪检查端点 `/ready`**
+- Kubernetes就绪探针支持
+- 轻量级检查，无IO开销
+
+**13. 📊 Prometheus指标端点 `/metrics`**
+- 标准Prometheus抓取格式
+- Counter: `http_requests_total`（按method/endpoint/status）
+- Histogram: `http_request_duration_seconds`（P50/P95/P99）
+- Gauge: `active_tasks`（活跃任务数）
+- 可直接接入Grafana监控面板
+
+**14. 📚 Swagger/OpenAPI文档 `/docs/`**
+- 交互式API文档界面
+- 自动生成OpenAPI 3.0规范
+- 命名空间分组：command / task / system
+- 在线测试API端点
+
+**15. 🏋️ 压力测试工具 `tests/stress_test.py`**
+- 并发请求模拟（可配置并发数）
+- 多维度性能报告：QPS、P50/P95/P99延迟、成功率
+- 多端点轮询测试
+- JSON报告自动保存
+- 用法：`python tests/stress_test.py --target http://localhost:5000 --concurrent 100 --requests 1000`
+
+**16. 🔧 CI/CD流水线 `.github/workflows/ci-cd.yml`**
+- 代码质量检查（Flake8/Black/isort）
+- 单元测试（pytest + 覆盖率报告）
+- 安全扫描（Bandit + Safety）
+- Staging自动部署
+- 触发条件：push到master/staging分支 或 Pull Request
+
+**17. ⚙️ 环境配置文件**
+- `config/production.json` - 生产环境严格配置
+- `config/staging.json` - Staging环境宽松配置
+- 可调参数：速率限制、缓存TTL、资源告警阈值、日志级别
+
+**新增依赖**（已添加到requirements.txt）：
+- `psutil>=5.9.0` - 系统资源监控
+- `prometheus_client>=0.17.0` - Prometheus指标导出
+- `flask-restx>=1.1.0` - Swagger/OpenAPI文档  
 
 ---
 
