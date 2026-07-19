@@ -1562,9 +1562,9 @@ def get_version_from_readme():
     try:
         with open(readme_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        match = re.search(r'##\s+v(\d+\.\d+\.\d+)', content)
+        match = re.search(r'###\s+v(\d+\.\d+\.\d+)', content)
         if not match:
-            match = re.search(r'###\s+v(\d+\.\d+\.\d+)', content)
+            match = re.search(r'##\s+v(\d+\.\d+\.\d+)', content)
         if match:
             return match.group(1)
     except Exception as e:
@@ -7155,13 +7155,13 @@ if __name__ == '__main__':
                     if not in_changelog:
                         continue
                     stripped = line.strip()
-                    version_match = re.match(r'##\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
-                    if not version_match:
-                        version_match = re.match(r'##\s+v([\d.]+)\s+\(([^)]+)\)', line.split(' - ')[0].strip())
-                    if not version_match:
-                        version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
+                    version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
                     if not version_match:
                         version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.split(' - ')[0].strip())
+                    if not version_match:
+                        version_match = re.match(r'##\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
+                    if not version_match:
+                        version_match = re.match(r'##\s+v([\d.]+)\s+\(([^)]+)\)', line.split(' - ')[0].strip())
                     if version_match:
                         if current_version:
                             if current_section:
