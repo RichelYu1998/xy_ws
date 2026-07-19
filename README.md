@@ -118,10 +118,12 @@
 - 可直接接入Grafana监控面板
 
 **14. 📚 Swagger/OpenAPI文档 `/docs/`**
-- 交互式API文档界面
-- 自动生成OpenAPI 3.0规范
-- 命名空间分组：command / task / system
+- 交互式API文档界面（Swagger UI 5.x）
+- OpenAPI 3.0规范（`/api/swagger.json`）
+- 5大分类：系统/商品/任务/隧道/邮件
+- 16个API端点文档
 - 在线测试API端点
+- 纯HTML实现，不依赖flask-restx路由注册
 
 **15. 🏋️ 压力测试工具 `tests/stress_test.py`**
 - 并发请求模拟（可配置并发数）
