@@ -343,7 +343,99 @@ except PermissionError as e:
     ) from e
 ```
 
-### 2.2 异常处理装饰器
+#
+
+# ============================================================
+# 文档编写规范（v3.8.70 强制要求）
+# ============================================================
+
+## 0. 语言要求
+
+### 0.1 核心原则
+**所有项目文档必须使用简体中文编写，禁止使用英文。**
+
+适用范围：
+- ✅ README.md 版本更新日志
+- ✅ skill.md 技术规范文档
+- ✅ 代码注释（除变量名、函数名、技术术语外）
+- ✅ Git提交信息
+- ✅ API错误消息（面向用户的）
+- ✅ 日志输出信息
+
+允许使用英文的场景：
+- 变量名、函数名、类名（遵循PEP 8/通用命名规范）
+- 技术术语首次出现时可保留英文原文（如：JSON, API, HTTP等）
+- 代码示例中的字符串字面量（如URL、配置键名）
+- 第三方库的原始错误消息
+
+### 0.2 示例对比
+
+#### ❌ 错误示例（中英混杂）
+
+```markdown
+### v3.8.70 (2026-07-19) - Enterprise-grade production optimization
+
+#### Core Fixes
+
+**1. CRITICAL: kill_process_by_name indentation error**
+- **Issue**: try-except block indentation error caused exception handling to fail completely
+- **Impact**: Unhandled exceptions when process termination fails
+```
+
+#### ✅ 正确示例（纯中文）
+
+```markdown
+### v3.8.70 (2026-07-19) - 🚀 企业级生产优化 + 完整测试套件
+
+#### 🎯 核心改进
+
+**1. 🔴 严重: kill_process_by_name 函数缩进错误**
+- **问题**: try-except块缩进错误导致异常处理完全失效
+- **影响**: 进程终止失败时会产生未处理异常，可能导致程序崩溃
+```
+
+### 0.3 Git提交信息格式
+
+```bash
+# ✅ 正确
+git commit -m "v3.8.71: 新增用户认证功能"
+
+# ❌ 错误
+git commit -m "v3.8.71: Add user authentication feature"
+```
+
+### 0.4 代码注释规范
+
+```python
+# ✅ 正确：中文注释
+def calculate_total_price(items):
+    """计算商品总价
+    
+    Args:
+        items: 商品列表，每个元素包含price字段
+        
+    Returns:
+        float: 商品总价
+    """
+    total = sum(item['price'] for item in items)
+    return total
+
+# ❌ 错误：英文注释
+def calculate_total_price(items):
+    """Calculate total price of items
+    
+    Args:
+        items: List of items with price field
+        
+    Returns:
+        float: Total price
+    """
+```
+
+---
+
+
+## 2.2 异常处理装饰器
 
 #### ExceptionHandler 统一异常处理器（单例模式）
 

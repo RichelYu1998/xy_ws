@@ -279,34 +279,67 @@ curl -X POST http://localhost:5000/api/run -H "Content-Type: application/json" -
 
 ---
 
-### v3.8.68 (2026-07-19) - Bug Fix + Code Quality Improvement
+### v3.8.68 (2026-07-19) - 🐛 关键Bug修复 + 代码质量提升
 
-#### Core Fixes
+#### 🛠️ 核心修复
 
-**1. CRITICAL: kill_process_by_name indentation error (Line 1593-1598)**
-- **Issue**: try-except block indentation error caused exception handling to fail completely
-- **Impact**: Unhandled exceptions when process termination fails, potential crashes
-- **Fixed**: Corrected all 6 indentation errors, restored normal exception handling flow
+**1. 🔴 严重: kill_process_by_name 函数缩进错误（第1593-1598行）**
+- **问题**: try-except块缩进错误导致异常处理完全失效
+- **影响**: 进程终止失败时会产生未处理异常，可能导致程序崩溃
+- **修复**: 纠正所有6处缩进错误，恢复正常的异常处理流程
+```python
+# ❌ 修复前
+def kill_process_by_name(process_name):
+    try:
+            if Environment.IS_WINDOWS:        # 错误：多4个空格
+                subprocess.run(...)           # 错误：多4个空格  
+        except Exception as e:               # 错误：缩进不匹配
+            
+# ✅ 修复后
+def kill_process_by_name(process_name):
+    try:
+        if Environment.IS_WINDOWS:           # 正确：12个空格
+            subprocess.run(...)              # 正确：16个空格
+    except Exception as e:                   # 正确：8个空格
+        print(f"⚠️ 终止进程失败: {e}")
+```
 
-**2. CRITICAL: Socket resource leak fix**
-- **Location**: get_lan_ip() method (Line 2455-2470)
-- **Issue**: socket object not closed on exceptions, causing file descriptor leak
-- **Fixed**: Added finally block to ensure socket is always properly closed
+**2. 🔴 严重: Socket资源泄漏修复**
+- **位置**: `get_lan_ip()` 方法（第2455-2470行）
+- **问题**: socket对象在异常情况下不会被关闭，导致文件描述符泄漏
+- **修复**: 添加finally块确保socket始终被正确关闭
+```python
+@staticmethod
+def get_lan_ip():
+    s = None  # 初始化为None
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # ... socket操作 ...
+        return ip
+    except (...) as e:
+        return ''
+    finally:  # 新增：确保资源释放
+        if s:
+            try:
+                s.close()  # 安全关闭
+            except Exception:
+                pass
+```
 
-**3. MEDIUM: Eliminated duplicate code**
-- **Location**: get_server_info() function (Line 6948-6960)
-- **Optimization**: Reuse PathManager.get_lan_ip() method, eliminated duplicate socket code
-- **Effect**: Improved code maintainability, unified IP retrieval logic
+**3. 🟡 中等: 消除重复代码**
+- **位置**: `get_server_info()` 函数（第6948-6960行）
+- **优化**: 复用`PathManager.get_lan_ip()`方法，消除socket相关重复代码
+- **效果**: 提高代码可维护性，统一IP获取逻辑
 
-**4. MEDIUM: Fixed bare except statements (38 occurrences)**
-- **Issue**: Using except: catches all exceptions including SystemExit and KeyboardInterrupt
-- **Fixed**: All changed to except Exception: to only catch business exceptions
-- **Scope**: Exception handling points throughout the entire codebase
+**4. 🟡 中等: 裸except语句修复（38处）**
+- **问题**: 使用`except:`捕获所有异常包括SystemExit和KeyboardInterrupt
+- **修复**: 全部改为`except Exception:`仅捕获业务异常
+- **影响范围**: 遍及整个代码库的异常处理点
 
-#### Code Quality Metrics
-- **Bugs Fixed**: 4 (1 critical, 2 medium, 1 code standard)
-- **Lines Affected**: ~50 lines
-- **Testing Recommendation**: Focus testing on process management and network functionality modules
+#### 📊 代码质量指标
+- **修复Bug数量**: 4个（1个严重，2个中等，1个代码规范）
+- **代码行数影响**: 约50行
+- **测试建议**: 重点测试进程管理和网络功能模块
 
 ---
 
