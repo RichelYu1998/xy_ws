@@ -46,9 +46,13 @@
 - **影响**: 代码更规范，符合Python PEP 8导入规范
 
 ### 🔧 CSP修复（新增）
-- **问题**: v3.8.73添加的CSP策略阻止了/docs/端点加载CDN的Swagger UI
-- **修复**: 为/docs/端点单独配置CSP策略，允许加载cdn.jsdelivr.net的脚本和样式
-- **影响**: /docs/端点现在可以正常显示Swagger UI文档
+- **问题**: v3.8.73添加的CSP策略阻止了/docs/和主页加载CDN资源
+- **修复**: 
+  - 为/docs/端点单独配置CSP策略，允许加载cdn.jsdelivr.net的Swagger UI资源
+  - 为主页（/）单独配置CSP策略，允许加载Bootstrap、Font Awesome和jQuery的CDN资源
+- **影响**: 
+  - /docs/端点现在可以正常显示Swagger UI文档
+  - 主页现在可以正常显示Bootstrap样式和Font Awesome图标
 
 ### 📊 验证结果
 ```
