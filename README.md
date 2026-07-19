@@ -1,7 +1,7 @@
 ﻿﻿邮寄# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.66
-> **更新日期**: 2026-07-18
+> **版本**: v3.8.67
+> **更新日期**: 2026-07-19
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 
@@ -9,6 +9,128 @@
 ---
 
 ## 最新更新
+
+### v3.8.67 (2026-07-19) - 🛡️ API响应解析全面健壮性提升+Bug修复
+
+#### 🎯 核心改进
+- **🛡️ 全面修复 `Unexpected token '<'` 错误** - 所有API调用点添加HTML响应检测和智能错误诊断
+- **🔍 智能错误类型识别** - 自动检测Cookie过期、验证码、403/404等常见问题
+- **💡 友好错误提示** - 根据HTTP状态码给出具体解决建议
+- **✅ 数据解析加固** - 图片URL等字段增加格式预检，防止非法数据导致崩溃
+
+#### 🐛 Bug修复详情
+
+**问题1**: API返回HTML而非JSON时程序崩溃（`Unexpected token '<'`）
+```python
+# ❌ 修复前 (v3.8.66)
+response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
+if response.status == 200:
+    text = await response.text()
+    data = json.loads(text)  # ❌ 如果text是HTML会抛出异常
+    
+# ✅ 修复后 (v3.8.67)
+response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
+if response.status == 200:
+    text = await response.text()
+    
+    # ✅ 新增：检查是否返回了HTML而非JSON
+    if text.strip().startswith('<'):
+        print(f'⚠️  错误: API返回了HTML而非JSON')
+        # 自动识别错误类型并给出建议...
+        break
+    
+    try:
+        data = json.loads(text)
+        # 检查业务错误码...
+    except json.JSONDecodeError as e:
+        print(f'❌ JSON解析失败: {e}')
+        break
+```
+
+**问题2**: 图片URL字段可能包含非法数据导致解析失败
+```python
+# ❌ 修复前 (v3.8.66)
+img_data = json.loads(new_image_url) if isinstance(new_image_url, str) else new_image_url
+except:
+    img_data = new_image_url
+
+# ✅ 修复后 (v3.8.67)
+if isinstance(new_image_url, str):
+    # 防止HTML或非法数据导致解析失败
+    if new_image_url.strip().startswith('<') or not new_image_url.strip().startswith('['):
+        img_data = new_image_url
+    else:
+        try:
+            img_data = json.loads(new_image_url)
+        except (json.JSONDecodeError, TypeError):
+            img_data = new_image_url
+else:
+    img_data = new_image_url
+```
+
+#### 📋 修改位置清单
+
+| 文件 | 函数/位置 | 行号 | 修改内容 |
+|------|----------|------|---------|
+| main.py | `fetch_cost_prices_via_api()` | L3619-3700 | ✅ 添加HTML检测、错误诊断、状态码建议 |
+| main.py | `fetch_all_products_via_api()` | L3858-3936 | ✅ 同上 |
+| main.py | 商品图片URL解析 | L6439-6457 | ✅ 格式预检、细粒度异常捕获 |
+| README.md | 最新更新章节 | - | ✅ 添加本次修复记录 |
+| skill.md | API数据获取规范 | Section 2.8.3 | ✅ 添加新的代码范式 |
+| skill.docx | - | - | ✅ 从 skill.md 自动生成 |
+
+#### 🛡️ 新增保护机制
+
+**1. HTML响应自动检测**
+```python
+if text.strip().startswith('<'):
+    # 自动识别具体错误类型
+    if '登录' in text or 'login' in text.lower():
+        print('🔒 检测到: 需要重新登录（Cookie已过期）')
+    elif '验证码' in text or 'captcha' in text.lower():
+        print('🛡️ 检测到: 触发了验证码验证')
+    elif '403' in text or 'forbidden' in text.lower():
+        print('🚫 检测到: 访问被禁止（403 Forbidden）')
+    elif '404' in text:
+        print('❌ 检测到: API端点不存在（404 Not Found）')
+```
+
+**2. HTTP状态码智能建议**
+```python
+if response.status == 401:
+    print('💡 建议: Cookie已过期或无效，请重新获取Cookie')
+elif response.status == 403:
+    print('💡 建议: 访问被拒绝，可能触发了反爬机制')
+elif response.status == 429:
+    print('💡 建议: 请求过于频繁，请稍后重试')
+elif response.status >= 500:
+    print('💡 建议: 服务器内部错误，请稍后重试或联系管理员')
+```
+
+**3. 业务错误码检测**
+```python
+if isinstance(data, dict) and data.get('code') and data.get('code') != 0:
+    print(f'❌ API业务错误: code={data.get("code")}, message={data.get("message")}')
+    break
+```
+
+#### 📊 实际效果对比
+
+| 场景 | 修改前 | 修改后 |
+|------|--------|--------|
+| **Cookie过期** | ❌ `JSONDecodeError: Unexpected token '<'` 程序崩溃 | ✅ 🔒 检测到登录页面，提示重新获取Cookie |
+| **触发反爬** | ❌ 解析失败，无任何提示 | ✅ 🛡️ 识别403/验证码，给出明确建议 |
+| **服务器错误** | ❌ 异常终止 | ✅ 💡 显示HTTP状态码和解决方案 |
+| **非法数据** | ❌ 宽泛的except吞掉所有异常 | ✅ ⚠️ 细粒度异常捕获+详细日志 |
+
+#### 🎯 影响范围
+
+- ✅ **核心功能**: 两个主要API调用方法（商品列表获取、价格获取）
+- ✅ **数据处理**: 商品图片URL解析（防止脏数据）
+- ✅ **用户体验**: 从"神秘崩溃"变为"清晰提示+解决方案"
+- ✅ **可维护性**: 详细日志输出便于后续排查问题
+
+---
 
 ### v3.8.66 (2026-07-18) - 🧪 CF独立性测试验证+Bug修复
 

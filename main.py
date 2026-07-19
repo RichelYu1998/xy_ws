@@ -3619,8 +3619,34 @@ class WegoScraper:
                 response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
                 if response.status == 200:
                     text = await response.text()
+                    
+                    # 检查是否返回了HTML而非JSON（常见问题：Cookie过期、反爬等）
+                    if text.strip().startswith('<'):
+                        print(f'  ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）')
+                        print(f'  📄 响应内容前200字符: {text[:200]}...')
+                        
+                        # 尝试检测具体的错误类型
+                        if '登录' in text or 'login' in text.lower():
+                            print(f'  🔒 检测到: 需要重新登录（Cookie已过期）')
+                        elif '验证码' in text or 'captcha' in text.lower():
+                            print(f'  🛡️ 检测到: 触发了验证码验证')
+                        elif '403' in text or 'forbidden' in text.lower():
+                            print(f'  🚫 检测到: 访问被禁止（403 Forbidden）')
+                        elif '404' in text:
+                            print(f'  ❌ 检测到: API端点不存在（404 Not Found）')
+                        else:
+                            print(f'  ⚠️  未知错误类型，请检查网络连接和Cookie有效性')
+                        
+                        break
+                    
                     try:
                         data = json.loads(text)
+                        
+                        # 检查API是否返回了业务错误
+                        if isinstance(data, dict) and data.get('code') and data.get('code') != 0:
+                            print(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
+                            break
+                        
                         result = data.get('result', {})
                         items = result.get('items', [])
                         pagination = result.get('pagination', {})
@@ -3643,11 +3669,31 @@ class WegoScraper:
                                 break
                         else:
                             break
+                    except json.JSONDecodeError as e:
+                        print(f'  ❌ JSON解析失败: {e}')
+                        print(f'  📄 响应内容前500字符: {text[:500]}...')
+                        break
                     except Exception as e:
                         handle_exception(e, 'fetch_cost_prices_via_api解析响应')
                         break
                 else:
-                    print(f'  请求失败: {response.status}')
+                    print(f'  请求失败: HTTP {response.status}')
+                    
+                    # 打印错误响应内容以帮助调试
+                    error_text = await response.text()
+                    if error_text:
+                        print(f'  📄 错误响应内容: {error_text[:300]}...')
+                    
+                    # 根据状态码给出具体建议
+                    if response.status == 401:
+                        print(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
+                    elif response.status == 403:
+                        print(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
+                    elif response.status == 429:
+                        print(f'  💡 建议: 请求过于频繁，请稍后重试')
+                    elif response.status >= 500:
+                        print(f'  💡 建议: 服务器内部错误，请稍后重试或联系管理员')
+                    
                     break
             except Exception as e:
                 handle_exception(e, 'fetch_cost_prices_via_api请求')
@@ -3813,8 +3859,34 @@ class WegoScraper:
                 
                 if response.status == 200:
                     text = await response.text()
+                    
+                    # 检查是否返回了HTML而非JSON（常见问题：Cookie过期、反爬等）
+                    if text.strip().startswith('<'):
+                        print(f'  ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）')
+                        print(f'  📄 响应内容前200字符: {text[:200]}...')
+                        
+                        # 尝试检测具体的错误类型
+                        if '登录' in text or 'login' in text.lower():
+                            print(f'  🔒 检测到: 需要重新登录（Cookie已过期）')
+                        elif '验证码' in text or 'captcha' in text.lower():
+                            print(f'  🛡️ 检测到: 触发了验证码验证')
+                        elif '403' in text or 'forbidden' in text.lower():
+                            print(f'  🚫 检测到: 访问被禁止（403 Forbidden）')
+                        elif '404' in text:
+                            print(f'  ❌ 检测到: API端点不存在（404 Not Found）')
+                        else:
+                            print(f'  ⚠️  未知错误类型，请检查网络连接和Cookie有效性')
+                        
+                        break
+                    
                     try:
                         data = json.loads(text)
+                        
+                        # 检查API是否返回了业务错误
+                        if isinstance(data, dict) and data.get('code') and data.get('code') != 0:
+                            print(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
+                            break
+                        
                         result = data.get('result', {})
                         items = result.get('items', [])
                         pagination = result.get('pagination', {})
@@ -3832,11 +3904,31 @@ class WegoScraper:
                                 break
                         else:
                             break
+                    except json.JSONDecodeError as e:
+                        print(f'  ❌ JSON解析失败: {e}')
+                        print(f'  📄 响应内容前500字符: {text[:500]}...')
+                        break
                     except Exception as e:
                         print(f'  解析失败: {e}')
                         break
                 else:
-                    print(f'  请求失败: {response.status}')
+                    print(f'  请求失败: HTTP {response.status}')
+                    
+                    # 打印错误响应内容以帮助调试
+                    error_text = await response.text()
+                    if error_text:
+                        print(f'  📄 错误响应内容: {error_text[:300]}...')
+                    
+                    # 根据状态码给出具体建议
+                    if response.status == 401:
+                        print(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
+                    elif response.status == 403:
+                        print(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
+                    elif response.status == 429:
+                        print(f'  💡 建议: 请求过于频繁，请稍后重试')
+                    elif response.status >= 500:
+                        print(f'  💡 建议: 服务器内部错误，请稍后重试或联系管理员')
+                    
                     break
             except Exception as e:
                 print(f'  请求异常: {e}')
@@ -6344,8 +6436,20 @@ if __name__ == '__main__':
                         new_image_url = p.get('图片', '')
                         if new_image_url:
                             try:
-                                img_data = json.loads(new_image_url) if isinstance(new_image_url, str) else new_image_url
-                            except:
+                                # 检查是否为有效的JSON字符串
+                                if isinstance(new_image_url, str):
+                                    # 防止HTML或非法数据导致解析失败
+                                    if new_image_url.strip().startswith('<') or not new_image_url.strip().startswith('['):
+                                        img_data = new_image_url
+                                    else:
+                                        try:
+                                            img_data = json.loads(new_image_url)
+                                        except (json.JSONDecodeError, TypeError):
+                                            img_data = new_image_url
+                                else:
+                                    img_data = new_image_url
+                            except Exception as e:
+                                print(f'  ⚠️ 图片URL解析异常: {e}')
                                 img_data = new_image_url
                             if isinstance(img_data, list):
                                 for b64_str in img_data:

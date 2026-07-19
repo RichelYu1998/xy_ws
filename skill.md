@@ -1938,12 +1938,16 @@ def scroll_to_bottom(self, max_attempts=30, same_height_limit=8,
     return False
 ```
 
-#### 2.8.3 API数据获取
+#### 2.8.3 API数据获取（v3.8.67 新增健壮性规范）⭐
+
+> **核心原则**: 所有API调用必须具备HTML响应检测、智能错误诊断、友好提示三大保护机制。
+
+##### 基础范式（适用于 requests/urllib 等同步请求）
 
 ```python
 def fetch_products_from_api(self, url, max_pages=10):
     """
-    从API获取商品数据
+    从API获取商品数据（健壮版）
     
     Args:
         url: API基础URL
@@ -1960,25 +1964,268 @@ def fetch_products_from_api(self, url, max_pages=10):
         try:
             api_url = f"{url}?page={page}&limit=50"
             response = session.get(api_url, timeout=15)
-            response.raise_for_status()
             
-            data = response.json()
-            page_products = data.get('data', {}).get('products', [])
+            # ✅ 第一步：检查HTTP状态码并给出智能建议
+            if response.status_code != 200:
+                print(f'  请求失败: HTTP {response.status_code}')
+                
+                # 打印错误响应内容以帮助调试
+                error_text = response.text[:300] if response.text else ''
+                if error_text:
+                    print(f'  📄 错误响应内容: {error_text}...')
+                
+                # 根据状态码给出具体建议
+                if response.status_code == 401:
+                    print(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
+                elif response.status_code == 403:
+                    print(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
+                elif response.status_code == 429:
+                    print(f'  💡 建议: 请求过于频繁，请稍后重试')
+                elif response.status_code >= 500:
+                    print(f'  💡 建议: 服务器内部错误，请稍后重试或联系管理员')
+                
+                break
             
-            if not page_products:
-                break  # 没有更多数据
+            text = response.text
             
-            products.extend(page_products)
-            print(f"[Scraper] 获取第{page}页，新增{len(page_products)}个商品")
+            # ✅ 第二步：检测是否返回了HTML而非JSON（防止 Unexpected token '<'）
+            if text.strip().startswith('<'):
+                print(f'  ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）')
+                print(f'  📄 响应内容前200字符: {text[:200]}...')
+                
+                # 尝试检测具体的错误类型
+                if '登录' in text or 'login' in text.lower():
+                    print(f'  🔒 检测到: 需要重新登录（Cookie已过期）')
+                elif '验证码' in text or 'captcha' in text.lower():
+                    print(f'  🛡️ 检测到: 触发了验证码验证')
+                elif '403' in text or 'forbidden' in text.lower():
+                    print(f'  🚫 检测到: 访问被禁止（403 Forbidden）')
+                elif '404' in text:
+                    print(f'  ❌ 检测到: API端点不存在（404 Not Found）')
+                else:
+                    print(f'  ⚠️  未知错误类型，请检查网络连接和Cookie有效性')
+                
+                break
             
-            # 请求间隔，避免触发限流
-            time.sleep(0.5)
-            
+            # ✅ 第三步：安全解析JSON（细粒度异常捕获）
+            try:
+                data = json.loads(text)
+                
+                # 检查API是否返回了业务错误
+                if isinstance(data, dict) and data.get('code') and data.get('code') != 0:
+                    print(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
+                    break
+                
+                page_products = data.get('data', {}).get('products', [])
+                
+                if not page_products:
+                    break  # 没有更多数据
+                
+                products.extend(page_products)
+                print(f"[Scraper] 获取第{page}页，新增{len(page_products)}个商品")
+                
+                # 请求间隔，避免触发限流
+                time.sleep(0.5)
+                
+            except json.JSONDecodeError as e:
+                print(f'  ❌ JSON解析失败: {e}')
+                print(f'  📄 响应内容前500字符: {text[:500]}...')
+                break
+            except Exception as e:
+                handle_exception(e, f'fetch_products_from_api 解析响应 page {page}')
+                break
+                
+        except requests.exceptions.Timeout:
+            print(f'⏰ 请求超时 (第{page}页)，请检查网络连接')
+            break
+        except requests.exceptions.ConnectionError:
+            print(f'🔌 连接失败 (第{page}页)，请检查网络或代理设置')
+            break
         except Exception as e:
             handle_exception(e, f'fetch_products_from_api page {page}')
             break
     
     return products
+```
+
+##### Playwright 异步请求范式（v3.8.67 核心修复）
+
+```python
+async def fetch_data_via_playwright_api(self, page, api_url, params=None, headers=None):
+    """
+    通过Playwright的page.request获取API数据（健壮版）
+    
+    Args:
+        page: Playwright页面对象
+        api_url: API地址
+        params: 查询参数
+        headers: 请求头（包含Cookie等）
+    
+    Returns:
+        tuple: (成功标志, 数据/错误信息)
+    """
+    try:
+        headers_with_cookie = dict(headers) if headers else {}
+        if 'Cookie' not in headers_with_cookie:
+            # 自动从cookie文件读取
+            cookie_file = os.path.join(os.path.dirname(__file__), 'config', 'cookies.json')
+            if os.path.exists(cookie_file):
+                with open(cookie_file, 'r', encoding='utf-8') as f:
+                    cookies = json.load(f)
+                cookie_str = '; '.join([f'{c["name"]}={c["value"]}' for c in cookies])
+                headers_with_cookie['Cookie'] = cookie_str
+        
+        response = await page.request.get(api_url, params=params or {}, headers=headers_with_cookie)
+        
+        # ✅ HTTP状态码检查 + 智能建议
+        if response.status != 200:
+            error_text = await response.text()
+            print(f'  请求失败: HTTP {response.status}')
+            
+            if error_text:
+                print(f'  📄 错误响应内容: {error_text[:300]}...')
+            
+            if response.status == 401:
+                print(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
+            elif response.status == 403:
+                print(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
+            elif response.status == 429:
+                print(f'  💡 建议: 请求过于频繁，请稍后重试')
+            elif response.status >= 500:
+                print(f'  💡 建议: 服务器内部错误，请稍后重试或联系管理员')
+            
+            return False, f"HTTP错误: {response.status}"
+        
+        text = await response.text()
+        
+        # ✅ HTML响应检测（防止 Unexpected token '<'）
+        if text.strip().startswith('<'):
+            print(f'  ⚠️  错误: API返回了HTML而非JSON')
+            print(f'  📄 响应内容前200字符: {text[:200]}...')
+            
+            if '登录' in text or 'login' in text.lower():
+                print(f'  🔒 检测到: 需要重新登录（Cookie已过期）')
+            elif '验证码' in text or 'captcha' in text.lower():
+                print(f'  🛡️ 检测到: 触发了验证码验证')
+            elif '403' in text or 'forbidden' in text.lower():
+                print(f'  🚫 检测到: 访问被禁止（403 Forbidden）')
+            else:
+                print(f'  ⚠️  未知错误类型')
+            
+            return False, "API返回了HTML而非JSON"
+        
+        # ✅ 安全JSON解析
+        try:
+            data = json.loads(text)
+            
+            # 业务错误码检测
+            if isinstance(data, dict) and data.get('code') and data.get('code') != 0:
+                print(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
+                return False, f"业务错误: {data.get('message')}"
+            
+            return True, data
+            
+        except json.JSONDecodeError as e:
+            print(f'  ❌ JSON解析失败: {e}')
+            print(f'  📄 响应内容前500字符: {text[:500]}...')
+            return False, f"JSON解析错误: {e}"
+            
+    except Exception as e:
+        handle_exception(e, 'fetch_data_via_playwright_api')
+        return False, str(e)
+```
+
+##### 数据解析加固范式（v3.8.67 新增）
+
+```python
+def safe_parse_json_field(self, field_value, context=''):
+    """
+    安全解析可能为JSON的字段值（防止脏数据导致崩溃）
+    
+    Args:
+        field_value: 字段值（可能是字符串、列表、字典等）
+        context: 错误上下文描述
+    
+    Returns:
+        解析后的数据（如果解析失败则返回原始值）
+    """
+    if not field_value:
+        return field_value
+    
+    try:
+        # 如果已经是合法的数据类型，直接返回
+        if isinstance(field_value, (list, dict)):
+            return field_value
+        
+        # 如果是字符串，尝试解析为JSON
+        if isinstance(field_value, str):
+            # 预检：排除明显的非JSON数据
+            stripped = field_value.strip()
+            
+            # 检测HTML或非法数据
+            if stripped.startswith('<'):
+                print(f'  ⚠️ {context}: 检测到HTML数据，跳过JSON解析')
+                return field_value
+            
+            # 检查是否像JSON（以 [ 或 { 开头）
+            if not (stripped.startswith('[') or stripped.startswith('{')):
+                return field_value
+            
+            # 尝试解析
+            try:
+                parsed = json.loads(field_value)
+                return parsed
+            except (json.JSONDecodeError, TypeError) as e:
+                print(f'  ⚠️ {context}: JSON解析失败 ({e})，使用原始值')
+                return field_value
+        
+        # 其他类型直接返回
+        return field_value
+        
+    except Exception as e:
+        print(f'  ⚠️ {context}: 解析异常 ({e})，使用原始值')
+        return field_value
+
+
+# 使用示例
+new_image_url = p.get('图片', '')
+if new_image_url:
+    img_data = self.safe_parse_json_field(new_image_url, context='图片URL解析')
+    
+    if isinstance(img_data, list):
+        for b64_str in img_data:
+            # 处理图片列表...
+            pass
+    elif isinstance(img_data, str):
+        # 处理单个URL...
+        pass
+```
+
+##### 关键规则清单（必须遵守）
+
+| 序号 | 规则 | 优先级 | 适用场景 |
+|------|------|--------|---------|
+| **R1** | ✅ 所有 `json.loads()` 前必须检测HTML响应 | **必须** | API调用 |
+| **R2** | ✅ 使用 `text.strip().startswith('<')` 检测 | **必须** | 响应解析 |
+| **R3** | ✅ 细粒度异常捕获：`json.JSONDecodeError` 单独处理 | **必须** | JSON解析 |
+| **R4** | ✅ HTTP状态码 != 200 时给出智能建议 | **必须** | 状态码处理 |
+| **R5** | ✅ 业务错误码检查（`code != 0`） | 推荐 | 有错误码的API |
+| **R6** | ✅ 错误时打印响应内容前200-500字符 | 必须 | 调试信息 |
+| **R7** | ✅ 数据字段解析增加格式预检 | 推荐 | 外部数据处理 |
+| **R8** | ❌ 禁止裸露的 `except:` 吞掉所有异常 | **禁止** | 异常处理 |
+
+##### 错误输出格式规范
+
+```python
+# ✅ 正确的错误输出格式（三段式）
+print(f'  ⚠️  错误: {问题描述}')           # 第一段：问题概述
+print(f'  📄 响应内容前{N}字符: {content}...')  # 第二段：证据（截断显示）
+print(f'  🔒/🛡️/🚫/❌ 检测到: {具体原因}')   # 第三段：诊断结果+建议
+
+# 示例：
+# ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）
+# 📄 响应内容前200字符: <!DOCTYPE html><html><head><title>请登录</title>...
+# 🔒 检测到: 需要重新登录（Cookie已过期）
 ```
 
 #### 2.8.4 页面解析
