@@ -6129,6 +6129,74 @@ function decodeBase64Url(url) {
 }
 ```
 
+**视频跨域处理规范（v3.8.74 新增）**：
+
+**问题背景**：
+- 浏览器对 `<video>` 标签的跨域限制比 `<img>` 更严格
+- 第三方视频服务器（如 `xcimg.szwego.com`）需要 CORS 支持
+- 缺少 CORS 配置会导致视频加载失败
+
+**解决方案**：
+
+1. **后端 CORS 配置**（[main.py:5856-5862](file:///D:/ws/xy_ws/main.py#L5856-L5862)）：
+```python
+@app.after_request
+def _log_response_info(response):
+    # ... 其他响应头设置 ...
+    
+    # CORS 支持（允许跨域加载视频）
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    
+    # CSP 策略更新（允许加载 HTTPS 视频）
+    if request.path == '/':
+        response.headers['Content-Security-Policy'] = "default-src 'self'; ...; media-src 'self' https:;"
+    
+    return response
+```
+
+2. **前端视频标签配置**（[index.html](file:///D:/ws/xy_ws/index.html)）：
+```javascript
+// 所有 <video> 标签必须添加以下属性
+const videoHtml = `
+    <video 
+        src="${videoUrl}" 
+        controls 
+        crossorigin="anonymous"    // 启用跨域加载
+        playsinline                // 移动端内联播放
+        preload="metadata"
+        onerror="handleVideoError(this, '${videoUrl}', ${isPreview})"
+        onloadeddata="handleVideoLoad(this)">
+        您的浏览器不支持视频播放
+    </video>
+`;
+```
+
+3. **视频URL识别**（[index.html:2272](file:///D:/ws/xy_ws/index.html#L2272)）：
+```javascript
+// 检测视频URL的两种方式
+const isVideo = decodedUrl.includes('/pvod/') || 
+                 /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp)(\?|$)/i.test(decodedUrl);
+```
+
+**关键要点**：
+- ✅ `crossorigin="anonymous"` - 必须添加，启用跨域资源加载
+- ✅ `playsinline` - 移动端必须，支持内联播放（不全屏）
+- ✅ 后端必须返回 CORS 响应头
+- ✅ CSP 策略必须包含 `media-src 'self' https:;`
+
+**浏览器兼容性**：
+- Chrome/Edge 90+: ✅ 完全支持
+- Firefox 85+: ✅ 完全支持
+- Safari 14+: ✅ 完全支持
+- 移动端浏览器: ✅ 支持 `playsinline`
+
+**常见问题**：
+1. **视频加载失败但图片正常**：检查 CORS 配置
+2. **移动端自动全屏播放**：添加 `playsinline` 属性
+3. **CORS 预检请求失败**：确保后端支持 OPTIONS 方法
+
 #### 2.16.5 面板管理（5个）
 
 ```javascript

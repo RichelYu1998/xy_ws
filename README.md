@@ -1,12 +1,90 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.73
-> **更新日期**: 2026-07-19
+> **版本**: v3.8.75
+> **更新日期**: 2026-07-20
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 ---
 
 ## 最新更新
+
+### v3.8.75 (2026-07-20) - 📚 Skill创建 + 文档规范化
+
+#### 🎯 Skill系统创建
+- **问题**: 项目缺少标准化的skill定义，不利于代码规范的一致性维护
+- **解决方案**: 
+  - 创建 `.trae/skills/xy-ws-coding-standards/` 目录结构
+  - 创建 `SKILL.md` 文件，定义项目代码规范skill
+  - skill引用项目根目录的 `skill.md` 作为完整规范文档
+- **Skill内容**:
+  - 项目代码规范概述
+  - 使用场景说明
+  - 核心原则总结
+  - 快速参考链接
+
+#### 📝 文档更新
+- **README.md**: 
+  - 新增 v3.8.75 版本更新记录
+  - 记录skill创建过程和文件结构
+- **skill.md**: 保持原有内容，作为完整规范文档
+
+#### 🏗️ 文件结构
+```
+.trae/
+└── skills/
+    └── xy-ws-coding-standards/
+        └── SKILL.md          # Skill定义文件
+```
+
+#### 📋 Skill元数据
+- **名称**: xy-ws-coding-standards
+- **描述**: Python + Flask + 原生JS 全栈项目代码规范
+- **触发条件**: 开发或修改xy_ws项目代码，或创建类似全栈项目时
+- **规范文档**: [skill.md](file:///D:/ws/xy_ws/skill.md)
+
+#### ✅ 验证结果
+```
+✅ Skill目录创建成功
+✅ SKILL.md文件创建成功
+✅ README.md版本更新成功
+✅ 文档结构规范化
+```
+
+### v3.8.74 (2026-07-20) - 🎥 视频跨域修复 + CORS支持
+
+#### 🎬 视频加载问题修复
+- **问题**: 商品详情中的视频无法加载，报错 `视频加载失败: https://xcimg.szwego.com/pvod/...`
+- **原因**: 
+  - 浏览器对 `<video>` 标签的跨域限制比 `<img>` 更严格
+  - 第三方视频服务器 `xcimg.szwego.com` 需要 CORS 支持
+  - 后端缺少 CORS 响应头配置
+- **修复**:
+  - **后端**: 添加 CORS 响应头（[main.py:5856-5862](file:///D:/ws/xy_ws/main.py#L5856-L5862)）
+    ```python
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    ```
+  - **前端**: 所有 `<video>` 标签添加 `crossorigin="anonymous"` 和 `playsinline` 属性
+  - **CSP策略**: 添加 `media-src 'self' https:;` 允许加载 HTTPS 视频
+- **影响**: 
+  - ✅ 图片正常加载（之前就正常）
+  - ✅ 视频现在可以正常加载和播放
+  - ✅ 支持移动端内联播放
+
+#### 📝 文档更新
+- **skill.md**: 新增视频跨域处理规范（[skill.md:2.16.4](file:///D:/ws/xy_ws/skill.md#L6109)）
+- **README.md**: 更新版本号至 v3.8.74
+
+#### 🔧 技术细节
+- **修改文件**: 
+  - [main.py](file:///D:/ws/xy_ws/main.py) - 后端 CORS 配置
+  - [index.html](file:///D:/ws/xy_ws/index.html) - 前端视频标签（4处）
+- **浏览器兼容性**: 
+  - Chrome/Edge: ✅ 完全支持
+  - Firefox: ✅ 完全支持
+  - Safari: ✅ 完全支持
+  - 移动端浏览器: ✅ 支持 `playsinline` 内联播放
 
 ### v3.8.73 (2026-07-19) - 隐藏Bug修复 + 资源管理优化 + 导入规范化 + CSP修复
 

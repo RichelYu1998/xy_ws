@@ -2192,7 +2192,7 @@ SzwegoSpider/
             const loadingText = isPreview ? '' : '<div class="video-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:12px;">重新加载中...</div>';
             
             const videoHtml = `
-                <video id="previewImage" src="${videoUrl}" controls ${videoAutoplay} preload="${videoPreload}" style="${videoStyle}" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${videoUrl.replace(/'/g, "\\'")}', ${isPreview})" onloadeddata="handleVideoLoad(this)">
+                <video id="previewImage" src="${videoUrl}" controls ${videoAutoplay} preload="${videoPreload}" crossorigin="anonymous" playsinline style="${videoStyle}" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${videoUrl.replace(/'/g, "\\'")}', ${isPreview})" onloadeddata="handleVideoLoad(this)">
                     您的浏览器不支持视频播放
                 </video>
                 ${loadingText}
@@ -2392,7 +2392,7 @@ SzwegoSpider/
                 
                 if (isVideo) {
                     const parent = previewImg.parentElement;
-                    const videoHtml = `<video id="previewImage" src="${decodedUrl}" controls autoplay preload="auto" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${decodedUrl.replace(/'/g, "\\'")}', true)">
+                    const videoHtml = `<video id="previewImage" src="${decodedUrl}" controls autoplay preload="auto" crossorigin="anonymous" playsinline style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${decodedUrl.replace(/'/g, "\\'")}', true)">
                         您的浏览器不支持视频播放
                     </video>`;
                     previewImg.outerHTML = videoHtml;
