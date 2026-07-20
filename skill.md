@@ -7160,7 +7160,26 @@ btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
 - ❌ 禁止硬编码恢复文本（如 `btn.innerHTML = '<span>Excel与JSON对比</span>'`），必须使用 `data-original` 动态恢复
 - ❌ 禁止遗漏按钮类（新增按钮类时必须同步更新 `resetButtons()`）
 
-### 3.5 iframe 懒加载模式
+### 3.5 iframe 加载规范（v3.8.78 更新）
+
+#### 3.5.1 推荐方式：直接加载（更可靠）
+
+```html
+<div id="weather-iframe-wrapper" style="position: relative; width: 100%; min-height: 200px;">
+    <iframe src="/dist/index.html"
+            style="width: 100%; border: none;"
+            onload="this.style.opacity='1';">
+    </iframe>
+</div>
+```
+
+**优点**：
+- ✅ 页面加载时立即开始加载 iframe
+- ✅ 不依赖 JavaScript 执行
+- ✅ 局域网和公网访问都能正常工作
+- ✅ 更可靠，避免 JavaScript 执行失败
+
+#### 3.5.2 原方式：懒加载（已废弃）
 
 ```html
 <div id="weather-iframe-wrapper" style="position: relative; width: 100%; min-height: 200px;">
@@ -7186,6 +7205,32 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 ```
+
+**问题**：
+- ❌ 依赖 JavaScript 执行
+- ❌ 在某些情况下（特别是局域网访问）可能不工作
+- ❌ 增加了复杂性
+
+#### 3.5.3 后端安全策略配合（重要）
+
+**X-Frame-Options 设置**（main.py）：
+```python
+if request.path.startswith('/dist/'):
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+else:
+    response.headers['X-Frame-Options'] = 'DENY'
+```
+
+**Content-Security-Policy 设置**（main.py）：
+```python
+elif request.path.startswith('/dist/'):
+    response.headers['Content-Security-Policy'] = "default-src 'self'; ... connect-src 'self' https://api.bigdatacloud.net https://api.open-meteo.com https://air-quality-api.open-meteo.com;"
+```
+
+**说明**：
+- `/dist/` 路径：允许同域名 iframe 加载（`SAMEORIGIN`）
+- `/dist/` 路径：允许连接到外部天气 API（`connect-src`）
+- 其他路径：保持严格的安全策略（`DENY`）
 
 ### 3.6 全局定时器管理
 

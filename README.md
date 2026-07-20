@@ -1,12 +1,62 @@
 ﻿﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.77
+> **版本**: v3.8.78
 > **更新日期**: 2026-07-20
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 ---
 
 ## 最新更新
+
+### v3.8.78 (2026-07-20) - 🌤️ 天气面板修复 + 安全策略优化
+
+#### 🎯 天气面板加载问题修复
+- **问题**: 天气面板无法加载，显示"接口错误"
+- **根本原因**:
+  1. `X-Frame-Options` 设置为 `DENY`，阻止 iframe 加载
+  2. `Content-Security-Policy` 阻止外部 API 连接
+- **解决方案**:
+  - 为 `/dist/` 路径设置 `X-Frame-Options` 为 `SAMEORIGIN`
+  - 为 `/dist/` 路径添加专门的 CSP 策略，允许连接到天气 API
+
+#### 📝 技术细节
+- **X-Frame-Options 优化**:
+  - `/dist/` 路径: `SAMEORIGIN`（允许同域名 iframe）
+  - 其他路径: `DENY`（保持安全性）
+- **CSP 策略优化**:
+  - 添加 `connect-src` 允许外部 API:
+    - `https://api.bigdatacloud.net` - 地理位置反向编码
+    - `https://api.open-meteo.com` - 天气预报
+    - `https://air-quality-api.open-meteo.com` - 空气质量
+- **iframe 加载方式**:
+  - 从 `data-src` 延迟加载改为直接 `src` 加载
+  - 删除不必要的 JavaScript 延迟加载代码
+
+#### 🔒 安全策略优化
+- **保持安全性**:
+  - 主页面和其他路径仍然保持严格的 CSP 策略
+  - 仅对天气应用路径放宽必要的限制
+  - 使用 `SAMEORIGIN` 而非 `ALLOW-FROM`，更安全
+
+#### 🎨 用户体验提升
+- ✅ 天气面板可以正常显示天气数据
+- ✅ 天气 API 可以正常连接和获取数据
+- ✅ 局域网和公网访问都能正常工作
+- ✅ 保持整体应用的安全性
+
+#### 📋 修改文件
+- [main.py:5858-5861](file:///D:/ws/xy_ws/main.py#L5858-L5861) - X-Frame-Options 优化
+- [main.py:5871-5872](file:///D:/ws/xy_ws/main.py#L5871-L5872) - CSP 策略优化
+- [index.html](file:///D:/ws/xy_ws/index.html) - iframe 加载方式优化
+
+#### ✅ 验证结果
+```
+✅ X-Frame-Options 设置正确
+✅ CSP 策略允许天气 API 连接
+✅ 天气面板正常显示
+✅ 天气数据正常获取
+✅ 安全策略保持严格
+```
 
 ### v3.8.77 (2026-07-20) - 📱 Swagger UI移动端适配
 
