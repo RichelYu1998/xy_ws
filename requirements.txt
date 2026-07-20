@@ -14,3 +14,6 @@ flask-restx>=1.1.0
 
 # 数据验证
 pydantic>=2.0.0
+
+# 文档生成
+python-docx>=1.2.0
