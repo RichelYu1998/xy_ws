@@ -14617,22 +14617,72 @@ def swagger_spec():
     }
     return jsonify(spec)
 
-# 2. 纯HTML Swagger UI
+# 2. 纯HTML Swagger UI（支持移动端）
 @app.route('/docs/')
 def swagger_ui():
     return '''<!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>API文档</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <style>
+        /* 移动端适配 */
+        @media screen and (max-width: 768px) {
+            .swagger-ui .wrapper { padding: 10px; }
+            .swagger-ui .btn { padding: 8px 12px; font-size: 14px; }
+            .swagger-ui input { font-size: 16px; }
+        }
+    </style>
 </head>
 <body>
     <div id="swagger-ui"></div>
     <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
     <script>
-    SwaggerUIBundle({url: "/api/swagger.json", dom_id: '#swagger-ui'})
+    SwaggerUIBundle({
+        url: "/api/swagger.json",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        docExpansion: 'list'
+    })
     </script>
 </body>
 </html>'''
+```
+
+#### 📱 移动端适配规范（v3.8.77 新增）
+
+**必须包含的移动端元素：**
+
+1. **viewport meta标签**（必须）
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+```
+
+2. **移动端Web App支持**
+```html
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+```
+
+3. **响应式CSS断点**
+- 768px: 平板和移动设备
+- 480px: 超小屏幕设备
+
+4. **关键优化点**
+- 输入框字体 ≥ 16px（防止iOS自动缩放）
+- 按钮padding ≥ 8px（触摸友好）
+- 表格列宽自适应（避免横向滚动）
+- 减少padding/margin（提高空间利用率）
+
+5. **横屏模式优化**
+```css
+@media screen and (max-width: 768px) and (orientation: landscape) {
+    /* 横屏特定样式 */
+}
 ```
 
 #### ❌ 禁止

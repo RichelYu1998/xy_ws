@@ -5976,10 +5976,138 @@ if __name__ == '__main__':
         @app.route('/docs/')
         def swagger_ui():
             return '''<!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>Szwego商品爬虫API文档</title>
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <style>
+        /* 移动端适配 */
+        @media screen and (max-width: 768px) {
+            .swagger-ui .topbar {
+                padding: 8px 10px;
+            }
+            .swagger-ui .topbar-wrapper img {
+                max-width: 150px;
+            }
+            .swagger-ui .information-container {
+                padding: 10px;
+            }
+            .swagger-ui .scheme-container {
+                padding: 10px 0;
+            }
+            .swagger-ui .opblock-tag {
+                padding: 10px;
+            }
+            .swagger-ui .opblock .opblock-summary {
+                padding: 10px;
+            }
+            .swagger-ui .opblock-body {
+                padding: 10px;
+            }
+            .swagger-ui .parameters-col_description {
+                width: 100%;
+                padding: 5px 0;
+            }
+            .swagger-ui .parameters-col_name {
+                width: 100%;
+                padding: 5px 0;
+            }
+            .swagger-ui .response-col_description {
+                width: 100%;
+                padding: 5px 0;
+            }
+            .swagger-ui .execute-wrapper {
+                padding: 10px;
+            }
+            .swagger-ui .btn {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+            .swagger-ui input[type=text],
+            .swagger-ui input[type=password],
+            .swagger-ui input[type=email],
+            .swagger-ui input[type=file],
+            .swagger-ui textarea {
+                font-size: 16px;
+            }
+            .swagger-ui .opblock .opblock-section {
+                padding: 10px;
+            }
+            .swagger-ui .opblock .opblock-section-header {
+                padding: 8px 10px;
+            }
+            .swagger-ui table thead tr th,
+            .swagger-ui table thead tr td,
+            .swagger-ui table tbody tr th,
+            .swagger-ui table tbody tr td {
+                padding: 8px;
+            }
+            .swagger-ui .response-col_status {
+                width: auto;
+                min-width: 80px;
+            }
+            .swagger-ui .col.response-headers {
+                width: auto;
+                min-width: 80px;
+            }
+            .swagger-ui .wrapper {
+                padding: 10px;
+            }
+            .swagger-ui .opblock-tag-section {
+                margin: 0 0 10px 0;
+            }
+            .swagger-ui .opblock.is-open .opblock-summary {
+                border-bottom: 1px solid #ebeef2;
+            }
+            body {
+                margin: 0;
+                padding: 0;
+            }
+        }
+        
+        /* 超小屏幕优化 */
+        @media screen and (max-width: 480px) {
+            .swagger-ui .topbar {
+                padding: 5px;
+            }
+            .swagger-ui .information-container {
+                padding: 5px;
+            }
+            .swagger-ui .opblock-tag {
+                font-size: 18px;
+                padding: 8px;
+            }
+            .swagger-ui .opblock .opblock-summary {
+                padding: 8px;
+            }
+            .swagger-ui .opblock .opblock-summary-description {
+                font-size: 13px;
+            }
+            .swagger-ui .btn {
+                padding: 6px 10px;
+                font-size: 13px;
+            }
+            .swagger-ui .wrapper {
+                padding: 5px;
+            }
+        }
+        
+        /* 横屏优化 */
+        @media screen and (max-width: 768px) and (orientation: landscape) {
+            .swagger-ui .opblock .opblock-summary {
+                display: flex;
+                align-items: center;
+            }
+            .swagger-ui .opblock .opblock-summary-method {
+                margin-right: 10px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div id="swagger-ui"></div>
@@ -5989,7 +6117,13 @@ if __name__ == '__main__':
         url: "/api/swagger.json",
         dom_id: '#swagger-ui',
         presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
-        layout: "BaseLayout"
+        layout: "BaseLayout",
+        deepLinking: true,
+        displayOperationId: false,
+        defaultModelsExpandDepth: 1,
+        defaultModelExpandDepth: 1,
+        docExpansion: 'list',
+        filter: true
     })
     </script>
 </body>
