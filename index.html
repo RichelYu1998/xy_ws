@@ -1664,7 +1664,7 @@
                         </div>
                         <iframe 
                             id="weather-iframe"
-                            data-src="/dist/index.html"
+                            src="/dist/index.html"
                             style="width: 100%; border: none; background: #fff; opacity: 0; position: relative; z-index: 0;"
                             title="天气时钟看板"
                             onload="this.style.opacity='1'; const wl = document.getElementById('weather-loading'); if (wl) wl.style.display='none';">
@@ -2622,14 +2622,6 @@ SzwegoSpider/
                     }
                 })
                 .catch(function() {});
-            const weatherIframe = document.getElementById('weather-iframe');
-            if (weatherIframe) {
-                const src = weatherIframe.getAttribute('data-src');
-                if (src) {
-                    weatherIframe.src = src;
-                    weatherIframe.removeAttribute('data-src');
-                }
-            }
             const device = applyDeviceStyles();
             
             function detectSystem() {
