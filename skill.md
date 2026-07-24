@@ -3015,38 +3015,58 @@ def dist_files(filename):
     return response
 ```
 
-#### 2.11.2 商品数据时间追踪规范（v3.8.79 新增）
+#### 2.11.2 商品数据时间追踪规范（v3.8.79 新增，v3.8.81 修复）
 
 **核心功能**：
-- 从URL参数 `t` 获取时间戳作为创建时间
-- 计算从创建时间到现在的时长作为入库时间
-- 在Web页面实时展示入库时间
+- 从API响应的`oldTime`字段获取真实入库时间（v3.8.81修复）
+- 移除前端传递时间戳的错误逻辑（v3.8.81修复）
+- 在Web页面展示真实入库时间
+
+**v3.8.81 修复内容**：
+
+**问题**：v3.8.79版本使用前端传递的时间戳，导致入库时间永远显示"0分钟前"
+
+**解决方案**：
+1. 爬取数据时保存API返回的`oldTime`字段
+2. API返回时从商品数据中提取入库时间
+3. 前端不再传递时间戳参数
 
 **后端实现**：
 
 ```python
-@app.route('/api/products', methods=['GET'])
-def get_all_products():
-    # ... 商品数据处理逻辑 ...
-    
-    created_time = None
-    storage_duration = None
-    t_param = request.args.get('t')
-    if t_param:
-        try:
-            timestamp_ms = int(t_param)
-            created_time = datetime.fromtimestamp(timestamp_ms / 1000).strftime('%Y-%m-%d %H:%M:%S')
-            
-            now = datetime.now()
-            created_dt = datetime.fromtimestamp(timestamp_ms / 1000)
-            delta = now - created_dt
-            
-            days = delta.days
-            hours = delta.seconds // 3600
-            minutes = (delta.seconds % 3600) // 60
-            
-            if days > 0:
-                storage_duration = f"{days}天{hours}小时{minutes}分钟前"
+# 爬取数据时保存入库时间（main.py:4267-4280）
+old_time = item.get('oldTime', '')
+
+product = {
+    '商品描述': title,
+    '售价': f'¥{int(sale_price):,}' if sale_price else '',
+    '拿货价': f'¥{int(cost_price):,}' if cost_price else '',
+    '货号': goods_num,
+    '备注': remark,
+    '员工': staff_nick,
+    '图片': media_b64,
+    '入库时间': old_time  # 新增：保存API返回的入库时间
+}
+
+# API返回时提取入库时间（main.py:6719-6742）
+storage_duration = None
+storage_times = []
+for p in products:
+    old_time = p.get('入库时间', '')
+    if old_time:
+        storage_times.append(old_time)
+
+if storage_times:
+    # 智能选择最新的入库时间（最接近"刚刚"）
+    min_time_str = min(storage_times, key=lambda x: (
+        0 if '刚刚' in x or '分钟前' in x else
+        1 if '小时前' in x else
+        2 if '天前' in x else
+        3 if '周前' in x else
+        4 if '月前' in x else
+        5
+    ))
+    storage_duration = min_time_str
             elif hours > 0:
                 storage_duration = f"{hours}小时{minutes}分钟前"
             else:
@@ -3099,6 +3119,59 @@ fetch(`/api/products?t=${timestamp}`)
 - ✅ 便于判断数据新鲜度
 - ✅ 支持实时计算，刷新页面自动更新
 - ✅ 优雅的UI设计，不影响主要信息展示
+
+**商品详情页颜色标识规范（v3.8.80 新增）**：
+
+在商品详情弹窗中，根据入库时长设置不同颜色：
+
+```javascript
+// 在showProductModal函数中添加入库时间展示
+let storageDurationHtml = '';
+if (window.allProductsData && window.allProductsData.storage_duration) {
+    const storageDuration = window.allProductsData.storage_duration;
+    const createdTime = window.allProductsData.created_time;
+    
+    let colorStyle = '';
+    if (createdTime) {
+        const createdDate = new Date(createdTime);
+        const now = new Date();
+        const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
+        
+        if (hoursDiff <= 24) {
+            colorStyle = 'color: #67c23a; font-weight: bold;'; // 绿色 - 最新
+        } else if (hoursDiff <= 72) {
+            colorStyle = 'color: #E6A23C; font-weight: bold;'; // 黄色 - 较新
+        } else {
+            colorStyle = 'color: #f56c6c; font-weight: bold;'; // 红色 - 较旧
+        }
+    }
+    
+    storageDurationHtml = `<div style="margin-bottom:10px;${colorStyle}">
+        <strong>🕐 入库时间:</strong> ${storageDuration}
+    </div>`;
+}
+
+// 在商品详情弹窗中显示
+let modalHtml = `
+    <div id="productModal" ...>
+        ...
+        <h3 style="margin:0 0 15px 0;color:#e4393c;">商品详情</h3>
+        ${storageDurationHtml}
+        <div style="margin-bottom:10px;"><strong>货号:</strong> ${p.货号 || '-'}</div>
+        ...
+    </div>
+`;
+```
+
+**颜色标识规则**：
+- 🟢 **24小时以内**：绿色（#67c23a）- 最新数据
+- 🟡 **3天以内**：黄色（#E6A23C）- 较新数据
+- 🔴 **3天以上**：红色（#f56c6c）- 较旧数据
+
+**用户体验优势**：
+- ✅ 商品详情页直观展示入库时间
+- ✅ 颜色标识快速判断数据新鲜度
+- ✅ 提升用户决策效率
 
 ### 2.12 EmailNotifier 邮件通知服务
 
