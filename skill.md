@@ -3281,46 +3281,47 @@ if created_times:
 **前端展示**：
 
 ```javascript
-// index.html:2249-2293
-let storageDurationHtml = '';
-if (window.allProductsData && (window.allProductsData.storage_duration || window.allProductsData.created_time)) {
-    const storageDuration = window.allProductsData.storage_duration;
-    const createdTime = window.allProductsData.created_time;
+// index.html:2245-2297 - 商品详情弹窗展示每个商品自己的入库时间
+let productTimeHtml = '';
+if (p.入库时间戳) {
+    // 优先显示精确时间戳
+    const createdDate = new Date(p.入库时间戳);
+    const now = new Date();
+    const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
     
-    let displayText = '';
     let colorStyle = '';
-    
-    if (createdTime) {
-        // 优先显示精确时间
-        const createdDate = new Date(createdTime);
-        const now = new Date();
-        const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
-        
-        if (hoursDiff <= 24) {
-            colorStyle = 'color: #67c23a; font-weight: bold;';
-        } else if (hoursDiff <= 72) {
-            colorStyle = 'color: #E6A23C; font-weight: bold;';
-        } else {
-            colorStyle = 'color: #f56c6c; font-weight: bold;';
-        }
-        
-        displayText = createdTime;
-    } else if (storageDuration) {
-        // 备用显示相对时间
-        if (storageDuration.includes('刚刚') || storageDuration.includes('分钟前')) {
-            colorStyle = 'color: #67c23a; font-weight: bold;';
-        } else if (storageDuration.includes('小时前') || storageDuration.includes('1天前')) {
-            colorStyle = 'color: #E6A23C; font-weight: bold;';
-        } else {
-            colorStyle = 'color: #f56c6c; font-weight: bold;';
-        }
-        displayText = storageDuration;
+    if (hoursDiff <= 24) {
+        colorStyle = 'color: #67c23a; font-weight: bold;';
+    } else if (hoursDiff <= 72) {
+        colorStyle = 'color: #E6A23C; font-weight: bold;';
+    } else {
+        colorStyle = 'color: #f56c6c; font-weight: bold;';
     }
     
-    if (displayText) {
-        storageDurationHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${displayText}</div>`;
+    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间戳}</div>`;
+} else if (p.入库时间) {
+    // 备用显示相对时间
+    let colorStyle = '';
+    if (p.入库时间.includes('刚刚') || p.入库时间.includes('分钟前')) {
+        colorStyle = 'color: #67c23a; font-weight: bold;';
+    } else if (p.入库时间.includes('小时前') || p.入库时间.includes('1天前')) {
+        colorStyle = 'color: #E6A23C; font-weight: bold;';
+    } else {
+        colorStyle = 'color: #f56c6c; font-weight: bold;';
     }
+    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间}</div>`;
 }
+
+// 在商品详情弹窗中显示
+let modalHtml = `
+    <div id="productModal" ...>
+        ...
+        <h3 style="margin:0 0 15px 0;color:#e4393c;">商品详情</h3>
+        ${productTimeHtml}  <!-- 展示每个商品自己的入库时间 -->
+        <div style="margin-bottom:10px;"><strong>货号:</strong> ${p.货号 || '-'}</div>
+        ...
+    </div>
+`;
 ```
 
 **数据示例**：
