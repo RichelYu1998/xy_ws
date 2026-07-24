@@ -2265,8 +2265,9 @@ SzwegoSpider/
                     colorStyle = 'color: #f56c6c; font-weight: bold;';
                 }
                 
-                productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间戳}</div>`;
-            } else if (p.入库时间) {
+                productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间戳:</strong> ${p.入库时间戳}</div>`;
+            }
+            if (p.入库时间) {
                 let colorStyle = '';
                 if (p.入库时间.includes('刚刚') || p.入库时间.includes('分钟前')) {
                     colorStyle = 'color: #67c23a; font-weight: bold;';
@@ -2275,7 +2276,7 @@ SzwegoSpider/
                 } else {
                     colorStyle = 'color: #f56c6c; font-weight: bold;';
                 }
-                productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间}</div>`;
+                productTimeHtml += `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间}</div>`;
             }
             
             let modalHtml = `
@@ -3303,6 +3304,7 @@ SzwegoSpider/
                         else if (isHighPrice) rowStyle = 'background: #fff3e0;';
                         else if (isAdded) rowStyle = 'background: #e3f2fd;';
                         const descDisplay = desc.length > 20 ? desc.substring(0, 20) + '...' : desc;
+                        
                         tableHtml += `<tr data-sku="${sku}" data-desc="${desc.replace(/"/g, '&quot;')}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 高亮并定位货号:', '${sku}'); highlightRow('${sku}'); scrollToSku('${sku}'); searchProductBySku('${sku}')">${sku || '-'}</a></td>
@@ -5740,3 +5742,9 @@ SzwegoSpider/
     </script>
 </body>
 </html>
+
+
+
+
+
+
