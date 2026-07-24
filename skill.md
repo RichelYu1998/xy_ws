@@ -3015,6 +3015,91 @@ def dist_files(filename):
     return response
 ```
 
+#### 2.11.2 商品数据时间追踪规范（v3.8.79 新增）
+
+**核心功能**：
+- 从URL参数 `t` 获取时间戳作为创建时间
+- 计算从创建时间到现在的时长作为入库时间
+- 在Web页面实时展示入库时间
+
+**后端实现**：
+
+```python
+@app.route('/api/products', methods=['GET'])
+def get_all_products():
+    # ... 商品数据处理逻辑 ...
+    
+    created_time = None
+    storage_duration = None
+    t_param = request.args.get('t')
+    if t_param:
+        try:
+            timestamp_ms = int(t_param)
+            created_time = datetime.fromtimestamp(timestamp_ms / 1000).strftime('%Y-%m-%d %H:%M:%S')
+            
+            now = datetime.now()
+            created_dt = datetime.fromtimestamp(timestamp_ms / 1000)
+            delta = now - created_dt
+            
+            days = delta.days
+            hours = delta.seconds // 3600
+            minutes = (delta.seconds % 3600) // 60
+            
+            if days > 0:
+                storage_duration = f"{days}天{hours}小时{minutes}分钟前"
+            elif hours > 0:
+                storage_duration = f"{hours}小时{minutes}分钟前"
+            else:
+                storage_duration = f"{minutes}分钟前"
+        except (ValueError, TypeError):
+            pass
+    
+    return jsonify({
+        'filename': os.path.basename(latest_file),
+        'total': len(products),
+        'products': products[:100],
+        'highPriceProducts': high_price_products[:500],
+        'highPriceCount': len(high_price_products),
+        'totalPrice': f'¥{total_price:,.2f}',
+        'avgPrice': f'¥{avg_price:,.2f}',
+        'fee': f'¥{total_fee:,.2f}',
+        'system': Environment.SYSTEM,
+        'created_time': created_time,
+        'storage_duration': storage_duration
+    })
+```
+
+**前端展示**：
+
+```javascript
+fetch(`/api/products?t=${timestamp}`)
+    .then(response => response.json())
+    .then(data => {
+        // 在商品数据汇总标题栏显示入库时间
+        let html = `
+        <div class="comparison-card products-card">
+            <div class="comparison-header" style="background: #409EFF;">
+                <i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}
+                ${data.storage_duration ? ` <span style="font-size: 14px; opacity: 0.9; margin-left: 15px;">
+                    <i class="fa fa-clock-o"></i> 入库时间: ${data.storage_duration}
+                </span>` : ''}
+            </div>
+            ...
+        </div>`;
+    });
+```
+
+**时长格式化规则**：
+- 超过1天：`X天X小时X分钟前`
+- 超过1小时：`X小时X分钟前`
+- 不足1小时：`X分钟前`
+
+**用户体验**：
+- ✅ 用户可直观看到数据入库时长
+- ✅ 便于判断数据新鲜度
+- ✅ 支持实时计算，刷新页面自动更新
+- ✅ 优雅的UI设计，不影响主要信息展示
+
 ### 2.12 EmailNotifier 邮件通知服务
 
 #### 2.12.1 配置规范
@@ -3184,7 +3269,7 @@ Szwego商品爬虫 - 隧道状态通知
 | 8 | `/api/sku/compare` | GET | 货号对比(JSON) | `stock_numbers` | `{success, data}` | - |
 | 9 | `/api/sku/compare/txt` | GET/POST | 货号对比(文本) | `stock_numbers` | 文本/JSON | - |
 | 10 | `/api/sku/compare/excel` | GET | 货号对比(Excel下载) | 无 | Excel文件流 | - |
-| 11 | `/api/products` | GET | 获取商品列表 | `t`(时间戳) | `{success, data}` | - |
+| 11 | `/api/products` | GET | 获取商品列表 | `t`(时间戳) | `{success, data, created_time, storage_duration}` | - |
 | 12 | `/api/daily-profit` | GET | 每日利润报表 | 无 | `{success, data}` | - |
 | 13 | `/api/product` | GET | 获取商品详情 | `sku` | `{success, data}` | - |
 | 14 | `/api/product/search` | GET | 搜索商品 | `keyword` | `{success, data}` | - |

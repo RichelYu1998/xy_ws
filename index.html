@@ -3290,7 +3290,7 @@ SzwegoSpider/
                 let html = `
                 <div class="comparison-card products-card">
                     <div class="comparison-header" style="background: #409EFF;">
-                        <i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}
+                        <i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}${data.storage_duration ? ` <span style="font-size: 14px; opacity: 0.9; margin-left: 15px;"><i class="fa fa-clock-o"></i> 入库时间: ${data.storage_duration}</span>` : ''}
                     </div>
                     <div class="comparison-body">
                         <div class="comparison-stats">

@@ -6716,6 +6716,31 @@ if __name__ == '__main__':
                 
                 avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
                 
+                created_time = None
+                storage_duration = None
+                t_param = request.args.get('t')
+                if t_param:
+                    try:
+                        timestamp_ms = int(t_param)
+                        created_time = datetime.fromtimestamp(timestamp_ms / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        now = datetime.now()
+                        created_dt = datetime.fromtimestamp(timestamp_ms / 1000)
+                        delta = now - created_dt
+                        
+                        days = delta.days
+                        hours = delta.seconds // 3600
+                        minutes = (delta.seconds % 3600) // 60
+                        
+                        if days > 0:
+                            storage_duration = f"{days}天{hours}小时{minutes}分钟前"
+                        elif hours > 0:
+                            storage_duration = f"{hours}小时{minutes}分钟前"
+                        else:
+                            storage_duration = f"{minutes}分钟前"
+                    except (ValueError, TypeError):
+                        pass
+                
                 return jsonify({
                     'filename': os.path.basename(latest_file), 
                     'total': len(products), 
@@ -6725,7 +6750,9 @@ if __name__ == '__main__':
                     'totalPrice': f'¥{total_price:,.2f}',
                     'avgPrice': f'¥{avg_price:,.2f}',
                     'fee': f'¥{total_fee:,.2f}',
-                    'system': Environment.SYSTEM
+                    'system': Environment.SYSTEM,
+                    'created_time': created_time,
+                    'storage_duration': storage_duration
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
