@@ -3322,6 +3322,24 @@ let modalHtml = `
         ...
     </div>
 `;
+
+// index.html:3284-3331 - 商品列表表格添加入库时间列
+<thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th><th>入库时间</th></tr></thead>
+
+const storageTime = p.入库时间 || '';
+let timeColorStyle = '';
+if (storageTime.includes('刚刚') || storageTime.includes('分钟前')) {
+    timeColorStyle = 'color: #67c23a; font-weight: bold;';  // 🟢 绿色 - 最新
+} else if (storageTime.includes('小时前') || storageTime.includes('1天前')) {
+    timeColorStyle = 'color: #E6A23C; font-weight: bold;';  // 🟡 橙色 - 较新
+} else if (storageTime) {
+    timeColorStyle = 'color: #f56c6c; font-weight: bold;';  // 🔴 红色 - 较旧
+}
+
+tableHtml += `<tr ...>
+    ...
+    <td style="${timeColorStyle}">${storageTime || '-'}</td>
+</tr>`;
 ```
 
 **数据示例**：
@@ -3355,6 +3373,66 @@ let modalHtml = `
   - 🟡 橙色：72小时以内（较新）
   - 🔴 红色：其他（较旧）
 
+**v3.8.82 优化内容**：
+
+**问题**：商品列表表格过于臃肿，入库时间信息重复显示
+
+**解决方案**：
+1. 移除商品列表表格中的"入库时间"列，保持列表简洁
+2. 在商品详情页同时显示"入库时间戳"和"入库时间"两个字段
+3. 两个字段都根据时间新鲜度显示不同颜色标识
+
+**前端实现**（v3.8.82优化）：
+
+```javascript
+// index.html:2253-2280 - 商品详情页同时显示两个字段
+let productTimeHtml = '';
+
+// 显示入库时间戳（精确时间）
+if (p.入库时间戳) {
+    const createdDate = new Date(p.入库时间戳);
+    const now = new Date();
+    const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
+    
+    let colorStyle = '';
+    if (hoursDiff <= 24) {
+        colorStyle = 'color: #67c23a; font-weight: bold;';
+    } else if (hoursDiff <= 72) {
+        colorStyle = 'color: #E6A23C; font-weight: bold;';
+    } else {
+        colorStyle = 'color: #f56c6c; font-weight: bold;';
+    }
+    
+    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间戳:</strong> ${p.入库时间戳}</div>`;
+}
+
+// 显示入库时间（相对时间）
+if (p.入库时间) {
+    let colorStyle = '';
+    if (p.入库时间.includes('刚刚') || p.入库时间.includes('分钟前')) {
+        colorStyle = 'color: #67c23a; font-weight: bold;';
+    } else if (p.入库时间.includes('小时前') || p.入库时间.includes('1天前')) {
+        colorStyle = 'color: #E6A23C; font-weight: bold;';
+    } else {
+        colorStyle = 'color: #f56c6c; font-weight: bold;';
+    }
+    productTimeHtml += `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间}</div>`;
+}
+
+// 商品列表表格（v3.8.82优化：移除入库时间列）
+// index.html:3293
+<thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead>
+```
+
+**显示逻辑**（v3.8.82优化）：
+- 商品列表：只显示基本字段（序号、货号、商品描述、售价、员工）
+- 商品详情：同时显示两个字段
+  - 🕐 入库时间戳：精确时间（如"2026-07-24 15:50:21"）
+  - 🕐 入库时间：相对时间（如"3小时前"）
+- 颜色标识：
+  - 🟢 绿色：24小时内/刚刚/几分钟前
+  - 🟠 橙色：24-72小时/几小时前/1天前
+  - 🔴 红色：超过72小时/较长时间
 **注意事项**：
 - `time_stamp` 字段是毫秒级时间戳，需要除以1000转换为秒
 - `old_time` 字段是相对时间字符串，如"2月前"、"1天前"、"刚刚"等
@@ -8264,6 +8342,66 @@ if (/^\d+$/.test(str) && parseInt(str) > 40000 && parseInt(str) < 100000) {
 return str;
 ```
 
+**v3.8.82 优化内容**：
+
+**问题**：商品列表表格过于臃肿，入库时间信息重复显示
+
+**解决方案**：
+1. 移除商品列表表格中的"入库时间"列，保持列表简洁
+2. 在商品详情页同时显示"入库时间戳"和"入库时间"两个字段
+3. 两个字段都根据时间新鲜度显示不同颜色标识
+
+**前端实现**（v3.8.82优化）：
+
+```javascript
+// index.html:2253-2280 - 商品详情页同时显示两个字段
+let productTimeHtml = '';
+
+// 显示入库时间戳（精确时间）
+if (p.入库时间戳) {
+    const createdDate = new Date(p.入库时间戳);
+    const now = new Date();
+    const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
+    
+    let colorStyle = '';
+    if (hoursDiff <= 24) {
+        colorStyle = 'color: #67c23a; font-weight: bold;';
+    } else if (hoursDiff <= 72) {
+        colorStyle = 'color: #E6A23C; font-weight: bold;';
+    } else {
+        colorStyle = 'color: #f56c6c; font-weight: bold;';
+    }
+    
+    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间戳:</strong> ${p.入库时间戳}</div>`;
+}
+
+// 显示入库时间（相对时间）
+if (p.入库时间) {
+    let colorStyle = '';
+    if (p.入库时间.includes('刚刚') || p.入库时间.includes('分钟前')) {
+        colorStyle = 'color: #67c23a; font-weight: bold;';
+    } else if (p.入库时间.includes('小时前') || p.入库时间.includes('1天前')) {
+        colorStyle = 'color: #E6A23C; font-weight: bold;';
+    } else {
+        colorStyle = 'color: #f56c6c; font-weight: bold;';
+    }
+    productTimeHtml += `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间}</div>`;
+}
+
+// 商品列表表格（v3.8.82优化：移除入库时间列）
+// index.html:3293
+<thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead>
+```
+
+**显示逻辑**（v3.8.82优化）：
+- 商品列表：只显示基本字段（序号、货号、商品描述、售价、员工）
+- 商品详情：同时显示两个字段
+  - 🕐 入库时间戳：精确时间（如"2026-07-24 15:50:21"）
+  - 🕐 入库时间：相对时间（如"3小时前"）
+- 颜色标识：
+  - 🟢 绿色：24小时内/刚刚/几分钟前
+  - 🟠 橙色：24-72小时/几小时前/1天前
+  - 🔴 红色：超过72小时/较长时间
 **注意事项**：
 - 正则表达式必须使用 `/^\d+$/`（带反斜杠），而非 `/^d+$/`
 - Excel 日期处理代码必须放在 `return str` 之前，否则永远不会执行
