@@ -4266,7 +4266,7 @@ class WegoScraper:
             
             media_b64 = media_b64_list[0] if len(media_b64_list) == 1 else media_b64_list
             
-            old_time = item.get('oldTime', '')
+            old_time = item.get('old_time', '')
             
             product = {
                 '商品描述': title,

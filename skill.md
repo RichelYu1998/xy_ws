@@ -2994,7 +2994,194 @@ def dist_files(filename):
         '.css': 'text/css',
         '.html': 'text/html',
         '.json': 'application/json',
-        '.svg': 'image/svg+xml',
+        '.svg': 'image/svg+xml',<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/><meta content="telephone=no" name="format-detection"/><meta name="referrer" content="never"/><title></title><script>window.addEventListener('load', function () {
+            window.onerror = function (msg, url, lineNo, columnNo, error) {
+                var string = msg.toLowerCase();
+                var substring = 'script error';
+                var message = '';
+                if (string.indexOf(substring) > -1) {
+                    message = 'Script Error: See Browser Console for Detail';
+                } else {
+                    message = [
+                        'Message: ' + msg,
+                        'URL: ' + url,
+                        'Line: ' + lineNo,
+                        'Column: ' + columnNo,
+                        'Error object: ' + JSON.stringify(error)
+                    ].join(' - ');
+                }
+
+                if (message) {
+                    console.error(message);
+                }
+
+                return false;
+            };
+        }, false);</script><style>.metaverse-widget {
+            position: fixed;
+            right: calc((100vw - 670px) / 2 - 8px - 256px);
+            top: 8px;
+            z-index: 98;
+            width: 144px;
+            height: 150px;
+            transform: translateX(100%);
+            background: url(https://xcimg.szwego.com/pc_client_poster_0523_1.png) no-repeat;
+            background-size: 144px 150px;
+        }
+
+        @media (max-width: 1024px) {
+            .m-hide {
+                display: none;
+            }
+        }
+
+        .metaverse-widget-link {
+            display: block;
+            height: 100%;
+        }</style><style>#rootLoading {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            margin-left: -12px;
+            margin-top: -12px;
+        }
+
+        .wgoo-loading-icon-outer {
+            display: inline-block;
+            position: relative;
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+
+        .wgoo-loading-icon-outer .loading-icon-circle-outer {
+            position: absolute;
+            top: 0.59375rem;
+            width: 0.3125rem;
+            height: 0.3125rem;
+            border-radius: 0.15625rem;
+            background: #B7BEC5;
+        }
+
+        @keyframes wgoo-loading-circle-anim {
+            from {
+                opacity: 0.2;
+                transform: scale(0.6);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes wgoo-loading-circle-anim-2 {
+            0% {
+                opacity: 0.6;
+                transform: scale(0.8);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .wgoo-loading-icon-outer .loading-icon-circle-outer.icon-outer-1 {
+            left: 0.09375rem;
+            -webkit-animation: wgoo-loading-circle-anim 1s ease-in-out 0s infinite alternate;
+            animation: wgoo-loading-circle-anim 1s ease-in-out 0s infinite alternate;
+        }
+
+        .wgoo-loading-icon-outer .loading-icon-circle-outer.icon-outer-2 {
+            left: 0.59375rem;
+            -webkit-animation: wgoo-loading-circle-anim-2 0.5s ease-out 0s infinite alternate;
+            animation: wgoo-loading-circle-anim-2 0.5s ease-out 0s infinite alternate;
+        }
+
+        .wgoo-loading-icon-outer .loading-icon-circle-outer.icon-outer-3 {
+            left: 1.09375rem;
+            -webkit-animation: wgoo-loading-circle-anim 1s ease-in-out -1s infinite alternate;
+            animation: wgoo-loading-circle-anim 1s ease-in-out -1s infinite alternate;
+        }</style><link href="https://static.szwego.com/wsxc_portal/css/weui-bb8822dbac@s201.css" rel="stylesheet"><link href="https://static.szwego.com/wsxc_portal/css/tdui-d91bb8aee2@d118.css" rel="stylesheet"><link href="https://static.szwego.com/wsxc_portal/css/swiper-41c9a71eed.min.4.0.2.css" rel="stylesheet"><link href="https://static.szwego.com/wsxc_portal/css/biz-global@0.0.1.css" rel="stylesheet"><link href="https://static.szwego.com/wsxc_portal/css/order-global@0.0.2.css" rel="stylesheet"><link href="https://static.szwego.com/wsxc_portal/css/iconfont@customer200-20260529.css" rel="stylesheet"><link href="https://static.szwego.com/wsxc_portal/css/font@mkt255-v2.css" rel="stylesheet"><link href="https://static.szwego.com/wsxc_service/wg-service@prepord-hotfix-im-20260723.css?v=1784795895000" rel="stylesheet"></head><body ontouchstart><div class="content" id="container"></div><div id="rootLoading"><i class="wgoo-loading-icon-outer"><i class="loading-icon-circle-outer icon-outer-1"></i> <i class="loading-icon-circle-outer icon-outer-2"></i> <i class="loading-icon-circle-outer icon-outer-3"></i></i></div><div id="ad_pcc" class="metaverse-widget m-hide" style="visibility: hidden"><a class="metaverse-widget-link" href="/static/index.html#/download_pc_client/ad_home" target="_blank"></a></div><script>var isClient = !!navigator.userAgent.match(/WegoAlbum/i);
+        var isMacOS = !!navigator.userAgent.match(/Mac/i);
+        var isIOS = !!navigator.userAgent.match(/iPhone|iPad|iPod|iOS/i);
+        var isAndroid = !!navigator.userAgent.match(/Android/i);
+
+        window.addEventListener('load', function () {
+            FastClick.prototype.needsClick = function (target) {
+                while (target.tagName !== 'BODY') {
+                    if (target.className.indexOf && target.className.indexOf('needsclick') > -1) return true;
+                    target = target.parentNode;
+                }
+                switch (target.nodeName.toLowerCase()) {
+                    case 'button':
+                    case 'select':
+                    case 'textarea':
+                        if (target.disabled) return true;
+                        break;
+                    case 'input':
+                        if ((isIOS && target.type === 'file') || target.disabled) return true;
+                        break;
+                    case 'label':
+                    case 'iframe':
+                    case 'video':
+                        return true;
+                }
+
+                return /\bneedsclick\b/.test(target.className);
+            };
+            // 解决ios设备下input、textarea第一次获取焦点难的问题
+            FastClick.prototype.focus = function (targetElement) {
+                var length;
+                var deviceIsIOS = /iP(ad|hone|od)/.test(navigator.userAgent);
+
+                // Issue #160: on iOS 7, some input elements (e.g. date datetime month) throw a vague TypeError on setSelectionRange. These elements don't have an integer value for the selectionStart and selectionEnd properties, but unfortunately that can't be used for detection because accessing the properties also throws a TypeError. Just check the type instead. Filed as Apple bug #15122724.
+                if (deviceIsIOS && targetElement.setSelectionRange && targetElement.type.indexOf('date') !== 0 && targetElement.type !== 'time' && targetElement.type !== 'month') {
+                    length = targetElement.value.length;
+                    targetElement.focus();
+                    targetElement.setSelectionRange(length, length);
+                } else {
+                    targetElement.focus();
+                }
+            };
+            FastClick.attach(document.body);
+        }, false);
+
+
+        if (!isClient && !isMacOS && !isIOS && !isAndroid) {
+            document.getElementById('ad_pcc').style.visibility = 'visible';
+        }
+
+        if (isAndroid || isIOS) {
+            document.body.style.webkitUserSelect = 'none';
+            document.body.style.userSelect = 'none';
+        }</script><script>function getPar(par) {
+            var reg = new RegExp('(^|&)'.concat(par, '=([^&]*)(&|$)'), 'i');
+            var r = window.location.search.substr(1).match(reg); // 截取URL中"?"后面的字符串并匹配url表达式
+
+            if (r != null) return decodeURI(r[2]);
+            return ''; // return get_par;
+        }
+        var appVersion = getPar('version');
+        if (appVersion && +appVersion < 2970) {
+            document.body.removeChild(document.getElementById('rootLoading'));
+        }
+
+        const ad = document.getElementById('ad_pcc');
+        // 独立站
+        const isIndSite = 'indsite' === getPar('siteType');
+
+        if (isIndSite && ad) {
+            ad.style.display = 'none';
+        }
+
+        // 处理在线弹窗背景色问题
+        const transparentBg = getPar("transparent_bg");
+        if (transparentBg === "1") {
+            document.body.style.backgroundColor = "transparent";
+        } else {
+            document.body.style.backgroundColor = "";
+        }</script><script>!function (t) { function e() { var e = this || self; e.globalThis = e, delete t.prototype._T_ } "object" != typeof globalThis && (this ? e() : (t.defineProperty(t.prototype, "_T_", { configurable: !0, get: e }), _T_)) }(Object);</script><script src="https://static.szwego.com/wsxc_portal/vendors/wg-polyfill@0.0.2.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/tim-js-sdk@2.19.1.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/tim-upload-plugin@1.0.4.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/react@16.14.0.min.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/react-router@3.2.6.min.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/react-intl@4.7.6.min.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/sortable@1.13.0.min.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/jquery@1.12.4.min.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/global@1.1.106.shop232.min.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/wg-load-config@0.1.30order441.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/fastclick-85f8a13b5c.min.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/jquery-7f2bf133cb.lazyload.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/swiper-5d5f1b4dfa.min.4.0.2.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/qrcode-64b3b33e8d.d118.min.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/clipboard-6d6db83352.min.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/moxie-d6b6f32a7c.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/plupload-5ff3d97bba.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/qiniu-fedd4947f7.infras-f102.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/LodopFuncs-45a537acff-d118.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/sa-sdk-javascript@1.21.6.min.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/fp-c162d7a395@3.3.3.min.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/cos-js-sdk-v5.min.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/wg-federation@2.0.8.customer196.min.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/wg-bridge@0.1.2.umd.min.js"></script><script src="https://static.szwego.com/wsxc_portal/vendors/wgoo@3.1.88.shop228.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_service/wg-service@prepord-hotfix-im-20260723.min.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_album/wg-album@shop221-6.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_increase/wg-increase@vip361-frontend.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_goods/wg-goods@shop221-6.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_order/wg-order@order507.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_biz/wg-biz@preprod-kuikly-hotfix-20260720.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_xway/wg-xway@shop232-2.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_im/wg-im@preprod-hotfix-20260722.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_data/wg-data@customer206-hotfix-20260717.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_publishToAlbum/wg-publishToAlbum@vip299.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_smartDelete/wg-smartDelete@vip299.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_followOfficialAccount/wg-followOfficialAccount@vip299.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_followOfficialAccountToC/wg-followOfficialAccountToC@vip299.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_paymentStatus/wg-paymentStatus@vip299.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_afterMarktProcess/wg-afterMarktProcess@vip299.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_setNotesAndLabels/wg-setNotesAndLabels@customer206.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_staffExpire/wg-staffExpire@customer169.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_vipIntercept/wg-vipIntercept@vip300-27.js?v=1784795895000"></script><script src="https://static.szwego.com/popup_scoreLottery/wg-scoreLottery@vip403.js?v=1784795895000"></script><script src="https://static.szwego.com/wsxc_portal/js/main.ed305e11.js"></script><script src="https://static.szwego.com/wsxc_portal/wg-portal%40preprod-hotfix-20260722.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/jweixin-1.6.0.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/wxLogin.js"></script><script src="https://static.szwego.com/wsxc_portal/plugins/html2canvas.js"></script><script src="https://static.szwego.com/wsxc_portal/js/entry.js" entry="entry"></script></body></html>
         '.woff2': 'font/woff2',
     }
     ext = os.path.splitext(filename)[1].lower()
@@ -3035,7 +3222,7 @@ def dist_files(filename):
 
 ```python
 # 爬取数据时保存入库时间（main.py:4267-4280）
-old_time = item.get('oldTime', '')
+old_time = item.get('old_time', '')  # 注意：字段名是old_time（小写）
 
 product = {
     '商品描述': title,
@@ -3067,26 +3254,6 @@ if storage_times:
         5
     ))
     storage_duration = min_time_str
-            elif hours > 0:
-                storage_duration = f"{hours}小时{minutes}分钟前"
-            else:
-                storage_duration = f"{minutes}分钟前"
-        except (ValueError, TypeError):
-            pass
-    
-    return jsonify({
-        'filename': os.path.basename(latest_file),
-        'total': len(products),
-        'products': products[:100],
-        'highPriceProducts': high_price_products[:500],
-        'highPriceCount': len(high_price_products),
-        'totalPrice': f'¥{total_price:,.2f}',
-        'avgPrice': f'¥{avg_price:,.2f}',
-        'fee': f'¥{total_fee:,.2f}',
-        'system': Environment.SYSTEM,
-        'created_time': created_time,
-        'storage_duration': storage_duration
-    })
 ```
 
 **前端展示**：
