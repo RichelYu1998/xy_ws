@@ -2251,19 +2251,41 @@ SzwegoSpider/
             window.currentImageIndex = 0;
             
             let storageDurationHtml = '';
-            if (window.allProductsData && window.allProductsData.storage_duration) {
+            if (window.allProductsData && (window.allProductsData.storage_duration || window.allProductsData.created_time)) {
                 const storageDuration = window.allProductsData.storage_duration;
+                const createdTime = window.allProductsData.created_time;
                 
+                let displayText = '';
                 let colorStyle = '';
-                if (storageDuration.includes('刚刚') || storageDuration.includes('分钟前')) {
-                    colorStyle = 'color: #67c23a; font-weight: bold;';
-                } else if (storageDuration.includes('小时前') || storageDuration.includes('1天前')) {
-                    colorStyle = 'color: #E6A23C; font-weight: bold;';
-                } else {
-                    colorStyle = 'color: #f56c6c; font-weight: bold;';
+                
+                if (createdTime) {
+                    const createdDate = new Date(createdTime);
+                    const now = new Date();
+                    const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
+                    
+                    if (hoursDiff <= 24) {
+                        colorStyle = 'color: #67c23a; font-weight: bold;';
+                    } else if (hoursDiff <= 72) {
+                        colorStyle = 'color: #E6A23C; font-weight: bold;';
+                    } else {
+                        colorStyle = 'color: #f56c6c; font-weight: bold;';
+                    }
+                    
+                    displayText = createdTime;
+                } else if (storageDuration) {
+                    if (storageDuration.includes('刚刚') || storageDuration.includes('分钟前')) {
+                        colorStyle = 'color: #67c23a; font-weight: bold;';
+                    } else if (storageDuration.includes('小时前') || storageDuration.includes('1天前')) {
+                        colorStyle = 'color: #E6A23C; font-weight: bold;';
+                    } else {
+                        colorStyle = 'color: #f56c6c; font-weight: bold;';
+                    }
+                    displayText = storageDuration;
                 }
                 
-                storageDurationHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${storageDuration}</div>`;
+                if (displayText) {
+                    storageDurationHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${displayText}</div>`;
+                }
             }
             
             let modalHtml = `

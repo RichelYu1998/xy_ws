@@ -4266,7 +4266,15 @@ class WegoScraper:
             
             media_b64 = media_b64_list[0] if len(media_b64_list) == 1 else media_b64_list
             
+            time_stamp = item.get('time_stamp', 0)
             old_time = item.get('old_time', '')
+            
+            created_time = None
+            if time_stamp:
+                try:
+                    created_time = datetime.fromtimestamp(time_stamp / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                except (ValueError, TypeError):
+                    pass
             
             product = {
                 '商品描述': title,
@@ -4276,7 +4284,8 @@ class WegoScraper:
                 '备注': remark,
                 '员工': staff_nick,
                 '图片': media_b64,
-                '入库时间': old_time
+                '入库时间': old_time,
+                '入库时间戳': created_time
             }
             products.append(product)
         
@@ -6737,6 +6746,16 @@ if __name__ == '__main__':
                     ))
                     storage_duration = min_time_str
                 
+                created_time = None
+                created_times = []
+                for p in products:
+                    created_time_str = p.get('入库时间戳', '')
+                    if created_time_str:
+                        created_times.append(created_time_str)
+                
+                if created_times:
+                    created_time = min(created_times)
+                
                 return jsonify({
                     'filename': os.path.basename(latest_file), 
                     'total': len(products), 
@@ -6747,7 +6766,8 @@ if __name__ == '__main__':
                     'avgPrice': f'¥{avg_price:,.2f}',
                     'fee': f'¥{total_fee:,.2f}',
                     'system': Environment.SYSTEM,
-                    'storage_duration': storage_duration
+                    'storage_duration': storage_duration,
+                    'created_time': created_time
                 })
             except Exception as e:
                 return jsonify({'error': str(e)}), 500

@@ -3205,24 +3205,35 @@ def dist_files(filename):
 #### 2.11.2 商品数据时间追踪规范（v3.8.79 新增，v3.8.81 修复）
 
 **核心功能**：
-- 从API响应的`oldTime`字段获取真实入库时间（v3.8.81修复）
+- 从API响应的`time_stamp`字段获取精确入库时间（v3.8.81新增）
+- 从API响应的`old_time`字段获取相对入库时间（v3.8.81修复）
 - 移除前端传递时间戳的错误逻辑（v3.8.81修复）
-- 在Web页面展示真实入库时间
+- 在Web页面展示精确入库时间
 
 **v3.8.81 修复内容**：
 
 **问题**：v3.8.79版本使用前端传递的时间戳，导致入库时间永远显示"0分钟前"
 
 **解决方案**：
-1. 爬取数据时保存API返回的`oldTime`字段
-2. API返回时从商品数据中提取入库时间
-3. 前端不再传递时间戳参数
+1. 爬取数据时保存API返回的`time_stamp`字段（毫秒级时间戳）
+2. 爬取数据时保存API返回的`old_time`字段（相对时间）
+3. 将时间戳转换为可读格式（如"2026-04-23 10:30:00"）
+4. API返回时从商品数据中提取入库时间
+5. 前端优先显示精确时间，备用显示相对时间
 
 **后端实现**：
 
 ```python
-# 爬取数据时保存入库时间（main.py:4267-4280）
-old_time = item.get('old_time', '')  # 注意：字段名是old_time（小写）
+# 爬取数据时保存入库时间（main.py:4267-4294）
+time_stamp = item.get('time_stamp', 0)  # 毫秒级时间戳
+old_time = item.get('old_time', '')  # 相对时间（如"2月前"）
+
+created_time = None
+if time_stamp:
+    try:
+        created_time = datetime.fromtimestamp(time_stamp / 1000).strftime('%Y-%m-%d %H:%M:%S')
+    except (ValueError, TypeError):
+        pass
 
 product = {
     '商品描述': title,
@@ -3232,10 +3243,11 @@ product = {
     '备注': remark,
     '员工': staff_nick,
     '图片': media_b64,
-    '入库时间': old_time  # 新增：保存API返回的入库时间
+    '入库时间': old_time,  # 相对时间（备用）
+    '入库时间戳': created_time  # 精确时间（优先）
 }
 
-# API返回时提取入库时间（main.py:6719-6742）
+# API返回时提取入库时间（main.py:6719-6761）
 storage_duration = None
 storage_times = []
 for p in products:
@@ -3254,91 +3266,98 @@ if storage_times:
         5
     ))
     storage_duration = min_time_str
+
+created_time = None
+created_times = []
+for p in products:
+    created_time_str = p.get('入库时间戳', '')
+    if created_time_str:
+        created_times.append(created_time_str)
+
+if created_times:
+    created_time = min(created_times)  # 最早的入库时间（最新商品）
 ```
 
 **前端展示**：
 
 ```javascript
-fetch(`/api/products?t=${timestamp}`)
-    .then(response => response.json())
-    .then(data => {
-        // 在商品数据汇总标题栏显示入库时间
-        let html = `
-        <div class="comparison-card products-card">
-            <div class="comparison-header" style="background: #409EFF;">
-                <i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}
-                ${data.storage_duration ? ` <span style="font-size: 14px; opacity: 0.9; margin-left: 15px;">
-                    <i class="fa fa-clock-o"></i> 入库时间: ${data.storage_duration}
-                </span>` : ''}
-            </div>
-            ...
-        </div>`;
-    });
-```
-
-**时长格式化规则**：
-- 超过1天：`X天X小时X分钟前`
-- 超过1小时：`X小时X分钟前`
-- 不足1小时：`X分钟前`
-
-**用户体验**：
-- ✅ 用户可直观看到数据入库时长
-- ✅ 便于判断数据新鲜度
-- ✅ 支持实时计算，刷新页面自动更新
-- ✅ 优雅的UI设计，不影响主要信息展示
-
-**商品详情页颜色标识规范（v3.8.80 新增）**：
-
-在商品详情弹窗中，根据入库时长设置不同颜色：
-
-```javascript
-// 在showProductModal函数中添加入库时间展示
+// index.html:2249-2293
 let storageDurationHtml = '';
-if (window.allProductsData && window.allProductsData.storage_duration) {
+if (window.allProductsData && (window.allProductsData.storage_duration || window.allProductsData.created_time)) {
     const storageDuration = window.allProductsData.storage_duration;
     const createdTime = window.allProductsData.created_time;
     
+    let displayText = '';
     let colorStyle = '';
+    
     if (createdTime) {
+        // 优先显示精确时间
         const createdDate = new Date(createdTime);
         const now = new Date();
         const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
         
         if (hoursDiff <= 24) {
-            colorStyle = 'color: #67c23a; font-weight: bold;'; // 绿色 - 最新
+            colorStyle = 'color: #67c23a; font-weight: bold;';
         } else if (hoursDiff <= 72) {
-            colorStyle = 'color: #E6A23C; font-weight: bold;'; // 黄色 - 较新
+            colorStyle = 'color: #E6A23C; font-weight: bold;';
         } else {
-            colorStyle = 'color: #f56c6c; font-weight: bold;'; // 红色 - 较旧
+            colorStyle = 'color: #f56c6c; font-weight: bold;';
         }
+        
+        displayText = createdTime;
+    } else if (storageDuration) {
+        // 备用显示相对时间
+        if (storageDuration.includes('刚刚') || storageDuration.includes('分钟前')) {
+            colorStyle = 'color: #67c23a; font-weight: bold;';
+        } else if (storageDuration.includes('小时前') || storageDuration.includes('1天前')) {
+            colorStyle = 'color: #E6A23C; font-weight: bold;';
+        } else {
+            colorStyle = 'color: #f56c6c; font-weight: bold;';
+        }
+        displayText = storageDuration;
     }
     
-    storageDurationHtml = `<div style="margin-bottom:10px;${colorStyle}">
-        <strong>🕐 入库时间:</strong> ${storageDuration}
-    </div>`;
+    if (displayText) {
+        storageDurationHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${displayText}</div>`;
+    }
 }
-
-// 在商品详情弹窗中显示
-let modalHtml = `
-    <div id="productModal" ...>
-        ...
-        <h3 style="margin:0 0 15px 0;color:#e4393c;">商品详情</h3>
-        ${storageDurationHtml}
-        <div style="margin-bottom:10px;"><strong>货号:</strong> ${p.货号 || '-'}</div>
-        ...
-    </div>
-`;
 ```
 
-**颜色标识规则**：
-- 🟢 **24小时以内**：绿色（#67c23a）- 最新数据
-- 🟡 **3天以内**：黄色（#E6A23C）- 较新数据
-- 🔴 **3天以上**：红色（#f56c6c）- 较旧数据
+**数据示例**：
 
-**用户体验优势**：
-- ✅ 商品详情页直观展示入库时间
-- ✅ 颜色标识快速判断数据新鲜度
-- ✅ 提升用户决策效率
+```json
+{
+  "商品描述": "iPad Air7 11英寸 M3芯片...",
+  "售价": "¥3,650",
+  "拿货价": "¥3,400",
+  "货号": "2N9T",
+  "入库时间": "2月前",  // 相对时间（备用）
+  "入库时间戳": "2026-04-23 10:30:00"  // 精确时间（优先）
+}
+```
+
+**API响应示例**：
+
+```json
+{
+  "time_stamp": 1776930503444,  // 毫秒级时间戳
+  "time": "04/23",
+  "old_time": "2月前"  // 相对时间
+}
+```
+
+**显示逻辑**：
+- 优先显示：`入库时间戳`（精确时间，如"2026-04-23 10:30:00"）
+- 备用显示：`入库时间`（相对时间，如"2月前"）
+- 颜色标识：
+  - 🟢 绿色：24小时以内（最新）
+  - 🟡 橙色：72小时以内（较新）
+  - 🔴 红色：其他（较旧）
+
+**注意事项**：
+- `time_stamp` 字段是毫秒级时间戳，需要除以1000转换为秒
+- `old_time` 字段是相对时间字符串，如"2月前"、"1天前"、"刚刚"等
+- 需要重新爬取数据才能看到正确的入库时间
 
 ### 2.12 EmailNotifier 邮件通知服务
 
