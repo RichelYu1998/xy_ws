@@ -1,12 +1,75 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.83
+> **版本**: v3.8.84
 > **更新日期**: 2026-07-25
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 ---
 
 ## 最新更新
+
+### v3.8.84 (2026-07-25) - 🔒 安全漏洞修复 + 命令注入防护
+
+#### 🔒 严重安全漏洞修复
+
+**1. 命令注入漏洞修复**（严重 🔴）
+- **问题**: `/run` API端点允许执行任意系统命令，无任何过滤
+- **风险**: 攻击者可执行 `rm -rf /`、`cat /etc/passwd` 等危险命令
+- **修复**: 
+  - 添加36种危险命令模式检测（正则表达式）
+  - 添加命令长度限制（最大10000字符）
+  - 拦截危险操作：rm -rf、mkfs、dd、shutdown、reboot等
+  - 拦截权限提升：sudo、su、chmod 777等
+  - 拦截网络操作：nc、netcat、wget、curl | bash等
+  - 拦截敏感文件访问：/etc/passwd、/etc/shadow、.ssh/等
+- **位置**: [main.py:6346-6395](file:///D:/ws/xy_ws/main.py#L6346-L6395)
+
+**2. SSL证书验证修复**（中等 🟡）
+- **问题**: URL验证时禁用了SSL证书验证
+- **风险**: 容易受到中间人攻击，无法验证服务器身份
+- **修复**: 
+  - 启用SSL证书验证（默认安全配置）
+  - 移除不安全的 `CERT_NONE` 设置
+  - 保持 `check_hostname = True`
+- **位置**: [main.py:8023-8059](file:///D:/ws/xy_ws/main.py#L8023-L8059)
+
+#### 📋 危险命令拦截列表（36种）
+
+**系统破坏类**:
+- `rm -rf`、`mkfs`、`dd`、`format`、`del /s`、`erase`
+
+**权限提升类**:
+- `sudo su`、`su -`、`chmod 777`、`chown`、`passwd`
+
+**系统控制类**:
+- `shutdown`、`reboot`、`halt`、`init 0`、`init 6`
+
+**网络攻击类**:
+- `nc -`、`netcat`、`telnet`、`wget`、`curl | bash`
+
+**代码执行类**:
+- `python -c import`、`perl -e`、`ruby -e`、`eval()`、`exec()`
+
+**敏感文件类**:
+- `/etc/passwd`、`/etc/shadow`、`.ssh/`、`id_rsa`
+
+**进程控制类**:
+- `kill -9 1`、`killall`、`pkill -9`
+
+#### 📝 修改文件
+- [main.py:6346-6395](file:///D:/ws/xy_ws/main.py#L6346-L6395) - 命令注入防护
+- [main.py:8023-8059](file:///D:/ws/xy_ws/main.py#L8023-L8059) - SSL证书验证修复
+
+#### ✅ 验证结果
+```
+✅ Python语法检查通过
+✅ 危险命令拦截测试通过
+✅ SSL证书验证已启用
+✅ 命令长度限制已生效
+✅ 安全漏洞已修复
+```
+
+---
 
 ### v3.8.83 (2026-07-25) - 🐛 关键Bug修复 + 资源管理优化
 
