@@ -1,12 +1,68 @@
 ﻿﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.80
-> **更新日期**: 2026-07-24
+> **版本**: v3.8.83
+> **更新日期**: 2026-07-25
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 ---
 
 ## 最新更新
+
+### v3.8.83 (2026-07-25) - 🐛 关键Bug修复 + 资源管理优化
+
+#### 🎯 未定义变量错误修复（严重bug）
+- **问题**: 代码中使用了未定义的变量 `_time`、`_dt`、`_threading`
+- **影响**: 程序运行时会抛出 NameError 异常，导致核心功能失效
+- **修复**:
+  - **`_time` 变量**（5处）→ `time`
+    - 第644行：`_time.strftime` → `time.strftime`
+    - 第646行：`_time.sleep` → `time.sleep`
+    - 第656行：`_time.sleep` → `time.sleep`
+    - 第2873行：`_time.time()` → `time.time()`
+    - 第8017行：`_time.sleep` → `time.sleep`
+  - **`_dt` 变量**（11处）→ `datetime`
+    - 第2836行及更多位置：`_dt.datetime.now()` → `datetime.now()`
+  - **`_threading` 变量**（2处）→ `threading`
+    - 第2837行：`_threading.current_thread()` → `threading.current_thread()`
+    - 第7954-7955行：删除了重复导入，直接使用已导入的模块
+
+#### 🔒 资源泄漏修复
+- **问题**: TeeOutput类缺少析构函数，文件资源可能泄漏
+- **修复**: 添加 `__del__` 方法，确保文件资源被正确释放
+- **文件未正确关闭**（2处）:
+  - 第747行：使用 `with` 语句确保文件正确关闭
+  - 第762行：使用 `with` 语句确保文件正确关闭
+
+#### 📝 generate_skill_docx.py 改进
+- **问题**: 缺少异常处理和文件存在性检查
+- **修复**:
+  - 添加文件存在性检查
+  - 添加文件读取异常处理
+  - 添加文件保存异常处理
+  - 添加 `os` 模块导入
+  - 添加返回值，便于调用者判断是否成功
+
+#### 📋 修改文件
+- [main.py:644-656](file:///D:/ws/xy_ws/main.py#L644-L656) - 修复 `_time` 变量
+- [main.py:2836-2837](file:///D:/ws/xy_ws/main.py#L2836-L2837) - 修复 `_dt` 和 `_threading` 变量
+- [main.py:2873](file:///D:/ws/xy_ws/main.py#L2873) - 修复 `_time.time()`
+- [main.py:747-762](file:///D:/ws/xy_ws/main.py#L747-L762) - 文件资源管理优化
+- [main.py:7954-7955](file:///D:/ws/xy_ws/main.py#L7954-L7955) - 删除重复导入
+- [main.py:8017](file:///D:/ws/xy_ws/main.py#L8017) - 修复 `_time.sleep`
+- [generate_skill_docx.py](file:///D:/ws/xy_ws/generate_skill_docx.py) - 异常处理完善
+
+#### ✅ 验证结果
+```
+✅ Python语法检查通过
+✅ VS Code诊断无错误
+✅ 所有未定义变量已修复
+✅ 所有资源泄漏已修复
+✅ 异常处理已完善
+✅ 邮件发送功能恢复正常
+✅ 日志记录功能恢复正常
+```
+
+---
 
 ### v3.8.82 (2026-07-24) - 🎨 入库时间显示优化
 
