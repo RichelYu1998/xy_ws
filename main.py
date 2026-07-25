@@ -6350,6 +6350,34 @@ if __name__ == '__main__':
             if not command:
                 return jsonify({'error': '命令不能为空'}), 400
             
+            # 危险命令检测（防止命令注入）
+            dangerous_patterns = [
+                r'\brm\s+-rf\b', r'\brm\s+.*-.*f\b', r'\bmkfs\b', r'\bdd\b',
+                r'\bformat\b', r'\bdel\s+/[sS]\b', r'\berase\b',
+                r'\bshutdown\b', r'\breboot\b', r'\bhalt\b',
+                r'\binit\s+0\b', r'\binit\s+6\b', r'\b:(){:|:&};:\b',
+                r'\bchmod\s+777\b', r'\bchown\s+.*:.*\b', r'\bpasswd\b',
+                r'\bsu\s+-\b', r'\bsudo\s+su\b', r'\b>\s*/dev/', r'\bnc\s+-',
+                r'\bnetcat\b', r'\btelnet\b', r'\bftp\s+', r'\bwget\b',
+                r'\bcurl\b.*\|\s*bash', r'\bcurl\b.*\|\s*sh',
+                r'\bpython.*-c.*import', r'\bperl.*-e', r'\bruby.*-e',
+                r'\beval\s+\(', r'\bexec\s+\(', r'\b__import__\s*\(',
+                r'\bos\.system\s*\(', r'\bsubprocess\.', r'\bpopen\s*\(',
+                r'/etc/passwd', r'/etc/shadow', r'\.ssh/', r'id_rsa',
+                r'\bcrontab\b', r'\bat\b.*-f', r'\bscreen\s+-dmS',
+                r'\btmux\s+new-session', r'\bnohup\b', r'\bdisown\b',
+                r'\bkill\s+-9\s+1\b', r'\bkillall\b', r'\bpkill\s+-9\b',
+            ]
+            
+            import re as _re
+            for pattern in dangerous_patterns:
+                if _re.search(pattern, command, _re.IGNORECASE):
+                    return jsonify({'error': f'危险命令已被阻止: 包含禁止的操作模式'}), 403
+            
+            # 命令长度限制
+            if len(command) > 10000:
+                return jsonify({'error': '命令长度超过限制（最大10000字符）'}), 400
+            
             if command.startswith('python '):
                 command = command.replace('python ', VENV_PYTHON + ' ', 1)
             if command.startswith('python3 '):
@@ -7999,9 +8027,12 @@ if __name__ == '__main__':
         def verify_url(url, timeout=10, verbose=False, max_retries=3):
             for attempt in range(max_retries):
                 try:
+                    # 创建SSL上下文，保持默认的安全验证
                     ctx = ssl.create_default_context()
-                    ctx.check_hostname = False
-                    ctx.verify_mode = ssl.CERT_NONE
+                    # 注意：不推荐禁用证书验证，除非有特殊需求
+                    # 如果必须禁用，请添加配置选项和环境变量控制
+                    # ctx.check_hostname = False
+                    # ctx.verify_mode = ssl.CERT_NONE
                     
                     req = urllib.request.Request(url, method='HEAD')
                     req.add_header('User-Agent', 'hostc-verify/1.0')
