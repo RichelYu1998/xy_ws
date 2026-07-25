@@ -1,4 +1,4 @@
-﻿﻿# 标准库
+# 标准库
 import argparse
 import asyncio
 import base64
