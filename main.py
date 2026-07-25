@@ -1,9 +1,8 @@
-﻿# 标准库
+﻿﻿# 标准库
 import argparse
 import asyncio
 import base64
 import ctypes
-import datetime as _dt
 import glob
 import gzip
 import importlib.metadata as im
@@ -22,9 +21,7 @@ import ssl
 import subprocess
 import sys
 import threading
-import threading as _threading
 import time
-import time as _time
 import traceback
 import urllib.request
 import uuid
@@ -628,15 +625,14 @@ class TeeOutput:
                     os.close(test_fd)
                 except OSError as e:
                     if retry_count < max_retries:
-                        import time as _t
-                        backup_path = f"{log_file_path}.locked_{_t.strftime('%H%M%S')}"
+                        backup_path = f"{log_file_path}.locked_{time.strftime('%H%M%S')}"
                         try:
                             os.rename(log_file_path, backup_path)
                             print(f"[TeeOutput] ⚠️ 日志文件被锁定，已备份为: {backup_path}")
                         except Exception as e:
                             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
                             pass
-                        _t.sleep(0.5 * (retry_count + 1))
+                        time.sleep(0.5 * (retry_count + 1))
                         return self._init_log_file(log_file_path, retry_count + 1)
                     else:
                         raise
@@ -645,10 +641,9 @@ class TeeOutput:
             
         except PermissionError as e:
             if retry_count < max_retries:
-                import time as _t
-                alt_path = f"{log_file_path}.{_t.strftime('%Y%m%d_%H%M%S')}"
+                alt_path = f"{log_file_path}.{time.strftime('%Y%m%d_%H%M%S')}"
                 print(f"[TeeOutput] ⚠️ 权限不足，尝试使用备用文件: {alt_path}")
-                _t.sleep(0.3 * (retry_count + 1))
+                time.sleep(0.3 * (retry_count + 1))
                 return self._init_log_file(alt_path, retry_count + 1)
             else:
                 print(f"[TeeOutput] ❌ 无法打开日志文件（已重试{max_retries}次），将仅输出到控制台")
@@ -658,8 +653,7 @@ class TeeOutput:
                 
         except Exception as e:
             if retry_count < max_retries:
-                import time as _t
-                _t.sleep(0.2 * (retry_count + 1))
+                time.sleep(0.2 * (retry_count + 1))
                 return self._init_log_file(log_file_path, retry_count + 1)
             else:
                 print(f"[TeeOutput] ❌ 初始化失败（已重试{max_retries}次）: {e}")
@@ -685,8 +679,7 @@ class TeeOutput:
             
             if not _has_timestamp:
                 if _is_flask_access_log:
-                    import re as _re
-                    _access_match = _re.search(r'^(\S+)\s+-\s+-\s+\[([^\]]+)\]\s+"([^"]+)"\s+(\d+)\s*(.*)', text.strip())
+                    _access_match = re.search(r'^(\S+)\s+-\s+-\s+\[([^\]]+)\]\s+"([^"]+)"\s+(\d+)\s*(.*)', text.strip())
                     if _access_match:
                         _client_ip, _flask_time, _request_line, _status_code, _extra = _access_match.groups()
                         _output_text = f"[{_full_timestamp}] {_client_ip} {_request_line} {_status_code}\n"
@@ -734,6 +727,13 @@ class TeeOutput:
     
     def isatty(self):
         return False
+    
+    def __del__(self):
+        """析构函数，确保文件资源被正确释放"""
+        try:
+            self.close()
+        except Exception:
+            pass
 
 def setup_web_logging():
     """设置Web模式下的日志输出（追加模式，保留shell脚本已写入的完整启动日志）"""
@@ -750,10 +750,10 @@ def setup_web_logging():
             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
             pass
     if need_header:
-        safe_execute_func(
-            lambda: open(web_log_file, 'a', encoding='utf-8').write("=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n"),
-            context='setup_web_logging'
-        )
+        def _write_header():
+            with open(web_log_file, 'a', encoding='utf-8') as f:
+                f.write("=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n")
+        safe_execute_func(_write_header, context='setup_web_logging')
     sys.stdout = TeeOutput(sys.stdout, web_log_file)
     sys.stderr = TeeOutput(sys.stderr, web_log_file)
 
@@ -765,10 +765,10 @@ def log_print(*args, **kwargs):
     _msg_with_timestamp = f"[{_log_timestamp}] {msg}"
     print(_msg_with_timestamp, **kwargs)
     if web_log_file:
-        safe_execute_func(
-            lambda: open(web_log_file, 'a', encoding='utf-8').write(_msg_with_timestamp + '\n'),
-            context='log_print'
-        )
+        def _write_log():
+            with open(web_log_file, 'a', encoding='utf-8') as f:
+                f.write(_msg_with_timestamp + '\n')
+        safe_execute_func(_write_log, context='log_print')
 
 def format_size(size_bytes: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
@@ -2840,8 +2840,8 @@ class EmailNotifier:
     
     def send_tunnel_notification(self, tunnel_url, event_type='new'):
         """发送隧道URL变化通知邮件"""
-        _current_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        _thread_id = _threading.current_thread().name
+        _current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        _thread_id = threading.current_thread().name
         
         config = self.get_email_config()
         
@@ -2876,9 +2876,8 @@ class EmailNotifier:
             html_status_note = ""
             
             if event_type == 'stable_available':
-                import time as _time
                 try:
-                    _verify_dur = int(_time.time() - globals().get('url_first_seen_time', 0)) if globals().get('url_first_seen_time', 0) > 0 else 0
+                    _verify_dur = int(time.time() - globals().get('url_first_seen_time', 0)) if globals().get('url_first_seen_time', 0) > 0 else 0
                     _min_confirms = globals().get('stable_url_min_confirms', 3)
                     _confirm_count = globals().get('stable_url_confirm_count', 0)
                 except (NameError, TypeError):
@@ -3042,39 +3041,39 @@ class EmailNotifier:
             msg.attach(MIMEText(body, 'plain', 'utf-8'))
             msg.attach(MIMEText(html_body, 'html', 'utf-8'))
             
-            _connect_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            _connect_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"[{_connect_time}] [EmailNotifier-Thread:{_thread_id}] 🔌 正在连接SMTP服务器 (超时: 30秒)...")
             timeout = 30
             
-            _connect_start = _dt.datetime.now()
+            _connect_start = datetime.now()
             if config['smtp_port'] == 465:
                 server = smtplib.SMTP_SSL(config['smtp_host'], config['smtp_port'], timeout=timeout)
             else:
                 server = smtplib.SMTP(config['smtp_host'], config['smtp_port'], timeout=timeout)
                 server.starttls()
-            _connect_end = _dt.datetime.now()
+            _connect_end = datetime.now()
             _connect_duration = (_connect_end - _connect_start).total_seconds()
             
-            _login_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            _login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"[{_login_time}] [EmailNotifier-Thread:{_thread_id}] ✅ SMTP连接成功 (耗时: {_connect_duration:.2f}秒)")
             print(f"[{_login_time}] [EmailNotifier-Thread:{_thread_id}] 🔐 正在登录SMTP服务器...")
             
-            _login_start = _dt.datetime.now()
+            _login_start = datetime.now()
             server.login(config['smtp_user'], config['smtp_password'])
-            _login_end = _dt.datetime.now()
+            _login_end = datetime.now()
             _login_duration = (_login_end - _login_start).total_seconds()
             
-            _send_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            _send_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"[{_send_time}] [EmailNotifier-Thread:{_thread_id}] ✅ SMTP登录成功 (耗时: {_login_duration:.2f}秒)")
             print(f"[{_send_time}] [EmailNotifier-Thread:{_thread_id}] 📤 正在发送邮件...")
             
-            _send_start = _dt.datetime.now()
+            _send_start = datetime.now()
             server.sendmail(config['smtp_user'], config['to_email'], msg.as_string())
             server.quit()
-            _send_end = _dt.datetime.now()
+            _send_end = datetime.now()
             _send_duration = (_send_end - _send_start).total_seconds()
             
-            _success_time = _dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            _success_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"[{_success_time}] [EmailNotifier-Thread:{_thread_id}] ✅✅✅ 邮件发送成功！")
             print(f"[{_success_time}] [EmailNotifier-Thread:{_thread_id}] 📬 收件人: {config['to_email']}")
             print(f"[{_success_time}] [EmailNotifier-Thread:{_thread_id}] ⏱️ 发送耗时: {_send_duration:.2f}秒")
@@ -3671,51 +3670,65 @@ class WegoScraper:
             stock_number = stock_match.group(1) if stock_match else ''
             
             def extract_price(text):
-                price_match = re.search(r'售价[：:]\s*¥?\s*([\d,]+)', text)
-                if not price_match:
-                    price_match = re.search(r'¥\s*([\d,]+)(?![0-9])', text)
-                if price_match:
-                    price_value = int(price_match.group(1).replace(',', ''))
-                    if 100 <= price_value <= 50000:
-                        return '¥' + price_match.group(1)
-                return None
+                try:
+                    price_match = re.search(r'售价[：:]\s*¥?\s*([\d,]+)', text)
+                    if not price_match:
+                        price_match = re.search(r'¥\s*([\d,]+)(?![0-9])', text)
+                    if price_match:
+                        try:
+                            price_value = int(price_match.group(1).replace(',', ''))
+                            if 100 <= price_value <= 50000:
+                                return '¥' + price_match.group(1)
+                        except (ValueError, TypeError):
+                            pass
+                    return None
+                except Exception:
+                    return None
             
             price = extract_price(element_text)
             
             def extract_cost_price(text, html):
-                # 只匹配真正包含"拿货价"关键字的数据
-                # 移除价格范围限制，接受任何合理的拿货价
-                
-                # 模式1: 拿货价：¥1234 或 拿货价:1234
-                cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', text)
-                if cost_match:
-                    cost_value = int(cost_match.group(1).replace(',', ''))
-                    if cost_value > 50:  # 拿货价至少要大于50元
-                        return '¥' + cost_match.group(1)
-                
-                # 模式2: 带空格的情况 拿货价 ：1234
-                cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', text)
-                if cost_match2:
-                    cost_value = int(cost_match2.group(1).replace(',', ''))
-                    if cost_value > 50:
-                        return '¥' + cost_match2.group(1)
-                
-                # 模式3: HTML内容中的拿货价
-                if html:
-                    html_cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', html)
-                    if html_cost_match:
-                        cost_value = int(html_cost_match.group(1).replace(',', ''))
-                        if cost_value > 50:
-                            return '¥' + html_cost_match.group(1)
+                try:
+                    cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', text)
+                    if cost_match:
+                        try:
+                            cost_value = int(cost_match.group(1).replace(',', ''))
+                            if cost_value > 50:
+                                return '¥' + cost_match.group(1)
+                        except (ValueError, TypeError):
+                            pass
                     
-                    # 模式4: HTML中带空格的情况
-                    html_cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', html)
-                    if html_cost_match2:
-                        cost_value = int(html_cost_match2.group(1).replace(',', ''))
-                        if cost_value > 50:
-                            return '¥' + html_cost_match2.group(1)
-                
-                return None
+                    cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', text)
+                    if cost_match2:
+                        try:
+                            cost_value = int(cost_match2.group(1).replace(',', ''))
+                            if cost_value > 50:
+                                return '¥' + cost_match2.group(1)
+                        except (ValueError, TypeError):
+                            pass
+                    
+                    if html:
+                        html_cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', html)
+                        if html_cost_match:
+                            try:
+                                cost_value = int(html_cost_match.group(1).replace(',', ''))
+                                if cost_value > 50:
+                                    return '¥' + html_cost_match.group(1)
+                            except (ValueError, TypeError):
+                                pass
+                        
+                        html_cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', html)
+                        if html_cost_match2:
+                            try:
+                                cost_value = int(html_cost_match2.group(1).replace(',', ''))
+                                if cost_value > 50:
+                                    return '¥' + html_cost_match2.group(1)
+                            except (ValueError, TypeError):
+                                pass
+                    
+                    return None
+                except Exception:
+                    return None
             
             cost_price = extract_cost_price(element_text, html_content)
             
@@ -3870,14 +3883,22 @@ class WegoScraper:
                 handle_exception(e, 'fetch_cost_prices_via_api读取Cookie')
                 return
         
-        cookie_str = '; '.join([f'{c["name"]}={c["value"]}' for c in cookies])
+        try:
+            cookie_str = '; '.join([f'{c.get("name", "")}={c.get("value", "")}' for c in cookies if c.get("name") and c.get("value")])
+        except (AttributeError, TypeError) as e:
+            print(f'  ⚠️ Cookie格式错误: {e}')
+            return
         
-        current_url = page.url        # 尝试从URL中提取albumId（可能在query参数或hash中）
-        album_id_match = re.search(r'albumId=([^&/]+)|/shop_detail/([^/?#]+)', current_url)
-        if album_id_match:
-            album_id = album_id_match.group(1) or album_id_match.group(2)
-        else:
-            album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
+        current_url = page.url
+        album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
+        
+        try:
+            album_id_match = re.search(r'albumId=([^&/]+)|/shop_detail/([^/?#]+)', current_url)
+            if album_id_match:
+                album_id = album_id_match.group(1) or album_id_match.group(2) or album_id
+        except Exception as e:
+            print(f'  ⚠️ URL解析失败，使用默认albumId: {e}')
+        
         print(f'Album ID: {album_id}')
         
         headers = {
@@ -3908,13 +3929,23 @@ class WegoScraper:
                 params['timestamp'] = page_timestamp
             
             try:
-                # 使用带cookies的请求
-                # 在headers中添加Cookie
                 headers_with_cookie = dict(headers)
                 headers_with_cookie['Cookie'] = cookie_str
-                response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
+                
+                try:
+                    response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
+                except Exception as req_error:
+                    print(f'  ⚠️ API请求异常: {req_error}')
+                    if 'pattern' in str(req_error).lower():
+                        print(f'  💡 可能原因: URL格式错误或网络问题')
+                    break
+                
                 if response.status == 200:
-                    text = await response.text()
+                    try:
+                        text = await response.text()
+                    except Exception as text_error:
+                        print(f'  ⚠️ 响应内容读取失败: {text_error}')
+                        break
                     
                     # 检查是否返回了HTML而非JSON（常见问题：Cookie过期、反爬等）
                     if text.strip().startswith('<'):
@@ -3938,26 +3969,46 @@ class WegoScraper:
                     try:
                         data = json.loads(text)
                         
-                        # 检查API是否返回了业务错误
-                        if isinstance(data, dict) and data.get('code') and data.get('code') != 0:
+                        if not isinstance(data, dict):
+                            print(f'  ⚠️ API返回数据格式错误（非字典类型）')
+                            break
+                        
+                        if data.get('code') and data.get('code') != 0:
                             print(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
                             break
                         
-                        result = data.get('result', {})
+                        result = data.get('result')
+                        if not result or not isinstance(result, dict):
+                            print(f'  ⚠️ API返回数据缺少result字段')
+                            break
+                        
                         items = result.get('items', [])
+                        if not isinstance(items, list):
+                            print(f'  ⚠️ items字段格式错误')
+                            items = []
+                        
                         pagination = result.get('pagination', {})
+                        if not isinstance(pagination, dict):
+                            pagination = {}
                         
                         if items:
                             all_goods_data.extend(items)
                             print(f'  第{page_num+1}页: 获取 {len(items)} 个商品')
                             
-                            # 调试：打印第一个商品的title和goodsNum
                             if page_num == 0 and items:
-                                print(f'    调试: 第一个商品 title={items[0].get("title", "")[:30]}... goodsNum={items[0].get("goodsNum", "")}')
+                                try:
+                                    first_item = items[0] if items else {}
+                                    title = str(first_item.get('title', ''))[:30]
+                                    goods_num = str(first_item.get('goodsNum', ''))
+                                    print(f'    调试: 第一个商品 title={title}... goodsNum={goods_num}')
+                                except Exception as debug_error:
+                                    print(f'    调试: 商品信息读取失败: {debug_error}')
                             
-                            # 检查是否还有更多 - 使用 isLoadMore 判断
                             is_load_more = pagination.get('isLoadMore', False)
-                            page_timestamp = str(pagination.get('pageTimestamp', ''))
+                            try:
+                                page_timestamp = str(pagination.get('pageTimestamp', ''))
+                            except (ValueError, TypeError):
+                                page_timestamp = ''
                             
                             if is_load_more and page_timestamp:
                                 params['timestamp'] = page_timestamp
@@ -4007,45 +4058,71 @@ class WegoScraper:
             sample = products_need_api[0][0]
             print(f'  调试: 第一个商品的货号={sample.get("货号", "")}, 名称={sample.get("商品名称", "")[:30]}...')
         
-        # 构建商品映射
         goods_by_num = {}
         goods_by_title = {}
         for item in all_goods_data:
-            goods_num = item.get('goodsNum', '')
-            title = item.get('title', '')
-            if goods_num:
-                goods_by_num[goods_num] = item
-            if title:
-                goods_by_title[title] = item
+            try:
+                if not isinstance(item, dict):
+                    continue
+                goods_num = str(item.get('goodsNum', ''))
+                title = str(item.get('title', ''))
+                if goods_num:
+                    goods_by_num[goods_num] = item
+                if title:
+                    goods_by_title[title] = item
+            except Exception:
+                continue
         
-        # 匹配并更新拿货价
         success_count = 0
         for product, element_id in products_need_api:
-            goods_num = product.get('货号', '')
-            title = product.get('商品名称', '')
-            
-            matched_item = None
-            if goods_num and goods_num in goods_by_num:
-                matched_item = goods_by_num[goods_num]
-            elif title and title in goods_by_title:
-                matched_item = goods_by_title[title]
-            
-            if matched_item:
-                price_arr = matched_item.get('priceArr', [])
-                cost_price = None
-                for price_item in price_arr:
-                    if price_item.get('priceType') == 1:
-                        cost_price = price_item.get('value')
-                        break
+            try:
+                if not isinstance(product, dict):
+                    continue
                 
-                if cost_price:
-                    product['拿货价'] = f'¥{int(cost_price):,}'
-                    success_count += 1
-                    print(f'  ✓ 获取拿货价: {product["商品名称"][:30]}... -> {product["拿货价"]}')
+                goods_num = str(product.get('货号', ''))
+                title = str(product.get('商品名称', ''))
+                
+                matched_item = None
+                if goods_num and goods_num in goods_by_num:
+                    matched_item = goods_by_num[goods_num]
+                elif title and title in goods_by_title:
+                    matched_item = goods_by_title[title]
+                
+                if matched_item and isinstance(matched_item, dict):
+                    price_arr = matched_item.get('priceArr', [])
+                    if not isinstance(price_arr, list):
+                        price_arr = []
+                    
+                    cost_price = None
+                    for price_item in price_arr:
+                        if not isinstance(price_item, dict):
+                            continue
+                        try:
+                            if price_item.get('priceType') == 1:
+                                cost_price = price_item.get('value')
+                                break
+                        except Exception:
+                            continue
+                    
+                    if cost_price is not None:
+                        try:
+                            cost_price_int = int(cost_price)
+                            product['拿货价'] = f'¥{cost_price_int:,}'
+                            success_count += 1
+                            product_name = str(product.get('商品名称', ''))[:30]
+                            print(f'  ✓ 获取拿货价: {product_name}... -> {product["拿货价"]}')
+                        except (ValueError, TypeError):
+                            product_name = str(product.get('商品名称', ''))[:30]
+                            print(f'  ⚠ 拿货价格式错误: {product_name}...')
+                    else:
+                        product_name = str(product.get('商品名称', ''))[:30]
+                        print(f'  ⚠ 无拿货价: {product_name}...')
                 else:
-                    print(f'  ⚠ 无拿货价: {product["商品名称"][:30]}...')
-            else:
-                print(f'  ⚠ 未匹配到: {product["商品名称"][:30]}...')
+                    product_name = str(product.get('商品名称', ''))[:30]
+                    print(f'  ⚠ 未匹配到: {product_name}...')
+            except Exception as e:
+                print(f'  ⚠ 处理商品匹配失败: {e}')
+                continue
         
         print(f'API获取完成，成功获取 {success_count}/{len(products_need_api)} 个拿货价')
 
@@ -4112,15 +4189,23 @@ class WegoScraper:
                 print(f'读取cookie失败: {e}')
                 return None
         
-        current_url = page.url
-        album_id_match = re.search(r'albumId=([^&/]+)|/shop_detail/([^/?#]+)', current_url)
-        if album_id_match:
-            album_id = album_id_match.group(1) or album_id_match.group(2)
-        else:
-            album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
-        print(f'Album ID: {album_id}')
+        try:
+            cookie_str = '; '.join([f'{c.get("name", "")}={c.get("value", "")}' for c in cookies if c.get("name") and c.get("value")])
+        except (AttributeError, TypeError) as e:
+            print(f'  ⚠️ Cookie格式错误: {e}')
+            return None
         
-        cookie_str = '; '.join([f'{c["name"]}={c["value"]}' for c in cookies])
+        current_url = page.url
+        album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
+        
+        try:
+            album_id_match = re.search(r'albumId=([^&/]+)|/shop_detail/([^/?#]+)', current_url)
+            if album_id_match:
+                album_id = album_id_match.group(1) or album_id_match.group(2) or album_id
+        except Exception as e:
+            print(f'  ⚠️ URL解析失败，使用默认albumId: {e}')
+        
+        print(f'Album ID: {album_id}')
         
         headers = {
             'Accept': 'application/json, text/plain, */*',
@@ -4148,13 +4233,23 @@ class WegoScraper:
                 params['timestamp'] = page_timestamp
             
             try:
-                # 在headers中添加Cookie
                 headers_with_cookie = dict(headers)
                 headers_with_cookie['Cookie'] = cookie_str
-                response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
+                
+                try:
+                    response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
+                except Exception as req_error:
+                    print(f'  ⚠️ API请求异常: {req_error}')
+                    if 'pattern' in str(req_error).lower():
+                        print(f'  💡 可能原因: URL格式错误或网络问题')
+                    break
                 
                 if response.status == 200:
-                    text = await response.text()
+                    try:
+                        text = await response.text()
+                    except Exception as text_error:
+                        print(f'  ⚠️ 响应内容读取失败: {text_error}')
+                        break
                     
                     # 检查是否返回了HTML而非JSON（常见问题：Cookie过期、反爬等）
                     if text.strip().startswith('<'):
@@ -4178,21 +4273,37 @@ class WegoScraper:
                     try:
                         data = json.loads(text)
                         
-                        # 检查API是否返回了业务错误
-                        if isinstance(data, dict) and data.get('code') and data.get('code') != 0:
+                        if not isinstance(data, dict):
+                            print(f'  ⚠️ API返回数据格式错误（非字典类型）')
+                            break
+                        
+                        if data.get('code') and data.get('code') != 0:
                             print(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
                             break
                         
-                        result = data.get('result', {})
+                        result = data.get('result')
+                        if not result or not isinstance(result, dict):
+                            print(f'  ⚠️ API返回数据缺少result字段')
+                            break
+                        
                         items = result.get('items', [])
+                        if not isinstance(items, list):
+                            print(f'  ⚠️ items字段格式错误')
+                            items = []
+                        
                         pagination = result.get('pagination', {})
+                        if not isinstance(pagination, dict):
+                            pagination = {}
                         
                         if items:
                             all_goods_data.extend(items)
                             print(f'  第{page_num+1}页: 获取 {len(items)} 个商品')
                             
                             is_load_more = pagination.get('isLoadMore', False)
-                            page_timestamp = str(pagination.get('pageTimestamp', ''))
+                            try:
+                                page_timestamp = str(pagination.get('pageTimestamp', ''))
+                            except (ValueError, TypeError):
+                                page_timestamp = ''
                             
                             if is_load_more and page_timestamp:
                                 params['timestamp'] = page_timestamp
@@ -4237,57 +4348,91 @@ class WegoScraper:
         
         products = []
         for item in all_goods_data:
-            title = item.get('title', '')
-            goods_num = item.get('goodsNum', '')
+            try:
+                if not isinstance(item, dict):
+                    continue
+                
+                title = str(item.get('title', ''))
+                goods_num = str(item.get('goodsNum', ''))
+                
+                price_arr = item.get('priceArr', [])
+                if not isinstance(price_arr, list):
+                    price_arr = []
+                
+                sale_price = None
+                cost_price = None
+                for price_item in price_arr:
+                    if not isinstance(price_item, dict):
+                        continue
+                    try:
+                        if price_item.get('priceType') == 1:
+                            cost_price = price_item.get('value')
+                        elif price_item.get('priceType') == 2:
+                            sale_price = price_item.get('value')
+                    except Exception:
+                        continue
+                
+                note_arr = item.get('noteArr', [])
+                remark = ''
+                if isinstance(note_arr, list) and note_arr:
+                    try:
+                        remark = str(note_arr[0].get('value', '')) if isinstance(note_arr[0], dict) else ''
+                    except (IndexError, AttributeError, TypeError):
+                        remark = ''
+                
+                staff_info = item.get('staffInfo', {})
+                staff_nick = str(staff_info.get('staffNick', '')) if isinstance(staff_info, dict) else ''
+                
+                media_b64_list = []
+                imgs_src = item.get('imgsSrc', [])
+                if isinstance(imgs_src, list):
+                    for url in imgs_src:
+                        try:
+                            media_b64_list.append(base64.b64encode(str(url).encode('utf-8')).decode('utf-8'))
+                        except Exception:
+                            continue
+                
+                video_url = item.get('videoUrl', '')
+                if video_url:
+                    try:
+                        media_b64_list.append(base64.b64encode(str(video_url).encode('utf-8')).decode('utf-8'))
+                    except Exception:
+                        pass
+                
+                media_b64 = media_b64_list[0] if len(media_b64_list) == 1 else media_b64_list
+                
+                time_stamp = item.get('time_stamp', 0)
+                old_time = str(item.get('old_time', ''))
+                
+                created_time = None
+                if time_stamp:
+                    try:
+                        created_time = datetime.fromtimestamp(int(time_stamp) / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                    except (ValueError, TypeError, OSError):
+                        pass
             
-            price_arr = item.get('priceArr', [])
-            sale_price = None
-            cost_price = None
-            for price_item in price_arr:
-                if price_item.get('priceType') == 1:
-                    cost_price = price_item.get('value')
-                elif price_item.get('priceType') == 2:
-                    sale_price = price_item.get('value')
-            
-            note_arr = item.get('noteArr', [])
-            remark = note_arr[0].get('value', '') if note_arr else ''
-            
-            staff_info = item.get('staffInfo', {})
-            staff_nick = staff_info.get('staffNick', '')
-            
-            media_b64_list = []
-            imgs_src = item.get('imgsSrc', [])
-            if imgs_src:
-                for url in imgs_src:
-                    media_b64_list.append(base64.b64encode(url.encode('utf-8')).decode('utf-8'))
-            video_url = item.get('videoUrl', '')
-            if video_url:
-                media_b64_list.append(base64.b64encode(video_url.encode('utf-8')).decode('utf-8'))
-            
-            media_b64 = media_b64_list[0] if len(media_b64_list) == 1 else media_b64_list
-            
-            time_stamp = item.get('time_stamp', 0)
-            old_time = item.get('old_time', '')
-            
-            created_time = None
-            if time_stamp:
                 try:
-                    created_time = datetime.fromtimestamp(time_stamp / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                    sale_price_int = int(sale_price) if sale_price is not None else None
+                    cost_price_int = int(cost_price) if cost_price is not None else None
                 except (ValueError, TypeError):
-                    pass
-            
-            product = {
-                '商品描述': title,
-                '售价': f'¥{int(sale_price):,}' if sale_price else '',
-                '拿货价': f'¥{int(cost_price):,}' if cost_price else '',
-                '货号': goods_num,
-                '备注': remark,
-                '员工': staff_nick,
-                '图片': media_b64,
-                '入库时间': old_time,
-                '入库时间戳': created_time
-            }
-            products.append(product)
+                    sale_price_int = None
+                    cost_price_int = None
+                
+                product = {
+                    '商品描述': title,
+                    '售价': f'¥{sale_price_int:,}' if sale_price_int is not None else '',
+                    '拿货价': f'¥{cost_price_int:,}' if cost_price_int is not None else '',
+                    '货号': goods_num,
+                    '备注': remark,
+                    '员工': staff_nick,
+                    '图片': media_b64,
+                    '入库时间': old_time,
+                    '入库时间戳': created_time
+                }
+                products.append(product)
+            except Exception as e:
+                print(f'  ⚠️ 处理商品数据失败: {e}')
+                continue
         
         print(f'fetch_all_products_via_api 返回: {len(products)} 个商品')
         return products
@@ -7810,10 +7955,8 @@ if __name__ == '__main__':
                 global last_email_sent_time, email_fail_count, last_email_sent_url
                 global cf_last_email_sent_time, cf_last_email_sent_url
                 global global_last_email_sent_time, recent_sent_urls
-                import datetime
-                import threading as _threading
-                current_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                thread_id = _threading.current_thread().name
+                current_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                thread_id = threading.current_thread().name
                 try:
                     print(f"[{current_time_str}] [EmailNotifier-Thread:{thread_id}] 📧 开始发送邮件通知")
                     print(f"[{current_time_str}] [EmailNotifier-Thread:{thread_id}] 🎯 目标URL: {new_url}")
@@ -7834,16 +7977,16 @@ if __name__ == '__main__':
                                 last_email_sent_time = send_time
                                 last_email_sent_url = new_url
                             email_fail_count = 0
-                            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] ✅✅✅ 邮件发送成功！")
-                            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] 🔗 隧道地址: {new_url}")
+                            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] ✅✅✅ 邮件发送成功！")
+                            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] 🔗 隧道地址: {new_url}")
                         else:
                             email_fail_count += 1
-                            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] ❌❌❌ 邮件发送失败！")
-                            print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] 📈 失败次数: {email_fail_count}/{email_max_fail_count}")
+                            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] ❌❌❌ 邮件发送失败！")
+                            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Email-{tunnel_type}] 📈 失败次数: {email_fail_count}/{email_max_fail_count}")
 
                 except Exception as e:
                     email_fail_count += 1
-                    error_time_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    error_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     print(f"[{error_time_str}] [Email-{tunnel_type}] 💥💥💥 邮件发送异常！")
                     print(f"[{error_time_str}] [Email-{tunnel_type}] 异常信息: {str(e)[:200]}")
 
@@ -7876,7 +8019,7 @@ if __name__ == '__main__':
                     if verbose:
                         print(f"[Email] URL验证失败 (第{attempt+1}/{max_retries}次): {url} - {str(e)[:100]}")
                     if attempt < max_retries - 1:
-                        _time.sleep(2)
+                        time.sleep(2)
                     continue
             return False
         
