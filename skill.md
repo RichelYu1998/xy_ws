@@ -130,6 +130,7 @@
     - [2.16.12 天气时钟（2个）](#21612-天气时钟2个)
     - [2.16.13 拖拽功能（3个，利润报表浮动面板）](#21613-拖拽功能3个利润报表浮动面板)
     - [2.16.14 表格渲染与联动（2个）](#21614-表格渲染与联动2个)
+    - [2.16.15 商品搜索多表联动（v3.8.86 新增）](#21615-商品搜索多表联动v3886-新增)
   - [2.17 Flask 路由核心范式](#217-flask-路由核心范式)
     - [2.17.1 首页版本注入 + 无缓存范式](#2171-首页版本注入--无缓存范式)
     - [2.17.2 静态资源 gzip 压缩范式](#2172-静态资源-gzip-压缩范式)
@@ -6854,6 +6855,11 @@ window._profitPanelDragMoveTouch = function(e) { var t = e.touches[0]; onDragMov
 function renderTable(products, title, color, tableId) {
     // 渲染商品表格（支持颜色标记、SKU高亮）
     // 自动计算列宽、响应式适配
+    // v3.8.86: 每个表格标题下方添加独立统计行
+    //   - 统计行ID: tableId + '-stats'
+    //   - 统计内容: 售出总价、均价、手续费
+    //   - data-original-html: 保存原始HTML，清除搜索时恢复
+    //   - 搜索时更新为匹配商品的统计 + 匹配数
 }
 
 function syncScroll(sourceContainer, sourceIndex) {
@@ -6861,6 +6867,47 @@ function syncScroll(sourceContainer, sourceIndex) {
     // sourceIndex: 0=左表, 1=右表
 }
 ```
+
+#### 2.16.15 商品搜索多表联动（v3.8.86 新增）
+
+**核心原则**：搜索时所有表格联动过滤，每个表格独立统计，不合并数据。
+
+```javascript
+function filterProducts(searchTerm) {
+    // 1. 遍历4个表格统一过滤
+    const tableIds = ['table-all', 'table-highprice', 'table-highprice-new', 'table-added'];
+    
+    tableIds.forEach(tableId => {
+        // 2. 对每个表格的行进行搜索匹配
+        // 3. 计算每个表格的独立统计（售出总价、均价、手续费）
+        // 4. 更新每个表格的统计行（tableId + '-stats'）
+        // 5. 更新表格标题显示匹配数
+        // 6. 无匹配时隐藏整个 change-section
+    });
+    
+    // 7. 顶部统计区只反映总商品列表（table-all）的数据
+    // 8. 顶部徽章更新为匹配数/总数格式
+    // 9. 搜索结果区域按表分别展示彩色标签
+}
+```
+
+**表格ID与徽章映射**：
+| 表格ID | 名称 | 徽章ID | 标签颜色 |
+|--------|------|--------|----------|
+| `table-all` | 总商品列表 | `badge-total` | `#409EFF` 蓝色 |
+| `table-highprice` | 高价商品 | `badge-highprice` | `#E6A23C` 橙色 |
+| `table-highprice-new` | 高价新增 | 无 | `#f56c6c` 红色 |
+| `table-added` | 新增商品 | `badge-added` | `#67c23a` 绿色 |
+
+**搜索结果展示规范**：
+- 每个有匹配的表单独一个彩色标签：`[总商品: 1/89]  [高价商品: 1/75]`
+- 禁止合并为"共找到 X 个匹配"的单一标签
+- 无匹配时显示红色"未找到匹配结果"标签
+
+**统计行恢复机制**：
+- `data-original-html` 属性保存原始HTML内容
+- 清除搜索时通过 `innerHTML` 恢复原始内容
+- 顶部徽章通过 `data-original-text` 恢复原始文本
 
 ### 2.17 Flask 路由核心范式
 
