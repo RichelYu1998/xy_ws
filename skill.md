@@ -3279,38 +3279,44 @@ if created_times:
     created_time = min(created_times)  # 最早的入库时间（最新商品）
 ```
 
-**前端展示**：
+**前端展示**（v3.8.87 优化：实时计算相对时间）：
 
 ```javascript
-// index.html:2245-2297 - 商品详情弹窗展示每个商品自己的入库时间
+// index.html:2253-2288 - 商品详情弹窗入库时间实时计算
 let productTimeHtml = '';
 if (p.入库时间戳) {
-    // 优先显示精确时间戳
     const createdDate = new Date(p.入库时间戳);
     const now = new Date();
-    const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
+    const diffMs = now - createdDate;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    let relativeTime = '';
+    if (diffMinutes < 1) {
+        relativeTime = '刚刚';
+    } else if (diffMinutes < 60) {
+        relativeTime = diffMinutes + '分钟前';
+    } else if (diffHours < 24) {
+        relativeTime = Math.floor(diffHours) + '小时前';
+    } else if (diffDays < 30) {
+        relativeTime = diffDays + '天前';
+    } else if (diffDays < 365) {
+        relativeTime = Math.floor(diffDays / 30) + '月前';
+    } else {
+        relativeTime = Math.floor(diffDays / 365) + '年前';
+    }
     
     let colorStyle = '';
-    if (hoursDiff <= 24) {
+    if (diffHours <= 24) {
         colorStyle = 'color: #67c23a; font-weight: bold;';
-    } else if (hoursDiff <= 72) {
+    } else if (diffHours <= 72) {
         colorStyle = 'color: #E6A23C; font-weight: bold;';
     } else {
         colorStyle = 'color: #f56c6c; font-weight: bold;';
     }
     
-    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间戳}</div>`;
-} else if (p.入库时间) {
-    // 备用显示相对时间
-    let colorStyle = '';
-    if (p.入库时间.includes('刚刚') || p.入库时间.includes('分钟前')) {
-        colorStyle = 'color: #67c23a; font-weight: bold;';
-    } else if (p.入库时间.includes('小时前') || p.入库时间.includes('1天前')) {
-        colorStyle = 'color: #E6A23C; font-weight: bold;';
-    } else {
-        colorStyle = 'color: #f56c6c; font-weight: bold;';
-    }
-    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间}</div>`;
+    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${relativeTime}（${p.入库时间戳}）</div>`;
 }
 
 // 在商品详情弹窗中显示
@@ -3366,10 +3372,17 @@ tableHtml += `<tr ...>
 }
 ```
 
-**显示逻辑**：
-- 优先显示：`入库时间戳`（精确时间，如"2026-04-23 10:30:00"）
-- 备用显示：`入库时间`（相对时间，如"2月前"）
-- 颜色标识：
+**显示逻辑**（v3.8.87 优化：实时计算相对时间）：
+- 基于`入库时间戳`实时计算相对时间（如"3小时前"），不再使用源API的静态相对时间
+- 合并显示：`🕐 入库时间: X分钟前（2026-07-26 18:06:05）`
+- 相对时间计算规则：
+  - < 1分钟 → "刚刚"
+  - < 60分钟 → "X分钟前"
+  - < 24小时 → "X小时前"
+  - < 30天 → "X天前"
+  - < 365天 → "X月前"
+  - ≥ 365天 → "X年前"
+- 颜色标识（基于实际时间差）：
   - 🟢 绿色：24小时以内（最新）
   - 🟡 橙色：72小时以内（较新）
   - 🔴 红色：其他（较旧）
@@ -3380,44 +3393,48 @@ tableHtml += `<tr ...>
 
 **解决方案**：
 1. 移除商品列表表格中的"入库时间"列，保持列表简洁
-2. 在商品详情页同时显示"入库时间戳"和"入库时间"两个字段
-3. 两个字段都根据时间新鲜度显示不同颜色标识
+2. 在商品详情页基于入库时间戳实时计算相对时间（v3.8.87优化）
+3. 合并显示相对时间和绝对时间，颜色基于实际时间差
 
-**前端实现**（v3.8.82优化）：
+**前端实现**（v3.8.87优化：实时计算相对时间）：
 
 ```javascript
-// index.html:2253-2280 - 商品详情页同时显示两个字段
+// index.html:2253-2288 - 商品详情入库时间实时计算
 let productTimeHtml = '';
 
-// 显示入库时间戳（精确时间）
 if (p.入库时间戳) {
     const createdDate = new Date(p.入库时间戳);
     const now = new Date();
-    const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
+    const diffMs = now - createdDate;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    let relativeTime = '';
+    if (diffMinutes < 1) {
+        relativeTime = '刚刚';
+    } else if (diffMinutes < 60) {
+        relativeTime = diffMinutes + '分钟前';
+    } else if (diffHours < 24) {
+        relativeTime = Math.floor(diffHours) + '小时前';
+    } else if (diffDays < 30) {
+        relativeTime = diffDays + '天前';
+    } else if (diffDays < 365) {
+        relativeTime = Math.floor(diffDays / 30) + '月前';
+    } else {
+        relativeTime = Math.floor(diffDays / 365) + '年前';
+    }
     
     let colorStyle = '';
-    if (hoursDiff <= 24) {
+    if (diffHours <= 24) {
         colorStyle = 'color: #67c23a; font-weight: bold;';
-    } else if (hoursDiff <= 72) {
+    } else if (diffHours <= 72) {
         colorStyle = 'color: #E6A23C; font-weight: bold;';
     } else {
         colorStyle = 'color: #f56c6c; font-weight: bold;';
     }
     
-    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间戳:</strong> ${p.入库时间戳}</div>`;
-}
-
-// 显示入库时间（相对时间）
-if (p.入库时间) {
-    let colorStyle = '';
-    if (p.入库时间.includes('刚刚') || p.入库时间.includes('分钟前')) {
-        colorStyle = 'color: #67c23a; font-weight: bold;';
-    } else if (p.入库时间.includes('小时前') || p.入库时间.includes('1天前')) {
-        colorStyle = 'color: #E6A23C; font-weight: bold;';
-    } else {
-        colorStyle = 'color: #f56c6c; font-weight: bold;';
-    }
-    productTimeHtml += `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间}</div>`;
+    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${relativeTime}（${p.入库时间戳}）</div>`;
 }
 
 // 商品列表表格（v3.8.82优化：移除入库时间列）
@@ -3425,18 +3442,17 @@ if (p.入库时间) {
 <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead>
 ```
 
-**显示逻辑**（v3.8.82优化）：
+**显示逻辑**（v3.8.87优化）：
 - 商品列表：只显示基本字段（序号、货号、商品描述、售价、员工）
-- 商品详情：同时显示两个字段
-  - 🕐 入库时间戳：精确时间（如"2026-07-24 15:50:21"）
-  - 🕐 入库时间：相对时间（如"3小时前"）
-- 颜色标识：
-  - 🟢 绿色：24小时内/刚刚/几分钟前
-  - 🟠 橙色：24-72小时/几小时前/1天前
-  - 🔴 红色：超过72小时/较长时间
+- 商品详情：基于入库时间戳实时计算相对时间，合并显示
+  - 🕐 入库时间: X分钟前（2026-07-24 15:50:21）
+- 颜色标识（基于实际时间差）：
+  - 🟢 绿色：24小时内
+  - 🟠 橙色：24-72小时
+  - 🔴 红色：超过72小时
 **注意事项**：
 - `time_stamp` 字段是毫秒级时间戳，需要除以1000转换为秒
-- `old_time` 字段是相对时间字符串，如"2月前"、"1天前"、"刚刚"等
+- `old_time` 字段是相对时间字符串，如"2月前"、"1天前"、"刚刚"等（v3.8.87起不再用于前端显示）
 - 需要重新爬取数据才能看到正确的入库时间
 
 ### 2.12 EmailNotifier 邮件通知服务
@@ -8473,44 +8489,48 @@ return str;
 
 **解决方案**：
 1. 移除商品列表表格中的"入库时间"列，保持列表简洁
-2. 在商品详情页同时显示"入库时间戳"和"入库时间"两个字段
-3. 两个字段都根据时间新鲜度显示不同颜色标识
+2. 在商品详情页基于入库时间戳实时计算相对时间（v3.8.87优化）
+3. 合并显示相对时间和绝对时间，颜色基于实际时间差
 
-**前端实现**（v3.8.82优化）：
+**前端实现**（v3.8.87优化：实时计算相对时间）：
 
 ```javascript
-// index.html:2253-2280 - 商品详情页同时显示两个字段
+// index.html:2253-2288 - 商品详情入库时间实时计算
 let productTimeHtml = '';
 
-// 显示入库时间戳（精确时间）
 if (p.入库时间戳) {
     const createdDate = new Date(p.入库时间戳);
     const now = new Date();
-    const hoursDiff = (now - createdDate) / (1000 * 60 * 60);
+    const diffMs = now - createdDate;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    let relativeTime = '';
+    if (diffMinutes < 1) {
+        relativeTime = '刚刚';
+    } else if (diffMinutes < 60) {
+        relativeTime = diffMinutes + '分钟前';
+    } else if (diffHours < 24) {
+        relativeTime = Math.floor(diffHours) + '小时前';
+    } else if (diffDays < 30) {
+        relativeTime = diffDays + '天前';
+    } else if (diffDays < 365) {
+        relativeTime = Math.floor(diffDays / 30) + '月前';
+    } else {
+        relativeTime = Math.floor(diffDays / 365) + '年前';
+    }
     
     let colorStyle = '';
-    if (hoursDiff <= 24) {
+    if (diffHours <= 24) {
         colorStyle = 'color: #67c23a; font-weight: bold;';
-    } else if (hoursDiff <= 72) {
+    } else if (diffHours <= 72) {
         colorStyle = 'color: #E6A23C; font-weight: bold;';
     } else {
         colorStyle = 'color: #f56c6c; font-weight: bold;';
     }
     
-    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间戳:</strong> ${p.入库时间戳}</div>`;
-}
-
-// 显示入库时间（相对时间）
-if (p.入库时间) {
-    let colorStyle = '';
-    if (p.入库时间.includes('刚刚') || p.入库时间.includes('分钟前')) {
-        colorStyle = 'color: #67c23a; font-weight: bold;';
-    } else if (p.入库时间.includes('小时前') || p.入库时间.includes('1天前')) {
-        colorStyle = 'color: #E6A23C; font-weight: bold;';
-    } else {
-        colorStyle = 'color: #f56c6c; font-weight: bold;';
-    }
-    productTimeHtml += `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${p.入库时间}</div>`;
+    productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${relativeTime}（${p.入库时间戳}）</div>`;
 }
 
 // 商品列表表格（v3.8.82优化：移除入库时间列）
@@ -8518,15 +8538,14 @@ if (p.入库时间) {
 <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead>
 ```
 
-**显示逻辑**（v3.8.82优化）：
+**显示逻辑**（v3.8.87优化）：
 - 商品列表：只显示基本字段（序号、货号、商品描述、售价、员工）
-- 商品详情：同时显示两个字段
-  - 🕐 入库时间戳：精确时间（如"2026-07-24 15:50:21"）
-  - 🕐 入库时间：相对时间（如"3小时前"）
-- 颜色标识：
-  - 🟢 绿色：24小时内/刚刚/几分钟前
-  - 🟠 橙色：24-72小时/几小时前/1天前
-  - 🔴 红色：超过72小时/较长时间
+- 商品详情：基于入库时间戳实时计算相对时间，合并显示
+  - 🕐 入库时间: X分钟前（2026-07-24 15:50:21）
+- 颜色标识（基于实际时间差）：
+  - 🟢 绿色：24小时内
+  - 🟠 橙色：24-72小时
+  - 🔴 红色：超过72小时
 **注意事项**：
 - 正则表达式必须使用 `/^\d+$/`（带反斜杠），而非 `/^d+$/`
 - Excel 日期处理代码必须放在 `return str` 之前，否则永远不会执行
