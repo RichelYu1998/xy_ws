@@ -6554,11 +6554,89 @@ function unhighlightRow(sku, allProductsData) { /* 取消高亮 */ }
 function scrollToSku(sku) { /* 滚动到指定货号行 */ }
 function searchProductBySku(sku) { /* 按货号搜索商品 */ }
 function filterProducts(searchTerm) { /* 过滤商品列表 */ }
+function updateStatistics(totalPrice, avgPrice, fee) { /* 更新统计数据（v3.8.85新增） */ }
 
 window.showProductDetail = function(sku) { /* 显示商品详情（全局） */ }
 window.showProductByDescription = function(description) { /* 按描述搜索（全局） */ }
 window.showAllProducts = function(signal) { /* 显示所有商品（全局，支持AbortController） */ }
 ```
+
+**搜索统计实时计算规范（v3.8.85 新增）**：
+
+**核心功能**：
+- 搜索商品时实时计算匹配商品的统计数据
+- 只搜索"总商品列表"表格，不影响其他表格
+- 清除搜索时恢复显示全部商品的统计数据
+
+**实现细节**：
+```javascript
+function filterProducts(searchTerm) {
+    // 1. 清除搜索：恢复原始统计
+    if (!searchTerm || searchTerm.trim() === '') {
+        if (window.allProductsData) {
+            updateStatistics(
+                window.allProductsData.totalPrice,
+                window.allProductsData.avgPrice,
+                window.allProductsData.fee
+            );
+        }
+        return;
+    }
+    
+    // 2. 只搜索总商品列表表格
+    const tableAllRows = document.querySelectorAll('#table-all tbody tr');
+    
+    // 3. 实时计算匹配商品的统计
+    let matchCountNum = 0;
+    let totalSellPrice = 0;
+    
+    tableAllRows.forEach(row => {
+        const sku = row.getAttribute('data-sku');
+        const desc = row.getAttribute('data-desc');
+        
+        if (sku.includes(searchLower) || desc.includes(searchLower)) {
+            matchCountNum++;
+            
+            // 提取售价并累加
+            const priceCell = row.querySelector('td:nth-child(4)');
+            const price = parseFloat(priceCell.textContent.match(/¥?([\d,]+\.?\d*)/)[1].replace(/,/g, ''));
+            totalSellPrice += price;
+        }
+    });
+    
+    // 4. 计算统计数据
+    const avgPrice = matchCountNum > 0 ? totalSellPrice / matchCountNum : 0;
+    const platformFee = totalSellPrice * 0.016;
+    
+    // 5. 更新显示
+    updateStatistics(
+        `¥${totalSellPrice.toFixed(2)}`,
+        `¥${avgPrice.toFixed(2)}`,
+        `¥${platformFee.toFixed(2)}`
+    );
+}
+
+function updateStatistics(totalPrice, avgPrice, fee) {
+    // 更新页面上的统计显示
+    const statsContainer = document.querySelector('.products-card .comparison-stats');
+    if (!statsContainer) return;
+    
+    statsContainer.querySelector('.stat-item:nth-child(1) .stat-value').textContent = totalPrice;
+    statsContainer.querySelector('.stat-item:nth-child(2) .stat-value').textContent = avgPrice;
+    statsContainer.querySelector('.stat-item:nth-child(3) .stat-value').textContent = fee;
+}
+```
+
+**统计计算逻辑**：
+- **预计售出总价**：匹配商品的售价总和
+- **平均售出均价**：总售价 / 匹配商品数量
+- **平台手续费**：总售价 × 1.6%（闲鱼平台费率）
+
+**用户体验**：
+- ✅ 搜索"ipad"时，只显示包含"ipad"的商品统计
+- ✅ "总商品列表(91个)"等计数保持不变
+- ✅ 其他表格（高价商品、高价新增、新增商品）不受影响
+- ✅ 清除搜索后自动恢复原始统计
 
 #### 2.16.4 视频处理（3个）
 
