@@ -3208,13 +3208,20 @@ SzwegoSpider/
                     row.style.display = '';
                     row.style.background = row.getAttribute('data-original-bg') || '';
                 });
+                
+                if (window.allProductsData) {
+                    updateStatistics(window.allProductsData.totalPrice, window.allProductsData.avgPrice, window.allProductsData.fee);
+                }
                 return;
             }
             
             const searchLower = searchTerm.toLowerCase().trim();
             let matchCountNum = 0;
+            let totalSellPrice = 0;
             
-            allRows.forEach(row => {
+            const tableAllRows = document.querySelectorAll('#table-all tbody tr');
+            
+            tableAllRows.forEach(row => {
                 const sku = (row.getAttribute('data-sku') || '').toLowerCase();
                 const desc = (row.getAttribute('data-desc') || '').toLowerCase();
                 
@@ -3224,6 +3231,18 @@ SzwegoSpider/
                 if (skuMatch || descMatch) {
                     row.style.display = '';
                     matchCountNum++;
+                    
+                    const priceCell = row.querySelector('td:nth-child(4)');
+                    if (priceCell) {
+                        const priceText = priceCell.textContent || '';
+                        const priceMatch = priceText.match(/¥?([\d,]+\.?\d*)/);
+                        if (priceMatch) {
+                            const price = parseFloat(priceMatch[1].replace(/,/g, ''));
+                            if (!isNaN(price)) {
+                                totalSellPrice += price;
+                            }
+                        }
+                    }
                     
                     if (skuMatch && descMatch) {
                         row.style.background = 'rgba(64, 158, 255, 0.2)';
@@ -3237,6 +3256,20 @@ SzwegoSpider/
                 }
             });
             
+            document.querySelectorAll('#table-highprice tbody tr, #table-highprice-new tbody tr, #table-added tbody tr').forEach(row => {
+                row.style.display = '';
+                row.style.background = row.getAttribute('data-original-bg') || '';
+            });
+            
+            const avgPrice = matchCountNum > 0 ? totalSellPrice / matchCountNum : 0;
+            const platformFee = totalSellPrice * 0.016;
+            
+            const totalPriceFormatted = `¥${totalSellPrice.toFixed(2)}`;
+            const avgPriceFormatted = `¥${avgPrice.toFixed(2)}`;
+            const feeFormatted = `¥${platformFee.toFixed(2)}`;
+            
+            updateStatistics(totalPriceFormatted, avgPriceFormatted, feeFormatted);
+            
             searchResultsCount.style.display = 'block';
             if (matchCount) {
                 matchCount.textContent = `找到 ${matchCountNum} 个匹配`;
@@ -3249,7 +3282,20 @@ SzwegoSpider/
                 }
             }
             
-            console.log('[搜索] 搜索词:', searchTerm, '匹配数量:', matchCountNum);
+            console.log('[搜索] 搜索词:', searchTerm, '匹配数量:', matchCountNum, '总售价:', totalSellPrice, '平均售价:', avgPrice, '平台手续费:', platformFee);
+        }
+        
+        function updateStatistics(totalPrice, avgPrice, fee) {
+            const statsContainer = document.querySelector('.products-card .comparison-stats');
+            if (!statsContainer) return;
+            
+            const totalPriceElement = statsContainer.querySelector('.stat-item:nth-child(1) .stat-value');
+            const avgPriceElement = statsContainer.querySelector('.stat-item:nth-child(2) .stat-value');
+            const feeElement = statsContainer.querySelector('.stat-item:nth-child(3) .stat-value');
+            
+            if (totalPriceElement) totalPriceElement.textContent = totalPrice;
+            if (avgPriceElement) avgPriceElement.textContent = avgPrice;
+            if (feeElement) feeElement.textContent = fee;
         }
         
         window.showAllProducts = function(signal) {
@@ -5742,9 +5788,3 @@ SzwegoSpider/
     </script>
 </body>
 </html>
-
-
-
-
-
-
