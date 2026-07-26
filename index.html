@@ -3196,17 +3196,54 @@ SzwegoSpider/
         function filterProducts(searchTerm) {
             const searchInput = document.getElementById('product-search-input');
             const searchResultsCount = document.getElementById('search-results-count');
-            const matchCount = document.getElementById('match-count');
             
             if (!searchInput || !searchResultsCount) return;
             
             const allRows = document.querySelectorAll('#products-content tbody tr');
+            
+            const badgeMap = {
+                'table-all': 'badge-total',
+                'table-highprice': 'badge-highprice',
+                'table-highprice-new': null,
+                'table-added': 'badge-added'
+            };
+            
+            const tableColors = {
+                'table-all': '#409EFF',
+                'table-highprice': '#E6A23C',
+                'table-highprice-new': '#f56c6c',
+                'table-added': '#67c23a'
+            };
             
             if (!searchTerm || searchTerm.trim() === '') {
                 searchResultsCount.style.display = 'none';
                 allRows.forEach(row => {
                     row.style.display = '';
                     row.style.background = row.getAttribute('data-original-bg') || '';
+                });
+                
+                document.querySelectorAll('.change-section').forEach(section => section.style.display = '');
+                document.querySelectorAll('.change-title[data-original-title]').forEach(title => {
+                    title.textContent = title.getAttribute('data-original-title');
+                });
+                Object.values(badgeMap).forEach(badgeId => {
+                    if (!badgeId) return;
+                    const badge = document.getElementById(badgeId);
+                    if (badge) {
+                        badge.textContent = badge.getAttribute('data-original-text');
+                        badge.style.opacity = '';
+                        badge.style.transform = '';
+                    }
+                });
+                
+                const tableIds = ['table-all', 'table-highprice', 'table-highprice-new', 'table-added'];
+                tableIds.forEach(tableId => {
+                    const statsEl = document.getElementById(tableId + '-stats');
+                    if (statsEl) {
+                        statsEl.style.display = '';
+                        const originalHtml = statsEl.getAttribute('data-original-html');
+                        if (originalHtml) statsEl.innerHTML = originalHtml;
+                    }
                 });
                 
                 if (window.allProductsData) {
@@ -3216,73 +3253,132 @@ SzwegoSpider/
             }
             
             const searchLower = searchTerm.toLowerCase().trim();
-            let matchCountNum = 0;
-            let totalSellPrice = 0;
+            let totalMatchCount = 0;
             
-            const tableAllRows = document.querySelectorAll('#table-all tbody tr');
+            const tableIds = ['table-all', 'table-highprice', 'table-highprice-new', 'table-added'];
+            const perTableCounts = {};
             
-            tableAllRows.forEach(row => {
-                const sku = (row.getAttribute('data-sku') || '').toLowerCase();
-                const desc = (row.getAttribute('data-desc') || '').toLowerCase();
+            tableIds.forEach(tableId => {
+                const tableRows = document.querySelectorAll('#' + tableId + ' tbody tr');
+                let tableMatchCount = 0;
+                let tableSellPrice = 0;
                 
-                const skuMatch = sku.includes(searchLower);
-                const descMatch = desc.includes(searchLower);
-                
-                if (skuMatch || descMatch) {
-                    row.style.display = '';
-                    matchCountNum++;
+                tableRows.forEach(row => {
+                    const sku = (row.getAttribute('data-sku') || '').toLowerCase();
+                    const desc = (row.getAttribute('data-desc') || '').toLowerCase();
                     
-                    const priceCell = row.querySelector('td:nth-child(4)');
-                    if (priceCell) {
-                        const priceText = priceCell.textContent || '';
-                        const priceMatch = priceText.match(/¥?([\d,]+\.?\d*)/);
-                        if (priceMatch) {
-                            const price = parseFloat(priceMatch[1].replace(/,/g, ''));
-                            if (!isNaN(price)) {
-                                totalSellPrice += price;
+                    const skuMatch = sku.includes(searchLower);
+                    const descMatch = desc.includes(searchLower);
+                    
+                    if (skuMatch || descMatch) {
+                        row.style.display = '';
+                        tableMatchCount++;
+                        totalMatchCount++;
+                        
+                        const priceCell = row.querySelector('td:nth-child(4)');
+                        if (priceCell) {
+                            const priceText = priceCell.textContent || '';
+                            const priceMatch = priceText.match(/¥?([\d,]+\.?\d*)/);
+                            if (priceMatch) {
+                                const price = parseFloat(priceMatch[1].replace(/,/g, ''));
+                                if (!isNaN(price)) {
+                                    tableSellPrice += price;
+                                }
                             }
                         }
-                    }
-                    
-                    if (skuMatch && descMatch) {
-                        row.style.background = 'rgba(64, 158, 255, 0.2)';
-                    } else if (skuMatch) {
-                        row.style.background = 'rgba(103, 194, 58, 0.2)';
+                        
+                        if (skuMatch && descMatch) {
+                            row.style.background = 'rgba(64, 158, 255, 0.2)';
+                        } else if (skuMatch) {
+                            row.style.background = 'rgba(103, 194, 58, 0.2)';
+                        } else {
+                            row.style.background = 'rgba(230, 162, 60, 0.2)';
+                        }
                     } else {
-                        row.style.background = 'rgba(230, 162, 60, 0.2)';
+                        row.style.display = 'none';
                     }
-                } else {
-                    row.style.display = 'none';
+                });
+                
+                perTableCounts[tableId] = { count: tableMatchCount, total: tableRows.length, price: tableSellPrice };
+                
+                const tableAvgPrice = tableMatchCount > 0 ? tableSellPrice / tableMatchCount : 0;
+                const tableFee = tableSellPrice * 0.016;
+                const color = tableColors[tableId];
+                
+                const statsEl = document.getElementById(tableId + '-stats');
+                if (statsEl) {
+                    if (tableMatchCount > 0) {
+                        statsEl.innerHTML = `
+                            <div style="font-size: 13px;"><span style="color: #999;">售出总价</span> <strong style="color: ${color};">¥${tableSellPrice.toFixed(2)}</strong></div>
+                            <div style="font-size: 13px;"><span style="color: #999;">均价</span> <strong>¥${tableAvgPrice.toFixed(2)}</strong></div>
+                            <div style="font-size: 13px;"><span style="color: #999;">手续费</span> <strong style="color: #f56c6c;">¥${tableFee.toFixed(2)}</strong></div>
+                            <div style="font-size: 13px; margin-left: auto;"><span style="color: #999;">匹配</span> <strong style="color: ${color};">${tableMatchCount}/${tableRows.length}</strong></div>
+                        `;
+                        statsEl.style.display = '';
+                    } else {
+                        statsEl.style.display = 'none';
+                    }
+                }
+                
+                const titleEl = document.querySelector('#' + tableId)?.closest('.change-section')?.querySelector('.change-title');
+                if (titleEl) {
+                    const originalTitle = titleEl.getAttribute('data-original-title') || '';
+                    if (tableMatchCount > 0) {
+                        titleEl.textContent = originalTitle + ' → 匹配 ' + tableMatchCount + '/' + tableRows.length + ' 个';
+                        titleEl.closest('.change-section').style.display = '';
+                    } else {
+                        titleEl.textContent = originalTitle + ' → 无匹配';
+                        titleEl.closest('.change-section').style.display = 'none';
+                    }
+                }
+                
+                const badgeId = badgeMap[tableId];
+                if (badgeId) {
+                    const badge = document.getElementById(badgeId);
+                    if (badge) {
+                        const originalText = badge.getAttribute('data-original-text') || '';
+                        if (tableMatchCount > 0) {
+                            badge.textContent = originalText.replace(/(\d+)个/, tableMatchCount + '/' + tableRows.length + '个');
+                            badge.style.opacity = '1';
+                            badge.style.transform = '';
+                        } else {
+                            badge.textContent = originalText.replace(/(\d+)个/, '0/' + tableRows.length + '个');
+                            badge.style.opacity = '0.5';
+                        }
+                    }
                 }
             });
             
-            document.querySelectorAll('#table-highprice tbody tr, #table-highprice-new tbody tr, #table-added tbody tr').forEach(row => {
-                row.style.display = '';
-                row.style.background = row.getAttribute('data-original-bg') || '';
-            });
-            
-            const avgPrice = matchCountNum > 0 ? totalSellPrice / matchCountNum : 0;
-            const platformFee = totalSellPrice * 0.016;
-            
-            const totalPriceFormatted = `¥${totalSellPrice.toFixed(2)}`;
-            const avgPriceFormatted = `¥${avgPrice.toFixed(2)}`;
-            const feeFormatted = `¥${platformFee.toFixed(2)}`;
-            
-            updateStatistics(totalPriceFormatted, avgPriceFormatted, feeFormatted);
+            const allTablePrice = perTableCounts['table-all'] ? perTableCounts['table-all'].price : 0;
+            const allTableCount = perTableCounts['table-all'] ? perTableCounts['table-all'].count : 0;
+            const allTableAvg = allTableCount > 0 ? allTablePrice / allTableCount : 0;
+            const allTableFee = allTablePrice * 0.016;
+            updateStatistics('¥' + allTablePrice.toFixed(2), '¥' + allTableAvg.toFixed(2), '¥' + allTableFee.toFixed(2));
             
             searchResultsCount.style.display = 'block';
+            const matchCount = document.getElementById('match-count');
             if (matchCount) {
-                matchCount.textContent = `找到 ${matchCountNum} 个匹配`;
-                
-                if (matchCountNum > 0) {
-                    matchCount.style.background = '#67c23a';
+                if (totalMatchCount > 0) {
+                    const badgeLabels = {
+                        'table-all': '总商品',
+                        'table-highprice': '高价商品',
+                        'table-highprice-new': '高价新增',
+                        'table-added': '新增商品'
+                    };
+                    let tagsHtml = '';
+                    tableIds.forEach(tid => {
+                        const info = perTableCounts[tid];
+                        if (info && info.count > 0) {
+                            tagsHtml += `<span style="background: ${tableColors[tid]}; color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 13px;">${badgeLabels[tid]}: ${info.count}/${info.total}</span>`;
+                        }
+                    });
+                    matchCount.innerHTML = tagsHtml;
                 } else {
-                    matchCount.style.background = '#f56c6c';
-                    matchCount.textContent = '未找到匹配结果';
+                    matchCount.innerHTML = '<span style="background: #f56c6c; color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 13px;">未找到匹配结果</span>';
                 }
             }
             
-            console.log('[搜索] 搜索词:', searchTerm, '匹配数量:', matchCountNum, '总售价:', totalSellPrice, '平均售价:', avgPrice, '平台手续费:', platformFee);
+            console.log('[搜索] 搜索词:', searchTerm, '各表匹配:', perTableCounts);
         }
         
         function updateStatistics(totalPrice, avgPrice, fee) {
@@ -3332,9 +3428,28 @@ SzwegoSpider/
                 
                 function renderTable(products, title, color, tableId) {
                     if (!products || products.length === 0) return '';
+                    let totalPrice = 0;
+                    let validCount = 0;
+                    products.forEach(p => {
+                        const priceText = (p.售价 || '').replace('¥', '').replace(',', '');
+                        const price = parseFloat(priceText);
+                        if (!isNaN(price) && price > 0) {
+                            totalPrice += price;
+                            validCount++;
+                        }
+                    });
+                    const avgPrice = validCount > 0 ? totalPrice / validCount : 0;
+                    const fee = totalPrice * 0.016;
+                    const statsId = tableId + '-stats';
+                    const statsHtml = `<div style="font-size: 13px;"><span style="color: #999;">售出总价</span> <strong style="color: ${color};">¥${totalPrice.toFixed(2)}</strong></div>
+                                <div style="font-size: 13px;"><span style="color: #999;">均价</span> <strong>¥${avgPrice.toFixed(2)}</strong></div>
+                                <div style="font-size: 13px;"><span style="color: #999;">手续费</span> <strong style="color: #f56c6c;">¥${fee.toFixed(2)}</strong></div>`;
                     let tableHtml = `
                         <div class="change-section">
-                            <div class="change-title" style="color: ${color};">${title}</div>
+                            <div class="change-title" style="color: ${color};" data-original-title="${title}" data-total-count="${products.length}">${title}</div>
+                            <div id="${statsId}" data-original-html="${statsHtml.replace(/"/g, '&quot;')}" style="display: flex; gap: 20px; padding: 8px 12px; background: ${color}08; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid ${color};">
+                                ${statsHtml}
+                            </div>
                             <div class="change-table-container">
                                 <table class="change-table" id="${tableId}">
                                     <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead>
@@ -3384,9 +3499,9 @@ SzwegoSpider/
                             </div>
                         </div>
                         <div class="summary-stats">
-                            <span class="summary-badge" style="background: #409EFF;">总商品: ${data.total}个</span>
-                            <span class="summary-badge" style="background: #E6A23C;">高价(≥599): ${data.highPriceCount || 0}个</span>
-                            <span class="summary-badge" style="background: #67c23a;">新增: ${data.addedCount || 0}个</span>
+                            <span class="summary-badge" style="background: #409EFF;" id="badge-total" data-original-text="总商品: ${data.total}个">总商品: ${data.total}个</span>
+                            <span class="summary-badge" style="background: #E6A23C;" id="badge-highprice" data-original-text="高价(≥599): ${data.highPriceCount || 0}个">高价(≥599): ${data.highPriceCount || 0}个</span>
+                            <span class="summary-badge" style="background: #67c23a;" id="badge-added" data-original-text="新增: ${data.addedCount || 0}个">新增: ${data.addedCount || 0}个</span>
                             <span class="summary-badge" style="background: #e8f5e9; color: #2e7d32;">↔ 高价+新增</span>
                         </div>
                         <div class="info-box" style="margin-bottom: 20px; padding: 15px;">
@@ -3408,7 +3523,7 @@ SzwegoSpider/
                                 <i class="fa fa-info-circle"></i> 支持模糊搜索,可输入货号(如: A001)或商品描述关键词
                             </small>
                             <div id="search-results-count" style="margin-top: 10px; display: none;">
-                                <span class="summary-badge" style="background: #409EFF;" id="match-count">找到 0 个匹配</span>
+                                <div id="match-count" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
                             </div>
                         </div>
                         ${renderTable(data.products, '总商品列表 (' + data.total + '个)', '#409EFF', 'table-all')}
