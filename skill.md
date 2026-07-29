@@ -7373,6 +7373,131 @@ fetch('/api/some-endpoint', { method: 'POST' })
 });
 ```
 
+#### 3.2.11 安全函数库（v3.8.88.2 新增）
+
+> **⚠️ 重要**：所有动态内容输出**必须**使用以下安全函数！
+
+##### 函数清单
+
+| 函数名 | 用途 | 使用场景 |
+|--------|------|----------|
+| `escapeHtml(text)` | 转义 HTML 内容 | innerHTML 文本内容 |
+| `escapeAttr(text)` | 转义 HTML 属性 | data-*、href、onclick 等属性 |
+| `isValidUrl(url)` | 验证 URL 安全性 | 检查 URL 协议是否为 http/https |
+| `safeUrl(url)` | 安全输出 URL | href 属性中的 URL |
+| `createSkuTag(sku, handler)` | 创建安全的 SKU 标签 | 商品货号标签 |
+| `bindSkuTagEvents(container, handler)` | 批量绑定 SKU 点击事件 | 显示对比结果后调用 |
+
+##### 完整函数定义
+
+```javascript
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function escapeAttr(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function isValidUrl(url) {
+    if (!url) return false;
+    try {
+        const parsed = new URL(url);
+        return ['http:', 'https:'].includes(parsed.protocol);
+    } catch {
+        return false;
+    }
+}
+
+function safeUrl(url) {
+    return isValidUrl(url) ? escapeAttr(url) : '#invalid-url';
+}
+
+function createSkuTag(sku, onClickHandler) {
+    const safeSku = escapeAttr(sku);
+    return `<span class="sku-tag" data-sku="${safeSku}" style="cursor: pointer;">${escapeHtml(sku)}</span>`;
+}
+
+function bindSkuTagEvents(container, onClickHandler) {
+    container.querySelectorAll('.sku-tag[data-sku]').forEach(tag => {
+        tag.onclick = function() {
+            onClickHandler(this.dataset.sku);
+        };
+    });
+}
+```
+
+##### 使用示例
+
+```javascript
+// ✅ 正确：URL 输出
+element.innerHTML = `<a href="${safeUrl(url)}">${escapeHtml(url)}</a>`;
+
+// ✅ 正确：SKU 标签
+const items = skus.map(sku => createSkuTag(sku, showProductDetail)).join('');
+container.innerHTML = `<div class="sku-container">${items}</div>`;
+bindSkuTagEvents(container, showProductDetail);
+
+// ✅ 正确：data 属性 + 事件委托
+element.innerHTML = `<a data-sku="${escapeAttr(sku)}" class="sku-link">${escapeHtml(sku)}</a>`;
+element.querySelector('.sku-link').onclick = () => showProductDetail(element.dataset.sku);
+
+// ❌ 错误：直接拼接（XSS 漏洞）
+element.innerHTML = `<a onclick="showProductDetail('${sku}')">${sku}</a>`;
+element.innerHTML = `<a href="${url}">${url}</a>;
+```
+
+#### 3.2.12 CORS 配置规范（v3.8.88.2 新增）
+
+> **⚠️ 重要**：生产环境必须限制 CORS 允许的来源！
+
+##### 后端配置规范
+
+```python
+@app.after_request
+def add_security_headers(response):
+    origin = request.headers.get('Origin', '')
+    
+    # 仅允许本地开发环境（生产环境应改为实际域名）
+    allowed_origins = [
+        'http://localhost:5000',
+        'http://127.0.0.1:5000',
+        # 生产环境添加：
+        # 'https://yourdomain.com',
+    ]
+    
+    if request.path.startswith('/api/') or request.path in ['/run', '/input', '/kill']:
+        if origin and origin in allowed_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+        elif not origin:
+            response.headers['Access-Control-Allow-Origin'] = '*'
+        else:
+            response.headers['Access-Control-Allow-Origin'] = 'null'
+        
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+        response.headers['Access-Control-Max-Age'] = '86400'  # 24小时缓存
+    
+    return response
+```
+
+##### 安全要点
+
+- ✅ **白名单机制**：仅允许信任的来源
+- ✅ **支持 Credentials**：允许携带 Cookie
+- ✅ **预检缓存**：减少 OPTIONS 请求
+- ✅ **拒绝未知来源**：返回 `null` 而非 `*`
+
 ### 3.3 Toast 提示（替代 alert）
 
 ```javascript
