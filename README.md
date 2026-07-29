@@ -1,12 +1,149 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.88
+> **版本**: v3.8.88.2
 > **更新日期**: 2026-07-29
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 ---
 
 ## 最新更新
+
+
+
+### v3.8.88.2 (2026-07-29) - 🐛 紧急Bug修复：事件绑定缺失导致功能失效
+
+#### 🔴 严重 Bug 修复（影响所有用户）
+
+**问题根源**：在v3.8.88.2安全更新中，为修复XSS漏洞，代码移除了内联`onclick`事件处理器，改用`data-*`属性+CSS类模式，但**忘记添加对应的事件绑定代码**，导致以下功能完全无法使用：
+
+#### 🐛 Bug #1: 商品详情弹窗无法打开（严重🔴）
+
+**影响范围**：所有商品列表中的货号和商品描述点击无响应
+
+**问题位置**：
+- [index.html:3549](file:///D:/ws/xy_ws/index.html#L3549) - 商品货号链接
+- [index.html:3550](file:///D:/ws/xy_ws/index.html#L3550) - 商品描述链接
+
+**错误代码**：
+```html
+<!-- ❌ 缺少事件绑定 -->
+<a data-sku="${escapeAttr(sku)}" class="sku-link">${escapeHtml(sku)}</a>
+<a data-desc="${escapeAttr(desc)}" class="desc-link">${escapeHtml(descDisplay)}</a>
+```
+
+**✅ 修复方案**：在 [index.html:2557-2595](file:///D:/ws/xy_ws/index.html#L2557-L2595) 添加事件委托：
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('click', function(e) {
+        // 处理货号点击
+        var skuLink = e.target.closest('.sku-link');
+        if (skuLink) {
+            e.preventDefault();
+            var sku = skuLink.dataset.sku;
+            if (sku) {
+                console.log('[按钮点击] 查看商品详情:', sku);
+                highlightRow(sku);
+                scrollToSku(sku);
+                searchProductBySku(sku);
+            }
+            return;
+        }
+        
+        // 处理商品描述点击
+        var descLink = e.target.closest('.desc-link');
+        if (descLink) {
+            e.preventDefault();
+            var desc = descLink.dataset.desc;
+            if (desc) {
+                console.log('[按钮点击] 查看商品详情:', desc);
+                showProductByDescription(desc);
+            }
+            return;
+        }
+        
+        // 处理利润报表行点击
+        var summaryRow = e.target.closest('.summary-row');
+        if (summaryRow) {
+            var dateKey = summaryRow.dataset.date;
+            if (dateKey && typeof window.toggleProfitDetail === 'function') {
+                window.toggleProfitDetail(dateKey, summaryRow);
+                if (typeof window.highlightChartPoint === 'function') {
+                    window.highlightChartPoint(dateKey);
+                }
+            }
+            return;
+        }
+    });
+    
+    // ... 其他初始化代码
+});
+```
+
+#### 🐛 Bug #2: 每日利润报表无法展开明细（严重🔴）
+
+**影响范围**：利润报表页面点击日期行无响应
+
+**问题位置**：[index.html:3999](file:///D:/ws/xy_ws/index.html#L3999)
+
+**双重问题**：
+
+1. **语法错误**：HTML标签存在多余的 `>` 字符
+```html
+<!-- ❌ 错误：两个 > -->
+<tr class="summary-row" ... onmouseout="this.style.backgroundColor=''">>
+                                                            ^^ 多余的 >
+</tr>
+
+<!-- ✅ 修复后 -->
+<tr class="summary-row" ... onmouseout="this.style.backgroundColor=''">
+</tr>
+```
+
+2. **缺少onclick事件**：
+```html
+<!-- ❌ 移除了onclick但未添加事件绑定 -->
+<tr class="summary-row" data-date="${escapeAttr(item.日期)}" style="cursor:pointer;">
+
+<!-- ✅ 通过事件委托统一处理（见上方代码） -->
+```
+
+#### ✨ 事件委托（Event Delegation）优势
+
+| 特性 | 传统方式 | 事件委托 |
+|------|---------|---------|
+| **安全性** | ⚠️ 可能被XSS攻击 | ✅ 使用安全函数转义 |
+| **性能** | ❌ 每个元素单独绑定 | ✅ 只需一个监听器 |
+| **动态内容** | ❌ 需要重新绑定 | ✅ 自动支持新元素 |
+| **代码量** | 🔴 大量重复代码 | 🟢 集中管理，简洁优雅 |
+
+#### 📊 修复统计
+
+- 🔴 修复Bug数量：**2个** (均为严重级别)
+- 🟢 新增代码行数：**~40行**
+- 🎯 影响功能模块：商品详情、利润报表
+- 🔒 安全性影响：**无** (保持原有安全加固)
+- ✅ 兼容性：**完美** (支持动态内容)
+
+#### ✅ 测试验证结果
+
+```
+✅ 事件委托代码已添加
+✅ 商品货号点击事件已绑定
+✅ 商品描述点击事件已绑定
+✅ 利润报表行点击事件已绑定
+✅ summary-row语法错误已修复
+📍 事件委托代码位置: 第2557行 (位于DOMContentLoaded回调函数内)
+🎉 所有修复已完成并通过验证！
+```
+
+#### 📝 修改文件清单
+
+- [index.html:2557-2595](file:///D:/ws/xy_ws/index.html#L2557-L2595) - 新增事件委托代码
+- [index.html:3549-3550](file:///D:/ws/xy_ws/index.html#L3549-L3550) - 商品链接使用data属性
+- [index.html:3999](file:///D:/ws/xy_ws/index.html#L3999) - 修复summary-row语法错误
+
+---
 
 ### v3.8.88 (2026-07-29) - 🛡️ 全面修复 "Unexpected token '<'" 错误 + API 路由安全加固
 

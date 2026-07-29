@@ -2552,6 +2552,42 @@ SzwegoSpider/
         
         // 确保DOM加载完成后执行
         document.addEventListener('DOMContentLoaded', function() {
+            
+            document.addEventListener('click', function(e) {
+                var skuLink = e.target.closest('.sku-link');
+                if (skuLink) {
+                    e.preventDefault();
+                    var sku = skuLink.dataset.sku;
+                    if (sku) {
+                        console.log('[按钮点击] 查看商品详情:', sku);
+                        highlightRow(sku);
+                        scrollToSku(sku);
+                        searchProductBySku(sku);
+                    }
+                    return;
+                }
+                var descLink = e.target.closest('.desc-link');
+                if (descLink) {
+                    e.preventDefault();
+                    var desc = descLink.dataset.desc;
+                    if (desc) {
+                        console.log('[按钮点击] 查看商品详情:', desc);
+                        showProductByDescription(desc);
+                    }
+                    return;
+                }
+                var summaryRow = e.target.closest('.summary-row');
+                if (summaryRow) {
+                    var dateKey = summaryRow.dataset.date;
+                    if (dateKey && typeof window.toggleProfitDetail === 'function') {
+                        window.toggleProfitDetail(dateKey, summaryRow);
+                        if (typeof window.highlightChartPoint === 'function') {
+                            window.highlightChartPoint(dateKey);
+                        }
+                    }
+                    return;
+                }
+            });
             fetch('/api/version')
                 .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
@@ -3960,7 +3996,7 @@ SzwegoSpider/
                         data.summary.forEach((item, idx) => {
                             const dateKey = item.日期.replace(/-/g, '');
                             cardHtml += `
-                                <tr class="summary-row" data-date="${escapeAttr(item.日期)}" style="cursor:pointer;" onmouseover="this.style.backgroundColor='#f5f7fa'" onmouseout="this.style.backgroundColor=''">>
+                                <tr class="summary-row" data-date="${escapeAttr(item.日期)}" style="cursor:pointer;" onmouseover="this.style.backgroundColor='#f5f7fa'" onmouseout="this.style.backgroundColor=''">
                                     <td class="action-col">
                                         <i class="fa fa-plus-circle detail-toggle-icon" style="color: #667eea; cursor: pointer;"></i>
                                     </td>

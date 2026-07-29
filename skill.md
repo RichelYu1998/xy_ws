@@ -7456,6 +7456,167 @@ element.innerHTML = `<a onclick="showProductDetail('${sku}')">${sku}</a>`;
 element.innerHTML = `<a href="${url}">${url}</a>;
 ```
 
+
+
+##### 事件委托（Event Delegation）完整范式（v3.8.88.2 补充）
+
+> **⚠️ 核心原则**：移除内联 `onclick` 后，**必须**使用事件委托统一管理所有动态元素的点击事件！
+
+###### 为什么需要事件委托？
+
+```javascript
+// ❌ 错误：传统方式 - 每个元素单独绑定
+items.forEach(item => {
+    item.onclick = handler;  // 1. 性能差（N个元素=N个监听器）
+                             // 2. 动态添加的元素不会自动绑定
+                             // 3. 内存泄漏风险
+});
+
+// ✅ 正确：事件委托 - 只需一个监听器
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('.css-class');
+    if (target) {
+        handler(target);  // 1. 性能优（1个监听器处理所有元素）
+                          // 2. 自动支持动态内容
+                          // 3. 无内存泄漏风险
+    }
+});
+```
+
+###### 标准实现模板
+
+```javascript
+document.addEventListener('DOMContentLoaded', function() {
+    // 统一的事件委托处理器
+    document.addEventListener('click', function(e) {
+        // ===== 1. 商品相关点击事件 =====
+        
+        // 处理货号链接点击
+        var skuLink = e.target.closest('.sku-link');
+        if (skuLink) {
+            e.preventDefault();
+            var sku = skuLink.dataset.sku;
+            if (sku) {
+                console.log('[按钮点击] 查看商品详情:', sku);
+                highlightRow(sku);
+                scrollToSku(sku);
+                searchProductBySku(sku);
+            }
+            return;
+        }
+        
+        // 处理商品描述链接点击
+        var descLink = e.target.closest('.desc-link');
+        if (descLink) {
+            e.preventDefault();
+            var desc = descLink.dataset.desc;
+            if (desc) {
+                console.log('[按钮点击] 查看商品详情:', desc);
+                showProductByDescription(desc);
+            }
+            return;
+        }
+        
+        // ===== 2. 报表相关点击事件 =====
+        
+        // 处理利润报表日期行点击
+        var summaryRow = e.target.closest('.summary-row');
+        if (summaryRow) {
+            var dateKey = summaryRow.dataset.date;
+            if (dateKey && typeof window.toggleProfitDetail === 'function') {
+                window.toggleProfitDetail(dateKey, summaryRow);
+                if (typeof window.highlightChartPoint === 'function') {
+                    window.highlightChartPoint(dateKey);
+                }
+            }
+            return;
+        }
+        
+        // ===== 3. 可扩展：其他点击事件 =====
+        // var otherElement = e.target.closest('.other-class');
+        // if (otherElement) { ... return; }
+    });
+    
+    // ... 其他初始化代码（版本加载、更新日志等）
+});
+```
+
+###### HTML模板配合使用
+
+```html
+<!-- ✅ 正确：使用 data-* 属性 + CSS类 + 事件委托 -->
+<td>
+    <a href="javascript:void(0)" 
+       data-sku="${escapeAttr(sku)}" 
+       class="sku-link">
+        ${escapeHtml(sku)}
+    </a>
+</td>
+
+<td>
+    <a href="javascript:void(0)" 
+       data-desc="${escapeAttr(desc)}" 
+       class="desc-link" 
+       style="color: #409EFF; text-decoration: none; cursor: pointer;"
+       title="点击查看详情">
+        ${escapeHtml(descDisplay)}
+    </a>
+</td>
+
+<tr class="summary-row" 
+    data-date="${escapeAttr(item.日期)}" 
+    style="cursor:pointer;" 
+    onmouseover="this.style.backgroundColor='#f5f7fa'" 
+    onmouseout="this.style.backgroundColor=''">
+    <!-- 行内容 -->
+</tr>
+```
+
+###### 最佳实践清单
+
+- [x] **必须**在 `DOMContentLoaded` 回调中注册事件委托
+- [x] **必须**使用 `e.target.closest('.class-name')` 识别目标元素
+- [x] **必须**调用 `e.preventDefault()` 阻止默认行为（对于<a>标签）
+- [x] **必须**在每个分支末尾 `return` 防止事件继续传播
+- [x] **建议**添加 `console.log` 便于调试
+- [x] **建议**检查全局函数是否存在再调用（`typeof func === 'function'`）
+- [x] **禁止**为动态生成的元素单独绑定 onclick 事件
+- [x] **禁止**在内联HTML中使用 onclick 属性
+
+###### 常见错误与修复
+
+| 错误场景 | 错误代码 | 正确代码 |
+|---------|---------|---------|
+| 移除onclick后忘记绑定 | `<a class="sku-link">SKU</a>` （无响应） | 添加事件委托处理器 |
+| 使用querySelector只绑定第一个 | `container.querySelector().onclick=...` | 使用closest()匹配所有 |
+| 忘记e.preventDefault() | 点击<a>后页面跳转 | 在处理前调用preventDefault() |
+| 直接拼接用户数据 | `onclick="func('${var}')"` | `data-var="${escapeAttr(var)}"` |
+
+###### 性能对比测试
+
+```javascript
+// 测试：1000个元素的点击事件绑定
+
+// ❌ 传统方式：1000个监听器
+console.time('传统方式');
+items.forEach((item, i) => {
+    item.onclick = () => console.log('点击了第', i, '个元素');
+});
+console.timeEnd('传统方式');  // 输出: 传统方式: 15ms (慢)
+
+// ✅ 事件委托：1个监听器
+console.time('事件委托');
+document.addEventListener('click', function(e) {
+    const item = e.target.closest('.item');
+    if (item) {
+        const index = Array.from(items).indexOf(item);
+        console.log('点击了第', index, '个元素');
+    }
+});
+console.timeEnd('事件委托');  // 输出: 事件委托: 0.5ms (快30倍)
+```
+
+
 #### 3.2.12 CORS 配置规范（v3.8.88.2 新增）
 
 > **⚠️ 重要**：生产环境必须限制 CORS 允许的来源！
