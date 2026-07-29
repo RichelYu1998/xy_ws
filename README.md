@@ -8,7 +8,135 @@
 
 ## 最新更新
 
+### v3.8.89.1 (2026-07-29) - 🐛 紧急修复：Excel对比货号点击无响应
 
+#### 🔴 严重 Bug 修复
+
+**问题根源**：Excel与JSON对比功能（`/api/sku/compare/excel`）返回的货号列表无法点击查看详情
+
+#### 🐛 Bug 详情
+
+**影响范围**：
+- ❌ JSON多余货号(所有价格) - 点击无响应
+- ❌ JSON多余货号(高价商品≥599) - 点击无响应  
+- ❌ 高价商品中已存在于Excel的货号 - 点击无响应
+
+**问题位置**：[dist/app.js:3576](file:///D:/ws/xy_ws/dist/app.js#L3576)
+
+**错误代码**：
+```javascript
+// ❌ 缺少事件绑定
+outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+// 这里没有调用 bindSkuTagEvents()！
+```
+
+**✅ 修复方案**：
+
+1. **添加事件绑定** ([dist/app.js:3579](file:///D:/ws/xy_ws/dist/app.js#L3579)):
+```javascript
+outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+bindSkuTagEvents(outputPanel, showProductDetail);  // ✅ 添加事件绑定
+```
+
+2. **增强事件绑定函数** ([dist/app.js:37-63](file:///D:/ws/xy_ws/dist/app.js#L37-L63)):
+```javascript
+function bindSkuTagEvents(container, onClickHandler) {
+    const tags = container.querySelectorAll('.sku-tag[data-sku]');
+    console.log('[调试] bindSkuTagEvents 找到标签数量:', tags.length);
+    
+    tags.forEach((tag, index) => {
+        console.log(`[调试] 绑定第${index + 1}个标签:`, tag.dataset.sku);
+        tag.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('[调试] 标签被点击:', this.dataset.sku);
+            if (typeof onClickHandler === 'function') {
+                onClickHandler(this.dataset.sku);
+            } else {
+                console.error('[错误] onClickHandler 不是函数:', typeof onClickHandler);
+            }
+        };
+        
+        tag.style.cursor = 'pointer';
+        tag.title = '点击查看商品详情';
+    });
+}
+```
+
+3. **支持所有三类货号列表渲染** ([dist/app.js:1400-1431](file:///D:/ws/xy_ws/dist/app.js#L1400-L1431)):
+   - JSON多余货号(所有价格) - 橙色背景 `#fff3e0`
+   - JSON多余货号(高价商品≥599) - 红色背景 `#ffebee`
+   - 高价商品中已存在于Excel的货号 - 绿色背景 `#e8f5e9`
+
+4. **文本解析模式增强** ([dist/app.js:1227-1253](file:///D:/ws/xy_ws/dist/app.js#L1227-L1253)):
+   - 新增对三类货号列表的文本解析支持
+   - 支持多种格式（带序号、逗号分隔、纯货号等）
+
+#### ✅ 修复统计
+
+- 🔴 修复Bug数量：**1个** (严重级别)
+- 🟢 新增代码行数：**~80行**
+- 🎯 影响功能模块：Excel与JSON对比、TXT文本对比
+- 💅 样式优化：移除过度的蓝色下划线样式，保持简洁
+
+#### ✅ 测试验证结果
+
+```
+✅ Excel对比模式事件绑定已添加
+✅ TXT文本对比模式三类货号列表已支持
+✅ 所有货号标签可点击查看详情
+✅ 调试日志完整输出
+✅ 样式简洁优雅（无蓝色下划线）
+🎉 所有修复已完成并通过验证！
+```
+
+#### 📝 修改文件清单
+
+- [dist/app.js:3579](file:///D:/ws/xy_ws/dist/app.js#L3579) - 添加事件绑定
+- [dist/app.js:37-63](file:///D:/ws/xy_ws/dist/app.js#L37-L63) - 增强事件绑定函数
+- [dist/app.js:1400-1431](file:///D:/ws/xy_ws/dist/app.js#L1400-L1431) - 三类货号列表渲染
+- [dist/app.js:1227-1253](file:///D:/ws/xy_ws/dist/app.js#L1227-L1253) - 文本解析增强
+
+---
+
+### v3.8.89 (2026-07-29) - 🚀 JavaScript重构 + 安全加固 + 性能优化
+
+#### ✨ 核心改进
+- **JavaScript代码提取** - 从index.html提取4190行JavaScript到独立文件 [dist/app.js](file:///D:/ws/xy_ws/dist/app.js)
+- **XSS安全漏洞修复** - 所有用户输入使用escapeHtml()转义（showProductModal等函数）
+- **内存泄漏修复** - 新增TimerManager统一管理定时器，修复事件监听器累积问题
+- **按钮事件绑定重构** - 彻底解决8个功能按钮失灵问题
+
+#### 🔒 安全加固
+- **XSS防护** - 货号、商品描述、售价、拿货价、员工、备注、入库时间戳等字段全部转义
+- **统一错误处理** - 新增ErrorHandler工具类，自动处理AbortError和网络错误
+- **防抖/节流** - 新增debounce和throttle函数，优化性能
+
+#### 🐛 Bug修复
+- **语法错误修复** - 删除错误的getter/setter语法导致整个JS文件无法解析
+- **事件绑定时序** - 改用智能DOM检测，支持同步/异步加载两种场景
+- **资源清理** - 页面卸载时完整释放所有定时器和事件监听器
+
+#### 📊 性能提升
+- **HTML文件大小减少71%** - 从~200KB降至~58KB（移除4188行内联代码）
+- **浏览器缓存** - 独立JS文件可被浏览器缓存，加速后续访问
+- **可见性优化** - 页面隐藏时暂停非必要轮询，节省资源
+
+#### 📁 文件变更
+```
+新增:
+  dist/app.js (4190行, 237KB) - 提取的JavaScript主文件
+
+修改:
+  index.html (1851行, 58KB) - 移除内联脚本，改为外部引用
+
+删除:
+  test_buttons.html (测试文件)
+  index.html.backup (备份文件)
+  dist/app.js_temp.js (临时文件)
+```
+
+---
 
 ### v3.8.88.2 (2026-07-29) - 🐛 紧急Bug修复：事件绑定缺失导致功能失效
 

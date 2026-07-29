@@ -7659,6 +7659,197 @@ def add_security_headers(response):
 - ✅ **预检缓存**：减少 OPTIONS 请求
 - ✅ **拒绝未知来源**：返回 `null` 而非 `*`
 
+### 3.2.5 SKU 标签与事件绑定规范（v3.8.89.1 新增）
+
+> **⚠️ 重要**：所有动态生成的货号/商品标签**必须**使用本规范，否则点击无响应！
+
+#### 核心原则
+
+1. **统一创建函数** - 使用 `createSkuTag()` 创建所有可点击的货号标签
+2. **统一事件绑定** - 使用 `bindSkuTagEvents()` 绑定点击事件
+3. **及时绑定时机** - 在 `insertAdjacentHTML` 后**立即调用**事件绑定
+4. **样式简洁** - 只设置 `cursor: pointer` 和 `title`，避免过度装饰
+
+#### createSkuTag 函数（必用）
+
+```javascript
+function createSkuTag(sku, onClickHandler) {
+    return `<span class="sku-tag" data-sku="${escapeAttr(sku)}" style="cursor:pointer; margin:2px; padding:2px 6px; background:#e8f4f8; border-radius:3px; font-size:12px;" title="点击查看商品详情">${escapeHtml(sku)}</span>`;
+}
+```
+
+#### bindSkuTagEvents 函数（必用）
+
+```javascript
+function bindSkuTagEvents(container, onClickHandler) {
+    const tags = container.querySelectorAll('.sku-tag[data-sku]');
+    
+    tags.forEach((tag, index) => {
+        tag.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (typeof onClickHandler === 'function') {
+                onClickHandler(this.dataset.sku);
+            } else {
+                console.error('[错误] onClickHandler 不是函数:', typeof onClickHandler);
+            }
+        };
+        
+        // ✅ 简洁样式（禁止蓝色下划线）
+        tag.style.cursor = 'pointer';
+        tag.title = '点击查看商品详情';
+    });
+}
+```
+
+#### 正确使用范式
+
+##### ✅ Excel对比模式
+
+```javascript
+// 生成HTML
+let cardHtml = `<div class="sku-container">`;
+if (extraSkus.length > 0) {
+    const items = extraSkus.map(sku => createSkuTag(sku, showProductDetail)).join('');
+    cardHtml += items;
+}
+cardHtml += `</div></div>`;
+
+// 插入DOM
+outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+
+// ✅ 关键：立即绑定事件！
+bindSkuTagEvents(outputPanel, showProductDetail);
+```
+
+##### ✅ TXT文本对比模式
+
+```javascript
+// 同样需要绑定事件
+outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+bindSkuTagEvents(outputPanel, showProductDetail);  // 必须添加！
+```
+
+##### ❌ 错误示例（常见Bug）
+
+```javascript
+// ❌ 错误1：忘记绑定事件
+outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+// 缺少 bindSkuTagEvents() → 点击无响应
+
+// ❌ 错误2：过度样式
+tag.style.cursor = 'pointer';
+tag.style.textDecoration = 'underline';  // ❌ 太丑了
+tag.style.color = '#409EFF';           // ❌ 不必要
+
+// ❌ 错误3：内联onclick（XSS风险）
+return `<span onclick="showProductDetail('${sku}')">${sku}</span>`;
+```
+
+#### 多类货号列表渲染示例
+
+```javascript
+// JSON多余货号(所有价格) - 橙色
+if (skuData.extraSkus && skuData.extraSkus.length > 0) {
+    const uniqueExtras = [...new Set(skuData.extraSkus)];
+    const items = uniqueExtras.map(sku => createSkuTag(sku, showProductDetail)).join('');
+    cardHtml += `
+        <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
+            <div class="missing-title" style="color: #f57c00;">JSON多余货号(所有价格):</div>
+            <div class="sku-container">${items}</div>
+        </div>
+    `;
+}
+
+// JSON多余货号(高价商品≥599) - 红色
+if (skuData.highPriceExtraSkus2 && skuData.highPriceExtraSkus2.length > 0) {
+    const uniqueHighPriceExtras = [...new Set(skuData.highPriceExtraSkus2)];
+    const items = uniqueHighPriceExtras.map(sku => createSkuTag(sku, showProductDetail)).join('');
+    cardHtml += `
+        <div class="missing-skus" style="background: #ffebee; border-color: #ef9a9a;">
+            <div class="missing-title" style="color: #c62828;">JSON多余货号(高价商品≥599):</div>
+            <div class="sku-container">${items}</div>
+        </div>
+    `;
+}
+
+// 高价商品中已存在于Excel的货号 - 绿色
+if (skuData.highPriceExistingSkus && skuData.highPriceExistingSkus.length > 0) {
+    const uniqueExisting = [...new Set(skuData.highPriceExistingSkus)];
+    const items = uniqueExisting.map(sku => createSkuTag(sku, showProductDetail)).join('');
+    cardHtml += `
+        <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
+            <div class="missing-title" style="color: #388e3c;">高价商品中已存在于Excel的货号:</div>
+            <div class="sku-container">${items}</div>
+        </div>
+    `;
+}
+```
+
+#### 文本解析增强（TXT模式支持）
+
+当从纯文本解析货号时，支持多种格式：
+
+```javascript
+// 格式1：带序号
+// 1. 02053
+// 2. 09735
+
+if (line.match(/^\s*\d+\.\s+\S+\s*$/)) {
+    const match = line.match(/\d+\.\s+(\S+)/);
+    if (match) skuArray.push(match[1].trim());
+}
+
+// 格式2：纯货号（每行一个）
+// 02053
+// 09735
+
+if (line.trim() && !line.includes(':') && !line.startsWith('=')) {
+    const skuMatch = line.trim().match(/^(\S+)$/);
+    if (skuMatch) skuArray.push(skuMatch[1]);
+}
+
+// 格式3：逗号分隔
+// 02053, 09735, 15448
+
+const skus = line.split(',').map(s => s.trim()).filter(s => s);
+skuArray.push(...skus);
+```
+
+#### 调试技巧
+
+在开发阶段，可以添加调试日志：
+
+```javascript
+function bindSkuTagEvents(container, onClickHandler) {
+    const tags = container.querySelectorAll('.sku-tag[data-sku]');
+    console.log('[调试] 找到标签数量:', tags.length);  // 应该 > 0
+    
+    tags.forEach((tag, index) => {
+        console.log(`[调试] 绑定第${index + 1}个标签:`, tag.dataset.sku);
+        
+        tag.onclick = function(e) {
+            console.log('[调试] 标签被点击:', this.dataset.sku);  // 验证触发
+            // ...
+        };
+    });
+}
+```
+
+#### 检查清单
+
+开发完成后，必须验证：
+
+- [ ] 所有 `.sku-tag[data-sku]` 元素都已绑定事件
+- [ ] `insertAdjacentHTML` 后立即调用了 `bindSkuTagEvents`
+- [ ] 样式简洁（只有 cursor: pointer）
+- [ ] 控制台无 `[错误] onClickHandler 不是函数`
+- [ ] 点击后能正确调用回调函数
+- [ ] 支持动态内容（新插入的标签自动可点击）
+
+---
+
 ### 3.3 Toast 提示（替代 alert）
 
 ```javascript
@@ -15947,6 +16138,31 @@ class VersionResource(Resource):
 ### 2.16.3 完整示例
 
 ``markdown
+### v3.8.89 (2026-07-29) - 🚀 JavaScript重构 + 安全加固 + 性能优化
+
+#### ✨ 核心改进
+- **JavaScript代码提取** - 从index.html提取4190行JavaScript到独立文件dist/app.js
+- **XSS安全漏洞修复** - 所有用户输入使用escapeHtml()转义
+- **内存泄漏修复** - 新增TimerManager统一管理定时器
+- **按钮事件绑定重构** - 彻底解决8个功能按钮失灵问题
+
+#### 🔒 安全加固
+- **XSS防护** - showProductModal等函数中所有用户输入字段转义
+- **统一错误处理** - 新增ErrorHandler工具类
+- **防抖/节流** - 新增debounce和throttle函数
+
+#### 🐛 Bug修复
+- **语法错误修复** - 删除错误的getter/setter语法
+- **事件绑定时序** - 智能DOM检测，支持同步/异步加载
+- **资源清理** - 页面卸载时完整释放所有资源
+
+#### 📊 性能提升
+- **HTML文件减少71%** - 从~200KB降至~58KB
+- **浏览器缓存优化** - 独立JS文件可缓存
+- **可见性优化** - 页面隐藏时暂停轮询
+
+---
+
 ### v3.8.73 (2026-07-19) - 隐藏Bug修复 + 资源管理优化
 
 ### 🔒 安全加固
