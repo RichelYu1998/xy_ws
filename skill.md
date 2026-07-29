@@ -7101,6 +7101,225 @@ def run_command_background(task_id, command):
 
 ---
 
+### 2.18 FastAPI 路由规范（v3.8.89 新增）
+
+> **重要**: 项目已从 Flask 迁移到 FastAPI，新代码必须使用 FastAPI 装饰器语法。
+
+#### 2.18.1 路由装饰器改造
+
+```python
+# ❌ 旧 (Flask) - 禁止使用
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'ok'}), 200
+
+# ✅ 新 (FastAPI) - 必须使用
+@app.get('/api/health')
+async def health_check():
+    return JSONResponse(content={'status': 'ok'}, status_code=200)
+```
+
+#### 2.18.2 HTTP 方法对应关系
+
+| Flask | FastAPI | 说明 |
+|-------|---------|------|
+| `methods=['GET']` | `@app.get()` | GET 请求 |
+| `methods=['POST']` | `@app.post()` | POST 请求 |
+| `methods=['PUT']` | `@app.put()` | PUT 请求 |
+| `methods=['DELETE']` | `@app.delete()` | DELETE 请求 |
+| `methods=['PATCH']` | `@app.patch()` | PATCH 请求 |
+
+#### 2.18.3 请求处理改造
+
+```python
+# ❌ 旧 (Flask)
+from flask import request, jsonify
+
+@app.route('/api/data', methods=['POST'])
+def get_data():
+    data = request.get_json()
+    return jsonify({'result': data}), 200
+
+# ✅ 新 (FastAPI)
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.post('/api/data')
+async def get_data(request: Request):
+    data = await request.json()
+    return JSONResponse(content={'result': data}, status_code=200)
+```
+
+#### 2.18.4 路径参数
+
+```python
+# ❌ 旧 (Flask)
+@app.route('/user/<int:id>')
+def get_user(id):
+    return jsonify({'id': id})
+
+# ✅ 新 (FastAPI)
+@app.get('/user/{id}')
+async def get_user(id: int):  # ← 必须添加类型注解
+    return JSONResponse(content={'id': id})
+```
+
+#### 2.18.5 查询参数
+
+```python
+# ❌ 旧 (Flask)
+@app.route('/search')
+def search():
+    q = request.args.get('q', '')
+    page = request.args.get('page', 1, type=int)
+
+# ✅ 新 (FastAPI)
+@app.get('/search')
+async def search(q: str = '', page: int = 1):
+    pass
+```
+
+#### 2.18.6 响应格式
+
+```python
+# ✅ 成功响应
+return JSONResponse(content={'success': True, 'data': result})
+
+# ✅ 错误响应（带 HTTP 状态码）
+return JSONResponse(content={'error': '描述信息'}, status_code=404)
+
+# ✅ 抛出异常（推荐）
+from fastapi import HTTPException
+raise HTTPException(status_code=404, detail='资源不存在')
+```
+
+#### 2.18.7 异步支持
+
+**核心优势**: FastAPI 原生支持 async/await，所有路由函数建议使用 `async def`：
+
+```python
+✅ 推荐写法：
+@app.get('/api/products')
+async def get_products():
+    products = await fetch_products_from_db()  # 异步数据库查询
+    return JSONResponse(content={'products': products})
+
+⚠️ 同步写法（兼容旧代码）：
+@app.get('/api/products')
+def get_products():  # 不加 async
+    products = fetch_products_sync()  # 同步操作
+    return JSONResponse(content={'products': products})
+```
+
+#### 2.18.8 Pydantic 模型验证（推荐）
+
+```python
+from pydantic import BaseModel
+
+class ProductCreate(BaseModel):
+    name: str
+    price: float
+    description: str = ""
+
+@app.post('/api/products')
+async def create_product(product: ProductCreate):
+    # product 参数自动验证，无需手动解析 JSON
+    return JSONResponse(content={
+        'success': True,
+        'data': product.dict()
+    }, status_code=201)
+```
+
+#### 2.18.9 中间件配置
+
+```python
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.cors import CORSMiddleware
+
+# Gzip 压缩（自动压缩 >1KB 的响应）
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# CORS 跨域支持
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+```
+
+#### 2.18.10 静态文件服务
+
+```python
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# 方式1：挂载整个目录
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# 方式2：单个文件返回
+@app.get('/dist/{filename}')
+async def dist_files(filename: str):
+    file_path = os.path.join(PROJECT_DIR, 'dist', filename)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail='File not found')
+    return FileResponse(file_path)
+```
+
+#### 2.18.11 全局异常处理
+
+```python
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        content={
+            'error': str(exc),
+            'success': False,
+            'code': 'INTERNAL_ERROR'
+        },
+        status_code=500
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        content={
+            'error': exc.detail,
+            'success': False,
+            'code': f'HTTP_{exc.status_code}'
+        },
+        status_code=exc.status_code
+    )
+```
+
+#### 2.18.12 性能优化最佳实践
+
+1. **异步优先**: 所有 I/O 操作使用 async/await
+2. **Pydantic 验证**: 使用模型自动验证请求数据
+3. **Gzip 压缩**: 已启用，>1KB 响应自动压缩
+4. **连接池**: 数据库/HTTP 客户端使用连接池
+5. **缓存**: 频繁访问的数据使用内存缓存
+
+#### 2.18.13 迁移检查清单
+
+将 Flask 路由迁移到 FastAPI 时，必须检查：
+
+- [ ] `@app.route()` → `@app.get()/post()/put()/delete()`
+- [ ] `def` → `async def`（除非是同步操作）
+- [ ] `request.args.get()` → 函数参数（带默认值和类型注解）
+- [ ] `request.get_json()` → Pydantic 模型 或 `await request.json()`
+- [ ] `jsonify()` → `JSONResponse(content=...)`
+- [ ] `send_file()` → `FileResponse()`
+- [ ] `request.remote_addr` → `request.client.host`
+- [ ] `<path:param>` → `{param}` + 类型注解
+- [ ] 手动错误返回 → `raise HTTPException()`
+
+---
+
 ## 三、前端规范
 
 ### 3.1 技术栈

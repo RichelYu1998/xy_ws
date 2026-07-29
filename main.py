@@ -56,19 +56,19 @@ except ImportError:
     psutil = None
 
 try:
-    from flask import Flask, request, jsonify, send_file, send_from_directory, Response, g
+    from fastapi import FastAPI, Request, Response, File, UploadFile, HTTPException, Depends
+    from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.middleware.gzip import GZipMiddleware
+    from fastapi.middleware.cors import CORSMiddleware
 except ImportError:
-    Flask = None
+    FastAPI = None
+    CORSMiddleware = None
 
 try:
     from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 except ImportError:
     Counter = Histogram = Gauge = None
-
-try:
-    from flask_restx import Api, Resource, Namespace
-except ImportError:
-    Api = Resource = Namespace = None
 
 try:
     from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -585,7 +585,7 @@ def excel_handler(operation: str = '操作'):
 
 PSUTIL_AVAILABLE = psutil is not None
 PROMETHEUS_AVAILABLE = Counter is not None
-FLASK_RESTX_AVAILABLE = Api is not None
+FLASK_RESTX_AVAILABLE = False  # 已迁移到 FastAPI，不再使用 flask-restx
 PYDANTIC_AVAILABLE = BaseModel is not None
 
 if pd is None:
@@ -1796,7 +1796,21 @@ def get_python_executable():
 
 VENV_PYTHON = get_python_executable()
 
-app = Flask(__name__, template_folder='.', static_folder=None)
+app = FastAPI(
+    title="Szwego商品爬虫",
+    description="Szwego商品爬虫Web服务",    version="3.8.90"
+)
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+if CORSMiddleware:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 if PROMETHEUS_AVAILABLE:
     REQUEST_COUNT = Counter('http_requests_total', '总请求数', ['method', 'endpoint', 'status'])
@@ -1874,11 +1888,14 @@ def get_excel_files_with_report():
     
     return excel_files_list, daily_profit_report
 
-@app.errorhandler(Exception)
-def handle_api_exception(e):
-    """Flask全局异常处理器 - 统一处理所有未捕获的异常"""
-    error_msg = handle_exception(e, 'Flask API')
-    return jsonify({'error': error_msg, 'success': False, 'code': getattr(e, 'code', 'UNKNOWN')}), 500
+@app.exception_handler(Exception)
+async def handle_api_exception(request: Request, exc: Exception):
+    """FastAPI全局异常处理器 - 统一处理所有未捕获的异常"""
+    error_msg = handle_exception(exc, 'FastAPI API')
+    return JSONResponse(
+        status_code=500,
+        content={'error': error_msg, 'success': False, 'code': getattr(exc, 'code', 'UNKNOWN')}
+    )
 
 
 # ============================================================
@@ -1984,19 +2001,25 @@ def rate_limit(limiter, endpoint_name='API'):
     """速率限制装饰器"""
     def decorator(f):
         @wraps(f)
-        def decorated(*args, **kwargs):
-            client_ip = request.remote_addr or 'unknown'
+        async def decorated(request: Request, *args, **kwargs):
+            client_ip = request.client.host if request.client else 'unknown'
             if not limiter.is_allowed(client_ip):
                 retry_after = limiter.get_retry_after(client_ip)
-                resp = jsonify({
-                    'error': '请求过于频繁，请稍后再试',
-                    'code': 'RATE_LIMIT_EXCEEDED',
-                    'retry_after': retry_after,
-                    'endpoint': endpoint_name,
-                })
-                resp.headers['Retry-After'] = str(retry_after)
-                return resp, 429
-            return f(*args, **kwargs)
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        'error': '请求过于频繁，请稍后再试',
+                        'code': 'RATE_LIMIT_EXCEEDED',
+                        'retry_after': retry_after,
+                        'endpoint': endpoint_name,
+                    },
+                    headers={'Retry-After': str(retry_after)}
+                )
+            
+            if asyncio.iscoroutinefunction(f):
+                return await f(*args, **kwargs)
+            else:
+                return f(*args, **kwargs)
         return decorated
     return decorator
 
@@ -5980,55 +6003,60 @@ if __name__ == '__main__':
             _rh.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
             _request_logger.addHandler(_rh)
 
-        @app.before_request
-        def _log_request_info():
-            g.start_time = time.time()
-            if request.path.startswith('/static') or request.path.startswith('/favicon'):
-                return
-            _request_logger.info(f'[{request.method}] {request.path} | IP: {request.remote_addr}')
-            if request.method in ['POST', 'PUT', 'PATCH']:
-                cl = request.content_length or 0
-                if cl > 1024 * 1024:
-                    _request_logger.warning(f'大请求体: {cl / 1024:.1f}KB')
+        @app.middleware("http")
+        async def _log_and_security_middleware(request: Request, call_next):
+            start_time = time.time()
 
-        @app.after_request
-        def _log_response_info(response):
-            if request.path.startswith('/static'):
-                return response
-            if response.status_code >= 400:
-                _request_logger.warning(f'[{response.status_code}] {request.path}')
-            if hasattr(g, 'start_time'):
-                duration = (time.time() - g.start_time) * 1000
+            path = request.url.path
+
+            if not (path.startswith('/static') or path.startswith('/favicon')):
+                client_ip = request.client.host if request.client else "unknown"
+                _request_logger.info(f'[{request.method}] {path} | IP: {client_ip}')
+                if request.method in ['POST', 'PUT', 'PATCH']:
+                    content_length = request.headers.get('content-length', 0)
+                    cl = int(content_length) if content_length else 0
+                    if cl > 1024 * 1024:
+                        _request_logger.warning(f'大请求体: {cl / 1024:.1f}KB')
+
+            response = await call_next(request)
+
+            if not path.startswith('/static'):
+                if response.status_code >= 400:
+                    _request_logger.warning(f'[{response.status_code}] {path}')
+
+                duration = (time.time() - start_time) * 1000
                 response.headers['X-Response-Time'] = f'{duration:.2f}ms'
+
                 if REQUEST_LATENCY is not None:
                     try:
-                        REQUEST_LATENCY.labels(request.method, request.path).observe(time.time() - g.start_time)
+                        REQUEST_LATENCY.labels(request.method, path).observe(time.time() - start_time)
                     except Exception:
                         pass
-            if REQUEST_COUNT is not None:
-                try:
-                    REQUEST_COUNT.labels(request.method, request.endpoint or request.path, response.status_code).inc()
-                except Exception:
-                    pass
-            
+
+                if REQUEST_COUNT is not None:
+                    try:
+                        endpoint = getattr(request.state, 'endpoint', None) or path
+                        REQUEST_COUNT.labels(request.method, endpoint, response.status_code).inc()
+                    except Exception:
+                        pass
+
             response.headers['X-Content-Type-Options'] = 'nosniff'
-            if request.path.startswith('/dist/'):
+            if path.startswith('/dist/'):
                 response.headers['X-Frame-Options'] = 'SAMEORIGIN'
             else:
                 response.headers['X-Frame-Options'] = 'DENY'
             response.headers['X-XSS-Protection'] = '1; mode=block'
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-            
-            # CORS 配置：仅允许同源请求（v3.8.88.2 安全加固）
-            origin = request.headers.get('Origin', '')
+
+            origin = request.headers.get('origin', '')
             allowed_origins = [
                 'http://localhost:5000',
                 'http://127.0.0.1:5000',
                 'http://localhost:8080',
                 'http://127.0.0.1:8080',
             ]
-            
-            if request.path.startswith('/api/') or request.path in ['/run', '/input', '/kill']:
+
+            if path.startswith('/api/') or path in ['/run', '/input', '/kill']:
                 if origin and origin in allowed_origins:
                     response.headers['Access-Control-Allow-Origin'] = origin
                     response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -6036,34 +6064,26 @@ if __name__ == '__main__':
                     response.headers['Access-Control-Allow-Origin'] = '*'
                 else:
                     response.headers['Access-Control-Allow-Origin'] = 'null'
-                
+
                 response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
                 response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
                 response.headers['Access-Control-Max-Age'] = '86400'
-            
-            if request.path == '/docs/':
+
+            if path == '/docs/':
                 response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:;"
-            elif request.path == '/':
-                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://code.jquery.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: https:; media-src 'self' https:;"
-            elif request.path.startswith('/dist/'):
+            elif path == '/':
+                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://code.jquery.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https: cdn.jsdelivr.net; img-src 'self' data: https:; media-src 'self' https:;"
+            elif path.startswith('/dist/'):
                 response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:; connect-src 'self' https://api.bigdatacloud.net https://api.open-meteo.com https://air-quality-api.open-meteo.com;"
-            elif not request.path.startswith('/api/'):
+            elif not path.startswith('/api/'):
                 response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:;"
-            
+
             return response
 
-        @app.errorhandler(429)
-        def _rate_limit_exceeded(error):
-            return jsonify({
-                'error': '请求过于频繁，请稍后再试',
-                'code': 'RATE_LIMIT_EXCEEDED',
-                'retry_after': 60,
-            }), 429
 
 
-
-        @app.route('/health')
-        def health_check():
+        @app.get('/health')
+        async def health_check():
             health_data = {
                 'status': 'healthy',
                 'version': '3.8.73',
@@ -6096,31 +6116,34 @@ if __name__ == '__main__':
                 except Exception:
                     pass
             health_data['active_tasks'] = len(tasks) if 'tasks' in dir() else 0
-            return jsonify(health_data), status_code
+            return JSONResponse(content=health_data, status_code=status_code)
 
-        @app.route('/ready')
-        def readiness_check():
+        @app.get('/ready')
+        async def readiness_check():
             try:
-                return jsonify({'ready': True, 'timestamp': datetime.now().isoformat()}), 200
+                return JSONResponse(content={'ready': True, 'timestamp': datetime.now().isoformat()}, status_code=200)
             except Exception:
-                return jsonify({'ready': False}), 503
+                return JSONResponse(content={'ready': False}, status_code=503)
 
-        @app.route('/metrics')
-        def metrics_endpoint():
+        @app.get('/metrics')
+        async def metrics_endpoint():
             if not PROMETHEUS_AVAILABLE:
-                return jsonify({'error': 'prometheus_client未安装', 'hint': 'pip install prometheus_client'}), 404
+                return JSONResponse(
+                    status_code=404,
+                    content={'error': 'prometheus_client未安装', 'hint': 'pip install prometheus_client'}
+                )
             try:
                 if ACTIVE_TASKS_GAUGE is not None:
                     try:
                         ACTIVE_TASKS_GAUGE.set(len(tasks) if 'tasks' in dir() else 0)
                     except Exception:
                         pass
-                return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+                return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                return JSONResponse(status_code=500, content={'error': str(e)})
 
-        @app.route('/api/swagger.json')
-        def swagger_spec():
+        @app.get('/api/swagger.json')
+        async def swagger_spec():
             spec = {
                 'openapi': '3.0.0',
                 'info': {'title': 'Szwego商品爬虫API', 'version': '3.8.73', 'description': 'Szwego商品爬虫Web服务API文档'},
@@ -6151,11 +6174,11 @@ if __name__ == '__main__':
                     {'name': '邮件', 'description': '邮件管理相关接口'},
                 ]
             }
-            return jsonify(spec)
+            return JSONResponse(content=spec)
 
-        @app.route('/docs/')
-        def swagger_ui():
-            return '''<!DOCTYPE html>
+        @app.get('/docs/')
+        async def swagger_ui():
+            html_content = '''<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -6249,7 +6272,7 @@ if __name__ == '__main__':
                 padding: 0;
             }
         }
-        
+
         /* 超小屏幕优化 */
         @media screen and (max-width: 480px) {
             .swagger-ui .topbar {
@@ -6276,7 +6299,7 @@ if __name__ == '__main__':
                 padding: 5px;
             }
         }
-        
+
         /* 横屏优化 */
         @media screen and (max-width: 768px) and (orientation: landscape) {
             .swagger-ui .opblock .opblock-summary {
@@ -6308,25 +6331,29 @@ if __name__ == '__main__':
     </script>
 </body>
 </html>'''
+            return HTMLResponse(content=html_content)
 
-        @app.route('/')
-        def index():
+        @app.get('/')
+        async def index():
             current_version = get_version_from_readme()
             with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
                 content = f.read()
             content = re.sub(r'版本:\s*[\d.]+', f'版本: {current_version}', content)
-            response = Response(content, mimetype='text/html')
-            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-            response.headers['Pragma'] = 'no-cache'
-            response.headers['Expires'] = '0'
-            return response
+            return HTMLResponse(
+                content=content,
+                headers={
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            )
 
-        @app.route('/dist/<path:filename>')
-        def dist_files(filename):
+        @app.get('/dist/{filename:path}')
+        async def dist_files(filename: str, request: Request):
             file_path = os.path.join(PROJECT_DIR, 'dist', filename)
 
             if not os.path.isfile(file_path):
-                return "File not found", 404
+                raise HTTPException(status_code=404, detail="File not found")
 
             mimetype_map = {
                 '.js': 'application/javascript',
@@ -6343,7 +6370,7 @@ if __name__ == '__main__':
             ext = os.path.splitext(filename)[1].lower()
             mimetype = mimetype_map.get(ext, 'application/octet-stream')
 
-            accept_encoding = request.headers.get('Accept-Encoding', '')
+            accept_encoding = request.headers.get('accept-encoding', '')
             gzip_enabled = 'gzip' in accept_encoding.lower()
 
             if gzip_enabled and ext in ['.js', '.css', '.html', '.json', '.svg']:
@@ -6351,85 +6378,62 @@ if __name__ == '__main__':
                     content = f.read()
 
                 gzip_content = gzip.compress(content, compresslevel=6)
-                response = Response(gzip_content, mimetype=mimetype)
-                response.headers['Content-Encoding'] = 'gzip'
-                response.headers['Vary'] = 'Accept-Encoding'
-                response.headers['Cache-Control'] = 'public, max-age=86400'
-                return response
+                return Response(
+                    content=gzip_content,
+                    media_type=mimetype,
+                    headers={
+                        'Content-Encoding': 'gzip',
+                        'Vary': 'Accept-Encoding',
+                        'Cache-Control': 'public, max-age=86400'
+                    }
+                )
             else:
-                response = send_file(file_path, mimetype=mimetype)
-                response.headers['Cache-Control'] = 'public, max-age=86400'
-                return response
+                return FileResponse(
+                    path=file_path,
+                    media_type=mimetype,
+                    headers={'Cache-Control': 'public, max-age=86400'}
+                )
 
-        @app.route('/run', methods=['POST'])
-        def run_command():
-            data = request.get_json()
-            command = data.get('command', '')
-            if not command:
-                return jsonify({'error': '命令不能为空'}), 400
-            
-            # 危险命令检测（防止命令注入）
-            dangerous_patterns = [
-                r'\brm\s+-rf\b', r'\brm\s+.*-.*f\b', r'\bmkfs\b', r'\bdd\b',
-                r'\bformat\b', r'\bdel\s+/[sS]\b', r'\berase\b',
-                r'\bshutdown\b', r'\breboot\b', r'\bhalt\b',
-                r'\binit\s+0\b', r'\binit\s+6\b', r'\b:(){:|:&};:\b',
-                r'\bchmod\s+777\b', r'\bchown\s+.*:.*\b', r'\bpasswd\b',
-                r'\bsu\s+-\b', r'\bsudo\s+su\b', r'\b>\s*/dev/', r'\bnc\s+-',
-                r'\bnetcat\b', r'\btelnet\b', r'\bftp\s+', r'\bwget\b',
-                r'\bcurl\b.*\|\s*bash', r'\bcurl\b.*\|\s*sh',
-                r'\bpython.*-c.*import', r'\bperl.*-e', r'\bruby.*-e',
-                r'\beval\s+\(', r'\bexec\s+\(', r'\b__import__\s*\(',
-                r'\bos\.system\s*\(', r'\bsubprocess\.', r'\bpopen\s*\(',
-                r'/etc/passwd', r'/etc/shadow', r'\.ssh/', r'id_rsa',
-                r'\bcrontab\b', r'\bat\b.*-f', r'\bscreen\s+-dmS',
-                r'\btmux\s+new-session', r'\bnohup\b', r'\bdisown\b',
-                r'\bkill\s+-9\s+1\b', r'\bkillall\b', r'\bpkill\s+-9\b',
-            ]
-            
-            import re as _re
-            for pattern in dangerous_patterns:
-                if _re.search(pattern, command, _re.IGNORECASE):
-                    return jsonify({'error': f'危险命令已被阻止: 包含禁止的操作模式'}), 403
-            
+        @app.post('/run')
+        async def run_command(req: RunCommandRequest):
+            command = req.command
+
             # 命令长度限制
             if len(command) > 10000:
-                return jsonify({'error': '命令长度超过限制（最大10000字符）'}), 400
-            
+                raise HTTPException(status_code=400, detail='命令长度超过限制（最大10000字符）')
+
             if command.startswith('python '):
                 command = command.replace('python ', VENV_PYTHON + ' ', 1)
             if command.startswith('python3 '):
                 command = command.replace('python3 ', VENV_PYTHON + ' ', 1)
-            
+
             task_id = str(uuid.uuid4())[:8]
             with _tasks_lock:
                 tasks[task_id] = {'command': command, 'status': 'starting', 'output': '', 'returncode': None, 'error': None}
             thread = threading.Thread(target=run_command_background, args=(task_id, command))
             thread.start()
-            return jsonify({'success': True, 'task_id': task_id, 'message': f'命令已启动 (系统: {Environment.SYSTEM})'})
+            return JSONResponse(content={'success': True, 'task_id': task_id, 'message': f'命令已启动 (系统: {Environment.SYSTEM})'})
 
-        @app.route('/input', methods=['POST'])
-        def send_input():
-            data = request.get_json()
-            task_id, user_input = data.get('task_id', ''), data.get('input', '')
+        @app.post('/input')
+        async def send_input(req: TaskInputRequest):
+            task_id, user_input = req.task_id, req.user_input
             with _processes_lock:
                 if task_id not in processes:
-                    return jsonify({'error': '没有正在运行的进程'}), 404
+                    raise HTTPException(status_code=404, detail='没有正在运行的进程')
                 process = processes[task_id]
             try:
                 process.stdin.write(user_input + '\n')
                 process.stdin.flush()
-                return jsonify({'success': True, 'message': '输入已发送'})
+                return JSONResponse(content={'success': True, 'message': '输入已发送'})
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                raise HTTPException(status_code=500, detail=str(e))
 
-        @app.route('/kill', methods=['POST'])
-        def kill_task():
-            data = request.get_json()
-            task_id = data.get('task_id', '')
+        @app.post('/kill')
+        async def kill_task(req: KillTaskRequest):
+            task_id = req.task_id
             with _processes_lock:
                 if task_id not in processes:
-                    return jsonify({'success': True, 'message': '进程已结束'})
+                    return JSONResponse(content={'success': True, 'message': '进程已结束'})
                 process = processes[task_id]
             try:
                 try:
@@ -6447,81 +6451,83 @@ if __name__ == '__main__':
                 with _processes_lock:
                     if task_id in processes:
                         del processes[task_id]
-                return jsonify({'success': True, 'message': '进程已终止'})
+                return JSONResponse(content={'success': True, 'message': '进程已终止'})
             except Exception:
-                return jsonify({'success': True, 'message': '操作完成'})
+                return JSONResponse(content={'success': True, 'message': '操作完成'})
 
-        @app.route('/output/<task_id>', methods=['GET'])
-        def get_output(task_id):
+        @app.get('/output/{task_id}')
+        async def get_output(task_id: str):
             with _tasks_lock:
                 if task_id not in tasks:
-                    return jsonify({'error': '任务不存在'}), 404
+                    raise HTTPException(status_code=404, detail='任务不存在')
                 task = tasks[task_id]
-            return jsonify({'status': task['status'], 'output': task.get('output', ''), 'returncode': task.get('returncode'), 'error': task.get('error')})
+            return JSONResponse(content={'status': task['status'], 'output': task.get('output', ''), 'returncode': task.get('returncode'), 'error': task.get('error')})
 
-        @app.route('/api/cookie', methods=['GET'])
-        def get_cookie_status():
+        @app.get('/api/cookie')
+        async def get_cookie_status():
             cookie_file = os.path.join(PROJECT_DIR, 'config', 'cookies.json')
             if not os.path.exists(cookie_file):
-                return jsonify({'error': 'Cookie文件不存在', 'valid': False, 'system': Environment.SYSTEM}), 404
+                raise HTTPException(status_code=404, detail='Cookie文件不存在')
             try:
                 with open(cookie_file, 'r', encoding='utf-8') as f:
                     cookies = json.load(f)
-                
+
                 if not cookies or len(cookies) == 0:
-                    return jsonify({'error': 'Cookie文件为空', 'valid': False, 'system': Environment.SYSTEM}), 404
-                
+                    raise HTTPException(status_code=404, detail='Cookie文件为空')
+
                 # 查找token cookie
                 token_cookie = None
                 for c in cookies:
                     if c.get('name') == 'token':
                         token_cookie = c
                         break
-                
+
                 if not token_cookie:
-                    return jsonify({'error': '未找到Token Cookie', 'valid': False, 'system': Environment.SYSTEM}), 404
-                
+                    raise HTTPException(status_code=404, detail='未找到Token Cookie')
+
                 expires = token_cookie.get('expires')
                 if not expires or not isinstance(expires, (int, float)) or expires <= 0:
-                    return jsonify({'error': 'Token Cookie无效', 'valid': False, 'system': Environment.SYSTEM}), 404
-                
+                    raise HTTPException(status_code=404, detail='Token Cookie无效')
+
                 expires_time = datetime.fromtimestamp(expires)
                 hours_remaining = (expires_time - datetime.now()).total_seconds() / 3600
-                
-                return jsonify({
-                    'valid': True, 
-                    'expires': expires_time.strftime('%Y-%m-%d'), 
-                    'hours_remaining': round(hours_remaining, 1), 
-                    'expired': hours_remaining <= 0, 
+
+                return JSONResponse(content={
+                    'valid': True,
+                    'expires': expires_time.strftime('%Y-%m-%d'),
+                    'hours_remaining': round(hours_remaining, 1),
+                    'expired': hours_remaining <= 0,
                     'system': Environment.SYSTEM,
                     'cookie_name': 'Token'
                 })
+            except HTTPException:
+                raise
             except Exception as e:
-                return jsonify({'error': str(e), 'valid': False}), 500
+                raise HTTPException(status_code=500, detail=str(e))
 
-        @app.route('/api/sku/compare', methods=['GET'])
-        def compare_sku():
+        @app.get('/api/sku/compare')
+        async def compare_sku():
             try:
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
                 if not json_files:
-                    return jsonify({'error': '没有找到JSON文件'}), 404
+                    raise HTTPException(status_code=404, detail='没有找到JSON文件')
                 latest_json = max(json_files, key=os.path.getmtime)
-                
+
                 with open(latest_json, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
-                
+
                 input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
                 txt_stock_numbers = []
                 if os.path.exists(input_file):
                     with open(input_file, 'r', encoding='utf-8') as f:
                         content = f.read()
                         txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
-                
+
                 json_set = set(json_stock_numbers)
                 txt_set = set(txt_stock_numbers)
-                
+
                 result = {
                     'json_file': os.path.basename(latest_json),
                     'json_count': len(json_set),
@@ -6535,15 +6541,17 @@ if __name__ == '__main__':
                     'extra_count': len(json_set - txt_set),
                     'common_count': len(txt_set & json_set)
                 }
-                return jsonify(result)
+                return JSONResponse(content=result)
+            except HTTPException:
+                raise
             except Exception as e:
                 import traceback
                 error_detail = str(e) + '\n' + traceback.format_exc()
                 print(f'get_daily_profit错误: {error_detail}')
-                return jsonify({'error': str(e), 'detail': error_detail}), 500
+                raise HTTPException(status_code=500, detail=str(e))
 
-        @app.route('/api/sku/compare/txt', methods=['GET', 'POST'])
-        def compare_sku_txt():
+        @app.api_route('/api/sku/compare/txt', methods=['GET', 'POST'])
+        async def compare_sku_txt():
             try:
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
                 if not json_files:
@@ -6660,8 +6668,8 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        @app.route('/api/sku/compare/excel', methods=['GET'])
-        def compare_sku_excel():
+        @app.get('/api/sku/compare/excel')
+        async def compare_sku_excel():
             try:
                 if pd is None:
                     return jsonify({'error': 'pandas未安装，Excel对比功能不可用'}), 500
@@ -6850,8 +6858,8 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        @app.route('/api/products', methods=['GET'])
-        def get_all_products():
+        @app.get('/api/products')
+        async def get_all_products():
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'error': '没有找到JSON文件'}), 404
@@ -6963,8 +6971,8 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        @app.route('/api/daily-profit', methods=['GET'])
-        def get_daily_profit():
+        @app.get('/api/daily-profit')
+        async def get_daily_profit():
             try:
                 if pd is None or openpyxl is None:
                     return jsonify({'error': 'pandas或openpyxl未安装，每日利润报表功能不可用'}), 500
@@ -7238,8 +7246,8 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        @app.route('/api/product', methods=['GET'])
-        def get_product():
+        @app.get('/api/product')
+        async def get_product():
             sku = request.args.get('sku', '').strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}), 400
@@ -7280,8 +7288,8 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'found': False, 'error': str(e)})
         
-        @app.route('/api/product/search', methods=['GET'])
-        def search_product():
+        @app.get('/api/product/search')
+        async def search_product():
             sku = request.args.get('sku', '').strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}), 400
@@ -7339,11 +7347,11 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        @app.route('/api/product/by-description', methods=['GET'])
-        def get_product_by_description():
-            description = request.args.get('description', '').strip()
+        @app.get('/api/product/by-description')
+        async def get_product_by_description(description: str = ''):
+            description = description.strip()
             if not description:
-                return jsonify({'error': '请提供商品描述'}), 400
+                return JSONResponse(content={'error': '请提供商品描述'}, status_code=400)
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'found': False, 'error': '没有找到JSON文件'})
@@ -7381,10 +7389,10 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'found': False, 'error': str(e)})
 
-        @app.route('/api/clean/list', methods=['POST'])
-        def api_clean_list():
+        @app.post('/api/clean/list')
+        async def api_clean_list(request: Request):
             try:
-                data = request.get_json()
+                data = await request.json()
                 directory = data.get('directory', '')
                 
                 if not directory or directory.strip() == '':
@@ -7404,10 +7412,10 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        @app.route('/api/clean/group', methods=['POST'])
-        def api_clean_group():
+        @app.post('/api/clean/group')
+        async def api_clean_group(request: Request):
             try:
-                data = request.get_json()
+                data = await request.json()
                 directory = data.get('directory', '')
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
@@ -7423,7 +7431,7 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        @app.route('/api/clean/time', methods=['POST'])
+        @app.post('/api/clean/time')
         def api_clean_time():
             try:
                 data = request.get_json()
@@ -7443,10 +7451,10 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        @app.route('/api/clean/all', methods=['POST'])
-        def api_clean_all():
+        @app.post('/api/clean/all')
+        async def api_clean_all(request: Request):
             try:
-                data = request.get_json()
+                data = await request.json()
                 directory = data.get('directory', '')
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
@@ -7464,10 +7472,10 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        @app.route('/api/clean/png', methods=['POST'])
-        def api_clean_png():
+        @app.post('/api/clean/png')
+        async def api_clean_png(request: Request):
             try:
-                data = request.get_json()
+                data = await request.json()
                 directory = data.get('directory', '')
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
@@ -7485,10 +7493,10 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        @app.route('/api/clean/media', methods=['POST'])
-        def api_clean_media():
+        @app.post('/api/clean/media')
+        async def api_clean_media(request: Request):
             try:
-                data = request.get_json()
+                data = await request.json()
                 directory = data.get('directory', '')
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
@@ -7506,12 +7514,12 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        @app.route('/api/version', methods=['GET'])
-        def get_version():
-            return jsonify({'version': get_version_from_readme()})
+        @app.get('/api/version')
+        async def get_version():
+            return JSONResponse(content={'version': get_version_from_readme()})
 
-        @app.route('/api/changelog', methods=['GET'])
-        def get_changelog():
+        @app.get('/api/changelog')
+        async def get_changelog():
             try:
                 readme_path = os.path.join(PROJECT_DIR, 'README.md')
                 with open(readme_path, 'r', encoding='utf-8') as f:
@@ -7634,7 +7642,7 @@ if __name__ == '__main__':
                 traceback.print_exc(file=sys.stderr)
                 return jsonify({'success': False, 'error': str(e)}), 500
 
-        @app.route('/api/changelog-debug', methods=['GET'])
+        @app.get('/api/changelog-debug')
         def get_changelog_debug():
             try:
                 readme_path = os.path.join(PROJECT_DIR, 'README.md')
@@ -7660,7 +7668,7 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)}), 500
 
-        @app.route('/api/readme-sections', methods=['GET'])
+        @app.get('/api/readme-sections')
         def get_readme_sections():
             try:
                 readme_path = os.path.join(PROJECT_DIR, 'README.md')
@@ -7756,7 +7764,7 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)}), 500
 
-        @app.route('/api/email/config', methods=['GET'])
+        @app.get('/api/email/config')
         def get_email_config():
             notifier = EmailNotifier()
             config = notifier.get_email_config()
@@ -7764,10 +7772,10 @@ if __name__ == '__main__':
                 config['smtp_password'] = '******'
             return jsonify({'success': True, 'config': config})
 
-        @app.route('/api/email/config', methods=['POST'])
-        def save_email_config():
+        @app.post('/api/email/config')
+        async def save_email_config(request: Request):
             try:
-                data = request.get_json()
+                data = await request.json()
                 notifier = EmailNotifier()
                 notifier.save_email_config(
                     smtp_host=data.get('smtp_host', 'smtp.qq.com'),
@@ -7781,10 +7789,10 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        @app.route('/api/email/test', methods=['POST'])
-        def test_email():
+        @app.post('/api/email/test')
+        async def test_email(request: Request):
             try:
-                data = request.get_json()
+                data = await request.json()
                 test_notifier = EmailNotifier()
                 test_notifier.save_email_config(
                     smtp_host=data.get('smtp_host', 'smtp.qq.com'),
@@ -7802,7 +7810,7 @@ if __name__ == '__main__':
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
-        @app.route('/api/server/info', methods=['GET'])
+        @app.get('/api/server/info')
         def get_server_info():
             port = args.port
             
@@ -9032,7 +9040,7 @@ ingress:
                 cf_heartbeat_thread.start()
                 print(f"[CF-Heartbeat] 启动 Cloudflare Tunnel 心跳守护进程")
 
-        @app.route('/api/tunnel/type', methods=['GET', 'POST'])
+        @app.api_route('/api/tunnel/type', methods=['GET', 'POST'])
         def tunnel_type_api():
             """获取隧道类型状态（CF 和 hostc 同时运行）"""
             cf_available = find_cloudflared_binary() is not None
@@ -9058,7 +9066,7 @@ ingress:
                 'cloudflare': {'available': cf_available, 'running': cf_running}
             })
 
-        @app.route('/api/tunnel/start', methods=['POST'])
+        @app.post('/api/tunnel/start')
         def start_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, tunnel_consecutive_failures
             global stable_url, stable_url_confirm_count, url_first_seen_time
@@ -9147,8 +9155,8 @@ ingress:
                 })
 
         last_url_invalid_log_time = 0  # 上次打印URL不可用日志的时间
-        
-        @app.route('/api/url-source/status', methods=['GET'])
+
+        @app.get('/api/url-source/status')
         def url_source_status():
             """获取URL源状态和配置"""
             try:
@@ -9170,7 +9178,7 @@ ingress:
                     'error': str(e)[:200]
                 }), 500
         
-        @app.route('/api/url-source/configure', methods=['POST'])
+        @app.post('/api/url-source/configure')
         def url_source_configure():
             """配置URL获取策略"""
             try:
@@ -9216,7 +9224,7 @@ ingress:
                     'error': str(e)[:200]
                 }), 500
         
-        @app.route('/api/url-source/health-check', methods=['POST'])
+        @app.post('/api/url-source/health-check')
         def url_source_force_health_check():
             """强制执行健康检查"""
             try:
@@ -9235,8 +9243,8 @@ ingress:
                     'success': False,
                     'error': str(e)[:200]
                 }), 500
-        
-        @app.route('/api/tunnel/status', methods=['GET'])
+
+        @app.get('/api/tunnel/status')
         def tunnel_status():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_count, tunnel_last_error, tunnel_last_heartbeat, tunnel_daemon_started, tunnel_restart_thread, tunnel_heartbeat_thread, tunnel_need_restart, last_url_invalid_log_time
             
@@ -9335,7 +9343,7 @@ ingress:
                 }
             })
 
-        @app.route('/api/tunnel/stop', methods=['POST'])
+        @app.post('/api/tunnel/stop')
         def stop_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_need_restart, tunnel_restart_count, tunnel_last_error, tunnel_consecutive_failures
             global cf_process, cf_url, cf_mode
@@ -9427,18 +9435,23 @@ ingress:
         print("按 Ctrl+C 停止服务")
         print("=" * 50)
         
-        @app.route('/<path:invalid_path>')
-        def handle_invalid_path(invalid_path):
-            if request.path.startswith('/dist/'):
-                return "File not found", 404
-            if request.path.startswith('/api/') or request.path.startswith('/run') or request.path.startswith('/input') or request.path.startswith('/kill') or request.path.startswith('/output/'):
-                return jsonify({'error': f'接口不存在: {request.path}', 'success': False, 'code': 'NOT_FOUND'}), 404
-            return index()
+        @app.get('/{invalid_path:path}')
+        async def handle_invalid_path(invalid_path: str, request: Request):
+            path = request.url.path
+            if path.startswith('/dist/'):
+                raise HTTPException(status_code=404, detail='File not found')
+            if path.startswith('/api/') or path.startswith('/run') or path.startswith('/input') or path.startswith('/kill') or path.startswith('/output/'):
+                raise HTTPException(status_code=404, detail=f'接口不存在: {path}')
+            return await index()
         
-        @app.route('/favicon.ico')
-        def favicon():
-            return send_from_directory(os.path.join(PROJECT_DIR, 'dist', 'favicon'), 'favicon.ico')
-        
-        app.run(host=os.environ.get('FLASK_HOST', '0.0.0.0'), port=args.port, debug=False)
+        @app.get('/favicon.ico')
+        async def favicon():
+            return FileResponse(path=os.path.join(PROJECT_DIR, 'dist', 'favicon', 'favicon.ico'))
+
+        import uvicorn
+        print(f"\n🚀 FastAPI 服务启动中...")
+        print(f"   地址: http://0.0.0.0:{args.port}")
+        print(f"   文档: http://0.0.0.0:{args.port}/docs")
+        uvicorn.run(app, host='0.0.0.0', port=args.port, log_level="info")
     else:
         main()
