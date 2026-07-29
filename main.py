@@ -6019,9 +6019,27 @@ if __name__ == '__main__':
             response.headers['X-XSS-Protection'] = '1; mode=block'
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
             
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            # CORS 配置：仅允许同源请求（v3.8.88.2 安全加固）
+            origin = request.headers.get('Origin', '')
+            allowed_origins = [
+                'http://localhost:5000',
+                'http://127.0.0.1:5000',
+                'http://localhost:8080',
+                'http://127.0.0.1:8080',
+            ]
+            
+            if request.path.startswith('/api/') or request.path in ['/run', '/input', '/kill']:
+                if origin and origin in allowed_origins:
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    response.headers['Access-Control-Allow-Credentials'] = 'true'
+                elif not origin:
+                    response.headers['Access-Control-Allow-Origin'] = '*'
+                else:
+                    response.headers['Access-Control-Allow-Origin'] = 'null'
+                
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+                response.headers['Access-Control-Max-Age'] = '86400'
             
             if request.path == '/docs/':
                 response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:;"

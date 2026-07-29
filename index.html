@@ -1853,6 +1853,43 @@ SzwegoSpider/
             return div.innerHTML;
         }
         
+        function escapeAttr(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+        
+        function isValidUrl(url) {
+            if (!url) return false;
+            try {
+                const parsed = new URL(url);
+                return ['http:', 'https:'].includes(parsed.protocol);
+            } catch {
+                return false;
+            }
+        }
+        
+        function safeUrl(url) {
+            return isValidUrl(url) ? escapeAttr(url) : '#invalid-url';
+        }
+        
+        function createSkuTag(sku, onClickHandler) {
+            const safeSku = escapeAttr(sku);
+            return `<span class="sku-tag" data-sku="${safeSku}" style="cursor: pointer;">${escapeHtml(sku)}</span>`;
+        }
+        
+        function bindSkuTagEvents(container, onClickHandler) {
+            container.querySelectorAll('.sku-tag[data-sku]').forEach(tag => {
+                tag.onclick = function() {
+                    onClickHandler(this.dataset.sku);
+                };
+            });
+        }
+        
         async function safeParseJson(response) {
             const contentType = response.headers.get('content-type') || '';
             if (!contentType.includes('application/json')) {
@@ -3075,7 +3112,7 @@ SzwegoSpider/
                 }
                 
                 if (skuData.highPriceExtraSkus && skuData.highPriceExtraSkus.length > 0) {
-                    const items = skuData.highPriceExtraSkus.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                    const items = skuData.highPriceExtraSkus.map(sku => createSkuTag(sku, showProductDetail)).join('');
                     cardHtml += `
                         <div class="missing-skus" style="background: #fff3e0; border-color: #ffcc80;">
                             <div class="missing-title" style="color: #E6A23C;">高价多余货号列表(≥599且不在Excel):</div>
@@ -3086,6 +3123,8 @@ SzwegoSpider/
                 
                 cardHtml += `</div></div>`;
                 spiderContent.insertAdjacentHTML('beforeend', cardHtml);
+                
+                bindSkuTagEvents(spiderContent, showProductDetail);
                 
             } else if (skuData.newProducts !== undefined || skuData.deletedProducts !== undefined) {
                 let cardHtml = `
@@ -3169,7 +3208,7 @@ SzwegoSpider/
                                     <tbody>
                                         ${skuData.addedProducts.map((p, idx) => `<tr>
                                             <td>${idx + 1}</td>
-                                            <td><a href="javascript:void(0)" onclick="showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
+                                            <td><a href="javascript:void(0)" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(p.sku)}</a></td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
@@ -3209,7 +3248,7 @@ SzwegoSpider/
                                     <tbody>
                                         ${skuData.newHighPriceProducts.map((p, idx) => `<tr>
                                             <td>${idx + 1}</td>
-                                            <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 查看商品详情:', '${p.sku}'); showProductDetail('${p.sku}')" style="color: #409EFF; text-decoration: none;">${p.sku}</a></td>
+                                            <td><a href="javascript:void(0)" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(p.sku)}</a></td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
@@ -3507,8 +3546,8 @@ SzwegoSpider/
                         
                         tableHtml += `<tr data-sku="${sku}" data-desc="${desc.replace(/"/g, '&quot;')}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
                             <td>${i + 1}</td>
-                            <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 高亮并定位货号:', '${sku}'); highlightRow('${sku}'); scrollToSku('${sku}'); searchProductBySku('${sku}')">${sku || '-'}</a></td>
-                            <td><a href="javascript:void(0)" onclick="console.log('[按钮点击] 查看商品详情:', '${desc.replace(/'/g, "\\'")}'); showProductByDescription('${desc.replace(/'/g, "\\'")}')" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${descDisplay}</a></td>
+                            <td><a href="javascript:void(0)" data-sku="${escapeAttr(sku)}" class="sku-link">${escapeHtml(sku) || '-'}</a></td>
+                            <td><a href="javascript:void(0)" data-desc="${escapeAttr(desc)}" class="desc-link" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${escapeHtml(descDisplay)}</a></td>
                             <td style="font-weight: bold;">${p.售价 || '-'}</td>
                             <td>${p.员工 || '-'}</td>
                         </tr>`;
@@ -3921,7 +3960,7 @@ SzwegoSpider/
                         data.summary.forEach((item, idx) => {
                             const dateKey = item.日期.replace(/-/g, '');
                             cardHtml += `
-                                <tr class="summary-row" data-date="${item.日期}" onclick="window.toggleProfitDetail('${item.日期}', this); window.highlightChartPoint('${item.日期}')">
+                                <tr class="summary-row" data-date="${escapeAttr(item.日期)}" style="cursor:pointer;" onmouseover="this.style.backgroundColor='#f5f7fa'" onmouseout="this.style.backgroundColor=''">>
                                     <td class="action-col">
                                         <i class="fa fa-plus-circle detail-toggle-icon" style="color: #667eea; cursor: pointer;"></i>
                                     </td>
@@ -4786,10 +4825,10 @@ SzwegoSpider/
                                 hostcContainer.className = 'p-2 bg-success text-white rounded mb-2';
                                 hostcContainer.innerHTML = `
                                     <i class="fa fa-check-circle"></i>
-                                    <a href="${statusData.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
-                                        <i class="fa fa-external-link"></i> ${statusData.url}
+                                    <a href="${safeUrl(statusData.url)}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
+                                        <i class="fa fa-external-link"></i> ${escapeHtml(statusData.url)}
                                     </a>
-                                    <button class="btn btn-sm btn-light ml-2" id="btn-copy-hostc-url" data-url="${statusData.url}">
+                                    <button class="btn btn-sm btn-light ml-2" id="btn-copy-hostc-url" data-url="${escapeAttr(statusData.url)}">
                                         <i class="fa fa-copy"></i> 复制
                                     </button>
                                 `;
@@ -4812,11 +4851,11 @@ SzwegoSpider/
                                     cfContainer.className = 'p-2 bg-info text-white rounded mb-2';
                                     cfContainer.innerHTML = `
                                         <i class="fa fa-cloud"></i>
-                                        <a href="${statusData.cloudflare.url}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
-                                            <i class="fa fa-external-link"></i> ${statusData.cloudflare.url}
+                                        <a href="${safeUrl(statusData.cloudflare.url)}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
+                                            <i class="fa fa-external-link"></i> ${escapeHtml(statusData.cloudflare.url)}
                                         </a>
                                         <span class="badge badge-${statusData.cloudflare.stable ? 'success' : 'info'} ml-1">${cfStatus}</span>
-                                        <button class="btn btn-sm btn-light ml-2" id="btn-copy-cf-url" data-url="${statusData.cloudflare.url}">
+                                        <button class="btn btn-sm btn-light ml-2" id="btn-copy-cf-url" data-url="${escapeAttr(statusData.cloudflare.url)}">
                                             <i class="fa fa-copy"></i> 复制
                                         </button>
                                     `;
@@ -5052,7 +5091,7 @@ SzwegoSpider/
                         }
                         
                         if (data.added_products && data.added_products.length > 0) {
-                            const items = data.added_products.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            const items = data.added_products.map(sku => createSkuTag(sku, showProductDetail)).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
                                     <div class="missing-title" style="color: #2e7d32;">新增商品 (${data.added_products_count}个):</div>
@@ -5062,7 +5101,7 @@ SzwegoSpider/
                         }
                         
                         if (data.added_high_price && data.added_high_price.length > 0) {
-                            const items = data.added_high_price.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            const items = data.added_high_price.map(sku => createSkuTag(sku, showProductDetail)).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #e3f2fd; border-color: #64b5f6;">
                                     <div class="missing-title" style="color: #1976d2;">新增高价商品(≥599) (${data.added_high_price_count}个):</div>
@@ -5092,7 +5131,7 @@ SzwegoSpider/
                         }
                         
                         if (data.extra_in_json && data.extra_in_json.length > 0) {
-                            const items = data.extra_in_json.map(sku => `<span class="sku-tag" onclick="console.log('[按钮点击] 查看商品详情:', '${sku}'); showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            const items = data.extra_in_json.map(sku => createSkuTag(sku, showProductDetail)).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
                                     <div class="missing-title" style="color: #f57c00;">JSON多余货号(所有价格):</div>
@@ -5102,7 +5141,7 @@ SzwegoSpider/
                         }
                         
                         if (data.high_price_extra_in_json && data.high_price_extra_in_json.length > 0) {
-                            const items = data.high_price_extra_in_json.map(sku => `<span class="sku-tag" onclick="console.log('[按钮点击] 查看商品详情:', '${sku}'); showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            const items = data.high_price_extra_in_json.map(sku => createSkuTag(sku, showProductDetail)).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #ffebee; border-color: #ef9a9a;">
                                     <div class="missing-title" style="color: #c62828;">JSON多余货号(高价商品≥599):</div>
@@ -5112,7 +5151,7 @@ SzwegoSpider/
                         }
                         
                         if (data.high_price_existing && data.high_price_existing.length > 0) {
-                            const items = data.high_price_existing.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                            const items = data.high_price_existing.map(sku => createSkuTag(sku, showProductDetail)).join('');
                             cardHtml += `
                                 <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
                                     <div class="missing-title" style="color: #388e3c;">高价商品中已存在于Excel的货号:</div>
@@ -5358,7 +5397,7 @@ SzwegoSpider/
             }
             
             if (data.added_products && data.added_products.length > 0) {
-                const items = data.added_products.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                const items = data.added_products.map(sku => createSkuTag(sku, showProductDetail)).join('');
                 cardHtml += `
                     <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
                         <div class="missing-title" style="color: #2e7d32;">新增商品 (${data.added_products_count}个):</div>
@@ -5366,7 +5405,7 @@ SzwegoSpider/
                     </div>`;
             }
             if (data.added_high_price && data.added_high_price.length > 0) {
-                const items = data.added_high_price.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                const items = data.added_high_price.map(sku => createSkuTag(sku, showProductDetail)).join('');
                 cardHtml += `
                     <div class="missing-skus" style="background: #e3f2fd; border-color: #64b5f6;">
                         <div class="missing-title" style="color: #1976d2;">新增高价商品(≥599) (${data.added_high_price_count}个):</div>
@@ -5391,7 +5430,7 @@ SzwegoSpider/
             }
             
             if (data.extra_in_json && data.extra_in_json.length > 0) {
-                const items = data.extra_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                const items = data.extra_in_json.map(sku => createSkuTag(sku, showProductDetail)).join('');
                 cardHtml += `
                     <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
                         <div class="missing-title" style="color: #f57c00;">JSON多余货号(所有价格):</div>
@@ -5399,7 +5438,7 @@ SzwegoSpider/
                     </div>`;
             }
             if (data.high_price_extra_in_json && data.high_price_extra_in_json.length > 0) {
-                const items = data.high_price_extra_in_json.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                const items = data.high_price_extra_in_json.map(sku => createSkuTag(sku, showProductDetail)).join('');
                 cardHtml += `
                     <div class="missing-skus" style="background: #ffebee; border-color: #ef9a9a;">
                         <div class="missing-title" style="color: #c62828;">JSON多余货号(高价商品≥599):</div>
@@ -5407,7 +5446,7 @@ SzwegoSpider/
                     </div>`;
             }
             if (data.high_price_existing && data.high_price_existing.length > 0) {
-                const items = data.high_price_existing.map(sku => `<span class="sku-tag" onclick="showProductDetail('${sku}')" style="cursor: pointer;">${sku}</span>`).join('');
+                const items = data.high_price_existing.map(sku => createSkuTag(sku, showProductDetail)).join('');
                 cardHtml += `
                     <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
                         <div class="missing-title" style="color: #388e3c;">高价商品中已存在于输入的货号:</div>
@@ -5418,6 +5457,8 @@ SzwegoSpider/
             cardHtml += `</div></div>`;
             
             skuContent.innerHTML = cardHtml;
+            
+            bindSkuTagEvents(skuContent, showProductDetail);
         }
         
         function closeSkuPanel() {
@@ -5778,7 +5819,7 @@ SzwegoSpider/
                     const cfStatus = cloudflare.stable ? '✅' : '⏳';
                     urlsHtml += `<div class="mb-2 d-flex align-items-center flex-wrap">
                         <strong><i class="fa fa-cloud"></i> Cloudflare:</strong>&nbsp;
-                        <a href="${cloudflare.url}" target="_blank" class="text-primary font-weight-bold" style="word-break:break-all;">${cloudflare.url}</a>
+                        <a href="${safeUrl(cloudflare.url)}" target="_blank" class="text-primary font-weight-bold" style="word-break:break-all;">${escapeHtml(cloudflare.url)}</a>
                         <span class="badge badge-${cloudflare.stable ? 'success' : 'info'} ml-1">${cfStatus}</span>
                         <button class="btn btn-sm btn-light ml-2 btn-copy-url" data-url="${cloudflare.url}" onclick="handleCopyUrl(this)"><i class="fa fa-copy"></i> 复制</button>
                     </div>`;
@@ -5788,7 +5829,7 @@ SzwegoSpider/
                     const hostcStatus = urlValid ? '✅' : '⏳';
                     urlsHtml += `<div class="mb-2 d-flex align-items-center flex-wrap">
                         <strong><i class="fa fa-bolt"></i> hostc:</strong>&nbsp;
-                        <a href="${url}" target="_blank" class="text-primary font-weight-bold" style="word-break:break-all;">${url}</a>
+                        <a href="${safeUrl(url)}" target="_blank" class="text-primary font-weight-bold" style="word-break:break-all;">${escapeHtml(url)}</a>
                         <span class="badge badge-${urlValid ? 'success' : 'info'} ml-1">${hostcStatus}</span>
                         <button class="btn btn-sm btn-light ml-2 btn-copy-url" data-url="${url}" onclick="handleCopyUrl(this)"><i class="fa fa-copy"></i> 复制</button>
                     </div>`;
