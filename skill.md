@@ -16438,3 +16438,196 @@ finally:
 6. ✅ 改进点使用 - **标题** - 描述 格式
 7. ✅ 代码示例使用 ✅ 优化后 或 ❌ 修复前 标记
 8. ✅ 格式与之前版本保持一致
+
+---
+
+## 2.17 Flask遗留代码修复规范（v3.8.89.3 新增）
+
+### 2.17.1 问题背景
+
+在 Flask → FastAPI 迁移过程中，可能存在以下遗留问题：
+
+1. **Flask request 对象调用** - `request.args.get()`, `request.form.get()` 等
+2. **Flask jsonify 函数** - 未替换为 FastAPI 的 JSONResponse
+3. **Flask 路由装饰器** - 残留的 `@app.route()` 调用
+4. **同步函数未异步化** - 使用 `def` 而非 `async def`
+
+### 2.17.2 常见Flask遗留模式及修复
+
+#### ❌ 错误：使用Flask的request对象
+
+```python
+# Flask风格（错误）
+@app.get('/api/product')
+async def get_product():
+    sku = request.args.get('sku', '').strip()  # NameError: 'request' is not defined
+```
+
+**✅ 正确修复**：
+
+```python
+# FastAPI风格（正确）
+@app.get('/api/product')
+async def get_product(sku: str = ''):  # 查询参数作为函数参数
+    sku = sku.strip()
+```
+
+#### ❌ 错误：使用Flask的jsonify函数
+
+```python
+# Flask风格（错误）
+return jsonify({'success': True, 'data': result}), 200
+return jsonify({'error': 'Not found'}), 404
+```
+
+**✅ 解决方案A：直接使用JSONResponse**
+
+```python
+from fastapi.responses import JSONResponse
+
+return JSONResponse(content={'success': True, 'data': result}, status_code=200)
+return JSONResponse(content={'error': 'Not found'}, status_code=404)
+```
+
+**✅ 解决方案B：定义兼容层（推荐用于大型项目）**
+
+```python
+# 在文件导入部分定义
+def jsonify(data, status_code=200):
+    return JSONResponse(content=data, status_code=status_code)
+
+# 然后可以继续使用jsonify（自动转换为FastAPI格式）
+return jsonify({'success': True, 'data': result})
+return jsonify({'error': 'Not found'}, status_code=404)
+```
+
+#### ❌ 错误：使用Flask路由装饰器
+
+```python
+# Flask风格（错误）
+@app.route('/api/clean/list', methods=['POST'])
+def api_clean_list():
+    data = request.get_json()
+    return jsonify({'success': True})
+```
+
+**✅ 正确修复**：
+
+```python
+# FastAPI风格（正确）
+@app.post('/api/clean/list')
+async def api_clean_list(request: Request):
+    data = await request.json()
+    return JSONResponse(content={'success': True})
+```
+
+### 2.17.3 FastAPI查询参数处理规范
+
+#### GET请求参数
+
+```python
+# ✅ 单个参数
+@app.get('/api/product')
+async def get_product(sku: str = ''):
+    pass
+
+# ✅ 多个可选参数
+@app.get('/api/daily-profit')
+async def get_daily_profit(
+    group_by: str = 'day',
+    start_date: str = None,
+    end_date: str = None
+):
+    pass
+
+# ✅ 必需参数（不提供默认值会报错）
+@app.get('/api/user/{user_id}')
+async def get_user(user_id: int):
+    pass
+```
+
+#### POST请求体
+
+```python
+from pydantic import BaseModel
+
+class Item(BaseModel):
+    name: str
+    price: float
+
+@app.post('/api/items')
+async def create_item(item: Item):
+    return {'name': item.name, 'price': item.price}
+```
+
+### 2.17.4 自动检测脚本
+
+创建测试脚本检测Flask遗留代码：
+
+```python
+# test_flask_legacy.py
+import re
+
+def check_flask_legacy(filepath):
+    with open(filepath, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    issues = []
+    
+    # 检查Flask request对象调用
+    if re.search(r'request\.(args|form|json|files)\.get\(', content):
+        issues.append("❌ 发现 Flask request对象调用")
+    
+    # 检查Flask路由装饰器
+    if re.search(r'@app\.route\(', content):
+        issues.append("❌ 发现 Flask @app.route()装饰器")
+    
+    # 检查未导入的jsonify（如果使用了但没定义兼容层）
+    if 'jsonify(' in content and 'def jsonify' not in content:
+        if 'from flask import' not in content:
+            issues.append("⚠️ 使用了jsonify但未定义兼容层")
+    
+    return issues
+
+if __name__ == '__main__':
+    issues = check_flask_legacy('main.py')
+    if issues:
+        print("发现以下问题：")
+        for issue in issues:
+            print(f"  {issue}")
+    else:
+        print("✅ 未发现Flask遗留代码")
+```
+
+### 2.17.5 迁移检查清单
+
+完成Flask → FastAPI迁移后，检查以下项目：
+
+- [ ] **0处** `@app.route(` 调用
+- [ ] **0处** `request.args.get(` 调用
+- [ ] **0处** `request.form.get(` 调用
+- [ ] **0处** `request.json` 直接访问（应使用 `await request.json()`）
+- [ ] **0处** `request.files[` 调用
+- [ ] 所有路由函数使用 `async def`
+- [ ] POST请求正确接收 `Request` 参数并使用 `await request.json()`
+- [ ] 响应使用 `JSONResponse(content=...)` 或已定义 `jsonify()` 兼容层
+- [ ] 查询参数通过函数参数传递（带类型注解和默认值）
+
+### 2.17.6 性能对比
+
+| 特性 | Flask | FastAPI |
+|------|-------|---------|
+| 同步/异步 | 同步为主 | **原生异步** |
+| 数据验证 | 手动 | **Pydantic自动** |
+| API文档 | 需要Swagger-UI插件 | **内置OpenAPI/Swagger** |
+| 性能 | 基准 | **快2-3倍** |
+| 类型提示 | 可选 | **强制要求** |
+| 参数解析 | request对象 | **函数参数注入** |
+
+### 2.17.7 最佳实践
+
+1. **渐进式迁移**：先修复关键错误，再优化代码质量
+2. **保持向后兼容**：使用 `jsonify()` 兼容层避免大规模重构
+3. **类型注解**：所有参数都加上类型注解，提升IDE支持
+4. **文档优先**：FastAPI自动生成文档，利用好这个特性
+5. **异常处理**：使用 `HTTPException` 替代手动返回错误状态码

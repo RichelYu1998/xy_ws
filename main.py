@@ -61,9 +61,13 @@ try:
     from fastapi.staticfiles import StaticFiles
     from fastapi.middleware.gzip import GZipMiddleware
     from fastapi.middleware.cors import CORSMiddleware
+
+    def jsonify(data, status_code=200):
+        return JSONResponse(content=data, status_code=status_code)
 except ImportError:
     FastAPI = None
     CORSMiddleware = None
+    jsonify = None
 
 try:
     from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
@@ -6972,14 +6976,10 @@ if __name__ == '__main__':
                 return jsonify({'error': str(e)}), 500
 
         @app.get('/api/daily-profit')
-        async def get_daily_profit():
+        async def get_daily_profit(group_by: str = 'day', start_date: str = None, end_date: str = None):
             try:
                 if pd is None or openpyxl is None:
                     return jsonify({'error': 'pandas或openpyxl未安装，每日利润报表功能不可用'}), 500
-                
-                group_by = request.args.get('group_by', 'day')
-                start_date = request.args.get('start_date', None)
-                end_date = request.args.get('end_date', None)
                 
                 excel_files_list, daily_profit_report = get_excel_files_with_report()
                 
@@ -7247,8 +7247,8 @@ if __name__ == '__main__':
                 return jsonify({'error': str(e)}), 500
 
         @app.get('/api/product')
-        async def get_product():
-            sku = request.args.get('sku', '').strip()
+        async def get_product(sku: str = ''):
+            sku = sku.strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}), 400
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
@@ -7289,8 +7289,8 @@ if __name__ == '__main__':
                 return jsonify({'found': False, 'error': str(e)})
         
         @app.get('/api/product/search')
-        async def search_product():
-            sku = request.args.get('sku', '').strip()
+        async def search_product(sku: str = ''):
+            sku = sku.strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}), 400
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
