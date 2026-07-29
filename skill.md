@@ -7113,10 +7113,41 @@ def run_command_background(task_id, command):
 
 ### 3.2 API 调用模式
 
+> **⚠️ 重要规范（v3.8.88 新增）**: 所有 API 调用**必须**使用 `safeParseJson(response)` 替代 `response.json()`，防止 HTML 响应导致 "Unexpected token '<'" 错误。
+
+#### 3.2.1 safeParseJson 统一解析函数
+
 ```javascript
-// GET 请求
+// ✅ 正确：使用 safeParseJson
+async function safeParseJson(response) {
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        let errorMsg = '服务器返回了非JSON响应';
+        if (text.includes('<title>') && text.includes('</title>')) {
+            const titleMatch = text.match(/<title>(.*?)<\/title>/);
+            if (titleMatch) errorMsg += ` (${titleMatch[1]})`;
+        }
+        if (response.status === 401 || text.toLowerCase().includes('登录') || text.toLowerCase().includes('login')) {
+            errorMsg = '登录已过期，请重新获取Cookie';
+        } else if (response.status === 404) {
+            errorMsg = '接口不存在 (404)';
+        } else if (response.status >= 500) {
+            errorMsg = `服务器内部错误 (${response.status})`;
+        }
+        console.error('[API响应错误]', errorMsg, '\n响应状态:', response.status, '\nContent-Type:', contentType);
+        throw new Error(errorMsg);
+    }
+    return response.json();
+}
+```
+
+#### 3.2.2 GET 请求范式
+
+```javascript
+// ✅ 正确：使用 safeParseJson
 fetch('/api/products?t=' + Date.now())
-    .then(response => response.json())
+    .then(response => safeParseJson(response))
     .then(data => {
         if (data.error) {
             showToast('加载失败: ' + data.error, 'error');
@@ -7125,20 +7156,33 @@ fetch('/api/products?t=' + Date.now())
         // 处理数据
     });
 
-// POST 请求
+// ❌ 错误：直接使用 response.json()（会导致 Unexpected token '<'）
+fetch('/api/products')
+    .then(response => response.json())  // 危险！
+    .then(data => { ... });
+```
+
+#### 3.2.3 POST 请求范式
+
+```javascript
+// ✅ 正确：使用 safeParseJson
 fetch('/api/sku/compare/txt', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ stock_numbers: inputText })
 })
-    .then(response => response.json())
+    .then(response => safeParseJson(response))
     .then(data => { ... });
+```
 
-// async/await 模式
+#### 3.2.4 async/await 范式
+
+```javascript
+// ✅ 正确：使用 safeParseJson
 async function loadServerInfo() {
     try {
         const response = await fetch('/api/server/info');
-        const data = await response.json();
+        const data = await safeParseJson(response);  // 必须用 safeParseJson
         if (data.success) {
             // 处理数据
         }
@@ -7147,6 +7191,80 @@ async function loadServerInfo() {
     }
 }
 ```
+
+#### 3.2.5 特殊情况：已做状态检查的 API 调用
+
+如果已经对 `response.ok` 做了检查并读取了 `response.text()`，则可以继续使用 `response.json()`：
+
+```javascript
+// ✅ 特殊情况：已检查 response.ok
+fetch(url, signal ? { signal: signal } : {})
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error('HTTP ' + response.status + ': ' + text);
+            });
+        }
+        return response.json();  // 安全：已确认是 JSON 响应
+    })
+    .then(data => { ... });
+```
+
+#### 3.2.6 后端路由安全规范（v3.8.88 新增）
+
+后端通用路由必须区分 API 和非 API 路径：
+
+```python
+@app.route('/<path:invalid_path>')
+def handle_invalid_path(invalid_path):
+    # 静态资源返回 404 文本
+    if request.path.startswith('/dist/'):
+        return "File not found", 404
+    
+    # API 路径返回 JSON 格式错误（重要！）
+    if request.path.startswith('/api/') or \
+       request.path.startswith('/run') or \
+       request.path.startswith('/input') or \
+       request.path.startswith('/kill') or \
+       request.path.startswith('/output/'):
+        return jsonify({
+            'error': f'接口不存在: {request.path}',
+            'success': False,
+            'code': 'NOT_FOUND'
+        }), 404
+    
+    # 非 API 路径正常返回 HTML 页面
+    return index()
+```
+
+#### 3.2.7 已修复的 API 调用点清单（v3.8.88）
+
+以下 22 个位置已从 `response.json()` 更新为 `safeParseJson(response)`：
+
+| 函数名 | 行号 | API 端点 |
+|--------|------|----------|
+| searchProductBySku | :2165 | /api/product/search |
+| showProductDetail | :2477 | /api/product |
+| showProductByDescription | :2494 | /api/product/by-description |
+| DOMContentLoaded | :2512 | /api/version |
+| DOMContentLoaded | :2522 | /api/changelog |
+| DOMContentLoaded | :2615 | /api/readme-sections |
+| checkCookieStatus | :2750 | /api/cookie |
+| runCommand | :2817 | /run (POST) |
+| pollOutput | :2836 | /output/{task_id} |
+| loadProducts | :3444 | /api/products |
+| runTaskFromMenu | :3671 | /run (POST) |
+| sendUserInput | :3707 | /input (POST) |
+| stopTask | :3733 | /kill (POST) |
+| compareStockNumbers | :4945 | /api/sku/compare |
+| compareTxtStockNumbers | :5245 | /api/sku/compare/txt |
+| executeCleanAction | :5530 | /api/clean/* (POST) |
+| loadTunnelTypeInfo | :5567 | /api/tunnel/type |
+| switchTunnelType | :5629 | /api/tunnel/type (POST) |
+| loadServerInfo | :5667 | /api/server/info |
+| checkTunnelStatus | :5704 | /api/tunnel/status |
+| toggleTunnel | :5820 | /api/tunnel/status, /api/tunnel/start |
+| startTunnelAndShow | :4708-4769 | /api/server/info, /api/tunnel/start, /api/tunnel/status |
 
 ### 3.3 Toast 提示（替代 alert）
 

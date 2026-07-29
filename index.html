@@ -1845,7 +1845,30 @@ SzwegoSpider/
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
     
-    <script>// 全局设备检测和响应式适配
+    <script>
+        async function safeParseJson(response) {
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                const text = await response.text();
+                let errorMsg = '服务器返回了非JSON响应';
+                if (text.includes('<title>') && text.includes('</title>')) {
+                    const titleMatch = text.match(/<title>(.*?)<\/title>/);
+                    if (titleMatch) errorMsg += ` (${titleMatch[1]})`;
+                }
+                if (response.status === 401 || text.toLowerCase().includes('登录') || text.toLowerCase().includes('login')) {
+                    errorMsg = '登录已过期，请重新获取Cookie';
+                } else if (response.status === 404) {
+                    errorMsg = '接口不存在 (404)';
+                } else if (response.status >= 500) {
+                    errorMsg = `服务器内部错误 (${response.status})`;
+                }
+                console.error('[API响应错误]', errorMsg, '\n响应状态:', response.status, '\nContent-Type:', contentType);
+                throw new Error(errorMsg);
+            }
+            return response.json();
+        }
+        
+        // 全局设备检测和响应式适配
         function closePanel(panelId) {
             console.log('[关闭面板] 关闭面板:', panelId);
             const panel = document.getElementById(panelId);
@@ -2139,7 +2162,7 @@ SzwegoSpider/
             if (!sku) return;
             const url = '/api/product/search?sku=' + encodeURIComponent(sku);
             fetch(url)
-            .then(response => response.json())
+            .then(response => safeParseJson(response))
             .then(data => {
                 if (data.error) {
                     showToast('搜索失败: ' + data.error, 'error');
@@ -2451,7 +2474,7 @@ SzwegoSpider/
         
         window.showProductDetail = function(sku) {
             fetch(`/api/product?sku=${encodeURIComponent(sku)}`)
-                .then(response => response.json())
+                .then(response => safeParseJson(response))
                 .then(data => {
                     if (data.found) {
                         const p = data.product;
@@ -2468,7 +2491,7 @@ SzwegoSpider/
         
         window.showProductByDescription = function(description) {
             fetch(`/api/product/by-description?description=${encodeURIComponent(description)}`)
-                .then(response => response.json())
+                .then(response => safeParseJson(response))
                 .then(data => {
                     if (data.found) {
                         const p = data.product;
@@ -2486,7 +2509,7 @@ SzwegoSpider/
         // 确保DOM加载完成后执行
         document.addEventListener('DOMContentLoaded', function() {
             fetch('/api/version')
-                .then(function(response) { return response.json(); })
+                .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
                     var v = data.version || '...';
                     var heroEl = document.getElementById('hero-version');
@@ -2496,7 +2519,7 @@ SzwegoSpider/
                 })
                 .catch(function() {});
             fetch('/api/changelog')
-                .then(function(response) { return response.json(); })
+                .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
                     if (!data.success || !data.changelog || !data.changelog.length) return;
                     var latest = data.changelog[0];
@@ -2589,7 +2612,7 @@ SzwegoSpider/
                 {icon: 'fa-clock-o', bg: '#fef0e6', color: '#e6a23c'}
             ];
             fetch('/api/readme-sections')
-                .then(function(response) { return response.json(); })
+                .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
                     if (!data.success) return;
                     var featuresContainer = document.getElementById('features-container');
@@ -2724,7 +2747,7 @@ SzwegoSpider/
          const btnIds = {'1': 'btn-run-spider', '4': 'btn-run-cookie', '6': 'btn-run-cleaner'};
         function checkCookieStatus() {
             fetch('/api/cookie')
-            .then(response => response.json())
+            .then(response => safeParseJson(response))
             .then(data => {
                 const statusEl = document.getElementById('cookie-status');
                 let systemInfo = data.system ? ` (${data.system})` : '';
@@ -2791,7 +2814,7 @@ SzwegoSpider/
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ command: cmd })
             })
-            .then(response => response.json())
+            .then(response => safeParseJson(response))
             .then(data => {
                 if (data.success) {
                     currentTaskId = data.task_id;
@@ -2810,7 +2833,7 @@ SzwegoSpider/
         
         function pollOutput() {
             fetch('/output/' + currentTaskId)
-            .then(response => response.json())
+            .then(response => safeParseJson(response))
             .then(data => {
                 const outputDiv = document.getElementById('output-content');
                 const statusDiv = document.getElementById('output-status');
@@ -3418,7 +3441,7 @@ SzwegoSpider/
                 },
                 signal: signal
             })
-            .then(response => response.json())
+            .then(response => safeParseJson(response))
             .then(data => {
                 if (data.error) {
                     showToast(data.error, 'error');
@@ -3645,7 +3668,7 @@ SzwegoSpider/
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ command: cmd })
             })
-            .then(response => response.json())
+            .then(response => safeParseJson(response))
             .then(data => {
                 if (data.success) {
                     currentTaskId = data.task_id;
@@ -3681,7 +3704,7 @@ SzwegoSpider/
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ task_id: currentTaskId, input: input })
             })
-            .then(response => response.json())
+            .then(response => safeParseJson(response))
             .then(data => {
                 if (data.success) {
                     const userInput = document.getElementById('user-input');
@@ -3707,7 +3730,7 @@ SzwegoSpider/
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ task_id: currentTaskId })
                 })
-                .then(response => response.json())
+                .then(response => safeParseJson(response))
                 .then(data => {
                     if (data.success) {
                         const statusEl = document.getElementById('output-status');
@@ -4682,9 +4705,9 @@ SzwegoSpider/
             activeAbortController = new AbortController();
             try {
                 const serverRes = await fetch('/api/server/info', { signal: activeAbortController.signal });
-                const serverData = await serverRes.json();
+                const serverData = await safeParseJson(serverRes);
                 const startRes = await fetch('/api/tunnel/start', { method: 'POST', signal: activeAbortController.signal });
-                const startData = await startRes.json();
+                const startData = await safeParseJson(startRes);
                 const localUrl = serverData.success ? serverData.local_url : window.location.origin;
                 const lanUrl = serverData.success && serverData.lan_url ? serverData.lan_url : '';
                 const tunnelPanel = document.getElementById('tunnel-panel');
@@ -4743,7 +4766,7 @@ SzwegoSpider/
                     retryCount++;
                     try {
                         const statusRes = await fetch('/api/tunnel/status');
-                        const statusData = await statusRes.json();
+                        const statusData = await safeParseJson(statusRes);
                         if (statusData.url && statusData.url.startsWith('http')) {
                             clearInterval(tunnelPollInterval);
                             tunnelPollInterval = null;
@@ -4919,7 +4942,7 @@ SzwegoSpider/
                     if (stopTaskBar) stopTaskBar.style.display = 'block';
                     activeAbortController = new AbortController();
                     fetch(apiUrl, { signal: activeAbortController.signal })
-                    .then(response => response.json())
+                    .then(response => safeParseJson(response))
                     .then(data => {
                         if (data.error) {
                             showToast('对比失败: ' + data.error, 'error');
@@ -5219,7 +5242,7 @@ SzwegoSpider/
                 body: JSON.stringify({ skus: skuInput }),
                 signal: activeAbortController.signal
             })
-            .then(response => response.json())
+            .then(response => safeParseJson(response))
             .then(data => {
                 if (data.error) {
                     showToast('对比失败: ' + data.error, 'error');
@@ -5504,7 +5527,7 @@ SzwegoSpider/
                 body: JSON.stringify(data),
                 signal: activeAbortController.signal
             })
-            .then(response => response.json())
+            .then(response => safeParseJson(response))
             .then(result => {
                 if (result.success) {
                     if (outputDiv) outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(result.output) + '</pre>';
@@ -5541,7 +5564,7 @@ SzwegoSpider/
         async function loadTunnelTypeInfo() {
             try {
                 const response = await fetch('/api/tunnel/type');
-                const data = await response.json();
+                const data = await safeParseJson(response);
                 const selector = document.getElementById('tunnel-type-selector');
                 const statusEl = document.getElementById('tunnel-type-status');
                 
@@ -5603,7 +5626,7 @@ SzwegoSpider/
                     body: JSON.stringify({ type: type })
                 });
                 
-                const data = await response.json();
+                const data = await safeParseJson(response);
                 
                 if (data.success) {
                     showToast('隧道类型已切换为: ' + type, 'success');
@@ -5641,7 +5664,7 @@ SzwegoSpider/
         async function loadServerInfo() {
             try {
                 const response = await fetch('/api/server/info');
-                const data = await response.json();
+                const data = await safeParseJson(response);
                 if (data.success) {
                     const localUrlEl = document.getElementById('tunnel-local-url');
                     const lanUrlEl = document.getElementById('tunnel-lan-url');
@@ -5678,7 +5701,7 @@ SzwegoSpider/
         async function checkTunnelStatus() {
             try {
                 const response = await fetch('/api/tunnel/status');
-                const data = await response.json();
+                const data = await safeParseJson(response);
                 updateTunnelUI(data.running, data.url, data.auto_restart, data.restart_count, data.last_error, data.tunnel_type, data.url_valid, data.detailed_status, data.status_message, data.cloudflare);
             } catch (e) {
                 console.error('检查隧道状态失败:', e);
@@ -5794,10 +5817,10 @@ SzwegoSpider/
             
             try {
                 const response = await fetch('/api/tunnel/status');
-                const data = await response.json();
+                const data = await safeParseJson(response);
                 if (!data.running) {
                     const startRes = await fetch('/api/tunnel/start', { method: 'POST' });
-                    const startData = await startRes.json();
+                    const startData = await safeParseJson(startRes);
                     if (startData.success) {
                         // 如果返回了 URL，直接显示
                         if (startData.url) {
