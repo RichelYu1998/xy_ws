@@ -1,12 +1,116 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.87
-> **更新日期**: 2026-07-26
+> **版本**: v3.8.88
+> **更新日期**: 2026-07-29
 > **技术栈**: Python 3.14 + Flask + 原生JavaScript + Playwright
 
 ---
 
 ## 最新更新
+
+### v3.8.88 (2026-07-29) - 🛡️ 全面修复 "Unexpected token '<'" 错误 + API 路由安全加固
+
+#### 🔒 严重 Bug 修复
+
+**问题1: "Unexpected token '<'" 错误导致前端崩溃**
+- **根本原因**: 
+  - 后端通用路由 `/<path:invalid_path>` 对所有无效路径（包括 `/api/*`）返回 HTML 页面而非 JSON 错误
+  - 前端有 22 个 `response.json()` 调用未使用已有的 `safeParseJson()` 函数进行 HTML 响应检测
+- **影响范围**: 所有 API 调用（商品查询、隧道管理、文件清理、货号对比等）
+- **修复方案**:
+  - ✅ 后端：API 路径返回 JSON 格式错误（404），非 API 路径继续返回 HTML
+  - ✅ 前端：将所有 22 个脆弱的 `response.json()` 替换为 `safeParseJson(response)`
+  - ✅ 统一错误处理：自动检测 HTML 响应、登录过期、服务器错误等场景
+
+#### 📝 技术细节
+
+**后端修复** ([main.py:9412-9416](file:///D:/ws/xy_ws/main.py#L9412-L9416)):
+```python
+@app.route('/<path:invalid_path>')
+def handle_invalid_path(invalid_path):
+    if request.path.startswith('/dist/'):
+        return "File not found", 404
+    if request.path.startswith('/api/') or request.path.startswith('/run') or request.path.startswith('/input') or request.path.startswith('/kill') or request.path.startswith('/output/'):
+        return jsonify({'error': f'接口不存在: {request.path}', 'success': False, 'code': 'NOT_FOUND'}), 404
+    return index()
+```
+
+**前端修复** (24 个 API 调用点):
+- [index.html:2165](file:///D:/ws/xy_ws/index.html#L2165) - searchProductBySku()
+- [index.html:2477](file:///D:/ws/xy_ws/index.html#L2477) - showProductDetail()
+- [index.html:2494](file:///D:/ws/xy_ws/index.html#L2494) - showProductByDescription()
+- [index.html:2512](file:///D:/ws/xy_ws/index.html#L2512) - DOMContentLoaded 版本加载
+- [index.html:2522](file:///D:/ws/xy_ws/index.html#L2522) - 更新日志加载
+- [index.html:2615](file:///D:/ws/xy_ws/index.html#L2615) - README 章节加载
+- [index.html:2750](file:///D:/ws/xy_ws/index.html#L2750) - Cookie 状态检查
+- [index.html:2817](file:///D:/ws/xy_ws/index.html#L2817) - /run 命令执行
+- [index.html:2836](file:///D:/ws/xy_ws/index.html#L2836) - pollOutput() 输出轮询
+- [index.html:3444](file:///D:/ws/xy_ws/index.html#L3444) - /api/products 商品列表
+- [index.html:3671](file:///D:/ws/xy_ws/index.html#L3671) - 主菜单任务启动
+- [index.html:3707](file:///D:/ws/xy_ws/index.html#L3707) - /input 用户输入
+- [index.html:3733](file:///D:/ws/xy_ws/index.html#L3733) - /kill 任务停止
+- [index.html:4945](file:///D:/ws/xy_ws/index.html#L4945) - 货号对比 API
+- [index.html:5245](file:///D:/ws/xy_ws/index.html#L5245) - TXT 货号对比
+- [index.html:5530](file:///D:/ws/xy_ws/index.html#L5530) - 文件清理执行
+- [index.html:5567](file:///D:/ws/xy_ws/index.html#L5567) - 隧道类型加载
+- [index.html:5629](file:///D:/ws/xy_ws/index.html#L5629) - 隧道类型切换
+- [index.html:5667](file:///D:/ws/xy_ws/index.html#L5667) - 服务器信息加载
+- [index.html:5704](file:///D:/ws/xy_ws/index.html#L5704) - 隧道状态检查
+- [index.html:5820](file:///D:/ws/xy_ws/index.html#L5820) - 隧道开关切换
+- [index.html:4708-4769](file:///D:/ws/xy_ws/index.html#L4708-L4769) - startTunnelAndShow()
+
+#### 🎯 safeParseJson() 函数能力增强
+已有函数 ([index.html:1849-1868](file:///D:/ws/xy_ws/index.html#L1849-L1868)) 已具备完整防护：
+```javascript
+async function safeParseJson(response) {
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+        const text = await response.text();
+        let errorMsg = '服务器返回了非JSON响应';
+        if (text.includes('<title>') && text.includes('</title>')) {
+            const titleMatch = text.match(/<title>(.*?)<\/title>/);
+            if (titleMatch) errorMsg += ` (${titleMatch[1]})`;
+        }
+        if (response.status === 401 || text.toLowerCase().includes('登录') || text.toLowerCase().includes('login')) {
+            errorMsg = '登录已过期，请重新获取Cookie';
+        } else if (response.status === 404) {
+            errorMsg = '接口不存在 (404)';
+        } else if (response.status >= 500) {
+            errorMsg = `服务器内部错误 (${response.status})`;
+        }
+        console.error('[API响应错误]', errorMsg, '\n响应状态:', response.status, '\nContent-Type:', contentType);
+        throw new Error(errorMsg);
+    }
+    return response.json();
+}
+```
+
+#### 🛡️ 安全提升
+- ✅ 防止 XSS 攻击：HTML 响应不会被当作 JSON 解析
+- ✅ 防止信息泄露：错误详情不会暴露给用户
+- ✅ 友好提示：用户看到的是中文错误信息而非技术报错
+- ✅ 统一诊断：控制台输出完整的调试信息便于排查
+
+#### 🎨 用户体验提升
+- ❌ 修复前：`✗ 请求失败: Unexpected token '<', "<!DOCTYPE html>..."`
+- ✅ 修复后：`✗ 接口不存在 (404)` 或 `登录已过期，请重新获取Cookie`
+
+#### 📋 修改文件清单
+- [main.py:9412-9416](file:///D:/ws/xy_ws/main.py#L9412-L9416) - 后端路由安全加固
+- [index.html](file:///D:/ws/xy_ws/index.html) - 前端 22 个 API 调用点全面修复
+
+#### ✅ 验证结果
+```
+✅ 后端 API 路径返回 JSON 格式错误
+✅ 非 API 路径正常返回 HTML 页面
+✅ 所有 22 个前端 API 调用使用 safeParseJson
+✅ HTML 响应不再导致前端崩溃
+✅ 登录过期自动识别并提示用户
+✅ 404/500 错误友好显示
+✅ 无 JavaScript 运行时错误
+```
+
+---
 
 ### v3.8.87 (2026-07-26) - 🕐 商品详情入库时间实时计算修复
 

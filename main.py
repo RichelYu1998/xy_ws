@@ -9413,6 +9413,8 @@ ingress:
         def handle_invalid_path(invalid_path):
             if request.path.startswith('/dist/'):
                 return "File not found", 404
+            if request.path.startswith('/api/') or request.path.startswith('/run') or request.path.startswith('/input') or request.path.startswith('/kill') or request.path.startswith('/output/'):
+                return jsonify({'error': f'接口不存在: {request.path}', 'success': False, 'code': 'NOT_FOUND'}), 404
             return index()
         
         @app.route('/favicon.ico')
