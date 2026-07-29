@@ -112,6 +112,91 @@ async function safeParseJson(response) {
 
 ---
 
+### v3.8.88.1 (2026-07-29) - 🛡️ 额外安全加固：XSS防护 + 定时器泄漏修复
+
+#### 🔒 XSS 漏洞修复（严重🔴）
+
+**问题**: 多处直接将未转义的用户数据（`data.error`、`result.error`、`startData.error`）拼接到 `innerHTML`，存在 XSS 攻击风险
+
+**修复方案**:
+- ✅ 新增 `escapeHtml()` 函数 ([index.html:1847-1851](file:///D:/ws/xy_ws/index.html#L1847-L1851))
+- ✅ 修复 3 处 XSS 漏洞：
+  - [index.html:2884](file:///D:/ws/xy_ws/index.html#L2884) - pollOutput 错误提示
+  - [index.html:4850](file:///D:/ws/xy_ws/index.html#L4850) - 隧道启动失败提示
+  - [index.html:5547](file:///D:/ws/xy_ws/index.html#L5547) - 文件清理执行失败提示
+
+```javascript
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+```
+
+#### ⏱️ 定时器泄漏修复（中等🟡）
+
+**问题**: 
+1. `setInterval(checkTunnelStatus, 2000)` 未保存引用，无法清理
+2. `setInterval(updateTime, 1000)` 未保存引用，无法清理
+3. 页面卸载时未清理定时器，可能导致内存泄漏
+
+**修复方案**:
+- ✅ 所有 setInterval 保存到全局变量 (`window.tunnelStatusInterval`, `window.updateTimeInterval`)
+- ✅ 添加 `beforeunload` 事件监听器，页面卸载时自动清理所有定时器
+- ✅ 防止重复创建定时器（检查变量是否已存在）
+
+```javascript
+// 页面卸载时清理所有定时器和资源
+window.addEventListener('beforeunload', function() {
+    clearAllPollingIntervals();
+    if (window.tunnelStatusInterval) {
+        clearInterval(window.tunnelStatusInterval);
+        window.tunnelStatusInterval = null;
+    }
+    if (window.updateTimeInterval) {
+        clearInterval(window.updateTimeInterval);
+        window.updateTimeInterval = null;
+    }
+});
+```
+
+#### 🔍 空 catch 块修复（低🟢）
+
+**问题**: `.catch(() => {})` 吞掉所有错误，难以调试
+
+**修复**: 改为记录错误日志
+```javascript
+// 修复前
+.catch(() => {});
+
+// 修复后
+.catch(error => {
+    console.error('[停止隧道] 忽略错误:', error.message || error);
+});
+```
+
+#### 📋 修改文件清单
+- [index.html:1847-1851](file:///D:/ws/xy_ws/index.html#L1847-L1851) - 新增 escapeHtml 函数
+- [index.html:2884](file:///D:/ws/xy_ws/index.html#L2884) - XSS 修复：pollOutput 错误
+- [index.html:4850](file:///D:/ws/xy_ws/index.html#L4850) - XSS 修复：隧道启动失败
+- [index.html:5547](file:///D:/ws/xy_ws/index.html#L5547) - XSS 修复：文件清理失败
+- [index.html:2743-2746](file:///D:/ws/xy_ws/index.html#L2743-L2746) - 定时器泄漏修复：updateTime
+- [index.html:5669-5672](file:///D:/ws/xy_ws/index.html#L5669-L5672) - 定时器泄漏修复：checkTunnelStatus
+- [index.html:5947-5958](file:///D:/ws/xy_ws/index.html#L5947-L5958) - 新增 beforeunload 清理逻辑
+- [index.html:3758](file:///D:/ws/xy_ws/index.html#L3758) - 空 catch 块修复
+
+#### ✅ 安全验证结果
+```
+✅ XSS 漏洞全部修复（3处）
+✅ 定时器泄漏全部修复（2处）
+✅ 页面卸载时资源正确清理
+✅ 空 catch 块已添加日志
+✅ 无新的安全隐患
+```
+
+---
+
 ### v3.8.87 (2026-07-26) - 🕐 商品详情入库时间实时计算修复
 
 #### 🎯 入库相对时间实时计算
