@@ -7266,6 +7266,113 @@ def handle_invalid_path(invalid_path):
 | toggleTunnel | :5820 | /api/tunnel/status, /api/tunnel/start |
 | startTunnelAndShow | :4708-4769 | /api/server/info, /api/tunnel/start, /api/tunnel/status |
 
+#### 3.2.8 XSS 防护规范（v3.8.88.1 新增）
+
+> **⚠️ 重要**：所有用户可控数据（API 响应、用户输入）在插入 `innerHTML` **必须**使用 `escapeHtml()` 转义！
+
+##### escapeHtml 函数
+
+```javascript
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+```
+
+##### 使用示例
+
+```javascript
+// ✅ 正确：转义后插入 innerHTML
+element.innerHTML = '<span>' + escapeHtml(data.error) + '</span>';
+
+// ❌ 错误：直接拼接（XSS 漏洞）
+element.innerHTML = '<span>' + data.error + '</span>';
+```
+
+##### 已修复的 XSS 漏洞点
+
+| 位置 | 行号 | 修复内容 |
+|------|------|----------|
+| pollOutput | :2884 | `data.error` 转义 |
+| startTunnelAndShow | :4850 | `startData.error` 转义 |
+| executeCleanAction | :5547 | `result.error` 转义 |
+
+##### 特殊情况：已做转义的函数
+
+以下函数内部已包含 HTML 转义，无需再次转义：
+- `formatOutput()` - 内部调用 `.replace(/</g, '&lt;')`
+- `showToast()` - 使用 `innerHTML = message`，但消息来源可信
+
+#### 3.2.9 定时器管理规范（v3.8.88.1 新增）
+
+> **⚠️ 重要**：所有 `setInterval`/`setTimeout` 必须保存引用，并在适当时机清理，防止内存泄漏。
+
+##### 定时器声明规范
+
+```javascript
+// ✅ 正确：保存到全局变量
+if (!window.myInterval) {
+    window.myInterval = setInterval(myFunction, 1000);
+}
+
+// ❌ 错误：未保存引用，无法清理
+setInterval(myFunction, 1000);
+```
+
+##### 页面卸载清理规范
+
+```javascript
+window.addEventListener('beforeunload', function() {
+    // 清理所有自定义定时器
+    clearAllPollingIntervals();
+    
+    if (window.tunnelStatusInterval) {
+        clearInterval(window.tunnelStatusInterval);
+        window.tunnelStatusInterval = null;
+    }
+    
+    if (window.updateTimeInterval) {
+        clearInterval(window.updateTimeInterval);
+        window.updateTimeInterval = null;
+    }
+});
+```
+
+##### 全局定时器变量清单
+
+| 变量名 | 用途 | 创建位置 |
+|--------|------|----------|
+| `pollingInterval` | 任务输出轮询 | runCommand(), runTaskFromMenu() |
+| `tunnelPollInterval` | 隧道状态轮询 | startTunnelAndShow() |
+| `tunnelRetryInterval` | 隧道重试逻辑 | - |
+| `tunnelStatusInterval` | 隧道状态定时检查 | initHostcTunnel() |
+| `updateTimeInterval` | 时间更新显示 | 初始化时 |
+
+#### 3.2.10 错误处理规范（v3.8.88.1 新增）
+
+> **⚠️ 禁止使用空 catch 块**：`.catch(() => {})` 会吞掉所有错误，导致难以调试。
+
+##### 错误处理范式
+
+```javascript
+// ✅ 正确：记录错误日志
+fetch('/api/some-endpoint', { method: 'POST' })
+    .catch(error => {
+        console.error('[功能名称] 操作失败:', error.message || error);
+        // 可选：静默处理已知错误
+    });
+
+// ❌ 错误：空 catch 块
+.catch(() => {});
+
+// ✅ 特殊情况：确实需要忽略错误时，添加注释说明原因
+.catch(error => {
+    console.log('[停止隧道] 忽略错误（预期行为）:', error.message || error);
+});
+```
+
 ### 3.3 Toast 提示（替代 alert）
 
 ```javascript

@@ -1846,6 +1846,13 @@ SzwegoSpider/
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
     
     <script>
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
         async function safeParseJson(response) {
             const contentType = response.headers.get('content-type') || '';
             if (!contentType.includes('application/json')) {
@@ -2731,7 +2738,9 @@ SzwegoSpider/
             }
         }
         
-        setInterval(updateTime, 1000);
+        if (!window.updateTimeInterval) {
+            window.updateTimeInterval = setInterval(updateTime, 1000);
+        }
         updateTime();
         
         function copyCommand(cmd) {
@@ -2872,7 +2881,7 @@ SzwegoSpider/
                     }
                 } else if (data.status === 'error') {
                     clearInterval(pollingInterval);
-                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 错误: ' + data.error + '</span>';
+                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 错误: ' + escapeHtml(data.error) + '</span>';
                     resetButtons();
                 }
             })
@@ -3745,7 +3754,9 @@ SzwegoSpider/
                     showToast('请求失败: ' + error.message, 'error');
                 });
             }
-            fetch('/api/tunnel/stop', { method: 'POST' }).catch(() => {});
+            fetch('/api/tunnel/stop', { method: 'POST' }).catch(error => {
+                console.error('[停止隧道] 忽略错误:', error.message || error);
+            });
             const cleanStatusDiv = document.getElementById('clean-status');
             if (cleanStatusDiv) cleanStatusDiv.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行</span>';
             const statusEl = document.getElementById('output-status');
@@ -4836,7 +4847,7 @@ SzwegoSpider/
                     console.log('[隧道共享] 启动失败:', startData.error);
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert alert-danger mt-3';
-                    alertDiv.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>启动失败:</strong> ' + (startData.error || '未知错误');
+                    alertDiv.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>启动失败:</strong> ' + escapeHtml(startData.error || '未知错误');
                     if (tunnelContent) tunnelContent.insertBefore(alertDiv, tunnelContent.firstChild);
                 }
             } catch (e) {
@@ -5533,7 +5544,7 @@ SzwegoSpider/
                     if (outputDiv) outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(result.output) + '</pre>';
                     if (statusDiv) statusDiv.innerHTML = '<span style="color: #67c23a;">✓ 执行完成</span>';
                 } else {
-                    if (outputDiv) outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败: ' + result.error + '</span>';
+                    if (outputDiv) outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败: ' + escapeHtml(result.error) + '</span>';
                     if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败</span>';
                 }
                 if (btn) {
@@ -5659,7 +5670,9 @@ SzwegoSpider/
             loadServerInfo();
             loadTunnelTypeInfo();
             checkTunnelStatus();
-            setInterval(checkTunnelStatus, 2000);
+            if (!window.tunnelStatusInterval) {
+                window.tunnelStatusInterval = setInterval(checkTunnelStatus, 2000);
+            }
         }
         async function loadServerInfo() {
             try {
@@ -5930,6 +5943,19 @@ SzwegoSpider/
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', initHostcTunnel);
         
+        // 页面卸载时清理所有定时器和资源
+        window.addEventListener('beforeunload', function() {
+            clearAllPollingIntervals();
+            if (window.tunnelStatusInterval) {
+                clearInterval(window.tunnelStatusInterval);
+                window.tunnelStatusInterval = null;
+            }
+            if (window.updateTimeInterval) {
+                clearInterval(window.updateTimeInterval);
+                window.updateTimeInterval = null;
+            }
+        });
+    
     </script>
 </body>
 </html>
