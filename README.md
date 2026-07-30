@@ -185,8 +185,11 @@ window.resetButtons = resetButtons;
 
 ## 📚 历史版本记录
 
-### v3.8.89.11 (2026-07-30) - 🐛 历史版本完整修复记录(问题+根因+代码+效果表+技术细节)
-- **🐛 历史版本完整修复记录(问题+根因+代码+效果表+技术细节)** - 历史版本完整修复记录(问题+根因+代码+效果表+技术细节)
+### v3.8.89.11 (2026-07-30) - 🔧 hostc WebSocket安全关闭修复+隧道验证修复+高价商品数解析修复
+- **🔧 WebSocket安全关闭** - safeCloseWebSocket2状态感知关闭(CONNECTING→terminate/OPEN→close)+超时处理器error事件吞掉+patch-package postinstall持久化补丁
+- **🔧 隧道验证修复** - FastAPI根路由添加HEAD方法支持(@app.api_route methods=['GET','HEAD'])，修复verify_url()返回405导致隧道被误判不可用
+- **🎯 高价商品数解析** - 简化正则表达式精确匹配Python输出格式(售价>=599的商品:数字个)，高价商品数从0恢复到78
+- **✅ 按钮失效修复** - 暴露bindAllButtons/resetButtons为全局函数(window.xxx)，确保按钮事件绑定成功
 ### v3.8.89.10 (2026-07-30) - 🔧 隧道验证修复(hostc/CF均不可用)
 - **🔧 HEAD验证修复** - FastAPI根路由添加HEAD方法支持，修复verify_url()返回405导致隧道被误判不可用
 - **📝 DNS排查指引** - CF隧道DNS解析失败的排查方案
