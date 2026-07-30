@@ -2704,6 +2704,9 @@
             }
         }
         
+        // 暴露为全局函数，确保可以从任何地方调用
+        window.bindAllButtons = bindAllButtons;
+        
         // 立即尝试绑定（因为脚本在</body>前，DOM应该已就绪）
         if (document.readyState === 'loading') {
             // DOM还在加载，等待DOMContentLoaded
@@ -4986,4 +4989,4 @@
                     TimerManager.set('polling', window.pollOutput, 1000);
                 }
             }
-        });
+        });
