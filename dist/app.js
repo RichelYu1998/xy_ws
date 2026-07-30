@@ -1185,23 +1185,27 @@
                 const statusDiv = document.getElementById('output-status');
                 
                 if (data.output) {
-                    const hasComparison = data.output.includes('对比文件:') || data.output.includes('货号对比结果') || data.output.includes('共获取') || data.output.includes('成功获取') || data.output.includes('总商品数') || data.output.includes('高价商品') || data.output.includes('预计售出') || data.output.includes('平均售出');
+                    // 检测是否包含爬虫统计数据（总商品数、高价商品、预计售出等）
+                    const hasSpiderStats = data.output.includes('成功获取') || 
+                                          data.output.includes('售价 >= 599') || 
+                                          data.output.includes('预计售出价格累计') ||
+                                          data.output.includes('平均每个设备售出均价');
                     
-                    console.log('[轮询] 检测到对比数据:', hasComparison, '输出长度:', data.output.length);
-                    
-                    if (!hasComparison && outputDiv) {
-                        outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(data.output) + '</pre>';
-                        const isMobile = window.innerWidth < 576;
-                        if (!isMobile) {
-                            outputDiv.scrollTop = outputDiv.scrollHeight;
-                        }
-                    }
-                    
-                    if (hasComparison) {
+                    if (hasSpiderStats) {
+                        // 爬虫运行时：解析日志输出实时显示统计数据
                         const spiderContent = document.getElementById('spider-output-content');
                         const existingCard = spiderContent ? spiderContent.querySelector('.comparison-card, .products-card') : null;
                         if (!existingCard) {
                             showComparisonCard(data.output);
+                        }
+                    } else {
+                        // 其他任务：只显示日志输出
+                        if (outputDiv) {
+                            outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(data.output) + '</pre>';
+                            const isMobile = window.innerWidth < 576;
+                            if (!isMobile) {
+                                outputDiv.scrollTop = outputDiv.scrollHeight;
+                            }
                         }
                     }
                 }
@@ -1214,6 +1218,13 @@
                     if (data.returncode === -15) {
                         if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行 (返回码: -15)</span>';
                     }
+                    
+                    // 爬虫完成后：调用API获取JSON数据
+                    if (completedChoice === 1 || completedChoice === 3) {
+                        console.log('[轮询] 爬虫完成，调用 /api/products 获取JSON数据');
+                        showAllProducts();
+                    }
+                    
                     if (typeof resetButtons === 'function') {
                         resetButtons();
                     } else {
