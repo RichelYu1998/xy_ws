@@ -7630,6 +7630,10 @@ if __name__ == '__main__':
                         version_match = re.match(r'##\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
                     if not version_match:
                         version_match = re.match(r'##\s+v([\d.]+)\s+\(([^)]+)\)', line.split(' - ')[0].strip())
+                    if not version_match:
+                        m_no_date = re.match(r'(?:###|##)\s+v([\d.]+)\s+', stripped)
+                        if m_no_date:
+                            version_match = type('VM', (), {'group': lambda self, n: m_no_date.group(n) if n <= m_no_date.lastindex else ''})()
                     if version_match:
                         if current_version:
                             if current_section:
