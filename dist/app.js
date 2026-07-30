@@ -1,4 +1,4 @@
-function escapeHtml(text) {
+﻿function escapeHtml(text) {
             if (!text) return '';
             const div = document.createElement('div');
             div.textContent = text;
@@ -1369,7 +1369,7 @@ function escapeHtml(text) {
                 }
                 
                 // 超级宽松的高价商品匹配
-                if ((line.includes('599') || line.includes('≥')) && !line.includes('新增') || 
+                if (((line.includes('599') || line.includes('≥')) && !line.includes('新增')) && 
                     !skuData.highPriceCount && /(\d+)/.test(line)) {
                     const match = line.match(/(\d+)/);
                     if (match && parseInt(match[1]) > 0 && parseInt(match[1]) < 10000) {
@@ -1429,8 +1429,8 @@ function escapeHtml(text) {
                         console.log('[对比卡片] ✓ 总商品数:', skuData.totalProducts);
                     }
                     inMissingSection = false;
-                } else if ((line.includes('售价 >=') || line.includes('售价>=')) && line.includes('商品') && !line.includes('新增') ||
-                           line.includes('≥599') && !line.includes('新增') ||
+                } else if ((line.includes('售价 >=') || line.includes('售价>=')) && line.includes('商品') )) &&
+                           line.includes('≥599') )) &&
                            line.match(/售价.*>=.*599.*商品/)) {
 
                     let match = line.match(/(\d+)\s*(个|件)/);
