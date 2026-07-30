@@ -6970,62 +6970,28 @@ if __name__ == '__main__':
                             media_result = img_data
                     p['图片'] = media_result if media_result else img_data
                 
-                high_price_products = []
+                high_price_stats = data.get('高价商品统计', {})
+                high_price_products = high_price_stats.get('商品列表', [])
+                high_price_count = high_price_stats.get('数量', 0)
+                
                 total_price = 0
                 total_fee = 0
                 valid_price_count = 0
                 
-                def safe_print(*args, **kwargs):
-                    try:
-                        print(*args, **kwargs)
-                    except (IOError, OSError):
-                        pass
-                
-                safe_print(f'\n{"="*60}')
-                safe_print(f'🔍 [DEBUG] 开始处理 {len(products)} 个商品...')
-                safe_print(f'{"="*60}')
-                
-                # 调试: 显示前5个商品的price字段
-                for debug_p in products[:5]:
-                    sku = debug_p.get('货号', '')
-                    price_debug = debug_p.get('售价', '') or p.get('price', '')
-                    price_cn_debug = debug_p.get('售价', '')
-                    safe_print(f'   [DEBUG] 商品[{sku}] price={repr(price_debug)}, 售价={repr(price_cn_debug)}')
-                
-                debug_skip_count = 0
                 for p in products:
                     try:
-                        price_str = p.get('售价', '') or p.get('price','')
-                        
-                        # 调试: 显示被跳过的原因
+                        price_str = p.get('售价', '') or p.get('price', '')
                         if not price_str or not str(price_str).strip():
-                            if debug_skip_count < 3:
-                                sku_skip = p.get('货号', '')
-                                safe_print(f'   [DEBUG-SKIP] 商品[{sku_skip}] price={repr(price_str)}, 类型={type(price_str).__name__}')
-                                debug_skip_count += 1
                             continue
-                        
-                        price_clean = price_str.replace('¥', '').replace(',', '').strip()
+                        price_clean = str(price_str).replace('¥', '').replace(',', '').strip()
                         price = float(price_clean)
-                        
-                        if price >= 599:
-                            high_price_products.append(p)
-                        
                         if price > 0:
                             total_price += price
                             fee = price * 0.016
                             total_fee += fee
                             valid_price_count += 1
-                    except Exception as e:
-                        safe_print(f'   [DEBUG-ERROR] 处理商品时出错: {e}')
+                    except Exception:
                         pass
-                
-                safe_print(f'\n{"="*60}')
-                safe_print(f'✅ [DEBUG] 统计结果:')
-                safe_print(f'   valid_price_count={valid_price_count}')
-                safe_print(f'   total_price={total_price}')
-                safe_print(f'   high_price_count={len(high_price_products)}')
-                safe_print(f'{"="*60}\n')
                 
                 avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
                 
@@ -7062,7 +7028,7 @@ if __name__ == '__main__':
                     'total': len(products), 
                     'products': products[:100], 
                     'highPriceProducts': high_price_products[:500], 
-                    'highPriceCount': len(high_price_products),
+                    'highPriceCount': high_price_count,
                     'totalPrice': f'¥{total_price:,.2f}',
                     'avgPrice': f'¥{avg_price:,.2f}',
                     'fee': f'¥{total_fee:,.2f}',
@@ -7340,7 +7306,7 @@ if __name__ == '__main__':
                     'total': len(products), 
                     'products': products[:100], 
                     'highPriceProducts': high_price_products[:500], 
-                    'highPriceCount': len(high_price_products),
+                    'highPriceCount': high_price_count,
                     'totalPrice': f'¥{total_price:,.2f}',
                     'avgPrice': f'¥{avg_price:,.2f}',
                     'fee': f'¥{total_fee:,.2f}',
