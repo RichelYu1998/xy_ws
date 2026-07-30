@@ -1429,8 +1429,7 @@
                         console.log('[对比卡片] ✓ 总商品数:', skuData.totalProducts);
                     }
                     inMissingSection = false;
-                } else if ((line.includes('售价 >=') || line.includes('售价>=')) && line.includes('商品') )) &&
-                           line.includes('≥599') )) &&
+                } else if ((line.includes('售价 >=') || line.includes('售价>=')) && (line.includes('商品') || line.includes('≥599')) &&
                            line.match(/售价.*>=.*599.*商品/)) {
 
                     let match = line.match(/(\d+)\s*(个|件)/);
