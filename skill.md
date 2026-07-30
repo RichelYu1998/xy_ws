@@ -267,9 +267,51 @@ npm install  # → postinstall → patch-package → 应用补丁
 - [ ] package.json 包含 `patch-package` 依赖
 - [ ] `npm install` 后验证补丁已正确应用
 
-### 2.4 UI渲染规范
+### 2.4 日志解析规范 ⚠️ **重要** (2026-07-30 新增)
 
-#### 2.4.1 统计数据显示
+#### 2.4.1 高价商品数解析 (强制)
+```javascript
+// ❌ 错误：正则表达式无法匹配Python输出格式
+// Python输出：售价 >= 599 的商品: 78 个（有空格）
+// 旧正则：/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/（无法匹配空格）
+if (line.match(/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/)) { ... }
+
+// ✅ 正确：简化正则，精确匹配Python输出格式
+if (line.includes('售价') && line.includes('599') && line.includes('商品')) {
+    let match = line.match(/售价\s*>=\s*599\s*的商品\s*[:：]\s*(\d+)\s*个/);
+    if (!match) match = line.match(/商品\s*[:：]\s*(\d+)\s*个/);
+    if (!match) match = line.match(/(\d+)\s*个\s*$/);
+    if (match && parseInt(match[1]) > 0) {
+        skuData.highPriceCount = match[1];
+    }
+}
+```
+
+**关键规则**:
+- Python输出格式可能包含空格（`售价 >= 599`），正则必须兼容
+- 使用多级fallback：精确匹配 → 宽松匹配 → 行末数字
+- 解析后必须验证数字有效性（`parseInt > 0`）
+
+#### 2.4.2 全局函数暴露规范 (强制)
+```javascript
+// ❌ 错误：函数定义在作用域内，外部无法调用
+function bindAllButtons() { ... }
+function resetButtons() { ... }
+// HTML中的 onclick="bindAllButtons()" 报错：bindAllButtons is not defined
+
+// ✅ 正确：暴露为全局函数
+window.bindAllButtons = bindAllButtons;
+window.resetButtons = resetButtons;
+```
+
+**关键规则**:
+- 所有被 HTML `onclick` 引用的函数必须暴露到 `window` 对象
+- ES Module 或 IIFE 内定义的函数默认不在全局作用域
+- 暴露方式：`window.functionName = functionName`
+
+### 2.5 UI渲染规范
+
+#### 2.5.1 统计数据显示
 ```javascript
 // ✅ 使用默认值防止显示 undefined 或 NaN
 <span class="stat-value">${skuData.highPriceCount || 0}</span>
@@ -279,7 +321,7 @@ npm install  # → postinstall → patch-package → 应用补丁
 <div class="stat-item ${skuData.highPriceExtraCount > 0 ? 'stat-danger' : ''}">
 ```
 
-#### 2.4.2 列表数据展示
+#### 2.5.2 列表数据展示
 ```javascript
 // ✅ 去重处理
 if (skuData.highPriceExtraSkus2 && skuData.highPriceExtraSkus2.length > 0) {
@@ -771,7 +813,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
-| v3.8.89.11 | 2026-07-30 | AI Assistant | 历史版本完整修复记录(问题+根因+代码+效果表+技术细节) |
+| v3.8.89.11 | 2026-07-30 | AI Assistant | 🔧 hostc WebSocket安全关闭修复(safeCloseWebSocket2状态感知+error事件吞掉+patch-package持久化)+隧道验证修复(FastAPI HEAD方法)+高价商品数解析修复+按钮全局函数暴露 |
 | v3.8.89.10 | 2026-07-30 | AI Assistant | FastAPI根路由添加HEAD方法支持，修复verify_url()返回405导致隧道被误判不可用; CF隧道DNS解析失败的排查方案; 隧道不再反复重启，邮件通知正常发送 |
 | v3.8.89.9 | 2026-07-30 | AI Assistant | 简化正则表达式，精确匹配Python输出格式; 暴露全局函数，确保按钮绑定成功; 高价商品数从0恢复到78 |
 | v3.8.89.8 | 2026-07-30 | AI Assistant | 高价商品、TXT对比、请求处理、数据源、CDN日志; 修复FastAPI迁移后的功能问题 |
