@@ -1402,7 +1402,8 @@
                     }
                 }
             }
-[对比卡片] 预扫描结果:', JSON.stringify(skuData));
+
+            console.log('[对比卡片] 解析结果:', JSON.stringify(skuData));
             
             // 精确解析（覆盖预扫描的结果）
             for (let i = 0; i < lines.length; i++) {
