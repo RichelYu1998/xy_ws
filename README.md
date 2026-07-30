@@ -186,10 +186,74 @@ window.resetButtons = resetButtons;
 ## 📚 历史版本记录
 
 ### v3.8.89.11 (2026-07-30) - 🔧 hostc WebSocket安全关闭修复
-- **🔧 WebSocket安全关闭** - 修复safeCloseWebSocket2对CONNECTING状态socket调用close()导致进程崩溃
-- **🛡️ error事件处理** - 超时关闭前注册error事件监听器，防止Unhandled error
-- **📦 patch-package持久化** - 添加postinstall钩子，npm install后自动应用补丁
-- **✅ hostc隧道** - 启动不再崩溃，WebSocket超时优雅关闭
+
+#### 问题: hostc 隧道启动时报错 `WebSocket was closed before the connection was established` 并导致进程崩溃
+**现象**: 项目启动时 hostc 隧道尝试建立 WebSocket 连接，超时或失败后调用 `safeCloseWebSocket2` 关闭 socket，触发未捕获的 `error` 事件导致 Node.js 进程崩溃退出
+
+**根本原因**:
+1. **`safeCloseWebSocket2` 函数缺陷**: 当 WebSocket 处于 `CONNECTING` 状态时，直接调用 `socket.close()` 会抛异常（`ws` 库规定未完成握手的 socket 必须用 `terminate()` 强制关闭）
+2. **超时处理器缺陷**: 超时后调用 `safeCloseWebSocket2` 关闭 socket，但未预先注册 `error` 事件监听器，导致 `close()` 触发的 error 事件无人处理，抛出 `Unhandled 'error' event`
+
+**修复方案**:
+```javascript
+// ❌ 修复前：超时处理器直接关闭，未处理 error 事件
+const timeout = setTimeout(() => {
+  cleanup();
+  safeCloseWebSocket2(socket, CLOSE_INTERNAL_ERROR, "connect timeout");
+  reject(new Error("WebSocket connect timed out"));
+}, WEBSOCKET_CONNECT_TIMEOUT_MS);
+
+// ✅ 修复后：关闭前吞掉 error 事件，防止进程崩溃
+const timeout = setTimeout(() => {
+  cleanup();
+  socket.once("error", () => {});
+  safeCloseWebSocket2(socket, CLOSE_INTERNAL_ERROR, "connect timeout");
+  reject(new Error("WebSocket connect timed out"));
+}, WEBSOCKET_CONNECT_TIMEOUT_MS);
+```
+
+```javascript
+// ❌ 修复前：不区分 socket 状态，直接调用 close()
+function safeCloseWebSocket2(socket, code, reason) {
+  if (!socket) return;
+  try {
+    socket.close(normalizeWebSocketCloseCode(code), normalizeWebSocketCloseReason(reason));
+  } catch {
+    socket.terminate();
+  }
+}
+
+// ✅ 修复后：CONNECTING 状态用 terminate()，OPEN 状态用 close()
+function safeCloseWebSocket2(socket, code, reason) {
+  if (!socket) return;
+  try {
+    if (socket.readyState === import_ws2.default.CONNECTING) {
+      socket.once("error", () => {});
+      socket.terminate();
+    } else {
+      socket.close(normalizeWebSocketCloseCode(code), normalizeWebSocketCloseReason(reason));
+    }
+  } catch {
+    try { socket.terminate(); } catch {}
+  }
+}
+```
+
+**持久化保护**:
+- 在 `dist/package.json` 中添加 `patch-package` 作为 `postinstall` 钩子
+- 补丁文件 `dist/patches/hostc+1.3.0.patch` 确保 `npm install` 后自动应用修复
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **hostc 启动** | 进程崩溃 ❌ | 正常启动 ✅ |
+| **WebSocket 超时** | Unhandled error ❌ | 优雅关闭 ✅ |
+| **补丁持久化** | npm install 后丢失 ❌ | postinstall 自动应用 ✅ |
+
+**技术细节**:
+- `ws` 库的 `close()` 方法仅在 `OPEN` 状态下可用，`CONNECTING` 状态必须使用 `terminate()`
+- `socket.once("error", () => {})` 用于吞掉因强制关闭而产生的 error 事件
+- `patch-package` 确保每次 `npm install` 后补丁自动应用，不会因依赖更新而丢失修复
 
 ### v3.8.89.10 (2026-07-30) - 🔧 隧道验证修复(hostc/CF均不可用)
 - **🔧 HEAD验证修复** - FastAPI根路由添加HEAD方法支持，修复verify_url()返回405导致隧道被误判不可用
