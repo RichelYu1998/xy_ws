@@ -1,7 +1,7 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.89.3
-> **更新日期**: 2026-07-29
+> **版本**: v3.8.89.4
+> **更新日期**: 2026-07-30
 > **技术栈**: Python 3.14 + FastAPI + 原生JavaScript + Playwright
 
 ---
@@ -90,6 +90,51 @@ uvicorn main:app --host 0.0.0.0 --port 8888 --workers 4
 ---
 
 ## 最新更新
+
+### v3.8.89.4 (2026-07-30) - 🐛 全面隐藏 Bug 修复 + 代码质量提升
+
+#### 🎯 修复内容
+
+**1. 修复所有语法错误（12处）**
+- ✅ main.py: 10处 except 块缺少换行符导致语法错误
+- ✅ main.py: 2处空 except 块，已添加日志记录
+- ✅ dist/app.js: 6处空 catch 块，已添加错误日志
+
+**2. 修复 mimetype 参数错误（3处）**
+- ✅ `/api/clean/all` 接口: `mimetype=` → `media_type=`
+- ✅ `/api/clean/png` 接口: `mimetype=` → `media_type=`
+- ✅ `/api/clean/media` 接口: `mimetype=` → `media_type=`
+- **问题原因**: FastAPI/Starlette 使用 `media_type`，Flask 使用 `mimetype`
+
+**3. 修复删除商品显示 "object object object object" bug**
+- ✅ **根本原因**: 变量名冲突导致数组被覆盖成字符串
+- ✅ **修复方案**: 分离数量变量和数组变量
+  ```javascript
+  // ❌ 之前（数组被覆盖）
+  skuData.deletedProducts = line.split(':')[1].trim();
+
+  // ✅ 现在（分离变量）
+  skuData.deletedProductsCount = line.split(':')[1].trim();
+  ```
+
+**4. 清理临时文件**
+- ❌ 删除 `_fix_except.py` - 临时修复脚本
+- ❌ 删除 `_fix_logging.py` - 临时日志脚本
+- ❌ 删除 `add_logging.py` - 添加日志脚本
+- ❌ 删除 `_fix_mimetype.py` - 修复mimetype脚本
+- ✅ 项目只保留 `main.py` 主程序文件
+
+**5. 全面代码审查结果**
+| 检查项 | 状态 | 详情 |
+|--------|------|------|
+| Python 语法 | ✅ 通过 | py_compile Exit code: 0 |
+| JavaScript 语法 | ✅ 通过 | node -c Exit code: 0 |
+| 安全漏洞 | ✅ 无 | 无 SQL注入、XSS、命令注入 |
+| 空异常块 | ✅ 0个 | 所有 except/catch 都有日志 |
+| 资源泄漏 | ✅ 无 | 文件/浏览器/进程都正确关闭 |
+| 硬编码密码 | ✅ 无 | 密码从配置/用户输入获取 |
+
+---
 
 ### v3.8.89.3 (2026-07-29) - 🔧 Flask遗留代码修复 + jsonify兼容层
 

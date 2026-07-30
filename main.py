@@ -737,8 +737,8 @@ class TeeOutput:
         """析构函数，确保文件资源被正确释放"""
         try:
             self.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Silent exception: {e}")
 
 def setup_web_logging():
     """设置Web模式下的日志输出（追加模式，保留shell脚本已写入的完整启动日志）"""
@@ -3710,7 +3710,8 @@ class WegoScraper:
                         except (ValueError, TypeError):
                             pass
                     return None
-                except Exception:
+                except Exception as e:
+                    logger.debug(f'Exception returning None: {e}')
                     return None
             
             price = extract_price(element_text)
@@ -3755,7 +3756,8 @@ class WegoScraper:
                                 pass
                     
                     return None
-                except Exception:
+                except Exception as e:
+                    logger.debug(f'Exception returning None: {e}')
                     return None
             
             cost_price = extract_cost_price(element_text, html_content)
@@ -4098,7 +4100,8 @@ class WegoScraper:
                     goods_by_num[goods_num] = item
                 if title:
                     goods_by_title[title] = item
-            except Exception:
+            except Exception as e:
+                logger.debug(f'Exception in loop: {e}')
                 continue
         
         success_count = 0
@@ -4129,7 +4132,8 @@ class WegoScraper:
                             if price_item.get('priceType') == 1:
                                 cost_price = price_item.get('value')
                                 break
-                        except Exception:
+                        except Exception as e:
+                            logger.debug(f'Exception in loop: {e}')
                             continue
                     
                     if cost_price is not None:
@@ -4397,7 +4401,8 @@ class WegoScraper:
                             cost_price = price_item.get('value')
                         elif price_item.get('priceType') == 2:
                             sale_price = price_item.get('value')
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f'Exception in loop: {e}')
                         continue
                 
                 note_arr = item.get('noteArr', [])
@@ -4417,15 +4422,15 @@ class WegoScraper:
                     for url in imgs_src:
                         try:
                             media_b64_list.append(base64.b64encode(str(url).encode('utf-8')).decode('utf-8'))
-                        except Exception:
+                        except Exception as e:
+                            logger.debug(f'Exception in loop: {e}')
                             continue
                 
                 video_url = item.get('videoUrl', '')
                 if video_url:
                     try:
                         media_b64_list.append(base64.b64encode(str(video_url).encode('utf-8')).decode('utf-8'))
-                    except Exception:
-                        pass
+                    except Exception as e:                        logger.debug(f"Silent exception: {e}")
                 
                 media_b64 = media_b64_list[0] if len(media_b64_list) == 1 else media_b64_list
                 
@@ -5277,6 +5282,8 @@ class StockNumberComparator:
             'missing_count': diff_data['comparison']['missing_count'],
             'extra_in_json_count': diff_data['comparison']['extra_in_json_count'],
             'high_price_extra_in_json_count': diff_data['comparison']['high_price_extra_in_json_count'],
+            'added': diff_data.get('新增商品', []),
+            'removed': diff_data.get('删除商品', []),
             'added_products_count': diff_data['新增商品数量'],
             'removed_products_count': diff_data['删除商品数量'],
             'data_change': diff_data['data_change'],
@@ -5683,7 +5690,8 @@ def select_pip_mirror(venv_path: str):
             start = time.time()
             urllib.request.urlopen(url, timeout=3)
             return round(time.time() - start, 3)
-        except Exception:
+        except Exception as e:
+            logger.debug(f'Exception returning None: {e}')
             return None
 
     print("[*] 检测到未配置pip镜像源，正在测试镜像源速度...")
@@ -5775,7 +5783,8 @@ def install_playwright_cdn():
             start = time.time()
             urllib.request.urlopen(url, timeout=3)
             return round(time.time() - start, 3)
-        except Exception:
+        except Exception as e:
+            logger.debug(f'Exception returning None: {e}')
             return None
 
     print("[*] 测试Playwright CDN速度...")
@@ -6035,15 +6044,13 @@ if __name__ == '__main__':
                 if REQUEST_LATENCY is not None:
                     try:
                         REQUEST_LATENCY.labels(request.method, path).observe(time.time() - start_time)
-                    except Exception:
-                        pass
+                    except Exception as e:                        logger.debug(f"Silent exception: {e}")
 
                 if REQUEST_COUNT is not None:
                     try:
                         endpoint = getattr(request.state, 'endpoint', None) or path
                         REQUEST_COUNT.labels(request.method, endpoint, response.status_code).inc()
-                    except Exception:
-                        pass
+                    except Exception as e:                        logger.debug(f"Silent exception: {e}")
 
             response.headers['X-Content-Type-Options'] = 'nosniff'
             if path.startswith('/dist/'):
@@ -6118,8 +6125,7 @@ if __name__ == '__main__':
                 try:
                     cache_stats = json_cache.get_stats()
                     health_data['cache'] = cache_stats
-                except Exception:
-                    pass
+                except Exception as e:                    logger.debug(f"Silent exception: {e}")
             health_data['active_tasks'] = len(tasks) if 'tasks' in dir() else 0
             return JSONResponse(content=health_data, status_code=status_code)
 
@@ -6127,7 +6133,8 @@ if __name__ == '__main__':
         async def readiness_check():
             try:
                 return JSONResponse(content={'ready': True, 'timestamp': datetime.now().isoformat()}, status_code=200)
-            except Exception:
+            except Exception as e:
+                logger.debug(f'Exception in response: {e}')
                 return JSONResponse(content={'ready': False}, status_code=503)
 
         @app.get('/metrics')
@@ -6141,8 +6148,7 @@ if __name__ == '__main__':
                 if ACTIVE_TASKS_GAUGE is not None:
                     try:
                         ACTIVE_TASKS_GAUGE.set(len(tasks) if 'tasks' in dir() else 0)
-                    except Exception:
-                        pass
+                    except Exception as e:                        logger.debug(f"Silent exception: {e}")
                 return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
             except Exception as e:
                 return JSONResponse(status_code=500, content={'error': str(e)})
@@ -6457,7 +6463,8 @@ if __name__ == '__main__':
                     if task_id in processes:
                         del processes[task_id]
                 return JSONResponse(content={'success': True, 'message': '进程已终止'})
-            except Exception:
+            except Exception as e:
+                logger.debug(f'Exception in response: {e}')
                 return JSONResponse(content={'success': True, 'message': '操作完成'})
 
         @app.get('/output/{task_id}')
@@ -6873,7 +6880,7 @@ if __name__ == '__main__':
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
-                
+
                 for p in products:
                     media_result = []
                     img_data = p.get('图片', '')
@@ -6883,14 +6890,17 @@ if __name__ == '__main__':
                                 for b64_str in img_data:
                                     try:
                                         media_result.append(base64.b64decode(b64_str).decode('utf-8'))
-                                    except Exception:
+                                    except Exception as e:
+                                        logger.debug(f"Exception processing media: {e}")
                                         media_result.append(b64_str)
                             else:
                                 try:
                                     media_result = base64.b64decode(img_data).decode('utf-8')
-                                except Exception:
+                                except Exception as e:
+                                    logger.debug(f"Exception processing media: {e}")
                                     media_result = img_data
-                        except Exception:
+                        except Exception as e:
+                            logger.debug(f"Exception processing media: {e}")
                             media_result = img_data
                     p['图片'] = media_result if media_result else img_data
                 
@@ -7022,7 +7032,8 @@ if __name__ == '__main__':
                                                     record_date = datetime.strptime(date_str.split()[0], fmt)
                                                     record_date_str = record_date.strftime('%Y-%m-%d')
                                                     break
-                                                except Exception:
+                                                except Exception as e:
+                                                    logger.debug(f"Exception in loop: {e}")
                                                     continue
                                             if record_date_str is None:
                                                 parts = date_str.split()
@@ -7067,7 +7078,8 @@ if __name__ == '__main__':
                                                 if record_date.year < 2000:
                                                     continue
                                                 record_date_str = record_date.strftime('%Y-%m-%d')
-                                            except Exception:
+                                            except Exception as e:
+                                                logger.debug(f"Exception in loop: {e}")
                                                 continue
                                         else:
                                             continue
@@ -7171,7 +7183,7 @@ if __name__ == '__main__':
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
-                
+
                 for p in products:
                     media_result = []
                     img_data = p.get('图片', '')
@@ -7181,14 +7193,17 @@ if __name__ == '__main__':
                                 for b64_str in img_data:
                                     try:
                                         media_result.append(base64.b64decode(b64_str).decode('utf-8'))
-                                    except Exception:
+                                    except Exception as e:
+                                        logger.debug(f"Exception processing media: {e}")
                                         media_result.append(b64_str)
                             else:
                                 try:
                                     media_result = base64.b64decode(img_data).decode('utf-8')
-                                except Exception:
+                                except Exception as e:
+                                    logger.debug(f"Exception processing media: {e}")
                                     media_result = img_data
-                        except Exception:
+                        except Exception as e:
+                            logger.debug(f"Exception processing media: {e}")
                             media_result = img_data
                     p['图片'] = media_result if media_result else img_data
                 
@@ -7271,14 +7286,16 @@ if __name__ == '__main__':
                                     try:
                                         decoded = base64.b64decode(img).decode('utf-8')
                                         decoded_images.append(decoded)
-                                    except Exception:
+                                    except Exception as e:
+                                        logger.debug(f"Exception decoding image: {e}")
                                         decoded_images.append(img)
                                 p['图片'] = decoded_images
                             elif isinstance(images, str):
                                 try:
                                     decoded = base64.b64decode(images).decode('utf-8')
                                     p['图片'] = [decoded]
-                                except Exception:
+                                except Exception as e:
+                                    logger.debug(f"Exception decoding image to list: {e}")
                                     p['图片'] = [images]
                             else:
                                 p['图片'] = []
@@ -7331,7 +7348,8 @@ if __name__ == '__main__':
                                             media_result.append(decoded_url)
                                         else:
                                             media_result.append(b64_str)
-                                    except Exception:
+                                    except Exception as e:
+                                        logger.debug(f"Exception processing media: {e}")
                                         media_result.append(b64_str)
                             else:
                                 try:
@@ -7340,7 +7358,8 @@ if __name__ == '__main__':
                                         media_result = [decoded_url]
                                     else:
                                         media_result = [img_data]
-                                except Exception:
+                                except Exception as e:
+                                    logger.debug(f"Exception processing media: {e}")
                                     media_result = [img_data]
                         p['图片'] = media_result
                         return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
@@ -7372,14 +7391,16 @@ if __name__ == '__main__':
                                     try:
                                         decoded = base64.b64decode(img).decode('utf-8')
                                         decoded_images.append(decoded)
-                                    except Exception:
+                                    except Exception as e:
+                                        logger.debug(f"Exception decoding image: {e}")
                                         decoded_images.append(img)
                                 p['图片'] = decoded_images
                             elif isinstance(images, str):
                                 try:
                                     decoded = base64.b64decode(images).decode('utf-8')
                                     p['图片'] = [decoded]
-                                except Exception:
+                                except Exception as e:
+                                    logger.debug(f"Exception decoding image to list: {e}")
                                     p['图片'] = [images]
                             else:
                                 p['图片'] = []
@@ -7469,7 +7490,7 @@ if __name__ == '__main__':
 
                 output = log_stream.getvalue()
                 response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
-                return Response(response_data, mimetype='application/json')
+                return Response(response_data, media_type='application/json')
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
@@ -7490,7 +7511,7 @@ if __name__ == '__main__':
                 
                 output = log_stream.getvalue()
                 response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
-                return Response(response_data, mimetype='application/json')
+                return Response(response_data, media_type='application/json')
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
@@ -7511,7 +7532,7 @@ if __name__ == '__main__':
                 
                 output = log_stream.getvalue()
                 response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
-                return Response(response_data, mimetype='application/json')
+                return Response(response_data, media_type='application/json')
             except Exception as e:
                 return jsonify({'success': False, 'error': str(e)})
 
@@ -8317,7 +8338,8 @@ if __name__ == '__main__':
                         global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time, last_email_sent_url
                         try:
                             url_verified = verify_url(url, timeout=10, verbose=True)
-                        except Exception:
+                        except Exception as e:
+                            logger.debug(f"Exception verifying URL: {e}")
                             url_verified = False
                         if url_verified:
                             print(f"[Tunnel] 🎉 公网地址验证通过！立即发送邮件通知...")
@@ -8370,7 +8392,8 @@ if __name__ == '__main__':
                                 print(f"[Tunnel] ✅ 后台获取到URL: {found_url}")
                                 try:
                                     url_verified = verify_url(found_url, timeout=10, verbose=True)
-                                except Exception:
+                                except Exception as e:
+                                    logger.debug(f"Exception verifying URL: {e}")
                                     url_verified = False
                                 if url_verified:
                                     print(f"[Tunnel] 🎉 公网地址验证通过！立即发送邮件通知...")
@@ -8570,7 +8593,8 @@ if __name__ == '__main__':
                     try:
                         tunnel_process.terminate()
                         tunnel_process.wait(timeout=2)
-                    except Exception:
+                    except Exception as e:
+                        logger.debug(f"Nested exception: {e}")
                         try:
                             tunnel_process.kill()
                         except Exception as e:
@@ -9355,7 +9379,8 @@ ingress:
                 try:
                     tunnel_process.terminate()
                     tunnel_process.wait(timeout=2)
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Nested exception: {e}")
                     try:
                         tunnel_process.kill()
                     except Exception as e:
@@ -9367,7 +9392,8 @@ ingress:
                 try:
                     cf_process.terminate()
                     cf_process.wait(timeout=2)
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"Nested exception: {e}")
                     try:
                         cf_process.kill()
                     except Exception as e:
