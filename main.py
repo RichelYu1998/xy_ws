@@ -4493,7 +4493,7 @@ class WegoScraper:
 
     def filter_high_price_products(self, data, min_price=599):
         """筛选高价商品"""
-        return [p for p in data if self.parse_price(p.get('price', '')) and self.parse_price(p.get('price', '')) >= min_price]
+        return [p for p in data if self.parse_price(p.get('售价', '') or p.get('price', '')) and self.parse_price(p.get('售价', '') or p.get('price', '')) >= min_price]
 
     def analyze_data_changes(self, data, previous_file):
         """分析数据变化"""
@@ -5076,7 +5076,7 @@ class StockNumberComparator:
             # 找出售价>=599的商品货号
             high_price_stock_numbers = []
             for product in latest_products:
-                price = WegoScraper.parse_price(product.get('price',''))
+                price = WegoScraper.parse_price(product.get('售价', '') or product.get('price',''))
                 if price and price >= 599:
                     stock_num = product.get('货号', '')
                     if stock_num:
@@ -5206,8 +5206,8 @@ class StockNumberComparator:
             
             high_price_stock_numbers = [
                 p.get('货号', '') for p in products 
-                if WegoScraper.parse_price(p.get('price','')) is not None
-                and WegoScraper.parse_price(p.get('price','')) >= 599
+                if WegoScraper.parse_price(p.get('售价', '') or p.get('price','')) is not None
+                and WegoScraper.parse_price(p.get('售价', '') or p.get('price','')) >= 599
             ]
             
             excel_stock_numbers = self.load_all_excel_data(remove_duplicates=False)
@@ -6665,7 +6665,7 @@ if __name__ == '__main__':
                 high_price_count = 0
                 high_price_stock_numbers = []
                 for p in products:
-                    price = p.get('price','')
+                    price = p.get('售价', '') or p.get('price','')
                     if price:
                         try:
                             price_val = float(price.replace('¥', '').replace(',', ''))
@@ -6707,7 +6707,7 @@ if __name__ == '__main__':
                     for sku in added_products_all:
                         for p in products:
                             if str(p.get('货号', '')) == str(sku):
-                                price = p.get('price','')
+                                price = p.get('售价', '') or p.get('price','')
                                 try:
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
@@ -6842,7 +6842,7 @@ if __name__ == '__main__':
                 high_price_count = 0
                 high_price_stock_numbers = []
                 for p in products:
-                    price = p.get('price','')
+                    price = p.get('售价', '') or p.get('price','')
                     if price:
                         try:
                             price_val = float(price.replace('¥', '').replace(',', ''))
@@ -6889,7 +6889,7 @@ if __name__ == '__main__':
                     for sku in added_products_all:
                         for p in products:
                             if str(p.get('货号', '')) == str(sku):
-                                price = p.get('price','')
+                                price = p.get('售价', '') or p.get('price','')
                                 try:
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
@@ -6981,12 +6981,28 @@ if __name__ == '__main__':
                     except (IOError, OSError):
                         pass
                 
-                safe_print(f'开始处理 {len(products)} 个商品...')
+                safe_print(f'\n{"="*60}')
+                safe_print(f'🔍 [DEBUG] 开始处理 {len(products)} 个商品...')
+                safe_print(f'{"="*60}')
                 
+                # 调试: 显示前5个商品的price字段
+                for debug_p in products[:5]:
+                    sku = debug_p.get('货号', '')
+                    price_debug = debug_p.get('售价', '') or p.get('price', '')
+                    price_cn_debug = debug_p.get('售价', '')
+                    safe_print(f'   [DEBUG] 商品[{sku}] price={repr(price_debug)}, 售价={repr(price_cn_debug)}')
+                
+                debug_skip_count = 0
                 for p in products:
                     try:
-                        price_str = p.get('price','')
-                        if not price_str or not price_str.strip():
+                        price_str = p.get('售价', '') or p.get('price','')
+                        
+                        # 调试: 显示被跳过的原因
+                        if not price_str or not str(price_str).strip():
+                            if debug_skip_count < 3:
+                                sku_skip = p.get('货号', '')
+                                safe_print(f'   [DEBUG-SKIP] 商品[{sku_skip}] price={repr(price_str)}, 类型={type(price_str).__name__}')
+                                debug_skip_count += 1
                             continue
                         
                         price_clean = price_str.replace('¥', '').replace(',', '').strip()
@@ -7001,10 +7017,15 @@ if __name__ == '__main__':
                             total_fee += fee
                             valid_price_count += 1
                     except Exception as e:
-                        safe_print(f'处理商品时出错: {e}, price_str: {p.get("售价", "")}')
+                        safe_print(f'   [DEBUG-ERROR] 处理商品时出错: {e}')
                         pass
                 
-                safe_print(f'统计结果: valid_price_count={valid_price_count}, total_price={total_price}, high_price_count={len(high_price_products)}')
+                safe_print(f'\n{"="*60}')
+                safe_print(f'✅ [DEBUG] 统计结果:')
+                safe_print(f'   valid_price_count={valid_price_count}')
+                safe_print(f'   total_price={total_price}')
+                safe_print(f'   high_price_count={len(high_price_products)}')
+                safe_print(f'{"="*60}\n')
                 
                 avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
                 
@@ -7288,7 +7309,7 @@ if __name__ == '__main__':
                 
                 for p in products:
                     try:
-                        price_str = p.get('price','')
+                        price_str = p.get('售价', '') or p.get('price','')
                         if not price_str or not price_str.strip():
                             continue
                         
