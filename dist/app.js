@@ -1367,9 +1367,17 @@
                 }
 
                 // 2. 高价商品数：直接找 "售价 >= 599 的商品: XX 个"
-                if (line.includes('售价') && (line.includes('599') || line.includes('≥599'))) {
-                    let match = line.match(/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/);
-                    if (!match) match = line.match(/(\d+)\s*[个件]/);
+                if (line.includes('售价') && line.includes('599') && line.includes('商品')) {
+                    // 简化正则表达式：直接匹配"售价 >= 599 的商品: 78 个"
+                    let match = line.match(/售价\s*>=\s*599\s*的商品\s*[:：]\s*(\d+)\s*个/);
+                    if (!match) {
+                        // 备选方案：匹配任意"商品: 数字 个"格式
+                        match = line.match(/商品\s*[:：]\s*(\d+)\s*个/);
+                    }
+                    if (!match) {
+                        // 最后备选：匹配行末的数字
+                        match = line.match(/(\d+)\s*个\s*$/);
+                    }
                     if (match && parseInt(match[1]) > 0) {
                         skuData.highPriceCount = match[1];
                         console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
@@ -1436,10 +1444,10 @@
                 } else if (line.includes('售价') && (line.includes('599') || line.includes('≥599')) &&
                            (line.includes('商品') || line.includes('个') || line.includes('件'))) {
 
-                    let match = line.match(/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/);
-                    if (!match) match = line.match(/(\d+)\s*[个件]/);
-                    if (!match) match = line.match(/[:：]\s*(\d+)/);
-                    if (!match) match = line.match(/(\d+)/);
+                    // 简化正则表达式：直接匹配"售价 >= 599 的商品: 78 个"
+                    let match = line.match(/售价\s*>=\s*599\s*的商品\s*[:：]\s*(\d+)\s*个/);
+                    if (!match) match = line.match(/商品\s*[:：]\s*(\d+)\s*个/);
+                    if (!match) match = line.match(/(\d+)\s*个/);
 
                     if (match && parseInt(match[1]) > 0) {
                         skuData.highPriceCount = match[1];
