@@ -856,22 +856,16 @@
                 .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
                     if (!data.success || !data.changelog || !data.changelog.length) return;
-                    var showCount = Math.min(data.changelog.length, 3);
+                    var latest = data.changelog[0];
                     var titleEl = document.getElementById('changelog-title');
-                    if (titleEl) titleEl.textContent = '最新更新 (v' + data.changelog[0].version + ')';
+                    if (titleEl) titleEl.textContent = '最新更新 (v' + latest.version + ')';
                     var container = document.getElementById('changelog-container');
                     if (!container) return;
                     container.innerHTML = '';
-                    for (var vi = 0; vi < showCount; vi++) {
-                        var verData = data.changelog[vi];
-                        var verCard = document.createElement('div');
-                        verCard.style.cssText = 'margin-bottom: 15px; border-left: 3px solid ' + (vi === 0 ? '#67c23a' : vi === 1 ? '#409EFF' : '#e6a23c') + '; padding-left: 12px;';
-                        var verHeader = document.createElement('div');
-                        verHeader.style.cssText = 'font-weight: 700; color: #303133; font-size: 15px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #ebeef5;';
-                        verHeader.innerHTML = '<i class="fa fa-tag" style="color: ' + (vi === 0 ? '#67c23a' : vi === 1 ? '#409EFF' : '#e6a23c') + '; margin-right: 6px;"></i>v' + verData.version + (verData.date ? ' <span style="font-weight: 400; color: #909399; font-size: 13px;">(' + verData.date + ')</span>' : '');
-                        verCard.appendChild(verHeader);
-                    if (verData.items && verData.items.length) {
-                        verData.items.forEach(function(item) {
+                    var verCard = document.createElement('div');
+                    verCard.style.cssText = 'margin-bottom: 15px; border-left: 3px solid #67c23a; padding-left: 12px;';
+                    if (latest.items && latest.items.length) {
+                        latest.items.forEach(function(item) {
                             var itemDiv = document.createElement('div');
                             itemDiv.style.cssText = 'margin-bottom: 12px;';
                             if (item.type === 'section') {
@@ -937,7 +931,6 @@
                         });
                     }
                     container.appendChild(verCard);
-                    }
                 })
                 .catch(function(e) {
                     console.error('Failed to load changelog:', e);
