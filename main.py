@@ -4768,19 +4768,27 @@ class WegoScraper:
                     print(f'对比耗时: {time.time() - compare_start:.2f}秒')
                 
                 save_cookie_start = time.time()
-                cookies = await context.cookies()
-                # 统一domain格式，将所有cookie的domain改为.szwego.com
-                szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
-                for cookie in szwego_cookies:
-                    if cookie['domain'] == 'www.szwego.com':
-                        cookie['domain'] = '.szwego.com'
-                FileManager.write_json(cookie_file, szwego_cookies)
-                print(f'Cookie已保存到 {cookie_file}')
-                print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
+                try:
+                    cookies = await context.cookies()
+                    # 统一domain格式，将所有cookie的domain改为.szwego.com
+                    szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+                    for cookie in szwego_cookies:
+                        if cookie['domain'] == 'www.szwego.com':
+                            cookie['domain'] = '.szwego.com'
+                    FileManager.write_json(cookie_file, szwego_cookies)
+                    print(f'Cookie已保存到 {cookie_file}')
+                    print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
+                except Exception as e:
+                    print(f'⚠️  Cookie保存失败: {e}')
+                    print('继续执行，不影响数据获取...')
                 
                 close_start = time.time()
-                await browser.close()
-                print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
+                try:
+                    await browser.close()
+                    print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
+                except Exception as e:
+                    print(f'⚠️  浏览器关闭失败: {e}')
+                    print('浏览器可能已经关闭，继续执行...')
                 
         except Exception as e:
             print(f'运行失败: {e}')
