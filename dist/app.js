@@ -1658,11 +1658,15 @@ function escapeHtml(text) {
                      console.log('[对比卡片] ✓ 删除商品数:', skuData.deletedProductsCount);
                      inMissingSection = false;
                  } else if (line.includes('新增高价商品数:')) {
-                     const count = parseInt(line.split(':')[1].trim());
-                     skuData.newHighPrice = count || 0;
-                     skuData.highPriceCount = count || 0; // 同时设置高价商品数
-                     console.log('[对比卡片] ✓ 新增高价商品数:', skuData.newHighPrice);
-                     inMissingSection = false;
+                    const count = parseInt(line.split(':')[1].trim());
+                    skuData.newHighPrice = count || 0;
+                    // ✅ 修复Bug: 只有当count>0或highPriceCount尚未设置时才更新
+                    // 防止"新增高价商品数:0"覆盖已正确解析的总高价商品数
+                    if (count > 0 || !skuData.highPriceCount) {
+                        skuData.highPriceCount = count || 0;
+                    }
+                    console.log('[对比卡片] ✓ 新增高价商品数:', skuData.newHighPrice, '(总高价商品数保持:', skuData.highPriceCount, ')');
+                    inMissingSection = false;
                  } else if (line.includes('预计售出价格累计:') || line.includes('预计售出总价') || line.includes('总售价')) {
                      console.log('[对比卡片] 解析预计售出总价行:', line.substring(0, 100));
                      
