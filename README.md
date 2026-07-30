@@ -7,6 +7,45 @@
 
 ## 🔄 最新更新
 
+### 🔧 隧道验证修复 — hostc/CF 均不可用的根因修复
+
+#### 问题: 项目启动后 hostc 和 CF 隧道均被判定为"不可用"
+**现象**: 项目启动时 hostc 和 Cloudflare Tunnel 都能成功启动并获取到 URL，但心跳验证机制始终判定为不可用，导致反复重启隧道
+
+**根本原因**:
+1. **hostc 验证失败**: `verify_url()` 函数使用 HTTP `HEAD` 方法验证 URL，但 FastAPI 根路由 `@app.get('/')` 不支持 HEAD 请求，返回 `405 Method Not Allowed`，导致验证永远失败
+2. **CF 验证失败**: 本机 DNS 无法解析 `trycloudflare.com` 域名（`Errno 8: nodename nor servname provided`），属于网络/DNS 配置问题
+
+**修复方案**:
+```python
+# ❌ 修复前：只支持 GET，HEAD 请求返回 405
+@app.get('/')
+async def index():
+
+# ✅ 修复后：同时支持 GET 和 HEAD，验证请求正常通过
+@app.api_route('/', methods=['GET', 'HEAD'])
+async def index():
+```
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **hostc 验证** | 405 Method Not Allowed ❌ | 200 OK ✅ |
+| **心跳判定** | 不可用 → 反复重启 ❌ | 可用 → 稳定运行 ✅ |
+| **邮件通知** | 发送"不可用"通知 ❌ | 发送"可用"通知 ✅ |
+
+**技术细节**:
+- FastAPI 的 `@app.get()` 装饰器不会自动为路由支持 HEAD 方法（与 Flask 不同）
+- `verify_url()` 使用 `urllib.request.Request(url, method='HEAD')` 发送 HEAD 请求
+- 改用 `@app.api_route('/', methods=['GET', 'HEAD'])` 后，HEAD 请求返回与 GET 相同的响应头（无 body），验证通过
+
+**CF 不可用的额外说明**:
+- CF 隧道进程本身启动正常（直接连接 Cloudflare 服务器获取 URL）
+- 但本机 DNS 无法解析 `*.trycloudflare.com`，导致验证请求失败
+- 建议排查 DNS 设置：`nslookup xxx.trycloudflare.com`，或更换 DNS 为 `8.8.8.8` / `114.114.114.114`
+
+---
+
 ### 🎯 高价商品数解析修复 + 按钮失效修复
 
 #### 问题1: 高价商品数显示为0
@@ -73,6 +112,11 @@ window.resetButtons = resetButtons;
 ---
 
 ## 📚 历史版本记录
+
+### v3.8.89.10 (2026-07-30) - 🔧 隧道验证修复(hostc/CF均不可用)
+- **🔧 HEAD验证修复** - FastAPI根路由添加HEAD方法支持，修复verify_url()返回405导致隧道被误判不可用
+- **📝 DNS排查指引** - CF隧道DNS解析失败的排查方案
+- **✅ 心跳稳定** - 隧道不再反复重启，邮件通知正常发送
 
 ### v3.8.89.9 (2026-07-30) - 🎯 高价商品数解析修复+按钮失效修复
 - **🎯 高价商品数解析修复** - 简化正则表达式，精确匹配Python输出格式
@@ -504,6 +548,6 @@ npm run dev
 
 ---
 
-**最后更新**: 2026-07-30  
+**最后更新**: 2026-07-30 (v3.8.89.10)
 **维护者**: 小旭数码团队  
 **许可证**: MIT License
