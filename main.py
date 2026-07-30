@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 # 标准库
 import argparse
 import asyncio
@@ -4484,7 +4484,7 @@ class WegoScraper:
 
     def filter_high_price_products(self, data, min_price=599):
         """筛选高价商品"""
-        return [p for p in data if self.parse_price(p.get('售价', '')) and self.parse_price(p.get('售价', '')) >= min_price]
+        return [p for p in data if self.parse_price(p.get('售䷜', '')) and self.parse_price(p.get('售䷜', '')) >= min_price]
 
     def analyze_data_changes(self, data, previous_file):
         """分析数据变化"""
@@ -4751,7 +4751,7 @@ class WegoScraper:
 
 class StockNumberComparator:
     def __init__(self, output_file=None, input_file=None, config_path=None):
-        self.output_file = output_file or PathManager.get_output_file()
+        self.json_file = output_file or FileManager.get_latest_json_file()
         self.input_file = input_file or PathManager.get_input_file()
         self.config_manager = ConfigManager(config_path)
         self.excel_file = self._get_excel_file()
@@ -4763,7 +4763,26 @@ class StockNumberComparator:
         return None
 
     def load_json_data(self):
-        return FileManager.read_json(self.output_file) or []
+        import os
+        if not self.json_file:
+            print('[StockNumberComparator] Warning: No JSON file found')
+            return []
+        
+        json_data = FileManager.read_json(self.json_file)
+        if not json_data:
+            print('[StockNumberComparator] Warning: Cannot read file')
+            return []
+        
+        if isinstance(json_data, dict) and '商品列表' in json_data:
+            products = json_data.get('商品列表', [])
+            print(f'[StockNumberComparator] Loaded {len(products)} products from {os.path.basename(self.json_file)}')
+            return products
+        elif isinstance(json_data, list):
+            print(f'[StockNumberComparator] Loaded {len(json_data)} products (list format)')
+            return json_data
+        else:
+            print('[StockNumberComparator] Warning: Invalid JSON format')
+            return []
 
     @staticmethod
     def extract_stock_numbers(data):
@@ -5140,8 +5159,8 @@ class StockNumberComparator:
             
             high_price_stock_numbers = [
                 p.get('货号', '') for p in products 
-                if WegoScraper.parse_price(p.get('售价', '')) is not None
-                and WegoScraper.parse_price(p.get('售价', '')) >= 599
+                if WegoScraper.parse_price(p.get('售䷜', '')) is not None
+                and WegoScraper.parse_price(p.get('售䷜', '')) >= 599
             ]
             
             excel_stock_numbers = self.load_all_excel_data(remove_duplicates=False)
@@ -5784,7 +5803,7 @@ def install_playwright_cdn():
             urllib.request.urlopen(url, timeout=3)
             return round(time.time() - start, 3)
         except Exception as e:
-            logger.warning(f'CDN test failed for {name}: {e}')
+            print(f'[CDN] Test failed {name}: {e}')
             return None
 
     print("[*] 测试Playwright CDN速度...")
@@ -6563,7 +6582,7 @@ if __name__ == '__main__':
                 raise HTTPException(status_code=500, detail=str(e))
 
         @app.api_route('/api/sku/compare/txt', methods=['GET', 'POST'])
-        async def compare_sku_txt():
+        async def compare_sku_txt(request: Request):
             try:
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
                 if not json_files:
@@ -6577,7 +6596,7 @@ if __name__ == '__main__':
                 
                 txt_stock_numbers_raw = []
                 if request.method == 'POST':
-                    req_data = request.get_json()
+                    req_data = await request.json()
                     input_skus = req_data.get('skus', '')
                     txt_stock_numbers_raw = [s.strip() for s in re.split(r'[\s,\n\r\t]+', input_skus) if s.strip()]
                 else:
@@ -6599,7 +6618,7 @@ if __name__ == '__main__':
                 high_price_count = 0
                 high_price_stock_numbers = []
                 for p in products:
-                    price = p.get('售价', '')
+                    price = p.get('售䷜', '')
                     if price:
                         try:
                             price_val = float(price.replace('¥', '').replace(',', ''))
@@ -6641,7 +6660,7 @@ if __name__ == '__main__':
                     for sku in added_products_all:
                         for p in products:
                             if str(p.get('货号', '')) == str(sku):
-                                price = p.get('售价', '')
+                                price = p.get('售䷜', '')
                                 try:
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
@@ -6776,7 +6795,7 @@ if __name__ == '__main__':
                 high_price_count = 0
                 high_price_stock_numbers = []
                 for p in products:
-                    price = p.get('售价', '')
+                    price = p.get('售䷜', '')
                     if price:
                         try:
                             price_val = float(price.replace('¥', '').replace(',', ''))
@@ -6823,7 +6842,7 @@ if __name__ == '__main__':
                     for sku in added_products_all:
                         for p in products:
                             if str(p.get('货号', '')) == str(sku):
-                                price = p.get('售价', '')
+                                price = p.get('售䷜', '')
                                 try:
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
@@ -6919,7 +6938,7 @@ if __name__ == '__main__':
                 
                 for p in products:
                     try:
-                        price_str = p.get('售价', '')
+                        price_str = p.get('售䷜', '')
                         if not price_str or not price_str.strip():
                             continue
                         
@@ -7222,7 +7241,7 @@ if __name__ == '__main__':
                 
                 for p in products:
                     try:
-                        price_str = p.get('售价', '')
+                        price_str = p.get('售䷜', '')
                         if not price_str or not price_str.strip():
                             continue
                         
@@ -7454,9 +7473,9 @@ if __name__ == '__main__':
                 return jsonify({'success': False, 'error': str(e)})
 
         @app.post('/api/clean/time')
-        def api_clean_time():
+        async def api_clean_time():
             try:
-                data = request.get_json()
+                data = await request.json()
                 directory = data.get('directory', '')
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
@@ -9204,10 +9223,10 @@ ingress:
                 }), 500
         
         @app.post('/api/url-source/configure')
-        def url_source_configure():
+        async def url_source_configure():
             """配置URL获取策略"""
             try:
-                data = request.get_json()
+                data = await request.json()
                 
                 if not data:
                     return jsonify({
