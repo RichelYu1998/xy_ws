@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # 标准库
 import argparse
 import asyncio
