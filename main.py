@@ -3711,9 +3711,9 @@ class WegoScraper:
                             pass
                     return None
                 except Exception as e:
-                    logger.debug(f'Exception returning None: {e}')
+                    logger.warning(f'Exception extracting price: {e}')
                     return None
-            
+
             price = extract_price(element_text)
             
             def extract_cost_price(text, html):
@@ -3757,9 +3757,9 @@ class WegoScraper:
                     
                     return None
                 except Exception as e:
-                    logger.debug(f'Exception returning None: {e}')
+                    logger.warning(f'Exception extracting cost price: {e}')
                     return None
-            
+
             cost_price = extract_cost_price(element_text, html_content)
             
             employee_match = re.search(r'员工[：:]\s*(.+)', element_text)
@@ -5493,8 +5493,8 @@ def main():
             print('\n正在启动Web服务...')
             print(f'访问地址: http://localhost:{args.port if "args" in dir() and hasattr(args, "port") else 8888} (默认端口)')
             print('按 Ctrl+C 停止服务\n')
-            
-            os.system(f'"{VENV_PYTHON}" main.py --web')
+
+            subprocess.Popen([VENV_PYTHON, 'main.py', '--web'])
         
         actions = {
             '1': lambda: run_scraper() or True,
@@ -5691,7 +5691,7 @@ def select_pip_mirror(venv_path: str):
             urllib.request.urlopen(url, timeout=3)
             return round(time.time() - start, 3)
         except Exception as e:
-            logger.debug(f'Exception returning None: {e}')
+            logger.warning(f'Mirror test failed for {name}: {e}')
             return None
 
     print("[*] 检测到未配置pip镜像源，正在测试镜像源速度...")
@@ -5784,7 +5784,7 @@ def install_playwright_cdn():
             urllib.request.urlopen(url, timeout=3)
             return round(time.time() - start, 3)
         except Exception as e:
-            logger.debug(f'Exception returning None: {e}')
+            logger.warning(f'CDN test failed for {name}: {e}')
             return None
 
     print("[*] 测试Playwright CDN速度...")
@@ -6134,7 +6134,7 @@ if __name__ == '__main__':
             try:
                 return JSONResponse(content={'ready': True, 'timestamp': datetime.now().isoformat()}, status_code=200)
             except Exception as e:
-                logger.debug(f'Exception in response: {e}')
+                logger.error(f'Readiness check failed: {e}')
                 return JSONResponse(content={'ready': False}, status_code=503)
 
         @app.get('/metrics')
@@ -6464,7 +6464,7 @@ if __name__ == '__main__':
                         del processes[task_id]
                 return JSONResponse(content={'success': True, 'message': '进程已终止'})
             except Exception as e:
-                logger.debug(f'Exception in response: {e}')
+                logger.warning(f'Kill task completed with exception: {e}')
                 return JSONResponse(content={'success': True, 'message': '操作完成'})
 
         @app.get('/output/{task_id}')

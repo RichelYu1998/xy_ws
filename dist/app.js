@@ -836,7 +836,10 @@ function escapeHtml(text) {
                     if (footerEl) footerEl.textContent = '版本: ' + v;
                 })
                 .catch(function(e) {
-                    console.debug('Failed to load version info:', e);
+                    console.error('Failed to load version info:', e);
+                    if (typeof showToast === 'function') {
+                        showToast('版本信息加载失败', 'warning');
+                    }
                 });
             fetch('/api/changelog')
                 .then(function(response) { return safeParseJson(response); })
@@ -918,7 +921,12 @@ function escapeHtml(text) {
                     }
                     container.appendChild(verCard);
                 })
-                .catch(function() {});
+                .catch(function(e) {
+                    console.error('Failed to load changelog:', e);
+                    if (typeof showToast === 'function') {
+                        showToast('更新日志加载失败', 'warning');
+                    }
+                });
             var featureIcons = [
                 {icon: 'fa-cloud-download', bg: '#e8f4fd', color: '#409EFF'},
                 {icon: 'fa-exchange', bg: '#fef0e6', color: '#e6a23c'},
@@ -1002,7 +1010,10 @@ function escapeHtml(text) {
                     }
                 })
                 .catch(function(e) {
-                    console.debug('Failed to initialize features:', e);
+                    console.error('Failed to initialize features:', e);
+                    if (typeof showToast === 'function') {
+                        showToast('功能初始化失败，部分功能可能不可用', 'error');
+                    }
                 });
             const device = applyDeviceStyles();
             

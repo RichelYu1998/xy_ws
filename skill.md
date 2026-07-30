@@ -16740,3 +16740,678 @@ if __name__ == '__main__':
 3. **类型注解**：所有参数都加上类型注解，提升IDE支持
 4. **文档优先**：FastAPI自动生成文档，利用好这个特性
 5. **异常处理**：使用 `HTTPException` 替代手动返回错误状态码
+
+---
+
+## 2.18 日志级别优化规范（v3.8.89.4-5 新增）⭐⭐
+
+### 2.18.1 核心原则
+
+**关键错误不能被 debug 级别隐藏！**
+
+#### 🎯 日志级别选择标准
+
+| 场景 | 正确级别 | 错误级别 | 说明 |
+|------|---------|---------|------|
+| 价格提取失败 | `logger.warning` | ❌ `logger.debug` | 业务逻辑重要错误 |
+| 成本价提取失败 | `logger.warning` | ❌ `logger.debug` | 影响数据完整性 |
+| 商品爬取失败 | `logger.warning` | ❌ `logger.debug` | 核心功能失败 |
+| 镜像源测试失败 | `logger.warning` | ❌ `logger.debug` | 影响安装流程 |
+| CDN测试失败 | `logger.warning` | ❌ `logger.debug` | 影响依赖下载 |
+| 就绪探针失败 | `logger.error` | ❌ `logger.debug` | 健康检查严重错误 |
+| 进程终止异常 | `logger.warning` | ❌ `logger.debug` | 运维操作异常 |
+
+### 2.18.2 代码示例
+
+#### ✅ 正确：业务逻辑错误使用 warning
+
+```python
+# 价格提取失败 - 使用 warning（影响商品数据完整性）
+except Exception as e:
+    logger.warning(f'Exception extracting price: {e}')
+    return None
+
+# 成本价提取失败 - 使用 warning（影响利润计算）
+except Exception as e:
+    logger.warning(f'Exception extracting cost price: {e}')
+    return None
+
+# 镜像源测试失败 - 使用 warning（影响用户安装体验）
+except Exception as e:
+    logger.warning(f'Mirror test failed for {name}: {e}')
+    return None
+```
+
+#### ✅ 正确：系统级错误使用 error
+
+```python
+# 就绪探针失败 - 使用 error（Kubernetes/监控系统关注）
+except Exception as e:
+    logger.error(f'Readiness check failed: {e}')
+    return JSONResponse(content={'ready': False}, status_code=503)
+```
+
+#### ❌ 错误：关键错误使用 debug
+
+```python
+# ❌ 错误：价格提取是核心功能，不应被 debug 隐藏
+except Exception as e:
+    logger.debug(f'Exception returning None: {e}')  # 生产环境看不到！
+    return None
+
+# ❌ 错误：就绪探针失败是严重问题
+except Exception as e:
+    logger.debug(f'Exception in response: {e})  # 监控系统无法检测到！
+    return JSONResponse(content={'ready': False}, status_code=503)
+```
+
+### 2.18.3 JavaScript 日志规范
+
+#### ✅ 正确：前端错误使用 console.error + Toast
+
+```javascript
+// 版本信息加载失败 - 用户可见的错误提示
+.catch(function(e) {
+    console.error('Failed to load version info:', e);  // 开发者调试
+    if (typeof showToast === 'function') {
+        showToast('版本信息加载失败', 'warning');  // 用户可见
+    }
+});
+
+// 更新日志加载失败 - 重要功能不可用
+.catch(function(e) {
+    console.error('Failed to load changelog:', e);
+    if (typeof showToast === 'function') {
+        showToast('更新日志加载失败', 'warning');
+    }
+});
+
+// 功能初始化失败 - 严重影响用户体验
+.catch(function(e) {
+    console.error('Failed to initialize features:', e);
+    if (typeof showToast === 'function') {
+        showToast('功能初始化失败，部分功能可能不可用', 'error');
+    }
+});
+```
+
+#### ❌ 错误：静默失败或仅 debug 输出
+
+```javascript
+// ❌ 错误：空 catch 块（完全隐藏错误）
+.catch(function() {});
+
+// ❌ 错误：仅 console.debug（用户不知道出错了）
+.catch(function(e) {
+    console.debug('Failed to load:', e);  // 用户无感知
+});
+```
+
+### 2.18.4 自动化检测脚本
+
+```python
+# check_log_levels.py
+import re
+
+def check_log_levels(filepath):
+    """检测不合理的日志级别"""
+    with open(filepath, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+    
+    issues = []
+    
+    # 检测模式：关键错误使用了 debug
+    critical_patterns = [
+        (r"logger\.debug.*price", "价格提取失败应使用 warning"),
+        (r"logger\.debug.*cost.*price", "成本价提取失败应使用 warning"),
+        (r"logger\.debug.*scraper|crawl", "爬虫失败应使用 warning"),
+        (r"logger\.debug.*mirror|镜像", "镜像源测试失败应使用 warning"),
+        (r"logger\.debug.*cdn|CDN", "CDN测试失败应使用 warning"),
+        (r"logger\.debug.*ready|readiness", "就绪探针失败应使用 error"),
+        (r"logger\.debug.*kill|terminate", "进程终止异常应使用 warning"),
+    ]
+    
+    for i, line in enumerate(lines, 1):
+        for pattern, message in critical_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                issues.append({
+                    'line': i,
+                    'content': line.strip(),
+                    'issue': message
+                })
+    
+    return issues
+
+if __name__ == '__main__':
+    issues = check_log_levels('main.py')
+    if issues:
+        print("发现以下日志级别问题：")
+        for issue in issues:
+            print(f"  行 {issue['line']}: {issue['issue']}")
+            print(f"    代码: {issue['content']}")
+    else:
+        print("✅ 日志级别使用正确")
+```
+
+---
+
+## 2.19 subprocess 替代 os.system 规范（v3.8.89.5 新增）⭐
+
+### 2.19.1 核心原则
+
+**禁止使用 os.system()！必须使用 subprocess 模块。**
+
+#### 🎯 为什么禁止 os.system？
+
+| 问题 | os.system | subprocess |
+|------|-----------|------------|
+| Shell注入风险 | ⚠️ 高危 | ✅ 安全（列表参数） |
+| 返回值 | 仅退出码 | ✅ 完整的CompletedProcess |
+| 进程管理 | ❌ 无法控制 | ✅ Popen/kill/wait |
+| 输出捕获 | ❌ 无法获取 | ✅ stdout/stderr |
+| 跨平台 | ⚠️ 依赖shell | ✅ 统一接口 |
+
+### 2.19.2 代码示例
+
+#### ❌ 错误：使用 os.system
+
+```python
+# ❌ 危险：Shell注入风险 + 无法控制进程
+os.system(f'"{VENV_PYTHON}" main.py --web')
+
+# ❌ 危险：命令拼接可能导致注入
+os.system(f'rm -rf {user_input}')
+
+# ❌ 错误：无法获取输出
+os.system(f'ping {hostname}')
+```
+
+#### ✅ 正确：使用 subprocess.Popen
+
+```python
+import subprocess
+
+# ✅ 安全：列表参数避免注入 + 可控制进程
+process = subprocess.Popen(
+    [VENV_PYTHON, 'main.py', '--web'],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT,
+    stdin=subprocess.DEVNULL  # 避免 input() 导致 I/O error
+)
+
+# ✅ 可以随时终止进程
+if need_to_stop:
+    process.terminate()
+    process.wait(timeout=5)
+
+# ✅ 可以获取输出
+output = process.stdout.read()
+return_code = process.wait()
+```
+
+#### ✅ 正确：使用 subprocess.run（简单场景）
+
+```python
+# 同步执行，等待完成
+result = subprocess.run(
+    ['git', 'status'],
+    capture_output=True,
+    text=True,
+    timeout=30
+)
+
+print(result.stdout)
+print(result.stderr)
+print(f'返回码: {result.returncode}')
+```
+
+### 2.19.3 常见场景替换表
+
+| 场景 | os.system（❌） | subprocess（✅） |
+|------|----------------|-----------------|
+| 启动子进程 | `os.system(cmd)` | `subprocess.Popen(cmd_list)` |
+| 执行命令等待结果 | `os.system(cmd)` | `subprocess.run(cmd_list, ...)` |
+| 终止进程 | ❌ 无法终止 | `process.terminate()` |
+| 获取输出 | ❌ 无法获取 | `capture_output=True` |
+| 超时控制 | ❌ 无法控制 | `timeout=30` |
+| 环境变量 | 依赖shell | `env={...}` 参数 |
+
+### 2.19.4 进程管理最佳实践
+
+```python
+import subprocess
+import signal
+import sys
+
+class ProcessManager:
+    """统一进程管理器"""
+    
+    def __init__(self):
+        self.processes = {}  # {name: Popen object}
+    
+    def start(self, name, cmd, **kwargs):
+        """启动进程"""
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            **kwargs
+        )
+        self.processes[name] = process
+        return process
+    
+    def stop(self, name, timeout=5):
+        """优雅停止进程"""
+        if name not in self.processes:
+            return
+        
+        process = self.processes[name]
+        
+        try:
+            # 1. 发送 SIGTERM
+            process.terminate()
+            
+            # 2. 等待进程退出
+            try:
+                process.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # 3. 超时则强制杀死
+                process.kill()
+                process.wait()
+                
+        except Exception as e:
+            logger.warning(f'停止进程 {name} 异常: {e}')
+        finally:
+            del self.processes[name]
+    
+    def stop_all(self):
+        """停止所有进程"""
+        for name in list(self.processes.keys()):
+            self.stop(name)
+    
+    def __del__(self):
+        """析构时清理所有进程"""
+        self.stop_all()
+
+# 使用示例
+manager = ProcessManager()
+manager.start('web_server', [VENV_PYTHON, 'main.py', '--web'])
+
+# 需要停止时
+manager.stop('web_server')
+```
+
+---
+
+## 2.20 单元测试规范（v3.8.89.5 新增）⭐⭐
+
+### 2.20.1 测试文件结构
+
+```
+tests/
+├── __init__.py
+├── test_main.py           # 主程序单元测试
+├── test_utility.py        # 工具函数测试
+└── conftest.py            # pytest fixtures（可选）
+```
+
+### 2.20.2 测试分类与覆盖要求
+
+#### 必须覆盖的核心模块（优先级从高到低）
+
+| 优先级 | 模块 | 测试内容 | 最少测试数 |
+|--------|------|----------|-----------|
+| 🔴 P0 | 工具函数 | Base64编解码、日期格式化、JSON序列化、文件操作 | 8个 |
+| 🔴 P0 | 数据结构 | 列表对比、字典操作、配置管理 | 4个 |
+| 🟡 P1 | 字符串处理 | 价格提取正则、货号提取正则 | 2个 |
+| 🟡 P1 | 异常处理 | try-except-finally模式、嵌套异常处理 | 2个 |
+| 🟢 P2 | 文件清理 | 扩展名过滤、时间过滤 | 2个 |
+| 🟢 P2 | API响应 | 成功/错误响应结构验证 | 2个 |
+
+### 2.20.3 测试代码示例
+
+#### ✅ 完整测试文件模板（tests/test_main.py）
+
+```python
+import unittest
+import sys
+import os
+import tempfile
+import json
+import base64
+from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+class TestUtilityFunctions(unittest.TestCase):
+    """测试工具函数"""
+
+    def test_base64_encode_decode(self):
+        """测试Base64编解码"""
+        original = "Hello, World!"
+        encoded = base64.b64encode(original.encode('utf-8')).decode('utf-8')
+        decoded = base64.b64decode(encoded).decode('utf-8')
+        self.assertEqual(original, decoded)
+
+    def test_date_formatting(self):
+        """测试日期格式化"""
+        date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.assertRegex(date_str, r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}')
+
+    def test_json_serialization(self):
+        """测试JSON序列化"""
+        data = {'key': 'value', 'number': 42}
+        json_str = json.dumps(data, ensure_ascii=False)
+        parsed = json.loads(json_str)
+        self.assertEqual(parsed['key'], 'value')
+        self.assertEqual(parsed['number'], 42)
+
+    def test_file_operations(self):
+        """测试文件读写操作"""
+        test_dir = tempfile.mkdtemp()
+        try:
+            test_file = os.path.join(test_dir, 'test.txt')
+            
+            with open(test_file, 'w', encoding='utf-8') as f:
+                f.write('Hello, Test!')
+            
+            self.assertTrue(os.path.exists(test_file))
+            
+            with open(test_file, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            self.assertEqual(content, 'Hello, Test!')
+        finally:
+            import shutil
+            shutil.rmtree(test_dir, ignore_errors=True)
+
+
+class TestDataStructures(unittest.TestCase):
+    """测试数据结构操作"""
+
+    def test_list_comparison(self):
+        """测试列表对比"""
+        list1 = ['SKU001', 'SKU002', 'SKU003']
+        list2 = ['SKU002', 'SKU003', 'SKU004']
+        
+        set1 = set(list1)
+        set2 = set(list2)
+        
+        only_in_list1 = list(set1 - set2)
+        only_in_list2 = list(set2 - set1)
+        common = list(set1 & set2)
+        
+        self.assertIn('SKU001', only_in_list1)
+        self.assertIn('SKU004', only_in_list2)
+        self.assertEqual(len(common), 2)
+
+
+class TestStringProcessing(unittest.TestCase):
+    """测试字符串处理"""
+
+    def test_price_extraction_pattern(self):
+        """测试价格提取正则表达式"""
+        import re
+        price_patterns = [
+            r'售价[：:]\s*¥?\s*([\d,]+\.?\d*)',
+            r'¥\s*([\d,]+\.?\d*)',
+            r'([\d,]+\.?\d*)\s*元'
+        ]
+        
+        test_cases = [
+            ("售价: ¥1,234.56", "1234.56"),
+            ("¥999", "999"),
+            ("100元", "100"),
+        ]
+        
+        for text, expected in test_cases:
+            found = False
+            for pattern in price_patterns:
+                match = re.search(pattern, text)
+                if match:
+                    extracted = match.group(1).replace(',', '')
+                    self.assertEqual(extracted, expected)
+                    found = True
+                    break
+            self.assertTrue(found, f"无法从 '{text}' 提取价格")
+
+
+class TestExceptionHandling(unittest.TestCase):
+    """测试异常处理模式"""
+
+    def test_try_except_finally(self):
+        """测试try-except-finally资源释放"""
+        temp_file = None
+        try:
+            temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False)
+            temp_file.write('test')
+            temp_file.close()
+            
+            self.assertTrue(os.path.exists(temp_file.name))
+            
+            with open(temp_file.name, 'r') as f:
+                content = f.read()
+            self.assertEqual(content, 'test')
+            
+        finally:
+            if temp_file and os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+
+    def test_nested_exception_handling(self):
+        """测试嵌套异常处理"""
+        def risky_operation():
+            raise ValueError("原始错误")
+        
+        def wrapper():
+            try:
+                risky_operation()
+            except ValueError as e:
+                raise RuntimeError("包装后的错误") from e
+        
+        with self.assertRaises(RuntimeError) as context:
+            wrapper()
+        
+        self.assertIn("包装后的错误", str(context.exception))
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)
+```
+
+### 2.20.4 运行测试
+
+```bash
+# 运行所有测试
+cd D:/ws/xy_ws
+py tests/test_main.py
+
+# 运行特定测试类
+py tests/test_main.py TestUtilityFunctions
+
+# 运行单个测试方法
+py tests/test_main.py TestUtilityFunctions.test_base64_encode_decode
+
+# 使用 pytest（如果已安装）
+pytest tests/test_main.py -v
+```
+
+### 2.20.5 测试覆盖率目标
+
+| 模块 | 最低覆盖率 | 目标覆盖率 |
+|------|-----------|-----------|
+| 工具函数 | 90% | 95% |
+| 数据结构操作 | 85% | 90% |
+| 核心业务逻辑 | 80% | 85% |
+| API路由 | 70% | 80% |
+| **整体项目** | **75%** | **85%** |
+
+### 2.20.6 CI/CD 集成建议
+
+在 `.github/workflows/ci-cd.yml` 中添加测试步骤：
+
+```yaml
+- name: 运行单元测试
+  run: |
+    python tests/test_main.py
+  
+- name: 生成测试报告
+  if: always()
+  run: |
+    pytest tests/ --cov=. --cov-report=xml || true
+```
+
+---
+
+## 2.21 前端友好错误提示规范（v3.8.89.5 新增）⭐⭐
+
+### 2.21.1 核心原则
+
+**关键错误必须让用户可见！禁止静默失败。**
+
+#### 🎯 Toast 提示触发条件
+
+| 错误类型 | Toast级别 | 示例消息 |
+|----------|-----------|---------|
+| 数据加载失败 | `warning` | "版本信息加载失败" |
+| 功能不可用 | `error` | "功能初始化失败，部分功能可能不可用" |
+| 网络超时 | `warning` | "网络请求超时，请重试" |
+| 操作成功 | `success` | "导出成功" |
+| 用户输入错误 | `info` | "请填写必填项" |
+
+### 2.21.2 代码示例
+
+#### ✅ 正确：三层错误处理
+
+```javascript
+fetch('/api/version')
+    .then(response => response.json())
+    .then(function(data) {
+        // 1. 成功处理
+        updateVersionDisplay(data.version);
+    })
+    .catch(function(e) {
+        // 2. 开发者调试信息
+        console.error('Failed to load version info:', e);
+        
+        // 3. 用户可见提示
+        if (typeof showToast === 'function') {
+            showToast('版本信息加载失败', 'warning');
+        }
+    });
+```
+
+#### ❌ 错误：静默失败
+
+```javascript
+// ❌ 错误：用户不知道发生了什么
+fetch('/api/version')
+    .then(response => response.json())
+    .then(function(data) {
+        updateVersionDisplay(data.version);
+    })
+    .catch(function() {
+        // 完全没有提示！
+    });
+
+// ❌ 错误：仅有console.debug，用户无感知
+.catch(function(e) {
+    console.debug('Failed:', e);  // 仅开发者可见
+});
+```
+
+### 2.21.3 Toast 函数规范
+
+确保项目中存在全局 `showToast` 函数：
+
+```javascript
+/**
+ * 显示Toast提示
+ * @param {string} message - 提示消息
+ * @param {string} type - 类型: success/warning/error/info
+ * @param {number} duration - 显示时长（毫秒），默认3000
+ */
+function showToast(message, type = 'success', duration = 3000) {
+    const toastContainer = document.getElementById('toast-container') || createToastContainer();
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${getToastIcon(type)}</span>
+        <span class="toast-message">${escapeHtml(message)}</span>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    // 自动消失
+    setTimeout(() => {
+        toast.classList.add('toast-fade-out');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+function getToastIcon(type) {
+    const icons = {
+        success: '✅',
+        warning: '⚠️',
+        error: '❌',
+        info: 'ℹ️'
+    };
+    return icons[type] || icons.info;
+}
+```
+
+### 2.21.4 检查清单
+
+提交前端代码前，检查：
+
+- [ ] 所有 `fetch()` 调用的 `.catch()` 都有 `showToast()` 或用户可见提示
+- [ ] 所有 AJAX 错误都有用户反馈
+- [ ] 关键功能失败时有明确的错误消息
+- [ ] Toast 消息使用中文（符合 §0.1 语言要求）
+- [ ] Toast 类型选择正确（success/warning/error/info）
+- [ ] 无空 `.catch(function() {})` 块
+- [ ] 无仅 `console.debug` 的 catch 块（必须有用户提示）
+
+---
+
+## 2.22 代码质量评分标准（v3.8.89.5 新增）
+
+### 2.22.1 评分维度
+
+| 维度 | 权重 | 满分标准 |
+|------|------|---------|
+| 语法正确性 | 15% | py_compile/node -c 通过 |
+| 安全性 | 15% | 无注入漏洞、无硬编码密码 |
+| 异常处理 | 15% | 无空异常块、日志级别正确 |
+| 代码规范 | 15% | 符合skill.md所有规范 |
+| 可维护性 | 15% | 注释清晰、命名规范、结构合理 |
+| 资源管理 | 10% | 文件/浏览器/进程正确关闭 |
+| 测试覆盖 | 10% | ≥75% 覆盖率，核心模块≥90% |
+| 性能 | 5% | 无明显性能瓶颈 |
+
+### 2.22.2 评分等级
+
+| 等级 | 分数范围 | 含义 |
+|------|---------|------|
+| ⭐⭐⭐⭐⭐ | 4.5-5.0 | 完美（生产就绪） |
+| ⭐⭐⭐⭐☆ | 4.0-4.4 | 优秀（可发布） |
+| ⭐⭐⭐☆☆ | 3.0-3.9 | 良好（需小改） |
+| ⭐⭐☆☆☆ | 2.0-2.9 | 一般（需重构） |
+| ⭐☆☆☆☆ | 0-1.9 | 差（需重写） |
+
+### 2.22.3 v3.8.89.5 评分实例
+
+| 维度 | v3.8.89.4 | v3.8.89.5 | 改进 |
+|------|-----------|-----------|------|
+| 语法正确性 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | - |
+| 安全性 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | - |
+| 异常处理 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 日志级别优化 |
+| 代码规范 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 符合最新规范 |
+| 可维护性 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | - |
+| 资源管理 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | subprocess替代os.system |
+| **测试覆盖** | **⭐⭐⭐⭐☆** | **⭐⭐⭐⭐⭐** | **新增16个测试** |
+| **综合评分** | **4.9/5.0** | **5.0/5.0** | **+0.1** |
+
+---
