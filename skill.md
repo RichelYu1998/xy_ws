@@ -771,7 +771,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
-| v3.8.89.11 | 2026-07-30 | AI Assistant | 🔧 hostc WebSocket安全关闭修复：safeCloseWebSocket2状态感知+patch-package持久化 |
+| v3.8.89.11 | 2026-07-30 | AI Assistant | 🔧 hostc WebSocket安全关闭修复：safeCloseWebSocket2状态感知关闭(CONNECTING→terminate/OPEN→close)+超时处理器error事件吞掉+patch-package postinstall持久化补丁 |
 | v3.8.89.10 | 2026-07-30 | AI Assistant | 🔧 隧道验证修复：FastAPI根路由HEAD方法支持+DNS排查指引 |
 | v3.8.68 | 2026-07-30 | AI Assistant | 🎯 高价商品数解析优化+文件末尾垃圾清理 |
 | v3.8.67 | 2026-07-30 | AI Assistant | 🐛 修复app.js括号不匹配严重语法错误 |
