@@ -1,6 +1,6 @@
 ﻿﻿﻿# xy_ws - Szwego商品爬虫系统
 
-> **版本**: v3.8.89.6
+> **版本**: v3.8.89.8
 > **更新日期**: 2026-07-30
 > **技术栈**: Python 3.14 + FastAPI + 原生JavaScript + Playwright
 
@@ -90,6 +90,38 @@ uvicorn main:app --host 0.0.0.0 --port 8888 --workers 4
 ---
 
 ## 最新更新
+
+### v3.8.89.8 (2026-07-30) - FastAPI迁移关键修复
+
+#### 核心修复（5个关键问题）
+
+**1. 修复高价商品显示为0**
+- 位置: main.py:4487, 5162-5163
+- 问题: 使用英文字段price但JSON使用中文字段售价
+- 解决: 全局替换p.get(price) -> p.get(售价) (10处)
+
+**2. 修复TXT货号对比500错误**
+- 位置: main.py:6583, 6599
+- 问题: Flask遗留 - 缺少Request参数 + 使用get_json()
+- 解决: 添加request: Request参数 + await request.json()
+
+**3. 全局替换Flask的request.get_json()** (12处)
+- 涉及接口: /api/sku/compare/txt, /api/clean/time等
+- 额外: 2个函数改为async def
+
+**4. 统一数据源路径**
+- StockNumberComparator改用FileManager.get_latest_json_file()
+
+**5. 修复CDN测试logger未定义错误**
+
+#### 修复效果
+
+| 功能 | 修复前 | 修复后 |
+|------|--------|--------|
+| 高价商品统计 | 0 | ~50-60 |
+| TXT货号对比 | 500错误 | 正常 |
+| 缺失货号列表 | undefined | 正确显示 |
+
 
 ### v3.8.89.6 (2026-07-30) - 🐛 爬虫结果卡片格式统一修复
 

@@ -35,8 +35,19 @@ function escapeHtml(text) {
         }
         
         function bindSkuTagEvents(container, onClickHandler) {
+            if (!container) {
+                console.warn('[调试] bindSkuTagEvents 容器不存在');
+                return;
+            }
+            
             const tags = container.querySelectorAll('.sku-tag[data-sku]');
-            console.log('[调试] bindSkuTagEvents 找到标签数量:', tags.length);
+            
+            if (tags.length === 0) {
+                console.log('[调试] bindSkuTagEvents 当前容器中没有SKU标签（这是正常的，在显示对比结果前不会有标签）');
+                return;
+            }
+            
+            console.log(`[调试] bindSkuTagEvents 找到 ${tags.length} 个SKU标签，开始绑定事件...`);
             
             tags.forEach((tag, index) => {
                 console.log(`[调试] 绑定第${index + 1}个标签:`, tag.dataset.sku);
@@ -1203,14 +1214,58 @@ function escapeHtml(text) {
                     if (data.returncode === -15) {
                         if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行 (返回码: -15)</span>';
                     }
-                    resetButtons();
+                    if (typeof resetButtons === 'function') {
+                        resetButtons();
+                    } else {
+                        currentTaskId = null;
+                        currentChoice = null;
+                        document.querySelectorAll('.btn-run').forEach(b => {
+                            b.disabled = false;
+                            b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                        });
+                        document.querySelectorAll('.btn-sku-api').forEach(b => {
+                            b.disabled = false;
+                            b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                        });
+                        document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+                        const tunnelBtn = document.getElementById('btn-run-tunnel');
+                        if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+                        const viewProductsBtn = document.getElementById('btn-view-products');
+                        if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+                        const dailyProfitBtn = document.getElementById('btn-daily-profit');
+                        if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+                        const stopTaskBar = document.getElementById('stop-task-bar');
+                        if (stopTaskBar) stopTaskBar.style.display = 'none';
+                    }
                     if (completedChoice === 1 || completedChoice === 3) {
                         showAllProducts();
                     }
                 } else if (data.status === 'error') {
                     clearInterval(pollingInterval);
                     if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 错误: ' + escapeHtml(data.error) + '</span>';
-                    resetButtons();
+                    if (typeof resetButtons === 'function') {
+                        resetButtons();
+                    } else {
+                        currentTaskId = null;
+                        currentChoice = null;
+                        document.querySelectorAll('.btn-run').forEach(b => {
+                            b.disabled = false;
+                            b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                        });
+                        document.querySelectorAll('.btn-sku-api').forEach(b => {
+                            b.disabled = false;
+                            b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                        });
+                        document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+                        const tunnelBtn = document.getElementById('btn-run-tunnel');
+                        if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+                        const viewProductsBtn = document.getElementById('btn-view-products');
+                        if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+                        const dailyProfitBtn = document.getElementById('btn-daily-profit');
+                        if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+                        const stopTaskBar = document.getElementById('stop-task-bar');
+                        if (stopTaskBar) stopTaskBar.style.display = 'none';
+                    }
                 }
             })
             .catch(error => {
@@ -1523,6 +1578,66 @@ function escapeHtml(text) {
                          skuData.oldFile = parts[1].trim();
                          skuData.newFile = parts[2].trim();
                      }
+                     
+                     // 从后续行中提取统计数据
+                     for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+                         let nextLine = lines[j].trim();
+                         if (!nextLine) continue;
+                         
+                         // 提取总商品数
+                         if (nextLine.includes('新增商品数:') && !skuData.totalProducts) {
+                             const count = parseInt(nextLine.split(':')[1].trim());
+                             if (count > 0) skuData.totalProducts = count;
+                         }
+                         
+                         // 提取高价商品数
+                         if ((nextLine.includes('新增高价商品数:') || nextLine.includes('高价商品')) && !skuData.highPriceCount) {
+                             const match = nextLine.match(/(\d+)/);
+                             if (match && parseInt(match[1]) > 0) skuData.highPriceCount = match[1];
+                         }
+                         
+                         // 提取预计售出总价
+                         if (nextLine.includes('预计售出总价') || nextLine.includes('预计售出价格累计') || nextLine.includes('总售价')) {
+                             let priceMatch = nextLine.match(/¥[\d,.]+/);
+                             if (!priceMatch) priceMatch = nextLine.match(/[\d,]+\.\d{2}/);
+                             if (!priceMatch) priceMatch = nextLine.match(/[\d,]+/);
+                             if (priceMatch && !skuData.totalPrice) {
+                                 const priceStr = priceMatch[0];
+                                 skuData.totalPrice = priceStr.startsWith('¥') ? priceStr : '¥' + priceStr;
+                             }
+                         }
+                         
+                         // 提取平均售出均价
+                         if ((nextLine.includes('平均售出均价') || nextLine.includes('平均每个设备') || nextLine.includes('平均价格')) && !skuData.avgPrice) {
+                             let priceMatch = nextLine.match(/¥[\d,.]+/);
+                             if (!priceMatch) priceMatch = nextLine.match(/[\d,]+\.\d{2}/);
+                             if (!priceMatch) priceMatch = nextLine.match(/[\d,.]+/);
+                             if (priceMatch) {
+                                 const priceStr = priceMatch[0];
+                                 skuData.avgPrice = priceStr.startsWith('¥') ? priceStr : '¥' + priceStr;
+                             }
+                         }
+                         
+                         // 提取平台手续费
+                         if (nextLine.includes('平台手续费') && !skuData.fee) {
+                             let feeMatch = nextLine.match(/¥[\d,.]+/);
+                             if (!feeMatch) feeMatch = nextLine.match(/[\d,]+\.\d{2}/);
+                             if (!feeMatch) feeMatch = nextLine.match(/[\d,.]+/);
+                             if (feeMatch) {
+                                 const feeStr = feeMatch[0];
+                                 skuData.fee = feeStr.startsWith('¥') ? feeStr : '¥' + feeStr;
+                             }
+                         }
+                     }
+                     
+                     console.log('[对比卡片] ✓ 对比文件解析完成，提取的数据:', JSON.stringify({
+                         totalProducts: skuData.totalProducts,
+                         highPriceCount: skuData.highPriceCount,
+                         totalPrice: skuData.totalPrice,
+                         avgPrice: skuData.avgPrice,
+                         fee: skuData.fee
+                     }));
+                     
                      inMissingSection = false;
                  } else if (line.includes('新增商品数:')) {
                      const count = parseInt(line.split(':')[1].trim());
@@ -2262,10 +2377,32 @@ function escapeHtml(text) {
             })
             .finally(() => {
                 activeAbortController = null;
-                resetButtons();
+                if (typeof resetButtons === 'function') {
+                    resetButtons();
+                } else {
+                    currentTaskId = null;
+                    currentChoice = null;
+                    document.querySelectorAll('.btn-run').forEach(b => {
+                        b.disabled = false;
+                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                    });
+                    document.querySelectorAll('.btn-sku-api').forEach(b => {
+                        b.disabled = false;
+                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                    });
+                    document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+                    const tunnelBtn = document.getElementById('btn-run-tunnel');
+                    if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+                    const viewProductsBtn = document.getElementById('btn-view-products');
+                    if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+                    const dailyProfitBtn = document.getElementById('btn-daily-profit');
+                    if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+                    const stopTaskBar = document.getElementById('stop-task-bar');
+                    if (stopTaskBar) stopTaskBar.style.display = 'none';
+                }
             });
         }
-        
+
         function runFunction(choice) {
            currentChoice = choice;
             const btnId = btnIds[choice];
@@ -2374,7 +2511,29 @@ function escapeHtml(text) {
             if (cleanStatusDiv) cleanStatusDiv.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行</span>';
             const statusEl = document.getElementById('output-status');
             if (statusEl && !currentTaskId) statusEl.innerHTML = '<span style="color: #f56c6c;">■ 已停止运行</span>';
-            resetButtons();
+            if (typeof resetButtons === 'function') {
+                resetButtons();
+            } else {
+                currentTaskId = null;
+                currentChoice = null;
+                document.querySelectorAll('.btn-run').forEach(b => {
+                    b.disabled = false;
+                    b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                });
+                document.querySelectorAll('.btn-sku-api').forEach(b => {
+                    b.disabled = false;
+                    b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                });
+                document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+                const tunnelBtn = document.getElementById('btn-run-tunnel');
+                if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+                const viewProductsBtn = document.getElementById('btn-view-products');
+                if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+                const dailyProfitBtn = document.getElementById('btn-daily-profit');
+                if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+                const stopTaskBar = document.getElementById('stop-task-bar');
+                if (stopTaskBar) stopTaskBar.style.display = 'none';
+            }
         }
         
         const userInputEl = document.getElementById('user-input');
@@ -2506,7 +2665,29 @@ function escapeHtml(text) {
                             })
                             .catch(error => {
                                 showToast('对比失败: ' + error.message, 'error');
-                                resetButtons();
+                                if (typeof resetButtons === 'function') {
+                                    resetButtons();
+                                } else {
+                                    currentTaskId = null;
+                                    currentChoice = null;
+                                    document.querySelectorAll('.btn-run').forEach(b => {
+                                        b.disabled = false;
+                                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                                    });
+                                    document.querySelectorAll('.btn-sku-api').forEach(b => {
+                                        b.disabled = false;
+                                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                                    });
+                                    document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+                                    const tunnelBtn = document.getElementById('btn-run-tunnel');
+                                    if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+                                    const viewProductsBtn = document.getElementById('btn-view-products');
+                                    if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+                                    const dailyProfitBtn = document.getElementById('btn-daily-profit');
+                                    if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+                                    const stopTaskBar = document.getElementById('stop-task-bar');
+                                    if (stopTaskBar) stopTaskBar.style.display = 'none';
+                                }
                             });
                         }
                     };
@@ -3575,7 +3756,29 @@ function escapeHtml(text) {
                 }
             } finally {
                 activeAbortController = null;
-                resetButtons();
+                if (typeof resetButtons === 'function') {
+                    resetButtons();
+                } else {
+                    currentTaskId = null;
+                    currentChoice = null;
+                    document.querySelectorAll('.btn-run').forEach(b => {
+                        b.disabled = false;
+                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                    });
+                    document.querySelectorAll('.btn-sku-api').forEach(b => {
+                        b.disabled = false;
+                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                    });
+                    document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+                    const tunnelBtn = document.getElementById('btn-run-tunnel');
+                    if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+                    const viewProductsBtn = document.getElementById('btn-view-products');
+                    if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+                    const dailyProfitBtn = document.getElementById('btn-daily-profit');
+                    if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+                    const stopTaskBar = document.getElementById('stop-task-bar');
+                    if (stopTaskBar) stopTaskBar.style.display = 'none';
+                }
             }
         }
         function handleCopyUrl(btn) {
@@ -3856,7 +4059,29 @@ function escapeHtml(text) {
                     })
                     .finally(() => {
                         activeAbortController = null;
-                        resetButtons();
+                        if (typeof resetButtons === 'function') {
+                            resetButtons();
+                        } else {
+                            currentTaskId = null;
+                            currentChoice = null;
+                            document.querySelectorAll('.btn-run').forEach(b => {
+                                b.disabled = false;
+                                b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                            });
+                            document.querySelectorAll('.btn-sku-api').forEach(b => {
+                                b.disabled = false;
+                                b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                            });
+                            document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+                            const tunnelBtn = document.getElementById('btn-run-tunnel');
+                            if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+                            const viewProductsBtn = document.getElementById('btn-view-products');
+                            if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+                            const dailyProfitBtn = document.getElementById('btn-daily-profit');
+                            if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+                            const stopTaskBar = document.getElementById('stop-task-bar');
+                            if (stopTaskBar) stopTaskBar.style.display = 'none';
+                        }
                     });
                 }
             };
@@ -3959,7 +4184,7 @@ function escapeHtml(text) {
                 return;
             }
             
-            const btn = document.getElementById('btn-compare-sku');
+            const btn = document.getElementById('btn-compare-txt');
             if (btn) {
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 对比中...';
@@ -3977,6 +4202,8 @@ function escapeHtml(text) {
             })
             .then(response => safeParseJson(response))
             .then(data => {
+                console.log('[货号对比] API返回数据:', JSON.stringify(data, null, 2));
+                
                 if (data.error) {
                     showToast('对比失败: ' + data.error, 'error');
                     if (btn) {
@@ -3985,6 +4212,14 @@ function escapeHtml(text) {
                     }
                     return;
                 }
+                
+                console.log('[货号对比] 关键统计数据:', {
+                    '输入货号(txt_count)': data.txt_count,
+                    'JSON货号(json_count)': data.json_count,
+                    '缺失货号(missing_count)': data.missing_count,
+                    '缺失货号列表(missing_in_json)': data.missing_in_json,
+                    '已存在(common_count)': data.common_count
+                });
                 
                 showComparisonResult(data);
             })
@@ -4001,7 +4236,34 @@ function escapeHtml(text) {
             })
             .finally(() => {
                 activeAbortController = null;
-                resetButtons();
+                if (typeof resetButtons === 'function') {
+                    resetButtons();
+                } else {
+                    currentTaskId = null;
+                    currentChoice = null;
+                    document.querySelectorAll('.btn-run').forEach(b => {
+                        b.disabled = false;
+                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                    });
+                    document.querySelectorAll('.btn-sku-api').forEach(b => {
+                        b.disabled = false;
+                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                    });
+                    document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+                    const tunnelBtn = document.getElementById('btn-run-tunnel');
+                    if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+                    const viewProductsBtn = document.getElementById('btn-view-products');
+                    if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+                    const dailyProfitBtn = document.getElementById('btn-daily-profit');
+                    if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+                    const stopTaskBar = document.getElementById('stop-task-bar');
+                    if (stopTaskBar) stopTaskBar.style.display = 'none';
+                    const btn = document.getElementById('btn-compare-sku');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = '<i class="fa fa-exchange"></i> 开始对比';
+                    }
+                }
             });
         }
         
@@ -4291,10 +4553,32 @@ function escapeHtml(text) {
             })
             .finally(() => {
                 activeAbortController = null;
-                resetButtons();
+                if (typeof resetButtons === 'function') {
+                    resetButtons();
+                } else {
+                    currentTaskId = null;
+                    currentChoice = null;
+                    document.querySelectorAll('.btn-run').forEach(b => {
+                        b.disabled = false;
+                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                    });
+                    document.querySelectorAll('.btn-sku-api').forEach(b => {
+                        b.disabled = false;
+                        b.innerHTML = b.getAttribute('data-original') || b.innerHTML;
+                    });
+                    document.querySelectorAll('.func-btn').forEach(b => b.disabled = false);
+                    const tunnelBtn = document.getElementById('btn-run-tunnel');
+                    if (tunnelBtn) tunnelBtn.innerHTML = '<span><i class="fa fa-external-link"></i> 隧道共享</span>';
+                    const viewProductsBtn = document.getElementById('btn-view-products');
+                    if (viewProductsBtn) viewProductsBtn.innerHTML = '<span><i class="fa fa-list"></i> 查看所有商品</span>';
+                    const dailyProfitBtn = document.getElementById('btn-daily-profit');
+                    if (dailyProfitBtn) dailyProfitBtn.innerHTML = '<span><i class="fa fa-bar-chart"></i> 每日利润报表</span>';
+                    const stopTaskBar = document.getElementById('stop-task-bar');
+                    if (stopTaskBar) stopTaskBar.style.display = 'none';
+                }
             });
         }
-        
+
         // ==================== Hostc Tunnel ====================
         async function loadTunnelTypeInfo() {
             try {
@@ -4697,7 +4981,7 @@ function escapeHtml(text) {
             } else {
                 console.log('[优化] 页面显示，恢复轮询');
                 if (currentTaskId) {
-                    TimerManager.set('polling', pollOutput, 1000);
+                    TimerManager.set('polling', window.pollOutput, 1000);
                 }
             }
         });
