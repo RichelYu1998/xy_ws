@@ -6,6 +6,184 @@
 
 ---
 
+## 🔄 最新更新 (v3.8.89.11)
+
+### 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复
+
+#### 问题: hostc 隧道启动时报错 `WebSocket was closed before the connection was established` 并导致进程崩溃
+**现象**: 项目启动时 hostc 隧道尝试建立 WebSocket 连接，超时或失败后调用 `safeCloseWebSocket2` 关闭 socket，触发未捕获的 `error` 事件导致 Node.js 进程崩溃退出
+
+**根本原因**:
+1. **`safeCloseWebSocket2` 函数缺陷**: 当 WebSocket 处于 `CONNECTING` 状态时，直接调用 `socket.close()` 会抛异常（`ws` 库规定未完成握手的 socket 必须用 `terminate()` 强制关闭）
+2. **超时处理器缺陷**: 超时后调用 `safeCloseWebSocket2` 关闭 socket，但未预先注册 `error` 事件监听器，导致 `close()` 触发的 error 事件无人处理，抛出 `Unhandled 'error' event`
+
+**修复方案**:
+```javascript
+// ❌ 修复前：超时处理器直接关闭，未处理 error 事件
+const timeout = setTimeout(() => {
+  cleanup();
+  safeCloseWebSocket2(socket, CLOSE_INTERNAL_ERROR, "connect timeout");
+  reject(new Error("WebSocket connect timed out"));
+}, WEBSOCKET_CONNECT_TIMEOUT_MS);
+
+// ✅ 修复后：关闭前吞掉 error 事件，防止进程崩溃
+const timeout = setTimeout(() => {
+  cleanup();
+  socket.once("error", () => {});
+  safeCloseWebSocket2(socket, CLOSE_INTERNAL_ERROR, "connect timeout");
+  reject(new Error("WebSocket connect timed out"));
+}, WEBSOCKET_CONNECT_TIMEOUT_MS);
+```
+
+```javascript
+// ❌ 修复前：不区分 socket 状态，直接调用 close()
+function safeCloseWebSocket2(socket, code, reason) {
+  if (!socket) return;
+  try {
+    socket.close(normalizeWebSocketCloseCode(code), normalizeWebSocketCloseReason(reason));
+  } catch {
+    socket.terminate();
+  }
+}
+
+// ✅ 修复后：CONNECTING 状态用 terminate()，OPEN 状态用 close()
+function safeCloseWebSocket2(socket, code, reason) {
+  if (!socket) return;
+  try {
+    if (socket.readyState === import_ws2.default.CONNECTING) {
+      socket.once("error", () => {});
+      socket.terminate();
+    } else {
+      socket.close(normalizeWebSocketCloseCode(code), normalizeWebSocketCloseReason(reason));
+    }
+  } catch {
+    try { socket.terminate(); } catch {}
+  }
+}
+```
+
+**持久化保护**:
+- 在 `dist/package.json` 中添加 `patch-package` 作为 `postinstall` 钩子
+- 补丁文件 `dist/patches/hostc+1.3.0.patch` 确保 `npm install` 后自动应用修复
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **hostc 启动** | 进程崩溃 ❌ | 正常启动 ✅ |
+| **WebSocket 超时** | Unhandled error ❌ | 优雅关闭 ✅ |
+| **补丁持久化** | npm install 后丢失 ❌ | postinstall 自动应用 ✅ |
+
+**技术细节**:
+- `ws` 库的 `close()` 方法仅在 `OPEN` 状态下可用，`CONNECTING` 状态必须使用 `terminate()`
+- `socket.once("error", () => {})` 用于吞掉因强制关闭而产生的 error 事件
+- `patch-package` 确保每次 `npm install` 后补丁自动应用，不会因依赖更新而丢失修复
+
+---
+
+### 🔧 隧道验证修复 — hostc/CF 均不可用的根因修复
+
+#### 问题: 项目启动后 hostc 和 CF 隧道均被判定为"不可用"
+**现象**: 项目启动时 hostc 和 Cloudflare Tunnel 都能成功启动并获取到 URL，但心跳验证机制始终判定为不可用，导致反复重启隧道
+
+**根本原因**:
+1. **hostc 验证失败**: `verify_url()` 函数使用 HTTP `HEAD` 方法验证 URL，但 FastAPI 根路由 `@app.get('/')` 不支持 HEAD 请求，返回 `405 Method Not Allowed`，导致验证永远失败
+2. **CF 验证失败**: 本机 DNS 无法解析 `trycloudflare.com` 域名（`Errno 8: nodename nor servename provided`），属于网络/DNS 配置问题
+
+**修复方案**:
+```python
+# ❌ 修复前：只支持 GET，HEAD 请求返回 405
+@app.get('/')
+async def index():
+
+# ✅ 修复后：同时支持 GET 和 HEAD，验证请求正常通过
+@app.api_route('/', methods=['GET', 'HEAD'])
+async def index():
+```
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **hostc 验证** | 405 Method Not Allowed ❌ | 200 OK ✅ |
+| **心跳判定** | 不可用 → 反复重启 ❌ | 可用 → 稳定运行 ✅ |
+| **邮件通知** | 发送"不可用"通知 ❌ | 发送"可用"通知 ✅ |
+
+**技术细节**:
+- FastAPI 的 `@app.get()` 装饰器不会自动为路由支持 HEAD 方法（与 Flask 不同）
+- `verify_url()` 使用 `urllib.request.Request(url, method='HEAD')` 发送 HEAD 请求
+- 改用 `@app.api_route('/', methods=['GET', 'HEAD'])` 后，HEAD 请求返回与 GET 相同的响应头（无 body），验证通过
+
+**CF 不可用的额外说明**:
+- CF 隧道进程本身启动正常（直接连接 Cloudflare 服务器获取 URL）
+- 但本机 DNS 无法解析 `*.trycloudflare.com`，导致验证请求失败
+- 建议排查 DNS 设置：`nslookup xxx.trycloudflare.com`，或更换 DNS 为 `8.8.8.8` / `114.114.114.114`
+
+---
+
+### 🎯 高价商品数解析修复 + 按钮失效修复
+
+#### 问题1: 高价商品数显示为0
+**现象**: 爬虫日志显示"售价 >= 599 的商品: 78 个"，但界面显示高价商品数为 **0**
+
+**根本原因**: 
+- 前端正则表达式无法正确匹配Python输出的格式
+- Python输出格式：`售价 >= 599 的商品: 78 个`（有空格）
+- 前端正则：`/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/`（无法匹配空格）
+
+**修复方案**:
+```javascript
+// ✅ 简化正则表达式，直接匹配Python输出格式
+if (line.includes('售价') && line.includes('599') && line.includes('商品')) {
+    // 主要匹配："售价 >= 599 的商品: 78 个"
+    let match = line.match(/售价\s*>=\s*599\s*的商品\s*[:：]\s*(\d+)\s*个/);
+    // 备选方案：匹配任意"商品: 数字 个"格式
+    if (!match) match = line.match(/商品\s*[:：]\s*(\d+)\s*个/);
+    // 最后备选：匹配行末的数字
+    if (!match) match = line.match(/(\d+)\s*个\s*$/);
+    
+    if (match && parseInt(match[1]) > 0) {
+        skuData.highPriceCount = match[1];
+        console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
+    }
+}
+```
+
+**数据流程说明**:
+1. **爬虫运行时**：前端解析日志输出实时显示统计数据
+2. **爬虫完成后**：前端调用 `/api/products` API获取JSON数据（已包含 `highPriceCount` 字段）
+
+#### 问题2: 8个按钮全部失效
+**现象**: 页面加载后所有按钮点击无响应
+
+**根本原因**: 
+- `bindAllButtons()` 函数定义在作用域内，不是全局函数
+- 外部无法调用，导致按钮事件绑定失败
+
+**修复方案**:
+```javascript
+// ✅ 暴露为全局函数
+window.bindAllButtons = bindAllButtons;
+window.resetButtons = resetButtons;
+```
+
+### ✅ 修复效果
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **高价商品(≥599)** | 0 ❌ | 78 ✅ |
+| **按钮响应** | 失效 ❌ | 正常 ✅ |
+| **数据显示** | 错误 ❌ | 准确 ✅ |
+
+### 📝 技术细节
+- **文件位置**: `dist/app.js` Line 1369-1383, 1441-1453, 2707
+- **修复方法**: 
+  1. 简化正则表达式，精确匹配Python输出格式
+  2. 暴露全局函数，确保按钮绑定成功
+- **验证方式**: 
+  1. Node.js语法检查通过
+  2. 浏览器测试按钮响应正常
+  3. 爬虫运行时实时显示正确的统计数据
+
+---
+
 ## 🎯 核心原则
 
 ### 1. 代码质量第一
