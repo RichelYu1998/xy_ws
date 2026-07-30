@@ -1155,7 +1155,7 @@ function escapeHtml(text) {
                     currentTaskId = data.task_id;
                     showOutputPanel();
                     if (outputContent) outputContent.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
-                    pollingInterval = setInterval(() => pollOutput(), 1000);
+                    pollingInterval = setInterval(window.pollOutput, 1000);
                 } else {
                     showToast('启动失败: ' + data.error, 'error');
                 }
@@ -1166,7 +1166,7 @@ function escapeHtml(text) {
             });
         }
         
-        function pollOutput() {
+        window.pollOutput = function() {
             fetch('/output/' + currentTaskId)
             .then(response => safeParseJson(response))
             .then(data => {
@@ -1174,7 +1174,9 @@ function escapeHtml(text) {
                 const statusDiv = document.getElementById('output-status');
                 
                 if (data.output) {
-                    const hasComparison = data.output.includes('对比文件:') || data.output.includes('货号对比结果') || data.output.includes('共获取') || data.output.includes('成功获取');
+                    const hasComparison = data.output.includes('对比文件:') || data.output.includes('货号对比结果') || data.output.includes('共获取') || data.output.includes('成功获取') || data.output.includes('总商品数') || data.output.includes('高价商品') || data.output.includes('预计售出') || data.output.includes('平均售出');
+                    
+                    console.log('[轮询] 检测到对比数据:', hasComparison, '输出长度:', data.output.length);
                     
                     if (!hasComparison && outputDiv) {
                         outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(data.output) + '</pre>';
@@ -1217,32 +1219,179 @@ function escapeHtml(text) {
         }
         
         function showComparisonCard(output) {
-            const spiderPanel = document.getElementById('spider-output-panel');
-            const spiderContent = document.getElementById('spider-output-content');
-            if (!spiderPanel || !spiderContent) return;
+            console.log('[对比卡片] 开始创建/显示爬虫结果卡片...');
+            console.log('[对比卡片] 输出数据前200字符:', output.substring(0, 200));
+            console.log('[对比卡片] 完整输出数据（请复制此内容给开发者）:\n', output);
             
+            let spiderPanel = document.getElementById('spider-output-panel');
+            let spiderContent = document.getElementById('spider-output-content');
+            
+            if (!spiderPanel || !spiderContent) {
+                console.log('[对比卡片] 动态创建爬虫结果面板');
+                
+                // 尝试多种方式找到合适的插入位置
+                const outputPanel = document.getElementById('output-panel') || 
+                                   document.querySelector('.output-panel') ||
+                                   document.querySelector('#app > .container') ||
+                                   document.querySelector('.container');
+                                   
+                console.log('[对比卡片] 找到的插入位置元素:', outputPanel ? outputPanel.id || outputPanel.className : 'null');
+                
+                if (outputPanel) {
+                    spiderPanel = document.createElement('div');
+                    spiderPanel.id = 'spider-output-panel';
+                    spiderPanel.className = 'output-panel';
+                    spiderPanel.style.cssText = 'display: block !important; margin-top: 20px; visibility: visible !important;';
+                    
+                    spiderPanel.innerHTML = `
+                        <div class="output-header">
+                            <span><i class="fa fa-terminal"></i> 爬虫运行结果</span>
+                            <button class="output-close" onclick="closePanel('spider-output-panel')"><i class="fa fa-times"></i></button>
+                        </div>
+                        <div id="spider-output-content"></div>
+                    `;
+                    
+                    // 插入到DOM中
+                    if (outputPanel.nextSibling) {
+                        outputPanel.parentElement.insertBefore(spiderPanel, outputPanel.nextSibling);
+                    } else {
+                        outputPanel.parentElement.appendChild(spiderPanel);
+                    }
+                    
+                    spiderContent = document.getElementById('spider-output-content');
+                    console.log('[对比卡片] ✅ 面板已成功创建并插入DOM');
+                } else {
+                    console.error('[对比卡片] ❌ 无法找到任何容器元素，无法创建爬虫结果面板');
+                    alert('错误：无法显示爬虫结果面板，请刷新页面重试');
+                    return;
+                }
+            } else {
+                console.log('[对比卡片] 复用已有的爬虫结果面板');
+            }
+            
+            // 强制显示面板
             spiderPanel.style.display = 'block';
-            spiderPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            spiderPanel.style.visibility = 'visible';
+            spiderPanel.style.opacity = '1';
+            
+            console.log('[对比卡片] 面板显示状态:', {
+                display: spiderPanel.style.display,
+                visibility: spiderPanel.style.visibility,
+                offsetWidth: spiderPanel.offsetWidth,
+                offsetHeight: spiderPanel.offsetHeight
+            });
+            
+            // 平滑滚动到面板位置（PC端和移动端都适用）
+            setTimeout(() => {
+                spiderPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
             
             const lines = output.split('\n');
             let skuData = {};
             let missingSkus = [];
             let inMissingSection = false;
             
-            for (let line of lines) {
-                line = line.trim();
+            console.log('[对比卡片] 开始解析输出，共', lines.length, '行');
+            
+            // 预扫描：先尝试用超级宽松的模式提取数据
+            console.log('[对比卡片] 开始预扫描（宽松模式）...');
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line) continue;
+                
+                // 超级宽松的总商品数匹配：任何包含"商品"和数字的行
+                if ((line.includes('商品') || line.includes('个') || line.includes('件')) && 
+                    !skuData.totalProducts && /(\d+)/.test(line)) {
+                    // 排除一些干扰行
+                    if (!line.includes('删除') && !line.includes('新增') && !line.includes('缺失')) {
+                        const match = line.match(/(\d+)/);
+                        if (match && parseInt(match[1]) > 0) {
+                            skuData.type = 'spider';
+                            skuData.totalProducts = match[1];
+                            console.log('[对比卡片] [预扫描] ✓ 总商品数:', skuData.totalProducts, '(来自:', line.substring(0, 50), ')');
+                        }
+                    }
+                }
+                
+                // 超级宽松的高价商品匹配
+                if ((line.includes('599') || line.includes('高价') || line.includes('≥')) && 
+                    !skuData.highPriceCount && /(\d+)/.test(line)) {
+                    const match = line.match(/(\d+)/);
+                    if (match && parseInt(match[1]) > 0 && parseInt(match[1]) < 10000) {
+                        skuData.highPriceCount = match[1];
+                        console.log('[对比卡片] [预扫描] ✓ 高价商品数:', skuData.highPriceCount, '(来自:', line.substring(0, 50), ')');
+                    }
+                }
+                
+                // 超级宽松的价格匹配（包含¥或大额数字）
+                if ((!skuData.totalPrice || !skuData.avgPrice || !skuData.fee) && 
+                    (line.includes('¥') || line.includes('元') || /[\d,]+\.\d{2}/.test(line))) {
+                    let priceMatch = line.match(/¥?\s*([\d,]+\.\d{2})/);
+                    if (priceMatch) {
+                        const price = parseFloat(priceMatch[1].replace(/,/g, ''));
+                        
+                        // 根据金额大小判断是总价还是均价
+                        if (price > 10000 && !skuData.totalPrice) {
+                            skuData.totalPrice = '¥' + priceMatch[1];
+                            console.log('[对比卡片] [预扫描] ✓ 预计售出总价:', skuData.totalPrice);
+                        } else if (price >= 100 && price <= 10000 && !skuData.avgPrice) {
+                            skuData.avgPrice = '¥' + priceMatch[1];
+                            console.log('[对比卡片] [预扫描] ✓ 平均售出均价:', skuData.avgPrice);
+                        } else if (price < 5000 && !skuData.fee) {
+                            skuData.fee = '¥' + priceMatch[1];
+                            console.log('[对比卡片] [预扫描] ✓ 平台手续费:', skuData.fee);
+                        }
+                    }
+                }
+            }
+            
+            console.log('[对比卡片] 预扫描结果:', JSON.stringify(skuData));
+            
+            // 精确解析（覆盖预扫描的结果）
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                
+                // 跳过空行
+                if (!line) continue;
+                
+                console.log(`[对比卡片] 解析第${i + 1}行:`, line.substring(0, 100));
                 
                 if (line.includes('货号对比结果')) {
                     skuData.type = 'sku';
+                    console.log('[对比卡片] ✓ 检测到类型: SKU对比');
                     inMissingSection = false;
-                } else if (line.includes('成功获取') || line.includes('共获取')) {
+                } else if (line.includes('成功获取') || line.includes('共获取') || line.includes('总商品数') || line.match(/(\d+)\s*(个|件).*商品/)) {
                     skuData.type = 'spider';
-                    const match = line.match(/(\d+)\s*个/);
-                    if (match) skuData.totalProducts = match[1];
+                    
+                    // 尝试多种匹配模式
+                    let match = line.match(/(\d+)\s*(个|件)/);
+                    if (!match) {
+                        match = line.match(/(\d+)/);
+                    }
+                    
+                    if (match) {
+                        skuData.totalProducts = match[1];
+                        console.log('[对比卡片] ✓ 总商品数:', skuData.totalProducts);
+                    }
                     inMissingSection = false;
-                } else if (line.includes('售价 >=') && line.includes('的商品:')) {
-                    const match = line.match(/(\d+)\s*个/);
-                    if (match) skuData.highPriceCount = match[1];
+                } else if (line.includes('售价 >=') && line.includes('商品') || 
+                           line.includes('高价商品') && (line.includes(':') || line.includes('：')) ||
+                           line.includes('≥599') ||
+                           line.match(/高价.*\d+/)) {
+                    
+                    // 尝试多种匹配模式
+                    let match = line.match(/(\d+)\s*(个|件)/);
+                    if (!match) {
+                        match = line.match(/[:：]\s*(\d+)/);
+                    }
+                    if (!match) {
+                        match = line.match(/(\d+)/);
+                    }
+                    
+                    if (match) {
+                        skuData.highPriceCount = match[1];
+                        console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
+                    }
                     inMissingSection = false;
                 } else if (line.includes('只在JSON中存在但不在Excel中的售价>=599货号数:')) {
                     const match = line.match(/:\s*(\d+)/);
@@ -1276,9 +1425,23 @@ function escapeHtml(text) {
                 } else if (skuData.inHighPriceExistingSection && line.trim() && !line.includes(':') && !line.startsWith('=')) {
                     const skuMatch = line.trim().match(/^(\S+)$/);
                     if (skuMatch) skuData.highPriceExistingSkus.push(skuMatch[1]);
-                } else if (line.includes('预计售出价格累计:')) {
-                    const match = line.match(/¥[\d,.]+/);
-                    if (match) skuData.totalPrice = match[0];
+                } else if (line.includes('预计售出价格累计:') || line.includes('预计售出总价') || line.includes('总售价') || 
+                           line.includes('预计售出') || line.includes('售价累计')) {
+                    
+                    // 尝试多种匹配模式
+                    let match = line.match(/¥[\d,.]+/);
+                    if (!match) {
+                        match = line.match(/[\d,]+\.\d{2}/); // 匹配 1,234.56 格式
+                    }
+                    if (!match) {
+                        match = line.match(/[\d,.]+/); // 匹配任何数字格式
+                    }
+                    
+                    if (match) {
+                        const priceStr = match[0];
+                        skuData.totalPrice = priceStr.startsWith('¥') ? priceStr : '¥' + priceStr;
+                        console.log('[对比卡片] ✓ 预计售出总价:', skuData.totalPrice);
+                    }
                     inMissingSection = false;
                 } else if (line.includes('【新增商品】')) {
                     skuData.inAddedSection = true;
@@ -1305,9 +1468,23 @@ function escapeHtml(text) {
                     } else if (skuData.inDeletedSection && product.sku) {
                         skuData.deletedProducts.push(product);
                     }
-                } else if (line.includes('平均每个设备售出均价:')) {
-                    const match = line.match(/¥[\d,.]+/);
-                    if (match) skuData.avgPrice = match[0];
+                } else if (line.includes('平均每个设备售出均价:') || line.includes('平均售出') || line.includes('平均价格') || 
+                           line.includes('均价') || line.includes('平均')) {
+                    
+                    // 尝试多种匹配模式
+                    let match = line.match(/¥[\d,.]+/);
+                    if (!match) {
+                        match = line.match(/[\d,]+\.\d{2}/); // 匹配 1,234.56 格式
+                    }
+                    if (!match) {
+                        match = line.match(/[\d,.]+/); // 匹配任何数字格式
+                    }
+                    
+                    if (match) {
+                        const priceStr = match[0];
+                        skuData.avgPrice = priceStr.startsWith('¥') ? priceStr : '¥' + priceStr;
+                        console.log('[对比卡片] ✓ 平均售出均价:', skuData.avgPrice);
+                    }
                     inMissingSection = false;
                 } else if (line.includes('闲鱼平台手续费累计:')) {
                     const match = line.match(/¥[\d,.]+/);
@@ -1338,20 +1515,57 @@ function escapeHtml(text) {
                     if (match) skuData.duplicateCount = match[1];
                     inMissingSection = false;
                 } else if (line.includes('对比文件:')) {
-                     skuData.type = 'product';
+                     skuData.type = 'spider';
+                     console.log('[对比卡片] ✓ 检测到对比文件，统一为爬虫类型');
+                     
+                     const parts = line.split(':');
+                     if (parts.length >= 3) {
+                         skuData.oldFile = parts[1].trim();
+                         skuData.newFile = parts[2].trim();
+                     }
                      inMissingSection = false;
                  } else if (line.includes('新增商品数:')) {
-                     skuData.newProductsCount = line.split(':')[1].trim();
+                     const count = parseInt(line.split(':')[1].trim());
+                     skuData.newProductsCount = count || 0;
+                     console.log('[对比卡片] ✓ 新增商品数:', skuData.newProductsCount);
+                     
+                     // 尝试提取总商品数（如果有）
+                     if (!skuData.totalProducts) {
+                         const totalMatch = line.match(/(\d+)/);
+                         if (totalMatch && parseInt(totalMatch[1]) > 0) {
+                             skuData.totalProducts = parseInt(totalMatch[1]);
+                         }
+                     }
                      inMissingSection = false;
                  } else if (line.includes('删除商品数:')) {
-                     skuData.deletedProductsCount = line.split(':')[1].trim();
+                     const count = parseInt(line.split(':')[1].trim());
+                     skuData.deletedProductsCount = count || 0;
+                     console.log('[对比卡片] ✓ 删除商品数:', skuData.deletedProductsCount);
                      inMissingSection = false;
                  } else if (line.includes('新增高价商品数:')) {
-                     skuData.newHighPrice = line.split(':')[1].trim();
+                     const count = parseInt(line.split(':')[1].trim());
+                     skuData.newHighPrice = count || 0;
+                     skuData.highPriceCount = count || 0; // 同时设置高价商品数
+                     console.log('[对比卡片] ✓ 新增高价商品数:', skuData.newHighPrice);
                      inMissingSection = false;
-                 } else if (line.includes('预计售出价格累计:')) {
-                     const match = line.match(/¥[\d,.]+/);
-                     if (match) skuData.totalPrice = match[0];
+                 } else if (line.includes('预计售出价格累计:') || line.includes('预计售出总价') || line.includes('总售价')) {
+                     console.log('[对比卡片] 解析预计售出总价行:', line.substring(0, 100));
+                     
+                     let match = line.match(/¥[\d,.]+/);
+                     if (!match) {
+                         match = line.match(/[\d,]+\.\d{2}/); // 匹配 1,234.56 格式
+                     }
+                     if (!match) {
+                         match = line.match(/[\d,]+/); // 匹配任何数字格式
+                     }
+                     
+                     if (match) {
+                         const priceStr = match[0];
+                         skuData.totalPrice = priceStr.startsWith('¥') ? priceStr : '¥' + priceStr;
+                         console.log('[对比卡片] ✓ 预计售出总价:', skuData.totalPrice);
+                     } else {
+                         console.warn('[对比卡片] ⚠️ 无法解析预计售出总价:', line.substring(0, 100));
+                     }
                      inMissingSection = false;
                  } else if (line.includes('缺失货号列表:') || line.includes('缺失的货号:')) {
                     inMissingSection = true;
@@ -1469,46 +1683,16 @@ function escapeHtml(text) {
                 
                 bindSkuTagEvents(spiderContent, showProductDetail);
                 
-            } else if (skuData.newProducts !== undefined || skuData.deletedProducts !== undefined) {
-                let cardHtml = `
-                <div class="comparison-card">
-                    <div class="comparison-header">
-                        <i class="fa fa-exchange"></i> 商品对比结果
-                    </div>
-                    <div class="comparison-body">
-                        <div class="comparison-row">
-                            <span class="comparison-label">对比文件:</span>
-                            <span class="comparison-value">${skuData.oldFile || ''} → ${skuData.newFile || ''}</span>
-                        </div>
-                        <div class="comparison-stats">
-                            <div class="stat-item ${skuData.newProductsCount > 0 ? 'stat-success' : ''}">
-                                <span class="stat-value">${skuData.newProductsCount || 0}</span>
-                                <span class="stat-label">新增商品</span>
-                            </div>
-                            <div class="stat-item ${skuData.deletedProductsCount > 0 ? 'stat-danger' : ''}">
-                                <span class="stat-value">${skuData.deletedProductsCount || 0}</span>
-                                <span class="stat-label">删除商品</span>
-                            </div>
-                            <div class="stat-item ${skuData.newHighPrice > 0 ? 'stat-warning' : ''}">
-                                <span class="stat-value">${skuData.newHighPrice || 0}</span>
-                                <span class="stat-label">新增高价</span>
-                            </div>
-                        </div>
-                `;
+            } else if (skuData.newProducts !== undefined || skuData.deletedProducts !== undefined || skuData.type === 'spider') {
+                console.log('[对比卡片] ✓ 检测到类型: 爬虫数据');
+                console.log('[对比卡片] 解析完成的爬虫数据:', JSON.stringify(skuData, null, 2));
                 
-                if (skuData.totalPrice) {
-                    cardHtml += `
-                        <div class="comparison-summary">
-                            <span class="summary-label">预计售出总价:</span>
-                            <span class="summary-value">${skuData.totalPrice}</span>
-                        </div>
-                    `;
+                // 如果没有解析到任何数据，给出警告
+                if (!skuData.totalProducts && !skuData.highPriceCount && !skuData.totalPrice && !skuData.avgPrice) {
+                    console.warn('[对比卡片] ⚠️ 未解析到任何统计数据！原始输出前500字符:');
+                    console.warn(output.substring(0, 500));
                 }
                 
-                cardHtml += `</div></div>`;
-                spiderContent.insertAdjacentHTML('beforeend', cardHtml);
-                
-            } else if (skuData.type === 'spider' && skuData.totalProducts) {
                 let cardHtml = `
                 <div class="comparison-card">
                     <div class="comparison-header" style="background: #67c23a;">
@@ -1527,17 +1711,27 @@ function escapeHtml(text) {
                         </div>
                         <div class="comparison-stats">
                             <div class="stat-item">
-                                <span class="stat-value" style="color: #E6A23C; font-weight: bold;">${skuData.totalPrice || '-'}</span>
+                                <span class="stat-value" style="color: #E6A23C; font-weight: bold;">${skuData.totalPrice || '¥0'}</span>
                                 <span class="stat-label">预计售出总价</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-value">${skuData.avgPrice || '-'}</span>
+                                <span class="stat-value">${skuData.avgPrice || '¥0'}</span>
                                 <span class="stat-label">平均售出均价</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-value" style="color: #f56c6c;">${skuData.fee || '-'}</span>
+                                <span class="stat-value" style="color: #f56c6c;">${skuData.fee || '¥0'}</span>
                                 <span class="stat-label">平台手续费</span>
                             </div>
+                        </div>
+                        
+                        <!-- 原始数据预览（调试用） -->
+                        <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 6px; border-left: 3px solid #E6A23C;">
+                            <details>
+                                <summary style="cursor: pointer; font-weight: bold; color: #666; margin-bottom: 8px;">
+                                    <i class="fa fa-code"></i> 原始输出数据（点击展开）
+                                </summary>
+                                <pre style="font-size: 11px; line-height: 1.4; color: #333; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; background: #fff; padding: 10px; border-radius: 4px; border: 1px solid #ddd;">${escapeHtml(output)}</pre>
+                            </details>
                         </div>
                 `;
                 
@@ -1602,8 +1796,45 @@ function escapeHtml(text) {
                 }
                 
                 cardHtml += `</div></div>`;
+                
+                console.log('[对比卡片] 准备插入卡片HTML，长度:', cardHtml.length);
+                
+                // 确保spiderContent存在
+                if (!spiderContent) {
+                    console.error('[对比卡片] ❌ spiderContent不存在！');
+                    return;
+                }
+                
                 spiderContent.insertAdjacentHTML('beforeend', cardHtml);
                 
+                console.log('[对比卡片] ✅ 爬虫结果卡片已成功插入DOM');
+                console.log('[对比卡片] 📊 显示的数据:', {
+                    '总商品数': skuData.totalProducts || 0,
+                    '高价商品(≥599)': skuData.highPriceCount || 0,
+                     '预计售出总价': skuData.totalPrice || '¥0',
+                    '平均售出均价': skuData.avgPrice || '¥0',
+                    '平台手续费': skuData.fee || '¥0'
+                });
+                
+                // 验证卡片是否真的显示在页面上
+                setTimeout(() => {
+                    const insertedCard = spiderContent.querySelector('.comparison-card:last-child');
+                    if (insertedCard) {
+                        const rect = insertedCard.getBoundingClientRect();
+                        console.log('[对比卡片] ✅ 卡片可见性检查:', {
+                            是否在DOM中: true,
+                            宽度: rect.width,
+                            高度: rect.height,
+                            是否可见: rect.width > 0 && rect.height > 0
+                        });
+                        
+                        if (rect.width === 0 || rect.height === 0) {
+                            console.warn('[对比卡片] ⚠️ 卡片尺寸为0，可能被CSS隐藏了！');
+                        }
+                    } else {
+                        console.error('[对比卡片] ❌ 未找到插入的卡片！');
+                    }
+                }, 200);
                 const isMobile = window.innerWidth < 576;
                 if (isMobile) {
                     const spiderOutputContent = document.getElementById('spider-output-content');
@@ -1907,15 +2138,15 @@ function escapeHtml(text) {
                     <div class="comparison-body">
                         <div class="comparison-stats">
                             <div class="stat-item">
-                                <span class="stat-value" style="color: #E6A23C; font-weight: bold;">${data.totalPrice || '-'}</span>
+                                <span class="stat-value" style="color: #E6A23C; font-weight: bold;">${data.totalPrice || '¥0'}</span>
                                 <span class="stat-label">预计售出总价</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-value">${data.avgPrice || '-'}</span>
+                                <span class="stat-value">${data.avgPrice || '¥0'}</span>
                                 <span class="stat-label">平均售出均价</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-value" style="color: #f56c6c;">${data.fee || '-'}</span>
+                                <span class="stat-value" style="color: #f56c6c;">${data.fee || '¥0'}</span>
                                 <span class="stat-label">平台手续费</span>
                             </div>
                         </div>
@@ -2066,7 +2297,7 @@ function escapeHtml(text) {
                     showOutputPanel();
                     const outputContent = document.getElementById('output-content');
                     if (outputContent) outputContent.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
-                    pollingInterval = setInterval(() => pollOutput(), 1000);
+                    pollingInterval = setInterval(window.pollOutput, 1000);
                 } else {
                     showToast('启动失败: ' + data.error, 'error');
                     btn.disabled = false;
