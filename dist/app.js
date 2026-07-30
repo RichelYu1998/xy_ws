@@ -1348,59 +1348,61 @@
             
             console.log('[对比卡片] 开始解析输出，共', lines.length, '行');
             
-            // 预扫描：先尝试用超级宽松的模式提取数据
-            console.log('[对比卡片] 开始预扫描（宽松模式）...');
+            
+            // 直接读取模式 - 简单粗暴但有效！
+            console.log('[对比卡片] 开始直接读取数据...');
+
             for (let i = 0; i < lines.length; i++) {
                 let line = lines[i].trim();
                 if (!line) continue;
-                
-                // 超级宽松的总商品数匹配：任何包含"商品"和数字的行
-                if ((line.includes('商品') || line.includes('个') || line.includes('件')) && 
-                    !skuData.totalProducts && /(\d+)/.test(line)) {
-                    // 排除一些干扰行
-                    if (!line.includes('删除') && !line.includes('新增') && !line.includes('缺失')) {
-                        const match = line.match(/(\d+)/);
-                        if (match && parseInt(match[1]) > 0) {
-                            skuData.type = 'spider';
-                            skuData.totalProducts = match[1];
-                            console.log('[对比卡片] [预扫描] ✓ 总商品数:', skuData.totalProducts, '(来自:', line.substring(0, 50), ')');
-                        }
-                    }
-                }
-                
-                // 超级宽松的高价商品匹配
-                if (((line.includes('599') || line.includes('≥')) && !line.includes('新增')) && 
-                    !skuData.highPriceCount && /(\d+)/.test(line)) {
+
+                // 1. 总商品数：直接找 "成功获取 XX 个商品"
+                if (line.includes('成功获取') && line.includes('个商品')) {
                     const match = line.match(/(\d+)/);
-                    if (match && parseInt(match[1]) > 0 && parseInt(match[1]) < 10000) {
-                        skuData.highPriceCount = match[1];
-                        console.log('[对比卡片] [预扫描] ✓ 高价商品数:', skuData.highPriceCount, '(来自:', line.substring(0, 50), ')');
+                    if (match) {
+                        skuData.type = 'spider';
+                        skuData.totalProducts = match[1];
+                        console.log('[对比卡片] ✓ 总商品数:', skuData.totalProducts);
                     }
                 }
-                
-                // 超级宽松的价格匹配（包含¥或大额数字）
-                if ((!skuData.totalPrice || !skuData.avgPrice || !skuData.fee) && 
-                    (line.includes('¥') || line.includes('元') || /[\d,]+\.\d{2}/.test(line))) {
-                    let priceMatch = line.match(/¥?\s*([\d,]+\.\d{2})/);
-                    if (priceMatch) {
-                        const price = parseFloat(priceMatch[1].replace(/,/g, ''));
-                        
-                        // 根据金额大小判断是总价还是均价
-                        if (price > 10000 && !skuData.totalPrice) {
-                            skuData.totalPrice = '¥' + priceMatch[1];
-                            console.log('[对比卡片] [预扫描] ✓ 预计售出总价:', skuData.totalPrice);
-                        } else if (price >= 100 && price <= 10000 && !skuData.avgPrice) {
-                            skuData.avgPrice = '¥' + priceMatch[1];
-                            console.log('[对比卡片] [预扫描] ✓ 平均售出均价:', skuData.avgPrice);
-                        } else if (price < 5000 && !skuData.fee) {
-                            skuData.fee = '¥' + priceMatch[1];
-                            console.log('[对比卡片] [预扫描] ✓ 平台手续费:', skuData.fee);
-                        }
+
+                // 2. 高价商品数：直接找 "售价 >= 599 的商品: XX 个"
+                if (line.includes('售价') && line.includes('599') && line.includes('个')) {
+                    const match = line.match(/(\d+)\s*个/);
+                    if (match) {
+                        skuData.highPriceCount = match[1];
+                        console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
+                    }
+                }
+
+                // 3. 预计售出总价
+                if (line.includes('预计售出价格累计') || line.includes('预计售出总价')) {
+                    const match = line.match(/¥?\s*([\d,]+\.\d{2})/);
+                    if (match) {
+                        skuData.totalPrice = '¥' + match[1];
+                        console.log('[对比卡片] ✓ 预计售出总价:', skuData.totalPrice);
+                    }
+                }
+
+                // 4. 平均售出均价
+                if (line.includes('平均') && line.includes('均价')) {
+                    const match = line.match(/¥?\s*([\d,]+\.\d{2})/);
+                    if (match) {
+                        skuData.avgPrice = '¥' + match[1];
+                        console.log('[对比卡片] ✓ 平均售出均价:', skuData.avgPrice);
+                    }
+                }
+
+                // 5. 平台手续费
+                if (line.includes('手续费')) {
+                    const match = line.match(/¥?\s*([\d,]+\.\d{2})/);
+                    if (match) {
+                        skuData.fee = '¥' + match[1];
+                        console.log('[对比卡片] ✓ 平台手续费:', skuData.fee);
                     }
                 }
             }
-            
-            console.log('[对比卡片] 预扫描结果:', JSON.stringify(skuData));
+[对比卡片] 预扫描结果:', JSON.stringify(skuData));
             
             // 精确解析（覆盖预扫描的结果）
             for (let i = 0; i < lines.length; i++) {
