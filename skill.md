@@ -436,6 +436,115 @@ def _log_response_info(response):
 - https://cdn.jsdelivr.net（Bootstrap、Font Awesome、Swagger UI）
 - https://code.jquery.com（jQuery）
 
+### 2.0.5 异常处理代码规范（v3.8.89.4 新增）⭐⭐
+
+#### 🎯 核心原则
+
+**禁止空异常块！所有 except/catch 必须有日志记录。**
+
+#### ✅ Python 异常处理规范
+
+**正确格式（强制要求）**：
+```python
+# ✅ 正确：多行格式，带日志
+try:
+    risky_operation()
+except Exception as e:
+    logger.debug(f"Operation failed: {e}")
+    fallback_action()
+
+# ✅ 正确：使用上下文管理器
+with ExceptionContext("context description") as ctx:
+    risky_operation()
+```
+
+**禁止格式（会导致语法错误或隐藏问题）**：
+```python
+# ❌ 错误：缺少换行符（导致 SyntaxError）
+except Exception as e:    logger.debug(f"Error")    code()
+
+# ❌ 错误：空异常块（隐藏错误信息）
+except Exception:
+    pass
+
+# ❌ 错误：无日志记录
+except Exception as e:
+    pass
+```
+
+**常见错误示例及修复**：
+```python
+# ❌ 错误：一行写完（语法错误）
+except Exception as e: logger.debug(f"Error: {e}") media_result = img_data
+
+# ✅ 正确：分成多行
+except Exception as e:
+    logger.debug(f"Error: {e}")
+    media_result = img_data
+```
+
+#### ✅ JavaScript 异常处理规范
+
+**正确格式（强制要求）**：
+```javascript
+// ✅ 正确：Promise catch 带日志
+fetch('/api/data')
+    .then(response => response.json())
+    .catch(function(e) {
+        console.debug('Failed to load data:', e);
+    });
+
+// ✅ 正确：try-catch 带日志
+try {
+    const data = JSON.parse(userInput);
+} catch (e) {
+    console.debug('JSON parse error:', e);
+}
+```
+
+**禁止格式**：
+```javascript
+// ❌ 错误：空 catch 块
+.catch(function() {});
+
+// ❌ 错误：空 catch 块
+try {
+    riskyCode();
+} catch(e) {}
+```
+
+#### 🔍 代码审查检查清单
+
+每次代码提交前必须检查：
+
+- [ ] **Python**: 无 `except Exception:` 或 `except:` 后面直接跟 `pass`
+- [ ] **Python**: 所有 `except` 块都有 `logger.debug()` 或 `logger.warning()`
+- [ ] **Python**: except 块内的语句必须换行，不能写在同一行
+- [ ] **JavaScript**: 无 `.catch(function() {})` 或 `catch(e) {}` 空块
+- [ ] **JavaScript**: 所有 catch 块都有 `console.debug()` 或 `console.error()`
+
+#### 🛠️ 自动化检测命令
+
+```bash
+# 检查 Python 空异常块
+py -c "
+import re
+with open('main.py', 'r', encoding='utf-8') as f:
+    lines = f.readlines()
+for i, line in enumerate(lines, 1):
+        if re.match(r'^\s*except\s+Exception\s*:\s*$', line.strip()):
+            print(f'Line {i}: Empty except block found!')
+"
+
+# 检查 JavaScript 空 catch 块
+node -e "
+const fs = require('fs');
+const code = fs.readFileSync('dist/app.js', 'utf8');
+const emptyCatches = code.match(/\.catch\s*\(\s*function\s*\(\s*\)\s*\{\s*\}/g);
+if (emptyCatches) console.log('Found empty catch blocks:', emptyCatches.length);
+"
+```
+
 ### 2.1 统一异常体系
 
 所有业务异常继承自 `AppException`，按分类工厂方法创建：

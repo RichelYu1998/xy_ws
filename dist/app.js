@@ -835,7 +835,9 @@ function escapeHtml(text) {
                     var footerEl = document.getElementById('footer-version');
                     if (footerEl) footerEl.textContent = '版本: ' + v;
                 })
-                .catch(function() {});
+                .catch(function(e) {
+                    console.debug('Failed to load version info:', e);
+                });
             fetch('/api/changelog')
                 .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
@@ -999,7 +1001,9 @@ function escapeHtml(text) {
                         });
                     }
                 })
-                .catch(function() {});
+                .catch(function(e) {
+                    console.debug('Failed to initialize features:', e);
+                });
             const device = applyDeviceStyles();
             
             function detectSystem() {
@@ -1326,10 +1330,10 @@ function escapeHtml(text) {
                      skuData.type = 'product';
                      inMissingSection = false;
                  } else if (line.includes('新增商品数:')) {
-                     skuData.newProducts = line.split(':')[1].trim();
+                     skuData.newProductsCount = line.split(':')[1].trim();
                      inMissingSection = false;
                  } else if (line.includes('删除商品数:')) {
-                     skuData.deletedProducts = line.split(':')[1].trim();
+                     skuData.deletedProductsCount = line.split(':')[1].trim();
                      inMissingSection = false;
                  } else if (line.includes('新增高价商品数:')) {
                      skuData.newHighPrice = line.split(':')[1].trim();
@@ -1466,12 +1470,12 @@ function escapeHtml(text) {
                             <span class="comparison-value">${skuData.oldFile || ''} → ${skuData.newFile || ''}</span>
                         </div>
                         <div class="comparison-stats">
-                            <div class="stat-item ${skuData.newProducts > 0 ? 'stat-success' : ''}">
-                                <span class="stat-value">${skuData.newProducts || 0}</span>
+                            <div class="stat-item ${skuData.newProductsCount > 0 ? 'stat-success' : ''}">
+                                <span class="stat-value">${skuData.newProductsCount || 0}</span>
                                 <span class="stat-label">新增商品</span>
                             </div>
-                            <div class="stat-item ${skuData.deletedProducts > 0 ? 'stat-danger' : ''}">
-                                <span class="stat-value">${skuData.deletedProducts || 0}</span>
+                            <div class="stat-item ${skuData.deletedProductsCount > 0 ? 'stat-danger' : ''}">
+                                <span class="stat-value">${skuData.deletedProductsCount || 0}</span>
                                 <span class="stat-label">删除商品</span>
                             </div>
                             <div class="stat-item ${skuData.newHighPrice > 0 ? 'stat-warning' : ''}">
@@ -2485,7 +2489,9 @@ function escapeHtml(text) {
                                         const d = String(jsDate.getDate()).padStart(2, '0');
                                         return y + '-' + m + '-' + d;
                                     }
-                                } catch(e) {}
+                                } catch(e) {
+                                    console.debug('Excel serial date parse error:', e);
+                                }
                             }
                             if (/^\d+$/.test(str) && parseInt(str) > 40000 && parseInt(str) < 100000) {
                                 try {
@@ -2497,7 +2503,9 @@ function escapeHtml(text) {
                                         const d = String(jsDate.getDate()).padStart(2, '0');
                                         return y + '-' + m + '-' + d;
                                     }
-                                } catch(e) {}
+                                } catch(e) {
+                                    console.debug('Excel date parse error:', e);
+                                }
                             }
                             if (str.includes('GMT') || str.includes('UTC') || /^\w{3}, \d{2} \w{3} \d{4}/.test(str)) {
                                 try {
@@ -2508,7 +2516,9 @@ function escapeHtml(text) {
                                         const day = String(date.getDate()).padStart(2, '0');
                                         return year + '-' + month + '-' + day;
                                     }
-                                } catch (e) {}
+                                } catch (e) {
+                                    console.debug('Date parse error (format 3):', e);
+                                }
                             }
                             return str;
                         }
