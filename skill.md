@@ -188,9 +188,88 @@ if (line.includes('售价') && (line.includes('599') || line.includes('≥599'))
 - `售价≥599的商品：80件` (数学符号)
 - `售价 >= 599 的商品: 85 个` (带空格)
 
-### 2.3 UI渲染规范
+### 2.3 WebSocket 安全关闭规范 ⚠️ **重要** (2026-07-30 新增)
 
-#### 2.3.1 统计数据显示
+#### 2.3.1 socket 状态感知关闭 (强制)
+```javascript
+// ❌ 错误：不区分 socket 状态直接调用 close()
+// 当 socket 处于 CONNECTING 状态时，close() 会抛出异常
+// 导致 "WebSocket was closed before the connection was established" 错误
+function safeCloseWebSocket(socket, code, reason) {
+  if (!socket) return;
+  try {
+    socket.close(code, reason);  // CONNECTING 状态下会崩溃！
+  } catch {
+    socket.terminate();
+  }
+}
+
+// ✅ 正确：根据 readyState 选择关闭方式
+function safeCloseWebSocket(socket, code, reason) {
+  if (!socket) return;
+  try {
+    if (socket.readyState === WebSocket.CONNECTING) {
+      socket.once("error", () => {});  // 吞掉 error 事件
+      socket.terminate();               // 强制关闭
+    } else {
+      socket.close(code, reason);       // 正常关闭
+    }
+  } catch {
+    try { socket.terminate(); } catch {}  // 双重保护
+  }
+}
+```
+
+**关键规则**:
+- `WebSocket.CONNECTING (0)`: 必须使用 `terminate()`，不能使用 `close()`
+- `WebSocket.OPEN (1)`: 使用 `close()` 发送关闭帧，优雅关闭
+- `WebSocket.CLOSING (2)` / `WebSocket.CLOSED (3)`: 无需操作
+- 关闭前必须注册 `socket.once("error", () => {})` 防止未捕获的 error 事件
+
+#### 2.3.2 超时处理器安全关闭模式
+```javascript
+// ❌ 错误：超时后直接关闭，未处理可能触发的 error 事件
+const timeout = setTimeout(() => {
+  cleanup();
+  safeCloseWebSocket(socket, code, reason);  // 可能触发 unhandled error
+  reject(new Error("connect timeout"));
+}, TIMEOUT_MS);
+
+// ✅ 正确：关闭前吞掉 error 事件
+const timeout = setTimeout(() => {
+  cleanup();
+  socket.once("error", () => {});  // 先注册 error 监听器
+  safeCloseWebSocket(socket, code, reason);
+  reject(new Error("connect timeout"));
+}, TIMEOUT_MS);
+```
+
+#### 2.3.3 patch-package 持久化补丁
+```bash
+# 修改 node_modules 中的代码后，生成补丁文件
+npx patch-package hostc
+
+# 补丁文件保存到 patches/ 目录
+# dist/patches/hostc+1.3.0.patch
+
+# 在 package.json 中添加 postinstall 钩子
+# "scripts": { "postinstall": "patch-package" }
+# "dependencies": { "patch-package": "^8.0.0" }
+
+# 每次 npm install 后自动应用补丁
+npm install  # → postinstall → patch-package → 应用补丁
+```
+
+**补丁管理检查清单**:
+- [ ] 修改 node_modules 后执行 `npx patch-package <package-name>`
+- [ ] patches/ 目录下的 .patch 文件已提交到 Git
+- [ ] package.json 包含 `postinstall: "patch-package"` 脚本
+- [ ] package.json 包含 `patch-package` 依赖
+- [ ] `npm install` 后验证补丁已正确应用
+
+### 2.4 UI渲染规范
+
+#### 2.4.1 统计数据显示
 ```javascript
 // ✅ 使用默认值防止显示 undefined 或 NaN
 <span class="stat-value">${skuData.highPriceCount || 0}</span>
@@ -200,7 +279,7 @@ if (line.includes('售价') && (line.includes('599') || line.includes('≥599'))
 <div class="stat-item ${skuData.highPriceExtraCount > 0 ? 'stat-danger' : ''}">
 ```
 
-#### 2.3.2 列表数据展示
+#### 2.4.2 列表数据展示
 ```javascript
 // ✅ 去重处理
 if (skuData.highPriceExtraSkus2 && skuData.highPriceExtraSkus2.length > 0) {
@@ -692,6 +771,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.89.11 | 2026-07-30 | AI Assistant | 🔧 hostc WebSocket安全关闭修复：safeCloseWebSocket2状态感知+patch-package持久化 |
 | v3.8.89.10 | 2026-07-30 | AI Assistant | 🔧 隧道验证修复：FastAPI根路由HEAD方法支持+DNS排查指引 |
 | v3.8.68 | 2026-07-30 | AI Assistant | 🎯 高价商品数解析优化+文件末尾垃圾清理 |
 | v3.8.67 | 2026-07-30 | AI Assistant | 🐛 修复app.js括号不匹配严重语法错误 |
@@ -700,7 +780,7 @@ if __name__ == '__main__':
 
 ---
 
-**文档版本**: v3.8.89.10  
+**文档版本**: v3.8.89.11  
 **最后更新**: 2026-07-30  
 **下次审查**: 2026-08-06  
 **维护者**: 小旭数码开发团队
