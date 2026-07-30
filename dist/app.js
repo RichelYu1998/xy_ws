@@ -1367,9 +1367,10 @@
                 }
 
                 // 2. 高价商品数：直接找 "售价 >= 599 的商品: XX 个"
-                if (line.includes('售价') && line.includes('599') && line.includes('个')) {
-                    const match = line.match(/(\d+)\s*个/);
-                    if (match) {
+                if (line.includes('售价') && (line.includes('599') || line.includes('≥599'))) {
+                    let match = line.match(/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/);
+                    if (!match) match = line.match(/(\d+)\s*[个件]/);
+                    if (match && parseInt(match[1]) > 0) {
                         skuData.highPriceCount = match[1];
                         console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
                     }
@@ -1432,18 +1433,15 @@
                         console.log('[对比卡片] ✓ 总商品数:', skuData.totalProducts);
                     }
                     inMissingSection = false;
-                } else if ((line.includes('售价 >=') || line.includes('售价>=')) && (line.includes('商品') || line.includes('≥599')) &&
-                           line.match(/售价.*>=.*599.*商品/)) {
+                } else if (line.includes('售价') && (line.includes('599') || line.includes('≥599')) &&
+                           (line.includes('商品') || line.includes('个') || line.includes('件'))) {
 
-                    let match = line.match(/(\d+)\s*(个|件)/);
-                    if (!match) {
-                        match = line.match(/[:：]\s*(\d+)/);
-                    }
-                    if (!match) {
-                        match = line.match(/(\d+)/);
-                    }
+                    let match = line.match(/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/);
+                    if (!match) match = line.match(/(\d+)\s*[个件]/);
+                    if (!match) match = line.match(/[:：]\s*(\d+)/);
+                    if (!match) match = line.match(/(\d+)/);
 
-                    if (match) {
+                    if (match && parseInt(match[1]) > 0) {
                         skuData.highPriceCount = match[1];
                         console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
                     }
@@ -4988,4 +4986,4 @@
                     TimerManager.set('polling', window.pollOutput, 1000);
                 }
             }
-        });
+        });

@@ -1,4 +1,4 @@
-﻿# 微购相册开发技能文档 (Skill Documentation)
+﻿ # 微购相册开发技能文档 (Skill Documentation)
 
 ## 📖 文档概述
 
@@ -75,6 +75,36 @@ const content = fs.readFileSync(file, 'utf8');
 content = content.replace(/\r\n/g, '\n');  // 统一转换为LF
 ```
 
+#### 2.1.4 文件清理规范 (2026-07-30新增)
+```javascript
+// ⚠️ 重要：避免文件末尾出现垃圾内容
+// 问题：文件末尾的 \r\n 字符串（作为文本内容）会导致语法错误
+
+// ❌ 错误示例：文件末尾有垃圾内容
+// Line 4989:        });
+// Line 4990: \r\n\r\n\r\n... (大量重复)
+// Line 5000: let match = line.match(/(\d+)\s*(个|件)/); (重复代码)
+
+// ✅ 正确做法：定期清理文件末尾
+// 1. 使用 Node.js 语法检查发现错误
+//    node --check dist/app.js
+
+// 2. 使用 PowerShell 脚本清理
+//    $content = Get-Content "dist/app.js" -Raw
+//    $lines = $content -split "`n"
+//    $cleanContent = $lines[0..4988] -join "`n"
+//    Set-Content "dist/app.js" -Value $cleanContent -NoNewline -Encoding UTF8
+
+// 3. 验证清理结果
+//    node --check dist/app.js  # 应该通过
+```
+
+**文件清理检查清单**:
+- [ ] 文件末尾无重复的 `\r\n` 字符串
+- [ ] 文件末尾无重复的代码片段
+- [ ] Node.js 语法检查通过
+- [ ] 文件大小合理（无异常增大）
+
 ### 2.2 数据解析规范
 
 #### 2.2.1 输出数据解析流程
@@ -124,6 +154,39 @@ if (match) {
     console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
 }
 ```
+
+#### 2.2.3 正则表达式优化 (2026-07-30新增)
+```javascript
+// ✅ 支持多种符号格式的正则表达式
+// 问题：爬虫输出可能使用全角符号"》"、半角符号">="、数学符号"≥"
+// 解决：使用字符类 [》>=]+ 匹配所有可能的符号
+
+if (line.includes('售价') && (line.includes('599') || line.includes('≥599'))) {
+    // 主要模式：精确匹配"售价[符号]599的商品：数字个"
+    let match = line.match(/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/);
+    
+    // 备选模式1：匹配"数字个/件"
+    if (!match) match = line.match(/(\d+)\s*[个件]/);
+    
+    // 备选模式2：匹配"：数字"
+    if (!match) match = line.match(/[:：]\s*(\d+)/);
+    
+    // 备选模式3：匹配任意数字
+    if (!match) match = line.match(/(\d+)/);
+    
+    // 验证数字有效性
+    if (match && parseInt(match[1]) > 0) {
+        skuData.highPriceCount = match[1];
+        console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
+    }
+}
+```
+
+**支持的格式示例**:
+- `售价》=599的商品：71个` (全角符号)
+- `售价>=599的商品: 77个` (半角符号)
+- `售价≥599的商品：80件` (数学符号)
+- `售价 >= 599 的商品: 85 个` (带空格)
 
 ### 2.3 UI渲染规范
 
@@ -519,13 +582,14 @@ diff README.md skill.docx >/dev/null 2>&1 && echo "✅ 文档已同步" || echo 
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.68 | 2026-07-30 | AI Assistant | 🎯 高价商品数解析优化+文件末尾垃圾清理 |
 | v3.8.67 | 2026-07-30 | AI Assistant | 🐛 修复app.js括号不匹配严重语法错误 |
 | v3.8.66 | 2026-07-18 | Team | 🧪 CF独立性测试验证+verify_url参数修复 |
 | v3.8.65 | 2026-07-18 | Team | 🔒 CF隧道独立性优化+智能复用机制 |
 
 ---
 
-**文档版本**: v3.8.67  
+**文档版本**: v3.8.68  
 **最后更新**: 2026-07-30  
 **下次审查**: 2026-08-06  
 **维护者**: 小旭数码开发团队
