@@ -2501,7 +2501,7 @@ function escapeHtml(text) {
                                         return y + '-' + m + '-' + d;
                                     }
                                 } catch(e) {
-                                    console.debug('Excel serial date parse error:', e);
+                                    console.error('Excel serial date parse error:', e);
                                 }
                             }
                             if (/^\d+$/.test(str) && parseInt(str) > 40000 && parseInt(str) < 100000) {
@@ -2515,7 +2515,7 @@ function escapeHtml(text) {
                                         return y + '-' + m + '-' + d;
                                     }
                                 } catch(e) {
-                                    console.debug('Excel date parse error:', e);
+                                    console.error('Excel date parse error:', e);
                                 }
                             }
                             if (str.includes('GMT') || str.includes('UTC') || /^\w{3}, \d{2} \w{3} \d{4}/.test(str)) {
@@ -2528,7 +2528,7 @@ function escapeHtml(text) {
                                         return year + '-' + month + '-' + day;
                                     }
                                 } catch (e) {
-                                    console.debug('Date parse error (format 3):', e);
+                                    console.error('Date parse error (format 3):', e);
                                 }
                             }
                             return str;
