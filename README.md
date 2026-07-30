@@ -7,7 +7,7 @@
 
 ## 🔄 最新更新
 
-### 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复
+### v3.8.89.11 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复
 
 #### 问题: hostc 隧道启动时报错 `WebSocket was closed before the connection was established` 并导致进程崩溃
 **现象**: 项目启动时 hostc 隧道尝试建立 WebSocket 连接，超时或失败后调用 `safeCloseWebSocket2` 关闭 socket，触发未捕获的 `error` 事件导致 Node.js 进程崩溃退出
@@ -79,7 +79,7 @@ function safeCloseWebSocket2(socket, code, reason) {
 
 ---
 
-### 🔧 隧道验证修复 — hostc/CF 均不可用的根因修复
+### v3.8.89.10 🔧 隧道验证修复 — hostc/CF 均不可用的根因修复
 
 #### 问题: 项目启动后 hostc 和 CF 隧道均被判定为"不可用"
 **现象**: 项目启动时 hostc 和 Cloudflare Tunnel 都能成功启动并获取到 URL，但心跳验证机制始终判定为不可用，导致反复重启隧道
@@ -118,7 +118,7 @@ async def index():
 
 ---
 
-### 🎯 高价商品数解析修复 + 按钮失效修复
+### v3.8.89.9 🎯 高价商品数解析修复 + 按钮失效修复
 
 #### 问题1: 高价商品数显示为0
 **现象**: 爬虫日志显示"售价 >= 599 的商品: 78 个"，但界面显示高价商品数为 **0**
