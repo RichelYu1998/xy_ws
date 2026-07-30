@@ -1369,7 +1369,7 @@ function escapeHtml(text) {
                 }
                 
                 // 超级宽松的高价商品匹配
-                if ((line.includes('599') || line.includes('高价') || line.includes('≥')) && 
+                if ((line.includes('599') || line.includes('≥')) && !line.includes('新增') || 
                     !skuData.highPriceCount && /(\d+)/.test(line)) {
                     const match = line.match(/(\d+)/);
                     if (match && parseInt(match[1]) > 0 && parseInt(match[1]) < 10000) {
@@ -1429,12 +1429,10 @@ function escapeHtml(text) {
                         console.log('[对比卡片] ✓ 总商品数:', skuData.totalProducts);
                     }
                     inMissingSection = false;
-                } else if (line.includes('售价 >=') && line.includes('商品') || 
-                           line.includes('高价商品') && (line.includes(':') || line.includes('：')) ||
-                           line.includes('≥599') ||
-                           line.match(/高价.*\d+/)) {
-                    
-                    // 尝试多种匹配模式
+                } else if ((line.includes('售价 >=') || line.includes('售价>=')) && line.includes('商品') && !line.includes('新增') ||
+                           line.includes('≥599') && !line.includes('新增') ||
+                           line.match(/售价.*>=.*599.*商品/)) {
+
                     let match = line.match(/(\d+)\s*(个|件)/);
                     if (!match) {
                         match = line.match(/[:：]\s*(\d+)/);
@@ -1442,7 +1440,7 @@ function escapeHtml(text) {
                     if (!match) {
                         match = line.match(/(\d+)/);
                     }
-                    
+
                     if (match) {
                         skuData.highPriceCount = match[1];
                         console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
