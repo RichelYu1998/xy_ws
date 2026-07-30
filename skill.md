@@ -220,6 +220,50 @@ if (skuData.highPriceExtraSkus2 && skuData.highPriceExtraSkus2.length > 0) {
 
 ## 🐍 Python 开发规范 (main.py)
 
+### 3.0 FastAPI 路由规范 ⚠️ **重要** (2026-07-30 新增)
+
+#### 3.0.1 HEAD 方法支持 (强制)
+```python
+# ❌ 错误：@app.get() 不支持 HEAD 请求
+# 当 verify_url() 使用 HEAD 方法验证时，返回 405 Method Not Allowed
+# 导致隧道心跳验证永远失败，隧道被误判为不可用并反复重启
+@app.get('/')
+async def index():
+    return HTMLResponse(content=html_content)
+
+# ✅ 正确：使用 @app.api_route() 同时支持 GET 和 HEAD
+@app.api_route('/', methods=['GET', 'HEAD'])
+async def index():
+    return HTMLResponse(content=html_content)
+```
+
+**关键说明**:
+- FastAPI 的 `@app.get()` **不会**自动为路由支持 HEAD 方法（与 Flask 不同）
+- 项目中 `verify_url()` 和 `send_heartbeat()` 都使用 `method='HEAD'` 验证隧道 URL
+- 如果根路由不支持 HEAD，隧道验证将返回 405，心跳机制误判为不可用
+- **所有可能被隧道验证访问的路由**都必须同时支持 GET 和 HEAD
+
+**隧道验证流程**:
+```
+verify_url(url) → HEAD / → FastAPI 路由 → 405 Method Not Allowed → 验证失败 → 心跳判定不可用 → 触发重启
+verify_url(url) → HEAD / → FastAPI 路由 → 200 OK → 验证成功 → 心跳判定可用 → 稳定运行 ✅
+```
+
+#### 3.0.2 路由方法声明规范
+```python
+# ✅ 需要被 HEAD 验证访问的路由：使用 api_route
+@app.api_route('/', methods=['GET', 'HEAD'])
+async def index():
+
+# ✅ 纯 API 路由（不需要 HEAD 验证）：可使用 @app.get
+@app.get('/api/tunnel/status')
+def tunnel_status():
+
+# ✅ 只写路由：使用 @app.post
+@app.post('/api/tunnel/start')
+def start_tunnel():
+```
+
 ### 3.1 异常处理标准
 
 #### 3.1.1 ExceptionContext 统一包装
@@ -648,6 +692,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.89.10 | 2026-07-30 | AI Assistant | 🔧 隧道验证修复：FastAPI根路由HEAD方法支持+DNS排查指引 |
 | v3.8.68 | 2026-07-30 | AI Assistant | 🎯 高价商品数解析优化+文件末尾垃圾清理 |
 | v3.8.67 | 2026-07-30 | AI Assistant | 🐛 修复app.js括号不匹配严重语法错误 |
 | v3.8.66 | 2026-07-18 | Team | 🧪 CF独立性测试验证+verify_url参数修复 |
@@ -655,7 +700,7 @@ if __name__ == '__main__':
 
 ---
 
-**文档版本**: v3.8.68  
+**文档版本**: v3.8.89.10  
 **最后更新**: 2026-07-30  
 **下次审查**: 2026-08-06  
 **维护者**: 小旭数码开发团队

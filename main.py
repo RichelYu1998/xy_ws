@@ -6418,7 +6418,7 @@ if __name__ == '__main__':
 </html>'''
             return HTMLResponse(content=html_content)
 
-        @app.get('/')
+        @app.api_route('/', methods=['GET', 'HEAD'])
         async def index():
             current_version = get_version_from_readme()
             with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
