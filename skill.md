@@ -578,6 +578,72 @@ diff README.md skill.docx >/dev/null 2>&1 && echo "✅ 文档已同步" || echo 
 
 ---
 
+## 📄 文档生成方法
+
+### 方法1: 使用 Pandoc (推荐)
+
+安装 Pandoc: https://pandoc.org/installing.html
+
+```bash
+pandoc skill.md -o skill.docx
+```
+
+### 方法2: 使用 Python python-docx
+
+```bash
+pip install python-docx markdown
+```
+
+Python脚本示例：
+```python
+from docx import Document
+
+def md_to_docx(md_file, docx_file):
+    doc = Document()
+    
+    with open(md_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    lines = content.split('\n')
+    
+    for line in lines:
+        if line.startswith('# '):
+            doc.add_heading(line[2:], level=1)
+        elif line.startswith('## '):
+            doc.add_heading(line[3:], level=2)
+        elif line.startswith('### '):
+            doc.add_heading(line[4:], level=3)
+        elif line.startswith('#### '):
+            doc.add_heading(line[5:], level=4)
+        elif line.strip():
+            doc.add_paragraph(line)
+    
+    doc.save(docx_file)
+
+if __name__ == '__main__':
+    md_to_docx('skill.md', 'skill.docx')
+    print('✅ skill.docx 生成成功')
+```
+
+### 方法3: 使用在线工具
+
+访问 https://cloudconvert.com/md-to-docx 上传 skill.md 文件
+
+### 方法4: 使用 Microsoft Word
+
+文件 → 打开 → 选择 skill.md → 另存为 skill.docx
+
+### 验证生成结果
+
+生成后检查以下内容：
+- [ ] 所有标题层级正确
+- [ ] 代码块格式完整
+- [ ] 表格显示正常
+- [ ] 中文字符无乱码
+- [ ] 文档版本号为 v3.8.68
+
+---
+
 ## 🔄 版本历史
 
 | 版本 | 日期 | 作者 | 变更内容 |
