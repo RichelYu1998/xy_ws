@@ -3,7 +3,11 @@
   "version": "1.0.0",
   "description": "xy_ws dist dependencies (hostc tunnel)",
   "private": true,
+  "scripts": {
+    "postinstall": "patch-package"
+  },
   "dependencies": {
-    "hostc": "^1.3.0"
+    "hostc": "^1.3.0",
+    "patch-package": "^8.0.0"
   }
 }
