@@ -4453,14 +4453,23 @@ class WegoScraper:
                 
                 product = {
                     '商品描述': title,
+                    'name': title,
                     '售价': f'¥{sale_price_int:,}' if sale_price_int is not None else '',
+                    'price': f'¥{sale_price_int:,}' if sale_price_int is not None else '',
                     '拿货价': f'¥{cost_price_int:,}' if cost_price_int is not None else '',
+                    'cost_price': f'¥{cost_price_int:,}' if cost_price_int is not None else '',
                     '货号': goods_num,
+                    'stock_number': goods_num,
                     '备注': remark,
+                    'remark': remark,
                     '员工': staff_nick,
+                    'staff': staff_nick,
                     '图片': media_b64,
+                    'image': media_b64,
                     '入库时间': old_time,
-                    '入库时间戳': created_time
+                    'created_time': old_time,
+                    '入库时间戳': created_time,
+                    'timestamp': created_time
                 }
                 products.append(product)
             except Exception as e:
@@ -4484,7 +4493,7 @@ class WegoScraper:
 
     def filter_high_price_products(self, data, min_price=599):
         """筛选高价商品"""
-        return [p for p in data if self.parse_price(p.get('售䷜', '')) and self.parse_price(p.get('售䷜', '')) >= min_price]
+        return [p for p in data if self.parse_price(p.get('price', '')) and self.parse_price(p.get('price', '')) >= min_price]
 
     def analyze_data_changes(self, data, previous_file):
         """分析数据变化"""
@@ -4543,18 +4552,56 @@ class WegoScraper:
         
         # 如果当天的JSON文件已存在，先保存为缓存文件
         existing_summary = None
+        cache_products_map = {}
         if os.path.exists(new_filename):
             try:
                 shutil.copy2(new_filename, cache_filename)
                 print(f'已将旧数据保存为缓存文件: {cache_filename}')
                 
-                # 读取现有的"小计"字段
+                # 读取现有的"小计"字段和商品列表（用于合并价格）
                 existing_data = FileManager.read_json(new_filename)
                 if existing_data and '小计' in existing_data:
                     existing_summary = existing_data['小计']
                     print(f'已保留 {len(existing_summary) if isinstance(existing_summary, list) else 1} 条对比记录')
+                
+                # 构建cache中的货号->商品映射（用于价格合并）
+                if existing_data and '商品列表' in existing_data:
+                    cache_products = existing_data['商品列表']
+                    for cache_p in cache_products:
+                        sku = cache_p.get('货号', '') or cache_p.get('stock_number', '')
+                        if sku:
+                            cache_products_map[sku] = cache_p
+                    if cache_products_map:
+                        print(f'已加载 {len(cache_products_map)} 个cache商品用于价格合并')
             except Exception as e:
                 print(f'创建缓存文件失败: {e}')
+        
+        # 价格合并逻辑：如果新数据的价格为空，则从cache中获取
+        merged_count = 0
+        for product in data:
+            sku = product.get('货号', '') or product.get('stock_number', '')
+            if not sku:
+                continue
+            
+            # 检查售价是否为空
+            if (not product.get('售价', '').strip() or not product.get('price', '').strip()) and sku in cache_products_map:
+                cache_product = cache_products_map[sku]
+                cache_price = cache_product.get('售价', '') or cache_product.get('price', '')
+                if cache_price.strip():
+                    product['售价'] = cache_price
+                    product['price'] = cache_price
+                    merged_count += 1
+            
+            # 检查拿货价是否为空
+            if (not product.get('拿货价', '').strip() or not product.get('cost_price', '').strip()) and sku in cache_products_map:
+                cache_product = cache_products_map[sku]
+                cache_cost = cache_product.get('拿货价', '') or cache_product.get('cost_price', '')
+                if cache_cost.strip():
+                    product['拿货价'] = cache_cost
+                    product['cost_price'] = cache_cost
+        
+        if merged_count > 0:
+            print(f'✓ 已从cache合并 {merged_count} 个商品的价格信息')
         
         total_count = len(data)
         high_price_products = self.filter_high_price_products(data)
@@ -5029,7 +5076,7 @@ class StockNumberComparator:
             # 找出售价>=599的商品货号
             high_price_stock_numbers = []
             for product in latest_products:
-                price = WegoScraper.parse_price(product.get('售价', ''))
+                price = WegoScraper.parse_price(product.get('price',''))
                 if price and price >= 599:
                     stock_num = product.get('货号', '')
                     if stock_num:
@@ -5159,8 +5206,8 @@ class StockNumberComparator:
             
             high_price_stock_numbers = [
                 p.get('货号', '') for p in products 
-                if WegoScraper.parse_price(p.get('售䷜', '')) is not None
-                and WegoScraper.parse_price(p.get('售䷜', '')) >= 599
+                if WegoScraper.parse_price(p.get('price','')) is not None
+                and WegoScraper.parse_price(p.get('price','')) >= 599
             ]
             
             excel_stock_numbers = self.load_all_excel_data(remove_duplicates=False)
@@ -6586,7 +6633,7 @@ if __name__ == '__main__':
             try:
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
                 if not json_files:
-                    return jsonify({'error': '没有找到JSON文件'}), 404
+                    return jsonify({'error': '没有找到JSON文件'}, status_code=404)
                 latest_json = max(json_files, key=os.path.getmtime)
                 
                 with open(latest_json, 'r', encoding='utf-8') as f:
@@ -6618,7 +6665,7 @@ if __name__ == '__main__':
                 high_price_count = 0
                 high_price_stock_numbers = []
                 for p in products:
-                    price = p.get('售䷜', '')
+                    price = p.get('price','')
                     if price:
                         try:
                             price_val = float(price.replace('¥', '').replace(',', ''))
@@ -6660,7 +6707,7 @@ if __name__ == '__main__':
                     for sku in added_products_all:
                         for p in products:
                             if str(p.get('货号', '')) == str(sku):
-                                price = p.get('售䷜', '')
+                                price = p.get('price','')
                                 try:
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
@@ -6697,13 +6744,13 @@ if __name__ == '__main__':
                 }
                 return jsonify(result)
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                return jsonify({'error': str(e)}, status_code=500)
 
         @app.get('/api/sku/compare/excel')
         async def compare_sku_excel():
             try:
                 if pd is None:
-                    return jsonify({'error': 'pandas未安装，Excel对比功能不可用'}), 500
+                    return jsonify({'error': 'pandas未安装，Excel对比功能不可用'}, status_code=500)
                 
                 today = datetime.now().strftime('%Y%m%d')
                 diff_log_file = os.path.join(PROJECT_DIR, 'file', f'diff_log_{today}.json')
@@ -6711,7 +6758,7 @@ if __name__ == '__main__':
                 json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
                 json_files = [f for f in json_files if '_cache' not in f]
                 if not json_files:
-                    return jsonify({'error': '没有找到JSON文件'}), 404
+                    return jsonify({'error': '没有找到JSON文件'}, status_code=404)
                 latest_json = max(json_files, key=os.path.getmtime)
                 
                 with open(latest_json, 'r', encoding='utf-8') as f:
@@ -6777,7 +6824,7 @@ if __name__ == '__main__':
                             continue
                 
                 if not excel_stock_numbers:
-                    return jsonify({'error': f'Excel文件中未找到"货号"或"序列号"列'}), 404
+                    return jsonify({'error': f'Excel文件中未找到"货号"或"序列号"列'}, status_code=404)
                 
                 json_set = set(json_stock_numbers)
                 excel_set = set(excel_stock_numbers)
@@ -6795,7 +6842,7 @@ if __name__ == '__main__':
                 high_price_count = 0
                 high_price_stock_numbers = []
                 for p in products:
-                    price = p.get('售䷜', '')
+                    price = p.get('price','')
                     if price:
                         try:
                             price_val = float(price.replace('¥', '').replace(',', ''))
@@ -6842,7 +6889,7 @@ if __name__ == '__main__':
                     for sku in added_products_all:
                         for p in products:
                             if str(p.get('货号', '')) == str(sku):
-                                price = p.get('售䷜', '')
+                                price = p.get('price','')
                                 try:
                                     price_val = float(price.replace('¥', '').replace(',', '')) if price else 0
                                     if price_val >= 599:
@@ -6887,13 +6934,13 @@ if __name__ == '__main__':
                 }
                 return jsonify(result)
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                return jsonify({'error': str(e)}, status_code=500)
 
         @app.get('/api/products')
         async def get_all_products():
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
-                return jsonify({'error': '没有找到JSON文件'}), 404
+                return jsonify({'error': '没有找到JSON文件'}, status_code=404)
             latest_file = max(json_files, key=os.path.getmtime)
             try:
                 with open(latest_file, 'r', encoding='utf-8') as f:
@@ -6938,7 +6985,7 @@ if __name__ == '__main__':
                 
                 for p in products:
                     try:
-                        price_str = p.get('售䷜', '')
+                        price_str = p.get('price','')
                         if not price_str or not price_str.strip():
                             continue
                         
@@ -7003,13 +7050,13 @@ if __name__ == '__main__':
                     'created_time': created_time
                 })
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                return jsonify({'error': str(e)}, status_code=500)
 
         @app.get('/api/daily-profit')
         async def get_daily_profit(group_by: str = 'day', start_date: str = None, end_date: str = None):
             try:
                 if pd is None or openpyxl is None:
-                    return jsonify({'error': 'pandas或openpyxl未安装，每日利润报表功能不可用'}), 500
+                    return jsonify({'error': 'pandas或openpyxl未安装，每日利润报表功能不可用'}, status_code=500)
                 
                 excel_files_list, daily_profit_report = get_excel_files_with_report()
                 
@@ -7121,7 +7168,7 @@ if __name__ == '__main__':
                             continue
                 
                 if not table_data:
-                    return jsonify({'error': '未找到Excel数据'}), 404
+                    return jsonify({'error': '未找到Excel数据'}, status_code=404)
                 
                 if start_date:
                     try:
@@ -7191,12 +7238,12 @@ if __name__ == '__main__':
                 import traceback
                 error_detail = str(e) + '\n' + traceback.format_exc()
                 print(f'get_daily_profit错误: {error_detail}')
-                return jsonify({'error': str(e), 'detail': error_detail}), 500
+                return jsonify({'error': str(e), 'detail': error_detail}, status_code=500)
 
         def get_all_products():
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
-                return jsonify({'error': '没有找到JSON文件'}), 404
+                return jsonify({'error': '没有找到JSON文件'}, status_code=404)
             latest_file = max(json_files, key=os.path.getmtime)
             try:
                 with open(latest_file, 'r', encoding='utf-8') as f:
@@ -7241,7 +7288,7 @@ if __name__ == '__main__':
                 
                 for p in products:
                     try:
-                        price_str = p.get('售䷜', '')
+                        price_str = p.get('price','')
                         if not price_str or not price_str.strip():
                             continue
                         
@@ -7279,13 +7326,13 @@ if __name__ == '__main__':
                     'system': Environment.SYSTEM
                 })
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                return jsonify({'error': str(e)}, status_code=500)
 
         @app.get('/api/product')
         async def get_product(sku: str = ''):
             sku = sku.strip()
             if not sku:
-                return jsonify({'error': '请提供货号'}), 400
+                return jsonify({'error': '请提供货号'}, status_code=400)
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'found': False, 'error': '没有找到JSON文件'})
@@ -7329,10 +7376,10 @@ if __name__ == '__main__':
         async def search_product(sku: str = ''):
             sku = sku.strip()
             if not sku:
-                return jsonify({'error': '请提供货号'}), 400
+                return jsonify({'error': '请提供货号'}, status_code=400)
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
-                return jsonify({'error': '没有找到JSON文件'}), 404
+                return jsonify({'error': '没有找到JSON文件'}, status_code=404)
             latest_file = max(json_files, key=os.path.getmtime)
             try:
                 with open(latest_file, 'r', encoding='utf-8') as f:
@@ -7384,7 +7431,7 @@ if __name__ == '__main__':
                         return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
                 return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
             except Exception as e:
-                return jsonify({'error': str(e)}), 500
+                return jsonify({'error': str(e)}, status_code=500)
 
         @app.get('/api/product/by-description')
         async def get_product_by_description(description: str = ''):
@@ -7681,7 +7728,7 @@ if __name__ == '__main__':
                 _error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 print(f'[{_error_time}] [ERROR] changelog 解析失败: {e}', file=sys.stderr)
                 traceback.print_exc(file=sys.stderr)
-                return jsonify({'success': False, 'error': str(e)}), 500
+                return jsonify({'success': False, 'error': str(e)}, status_code=500)
 
         @app.get('/api/changelog-debug')
         def get_changelog_debug():
@@ -7707,7 +7754,7 @@ if __name__ == '__main__':
                     'changelog_preview': '\n'.join(debug_lines[:100])
                 })
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)}), 500
+                return jsonify({'success': False, 'error': str(e)}, status_code=500)
 
         @app.get('/api/readme-sections')
         def get_readme_sections():
@@ -7803,7 +7850,7 @@ if __name__ == '__main__':
                     'install_steps': install_steps
                 })
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)}), 500
+                return jsonify({'success': False, 'error': str(e)}, status_code=500)
 
         @app.get('/api/email/config')
         def get_email_config():

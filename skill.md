@@ -17415,3 +17415,66 @@ function getToastIcon(type) {
 | **综合评分** | **4.9/5.0** | **5.0/5.0** | **+0.1** |
 
 ---
+
+## ⚡ FastAPI 迁移规范 (v3.8.89.3+)
+
+### 核心变更：从 Flask 完全迁移至 FastAPI
+
+#### 1. 导入规范
+```python
+# ✅ 正确 (FastAPI)
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+
+# ❌ 错误 (Flask)
+from flask import Flask, request, jsonify
+```
+
+#### 2. 路由定义规范
+```python
+# ✅ 正确 (FastAPI)
+@app.get("/api/products")
+async def get_all_products():  # 必须使用 async
+    return jsonify({"data": result})
+
+@app.post("/api/sku/compare/txt")
+async def compare_sku_txt(request: Request):  # POST需要Request参数
+    data = await request.json()  # 必须使用await
+```
+
+#### 3. 响应返回规范
+```python
+# ✅ 正确 (FastAPI兼容格式)
+return jsonify({"error": "未找到文件"}, status_code=404)
+
+# ❌ 错误 (Flask元组格式)
+return jsonify({"error": "未找到文件"}), 404
+```
+
+#### 4. 字段命名规范（必须包含英文别名）
+```python
+product = {
+    "售价": f"¥{price:,}",
+    "price": f"¥{price:,}",           # 英文别名（必须）
+    "拿货价": f"¥{cost:,}",
+    "cost_price": f"¥{cost:,}",       # 英文别名
+    "货号": goods_num,
+    "stock_number": goods_num         # 英文别名
+}
+# 重要: 所有筛选逻辑必须使用 price/cost_price/stock_number 字段！
+```
+
+#### 5. 价格数据处理规范
+```python
+def save_data(self, data):
+    # 1. 读取现有文件并保存为cache
+    # 2. 构建cache中的货号->商品映射
+    # 3. 价格合并：如果新数据价格为空，则从cache获取
+    # 4. 保存合并后的数据
+```
+
+#### 6. 常见陷阱
+- ❌ Unicode字符错误: `p.get('售䷜')` → ✅ 使用 `p.get('price')`
+- ❌ None vs 空字符串: 必须处理两种情况
+- ❌ Flask残留代码: 必须完全移除所有Flask引用
+
