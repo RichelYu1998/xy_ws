@@ -4038,3 +4038,327 @@ class TestExceptionHandling:
 **最后更新**: 2026-07-31  
 **下次审查**: 2026-08-06  
 **维护者**: 小旭数码开发团队
+
+---
+
+## 🔴 PY-CORE-007: 字段名兼容性范式 (Field Name Compatibility)
+
+### 范式描述
+由于JSON数据同时存储中文字段名和英文字段名（如 `商品描述`/`name`, `售价`/`price`），所有数据提取和解析代码必须实现**多重字段名兼容**，确保数据的完整性和向后兼容性。
+
+### 核心原则
+
+#### 1. 后端字段提取 - 多重回退策略
+```python
+def get_product_detail(item):
+    """
+    提取商品详情（字段名兼容性设计）
+    
+    优先级：
+    1. 主字段名（中文，如"商品描述"）
+    2. 英文别名（如"name"）
+    3. 备用中文名（如"商品名称"，兼容旧版本）
+    """
+    return {
+        "商品描述": item.get('商品描述', '') or item.get('name', '') or item.get('商品名称', ''),
+        "售价": item.get('售价', '') or item.get('price', ''),
+        "货号": item.get('货号', '') or item.get('stock_number', ''),
+        "备注": item.get('备注', '') or item.get('remark', ''),
+        "员工": item.get('员工', '') or item.get('staff', '')
+    }
+```
+
+**关键特性**:
+- ✅ 使用 `or` 链式调用，返回第一个非空值
+- ✅ 优先使用主字段名，降级到英文别名，最后尝试备用名
+- ✅ 确保即使JSON结构变化也能取到有效数据
+
+#### 2. 前端正则匹配 - 多模式兼容
+```javascript
+// ❌ 错误：只匹配单一字段名
+const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/);
+
+// ✅ 正确：多模式兼容匹配
+const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/) 
+               || line.match(/"商品名称":\s*"([^"]+)"/) 
+               || line.match(/"name":\s*"([^"]+)"/);
+const priceMatch = line.match(/"售价":\s*"([^"]+)"/) 
+                 || line.match(/"price":\s*"([^"]+)"/);
+```
+
+**匹配优先级**:
+1. 主字段名（中文）：`商品描述`, `售价`
+2. 备用中文名：`商品名称`（旧版兼容）
+3. 英文字段名：`name`, `price`（国际化支持）
+
+#### 3. 数据流完整性验证
+```
+数据源 (JSON)
+    ↓
+analyze_data_changes() [后端对比]
+    ↓ get_product_detail() [字段提取]
+    ↓ format_json_array() [格式化输出]
+    ↓ 前端正则解析 [app.js:1527]
+    ↓ 表格渲染 [UI展示]
+```
+
+**每个环节都必须**:
+- ✅ 兼容多种字段名格式
+- ✅ 对空值提供默认显示（如 `-`）
+- ✅ 记录日志便于调试（`console.log('[对比卡片] ✓ ...')`）
+
+### 应用场景
+
+| 场景 | 文件位置 | 说明 |
+|------|----------|------|
+| **删除商品对比** | `main.py:4520-4529` | 从旧数据中提取被删除商品的详细信息 |
+| **新增商品对比** | `main.py:4520-4529` | 从新数据中提取新增商品的详细信息 |
+| **前端表格渲染** | `dist/app.js:1527-1540` | 解析后端输出的JSON字符串并渲染为表格 |
+| **API响应处理** | `dist/app.js:6947+` | 处理 `/api/products` 返回的商品列表 |
+
+### 最佳实践清单
+
+- [ ] **后端提取时**：始终使用 `or` 链式调用，不要依赖单一字段名
+- [ ] **前端解析时**：使用 `\|\|` 操作符连接多个正则表达式
+- [ ] **默认值处理**：空值统一显示为 `-`，保持界面整洁
+- [ ] **日志记录**：每个关键字段提取都记录日志，方便问题排查
+- [ ] **单元测试覆盖**：测试用例必须包含多种字段名格式的测试数据
+- [ ] **文档同步**：字段映射关系必须在 README.md 和 SKILL.md 中同步更新
+
+### 反面案例（避免）
+
+```python
+# ❌ 错误示例：硬编码单一字段名
+def bad_extract(item):
+    return {
+        "name": item['商品名称'],  # 如果数据中是'商品描述'会抛KeyError
+        "price": item['售价']      # 如果数据中是'price'会抛KeyError
+    }
+
+# ❌ 错误示例：不处理空值
+def bad_extract2(item):
+    name = item.get('商品描述')  # 可能为None或空字符串
+    return {"name": name}         # 前端显示空白而非"-"
+```
+
+---
+
+## 🔴 JS-FRONT-001: 响应式体验一致性范式 (Responsive Experience Consistency)
+
+### 范式描述
+确保移动端和PC端在功能体验上保持一致，不能因为设备差异导致功能可用性不同。
+
+### 核心实现
+
+#### 设备检测与差异化处理
+```javascript
+const isMobile = window.innerWidth < 576;
+const isTablet = window.innerWidth >= 576 && window.innerWidth < 768;
+const isDesktop = window.innerWidth >= 992;
+
+if (isMobile) {
+    // 移动端优化：滚动到顶部 + 简化动画
+    spiderOutputContent.scrollTop = 0;
+} else {
+    // PC端优化：滚动到目标位置 + 视觉提醒动画
+    const targetElement = document.querySelector('.comparison-card:last-child');
+    if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        targetElement.style.animation = 'pulse 2s ease-in-out 3';
+    }
+}
+```
+
+**设计原则**:
+- ✅ **移动端优先**：小屏幕空间有限，直接滚动到顶部查看最新内容
+- ✅ **PC端增强**：大屏幕空间充足，精确滚动到目标位置 + 动画提示用户注意
+- ✅ **渐进增强**：基础功能一致，高级体验根据设备能力差异化提供
+
+#### 动画提示系统
+```css
+/* 脉冲动画 - 用于PC端提醒用户关注新增内容 */
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(64, 158, 255, 0.7); }
+    70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(64, 158, 255, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(64, 158, 255, 0); }
+}
+
+.comparison-card {
+    animation: pulse 2s ease-in-out 3;  /* 播放3次后停止 */
+}
+```
+
+**应用场景**:
+- 🎯 **爬虫结果卡片**：爬虫运行完成后自动定位到对比结果
+- 📊 **对比差异高亮**：新增/删除的商品行添加背景色区分
+- 🔔 **错误提示**：Toast通知在不同位置显示（移动端居中，PC端右上角）
+
+### 体验一致性检查清单
+
+- [ ] **核心功能可用性**：移动端和PC端都能完成相同的核心操作
+- [ ] **信息可见性**：重要信息在两种设备上都无需额外操作即可看到
+- [ ] **交互反馈**：点击、滚动等操作在两种设备上都有明确的视觉反馈
+- [ ] **性能表现**：移动端不会因复杂动画导致卡顿，PC端充分利用硬件性能
+- [ ] **可访问性**：键盘导航、屏幕阅读器等辅助功能在两种设备上都能正常工作
+
+---
+
+## 🛠️ 开发工具链规范 (Development Toolchain Standards)
+
+### Git提交规范
+
+#### Commit Message 格式
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Type 类型**:
+- `feat`: 新功能
+- `fix`: Bug修复
+- `docs`: 文档更新
+- `style`: 代码格式调整（不影响功能）
+- `refactor`: 重构（不是新功能也不是修复bug）
+- `perf`: 性能优化
+- `test`: 测试相关
+- `chore`: 构建/工具/辅助工具的变动
+
+**Scope 范围**:
+- `backend`: Python后端 (main.py)
+- `frontend`: JavaScript前端 (dist/app.js)
+- `docs`: 文档 (README.md, skill.md)
+- `config`: 配置文件
+- `deploy`: 部署相关
+
+**示例**:
+```
+fix(frontend): 对比数据字段名匹配问题
+
+- 修复get_product_detail()函数字段名错误（商品名称→商品描述）
+- 增强前端正则表达式支持多字段名匹配
+- 优化PC端对比卡片自动定位和动画提示
+
+Closes #123
+```
+
+### 代码审查 Checklist
+
+#### 后端代码 (Python)
+- [ ] 异常处理是否使用了 `ExceptionContext` 或 `safe_call()`?
+- [ ] 字段提取是否遵循 PY-CORE-007 字段兼容性范式?
+- [ ] 日志是否使用了 `logger.info/warning/error` 而非 `print()`?
+- [ ] 路径管理是否通过 `PathManager` 统一处理?
+- [ ] 是否有对应的单元测试?
+
+#### 前端代码 (JavaScript)
+- [ ] 是否对用户输入进行了 HTML 转义 (`escapeHtml()`)?
+- [ ] 字段名匹配是否支持多模式兼容?
+- [ ] 是否考虑了移动端和PC端的体验差异?
+- [ ] 是否添加了调试日志 (`console.log('[模块] ✓/✗ ...')`)?
+- [ ] 是否暴露了必要的全局函数 (`window.xxx = xxx`)?
+
+#### 文档更新
+- [ ] README.md 是否按照版本更新范式添加了记录?
+- [ ] skill.md 是否添加了相关的技术范式或最佳实践?
+- [ ] 修改的代码行号是否准确标注?
+- [ ] 是否包含修复前后的对比代码?
+- [ ] 修复效果是否有量化对比表?
+
+### 自动化检查命令
+
+```bash
+# Python语法检查
+python -m py_compile main.py
+
+# JavaScript语法检查
+node --check dist/app.js
+
+# 单元测试
+python -m pytest tests/ -v
+
+# 代码格式化（可选）
+black main.py
+prettier --write dist/app.js
+```
+
+---
+
+## 📖 附录A: 字段映射速查表 (Field Mapping Reference)
+
+### 商品数据字段映射
+
+| 业务含义 | 主字段名（中文） | 英文别名 | 备用字段名 | 示例值 |
+|---------|----------------|---------|-----------|--------|
+| 商品名称 | `商品描述` | `name` | `商品名称` | iPhone 16 Pro Max |
+| 售价 | `售价` | `price` | - | ¥5,899 |
+| 拿货价 | `拿货价` | `cost_price` | - | ¥4,500 |
+| 货号 | `货号` | `stock_number` | - | 58187 |
+| 备注 | `备注` | `remark` | - | 屏幕有划痕 |
+| 员工 | `员工` | `staff` | - | 店长 |
+| 入库时间 | `入库时间` | `created_time` | - | 3小时前 |
+| 图片列表 | `图片` | `image` | - | `[base64...]` |
+
+### 对比数据字段映射
+
+| 业务含义 | JSON字段 | 前端显示字段 | 说明 |
+|---------|----------|-------------|------|
+| 新增数量 | `added_count` | `newProductsCount` | 新增商品数 |
+| 删除数量 | `removed_count` | `deletedProductsCount` | 删除商品数 |
+| 新增列表 | `added` | `addedProducts` | 新增商品详情数组 |
+| 删除列表 | `removed` | `deletedProducts` | 删除商品详情数组 |
+| 高价新增 | `high_price_added` | `newHighPriceProducts` | 售价≥599的新增商品 |
+
+---
+
+## 📖 附录B: 常见问题排查指南 (Troubleshooting Guide)
+
+### Q1: 为什么删除商品的售价显示为"-"？
+
+**症状**: 后端日志显示售价为 `¥5,899`，但前端表格显示 `-`
+
+**排查步骤**:
+1. 检查 `main.py:4520` 的 `get_product_detail()` 函数
+2. 确认字段名是否正确（应该是 `"商品描述"` 而非 `"商品名称"`）
+3. 检查前端 `dist/app.js:1528` 的正则表达式是否匹配该字段名
+4. 查看浏览器控制台的 `[对比卡片]` 日志确认解析结果
+
+**解决方案**:
+- 更新 `get_product_detail()` 使用多字段名兼容（PY-CORE-007）
+- 增强前端正则支持多模式匹配
+
+### Q2: 为什么PC端看不到对比卡片？
+
+**症状**: 移动端能正常显示，但PC端需要手动滚动才能找到
+
+**排查步骤**:
+1. 打开浏览器开发者工具（F12）切换到Console标签
+2. 查找 `[对比卡片] ✅ 卡片可见性检查` 日志
+3. 检查卡片的 `width` 和 `height` 是否为0
+4. 确认CSS是否隐藏了该元素（`display: none` 或 `visibility: hidden`）
+
+**解决方案**:
+- 在 `dist/app.js:1984` 添加PC端的 `scrollIntoView()` 调用
+- 为卡片添加脉冲动画提醒用户注意
+
+### Q3: 如何验证字段兼容性修复是否生效？
+
+**测试步骤**:
+1. 准备测试数据：创建一个包含多种字段名的JSON文件
+   ```json
+   [
+     {"商品描述": "iPhone", "售价": "¥5000"},
+     {"name": "Android", "price": "¥3000"},
+     {"商品名称": "iPad", "售价": "¥4000"}
+   ]
+   ```
+2. 运行爬虫触发对比逻辑
+3. 检查前端表格是否正确显示所有商品的名称和售价
+4. 查看控制台日志确认每个字段都被成功解析
+
+**预期结果**:
+- 所有三种格式都能正确提取字段值
+- 表格中不会出现 `-`（除非原始数据确实为空）
+- 控制台显示 `[对比卡片] ✓` 成功日志

@@ -4517,11 +4517,11 @@ class WegoScraper:
             
             def get_product_detail(item):
                 return {
-                    "商品名称": item.get('商品名称', ''),
-                    "售价": item.get('售价', ''),
-                    "货号": item.get('货号', ''),
-                    "备注": item.get('备注', ''),
-                    "员工": item.get('员工', '')
+                    "商品描述": item.get('商品描述', '') or item.get('name', '') or item.get('商品名称', ''),
+                    "售价": item.get('售价', '') or item.get('price', ''),
+                    "货号": item.get('货号', '') or item.get('stock_number', ''),
+                    "备注": item.get('备注', '') or item.get('remark', ''),
+                    "员工": item.get('员工', '') or item.get('staff', '')
                 }
             
             def format_json_array(items):

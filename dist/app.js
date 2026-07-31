@@ -1526,9 +1526,9 @@
                     inMissingSection = false;
                 } else if ((skuData.inAddedSection || skuData.inDeletedSection) && line.includes('"货号":')) {
                     const skuMatch = line.match(/"货号":\s*"([^"]+)"/);
-                    const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/);
-                    const priceMatch = line.match(/"售价":\s*"([^"]+)"/);
-                    
+                    const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/) || line.match(/"商品名称":\s*"([^"]+)"/) || line.match(/"name":\s*"([^"]+)"/);
+                    const priceMatch = line.match(/"售价":\s*"([^"]+)"/) || line.match(/"price":\s*"([^"]+)"/);
+
                     const product = {
                         sku: skuMatch ? skuMatch[1] : '',
                         name: nameMatch ? nameMatch[1] : '',
@@ -1971,11 +1971,19 @@
                         console.error('[对比卡片] ❌ 未找到插入的卡片！');
                     }
                 }, 200);
-                const isMobile = window.innerWidth < 576;
-                if (isMobile) {
-                    const spiderOutputContent = document.getElementById('spider-output-content');
-                    if (spiderOutputContent) {
+
+                const spiderOutputContent = document.getElementById('spider-output-content');
+                if (spiderOutputContent) {
+                    const isMobile = window.innerWidth < 576;
+
+                    if (isMobile) {
                         spiderOutputContent.scrollTop = 0;
+                    } else {
+                        const comparisonCard = spiderOutputContent.querySelector('.comparison-card:last-child');
+                        if (comparisonCard) {
+                            comparisonCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            comparisonCard.style.animation = 'pulse 2s ease-in-out 3';
+                        }
                     }
                 }
             }
