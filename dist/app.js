@@ -1534,7 +1534,20 @@
                         name: nameMatch ? nameMatch[1] : '',
                         price: priceMatch ? priceMatch[1] : ''
                     };
-                    
+
+                    console.log(`[对比卡片] 📊 解析到${skuData.inDeletedSection ? '删除' : '新增'}商品:`, {
+                        原始行: line.trim(),
+                        解析结果: product,
+                        SKU匹配: !!skuMatch,
+                        名称匹配: !!nameMatch,
+                        价格匹配: !!priceMatch,
+                        匹配详情: {
+                            sku: skuMatch?.[0],
+                            name: nameMatch?.[0],
+                            price: priceMatch?.[0]
+                        }
+                    });
+
                     if (skuData.inAddedSection && product.sku) {
                         skuData.addedProducts.push(product);
                     } else if (skuData.inDeletedSection && product.sku) {
