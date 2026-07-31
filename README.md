@@ -7,6 +7,96 @@
 
 ## 🔄 最新更新
 
+### v3.8.89.12 🎯 对比数据字段匹配修复 + PC端显示优化
+
+#### 问题: 删除/新增商品对比中售价显示为"-", 且PC端难以查看对比结果
+**现象**: 
+1. 爬虫运行日志显示删除商品 `58187` 的售价为 `¥5,899`，但前端表格显示为 `-`
+2. 新增商品的售价、商品名称等字段也显示为 `-`
+3. 移动端能正常看到对比卡片，但PC端需要手动滚动才能看到
+
+**根本原因**:
+1. **后端字段名错误**: `get_product_detail()` 函数使用 `"商品名称"` 字段，但实际JSON数据中使用的是 `"商品描述"`，导致字段值始终为空
+2. **前端解析不健壮**: 前端正则只匹配单一字段名（如 `"商品描述":`），未兼容其他可能的字段名（`"商品名称":`, `"name":`）
+3. **PC端体验缺失**: 移动端会自动滚动到顶部查看对比结果，但PC端没有类似优化
+
+**修复方案**:
+
+##### 修复1: 后端字段名兼容 (main.py:4520-4529)
+```python
+# ❌ 修复前：使用错误的字段名
+def get_product_detail(item):
+    return {
+        "商品名称": item.get('商品名称', ''),  # 数据中是"商品描述"，永远取不到值
+        "售价": item.get('售价', ''),
+        "货号": item.get('货号', ''),
+        "备注": item.get('备注', ''),
+        "员工": item.get('员工', '')
+    }
+
+# ✅ 修复后：多字段名兼容 + 中英文段别名支持
+def get_product_detail(item):
+    return {
+        "商品描述": item.get('商品描述', '') or item.get('name', '') or item.get('商品名称', ''),
+        "售价": item.get('售价', '') or item.get('price', ''),
+        "货号": item.get('货号', '') or item.get('stock_number', ''),
+        "备注": item.get('备注', '') or item.get('remark', ''),
+        "员工": item.get('员工', '') or item.get('staff', '')
+    }
+```
+
+##### 修复2: 前端正则增强 (dist/app.js:1527-1540)
+```javascript
+// ❌ 修复前：只匹配单一字段名
+const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/);
+const priceMatch = line.match(/"售价":\s*"([^"]+)"/);
+
+// ✅ 修复后：多字段名兼容匹配
+const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/) 
+               || line.match(/"商品名称":\s*"([^"]+)"/) 
+               || line.match(/"name":\s*"([^"]+)"/);
+const priceMatch = line.match(/"售价":\s*"([^"]+)"/) 
+                 || line.match(/"price":\s*"([^"]+)"/);
+```
+
+##### 修复3: PC端自动定位 (dist/app.js:1984-1997)
+```javascript
+// ❌ 修复前：只有移动端才自动滚动
+const isMobile = window.innerWidth < 576;
+if (isMobile) {
+    spiderOutputContent.scrollTop = 0;
+}
+
+// ✅ 修复后：移动端滚动到顶，PC端滚动到卡片位置+动画提示
+if (isMobile) {
+    spiderOutputContent.scrollTop = 0;
+} else {
+    const comparisonCard = spiderOutputContent.querySelector('.comparison-card:last-child');
+    if (comparisonCard) {
+        comparisonCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        comparisonCard.style.animation = 'pulse 2s ease-in-out 3';  // 脉冲动画提醒用户
+    }
+}
+```
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **删除商品售价** | 显示 `-` ❌ | 显示 `¥5,899` ✅ |
+| **新增商品名称** | 为空 ❌ | 正确显示 ✅ |
+| **字段匹配率** | 单一匹配 ❌ | 多重兼容 ✅ |
+| **移动端体验** | 自动滚动 ✅ | 保持不变 ✅ |
+| **PC端体验** | 需手动查找 ❌ | 自动定位+动画 ✅ |
+
+**技术细节**:
+- **数据流**: `analyze_data_changes()` → `format_json_array()` → 前端正则解析 → 表格渲染
+- **字段映射**: JSON数据同时存储中文和英文字段名（如 `商品描述`/`name`, `售价`/`price`），需兼容两种格式
+- **容错设计**: 使用 `or` 链式调用确保至少能取到一个非空值
+- **动画效果**: CSS `pulse` 动画让新增的对比卡片在PC端更醒目
+- **向后兼容**: 修复不影响旧数据的解析，旧格式仍可正常工作
+
+---
+
 ### v3.8.89.11 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复
 
 #### 问题: hostc 隧道启动时报错 `WebSocket was closed before the connection was established` 并导致进程崩溃
