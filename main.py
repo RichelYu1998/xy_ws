@@ -6469,14 +6469,16 @@ if __name__ == '__main__':
                     headers={
                         'Content-Encoding': 'gzip',
                         'Vary': 'Accept-Encoding',
-                        'Cache-Control': 'public, max-age=86400'
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
                     }
                 )
             else:
                 return FileResponse(
                     path=file_path,
                     media_type=mimetype,
-                    headers={'Cache-Control': 'public, max-age=86400'}
+                    headers={'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0'}
                 )
 
         @app.post('/run')
