@@ -1524,34 +1524,42 @@
                     skuData.inDeletedSection = true;
                     skuData.deletedProducts = [];
                     inMissingSection = false;
-                } else if ((skuData.inAddedSection || skuData.inDeletedSection) && line.includes('"货号":')) {
-                    const skuMatch = line.match(/"货号":\s*"([^"]+)"/);
-                    const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/) || line.match(/"商品名称":\s*"([^"]+)"/) || line.match(/"name":\s*"([^"]+)"/);
-                    const priceMatch = line.match(/"售价":\s*"([^"]+)"/) || line.match(/"price":\s*"([^"]+)"/);
+                } else if ((skuData.inAddedSection || skuData.inDeletedSection)) {
+                    if (!skuData.currentProduct) {
+                        skuData.currentProduct = { sku: '', name: '', price: '' };
+                    }
 
-                    const product = {
-                        sku: skuMatch ? skuMatch[1] : '',
-                        name: nameMatch ? nameMatch[1] : '',
-                        price: priceMatch ? priceMatch[1] : ''
-                    };
+                    const currentP = skuData.currentProduct;
 
-                    console.log(`[对比卡片] 📊 解析到${skuData.inDeletedSection ? '删除' : '新增'}商品:`, {
-                        原始行: line.trim(),
-                        解析结果: product,
-                        SKU匹配: !!skuMatch,
-                        名称匹配: !!nameMatch,
-                        价格匹配: !!priceMatch,
-                        匹配详情: {
-                            sku: skuMatch?.[0],
-                            name: nameMatch?.[0],
-                            price: priceMatch?.[0]
+                    if (line.includes('"货号":')) {
+                        const match = line.match(/"货号":\s*"([^"]+)"/);
+                        if (match) currentP.sku = match[1];
+                    }
+                    if (line.includes('"商品描述":') || line.includes('"商品名称":') || line.includes('"name":')) {
+                        const match = line.match(/"商品描述":\s*"([^"]+)"/) || line.match(/"商品名称":\s*"([^"]+)"/) || line.match(/"name":\s*"([^"]+)"/);
+                        if (match) currentP.name = match[1];
+                    }
+                    if (line.includes('"售价":') || line.includes('"price":')) {
+                        const match = line.match(/"售价":\s*"([^"]+)"/) || line.match(/"price":\s*"([^"]+)"/);
+                        if (match) currentP.price = match[1];
+                    }
+
+                    if (line.trim() === '}' || line.trim() === '},') {
+                        if (currentP.sku) {
+                            console.log(`[对比卡片] 📊 解析到${skuData.inDeletedSection ? '删除' : '新增'}商品:`, {
+                                解析结果: {...currentP},
+                                SKU匹配: !!currentP.sku,
+                                名称匹配: !!currentP.name,
+                                价格匹配: !!currentP.price,
+                            });
+
+                            if (skuData.inAddedSection) {
+                                skuData.addedProducts.push({...currentP});
+                            } else if (skuData.inDeletedSection) {
+                                skuData.deletedProducts.push({...currentP});
+                            }
                         }
-                    });
-
-                    if (skuData.inAddedSection && product.sku) {
-                        skuData.addedProducts.push(product);
-                    } else if (skuData.inDeletedSection && product.sku) {
-                        skuData.deletedProducts.push(product);
+                        skuData.currentProduct = null;
                     }
                 } else if (line.includes('平均每个设备售出均价:') || line.includes('平均售出') || line.includes('平均价格') || 
                            line.includes('均价') || line.includes('平均')) {
