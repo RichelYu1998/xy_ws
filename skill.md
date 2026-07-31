@@ -7,9 +7,9 @@
 
 ---
 
-## 🔄 最新更新
+## 🔄 最新更新 (v3.8.89.11)
 
-### v3.8.89.11 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复
+### 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复
 
 #### 问题: hostc 隧道启动时报错 `WebSocket was closed before the connection was established` 并导致进程崩溃
 **现象**: 项目启动时 hostc 隧道尝试建立 WebSocket 连接，超时或失败后调用 `safeCloseWebSocket2` 关闭 socket，触发未捕获的 `error` 事件导致 Node.js 进程崩溃退出
@@ -81,7 +81,7 @@ function safeCloseWebSocket2(socket, code, reason) {
 
 ---
 
-### v3.8.89.10 🔧 隧道验证修复 — hostc/CF 均不可用的根因修复
+### 🔧 隧道验证修复 — hostc/CF 均不可用的根因修复
 
 #### 问题: 项目启动后 hostc 和 CF 隧道均被判定为"不可用"
 **现象**: 项目启动时 hostc 和 Cloudflare Tunnel 都能成功启动并获取到 URL，但心跳验证机制始终判定为不可用，导致反复重启隧道
@@ -11861,7 +11861,7 @@ class Spider:
 - 实现商品数据采集和保存功能
 
 ---
-### v3.5.0 (2026-04-29) - 🎉 v3.5.0版本发布
+### v3.5.0 (2026-04-29) - 🎉 v3.5.0版本发布
 
 #### 问题: v3.5.0版本发布
 **现象**: 发布v3.5.0版本
@@ -13026,4 +13026,3 @@ if __name__ == '__main__':
 **最后更新**: 2026-07-30  
 **下次审查**: 2026-08-06  
 **维护者**: 小旭数码开发团队
-
