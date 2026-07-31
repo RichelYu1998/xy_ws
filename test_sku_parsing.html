@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKU解析功能模拟测试</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+        h1 { color: #333; margin-bottom: 20px; font-size: 24px; }
+        .test-section { margin-bottom: 30px; padding: 15px; border: 1px solid #e4e7ed; border-radius: 4px; background: #fafafa; }
+        .test-section h3 { color: #409EFF; margin-bottom: 10px; font-size: 16px; }
+        .input-area { width: 100%; min-height: 150px; padding: 10px; font-family: monospace; font-size: 13px; border: 1px solid #dcdfe6; border-radius: 4px; resize: vertical; margin-bottom: 10px; }
+        button { padding: 10px 20px; background: #409EFF; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 10px; }
+        button:hover { background: #66b1ff; }
+        .result { margin-top: 15px; padding: 15px; background: #f0f9ff; border-left: 3px solid #409EFF; border-radius: 2px; }
+        .success { color: #67c23a; font-weight: bold; }
+        .error { color: #f56c6c; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 8px; text-align: left; border: 1px solid #ebeef5; }
+        th { background: #f5f7fa; font-weight: bold; }
+        .price-correct { color: #67c23a; background: #f0f9eb; }
+        .price-wrong { color: #f56c6c; background: #fef0f0; }
+        pre { background: #282c34; color: #abb2bf; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+        code { font-family: 'Consolas', 'Monaco', monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 SKU 解析功能模拟测试工具</h1>
+        
+        <div class="test-section">
+            <h3>📝 步骤1：粘贴爬虫原始输出数据</h3>
+            <textarea id="rawOutput" class="input-area" placeholder="在这里粘贴爬虫运行后的完整输出...
+
+示例格式：
+【删除商品】(1个):
+[
+  {
+    "商品描述": "iPhone 16 Pro Max",
+    "售价": "¥6,699",
+    "货号": "08055"
+  }
+]"></textarea>
+            <button onclick="testParsing()">▶️ 开始解析测试</button>
+            <button onclick="loadSampleData()">📋 加载示例数据</button>
+            <button onclick="clearAll()">🗑️ 清空</button>
+        </div>
+
+        <div id="result" class="result" style="display: none;">
+            <h3>📊 测试结果</h3>
+            <div id="parsingResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📖 使用说明</h3>
+            <ol style="line-height: 2; padding-left: 20px;">
+                <li><strong>获取数据</strong>：运行爬虫任务后，复制控制台或页面的完整输出文本</li>
+                <li><strong>粘贴到上方文本框</strong></li>
+                <li><strong>点击"开始解析测试"</strong></li>
+                <li><strong>查看结果</strong>：检查删除/新增商品的售价是否正确显示</li>
+            </ol>
+            
+            <h3 style="margin-top: 15px;">✅ 预期正确结果</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>货号</th>
+                        <th>售价</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>08055</td>
+                        <td class="price-correct">¥6,699</td>
+                        <td class="success">✅ 正确</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 style="margin-top: 15px;">❌ 错误结果（修复前）</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>货号</th>
+                        <th>售价</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td>08055</td>
+                        <td class="price-wrong">-</td>
+                        <td class="error">❌ 错误（字段未匹配）</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function loadSampleData() {
+            const sampleData = `执行任务 1...
+准备启动爬虫，将使用现有Cookie...
+==================================================
+Szwego商品爬虫 - v3.8.89
+==================================================
+开始运行...
+正在启动浏览器...
+浏览器启动耗时: 4.61秒
+上下文创建耗时: 0.04秒
+已加载 3 个Cookie
+页面创建耗时: 0.46秒
+直接通过API获取所有商品数据...
+共获取 82 个商品数据
+通过API成功获取 82 个商品
+数据获取耗时: 12.28秒
+已将旧数据保存为缓存文件
+数据已保存到 D:\\ws\\xy_ws\\file\\20260731微购相册(小旭数码).json
+成功获取 82 个商品
+售价 >= 599 的商品: 66 个
+预计售出价格累计: ¥167,476.00
+平均每个设备售出均价: ¥2,042.39
+闲鱼平台手续费累计: ¥2,679.62
+对比 20260731 新增 0 个，删除 1 个
+
+【新增商品】(0个):
+[]
+
+【删除商品】(1个):
+[
+  {
+    "商品描述": "iPhone 16 Pro Max      国行256G白色     电池容量92%     成色九九新",
+    "售价": "¥6,699",
+    "货号": "08055",
+    "备注": "屏幕下方有一道硬划痕，",
+    "员工": "店长"
+  }
+]
+
+============================================================
+对比结果
+============================================================
+
+对比文件: 20260731微购相册(小旭数码)_cache.json -> 20260731微购相册(小旭数码).json
+新增商品数: 0
+删除商品数: 1
+新增高价商品数: 0
+============================================================
+
+删除的商品:
+  1. 08055
+============================================================`;
+            
+            document.getElementById('rawOutput').value = sampleData;
+            console.log('✅ 示例数据已加载');
+        }
+
+        function testParsing() {
+            const rawOutput = document.getElementById('rawOutput').value;
+            if (!rawOutput.trim()) {
+                alert('请先粘贴或加载爬虫输出数据！');
+                return;
+            }
+
+            console.log('🚀 开始解析...');
+            console.log('📥 原始数据长度:', rawOutput.length);
+            
+            // 模拟 app.js 的解析逻辑
+            let skuData = {
+                inAddedSection: false,
+                inDeletedSection: false,
+                addedProducts: [],
+                deletedProducts: [],
+                totalProducts: 0,
+                newProductsCount: 0,
+                deletedProductsCount: 0
+            };
+
+            const lines = rawOutput.split('\n');
+            console.log('📊 总行数:', lines.length);
+
+            lines.forEach((line, index) => {
+                // 检测区域
+                if (line.includes('【新增商品】')) {
+                    skuData.inAddedSection = true;
+                    skuData.inDeletedSection = false;
+                    console.log(`[${index}] ✅ 检测到新增商品区域`);
+                } else if (line.includes('【删除商品】')) {
+                    skuData.inAddedSection = false;
+                    skuData.inDeletedSection = true;
+                    console.log(`[${index}] ✅ 检测到删除商品区域`);
+                } 
+                
+                // 解析商品数据
+                else if ((skuData.inAddedSection || skuData.inDeletedSection) && line.includes('"货号":')) {
+                    const skuMatch = line.match(/"货号":\s*"([^"]+)"/);
+                    const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/) 
+                                   || line.match(/"商品名称":\s*"([^"]+)"/) 
+                                   || line.match(/"name":\s*"([^"]+)"/);
+                    const priceMatch = line.match(/"售价":\s*"([^"]+)"/) 
+                                     || line.match(/"price":\s*"([^"]+)"/);
+
+                    const product = {
+                        sku: skuMatch ? skuMatch[1] : '',
+                        name: nameMatch ? nameMatch[1] : '',
+                        price: priceMatch ? priceMatch[1] : ''
+                    };
+
+                    console.log(`[对比卡片] 📊 解析到${skuData.inDeletedSection ? '删除' : '新增'}商品:`, {
+                        原始行: line.trim(),
+                        解析结果: product,
+                        SKU匹配: !!skuMatch,
+                        名称匹配: !!nameMatch,
+                        价格匹配: !!priceMatch,
+                        匹配详情: {
+                            sku: skuMatch?.[0],
+                            name: nameMatch?.[0],
+                            price: priceMatch?.[0]
+                        }
+                    });
+
+                    if (skuData.inAddedSection && product.sku) {
+                        skuData.addedProducts.push(product);
+                    } else if (skuData.inDeletedSection && product.sku) {
+                        skuData.deletedProducts.push(product);
+                    }
+                } 
+                
+                // 提取统计数字
+                else if (line.includes('删除商品数:')) {
+                    const count = parseInt(line.split(':')[1].trim());
+                    skuData.deletedProductsCount = count || 0;
+                }
+            });
+
+            // 显示结果
+            displayResult(skuData);
+        }
+
+        function displayResult(skuData) {
+            const resultDiv = document.getElementById('result');
+            const parsingDiv = document.getElementById('parsingResult');
+            
+            resultDiv.style.display = 'block';
+            
+            let html = `
+                <h4>📋 解析统计</h4>
+                <ul style="line-height: 2;">
+                    <li>新增商品数: <strong>${skuData.addedProducts.length}</strong></li>
+                    <li>删除商品数: <strong>${skuData.deletedProducts.length}</strong></li>
+                </ul>
+            `;
+
+            // 显示删除商品表格
+            if (skuData.deletedProducts.length > 0) {
+                html += `
+                    <h4 style="margin-top: 20px; color: #f56c6c;">❌ 删除商品详情 (${skuData.deletedProducts.length}个)</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>货号</th>
+                                <th>售价</th>
+                                <th>商品名称</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${skuData.deletedProducts.map((p, idx) => `
+                                <tr>
+                                    <td>${idx + 1}</td>
+                                    <td><strong>${p.sku}</strong></td>
+                                    <td class="${p.price ? 'price-correct' : 'price-wrong'}">${p.price || '-'}</td>
+                                    <td>${p.name || '-'}</td>
+                                    <td class="${p.price ? 'success' : 'error'}">${p.price ? '✅ 正确' : '❌ 未匹配到价格'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            // 显示新增商品表格
+            if (skuData.addedProducts.length > 0) {
+                html += `
+                    <h4 style="margin-top: 20px; color: #67c23a;">✅ 新增商品详情 (${skuData.addedProducts.length}个)</h4>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>货号</th>
+                                <th>售价</th>
+                                <th>商品名称</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${skuData.addedProducts.map((p, idx) => `
+                                <tr>
+                                    <td>${idx + 1}</td>
+                                    <td><strong>${p.sku}</strong></td>
+                                    <td class="${p.price ? 'price-correct' : 'price-wrong'}">${p.price || '-'}</td>
+                                    <td>${p.name || '-'}</td>
+                                    <td class="${p.price ? 'success' : 'error'}">${p.price ? '✅ 正确' : '❌ 未匹配到价格'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+
+            // 添加调试信息
+            html += `
+                <h4 style="margin-top: 20px;">🔍 调试日志（查看浏览器控制台获取详细信息）</h4>
+                <pre><code>// 在浏览器控制台 (F12) 中可以看到详细的解析过程
+console.log('[对比卡片] 📊 解析到删除商品: {...})
+// 包含：原始行、解析结果、SKU匹配、名称匹配、价格匹配等信息</code></pre>
+            `;
+
+            parsingDiv.innerHTML = html;
+
+            // 输出到控制台
+            console.log('✅ 解析完成！结果:', skuData);
+            console.log('💡 删除商品列表:', skuData.deletedProducts);
+            console.log('💡 新增商品列表:', skuData.addedProducts);
+            
+            // 滚动到结果区域
+            resultDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function clearAll() {
+            document.getElementById('rawOutput').value = '';
+            document.getElementById('result').style.display = 'none';
+            console.log('🗑️ 已清空');
+        }
+
+        // 页面加载时提示
+        window.onload = function() {
+            console.log('🔍 SKU解析测试工具已准备就绪');
+            console.log('💡 提示：点击"加载示例数据"快速测试');
+        };
+    </script>
+</body>
+</html>
