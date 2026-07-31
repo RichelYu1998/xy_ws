@@ -4362,3 +4362,304 @@ prettier --write dist/app.js
 - 所有三种格式都能正确提取字段值
 - 表格中不会出现 `-`（除非原始数据确实为空）
 - 控制台显示 `[对比卡片] ✓` 成功日志
+
+---
+
+## 🔴 PY-CORE-008: 代码库卫生维护范式 (Codebase Hygiene Maintenance)
+
+### 范式描述
+建立定期清理机制，及时移除临时文件、测试工具和废弃脚本，保持代码库整洁和可维护性。
+
+### 核心原则
+
+#### 1. 文件生命周期管理
+```python
+class FileLifecycleManager:
+    """文件生命周期管理器"""
+    
+    TEMP_FILE_PATTERNS = [
+        'test_*.html',      # 测试工具
+        'test_*.py',        # 测试脚本
+        'generate_*.py',    # 生成器脚本
+        'fix_*.py',         # 临时修复脚本
+        'debug_*.log',      # 调试日志
+        '*.tmp',            # 临时文件
+        '~$*'               # Office锁文件
+    ]
+    
+    @classmethod
+    def should_cleanup(cls, file_path):
+        """
+        判断文件是否应该被清理
+        
+        清理标准：
+        1. 匹配临时文件模式
+        2. 已完成历史使命（功能已验证/整合）
+        3. 不影响核心功能
+        4. 可通过Git历史恢复
+        """
+        import fnmatch
+        
+        filename = os.path.basename(file_path)
+        
+        for pattern in cls.TEMP_FILE_PATTERNS:
+            if fnmatch.fnmatch(filename, pattern):
+                return True
+        
+        return False
+    
+    @classmethod
+    def cleanup_temp_files(cls, project_dir, dry_run=False):
+        """
+        清理临时文件
+        
+        Args:
+            project_dir: 项目根目录
+            dry_run: 如果为True，只显示要删除的文件，不实际删除
+        """
+        removed_files = []
+        
+        for root, dirs, files in os.walk(project_dir):
+            # 跳过 .git、.venv 等目录
+            dirs[:] = [d for d in dirs if d not in ['.git', '.venv', 'node_modules', '__pycache__']]
+            
+            for file in files:
+                file_path = os.path.join(root, file)
+                
+                if cls.should_cleanup(file_path):
+                    if dry_run:
+                        print(f'[DRY-RUN] 将删除: {file_path}')
+                        removed_files.append(file_path)
+                    else:
+                        try:
+                            os.remove(file_path)
+                            print(f'✓ 已删除: {file_path}')
+                            removed_files.append(file_path)
+                        except Exception as e:
+                            print(f'✗ 删除失败: {file_path} - {e}')
+        
+        return removed_files
+```
+
+#### 2. 清理决策清单
+```python
+class CleanupChecklist:
+    """清理前检查清单"""
+    
+    @staticmethod
+    def pre_cleanup_checks(file_path):
+        """
+        删除前的安全检查
+        
+        Returns:
+            (can_delete, reason) 元组
+        """
+        checks = {
+            '核心功能依赖': not is_core_dependency(file_path),
+            '文档已独立维护': is_documentation_independent(file_path),
+            'Git历史可恢复': is_in_git_history(file_path),
+            '无运行时依赖': not has_runtime_dependency(file_path),
+            '测试已完成': is_testing_completed(file_path)
+        }
+        
+        all_pass = all(checks.values())
+        failed = [k for k, v in checks.items() if not v]
+        
+        return all_pass, failed if not all_pass else None
+    
+    @staticmethod
+    def generate_recovery_instructions(removed_files):
+        """
+        生成恢复说明文档
+        
+        Args:
+            removed_files: 已删除的文件列表
+            
+        Returns:
+            Markdown格式的恢复指南
+        """
+        instructions = ["## 📁 文件恢复指南\n"]
+        instructions.append("以下文件已被清理，如需恢复请使用对应的命令：\n")
+        
+        for file_path in removed_files:
+            relative_path = os.path.relpath(file_path)
+            instructions.append(f"### {relative_path}")
+            instructions.append(f"\`\`\`bash")
+            instructions.append(f"git show HEAD~1:{relative_path} > {relative_path}")
+            instructions.append(f"\`\`\`\n")
+        
+        return '\n'.join(instructions)
+```
+
+#### 3. 自动化清理流程
+```python
+# 在 CI/CD 或 pre-commit 钩子中使用
+def automated_cleanup_pipeline():
+    """自动化清理流水线"""
+    
+    print('🧹 开始代码库卫生检查...\n')
+    
+    # Step 1: 识别候选文件
+    candidates = FileLifecycleManager.cleanup_temp_files(
+        project_dir=PROJECT_DIR,
+        dry_run=True  # 先预览
+    )
+    
+    if not candidates:
+        print('✅ 代码库整洁，无需清理')
+        return
+    
+    print(f'\n📋 发现 {len(candidates)} 个候选文件：')
+    for f in candidates:
+        print(f'  - {os.path.relpath(f)}')
+    
+    # Step 2: 安全检查
+    safe_to_remove = []
+    for file_path in candidates:
+        can_delete, reasons = CleanupChecklist.pre_cleanup_checks(file_path)
+        if can_delete:
+            safe_to_remove.append(file_path)
+        else:
+            print(f'⚠️  跳过: {os.path.relpath(file_path)}')
+            print(f'   原因: {", ".join(reasons)}')
+    
+    # Step 3: 执行清理
+    if safe_to_remove:
+        print(f'\n🗑️  准备删除 {len(safe_to_remove)} 个文件...')
+        removed = FileLifecycleManager.cleanup_temp_files(
+            project_dir=PROJECT_DIR,
+            dry_run=False
+        )
+        
+        # Step 4: 生成恢复指南
+        recovery_guide = CleanupChecklist.generate_recovery_instructions(removed)
+        with open('RECOVERY_GUIDE.md', 'w', encoding='utf-8') as f:
+            f.write(recovery_guide)
+        
+        print(f'\n✅ 清理完成！已删除 {len(removed)} 个文件')
+        print(f'📝 恢复指南已保存到 RECOVERY_GUIDE.md')
+```
+
+### 实施规范
+
+#### 清理时机
+| 触发条件 | 操作 | 说明 |
+|----------|------|------|
+| **版本发布前** | 必须清理 | 确保发布包干净 |
+| **功能验证后** | 建议清理 | 测试工具完成使命 |
+| **每周例行** | 推荐执行 | 保持代码库健康 |
+| **合并PR前** | 检查提醒 | 避免引入临时文件 |
+
+#### 文件分类标准
+```yaml
+# 应该删除的文件
+must_remove:
+  - pattern: "test_*.html"
+    reason: "临时测试工具"
+    lifecycle: "功能验证后即可删除"
+  
+  - pattern: "generate_*.py"
+    reason: "一次性生成脚本"
+    lifecycle: "文档生成完成后删除"
+
+# 不应该删除的文件
+never_remove:
+  - pattern: "*.md"
+    reason: "项目文档"
+    exception: "README.md, skill.md, CHANGELOG.md"
+  
+  - pattern: "config/*.json"
+    reason: "配置文件"
+    exception: null
+  
+  - pattern: "dist/**"
+    reason: "构建产物"
+    exception: "由CI/CD管理"
+```
+
+#### Git 提交规范
+```bash
+# 清理操作的提交信息格式
+git add -A
+git commit -m "chore: 代码清理 - 删除临时测试文件和生成脚本 (v3.8.89.13)
+
+删除的文件:
+- test_sku_parsing.html (SKU解析测试工具)
+- generate_*.py (文档生成脚本系列)
+
+清理原因:
+- 测试工具已完成历史使命
+- 生成脚本已整合到开发流程
+- 保持代码库整洁
+
+影响范围: 无（核心功能不受影响）
+恢复方法: git show HEAD~1:<filename> > <filename>"
+```
+
+### 最佳实践
+
+#### ✅ 推荐做法
+1. **先预览再删除**: 使用 `dry_run=True` 先查看将要删除的文件
+2. **批量操作**: 一次性清理所有临时文件，避免多次提交
+3. **记录清晰**: 在提交信息中详细说明删除原因和恢复方法
+4. **更新文档**: 同步更新 README.md 和 CHANGELOG.md
+5. **团队同步**: 清理前通知团队成员，避免工作丢失
+
+#### ❌ 避免做法
+1. **不要强制删除**: 使用 `-f` 参数前务必确认
+2. **不要忽略.gitignore**: 确保临时文件已在 .gitignore 中
+3. **不要删除未跟踪的新文件**: 可能是同事正在开发的代码
+4. **不要在生产环境清理**: 只在开发分支执行
+5. **不要忘记备份**: 虽然有Git历史，但养成好习惯
+
+### 工具集成
+
+#### VS Code 设置
+```json
+// .vscode/settings.json
+{
+  "files.exclude": {
+    "**/test_*.html": true,
+    "**/generate_*.py": true,
+    "**/fix_*.py": true,
+    "**/*.tmp": true,
+    "**/~$*": true
+  },
+  "files.watcherExclude": {
+    "**/test_*": true,
+    "**/generate_*": true
+  }
+}
+```
+
+#### Pre-commit Hook
+```bash
+# .pre-commit-config.yaml
+repos:
+  - repo: local
+    hooks:
+      - id: cleanup-temp-files
+        name: 清理临时文件
+        entry: python -c "
+from file_lifecycle import FileLifecycleManager
+import sys
+sys.exit(0 if FileLifecycleManager.cleanup_temp_files('.', dry_run=True) else 1)
+"
+        language: system
+        pass_filenames: false
+        always_run: true
+        verbose: true
+```
+
+**技术细节**:
+- **安全第一**: 所有删除操作都经过多重安全检查
+- **可追溯性**: Git历史完整保留所有文件的完整记录
+- **可恢复性**: 提供一键恢复命令和详细指南
+- **自动化**: 支持CI/CD集成和pre-commit钩子
+- **团队友好**: 干运行模式和详细日志避免误删
+
+**适用场景**:
+- ✅ 版本发布前的代码库整理
+- ✅ 功能完成后的测试工具清理
+- ✅ 项目交接时的代码库瘦身
+- ✅ 定期维护的卫生保持

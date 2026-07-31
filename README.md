@@ -7,6 +7,49 @@
 
 ## 🔄 最新更新
 
+### v3.8.89.13 🧹 代码清理 — 删除测试工具和生成脚本
+
+#### 更新内容: 清理项目中的临时测试文件和生成脚本，保持代码库整洁
+
+**删除的文件**:
+1. **test_sku_parsing.html** - SKU解析功能模拟测试工具
+   - 用于测试前端解析爬虫输出数据的功能
+   - 已完成调试使命，不再需要保留
+   - 包含示例数据和交互式测试界面
+
+2. **generate_*.py** - 文档生成脚本系列
+   - generate_readme.py - README.md 生成器
+   - generate_skill.py - skill.md 生成器
+   - generate_docx.py - skill.docx 生成器
+   - 这些脚本已整合到开发流程中，无需单独保留
+
+**清理原因**:
+- ✅ 测试工具已完成历史使命（v3.8.89.12 字段匹配修复已验证通过）
+- ✅ 生成脚本功能已内嵌到维护流程中
+- ✅ 避免代码库膨胀，保持项目整洁
+- ✅ 减少潜在的安全风险（测试文件可能包含敏感逻辑）
+
+**影响范围**:
+| 项目 | 影响 | 说明 |
+|------|------|------|
+| **核心功能** | 无影响 ✅ | 爬虫、API、前端均不受影响 |
+| **文档** | 无影响 ✅ | README.md、skill.md、skill.docx 已独立维护 |
+| **测试** | 无影响 ✅ | 可随时重新创建测试文件 |
+| **Git历史** | 完整保留 ✅ | 可通过 `git checkout` 恢复任意版本 |
+
+**恢复方法** (如需要):
+```bash
+# 恢复 test_sku_parsing.html
+git show HEAD~1:test_sku_parsing.html > test_sku_parsing.html
+
+# 恢复 generate_*.py 脚本
+git show HEAD~1:generate_readme.py > generate_readme.py
+git show HEAD~1:generate_skill.py > generate_skill.py
+git show HEAD~1:generate_docx.py > generate_docx.py
+```
+
+---
+
 ### v3.8.89.12 🎯 对比数据字段匹配修复 + PC端显示优化
 
 #### 问题: 删除/新增商品对比中售价显示为"-", 且PC端难以查看对比结果
