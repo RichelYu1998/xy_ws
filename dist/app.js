@@ -1980,7 +1980,7 @@
                                         ${skuData.addedProducts.map((p, idx) => `<tr>
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0)" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(p.sku)}</a></td>
-                                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><a href="javascript:void(0)" data-desc="${escapeAttr(p.name || '')}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</a></td>
+                                            <td style="word-break: break-word; white-space: normal; min-width: 200px;"><a href="javascript:void(0)" data-desc="${escapeAttr(p.name || '')}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</a></td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
@@ -2001,7 +2001,7 @@
                                         ${skuData.deletedProducts.map((p, idx) => `<tr>
                                             <td>${idx + 1}</td>
                                             <td>${escapeHtml(p.sku)}</td>
-                                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</td>
+                                            <td style="word-break: break-word; white-space: normal; min-width: 200px;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
