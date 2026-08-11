@@ -1,85 +1,85 @@
- # 微购相册开发技能文档 (Skill Documentation)
+﻿ # 寰喘鐩稿唽寮€鍙戞妧鑳芥枃妗?(Skill Documentation)
 
-## 📖 文档概述
+## 馃摉 鏂囨。姒傝堪
 
-**作者**: 小旭二手机（西园路）
+**浣滆€?*: 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級
 
-本文档定义了微购相册管理系统的**完整代码开发规范、架构设计、最佳实践和技术标准**。所有开发者必须严格遵守本规范。
+鏈枃妗ｅ畾涔変簡寰喘鐩稿唽绠＄悊绯荤粺鐨?*瀹屾暣浠ｇ爜寮€鍙戣鑼冦€佹灦鏋勮璁°€佹渶浣冲疄璺靛拰鎶€鏈爣鍑?*銆傛墍鏈夊紑鍙戣€呭繀椤讳弗鏍奸伒瀹堟湰瑙勮寖銆?
 
 ---
 
-## 🏗️ 项目架构总览
+## 馃彈锔?椤圭洰鏋舵瀯鎬昏
 
-### 技术栈
-- **后端**: Python 3.14 + FastAPI + Pydantic V2
-- **前端**: JavaScript (ES6+) + HTML5 + CSS3
-- **数据库**: JSON文件存储 + Excel文件
-- **部署**: hostc隧道 / Cloudflare Tunnel双隧道方案
-- **浏览器自动化**: Playwright (async)
+### 鎶€鏈爤
+- **鍚庣**: Python 3.14 + FastAPI + Pydantic V2
+- **鍓嶇**: JavaScript (ES6+) + HTML5 + CSS3
+- **鏁版嵁搴?*: JSON鏂囦欢瀛樺偍 + Excel鏂囦欢
+- **閮ㄧ讲**: hostc闅ч亾 / Cloudflare Tunnel鍙岄毀閬撴柟妗?
+- **娴忚鍣ㄨ嚜鍔ㄥ寲**: Playwright (async)
 
-### 核心模块架构
+### 鏍稿績妯″潡鏋舵瀯
 
-#### Python后端模块 (main.py)
+#### Python鍚庣妯″潡 (main.py)
 ```
 main.py
-├── 异常处理系统
-│   ├── AppException - 统一异常类
-│   ├── ExceptionHandler - 异常处理器
-│   └── ExceptionContext - 异常上下文管理器
-├── 工具函数层
-│   ├── safe_call() - 安全调用包装器
-│   ├── handle_error() - 错误处理
-│   └── format_size() - 格式化工具
-├── 日志系统
-│   ├── TeeOutput - 双输出流
-│   ├── setup_logger() - 日志配置
-│   └── log_print() - 日志打印
-├── 文件管理
-│   ├── FileManager - 文件操作类
-│   ├── PathManager - 路径管理类
-│   └── FileCacheManager - 文件缓存管理
-├── 配置管理
-│   ├── ConfigManager - 配置管理器
-│   └── Environment - 环境变量管理
-├── 邮件通知
-│   └── EmailNotifier - 邮件通知类
-├── 隧道管理
-│   ├── auto_start_tunnel() - 隧道启动
-│   ├── verify_url() - URL验证
-│   └── send_heartbeat() - 心跳检测
-├── 爬虫引擎
-│   ├── WegoScraper - 爬虫核心类
-│   └── StockNumberComparator - 数据对比类
-├── API路由层
-│   ├── FastAPI应用实例
-│   ├── 速率限制器 (RateLimiter)
-│   └── 输入验证 (Pydantic模型)
-└── 前端交互层 (dist/app.js)
-    ├── 安全工具函数
-    ├── 设备检测与适配
-    ├── 数据解析与展示
-    └── UI组件管理
+鈹溾攢鈹€ 寮傚父澶勭悊绯荤粺
+鈹?  鈹溾攢鈹€ AppException - 缁熶竴寮傚父绫?
+鈹?  鈹溾攢鈹€ ExceptionHandler - 寮傚父澶勭悊鍣?
+鈹?  鈹斺攢鈹€ ExceptionContext - 寮傚父涓婁笅鏂囩鐞嗗櫒
+鈹溾攢鈹€ 宸ュ叿鍑芥暟灞?
+鈹?  鈹溾攢鈹€ safe_call() - 瀹夊叏璋冪敤鍖呰鍣?
+鈹?  鈹溾攢鈹€ handle_error() - 閿欒澶勭悊
+鈹?  鈹斺攢鈹€ format_size() - 鏍煎紡鍖栧伐鍏?
+鈹溾攢鈹€ 鏃ュ織绯荤粺
+鈹?  鈹溾攢鈹€ TeeOutput - 鍙岃緭鍑烘祦
+鈹?  鈹溾攢鈹€ setup_logger() - 鏃ュ織閰嶇疆
+鈹?  鈹斺攢鈹€ log_print() - 鏃ュ織鎵撳嵃
+鈹溾攢鈹€ 鏂囦欢绠＄悊
+鈹?  鈹溾攢鈹€ FileManager - 鏂囦欢鎿嶄綔绫?
+鈹?  鈹溾攢鈹€ PathManager - 璺緞绠＄悊绫?
+鈹?  鈹斺攢鈹€ FileCacheManager - 鏂囦欢缂撳瓨绠＄悊
+鈹溾攢鈹€ 閰嶇疆绠＄悊
+鈹?  鈹溾攢鈹€ ConfigManager - 閰嶇疆绠＄悊鍣?
+鈹?  鈹斺攢鈹€ Environment - 鐜鍙橀噺绠＄悊
+鈹溾攢鈹€ 閭欢閫氱煡
+鈹?  鈹斺攢鈹€ EmailNotifier - 閭欢閫氱煡绫?
+鈹溾攢鈹€ 闅ч亾绠＄悊
+鈹?  鈹溾攢鈹€ auto_start_tunnel() - 闅ч亾鍚姩
+鈹?  鈹溾攢鈹€ verify_url() - URL楠岃瘉
+鈹?  鈹斺攢鈹€ send_heartbeat() - 蹇冭烦妫€娴?
+鈹溾攢鈹€ 鐖櫕寮曟搸
+鈹?  鈹溾攢鈹€ WegoScraper - 鐖櫕鏍稿績绫?
+鈹?  鈹斺攢鈹€ StockNumberComparator - 鏁版嵁瀵规瘮绫?
+鈹溾攢鈹€ API璺敱灞?
+鈹?  鈹溾攢鈹€ FastAPI搴旂敤瀹炰緥
+鈹?  鈹溾攢鈹€ 閫熺巼闄愬埗鍣?(RateLimiter)
+鈹?  鈹斺攢鈹€ 杈撳叆楠岃瘉 (Pydantic妯″瀷)
+鈹斺攢鈹€ 鍓嶇浜や簰灞?(dist/app.js)
+    鈹溾攢鈹€ 瀹夊叏宸ュ叿鍑芥暟
+    鈹溾攢鈹€ 璁惧妫€娴嬩笌閫傞厤
+    鈹溾攢鈹€ 鏁版嵁瑙ｆ瀽涓庡睍绀?
+    鈹斺攢鈹€ UI缁勪欢绠＄悊
 ```
 
 ---
 
-# 📚 完整项目范式体系 (Project Paradigm System)
+# 馃摎 瀹屾暣椤圭洰鑼冨紡浣撶郴 (Project Paradigm System)
 
-基于项目代码深度分析，以下是微购相册项目的**完整技术范式和最佳实践**。
+鍩轰簬椤圭洰浠ｇ爜娣卞害鍒嗘瀽锛屼互涓嬫槸寰喘鐩稿唽椤圭洰鐨?*瀹屾暣鎶€鏈寖寮忓拰鏈€浣冲疄璺?*銆?
 
 ---
 
-## 🔴 PY-CORE-001: 统一异常处理范式 (Unified Exception Handling)
+## 馃敶 PY-CORE-001: 缁熶竴寮傚父澶勭悊鑼冨紡 (Unified Exception Handling)
 
-### 范式描述
-建立分层异常处理机制，实现异常的统一捕获、分类、记录和转换。
+### 鑼冨紡鎻忚堪
+寤虹珛鍒嗗眰寮傚父澶勭悊鏈哄埗锛屽疄鐜板紓甯哥殑缁熶竴鎹曡幏銆佸垎绫汇€佽褰曞拰杞崲銆?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 
-#### 1. 自定义异常基类 - `AppException`
+#### 1. 鑷畾涔夊紓甯稿熀绫?- `AppException`
 ```python
 class AppException(Exception):
-    """统一异常类 - 所有业务异常都使用此类"""
+    """缁熶竴寮傚父绫?- 鎵€鏈変笟鍔″紓甯搁兘浣跨敤姝ょ被"""
     
     CATEGORY_FILE = 'FILE'
     CATEGORY_NETWORK = 'NETWORK'
@@ -98,27 +98,27 @@ class AppException(Exception):
         
     @classmethod
     def file_error(cls, message, file_path=None, operation=None):
-        """工厂方法：创建文件操作异常"""
+        """宸ュ巶鏂规硶锛氬垱寤烘枃浠舵搷浣滃紓甯?""
         return cls(message, category=cls.CATEGORY_FILE, 
                   details={'file_path': file_path, 'operation': operation})
     
     @classmethod
     def network_error(cls, message, url=None, status_code=None):
-        """工厂方法：创建网络请求异常"""
+        """宸ュ巶鏂规硶锛氬垱寤虹綉缁滆姹傚紓甯?""
         return cls(message, category=cls.CATEGORY_NETWORK,
                   details={'url': url, 'status_code': status_code})
 ```
 
-**关键特性**:
-- ✅ 13种异常类别覆盖（FILE/NETWORK/AUTH/BROWSER/PARSE等）
-- ✅ 工厂方法模式简化异常创建
-- ✅ 结构化错误详情（details字典）
-- ✅ 自动错误码生成
+**鍏抽敭鐗规€?*:
+- 鉁?13绉嶅紓甯哥被鍒鐩栵紙FILE/NETWORK/AUTH/BROWSER/PARSE绛夛級
+- 鉁?宸ュ巶鏂规硶妯″紡绠€鍖栧紓甯稿垱寤?
+- 鉁?缁撴瀯鍖栭敊璇鎯咃紙details瀛楀吀锛?
+- 鉁?鑷姩閿欒鐮佺敓鎴?
 
-#### 2. 单例异常处理器 - `ExceptionHandler`
+#### 2. 鍗曚緥寮傚父澶勭悊鍣?- `ExceptionHandler`
 ```python
 class ExceptionHandler:
-    """统一异常处理器（单例模式）"""
+    """缁熶竴寮傚父澶勭悊鍣紙鍗曚緥妯″紡锛?""
     
     _instance = None
     
@@ -129,14 +129,14 @@ class ExceptionHandler:
         return cls._instance
     
     def handle(self, error: Exception, context: str = '') -> str:
-        """处理异常并返回格式化错误信息"""
+        """澶勭悊寮傚父骞惰繑鍥炴牸寮忓寲閿欒淇℃伅"""
         error_type = type(error).__name__
         error_msg = str(error)
         
-        # 记录错误统计
+        # 璁板綍閿欒缁熻
         self._error_counts[error_type] = self._error_counts.get(error_type, 0) + 1
         
-        # 记录错误历史
+        # 璁板綍閿欒鍘嗗彶
         self._error_history.append({
             'timestamp': datetime.now().isoformat(),
             'type': error_type,
@@ -147,7 +147,7 @@ class ExceptionHandler:
         return f"[{error_type}] {error_msg}"
     
     def try_execute(self, func: Callable, default: Any = None, context: str = '') -> Any:
-        """安全执行函数，失败时返回默认值"""
+        """瀹夊叏鎵ц鍑芥暟锛屽け璐ユ椂杩斿洖榛樿鍊?""
         try:
             return func()
         except Exception as e:
@@ -155,7 +155,7 @@ class ExceptionHandler:
             return default
     
     def retry_on_exception(self, func, max_retries=3, delay=1.0, context=''):
-        """带重试机制的异常处理"""
+        """甯﹂噸璇曟満鍒剁殑寮傚父澶勭悊"""
         for attempt in range(max_retries):
             try:
                 return func()
@@ -165,16 +165,16 @@ class ExceptionHandler:
         raise last_error
 ```
 
-**核心能力**:
-- ✅ 单例模式确保全局唯一实例
-- ✅ 错误统计和历史记录
-- ✅ 重复错误抑制（避免日志爆炸）
-- ✅ 重试机制支持
+**鏍稿績鑳藉姏**:
+- 鉁?鍗曚緥妯″紡纭繚鍏ㄥ眬鍞竴瀹炰緥
+- 鉁?閿欒缁熻鍜屽巻鍙茶褰?
+- 鉁?閲嶅閿欒鎶戝埗锛堥伩鍏嶆棩蹇楃垎鐐革級
+- 鉁?閲嶈瘯鏈哄埗鏀寔
 
-#### 3. 上下文管理器 - `ExceptionContext`
+#### 3. 涓婁笅鏂囩鐞嗗櫒 - `ExceptionContext`
 ```python
 class ExceptionContext:
-    """异常处理上下文管理器（with语句语法糖）"""
+    """寮傚父澶勭悊涓婁笅鏂囩鐞嗗櫒锛坵ith璇彞璇硶绯栵級"""
     
     def __init__(self, context='', default=None, show_traceback=True):
         self.context = context
@@ -187,41 +187,41 @@ class ExceptionContext:
         if exc_type is not None:
             self.error = self.handler.handle(exc_val, self.context)
             self.result = self.default
-            return True  # 吞掉异常
+            return True  # 鍚炴帀寮傚父
         return False
     
     def get_result(self) -> Tuple[Any, str]:
-        """获取结果和错误信息"""
+        """鑾峰彇缁撴灉鍜岄敊璇俊鎭?""
         return self.result, self.error
 ```
 
-**使用示例**:
+**浣跨敤绀轰緥**:
 ```python
-# 方式1：使用上下文管理器
-with ExceptionContext("读取配置文件", default={}) as ctx:
+# 鏂瑰紡1锛氫娇鐢ㄤ笂涓嬫枃绠＄悊鍣?
+with ExceptionContext("璇诲彇閰嶇疆鏂囦欢", default={}) as ctx:
     config = json.load(open('config.json'))
 result, error = ctx.get_result()
 
-# 方式2：使用装饰器
-@exception_handler(context="处理用户请求", default={"error": "系统繁忙"})
+# 鏂瑰紡2锛氫娇鐢ㄨ楗板櫒
+@exception_handler(context="澶勭悊鐢ㄦ埛璇锋眰", default={"error": "绯荤粺绻佸繖"})
 def process_request(data):
     return complex_operation(data)
 
-# 方式3：使用安全调用
-data = safe_call(lambda: json.load(f), default={}, context='读取JSON')
+# 鏂瑰紡3锛氫娇鐢ㄥ畨鍏ㄨ皟鐢?
+data = safe_call(lambda: json.load(f), default={}, context='璇诲彇JSON')
 ```
 
 ---
 
-## 🔴 PY-CORE-002: 环境自适应范式 (Environment-Aware Design)
+## 馃敶 PY-CORE-002: 鐜鑷€傚簲鑼冨紡 (Environment-Aware Design)
 
-### 范式描述
-通过`Environment`静态类实现跨平台兼容性，自动适配Windows/Mac/Linux系统差异。
+### 鑼冨紡鎻忚堪
+閫氳繃`Environment`闈欐€佺被瀹炵幇璺ㄥ钩鍙板吋瀹规€э紝鑷姩閫傞厤Windows/Mac/Linux绯荤粺宸紓銆?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class Environment:
-    """统一环境检测和管理"""
+    """缁熶竴鐜妫€娴嬪拰绠＄悊"""
     
     SYSTEM = platform.system()
     IS_WINDOWS = SYSTEM == 'Windows'
@@ -230,7 +230,7 @@ class Environment:
     
     @staticmethod
     def get_venv_python():
-        """获取虚拟环境Python路径"""
+        """鑾峰彇铏氭嫙鐜Python璺緞"""
         if Environment.IS_WINDOWS:
             return os.path.join(PROJECT_DIR, '.venv', 'Scripts', 'python.exe')
         else:
@@ -238,7 +238,7 @@ class Environment:
     
     @staticmethod
     def get_browser_args():
-        """根据系统返回不同的浏览器启动参数"""
+        """鏍规嵁绯荤粺杩斿洖涓嶅悓鐨勬祻瑙堝櫒鍚姩鍙傛暟"""
         args = ['--no-sandbox', '--disable-setuid-sandbox']
         if Environment.IS_WINDOWS:
             args.append('--disable-gpu')
@@ -248,7 +248,7 @@ class Environment:
     
     @staticmethod
     def get_user_agent():
-        """动态生成User-Agent（随机Chrome版本号）"""
+        """鍔ㄦ€佺敓鎴怳ser-Agent锛堥殢鏈篊hrome鐗堟湰鍙凤級"""
         versions = ['120.0.0.0', '121.0.0.0', ..., '129.0.0.0']
         chrome_version = random.choice(versions)
         
@@ -261,31 +261,31 @@ class Environment:
     
     @staticmethod
     def kill_process_by_name(process_name):
-        """跨系统终止进程"""
+        """璺ㄧ郴缁熺粓姝㈣繘绋?""
         if Environment.IS_WINDOWS:
             subprocess.run(f'taskkill /F /IM {process_name}', shell=True)
         else:
             subprocess.run(f'pkill -f "{process_name}"', shell=True)
 ```
 
-**关键特性**:
-- ✅ 系统类型自动检测（IS_WINDOWS/IS_MAC/IS_LINUX）
-- ✅ 路径分隔符自动处理
-- ✅ 进程管理命令跨平台适配
-- ✅ 浏览器参数差异化配置
-- ✅ 动态UA防反爬检测
+**鍏抽敭鐗规€?*:
+- 鉁?绯荤粺绫诲瀷鑷姩妫€娴嬶紙IS_WINDOWS/IS_MAC/IS_LINUX锛?
+- 鉁?璺緞鍒嗛殧绗﹁嚜鍔ㄥ鐞?
+- 鉁?杩涚▼绠＄悊鍛戒护璺ㄥ钩鍙伴€傞厤
+- 鉁?娴忚鍣ㄥ弬鏁板樊寮傚寲閰嶇疆
+- 鉁?鍔ㄦ€乁A闃插弽鐖娴?
 
 ---
 
-## 🔴 PY-CORE-003: 统一路径管理范式 (Centralized Path Management)
+## 馃敶 PY-CORE-003: 缁熶竴璺緞绠＄悊鑼冨紡 (Centralized Path Management)
 
-### 范式描述
-通过`PathManager`集中管理所有文件路径，避免硬编码，实现路径的统一维护和跨平台兼容。
+### 鑼冨紡鎻忚堪
+閫氳繃`PathManager`闆嗕腑绠＄悊鎵€鏈夋枃浠惰矾寰勶紝閬垮厤纭紪鐮侊紝瀹炵幇璺緞鐨勭粺涓€缁存姢鍜岃法骞冲彴鍏煎銆?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class PathManager:
-    """路径管理类 - 统一处理跨系统路径问题"""
+    """璺緞绠＄悊绫?- 缁熶竴澶勭悊璺ㄧ郴缁熻矾寰勯棶棰?""
     
     @staticmethod
     def get_config_dir():
@@ -305,47 +305,47 @@ class PathManager:
     
     @staticmethod
     def get_json_filename(date_str):
-        """动态生成JSON文件名"""
-        return f"{date_str}微购相册(小旭数码).json"
+        """鍔ㄦ€佺敓鎴怞SON鏂囦欢鍚?""
+        return f"{date_str}寰喘鐩稿唽(灏忔棴鏁扮爜).json"
     
     @staticmethod
     def get_cache_filename(date_str):
-        """动态生成缓存文件名"""
-        return f"{date_str}微购相册(小旭数码)_cache.json"
+        """鍔ㄦ€佺敓鎴愮紦瀛樻枃浠跺悕"""
+        return f"{date_str}寰喘鐩稿唽(灏忔棴鏁扮爜)_cache.json"
     
     @staticmethod
     def get_public_url_from_web_log(skip_validation=False, quiet=False):
         """
-        获取公网地址（统一入口）
+        鑾峰彇鍏綉鍦板潃锛堢粺涓€鍏ュ彛锛?
         
-        数据流向：
-        hostc → tunnel_url.txt (权威源) → web_output.log (镜像) → 前端显示
+        鏁版嵁娴佸悜锛?
+        hostc 鈫?tunnel_url.txt (鏉冨▉婧? 鈫?web_output.log (闀滃儚) 鈫?鍓嶇鏄剧ず
         
-        策略：
-        1. 优先从 tunnel_url.txt 读取（权威源）
-        2. 如果不可用，尝试 web_output.log
-        3. 两个都失败则返回 None
+        绛栫暐锛?
+        1. 浼樺厛浠?tunnel_url.txt 璇诲彇锛堟潈濞佹簮锛?
+        2. 濡傛灉涓嶅彲鐢紝灏濊瘯 web_output.log
+        3. 涓や釜閮藉け璐ュ垯杩斿洖 None
         """
-        # 实现多源URL获取逻辑...
+        # 瀹炵幇澶氭簮URL鑾峰彇閫昏緫...
 ```
 
-**设计原则**:
-- ✅ 所有路径集中定义，一处修改全局生效
-- ✅ 使用`os.path.join()`确保跨平台兼容
-- ✅ 动态文件名生成（日期前缀）
-- ✅ 多源数据获取策略（权威源+备用源）
+**璁捐鍘熷垯**:
+- 鉁?鎵€鏈夎矾寰勯泦涓畾涔夛紝涓€澶勪慨鏀瑰叏灞€鐢熸晥
+- 鉁?浣跨敤`os.path.join()`纭繚璺ㄥ钩鍙板吋瀹?
+- 鉁?鍔ㄦ€佹枃浠跺悕鐢熸垚锛堟棩鏈熷墠缂€锛?
+- 鉁?澶氭簮鏁版嵁鑾峰彇绛栫暐锛堟潈濞佹簮+澶囩敤婧愶級
 
 ---
 
-## 🔴 PY-CORE-004: 智能缓存管理范式 (Intelligent Caching)
+## 馃敶 PY-CORE-004: 鏅鸿兘缂撳瓨绠＄悊鑼冨紡 (Intelligent Caching)
 
-### 范式描述
-通过`FileCacheManager`实现文件级TTL缓存，减少IO操作，提升性能。
+### 鑼冨紡鎻忚堪
+閫氳繃`FileCacheManager`瀹炵幇鏂囦欢绾TL缂撳瓨锛屽噺灏慖O鎿嶄綔锛屾彁鍗囨€ц兘銆?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class FileCacheManager:
-    """JSON文件缓存管理器"""
+    """JSON鏂囦欢缂撳瓨绠＄悊鍣?""
     
     def __init__(self, ttl_seconds=30):
         self._cache = {}
@@ -353,24 +353,24 @@ class FileCacheManager:
         self._lock = threading.Lock()
     
     def read_json(self, file_path, default=None):
-        """带缓存的JSON文件读取"""
+        """甯︾紦瀛樼殑JSON鏂囦欢璇诲彇"""
         current_time = time.time()
         
         with self._lock:
-            # 检查缓存是否有效
+            # 妫€鏌ョ紦瀛樻槸鍚︽湁鏁?
             if file_path in self._cache:
                 cached_data, cache_time = self._cache[file_path]
                 
-                # 检查TTL是否过期
+                # 妫€鏌TL鏄惁杩囨湡
                 if current_time - cache_time < self._ttl:
-                    # 二次验证：检查文件修改时间
+                    # 浜屾楠岃瘉锛氭鏌ユ枃浠朵慨鏀规椂闂?
                     if os.path.exists(file_path):
                         if os.path.getmtime(file_path) <= cache_time:
-                            return cached_data  # 缓存命中
+                            return cached_data  # 缂撳瓨鍛戒腑
                     
-                    del self._cache[file_path]  # 文件已更新，清除缓存
+                    del self._cache[file_path]  # 鏂囦欢宸叉洿鏂帮紝娓呴櫎缂撳瓨
         
-        # 缓存未命中或已过期，重新读取
+        # 缂撳瓨鏈懡涓垨宸茶繃鏈燂紝閲嶆柊璇诲彇
         data = safe_read_json(file_path, default)
         
         with self._lock:
@@ -379,65 +379,65 @@ class FileCacheManager:
         return data
     
     def invalidate(self, file_path=None):
-        """手动清除缓存"""
+        """鎵嬪姩娓呴櫎缂撳瓨"""
         with self._lock:
             if file_path:
                 self._cache.pop(file_path, None)
             else:
                 self._cache.clear()
 
-# 全局单例
+# 鍏ㄥ眬鍗曚緥
 json_cache = FileCacheManager(ttl_seconds=30)
 ```
 
-**高级特性**:
-- ✅ TTL（Time-To-Live）过期机制
-- ✅ 文件修改时间二次验证
-- ✅ 线程安全（threading.Lock）
-- ✅ 支持批量清除和单个文件清除
-- ✅ 缓存命中率统计
+**楂樼骇鐗规€?*:
+- 鉁?TTL锛圱ime-To-Live锛夎繃鏈熸満鍒?
+- 鉁?鏂囦欢淇敼鏃堕棿浜屾楠岃瘉
+- 鉁?绾跨▼瀹夊叏锛坱hreading.Lock锛?
+- 鉁?鏀寔鎵归噺娓呴櫎鍜屽崟涓枃浠舵竻闄?
+- 鉁?缂撳瓨鍛戒腑鐜囩粺璁?
 
 ---
 
-## 🔴 PY-CORE-005: 安全邮件通知范式 (Secure Email Notification)
+## 馃敶 PY-CORE-005: 瀹夊叏閭欢閫氱煡鑼冨紡 (Secure Email Notification)
 
-### 范式描述
-通过`EmailNotifier`实现结构化邮件发送，支持HTML富文本、事件分类、连接超时控制。
+### 鑼冨紡鎻忚堪
+閫氳繃`EmailNotifier`瀹炵幇缁撴瀯鍖栭偖浠跺彂閫侊紝鏀寔HTML瀵屾枃鏈€佷簨浠跺垎绫汇€佽繛鎺ヨ秴鏃舵帶鍒躲€?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class EmailNotifier:
-    """邮件通知类"""
+    """閭欢閫氱煡绫?""
     
     def send_tunnel_notification(self, tunnel_url, event_type='new'):
         """
-        发送隧道URL变化通知邮件
+        鍙戦€侀毀閬揢RL鍙樺寲閫氱煡閭欢
         
-        事件类型：
-        - new: 新公网地址
-        - available: 公网地址可用
-        - unavailable: 公网地址不可用
-        - restarted: 隧道已重启
-        - fallback_available: 备用地址可用
+        浜嬩欢绫诲瀷锛?
+        - new: 鏂板叕缃戝湴鍧€
+        - available: 鍏綉鍦板潃鍙敤
+        - unavailable: 鍏綉鍦板潃涓嶅彲鐢?
+        - restarted: 闅ч亾宸查噸鍚?
+        - fallback_available: 澶囩敤鍦板潃鍙敤
         """
         event_titles = {
-            'new': '✅ 新公网地址',
-            'unavailable': '🚨 公网地址不可用',
-            'restarted': '🔄 隧道已重启',
-            'fallback_available': '🔄 备用公网地址可用'
+            'new': '鉁?鏂板叕缃戝湴鍧€',
+            'unavailable': '馃毃 鍏綉鍦板潃涓嶅彲鐢?,
+            'restarted': '馃攧 闅ч亾宸查噸鍚?,
+            'fallback_available': '馃攧 澶囩敤鍏綉鍦板潃鍙敤'
         }
         
-        # 构建MIME多部分邮件（纯文本 + HTML）
+        # 鏋勫缓MIME澶氶儴鍒嗛偖浠讹紙绾枃鏈?+ HTML锛?
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = Header(f'【{event_title}】{时间}', 'utf-8')
+        msg['Subject'] = Header(f'銆恵event_title}銆憑鏃堕棿}', 'utf-8')
         
-        # 纯文本版本
+        # 绾枃鏈増鏈?
         body = f"""{event_title}
-时间: {current_time}
-公网地址: {tunnel_url}
+鏃堕棿: {current_time}
+鍏綉鍦板潃: {tunnel_url}
 {status_note}"""
         
-        # HTML富文本版本（响应式布局）
+        # HTML瀵屾枃鏈増鏈紙鍝嶅簲寮忓竷灞€锛?
         html_body = f"""
 <html>
 <body style="font-family: -apple-system, BlinkMacSystemFont, ...">
@@ -448,10 +448,10 @@ class EmailNotifier:
 <div style="background-color: #ffffff; border: 1px solid #e0e0e0; 
             border-radius: 8px; padding: 25px;">
     <table style="width: 100%;">
-        <tr><td><strong>时间:</strong></td><td>{current_time}</td></tr>
-        <tr><td><strong>公网地址:</strong></td>
+        <tr><td><strong>鏃堕棿:</strong></td><td>{current_time}</td></tr>
+        <tr><td><strong>鍏綉鍦板潃:</strong></td>
             <td><a href="{tunnel_url}">{tunnel_url}</a>
-                <button onclick="window.open('{tunnel_url}')">点击访问</button>
+                <button onclick="window.open('{tunnel_url}')">鐐瑰嚮璁块棶</button>
             </td>
         </tr>
     </table>
@@ -462,7 +462,7 @@ class EmailNotifier:
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
         msg.attach(MIMEText(html_body, 'html', 'utf-8'))
         
-        # 发送邮件（带超时控制）
+        # 鍙戦€侀偖浠讹紙甯﹁秴鏃舵帶鍒讹級
         timeout = 30
         server = smtplib.SMTP(host, port, timeout=timeout)
         server.starttls()
@@ -471,27 +471,27 @@ class EmailNotifier:
         server.quit()
 ```
 
-**安全特性**:
-- ✅ SMTP连接超时控制（30秒）
-- ✅ SSL/TLS加密传输
-- ✅ HTML转义防止XSS
-- ✅ 结构化事件分类
-- ✅ 详细的时间戳日志
+**瀹夊叏鐗规€?*:
+- 鉁?SMTP杩炴帴瓒呮椂鎺у埗锛?0绉掞級
+- 鉁?SSL/TLS鍔犲瘑浼犺緭
+- 鉁?HTML杞箟闃叉XSS
+- 鉁?缁撴瀯鍖栦簨浠跺垎绫?
+- 鉁?璇︾粏鐨勬椂闂存埑鏃ュ織
 
 ---
 
-## 🔴 PY-CORE-006: 浏览器自动化爬虫范式 (Browser Automation Scraping)
+## 馃敶 PY-CORE-006: 娴忚鍣ㄨ嚜鍔ㄥ寲鐖櫕鑼冨紡 (Browser Automation Scraping)
 
-### 范式描述
-通过`WegoScraper`实现Playwright异步爬虫，包含智能滚动、弹窗关闭、并发处理、API回退等高级功能。
+### 鑼冨紡鎻忚堪
+閫氳繃`WegoScraper`瀹炵幇Playwright寮傛鐖櫕锛屽寘鍚櫤鑳芥粴鍔ㄣ€佸脊绐楀叧闂€佸苟鍙戝鐞嗐€丄PI鍥為€€绛夐珮绾у姛鑳姐€?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class WegoScraper:
-    """爬虫核心类"""
+    """鐖櫕鏍稿績绫?""
     
     async def scroll_to_load_all(self, page):
-        """智能滚动加载所有商品（动态调整策略）"""
+        """鏅鸿兘婊氬姩鍔犺浇鎵€鏈夊晢鍝侊紙鍔ㄦ€佽皟鏁寸瓥鐣ワ級"""
         
         config = self.config_manager.get('scroll_config', {
             'max_attempts': 30,
@@ -507,40 +507,40 @@ class WegoScraper:
         for scroll_attempts in range(config['max_attempts']):
             current_height = await page.evaluate('document.body.scrollHeight')
             
-            # 检测页面是否到底部
+            # 妫€娴嬮〉闈㈡槸鍚﹀埌搴曢儴
             if current_height == last_height:
                 no_change_count += 1
                 if no_change_count >= config['same_height_limit']:
-                    print(f'页面已滚动到底部（连续{config["same_height_limit"]}次不变）')
+                    print(f'椤甸潰宸叉粴鍔ㄥ埌搴曢儴锛堣繛缁瓄config["same_height_limit"]}娆′笉鍙橈級')
                     break
             else:
                 no_change_count = 0
             
-            # 动态调整滚动距离
+            # 鍔ㄦ€佽皟鏁存粴鍔ㄨ窛绂?
             scroll_distance = current_height * 0.3 if scroll_attempts < 10 else current_height
             await page.evaluate(f'window.scrollBy(0, {scroll_distance})')
             
             await asyncio.sleep(config['scroll_wait_time'])
             
-            # 动态调整等待时间（基于页面加载速度）
+            # 鍔ㄦ€佽皟鏁寸瓑寰呮椂闂达紙鍩轰簬椤甸潰鍔犺浇閫熷害锛?
             if config['dynamic_adjust'] and len(height_history) >= 5:
                 avg_change = sum(height_changes) / len(height_changes)
                 
                 if avg_change < 50 and config['scroll_wait_time'] < 2.0:
-                    config['scroll_wait_time'] += 0.1  # 页面慢，增加等待
+                    config['scroll_wait_time'] += 0.1  # 椤甸潰鎱紝澧炲姞绛夊緟
                 elif avg_change > 300 and config['scroll_wait_time'] > 0.5:
-                    config['scroll_wait_time'] -= 0.1  # 页面快，减少等待
+                    config['scroll_wait_time'] -= 0.1  # 椤甸潰蹇紝鍑忓皯绛夊緟
             
-            # 定期关闭弹窗
+            # 瀹氭湡鍏抽棴寮圭獥
             if (scroll_attempts + 1) % 5 == 0:
                 await self.close_popups(page)
     
     async def close_popups(self, page, close_limit=3, wait_time=0.3):
-        """智能关闭弹窗（多种选择器）"""
+        """鏅鸿兘鍏抽棴寮圭獥锛堝绉嶉€夋嫨鍣級"""
         popup_selectors = [
             '[class*="close"]',
             '[class*="modal-close"]',
-            'button:has-text("关闭")',
+            'button:has-text("鍏抽棴")',
             '.ant-modal-close',
             '.el-dialog__close'
         ]
@@ -552,11 +552,11 @@ class WegoScraper:
             )
     
     async def process_elements_concurrently(self, page, elements):
-        """并发处理商品元素（ThreadPoolExecutor）"""
+        """骞跺彂澶勭悊鍟嗗搧鍏冪礌锛圱hreadPoolExecutor锛?""
         
         elements_data = []
         
-        # 第一阶段：收集元素数据
+        # 绗竴闃舵锛氭敹闆嗗厓绱犳暟鎹?
         for element in elements:
             try:
                 text = await asyncio.wait_for(element.text_content(), timeout=2.0)
@@ -565,7 +565,7 @@ class WegoScraper:
             except asyncio.TimeoutError:
                 continue
         
-        # 第二阶段：并发提取商品信息
+        # 绗簩闃舵锛氬苟鍙戞彁鍙栧晢鍝佷俊鎭?
         products = []
         with ThreadPoolExecutor(max_workers=15) as executor:
             futures = [executor.submit(self.extract_product_info, text, html) 
@@ -579,8 +579,8 @@ class WegoScraper:
                 except Exception:
                     pass
         
-        # 第三阶段：API回退获取缺失数据
-        products_need_api = [p for p in products if not p.get('拿货价')]
+        # 绗笁闃舵锛欰PI鍥為€€鑾峰彇缂哄け鏁版嵁
+        products_need_api = [p for p in products if not p.get('鎷胯揣浠?)]
         if products_need_api:
             await self.fetch_cost_prices_via_api(page, products_need_api, products)
         
@@ -588,56 +588,56 @@ class WegoScraper:
     
     @staticmethod
     def extract_product_info(element_text, html_content):
-        """提取商品信息（正则表达式解析）"""
+        """鎻愬彇鍟嗗搧淇℃伅锛堟鍒欒〃杈惧紡瑙ｆ瀽锛?""
         
-        stock_match = re.search(r'货号[：:]\s*(\d+)', element_text)
-        price_match = re.search(r'售价[：:]\s*¥?\s*([\d,]+)', element_text)
-        cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', element_text)
+        stock_match = re.search(r'璐у彿[锛?]\s*(\d+)', element_text)
+        price_match = re.search(r'鍞环[锛?]\s*楼?\s*([\d,]+)', element_text)
+        cost_match = re.search(r'鎷胯揣浠穂锛?]\s*楼?\s*([\d,]+)', element_text)
         
         name = WegoScraper.clean_product_name(element_text[:cut_pos])
         
         return {
-            '商品名称': name,
-            '售价': price,
-            '拿货价': cost_price,
-            '货号': stock_number,
-            '备注': remark,
-            '员工': employee,
-            '图片': ''
+            '鍟嗗搧鍚嶇О': name,
+            '鍞环': price,
+            '鎷胯揣浠?: cost_price,
+            '璐у彿': stock_number,
+            '澶囨敞': remark,
+            '鍛樺伐': employee,
+            '鍥剧墖': ''
         }
 ```
 
-**高级特性**:
-- ✅ 动态滚动策略（速度自适应）
-- ✅ 弹窗智能识别与关闭
-- ✅ 并发数据处理（15线程池）
-- ✅ API回退机制（缺失数据补充）
-- ✅ 超时保护（每步2秒超时）
-- ✅ 商品去重（seen_products集合）
+**楂樼骇鐗规€?*:
+- 鉁?鍔ㄦ€佹粴鍔ㄧ瓥鐣ワ紙閫熷害鑷€傚簲锛?
+- 鉁?寮圭獥鏅鸿兘璇嗗埆涓庡叧闂?
+- 鉁?骞跺彂鏁版嵁澶勭悊锛?5绾跨▼姹狅級
+- 鉁?API鍥為€€鏈哄埗锛堢己澶辨暟鎹ˉ鍏咃級
+- 鉁?瓒呮椂淇濇姢锛堟瘡姝?绉掕秴鏃讹級
+- 鉁?鍟嗗搧鍘婚噸锛坰een_products闆嗗悎锛?
 
 ---
 
-## 🔴 PY-CORE-007: 数据对比分析范式 (Data Comparison & Analysis)
+## 馃敶 PY-CORE-007: 鏁版嵁瀵规瘮鍒嗘瀽鑼冨紡 (Data Comparison & Analysis)
 
-### 范式描述
-通过`StockNumberComparator`实现Excel/JSON数据对比，支持高价商品筛选、重复检测、差异报告。
+### 鑼冨紡鎻忚堪
+閫氳繃`StockNumberComparator`瀹炵幇Excel/JSON鏁版嵁瀵规瘮锛屾敮鎸侀珮浠峰晢鍝佺瓫閫夈€侀噸澶嶆娴嬨€佸樊寮傛姤鍛娿€?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class StockNumberComparator:
-    """数据对比核心类"""
+    """鏁版嵁瀵规瘮鏍稿績绫?""
     
     @staticmethod
     def compare_stock_numbers(json_stock_numbers, input_stock_numbers, 
                              high_price_stock_numbers=None):
-        """对比两组货号数据"""
+        """瀵规瘮涓ょ粍璐у彿鏁版嵁"""
         json_set = set(json_stock_numbers)
         input_set = set(input_stock_numbers)
         
         result = {
-            'missing': sorted(list(input_set - json_set)),      # 缺失的
-            'existing': sorted(list(input_set & json_set)),     # 已存在的
-            'extra_in_json': sorted(list(json_set - input_set)), # 多余的
+            'missing': sorted(list(input_set - json_set)),      # 缂哄け鐨?
+            'existing': sorted(list(input_set & json_set)),     # 宸插瓨鍦ㄧ殑
+            'extra_in_json': sorted(list(json_set - input_set)), # 澶氫綑鐨?
             'total_input': len(input_set),
             'total_json': len(json_set),
             'missing_count': len(input_set - json_set),
@@ -645,7 +645,7 @@ class StockNumberComparator:
             'extra_in_json_count': len(json_set - input_set)
         }
         
-        # 高价商品特殊处理
+        # 楂樹环鍟嗗搧鐗规畩澶勭悊
         if high_price_stock_numbers:
             result['high_price_stock_numbers'] = sorted(set(high_price_stock_numbers))
             result['high_price_count'] = len(result['high_price_stock_numbers'])
@@ -653,79 +653,79 @@ class StockNumberComparator:
         return result
     
     def compare_json_files(self):
-        """对比当天最新的两个JSON文件"""
+        """瀵规瘮褰撳ぉ鏈€鏂扮殑涓や釜JSON鏂囦欢"""
         
         latest_file, second_file = FileManager.get_today_json_files()
         
         latest_data = FileManager.read_json(latest_file)
         second_data = FileManager.read_json(second_file)
         
-        latest_products = latest_data.get('商品列表', [])
-        second_products = second_data.get('商品列表', [])
+        latest_products = latest_data.get('鍟嗗搧鍒楄〃', [])
+        second_products = second_data.get('鍟嗗搧鍒楄〃', [])
         
-        # 提取货号集合
-        latest_stocks = {p.get('货号') for p in latest_products if p.get('货号')}
-        second_stocks = {p.get('货号') for p in second_products if p.get('货号')}
+        # 鎻愬彇璐у彿闆嗗悎
+        latest_stocks = {p.get('璐у彿') for p in latest_products if p.get('璐у彿')}
+        second_stocks = {p.get('璐у彿') for p in second_products if p.get('璐у彿')}
         
-        # 计算差异
+        # 璁＄畻宸紓
         added = latest_stocks - second_stocks
         removed = second_stocks - latest_stocks
         
-        # 高价商品筛选（售价>=599）
+        # 楂樹环鍟嗗搧绛涢€夛紙鍞环>=599锛?
         high_price_added = [
-            p.get('货号') for p in latest_products 
-            if WegoScraper.parse_price(p.get('售价')) >= 599 
-            and p.get('货号') in added
+            p.get('璐у彿') for p in latest_products 
+            if WegoScraper.parse_price(p.get('鍞环')) >= 599 
+            and p.get('璐у彿') in added
         ]
         
-        # 生成差异报告
+        # 鐢熸垚宸紓鎶ュ憡
         diff_data = {
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'added_count': len(added),
             'removed_count': len(removed),
             'high_price_added': sorted(high_price_added),
-            'high_price_description': '新增的售价>=599的商品'
+            'high_price_description': '鏂板鐨勫敭浠?=599鐨勫晢鍝?
         }
         
-        # 追加到"小计"字段（保留历史记录）
-        if '小计' not in latest_data:
-            latest_data['小计'] = []
-        latest_data['小计'].append(diff_data)
-        latest_data['小计'].sort(key=lambda x: x['timestamp'])
+        # 杩藉姞鍒?灏忚"瀛楁锛堜繚鐣欏巻鍙茶褰曪級
+        if '灏忚' not in latest_data:
+            latest_data['灏忚'] = []
+        latest_data['灏忚'].append(diff_data)
+        latest_data['灏忚'].sort(key=lambda x: x['timestamp'])
         
         FileManager.write_json(latest_file, latest_data)
     
     @staticmethod
     def find_duplicate_stock_numbers(stock_numbers):
-        """检测重复货号"""
+        """妫€娴嬮噸澶嶈揣鍙?""
         seen = {}
         for num in stock_numbers:
             seen[num] = seen.get(num, 0) + 1
         
-        return [{'货号': num, 'count': count} 
+        return [{'璐у彿': num, 'count': count} 
                 for num, count in seen.items() if count > 1]
 ```
 
-**数据分析能力**:
-- ✅ 集合运算高效对比（O(n)复杂度）
-- ✅ 高价商品自动筛选（价格阈值可配置）
-- ✅ 重复数据检测与统计
-- ✅ 增量差异追踪（历史记录）
-- ✅ 多源数据融合（Excel+JSON）
+**鏁版嵁鍒嗘瀽鑳藉姏**:
+- 鉁?闆嗗悎杩愮畻楂樻晥瀵规瘮锛圤(n)澶嶆潅搴︼級
+- 鉁?楂樹环鍟嗗搧鑷姩绛涢€夛紙浠锋牸闃堝€煎彲閰嶇疆锛?
+- 鉁?閲嶅鏁版嵁妫€娴嬩笌缁熻
+- 鉁?澧為噺宸紓杩借釜锛堝巻鍙茶褰曪級
+- 鉁?澶氭簮鏁版嵁铻嶅悎锛圗xcel+JSON锛?
 
 ---
 
-## 🔴 PY-CORE-008: API速率限制与输入验证范式 (Rate Limiting & Input Validation)
+## 馃敶 PY-CORE-008: API閫熺巼闄愬埗涓庤緭鍏ラ獙璇佽寖寮?(Rate Limiting & Input Validation)
 
-### 范式描述
-通过`RateLimiter`和Pydantic模型实现API层面的安全和性能保护。
+### 鑼冨紡鎻忚堪
+閫氳繃`RateLimiter`鍜孭ydantic妯″瀷瀹炵幇API灞傞潰鐨勫畨鍏ㄥ拰鎬ц兘淇濇姢銆?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 
-#### 1. IP级别速率限制器
+#### 1. IP绾у埆閫熺巼闄愬埗鍣?
 ```python
 class RateLimiter:
-    """IP级别速率限制器"""
+    """IP绾у埆閫熺巼闄愬埗鍣?""
     
     def __init__(self, max_requests=100, window_seconds=60):
         self.max_requests = max_requests
@@ -734,14 +734,14 @@ class RateLimiter:
         self._lock = threading.Lock()
     
     def is_allowed(self, client_ip):
-        """检查是否允许请求（滑动窗口算法）"""
+        """妫€鏌ユ槸鍚﹀厑璁歌姹傦紙婊戝姩绐楀彛绠楁硶锛?""
         current_time = time.time()
         
         with self._lock:
             if client_ip not in self.requests:
                 self.requests[client_ip] = []
             
-            # 清理过期请求记录
+            # 娓呯悊杩囨湡璇锋眰璁板綍
             self.requests[client_ip] = [
                 t for t in self.requests[client_ip]
                 if current_time - t < self.window_seconds
@@ -754,23 +754,23 @@ class RateLimiter:
             return True
     
     def get_retry_after(self, client_ip):
-        """获取重试等待时间"""
+        """鑾峰彇閲嶈瘯绛夊緟鏃堕棿"""
         oldest = min(self.requests[client_ip])
         return max(0, int(self.window_seconds - (time.time() - oldest)) + 1)
 
-# 全局实例
+# 鍏ㄥ眬瀹炰緥
 api_rate_limiter = RateLimiter(max_requests=200, window_seconds=60)
 upload_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
 ```
 
-#### 2. Pydantic输入验证模型
+#### 2. Pydantic杈撳叆楠岃瘉妯″瀷
 ```python
 class RunCommandRequest(BaseModel):
     command: str = Field(..., min_length=1, max_length=10000)
     
     @field_validator('command')
     def validate_command_safe(cls, v):
-        """危险命令黑名单检测"""
+        """鍗遍櫓鍛戒护榛戝悕鍗曟娴?""
         dangerous = [
             'rm -rf /', 'mkfs', 'shutdown', 'reboot',
             'dd if=', '> /dev/sd', ':(){ :|:& };:',  # fork bomb
@@ -782,7 +782,7 @@ class RunCommandRequest(BaseModel):
         v_lower = v.lower()
         for pattern in dangerous:
             if pattern.lower() in v_lower:
-                raise ValueError(f'检测到危险命令: {pattern}')
+                raise ValueError(f'妫€娴嬪埌鍗遍櫓鍛戒护: {pattern}')
         return v.strip()
 
 class TaskInputRequest(BaseModel):
@@ -790,10 +790,10 @@ class TaskInputRequest(BaseModel):
     user_input: str = Field('', max_length=10000)
 ```
 
-#### 3. 速率限制装饰器
+#### 3. 閫熺巼闄愬埗瑁呴グ鍣?
 ```python
 def rate_limit(limiter, endpoint_name='API'):
-    """速率限制装饰器"""
+    """閫熺巼闄愬埗瑁呴グ鍣?""
     def decorator(f):
         async def decorated(request: Request, *args, **kwargs):
             client_ip = request.client.host
@@ -802,7 +802,7 @@ def rate_limit(limiter, endpoint_name='API'):
                 retry_after = limiter.get_retry_after(client_ip)
                 raise HTTPException(
                     status_code=429,
-                    detail={'error': '请求过于频繁', 'retry_after': retry_after},
+                    detail={'error': '璇锋眰杩囦簬棰戠箒', 'retry_after': retry_after},
                     headers={'Retry-After': str(retry_after)}
                 )
             
@@ -811,23 +811,23 @@ def rate_limit(limiter, endpoint_name='API'):
     return decorator
 ```
 
-**安全特性**:
-- ✅ 滑动窗口限流算法
-- ✅ 危险命令黑名单（30+规则）
-- ✅ 输入长度限制
-- ✅ 429状态码 + Retry-After头
-- ✅ 分端点独立限流
+**瀹夊叏鐗规€?*:
+- 鉁?婊戝姩绐楀彛闄愭祦绠楁硶
+- 鉁?鍗遍櫓鍛戒护榛戝悕鍗曪紙30+瑙勫垯锛?
+- 鉁?杈撳叆闀垮害闄愬埗
+- 鉁?429鐘舵€佺爜 + Retry-After澶?
+- 鉁?鍒嗙鐐圭嫭绔嬮檺娴?
 
 ---
 
-## 🔴 PY-CORE-009: 前端安全防护范式 (Frontend Security)
+## 馃敶 PY-CORE-009: 鍓嶇瀹夊叏闃叉姢鑼冨紡 (Frontend Security)
 
-### 范式描述
-在JavaScript前端实现XSS防护、URL验证、设备检测等安全机制。
+### 鑼冨紡鎻忚堪
+鍦↗avaScript鍓嶇瀹炵幇XSS闃叉姢銆乁RL楠岃瘉銆佽澶囨娴嬬瓑瀹夊叏鏈哄埗銆?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 
-#### 1. XSS防护函数
+#### 1. XSS闃叉姢鍑芥暟
 ```javascript
 function escapeHtml(text) {
     if (!text) return '';
@@ -861,7 +861,7 @@ function isValidUrl(url) {
 }
 ```
 
-#### 2. 设备检测与响应式适配
+#### 2. 璁惧妫€娴嬩笌鍝嶅簲寮忛€傞厤
 ```javascript
 function detectDevice() {
     const ua = navigator.userAgent.toLowerCase();
@@ -869,14 +869,14 @@ function detectDevice() {
     
     let deviceType = 'desktop';
     
-    // 屏幕宽度判断
+    // 灞忓箷瀹藉害鍒ゆ柇
     if (width < 576) deviceType = 'phone';
     else if (width < 768) deviceType = 'tablet';
     else if (width < 992) deviceType = 'laptop';
     else if (width < 1200) deviceType = 'desktop';
     else deviceType = 'large-desktop';
     
-    // 浏览器检测
+    // 娴忚鍣ㄦ娴?
     const mobileDevices = {
         wechat: /micromessenger/i.test(ua),
         weibo: /weibo/i.test(ua),
@@ -900,29 +900,29 @@ function applyDeviceStyles() {
     document.body.classList.add('is-' + device.type);
 }
 
-// 监听窗口大小变化（防抖）
+// 鐩戝惉绐楀彛澶у皬鍙樺寲锛堥槻鎶栵級
 window.addEventListener('resize', function() {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(applyDeviceStyles, 250);
 });
 ```
 
-#### 3. 安全的API响应解析
+#### 3. 瀹夊叏鐨凙PI鍝嶅簲瑙ｆ瀽
 ```javascript
 async function safeParseJson(response) {
     const contentType = response.headers.get('content-type') || '';
     
     if (!contentType.includes('application/json')) {
         const text = await response.text();
-        let errorMsg = '服务器返回了非JSON响应';
+        let errorMsg = '鏈嶅姟鍣ㄨ繑鍥炰簡闈濲SON鍝嶅簲';
         
-        // 错误类型智能识别
-        if (response.status === 401 || text.includes('登录')) {
-            errorMsg = '登录已过期，请重新获取Cookie';
+        // 閿欒绫诲瀷鏅鸿兘璇嗗埆
+        if (response.status === 401 || text.includes('鐧诲綍')) {
+            errorMsg = '鐧诲綍宸茶繃鏈燂紝璇烽噸鏂拌幏鍙朇ookie';
         } else if (response.status === 404) {
-            errorMsg = '接口不存在 (404)';
+            errorMsg = '鎺ュ彛涓嶅瓨鍦?(404)';
         } else if (response.status >= 500) {
-            errorMsg = `服务器内部错误 (${response.status})`;
+            errorMsg = `鏈嶅姟鍣ㄥ唴閮ㄩ敊璇?(${response.status})`;
         }
         
         throw new Error(errorMsg);
@@ -932,24 +932,24 @@ async function safeParseJson(response) {
 }
 ```
 
-**安全措施**:
-- ✅ DOM-based XSS防护（escapeHtml/escapeAttr）
-- ✅ URL白名单协议验证（http/https only）
-- ✅ Content-Type强制校验
-- ✅ 设备指纹识别
-- ✅ 响应式断点系统（5个层级）
+**瀹夊叏鎺柦**:
+- 鉁?DOM-based XSS闃叉姢锛坋scapeHtml/escapeAttr锛?
+- 鉁?URL鐧藉悕鍗曞崗璁獙璇侊紙http/https only锛?
+- 鉁?Content-Type寮哄埗鏍￠獙
+- 鉁?璁惧鎸囩汗璇嗗埆
+- 鉁?鍝嶅簲寮忔柇鐐圭郴缁燂紙5涓眰绾э級
 
 ---
 
-## 🔴 PY-CORE-010: 双输出日志系统范式 (Dual-Output Logging)
+## 馃敶 PY-CORE-010: 鍙岃緭鍑烘棩蹇楃郴缁熻寖寮?(Dual-Output Logging)
 
-### 范式描述
-通过`TeeOutput`类实现同时输出到控制台和文件的日志系统，支持自动时间戳、文件锁定恢复。
+### 鑼冨紡鎻忚堪
+閫氳繃`TeeOutput`绫诲疄鐜板悓鏃惰緭鍑哄埌鎺у埗鍙板拰鏂囦欢鐨勬棩蹇楃郴缁燂紝鏀寔鑷姩鏃堕棿鎴炽€佹枃浠堕攣瀹氭仮澶嶃€?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class TeeOutput:
-    """同时输出到控制台和文件"""
+    """鍚屾椂杈撳嚭鍒版帶鍒跺彴鍜屾枃浠?""
     
     def __init__(self, original, log_file_path=None):
         self.original = original
@@ -959,11 +959,11 @@ class TeeOutput:
             self._init_log_file(log_file_path)
     
     def _init_log_file(self, log_file_path, retry_count=0):
-        """初始化日志文件（带重试和锁定恢复）"""
+        """鍒濆鍖栨棩蹇楁枃浠讹紙甯﹂噸璇曞拰閿佸畾鎭㈠锛?""
         max_retries = 3
         
         try:
-            # 检查文件是否被锁定
+            # 妫€鏌ユ枃浠舵槸鍚﹁閿佸畾
             if os.path.exists(log_file_path):
                 test_fd = os.open(log_file_path, os.O_WRONLY | os.O_APPEND)
                 os.close(test_fd)
@@ -972,18 +972,18 @@ class TeeOutput:
             
         except OSError as e:
             if retry_count < max_retries:
-                # 锁定文件备份
+                # 閿佸畾鏂囦欢澶囦唤
                 backup_path = f"{log_file_path}.locked_{time.strftime('%H%M%S')}"
                 os.rename(log_file_path, backup_path)
                 time.sleep(0.5 * (retry_count + 1))
                 return self._init_log_file(log_file_path, retry_count + 1)
             else:
-                self.file = None  # 降级为仅控制台输出
+                self.file = None  # 闄嶇骇涓轰粎鎺у埗鍙拌緭鍑?
     
     def write(self, text):
         _output_text = text
         
-        # 自动添加时间戳
+        # 鑷姩娣诲姞鏃堕棿鎴?
         if text.strip():
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
             
@@ -995,16 +995,16 @@ class TeeOutput:
                 ]
                 _output_text = '\n'.join(timestamped_lines)
         
-        # 双输出
+        # 鍙岃緭鍑?
         self.original.write(_output_text)
         
         if self.file:
             safe_execute_func(
                 lambda: (self.file.write(_output_text), self.file.flush()),
-                context='TeeOutput写入'
+                context='TeeOutput鍐欏叆'
             )
 
-# 全局初始化
+# 鍏ㄥ眬鍒濆鍖?
 def setup_web_logging():
     global web_log_file
     web_log_file = PathManager.get_web_output_file()
@@ -1012,28 +1012,28 @@ def setup_web_logging():
     sys.stderr = TeeOutput(sys.stderr, web_log_file)
 ```
 
-**高级特性**:
-- ✅ 100%时间戳覆盖率（毫秒精度）
-- ✅ 文件锁定自动恢复（备份+重试）
-- ✅ Flask访问日志特殊处理
-- ✅ 降级容错（文件不可用时仅控制台）
-- ✅ 自动flush保证实时性
+**楂樼骇鐗规€?*:
+- 鉁?100%鏃堕棿鎴宠鐩栫巼锛堟绉掔簿搴︼級
+- 鉁?鏂囦欢閿佸畾鑷姩鎭㈠锛堝浠?閲嶈瘯锛?
+- 鉁?Flask璁块棶鏃ュ織鐗规畩澶勭悊
+- 鉁?闄嶇骇瀹归敊锛堟枃浠朵笉鍙敤鏃朵粎鎺у埗鍙帮級
+- 鉁?鑷姩flush淇濊瘉瀹炴椂鎬?
 
 ---
 
-## 🔴 PY-CORE-011: 配置管理范式 (Configuration Management)
+## 馃敶 PY-CORE-011: 閰嶇疆绠＄悊鑼冨紡 (Configuration Management)
 
-### 范式描述
-通过`ConfigManager`实现JSON配置文件的读写、默认值、热更新等功能。
+### 鑼冨紡鎻忚堪
+閫氳繃`ConfigManager`瀹炵幇JSON閰嶇疆鏂囦欢鐨勮鍐欍€侀粯璁ゅ€笺€佺儹鏇存柊绛夊姛鑳姐€?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class ConfigManager:
-    """配置管理器（懒加载+缓存）"""
+    """閰嶇疆绠＄悊鍣紙鎳掑姞杞?缂撳瓨锛?""
     
     def __init__(self, config_path=None):
         self.config_path = config_path or PathManager.get_config_file()
-        self._config = None  # 懒加载
+        self._config = None  # 鎳掑姞杞?
     
     @property
     def config(self):
@@ -1046,9 +1046,9 @@ class ConfigManager:
             with open(self.config_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except FileNotFoundError:
-            return {}  # 默认空配置
+            return {}  # 榛樿绌洪厤缃?
         except json.JSONDecodeError as e:
-            raise AppException.config_error(f"配置文件格式错误: {e}")
+            raise AppException.config_error(f"閰嶇疆鏂囦欢鏍煎紡閿欒: {e}")
     
     def save_config(self):
         if self._config:
@@ -1061,10 +1061,10 @@ class ConfigManager:
     def set(self, key, value):
         if self._config is not None:
             self._config[key] = value
-            self.save_config()  # 自动持久化
+            self.save_config()  # 鑷姩鎸佷箙鍖?
     
     def get_excel_files(self):
-        """获取Excel文件列表（路径展开+存在性检查）"""
+        """鑾峰彇Excel鏂囦欢鍒楄〃锛堣矾寰勫睍寮€+瀛樺湪鎬ф鏌ワ級"""
         excel_files = self.config.get('excel_files', [])
         existing_files = []
         for path in excel_files:
@@ -1074,104 +1074,104 @@ class ConfigManager:
         return existing_files
 ```
 
-**设计特点**:
-- ✅ 懒加载（首次访问时才加载）
-- ✅ 内存缓存（避免重复IO）
-- ✅ 自动持久化（set即保存）
-- ✅ 路径展开（~ → 用户主目录）
-- ✅ 存在性预检
+**璁捐鐗圭偣**:
+- 鉁?鎳掑姞杞斤紙棣栨璁块棶鏃舵墠鍔犺浇锛?
+- 鉁?鍐呭瓨缂撳瓨锛堥伩鍏嶉噸澶岻O锛?
+- 鉁?鑷姩鎸佷箙鍖栵紙set鍗充繚瀛橈級
+- 鉁?璺緞灞曞紑锛垀 鈫?鐢ㄦ埛涓荤洰褰曪級
+- 鉁?瀛樺湪鎬ч妫€
 
 ---
 
-## 🔴 PY-CORE-012: Cookie验证与管理范式 (Cookie Validation & Management)
+## 馃敶 PY-CORE-012: Cookie楠岃瘉涓庣鐞嗚寖寮?(Cookie Validation & Management)
 
-### 范式描述
-通过`CookieValidator`实现Cookie的有效性验证、友好提示、自动更新引导。
+### 鑼冨紡鎻忚堪
+閫氳繃`CookieValidator`瀹炵幇Cookie鐨勬湁鏁堟€ч獙璇併€佸弸濂芥彁绀恒€佽嚜鍔ㄦ洿鏂板紩瀵笺€?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class CookieValidator:
-    """Cookie验证器"""
+    """Cookie楠岃瘉鍣?""
     
     @staticmethod
     def validate_and_prompt(cookie_file):
-        """验证cookie并给出友好提示"""
+        """楠岃瘉cookie骞剁粰鍑哄弸濂芥彁绀?""
         
-        # 1. 检查文件是否存在
+        # 1. 妫€鏌ユ枃浠舵槸鍚﹀瓨鍦?
         if not os.path.exists(cookie_file):
             CookieValidator._show_prompt(
-                title='Cookie文件不存在',
-                reasons=['首次使用程序', 'Cookie被误删除', '路径错误'],
-                solutions=['选择"更新Cookie"功能', '浏览器将自动打开登录页'],
-                tip='Cookie有效期为30天，建议定期更新'
+                title='Cookie鏂囦欢涓嶅瓨鍦?,
+                reasons=['棣栨浣跨敤绋嬪簭', 'Cookie琚鍒犻櫎', '璺緞閿欒'],
+                solutions=['閫夋嫨"鏇存柊Cookie"鍔熻兘', '娴忚鍣ㄥ皢鑷姩鎵撳紑鐧诲綍椤?],
+                tip='Cookie鏈夋晥鏈熶负30澶╋紝寤鸿瀹氭湡鏇存柊'
             )
             return False, None
         
-        # 2. 检查文件格式
+        # 2. 妫€鏌ユ枃浠舵牸寮?
         try:
             cookies = json.load(open(cookie_file))
         except json.JSONDecodeError:
             CookieValidator._show_prompt(
-                title='Cookie文件格式错误',
-                reasons=['文件被意外修改', '保存出错'],
-                solutions=['删除当前Cookie', '重新获取']
+                title='Cookie鏂囦欢鏍煎紡閿欒',
+                reasons=['鏂囦欢琚剰澶栦慨鏀?, '淇濆瓨鍑洪敊'],
+                solutions=['鍒犻櫎褰撳墠Cookie', '閲嶆柊鑾峰彇']
             )
             return False, None
         
-        # 3. 检查Cookie有效期
+        # 3. 妫€鏌ookie鏈夋晥鏈?
         expiry_time = CookieValidator._check_expiry(cookies)
         if expiry_time and expiry_time < datetime.now():
             remaining_days = (expiry_time - datetime.now()).days
             if remaining_days < 7:
                 CookieValidator._show_warning(
-                    f'Cookie将在{remaining_days}天后过期',
-                    action='建议立即更新'
+                    f'Cookie灏嗗湪{remaining_days}澶╁悗杩囨湡',
+                    action='寤鸿绔嬪嵆鏇存柊'
                 )
         
         return True, cookies
     
     @staticmethod
     def _show_prompt(title, reasons, solutions, tip=''):
-        """显示结构化的友好提示"""
+        """鏄剧ず缁撴瀯鍖栫殑鍙嬪ソ鎻愮ず"""
         print_separator()
-        print(f'⚠️ {title}')
-        print('\n可能的原因:')
+        print(f'鈿狅笍 {title}')
+        print('\n鍙兘鐨勫師鍥?')
         for i, reason in enumerate(reasons, 1):
             print(f'  {i}. {reason}')
-        print('\n解决方案:')
+        print('\n瑙ｅ喅鏂规:')
         for i, solution in enumerate(solutions, 1):
-            print(f'  ✓ {solution}')
+            print(f'  鉁?{solution}')
         if tip:
-            print(f'\n💡 提示: {tip}')
+            print(f'\n馃挕 鎻愮ず: {tip}')
         print_separator()
 ```
 
-**用户体验优化**:
-- ✅ 分步骤验证（存在性→格式→有效性）
-- ✅ 结构化错误提示（原因+解决方案+提示）
-- ✅ 过期预警（提前7天提醒）
-- ✅ 引导式修复流程
+**鐢ㄦ埛浣撻獙浼樺寲**:
+- 鉁?鍒嗘楠ら獙璇侊紙瀛樺湪鎬р啋鏍煎紡鈫掓湁鏁堟€э級
+- 鉁?缁撴瀯鍖栭敊璇彁绀猴紙鍘熷洜+瑙ｅ喅鏂规+鎻愮ず锛?
+- 鉁?杩囨湡棰勮锛堟彁鍓?澶╂彁閱掞級
+- 鉁?寮曞寮忎慨澶嶆祦绋?
 
 ---
 
-## 🔴 PY-CORE-013: 文件清理自动化范式 (Automated File Cleanup)
+## 馃敶 PY-CORE-013: 鏂囦欢娓呯悊鑷姩鍖栬寖寮?(Automated File Cleanup)
 
-### 范式描述
-实现智能文件清理策略，按组保留最新、按时间删除旧文件、支持测试模式。
+### 鑼冨紡鎻忚堪
+瀹炵幇鏅鸿兘鏂囦欢娓呯悊绛栫暐锛屾寜缁勪繚鐣欐渶鏂般€佹寜鏃堕棿鍒犻櫎鏃ф枃浠躲€佹敮鎸佹祴璇曟ā寮忋€?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 def clean_old_files(directory, dry_run=False):
     """
-    清理旧文件策略：
-    - 按'_'前缀分组（如 image_001.jpg, image_002.jpg 为一组）
-    - 每组只保留最新的一个文件
-    - 删除其他组的所有文件
+    娓呯悊鏃ф枃浠剁瓥鐣ワ細
+    - 鎸?_'鍓嶇紑鍒嗙粍锛堝 image_001.jpg, image_002.jpg 涓轰竴缁勶級
+    - 姣忕粍鍙繚鐣欐渶鏂扮殑涓€涓枃浠?
+    - 鍒犻櫎鍏朵粬缁勭殑鎵€鏈夋枃浠?
     """
     
     matched_files = []
     
-    # 扫描媒体文件
+    # 鎵弿濯掍綋鏂囦欢
     for file in directory.iterdir():
         if file.is_file() and file.suffix.lower() in MEDIA_EXTENSIONS:
             stat = file.stat()
@@ -1185,10 +1185,10 @@ def clean_old_files(directory, dry_run=False):
                 'size': stat.st_size
             })
     
-    # 按修改时间排序（从新到旧）
+    # 鎸変慨鏀规椂闂存帓搴忥紙浠庢柊鍒版棫锛?
     matched_files.sort(key=lambda x: x['mtime'], reverse=True)
     
-    # 分组
+    # 鍒嗙粍
     groups = {}
     for file_info in matched_files:
         key = file_info['group_key']
@@ -1196,55 +1196,55 @@ def clean_old_files(directory, dry_run=False):
             groups[key] = []
         groups[key].append(file_info)
     
-    # 找到最新的一组
+    # 鎵惧埌鏈€鏂扮殑涓€缁?
     sorted_groups = sorted(groups.keys(), 
                           key=lambda k: max(f['mtime'] for f in groups[k]),
                           reverse=True)
     latest_group = sorted_groups[0]
     
-    # 删除除最新组以外的所有文件
+    # 鍒犻櫎闄ゆ渶鏂扮粍浠ュ鐨勬墍鏈夋枃浠?
     files_to_delete = [f for f in matched_files if f['group_key'] != latest_group]
     
     for file_info in files_to_delete:
         file_info['file'].unlink()
     
-    print(f"清理完成: 保留{len(groups[latest_group])}个, 删除{len(files_to_delete)}个")
+    print(f"娓呯悊瀹屾垚: 淇濈暀{len(groups[latest_group])}涓? 鍒犻櫎{len(files_to_delete)}涓?)
 
 def auto_clean_temp_dir():
-    """自动清理temp目录（超过3MB时全清）"""
+    """鑷姩娓呯悊temp鐩綍锛堣秴杩?MB鏃跺叏娓咃級"""
     temp_dir = os.path.join(PROJECT_DIR, 'temp')
     total_size = sum(f.stat().st_size for f in temp_dir.iterdir() if f.is_file())
     
-    if total_size > 3 * 1024 * 1024:  # 3MB阈值
+    if total_size > 3 * 1024 * 1024:  # 3MB闃堝€?
         for f in temp_dir.iterdir():
             if f.is_file():
                 f.unlink()
-        print(f"[Clean] temp目录超过3MB，已清理")
+        print(f"[Clean] temp鐩綍瓒呰繃3MB锛屽凡娓呯悊")
 ```
 
-**清理策略**:
-- ✅ 智能分组（按文件名前缀）
-- ✅ 保留最新（每组保留最新文件）
-- ✅ 大小监控（3MB自动清理）
-- ✅ 测试模式（dry_run预览）
-- ✅ 类型过滤（图片/视频/文档）
+**娓呯悊绛栫暐**:
+- 鉁?鏅鸿兘鍒嗙粍锛堟寜鏂囦欢鍚嶅墠缂€锛?
+- 鉁?淇濈暀鏈€鏂帮紙姣忕粍淇濈暀鏈€鏂版枃浠讹級
+- 鉁?澶у皬鐩戞帶锛?MB鑷姩娓呯悊锛?
+- 鉁?娴嬭瘯妯″紡锛坉ry_run棰勮锛?
+- 鉁?绫诲瀷杩囨护锛堝浘鐗?瑙嗛/鏂囨。锛?
 
 ---
 
-## 🔴 PY-CORE-014: 后台任务管理范式 (Background Task Management)
+## 馃敶 PY-CORE-014: 鍚庡彴浠诲姟绠＄悊鑼冨紡 (Background Task Management)
 
-### 范式描述
-实现后台任务的生命周期管理，包括启动、监控、输出收集、终止等。
+### 鑼冨紡鎻忚堪
+瀹炵幇鍚庡彴浠诲姟鐨勭敓鍛藉懆鏈熺鐞嗭紝鍖呮嫭鍚姩銆佺洃鎺с€佽緭鍑烘敹闆嗐€佺粓姝㈢瓑銆?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
-processes = {}  # 进程字典
-tasks = {}      # 任务状态字典
+processes = {}  # 杩涚▼瀛楀吀
+tasks = {}      # 浠诲姟鐘舵€佸瓧鍏?
 _processes_lock = threading.Lock()
 _tasks_lock = threading.Lock()
 
 def run_command_background(task_id, command):
-    """后台运行命令（线程+子进程）"""
+    """鍚庡彴杩愯鍛戒护锛堢嚎绋?瀛愯繘绋嬶級"""
     
     with _tasks_lock:
         tasks[task_id] = {
@@ -1256,7 +1256,7 @@ def run_command_background(task_id, command):
     env = os.environ.copy()
     env['PYTHONIOENCODING'] = 'utf-8'
     
-    # 启动子进程
+    # 鍚姩瀛愯繘绋?
     process = subprocess.Popen(
         command,
         shell=True,
@@ -1271,7 +1271,7 @@ def run_command_background(task_id, command):
     with _processes_lock:
         processes[task_id] = process
     
-    # 实时收集输出
+    # 瀹炴椂鏀堕泦杈撳嚭
     stdout_lines = []
     while True:
         if process.poll() is not None:
@@ -1292,7 +1292,7 @@ def run_command_background(task_id, command):
             if line:
                 stdout_lines.append(line)
                 
-                # 实时更新任务状态
+                # 瀹炴椂鏇存柊浠诲姟鐘舵€?
                 with _tasks_lock:
                     tasks[task_id]['output'] = ''.join(stdout_lines)
                     
@@ -1308,7 +1308,7 @@ def run_command_background(task_id, command):
 
 @app.post("/api/task/{task_id}/kill")
 async def kill_task(task_id: str):
-    """终止任务API"""
+    """缁堟浠诲姟API"""
     with _processes_lock:
         if task_id in processes:
             process = processes[task_id]
@@ -1316,7 +1316,7 @@ async def kill_task(task_id: str):
             try:
                 process.wait(timeout=TIMEOUT_CONFIG['subprocess_kill'])
             except subprocess.TimeoutExpired:
-                process.kill()  # 强制杀死
+                process.kill()  # 寮哄埗鏉€姝?
             
             del processes[task_id]
             
@@ -1324,51 +1324,51 @@ async def kill_task(task_id: str):
         if task_id in tasks:
             tasks[task_id]['status'] = 'killed'
     
-    return {"success": True, "message": f"任务 {task_id} 已终止"}
+    return {"success": True, "message": f"浠诲姟 {task_id} 宸茬粓姝?}
 ```
 
-**任务管理能力**:
-- ✅ 实时输出流式收集
-- ✅ 优雅终止（terminate→wait→kill）
-- ✅ 线程安全锁保护
-- ✅ 任务状态机（running/completed/error/killed）
-- ✅ 跨平台兼容（Windows select vs Unix select）
+**浠诲姟绠＄悊鑳藉姏**:
+- 鉁?瀹炴椂杈撳嚭娴佸紡鏀堕泦
+- 鉁?浼橀泤缁堟锛坱erminate鈫抴ait鈫択ill锛?
+- 鉁?绾跨▼瀹夊叏閿佷繚鎶?
+- 鉁?浠诲姟鐘舵€佹満锛坮unning/completed/error/killed锛?
+- 鉁?璺ㄥ钩鍙板吋瀹癸紙Windows select vs Unix select锛?
 
 ---
 
-## 🔴 PY-CORE-015: 隧道高可用范式 (High-Availability Tunnel)
+## 馃敶 PY-CORE-015: 闅ч亾楂樺彲鐢ㄨ寖寮?(High-Availability Tunnel)
 
-### 范式描述
-实现hostc + Cloudflare双隧道互备方案，包含心跳检测、故障转移、自动重启等机制。
+### 鑼冨紡鎻忚堪
+瀹炵幇hostc + Cloudflare鍙岄毀閬撲簰澶囨柟妗堬紝鍖呭惈蹇冭烦妫€娴嬨€佹晠闅滆浆绉汇€佽嚜鍔ㄩ噸鍚瓑鏈哄埗銆?
 
-### 架构设计
+### 鏋舵瀯璁捐
 ```
-┌─────────────┐     ┌─────────────────┐     ┌──────────────┐
-│   hostc      │     │ Cloudflare       │     │   前端展示    │
-│   隧道       │ ── │ Tunnel           │ ── │              │
-│ (Plan A)    │     │ (Plan B)         │     │              │
-└─────────────┘     └─────────────────┘     └──────────────┘
-       │                     │                      │
-       └──────────┬──────────┘                      │
-                  ▼                                 │
-          ┌──────────────┐                         │
-          │ 心跳守护进程  │ ◄───────────────────────┘
-          │ (Heartbeat)  │    定期验证URL可用性
-          └──────────────┘
-                  │
-         ┌────────┴────────┐
-         ▼                 ▼
-  Plan A可用         Plan A不可用
-  (使用hostc)       (切换到CF)
-         │                 │
-         ▼                 ▼
-  发送stable邮件    发送fallback邮件
+鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?    鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?    鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+鈹?  hostc      鈹?    鈹?Cloudflare       鈹?    鈹?  鍓嶇灞曠ず    鈹?
+鈹?  闅ч亾       鈹?鈹€鈹€ 鈹?Tunnel           鈹?鈹€鈹€ 鈹?             鈹?
+鈹?(Plan A)    鈹?    鈹?(Plan B)         鈹?    鈹?             鈹?
+鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?    鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?    鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+       鈹?                    鈹?                     鈹?
+       鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                     鈹?
+                  鈻?                                鈹?
+          鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?                        鈹?
+          鈹?蹇冭烦瀹堟姢杩涚▼  鈹?鈼勨攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+          鈹?(Heartbeat)  鈹?   瀹氭湡楠岃瘉URL鍙敤鎬?
+          鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+                  鈹?
+         鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹粹攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?
+         鈻?                鈻?
+  Plan A鍙敤         Plan A涓嶅彲鐢?
+  (浣跨敤hostc)       (鍒囨崲鍒癈F)
+         鈹?                鈹?
+         鈻?                鈻?
+  鍙戦€乻table閭欢    鍙戦€乫allback閭欢
 ```
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 def verify_url(url, timeout=5, method='GET'):
-    """URL可用性验证（多方式尝试）"""
+    """URL鍙敤鎬ч獙璇侊紙澶氭柟寮忓皾璇曪級"""
     
     validation_methods = [
         ('GET', lambda u: urllib.request.urlopen(u, timeout=timeout)),
@@ -1386,7 +1386,7 @@ def verify_url(url, timeout=5, method='GET'):
     return False, last_error
 
 def send_heartbeat():
-    """心跳检测循环"""
+    """蹇冭烦妫€娴嬪惊鐜?""
     
     while True:
         url = PathManager.get_public_url_from_web_log()
@@ -1397,7 +1397,7 @@ def send_heartbeat():
             if is_valid:
                 stable_confirm_count += 1
                 
-                if stable_confirm_count >= 3:  # 连续3次成功
+                if stable_confirm_count >= 3:  # 杩炵画3娆℃垚鍔?
                     if not was_stable:
                         email_notifier.send_tunnel_notification(url, 'stable_available')
                         was_stable = True
@@ -1407,15 +1407,15 @@ def send_heartbeat():
                 
                 fail_count += 1
                 
-                if fail_count >= 2:  # 连续2次失败
+                if fail_count >= 2:  # 杩炵画2娆″け璐?
                     email_notifier.send_tunnel_notification(url, 'unavailable')
-                    restart_tunnel()  # 触发重启
+                    restart_tunnel()  # 瑙﹀彂閲嶅惎
                     fail_count = 0
         
-        time.sleep(30)  # 30秒间隔
+        time.sleep(30)  # 30绉掗棿闅?
 
 def restart_tunnel():
-    """隧道重启（双隧道切换逻辑）"""
+    """闅ч亾閲嶅惎锛堝弻闅ч亾鍒囨崲閫昏緫锛?""
     
     if use_cloudflare_tunnel:
         start_cloudflare_tunnel()
@@ -1429,264 +1429,252 @@ def restart_tunnel():
         email_notifier.send_tunnel_notification(new_url, 'restarted')
 ```
 
-**高可用特性**:
-- ✅ 双隧道互备（hostc + CF）
-- ✅ 多方式验证（GET/HEAD/TCP）
-- ✅ 连续失败计数（阈值触发）
-- ✅ 稳定性确认（连续成功N次）
-- ✅ 自动故障转移
-- ✅ 邮件通知分级（new/stable/unavailable/restarted/fallback）
+**楂樺彲鐢ㄧ壒鎬?*:
+- 鉁?鍙岄毀閬撲簰澶囷紙hostc + CF锛?
+- 鉁?澶氭柟寮忛獙璇侊紙GET/HEAD/TCP锛?
+- 鉁?杩炵画澶辫触璁℃暟锛堥槇鍊艰Е鍙戯級
+- 鉁?绋冲畾鎬х‘璁わ紙杩炵画鎴愬姛N娆★級
+- 鉁?鑷姩鏁呴殰杞Щ
+- 鉁?閭欢閫氱煡鍒嗙骇锛坣ew/stable/unavailable/restarted/fallback锛?
 
 ---
 
-## 📊 代码质量指标 (Code Quality Metrics)
+## 馃搳 浠ｇ爜璐ㄩ噺鎸囨爣 (Code Quality Metrics)
 
-### 命名规范
-- **类名**: PascalCase（AppException, ExceptionHandler）
-- **函数名**: snake_case（send_heartbeat, validate_cookie）
-- **常量**: UPPER_SNAKE_CASE（TIMEOUT_CONFIG, PROJECT_DIR）
-- **私有属性**: 下划线前缀（_config, _lock）
-- **布尔变量**: is_/has_/can_前缀（is_valid, has_cache）
+### 鍛藉悕瑙勮寖
+- **绫诲悕**: PascalCase锛圓ppException, ExceptionHandler锛?
+- **鍑芥暟鍚?*: snake_case锛坰end_heartbeat, validate_cookie锛?
+- **甯搁噺**: UPPER_SNAKE_CASE锛圱IMEOUT_CONFIG, PROJECT_DIR锛?
+- **绉佹湁灞炴€?*: 涓嬪垝绾垮墠缂€锛坃config, _lock锛?
+- **甯冨皵鍙橀噺**: is_/has_/can_鍓嶇紑锛坕s_valid, has_cache锛?
 
-### 注释规范
-- **类注释**: 功能说明 + 使用示例
-- **函数注释**: Args/Returns/Raises + 类型标注
-- **复杂逻辑**: 行内注释说明意图
-- **TODO/FIXME**: 标记待办事项
+### 娉ㄩ噴瑙勮寖
+- **绫绘敞閲?*: 鍔熻兘璇存槑 + 浣跨敤绀轰緥
+- **鍑芥暟娉ㄩ噴**: Args/Returns/Raises + 绫诲瀷鏍囨敞
+- **澶嶆潅閫昏緫**: 琛屽唴娉ㄩ噴璇存槑鎰忓浘
+- **TODO/FIXME**: 鏍囪寰呭姙浜嬮」
 
-### 错误处理等级
-1. **致命错误**: 抛出AppException，终止流程
-2. **可恢复错误**: ExceptionContext吞掉，返回默认值
-3. **警告**: 日志记录，继续执行
-4. **静默异常**: debug级别日志，不影响流程
+### 閿欒澶勭悊绛夌骇
+1. **鑷村懡閿欒**: 鎶涘嚭AppException锛岀粓姝㈡祦绋?
+2. **鍙仮澶嶉敊璇?*: ExceptionContext鍚炴帀锛岃繑鍥為粯璁ゅ€?
+3. **璀﹀憡**: 鏃ュ織璁板綍锛岀户缁墽琛?
+4. **闈欓粯寮傚父**: debug绾у埆鏃ュ織锛屼笉褰卞搷娴佺▼
 
-### 性能要求
-- API响应时间: < 500ms（P95）
-- 文件缓存TTL: 30秒
-- 速率限制: 200请求/分钟/IP
-- 子进程超时: 3-30秒（按场景）
-- 爬虫并发: 15线程
+### 鎬ц兘瑕佹眰
+- API鍝嶅簲鏃堕棿: < 500ms锛圥95锛?
+- 鏂囦欢缂撳瓨TTL: 30绉?
+- 閫熺巼闄愬埗: 200璇锋眰/鍒嗛挓/IP
+- 瀛愯繘绋嬭秴鏃? 3-30绉掞紙鎸夊満鏅級
+- 鐖櫕骞跺彂: 15绾跨▼
 
 ---
 
-## 🔧 开发工作流 (Development Workflow)
+## 馃敡 寮€鍙戝伐浣滄祦 (Development Workflow)
 
-### 新功能开发流程
-1. **设计阶段**
-   - 确定所属模块（异常/日志/业务/API）
-   - 选择合适的设计模式（单例/工厂/策略）
-   - 定义接口和数据结构
+### 鏂板姛鑳藉紑鍙戞祦绋?
+1. **璁捐闃舵**
+   - 纭畾鎵€灞炴ā鍧楋紙寮傚父/鏃ュ織/涓氬姟/API锛?
+   - 閫夋嫨鍚堥€傜殑璁捐妯″紡锛堝崟渚?宸ュ巶/绛栫暐锛?
+   - 瀹氫箟鎺ュ彛鍜屾暟鎹粨鏋?
 
-2. **编码阶段**
-   - 遵循命名规范和注释规范
-   - 使用safe_call/ExceptionContext处理异常
-   - 通过PathManager管理路径
-   - 使用ConfigManager读写配置
+2. **缂栫爜闃舵**
+   - 閬靛惊鍛藉悕瑙勮寖鍜屾敞閲婅鑼?
+   - 浣跨敤safe_call/ExceptionContext澶勭悊寮傚父
+   - 閫氳繃PathManager绠＄悊璺緞
+   - 浣跨敤ConfigManager璇诲啓閰嶇疆
 
-3. **测试阶段**
-   - 单元测试覆盖核心逻辑
-   - 集成测试验证流程
-   - 性能测试满足指标
+3. **娴嬭瘯闃舵**
+   - 鍗曞厓娴嬭瘯瑕嗙洊鏍稿績閫昏緫
+   - 闆嗘垚娴嬭瘯楠岃瘉娴佺▼
+   - 鎬ц兘娴嬭瘯婊¤冻鎸囨爣
 
-4. **文档阶段**
-   - 更新README.md版本记录
-   - 更新skill.md范式文档
-   - 重新生成skill.docx
+4. **鏂囨。闃舵**
+   - 鏇存柊README.md鐗堟湰璁板綍
+   - 鏇存柊skill.md鑼冨紡鏂囨。
+   - 閲嶆柊鐢熸垚skill.docx
 
-### Git提交规范
+### Git鎻愪氦瑙勮寖
 ```
-docs: 文档更新
-feat: 新功能
-fix: Bug修复
-refactor: 代码重构
-perf: 性能优化
-test: 测试相关
-chore: 构建/工具
-security: 安全修复
-```
-
----
-
-## 📈 项目演进路线图 (Evolution Roadmap)
-
-### v3.8.x - 企业级稳定版 (当前)
-- ✅ FastAPI全面迁移完成
-- ✅ 双隧道高可用方案
-- ✅ 企业级安全加固
-- ✅ 移动端完美适配
-- ✅ 完整的监控告警
-
-### v3.9.x - 智能化增强版 (规划)
-- 🔲 AI辅助商品定价
-- 🔲 智能库存预测
-- 🔲 自动化报表生成
-- 🔲 多店铺管理
-- 🔲 分布式爬虫集群
-
-### v4.0.x - 云原生架构 (远期)
-- 🔲 Kubernetes部署
-- 🔲 微服务拆分
-- 🔲 PostgreSQL迁移
-- 🔲 Redis缓存层
-- 🔲 消息队列集成
-
----
-
-## 🎯 总结
-
-本项目实现了**15大核心技术范式**：
-
-1. ✅ **统一异常处理** - 分层捕获、分类、转换
-2. ✅ **环境自适应** - 跨平台无缝兼容
-3. ✅ **路径集中管理** - 避免硬编码、易维护
-4. ✅ **智能缓存机制** - TTL + 文件变更检测
-5. ✅ **安全邮件通知** - HTML富文本 + 事件分类
-6. ✅ **浏览器自动化** - Playwright + 智能滚动
-7. ✅ **数据对比分析** - 集合运算 + 高价筛选
-8. ✅ **API安全防护** - 速率限制 + 输入验证
-9. ✅ **前端XSS防护** - 转义 + 白名单
-10. ✅ **双输出日志** - 控制台 + 文件同步
-11. ✅ **配置管理** - 懒加载 + 自动持久化
-12. ✅ **Cookie生命周期** - 验证 + 过期提醒
-13. ✅ **文件清理自动化** - 分组保留 + 大小监控
-14. ✅ **后台任务管理** - 流式输出 + 优雅终止
-15. ✅ **隧道高可用** - 双活 + 心跳 + 故障转移
-
-这些范式构成了企业级Python Web应用的**最佳实践集**，可直接应用于类似项目。
-│   └── WegoScraper - 微购爬虫类
-└── API路由层
-    ├── FastAPI应用实例
-    ├── RESTful API端点
-    └── 请求验证与响应
+docs: 鏂囨。鏇存柊
+feat: 鏂板姛鑳?
+fix: Bug淇
+refactor: 浠ｇ爜閲嶆瀯
+perf: 鎬ц兘浼樺寲
+test: 娴嬭瘯鐩稿叧
+chore: 鏋勫缓/宸ュ叿
+security: 瀹夊叏淇
 ```
 
-#### JavaScript前端模块 (dist/app.js)
+---
+
+## 馃搱 椤圭洰婕旇繘璺嚎鍥?(Evolution Roadmap)
+
+### v3.8.x - 浼佷笟绾хǔ瀹氱増 (褰撳墠)
+- 鉁?FastAPI鍏ㄩ潰杩佺Щ瀹屾垚
+- 鉁?鍙岄毀閬撻珮鍙敤鏂规
+- 鉁?浼佷笟绾у畨鍏ㄥ姞鍥?
+- 鉁?绉诲姩绔畬缇庨€傞厤
+- 鉁?瀹屾暣鐨勭洃鎺у憡璀?
+
+### v3.9.x - 鏅鸿兘鍖栧寮虹増 (瑙勫垝)
+- 馃敳 AI杈呭姪鍟嗗搧瀹氫环
+- 馃敳 鏅鸿兘搴撳瓨棰勬祴
+- 馃敳 鑷姩鍖栨姤琛ㄧ敓鎴?
+- 馃敳 澶氬簵閾虹鐞?
+- 馃敳 鍒嗗竷寮忕埇铏泦缇?
+
+### v4.0.x - 浜戝師鐢熸灦鏋?(杩滄湡)
+- 馃敳 Kubernetes閮ㄧ讲
+- 馃敳 寰湇鍔℃媶鍒?
+- 馃敳 PostgreSQL杩佺Щ
+- 馃敳 Redis缂撳瓨灞?
+- 馃敳 娑堟伅闃熷垪闆嗘垚
+
+---
+
+## 馃幆 鎬荤粨
+
+鏈」鐩疄鐜颁簡**15澶ф牳蹇冩妧鏈寖寮?*锛?
+
+1. 鉁?**缁熶竴寮傚父澶勭悊** - 鍒嗗眰鎹曡幏銆佸垎绫汇€佽浆鎹?
+2. 鉁?**鐜鑷€傚簲** - 璺ㄥ钩鍙版棤缂濆吋瀹?
+3. 鉁?**璺緞闆嗕腑绠＄悊** - 閬垮厤纭紪鐮併€佹槗缁存姢
+4. 鉁?**鏅鸿兘缂撳瓨鏈哄埗** - TTL + 鏂囦欢鍙樻洿妫€娴?
+5. 鉁?**瀹夊叏閭欢閫氱煡** - HTML瀵屾枃鏈?+ 浜嬩欢鍒嗙被
+6. 鉁?**娴忚鍣ㄨ嚜鍔ㄥ寲** - Playwright + 鏅鸿兘婊氬姩
+7. 鉁?**鏁版嵁瀵规瘮鍒嗘瀽** - 闆嗗悎杩愮畻 + 楂樹环绛涢€?
+8. 鉁?**API瀹夊叏闃叉姢** - 閫熺巼闄愬埗 + 杈撳叆楠岃瘉
+9. 鉁?**鍓嶇XSS闃叉姢** - 杞箟 + 鐧藉悕鍗?
+10. 鉁?**鍙岃緭鍑烘棩蹇?* - 鎺у埗鍙?+ 鏂囦欢鍚屾
+11. 鉁?**閰嶇疆绠＄悊** - 鎳掑姞杞?+ 鑷姩鎸佷箙鍖?
+12. 鉁?**Cookie鐢熷懡鍛ㄦ湡** - 楠岃瘉 + 杩囨湡鎻愰啋
+13. 鉁?**鏂囦欢娓呯悊鑷姩鍖?* - 鍒嗙粍淇濈暀 + 澶у皬鐩戞帶
+14. 鉁?**鍚庡彴浠诲姟绠＄悊** - 娴佸紡杈撳嚭 + 浼橀泤缁堟
+15. 鉁?**闅ч亾楂樺彲鐢?* - 鍙屾椿 + 蹇冭烦 + 鏁呴殰杞Щ
+
+杩欎簺鑼冨紡鏋勬垚浜嗕紒涓氱骇Python Web搴旂敤鐨?*鏈€浣冲疄璺甸泦**锛屽彲鐩存帴搴旂敤浜庣被浼奸」鐩€?
+鈹?  鈹斺攢鈹€ WegoScraper - 寰喘鐖櫕绫?
+鈹斺攢鈹€ API璺敱灞?
+    鈹溾攢鈹€ FastAPI搴旂敤瀹炰緥
+    鈹溾攢鈹€ RESTful API绔偣
+    鈹斺攢鈹€ 璇锋眰楠岃瘉涓庡搷搴?
+```
+
+#### JavaScript鍓嶇妯″潡 (dist/app.js)
 ```
 dist/app.js
-├── 安全工具函数
-│   ├── escapeHtml() - HTML转义
-│   ├── escapeAttr() - 属性转义
-│   ├── isValidUrl() - URL验证
-│   └── safeUrl() - 安全URL生成
-├── 设备检测系统
-│   ├── detectDevice() - 设备类型检测
-│   └── applyDeviceStyles() - 响应式样式应用
-├── 数据解析引擎
-│   ├── 日志解析 - Python输出解析
-│   ├── 正则表达式优化 - 多格式兼容
-│   └── 数据验证 - 容错机制
-├── UI渲染系统
-│   ├── 统计数据显示
-│   ├── 列表数据展示
-│   └── SKU标签渲染
-├── WebSocket通信
-│   ├── safeCloseWebSocket() - 安全关闭
-│   └── 状态感知关闭机制
-├── API客户端
-│   ├── safeParseJson() - 安全JSON解析
-│   └── 错误处理机制
-└── 事件绑定系统
-    ├── bindAllButtons() - 按钮绑定
-    ├── bindSkuTagEvents() - SKU标签事件
-    └── 全局函数暴露
+鈹溾攢鈹€ 瀹夊叏宸ュ叿鍑芥暟
+鈹?  鈹溾攢鈹€ escapeHtml() - HTML杞箟
+鈹?  鈹溾攢鈹€ escapeAttr() - 灞炴€ц浆涔?
+鈹?  鈹溾攢鈹€ isValidUrl() - URL楠岃瘉
+鈹?  鈹斺攢鈹€ safeUrl() - 瀹夊叏URL鐢熸垚
+鈹溾攢鈹€ 璁惧妫€娴嬬郴缁?
+鈹?  鈹溾攢鈹€ detectDevice() - 璁惧绫诲瀷妫€娴?
+鈹?  鈹斺攢鈹€ applyDeviceStyles() - 鍝嶅簲寮忔牱寮忓簲鐢?
+鈹溾攢鈹€ 鏁版嵁瑙ｆ瀽寮曟搸
+鈹?  鈹溾攢鈹€ 鏃ュ織瑙ｆ瀽 - Python杈撳嚭瑙ｆ瀽
+鈹?  鈹溾攢鈹€ 姝ｅ垯琛ㄨ揪寮忎紭鍖?- 澶氭牸寮忓吋瀹?
+鈹?  鈹斺攢鈹€ 鏁版嵁楠岃瘉 - 瀹归敊鏈哄埗
+鈹溾攢鈹€ UI娓叉煋绯荤粺
+鈹?  鈹溾攢鈹€ 缁熻鏁版嵁鏄剧ず
+鈹?  鈹溾攢鈹€ 鍒楄〃鏁版嵁灞曠ず
+鈹?  鈹斺攢鈹€ SKU鏍囩娓叉煋
+鈹溾攢鈹€ WebSocket閫氫俊
+鈹?  鈹溾攢鈹€ safeCloseWebSocket() - 瀹夊叏鍏抽棴
+鈹?  鈹斺攢鈹€ 鐘舵€佹劅鐭ュ叧闂満鍒?
+鈹溾攢鈹€ API瀹㈡埛绔?
+鈹?  鈹溾攢鈹€ safeParseJson() - 瀹夊叏JSON瑙ｆ瀽
+鈹?  鈹斺攢鈹€ 閿欒澶勭悊鏈哄埗
+鈹斺攢鈹€ 浜嬩欢缁戝畾绯荤粺
+    鈹溾攢鈹€ bindAllButtons() - 鎸夐挳缁戝畾
+    鈹溾攢鈹€ bindSkuTagEvents() - SKU鏍囩浜嬩欢
+    鈹斺攢鈹€ 鍏ㄥ眬鍑芥暟鏆撮湶
 ```
 
-### 项目目录结构
+### 椤圭洰鐩綍缁撴瀯
 ```
 D:/ws/xy_ws/
-├── main.py                 # Python后端主程序
-├── README.md               # 项目说明文档
-├── skill.md                # 开发技能文档（本文件）
-├── skill.docx              # Word格式文档
-├── run.bat                 # Windows启动脚本
-├── run.sh                  # Linux/Mac启动脚本
-├── tests/                  # 测试目录
-│   ├── test_main.py        # 主测试文件
-│   ├── test_edge_cases.py  # 边界测试
-│   ├── stress_test.py      # 压力测试
-│   └── test_security_fixes.py  # 安全测试
-├── dist/                   # 前端构建产物
-│   ├── app.js              # JavaScript主文件
-│   ├── index.html          # HTML入口
-│   ├── package.json        # Node.js依赖
-│   ├── patches/            # patch-package补丁
-│   │   └── hostc+1.3.0.patch
-│   ├── assets/             # 静态资源
-│   │   ├── index-*.js      # 应用代码
-│   │   ├── vendor-*.js     # 第三方库
-│   │   └── index-*.css     # 样式文件
-│   ├── fonts/              # 字体文件
-│   ├── weather-icons/      # 天气图标
-│   └── screenshots/        # 截图
-├── .github/workflows/      # CI/CD配置
-│   └── ci-cd.yml
-└── .venv/                  # Python虚拟环境
+鈹溾攢鈹€ main.py                 # Python鍚庣涓荤▼搴?
+鈹溾攢鈹€ README.md               # 椤圭洰璇存槑鏂囨。
+鈹溾攢鈹€ skill.md                # 寮€鍙戞妧鑳芥枃妗ｏ紙鏈枃浠讹級
+鈹溾攢鈹€ skill.docx              # Word鏍煎紡鏂囨。
+鈹溾攢鈹€ run.bat                 # Windows鍚姩鑴氭湰
+鈹溾攢鈹€ run.sh                  # Linux/Mac鍚姩鑴氭湰
+鈹溾攢鈹€ tests/                  # 娴嬭瘯鐩綍
+鈹?  鈹溾攢鈹€ test_main.py        # 涓绘祴璇曟枃浠?
+鈹?  鈹溾攢鈹€ test_edge_cases.py  # 杈圭晫娴嬭瘯
+鈹?  鈹溾攢鈹€ stress_test.py      # 鍘嬪姏娴嬭瘯
+鈹?  鈹斺攢鈹€ test_security_fixes.py  # 瀹夊叏娴嬭瘯
+鈹溾攢鈹€ dist/                   # 鍓嶇鏋勫缓浜х墿
+鈹?  鈹溾攢鈹€ app.js              # JavaScript涓绘枃浠?
+鈹?  鈹溾攢鈹€ index.html          # HTML鍏ュ彛
+鈹?  鈹溾攢鈹€ package.json        # Node.js渚濊禆
+鈹?  鈹溾攢鈹€ patches/            # patch-package琛ヤ竵
+鈹?  鈹?  鈹斺攢鈹€ hostc+1.3.0.patch
+鈹?  鈹溾攢鈹€ assets/             # 闈欐€佽祫婧?
+鈹?  鈹?  鈹溾攢鈹€ index-*.js      # 搴旂敤浠ｇ爜
+鈹?  鈹?  鈹溾攢鈹€ vendor-*.js     # 绗笁鏂瑰簱
+鈹?  鈹?  鈹斺攢鈹€ index-*.css     # 鏍峰紡鏂囦欢
+鈹?  鈹溾攢鈹€ fonts/              # 瀛椾綋鏂囦欢
+鈹?  鈹溾攢鈹€ weather-icons/      # 澶╂皵鍥炬爣
+鈹?  鈹斺攢鈹€ screenshots/        # 鎴浘
+鈹溾攢鈹€ .github/workflows/      # CI/CD閰嶇疆
+鈹?  鈹斺攢鈹€ ci-cd.yml
+鈹斺攢鈹€ .venv/                  # Python铏氭嫙鐜
 ```
 
 ---
 
-## 🔄 最新更新 (v3.8.89.19)
+## 馃攧 鏈€鏂版洿鏂?(v3.8.89.19)
 
-### v3.8.89.19 (2026-08-11) - 🎨 删除商品描述完整显示优化 + 响应式布局增强
+### v3.8.89.19 (2026-08-11) - 馃帹 鍒犻櫎鍟嗗搧鎻忚堪瀹屾暣鏄剧ず浼樺寲 + 鍝嶅簲寮忓竷灞€澧炲己
 
-#### 更新内容: 将删除商品的商品描述从截断显示改为完整显示，确保移动端和PC端都能完美展示
-
-**影响文件**: [dist/app.js](dist/app.js#L2004), [README.md](README.md), [skill.md](skill.md)
+#### 鏇存柊鍐呭: 灏嗗垹闄ゅ晢鍝佺殑鍟嗗搧鎻忚堪浠庢埅鏂樉绀烘敼涓哄畬鏁存樉绀猴紝纭繚绉诲姩绔拰PC绔兘鑳藉畬缇庡睍绀?
+**褰卞搷鏂囦欢**: [dist/app.js](dist/app.js#L2004), [README.md](README.md), [skill.md](skill.md)
 
 ---
 
-- **删除商品描述完整显示 (核心改进)** - 将删除商品的商品描述从截断显示改为完整显示
-  - 修改位置: dist/app.js#L2004 (删除商品序列号表格)
-  - CSS变更: 移除 max-width(300px)/overflow(hidden)/text-overflow(ellipsis) 限制
-  - 新增样式: word-break(break-word)/white-space(normal)/min-width(200px)
-  - 效果: 长描述自动换行多行显示，不再截断为"..."
+- **鍒犻櫎鍟嗗搧鎻忚堪瀹屾暣鏄剧ず (鏍稿績鏀硅繘)** - 灏嗗垹闄ゅ晢鍝佺殑鍟嗗搧鎻忚堪浠庢埅鏂樉绀烘敼涓哄畬鏁存樉绀?  - 淇敼浣嶇疆: dist/app.js#L2004 (鍒犻櫎鍟嗗搧搴忓垪鍙疯〃鏍?
+  - CSS鍙樻洿: 绉婚櫎 max-width(300px)/overflow(hidden)/text-overflow(ellipsis) 闄愬埗
+  - 鏂板鏍峰紡: word-break(break-word)/white-space(normal)/min-width(200px)
+  - 鏁堟灉: 闀挎弿杩拌嚜鍔ㄦ崲琛屽琛屾樉绀猴紝涓嶅啀鎴柇涓?..."
 
-- **移动端适配 (手机/平板)** - 优先保证移动端用户体验
-  - 长描述自动换行为多行显示
-  - 完整展示所有文字内容（不再截断）
-  - 不产生横向滚动条（避免布局错乱）
-  - 表格容器保持可滚动性
+- **绉诲姩绔€傞厤 (鎵嬫満/骞虫澘)** - 浼樺厛淇濊瘉绉诲姩绔敤鎴蜂綋楠?  - 闀挎弿杩拌嚜鍔ㄦ崲琛屼负澶氳鏄剧ず
+  - 瀹屾暣灞曠ず鎵€鏈夋枃瀛楀唴瀹癸紙涓嶅啀鎴柇锛?  - 涓嶄骇鐢熸í鍚戞粴鍔ㄦ潯锛堥伩鍏嶅竷灞€閿欎贡锛?  - 琛ㄦ牸瀹瑰櫒淇濇寔鍙粴鍔ㄦ€?
+- **PC绔€傞厤 (鐢佃剳娴忚鍣?** - 娓愯繘澧炲己妗岄潰浣撻獙
+  - 瀹屾暣鏄剧ず鍟嗗搧鎻忚堪鍏ㄦ枃
+  - 琛ㄦ牸瀹瑰櫒鏀寔妯悜婊氬姩 (.change-table-container 宸叉湁 overflow-x: auto)
+  - 淇濇寔鏁翠綋甯冨眬鏁存磥缇庤
+  - 榧犳爣鎮仠浠嶅彲鏌ョ湅鎻愮ず (title 灞炴€т繚鐣?
 
-- **PC端适配 (电脑浏览器)** - 渐进增强桌面体验
-  - 完整显示商品描述全文
-  - 表格容器支持横向滚动 (.change-table-container 已有 overflow-x: auto)
-  - 保持整体布局整洁美观
-  - 鼠标悬停仍可查看提示 (title 属性保留)
+- **浠ｇ爜瑙勮寖閬靛惊 skill.md** - 涓ユ牸閬靛惊椤圭洰缂栫爜瑙勮寖
+  - 鉁?PY-FRONT-001 瀹夊叏缂栫爜: 浣跨敤 escapeHtml() + escapeAttr() 鏃犲畨鍏ㄦ紡娲?  - 鉁?PY-FRONT-003 鍝嶅簲寮忚璁? 绉诲姩绔紭鍏?+ 娓愯繘澧炲己 + 瑙︽懜鍙嬪ソ
+  - 鉁?PY-FRONT-004 宸紓鍖栦氦浜? 鏂板/楂樹环鍟嗗搧淇濈暀鐐瑰嚮鍔熻兘锛屽垹闄ゅ晢鍝佺函鏂囨湰灞曠ず
 
-- **代码规范遵循 skill.md** - 严格遵循项目编码规范
-  - ✅ PY-FRONT-001 安全编码: 使用 escapeHtml() + escapeAttr() 无安全漏洞
-  - ✅ PY-FRONT-003 响应式设计: 移动端优先 + 渐进增强 + 触摸友好
-  - ✅ PY-FRONT-004 差异化交互: 新增/高价商品保留点击功能，删除商品纯文本展示
+- **楠岃瘉缁撴灉** - 鍏ㄩ儴娴嬭瘯閫氳繃
+  - [x] 鍒犻櫎鍟嗗搧闀挎弿杩?鈫?瀹屾暣澶氳鏄剧ず锛堟棤鎴柇锛夆渽
+  - [x] 绉诲姩绔祴璇?鈫?鑷姩鎹㈣锛屾棤妯悜婊氬姩 鉁?  - [x] PC绔祴璇?鈫?瀹屾暣鏄剧ず锛屽鍣ㄥ彲婊氬姩 鉁?  - [x] XSS鏀诲嚮娴嬭瘯 鈫?鎭舵剰鑴氭湰鏃犳硶娉ㄥ叆 鉁?  - [x] 鍔熻兘鍥炲綊娴嬭瘯 鈫?鏂板/楂樹环鍟嗗搧鐐瑰嚮鍔熻兘姝ｅ父 鉁?  - [x] 琛ㄦ牸甯冨眬娴嬭瘯 鈫?鏁翠綋甯冨眬鏃犻敊涔?鉁?
+## 馃攧 鏈€鏂版洿鏂?(v3.8.89.11)
 
-- **验证结果** - 全部测试通过
-  - [x] 删除商品长描述 → 完整多行显示（无截断）✅
-  - [x] 移动端测试 → 自动换行，无横向滚动 ✅
-  - [x] PC端测试 → 完整显示，容器可滚动 ✅
-  - [x] XSS攻击测试 → 恶意脚本无法注入 ✅
-  - [x] 功能回归测试 → 新增/高价商品点击功能正常 ✅
-  - [x] 表格布局测试 → 整体布局无错乱 ✅
+### 馃敡 hostc WebSocket 瀹夊叏鍏抽棴淇 鈥?杩涚▼宕╂簝鏍瑰洜淇
 
-## 🔄 最新更新 (v3.8.89.11)
+#### 闂: hostc 闅ч亾鍚姩鏃舵姤閿?`WebSocket was closed before the connection was established` 骞跺鑷磋繘绋嬪穿婧?
+**鐜拌薄**: 椤圭洰鍚姩鏃?hostc 闅ч亾灏濊瘯寤虹珛 WebSocket 杩炴帴锛岃秴鏃舵垨澶辫触鍚庤皟鐢?`safeCloseWebSocket2` 鍏抽棴 socket锛岃Е鍙戞湭鎹曡幏鐨?`error` 浜嬩欢瀵艰嚧 Node.js 杩涚▼宕╂簝閫€鍑?
 
-### 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复
+**鏍规湰鍘熷洜**:
+1. **`safeCloseWebSocket2` 鍑芥暟缂洪櫡**: 褰?WebSocket 澶勪簬 `CONNECTING` 鐘舵€佹椂锛岀洿鎺ヨ皟鐢?`socket.close()` 浼氭姏寮傚父锛坄ws` 搴撹瀹氭湭瀹屾垚鎻℃墜鐨?socket 蹇呴』鐢?`terminate()` 寮哄埗鍏抽棴锛?
+2. **瓒呮椂澶勭悊鍣ㄧ己闄?*: 瓒呮椂鍚庤皟鐢?`safeCloseWebSocket2` 鍏抽棴 socket锛屼絾鏈鍏堟敞鍐?`error` 浜嬩欢鐩戝惉鍣紝瀵艰嚧 `close()` 瑙﹀彂鐨?error 浜嬩欢鏃犱汉澶勭悊锛屾姏鍑?`Unhandled 'error' event`
 
-#### 问题: hostc 隧道启动时报错 `WebSocket was closed before the connection was established` 并导致进程崩溃
-**现象**: 项目启动时 hostc 隧道尝试建立 WebSocket 连接，超时或失败后调用 `safeCloseWebSocket2` 关闭 socket，触发未捕获的 `error` 事件导致 Node.js 进程崩溃退出
-
-**根本原因**:
-1. **`safeCloseWebSocket2` 函数缺陷**: 当 WebSocket 处于 `CONNECTING` 状态时，直接调用 `socket.close()` 会抛异常（`ws` 库规定未完成握手的 socket 必须用 `terminate()` 强制关闭）
-2. **超时处理器缺陷**: 超时后调用 `safeCloseWebSocket2` 关闭 socket，但未预先注册 `error` 事件监听器，导致 `close()` 触发的 error 事件无人处理，抛出 `Unhandled 'error' event`
-
-**修复方案**:
+**淇鏂规**:
 ```javascript
-// ❌ 修复前：超时处理器直接关闭，未处理 error 事件
+// 鉂?淇鍓嶏細瓒呮椂澶勭悊鍣ㄧ洿鎺ュ叧闂紝鏈鐞?error 浜嬩欢
 const timeout = setTimeout(() => {
   cleanup();
   safeCloseWebSocket2(socket, CLOSE_INTERNAL_ERROR, "connect timeout");
   reject(new Error("WebSocket connect timed out"));
 }, WEBSOCKET_CONNECT_TIMEOUT_MS);
 
-// ✅ 修复后：关闭前吞掉 error 事件，防止进程崩溃
+// 鉁?淇鍚庯細鍏抽棴鍓嶅悶鎺?error 浜嬩欢锛岄槻姝㈣繘绋嬪穿婧?
 const timeout = setTimeout(() => {
   cleanup();
   socket.once("error", () => {});
@@ -1696,7 +1684,7 @@ const timeout = setTimeout(() => {
 ```
 
 ```javascript
-// ❌ 修复前：不区分 socket 状态，直接调用 close()
+// 鉂?淇鍓嶏細涓嶅尯鍒?socket 鐘舵€侊紝鐩存帴璋冪敤 close()
 function safeCloseWebSocket2(socket, code, reason) {
   if (!socket) return;
   try {
@@ -1706,7 +1694,7 @@ function safeCloseWebSocket2(socket, code, reason) {
   }
 }
 
-// ✅ 修复后：CONNECTING 状态用 terminate()，OPEN 状态用 close()
+// 鉁?淇鍚庯細CONNECTING 鐘舵€佺敤 terminate()锛孫PEN 鐘舵€佺敤 close()
 function safeCloseWebSocket2(socket, code, reason) {
   if (!socket) return;
   try {
@@ -1722,238 +1710,238 @@ function safeCloseWebSocket2(socket, code, reason) {
 }
 ```
 
-**持久化保护**:
-- 在 `dist/package.json` 中添加 `patch-package` 作为 `postinstall` 钩子
-- 补丁文件 `dist/patches/hostc+1.3.0.patch` 确保 `npm install` 后自动应用修复
+**鎸佷箙鍖栦繚鎶?*:
+- 鍦?`dist/package.json` 涓坊鍔?`patch-package` 浣滀负 `postinstall` 閽╁瓙
+- 琛ヤ竵鏂囦欢 `dist/patches/hostc+1.3.0.patch` 纭繚 `npm install` 鍚庤嚜鍔ㄥ簲鐢ㄤ慨澶?
 
-**修复效果**:
-| 指标 | 修复前 | 修复后 |
+**淇鏁堟灉**:
+| 鎸囨爣 | 淇鍓?| 淇鍚?|
 |------|--------|--------|
-| **hostc 启动** | 进程崩溃 ❌ | 正常启动 ✅ |
-| **WebSocket 超时** | Unhandled error ❌ | 优雅关闭 ✅ |
-| **补丁持久化** | npm install 后丢失 ❌ | postinstall 自动应用 ✅ |
+| **hostc 鍚姩** | 杩涚▼宕╂簝 鉂?| 姝ｅ父鍚姩 鉁?|
+| **WebSocket 瓒呮椂** | Unhandled error 鉂?| 浼橀泤鍏抽棴 鉁?|
+| **琛ヤ竵鎸佷箙鍖?* | npm install 鍚庝涪澶?鉂?| postinstall 鑷姩搴旂敤 鉁?|
 
-**技术细节**:
-- `ws` 库的 `close()` 方法仅在 `OPEN` 状态下可用，`CONNECTING` 状态必须使用 `terminate()`
-- `socket.once("error", () => {})` 用于吞掉因强制关闭而产生的 error 事件
-- `patch-package` 确保每次 `npm install` 后补丁自动应用，不会因依赖更新而丢失修复
+**鎶€鏈粏鑺?*:
+- `ws` 搴撶殑 `close()` 鏂规硶浠呭湪 `OPEN` 鐘舵€佷笅鍙敤锛宍CONNECTING` 鐘舵€佸繀椤讳娇鐢?`terminate()`
+- `socket.once("error", () => {})` 鐢ㄤ簬鍚炴帀鍥犲己鍒跺叧闂€屼骇鐢熺殑 error 浜嬩欢
+- `patch-package` 纭繚姣忔 `npm install` 鍚庤ˉ涓佽嚜鍔ㄥ簲鐢紝涓嶄細鍥犱緷璧栨洿鏂拌€屼涪澶变慨澶?
 
 ---
 
-### 🔧 隧道验证修复 — hostc/CF 均不可用的根因修复
+### 馃敡 闅ч亾楠岃瘉淇 鈥?hostc/CF 鍧囦笉鍙敤鐨勬牴鍥犱慨澶?
 
-#### 问题: 项目启动后 hostc 和 CF 隧道均被判定为"不可用"
-**现象**: 项目启动时 hostc 和 Cloudflare Tunnel 都能成功启动并获取到 URL，但心跳验证机制始终判定为不可用，导致反复重启隧道
+#### 闂: 椤圭洰鍚姩鍚?hostc 鍜?CF 闅ч亾鍧囪鍒ゅ畾涓?涓嶅彲鐢?
+**鐜拌薄**: 椤圭洰鍚姩鏃?hostc 鍜?Cloudflare Tunnel 閮借兘鎴愬姛鍚姩骞惰幏鍙栧埌 URL锛屼絾蹇冭烦楠岃瘉鏈哄埗濮嬬粓鍒ゅ畾涓轰笉鍙敤锛屽鑷村弽澶嶉噸鍚毀閬?
 
-**根本原因**:
-1. **hostc 验证失败**: `verify_url()` 函数使用 HTTP `HEAD` 方法验证 URL，但 FastAPI 根路由 `@app.get('/')` 不支持 HEAD 请求，返回 `405 Method Not Allowed`，导致验证永远失败
-2. **CF 验证失败**: 本机 DNS 无法解析 `trycloudflare.com` 域名（`Errno 8: nodename nor servename provided`），属于网络/DNS 配置问题
+**鏍规湰鍘熷洜**:
+1. **hostc 楠岃瘉澶辫触**: `verify_url()` 鍑芥暟浣跨敤 HTTP `HEAD` 鏂规硶楠岃瘉 URL锛屼絾 FastAPI 鏍硅矾鐢?`@app.get('/')` 涓嶆敮鎸?HEAD 璇锋眰锛岃繑鍥?`405 Method Not Allowed`锛屽鑷撮獙璇佹案杩滃け璐?
+2. **CF 楠岃瘉澶辫触**: 鏈満 DNS 鏃犳硶瑙ｆ瀽 `trycloudflare.com` 鍩熷悕锛坄Errno 8: nodename nor servename provided`锛夛紝灞炰簬缃戠粶/DNS 閰嶇疆闂
 
-**修复方案**:
+**淇鏂规**:
 ```python
-# ❌ 修复前：只支持 GET，HEAD 请求返回 405
+# 鉂?淇鍓嶏細鍙敮鎸?GET锛孒EAD 璇锋眰杩斿洖 405
 @app.get('/')
 async def index():
 
-# ✅ 修复后：同时支持 GET 和 HEAD，验证请求正常通过
+# 鉁?淇鍚庯細鍚屾椂鏀寔 GET 鍜?HEAD锛岄獙璇佽姹傛甯搁€氳繃
 @app.api_route('/', methods=['GET', 'HEAD'])
 async def index():
 ```
 
-**修复效果**:
-| 指标 | 修复前 | 修复后 |
+**淇鏁堟灉**:
+| 鎸囨爣 | 淇鍓?| 淇鍚?|
 |------|--------|--------|
-| **hostc 验证** | 405 Method Not Allowed ❌ | 200 OK ✅ |
-| **心跳判定** | 不可用 → 反复重启 ❌ | 可用 → 稳定运行 ✅ |
-| **邮件通知** | 发送"不可用"通知 ❌ | 发送"可用"通知 ✅ |
+| **hostc 楠岃瘉** | 405 Method Not Allowed 鉂?| 200 OK 鉁?|
+| **蹇冭烦鍒ゅ畾** | 涓嶅彲鐢?鈫?鍙嶅閲嶅惎 鉂?| 鍙敤 鈫?绋冲畾杩愯 鉁?|
+| **閭欢閫氱煡** | 鍙戦€?涓嶅彲鐢?閫氱煡 鉂?| 鍙戦€?鍙敤"閫氱煡 鉁?|
 
-**技术细节**:
-- FastAPI 的 `@app.get()` 装饰器不会自动为路由支持 HEAD 方法（与 Flask 不同）
-- `verify_url()` 使用 `urllib.request.Request(url, method='HEAD')` 发送 HEAD 请求
-- 改用 `@app.api_route('/', methods=['GET', 'HEAD'])` 后，HEAD 请求返回与 GET 相同的响应头（无 body），验证通过
+**鎶€鏈粏鑺?*:
+- FastAPI 鐨?`@app.get()` 瑁呴グ鍣ㄤ笉浼氳嚜鍔ㄤ负璺敱鏀寔 HEAD 鏂规硶锛堜笌 Flask 涓嶅悓锛?
+- `verify_url()` 浣跨敤 `urllib.request.Request(url, method='HEAD')` 鍙戦€?HEAD 璇锋眰
+- 鏀圭敤 `@app.api_route('/', methods=['GET', 'HEAD'])` 鍚庯紝HEAD 璇锋眰杩斿洖涓?GET 鐩稿悓鐨勫搷搴斿ご锛堟棤 body锛夛紝楠岃瘉閫氳繃
 
-**CF 不可用的额外说明**:
-- CF 隧道进程本身启动正常（直接连接 Cloudflare 服务器获取 URL）
-- 但本机 DNS 无法解析 `*.trycloudflare.com`，导致验证请求失败
-- 建议排查 DNS 设置：`nslookup xxx.trycloudflare.com`，或更换 DNS 为 `8.8.8.8` / `114.114.114.114`
+**CF 涓嶅彲鐢ㄧ殑棰濆璇存槑**:
+- CF 闅ч亾杩涚▼鏈韩鍚姩姝ｅ父锛堢洿鎺ヨ繛鎺?Cloudflare 鏈嶅姟鍣ㄨ幏鍙?URL锛?
+- 浣嗘湰鏈?DNS 鏃犳硶瑙ｆ瀽 `*.trycloudflare.com`锛屽鑷撮獙璇佽姹傚け璐?
+- 寤鸿鎺掓煡 DNS 璁剧疆锛歚nslookup xxx.trycloudflare.com`锛屾垨鏇存崲 DNS 涓?`8.8.8.8` / `114.114.114.114`
 
 ---
 
-### 🎯 高价商品数解析修复 + 按钮失效修复
+### 馃幆 楂樹环鍟嗗搧鏁拌В鏋愪慨澶?+ 鎸夐挳澶辨晥淇
 
-#### 问题1: 高价商品数显示为0
-**现象**: 爬虫日志显示"售价 >= 599 的商品: 78 个"，但界面显示高价商品数为 **0**
+#### 闂1: 楂樹环鍟嗗搧鏁版樉绀轰负0
+**鐜拌薄**: 鐖櫕鏃ュ織鏄剧ず"鍞环 >= 599 鐨勫晢鍝? 78 涓?锛屼絾鐣岄潰鏄剧ず楂樹环鍟嗗搧鏁颁负 **0**
 
-**根本原因**: 
-- 前端正则表达式无法正确匹配Python输出的格式
-- Python输出格式：`售价 >= 599 的商品: 78 个`（有空格）
-- 前端正则：`/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/`（无法匹配空格）
+**鏍规湰鍘熷洜**: 
+- 鍓嶇姝ｅ垯琛ㄨ揪寮忔棤娉曟纭尮閰峆ython杈撳嚭鐨勬牸寮?
+- Python杈撳嚭鏍煎紡锛歚鍞环 >= 599 鐨勫晢鍝? 78 涓猔锛堟湁绌烘牸锛?
+- 鍓嶇姝ｅ垯锛歚/鍞环[銆?=]+\s*599[^:锛歖*[:锛歖\s*(\d+)\s*[涓欢]/`锛堟棤娉曞尮閰嶇┖鏍硷級
 
-**修复方案**:
+**淇鏂规**:
 ```javascript
-// ✅ 简化正则表达式，直接匹配Python输出格式
-if (line.includes('售价') && line.includes('599') && line.includes('商品')) {
-    // 主要匹配："售价 >= 599 的商品: 78 个"
-    let match = line.match(/售价\s*>=\s*599\s*的商品\s*[:：]\s*(\d+)\s*个/);
-    // 备选方案：匹配任意"商品: 数字 个"格式
-    if (!match) match = line.match(/商品\s*[:：]\s*(\d+)\s*个/);
-    // 最后备选：匹配行末的数字
-    if (!match) match = line.match(/(\d+)\s*个\s*$/);
+// 鉁?绠€鍖栨鍒欒〃杈惧紡锛岀洿鎺ュ尮閰峆ython杈撳嚭鏍煎紡
+if (line.includes('鍞环') && line.includes('599') && line.includes('鍟嗗搧')) {
+    // 涓昏鍖归厤锛?鍞环 >= 599 鐨勫晢鍝? 78 涓?
+    let match = line.match(/鍞环\s*>=\s*599\s*鐨勫晢鍝乗s*[:锛歖\s*(\d+)\s*涓?);
+    // 澶囬€夋柟妗堬細鍖归厤浠绘剰"鍟嗗搧: 鏁板瓧 涓?鏍煎紡
+    if (!match) match = line.match(/鍟嗗搧\s*[:锛歖\s*(\d+)\s*涓?);
+    // 鏈€鍚庡閫夛細鍖归厤琛屾湯鐨勬暟瀛?
+    if (!match) match = line.match(/(\d+)\s*涓猏s*$/);
     
     if (match && parseInt(match[1]) > 0) {
         skuData.highPriceCount = match[1];
-        console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
+        console.log('[瀵规瘮鍗＄墖] 鉁?楂樹环鍟嗗搧鏁?', skuData.highPriceCount);
     }
 }
 ```
 
-**数据流程说明**:
-1. **爬虫运行时**：前端解析日志输出实时显示统计数据
-2. **爬虫完成后**：前端调用 `/api/products` API获取JSON数据（已包含 `highPriceCount` 字段）
+**鏁版嵁娴佺▼璇存槑**:
+1. **鐖櫕杩愯鏃?*锛氬墠绔В鏋愭棩蹇楄緭鍑哄疄鏃舵樉绀虹粺璁℃暟鎹?
+2. **鐖櫕瀹屾垚鍚?*锛氬墠绔皟鐢?`/api/products` API鑾峰彇JSON鏁版嵁锛堝凡鍖呭惈 `highPriceCount` 瀛楁锛?
 
-#### 问题2: 8个按钮全部失效
-**现象**: 页面加载后所有按钮点击无响应
+#### 闂2: 8涓寜閽叏閮ㄥけ鏁?
+**鐜拌薄**: 椤甸潰鍔犺浇鍚庢墍鏈夋寜閽偣鍑绘棤鍝嶅簲
 
-**根本原因**: 
-- `bindAllButtons()` 函数定义在作用域内，不是全局函数
-- 外部无法调用，导致按钮事件绑定失败
+**鏍规湰鍘熷洜**: 
+- `bindAllButtons()` 鍑芥暟瀹氫箟鍦ㄤ綔鐢ㄥ煙鍐咃紝涓嶆槸鍏ㄥ眬鍑芥暟
+- 澶栭儴鏃犳硶璋冪敤锛屽鑷存寜閽簨浠剁粦瀹氬け璐?
 
-**修复方案**:
+**淇鏂规**:
 ```javascript
-// ✅ 暴露为全局函数
+// 鉁?鏆撮湶涓哄叏灞€鍑芥暟
 window.bindAllButtons = bindAllButtons;
 window.resetButtons = resetButtons;
 ```
 
-### ✅ 修复效果
-| 指标 | 修复前 | 修复后 |
+### 鉁?淇鏁堟灉
+| 鎸囨爣 | 淇鍓?| 淇鍚?|
 |------|--------|--------|
-| **高价商品(≥599)** | 0 ❌ | 78 ✅ |
-| **按钮响应** | 失效 ❌ | 正常 ✅ |
-| **数据显示** | 错误 ❌ | 准确 ✅ |
+| **楂樹环鍟嗗搧(鈮?99)** | 0 鉂?| 78 鉁?|
+| **鎸夐挳鍝嶅簲** | 澶辨晥 鉂?| 姝ｅ父 鉁?|
+| **鏁版嵁鏄剧ず** | 閿欒 鉂?| 鍑嗙‘ 鉁?|
 
-### 📝 技术细节
-- **文件位置**: `dist/app.js` Line 1369-1383, 1441-1453, 2707
-- **修复方法**: 
-  1. 简化正则表达式，精确匹配Python输出格式
-  2. 暴露全局函数，确保按钮绑定成功
-- **验证方式**: 
-  1. Node.js语法检查通过
-  2. 浏览器测试按钮响应正常
-  3. 爬虫运行时实时显示正确的统计数据
-
----
-
-## 🎯 核心原则
-
-### 1. 代码质量第一
-- ✅ **语法正确性** - 所有代码必须通过语法检查
-- ✅ **括号匹配** - 函数调用、条件判断的括号必须成对出现
-- ✅ **逻辑完整性** - 避免因语法错误导致功能失效
-
-### 2. 用户体验优先
-- ✅ **数据准确性** - 确保显示的数据与实际一致
-- ✅ **错误友好性** - 提供清晰的错误提示和解决方案
-- ✅ **性能优化** - 避免不必要的重复计算
-
-### 3. 可维护性
-- ✅ **注释完整** - 中文注释，清晰描述逻辑
-- ✅ **日志详细** - 关键操作必须有日志输出
-- ✅ **异常处理** - 统一的异常捕获和处理机制
+### 馃摑 鎶€鏈粏鑺?
+- **鏂囦欢浣嶇疆**: `dist/app.js` Line 1369-1383, 1441-1453, 2707
+- **淇鏂规硶**: 
+  1. 绠€鍖栨鍒欒〃杈惧紡锛岀簿纭尮閰峆ython杈撳嚭鏍煎紡
+  2. 鏆撮湶鍏ㄥ眬鍑芥暟锛岀‘淇濇寜閽粦瀹氭垚鍔?
+- **楠岃瘉鏂瑰紡**: 
+  1. Node.js璇硶妫€鏌ラ€氳繃
+  2. 娴忚鍣ㄦ祴璇曟寜閽搷搴旀甯?
+  3. 鐖櫕杩愯鏃跺疄鏃舵樉绀烘纭殑缁熻鏁版嵁
 
 ---
 
-## 🔧 JavaScript 开发规范 (app.js)
+## 馃幆 鏍稿績鍘熷垯
 
-### 2.1 基础语法规则 ⚠️ **重要**
+### 1. 浠ｇ爜璐ㄩ噺绗竴
+- 鉁?**璇硶姝ｇ‘鎬?* - 鎵€鏈変唬鐮佸繀椤婚€氳繃璇硶妫€鏌?
+- 鉁?**鎷彿鍖归厤** - 鍑芥暟璋冪敤銆佹潯浠跺垽鏂殑鎷彿蹇呴』鎴愬鍑虹幇
+- 鉁?**閫昏緫瀹屾暣鎬?* - 閬垮厤鍥犺娉曢敊璇鑷村姛鑳藉け鏁?
 
-#### 2.1.1 括号匹配 (强制)
+### 2. 鐢ㄦ埛浣撻獙浼樺厛
+- 鉁?**鏁版嵁鍑嗙‘鎬?* - 纭繚鏄剧ず鐨勬暟鎹笌瀹為檯涓€鑷?
+- 鉁?**閿欒鍙嬪ソ鎬?* - 鎻愪緵娓呮櫚鐨勯敊璇彁绀哄拰瑙ｅ喅鏂规
+- 鉁?**鎬ц兘浼樺寲** - 閬垮厤涓嶅繀瑕佺殑閲嶅璁＄畻
+
+### 3. 鍙淮鎶ゆ€?
+- 鉁?**娉ㄩ噴瀹屾暣** - 涓枃娉ㄩ噴锛屾竻鏅版弿杩伴€昏緫
+- 鉁?**鏃ュ織璇︾粏** - 鍏抽敭鎿嶄綔蹇呴』鏈夋棩蹇楄緭鍑?
+- 鉁?**寮傚父澶勭悊** - 缁熶竴鐨勫紓甯告崟鑾峰拰澶勭悊鏈哄埗
+
+---
+
+## 馃敡 JavaScript 寮€鍙戣鑼?(app.js)
+
+### 2.1 鍩虹璇硶瑙勫垯 鈿狅笍 **閲嶈**
+
+#### 2.1.1 鎷彿鍖归厤 (寮哄埗)
 ```javascript
-// ❌ 错误示例 - 括号不匹配（2026-07-30实际Bug）
-} else if ((line.includes('售价 >=') || line.includes('售价>=')) && line.includes('商品') )) &&
-           line.includes('≥599')) &&  // ← 多了两个 )
-           line.match(/售价.*>=.*599.*商品/)) {
+// 鉂?閿欒绀轰緥 - 鎷彿涓嶅尮閰嶏紙2026-07-30瀹為檯Bug锛?
+} else if ((line.includes('鍞环 >=') || line.includes('鍞环>=')) && line.includes('鍟嗗搧') )) &&
+           line.includes('鈮?99')) &&  // 鈫?澶氫簡涓や釜 )
+           line.match(/鍞环.*>=.*599.*鍟嗗搧/)) {
 
-// ✅ 正确示例 - 括号正确匹配
-} else if ((line.includes('售价 >=') || line.includes('售价>=')) &&
-           (line.includes('商品') || line.includes('≥599')) &&  // ← 使用 ||
-           line.match(/售价.*>=.*599.*商品/)) {
+// 鉁?姝ｇ‘绀轰緥 - 鎷彿姝ｇ‘鍖归厤
+} else if ((line.includes('鍞环 >=') || line.includes('鍞环>=')) &&
+           (line.includes('鍟嗗搧') || line.includes('鈮?99')) &&  // 鈫?浣跨敤 ||
+           line.match(/鍞环.*>=.*599.*鍟嗗搧/)) {
 ```
 
-**检查清单**:
-- [ ] 每个 `(` 必须有对应的 `)`
-- [ ] 每个 `[` 必须有对应的 `]`
-- [ ] 每个 `{` 必须有对应的 `}`
-- [ ] 多条件判断时使用 `||` 和 `&&` 的正确组合
+**妫€鏌ユ竻鍗?*:
+- [ ] 姣忎釜 `(` 蹇呴』鏈夊搴旂殑 `)`
+- [ ] 姣忎釜 `[` 蹇呴』鏈夊搴旂殑 `]`
+- [ ] 姣忎釜 `{` 蹇呴』鏈夊搴旂殑 `}`
+- [ ] 澶氭潯浠跺垽鏂椂浣跨敤 `||` 鍜?`&&` 鐨勬纭粍鍚?
 
-#### 2.1.2 条件判断最佳实践
+#### 2.1.2 鏉′欢鍒ゆ柇鏈€浣冲疄璺?
 ```javascript
-// ✅ 推荐：使用逻辑运算符组合条件
+// 鉁?鎺ㄨ崘锛氫娇鐢ㄩ€昏緫杩愮畻绗︾粍鍚堟潯浠?
 if ((condition1 || condition2) && 
     (condition3 || condition4) && 
     regex.test(string)) {
-    // 执行逻辑
+    // 鎵ц閫昏緫
 }
 
-// ❌ 避免：嵌套过多的括号导致混乱
+// 鉂?閬垮厤锛氬祵濂楄繃澶氱殑鎷彿瀵艰嚧娣蜂贡
 if (((condition1) && (condition2)) || ((condition3))) {
-    // 不推荐
+    // 涓嶆帹鑽?
 }
 ```
 
-#### 2.1.3 字符串处理规范
+#### 2.1.3 瀛楃涓插鐞嗚鑼?
 ```javascript
-// ✅ 正确：使用模板字符串或转义字符
-const str = `line.includes('\u5546\u54C1')`;  // Unicode转义
-const pattern = /pattern/g;                     // 正则表达式
+// 鉁?姝ｇ‘锛氫娇鐢ㄦā鏉垮瓧绗︿覆鎴栬浆涔夊瓧绗?
+const str = `line.includes('\u5546\u54C1')`;  // Unicode杞箟
+const pattern = /pattern/g;                     // 姝ｅ垯琛ㄨ揪寮?
 
-// ⚠️ 注意：Windows环境下的换行符
-// 文件可能使用 \r\n (CRLF)，需要特殊处理
+// 鈿狅笍 娉ㄦ剰锛歐indows鐜涓嬬殑鎹㈣绗?
+// 鏂囦欢鍙兘浣跨敤 \r\n (CRLF)锛岄渶瑕佺壒娈婂鐞?
 const content = fs.readFileSync(file, 'utf8');
-content = content.replace(/\r\n/g, '\n');  // 统一转换为LF
+content = content.replace(/\r\n/g, '\n');  // 缁熶竴杞崲涓篖F
 ```
 
-#### 2.1.4 文件清理规范 (2026-07-30新增)
+#### 2.1.4 鏂囦欢娓呯悊瑙勮寖 (2026-07-30鏂板)
 ```javascript
-// ⚠️ 重要：避免文件末尾出现垃圾内容
-// 问题：文件末尾的 \r\n 字符串（作为文本内容）会导致语法错误
+// 鈿狅笍 閲嶈锛氶伩鍏嶆枃浠舵湯灏惧嚭鐜板瀮鍦惧唴瀹?
+// 闂锛氭枃浠舵湯灏剧殑 \r\n 瀛楃涓诧紙浣滀负鏂囨湰鍐呭锛変細瀵艰嚧璇硶閿欒
 
-// ❌ 错误示例：文件末尾有垃圾内容
+// 鉂?閿欒绀轰緥锛氭枃浠舵湯灏炬湁鍨冨溇鍐呭
 // Line 4989:        });
-// Line 4990: \r\n\r\n\r\n... (大量重复)
-// Line 5000: let match = line.match(/(\d+)\s*(个|件)/); (重复代码)
+// Line 4990: \r\n\r\n\r\n... (澶ч噺閲嶅)
+// Line 5000: let match = line.match(/(\d+)\s*(涓獆浠?/); (閲嶅浠ｇ爜)
 
-// ✅ 正确做法：定期清理文件末尾
-// 1. 使用 Node.js 语法检查发现错误
+// 鉁?姝ｇ‘鍋氭硶锛氬畾鏈熸竻鐞嗘枃浠舵湯灏?
+// 1. 浣跨敤 Node.js 璇硶妫€鏌ュ彂鐜伴敊璇?
 //    node --check dist/app.js
 
-// 2. 使用 PowerShell 脚本清理
+// 2. 浣跨敤 PowerShell 鑴氭湰娓呯悊
 //    $content = Get-Content "dist/app.js" -Raw
 //    $lines = $content -split "`n"
 //    $cleanContent = $lines[0..4988] -join "`n"
 //    Set-Content "dist/app.js" -Value $cleanContent -NoNewline -Encoding UTF8
 
-// 3. 验证清理结果
-//    node --check dist/app.js  # 应该通过
+// 3. 楠岃瘉娓呯悊缁撴灉
+//    node --check dist/app.js  # 搴旇閫氳繃
 ```
 
-**文件清理检查清单**:
-- [ ] 文件末尾无重复的 `\r\n` 字符串
-- [ ] 文件末尾无重复的代码片段
-- [ ] Node.js 语法检查通过
-- [ ] 文件大小合理（无异常增大）
+**鏂囦欢娓呯悊妫€鏌ユ竻鍗?*:
+- [ ] 鏂囦欢鏈熬鏃犻噸澶嶇殑 `\r\n` 瀛楃涓?
+- [ ] 鏂囦欢鏈熬鏃犻噸澶嶇殑浠ｇ爜鐗囨
+- [ ] Node.js 璇硶妫€鏌ラ€氳繃
+- [ ] 鏂囦欢澶у皬鍚堢悊锛堟棤寮傚父澧炲ぇ锛?
 
-### 2.2 数据解析规范
+### 2.2 鏁版嵁瑙ｆ瀽瑙勮寖
 
-#### 2.2.1 输出数据解析流程
+#### 2.2.1 杈撳嚭鏁版嵁瑙ｆ瀽娴佺▼
 ```javascript
-// 1. 预扫描（宽松模式）提取关键数据
+// 1. 棰勬壂鎻忥紙瀹芥澗妯″紡锛夋彁鍙栧叧閿暟鎹?
 for (let i = 0; i < lines.length; i++) {
     let line = lines[i].trim();
     if (!line) continue;
     
-    // 超级宽松的总商品数匹配
-    if ((line.includes('商品') || line.includes('个')) && !skuData.totalProducts) {
+    // 瓒呯骇瀹芥澗鐨勬€诲晢鍝佹暟鍖归厤
+    if ((line.includes('鍟嗗搧') || line.includes('涓?)) && !skuData.totalProducts) {
         const match = line.match(/(\d+)/);
         if (match && parseInt(match[1]) > 0) {
             skuData.totalProducts = match[1];
@@ -1961,214 +1949,214 @@ for (let i = 0; i < lines.length; i++) {
     }
 }
 
-// 2. 精确解析（覆盖预扫描结果）
+// 2. 绮剧‘瑙ｆ瀽锛堣鐩栭鎵弿缁撴灉锛?
 for (let i = 0; i < lines.length; i++) {
     let line = lines[i].trim();
     
-    // 更精确的模式匹配
-    if (line.includes('成功获取') || line.match(/(\d+)\s*(个|件).*商品/)) {
+    // 鏇寸簿纭殑妯″紡鍖归厤
+    if (line.includes('鎴愬姛鑾峰彇') || line.match(/(\d+)\s*(涓獆浠?.*鍟嗗搧/)) {
         skuData.type = 'spider';
-        let match = line.match(/(\d+)\s*(个|件)/);
+        let match = line.match(/(\d+)\s*(涓獆浠?/);
         if (match) {
-            skuData.totalProducts = match[1];  // 覆盖预扫描结果
+            skuData.totalProducts = match[1];  // 瑕嗙洊棰勬壂鎻忕粨鏋?
         }
     }
 }
 ```
 
-#### 2.2.2 数据验证与容错
+#### 2.2.2 鏁版嵁楠岃瘉涓庡閿?
 ```javascript
-// ✅ 好的做法：提供多个匹配模式作为fallback
-let match = line.match(/(\d+)\s*(个|件)/);      // 主要模式
+// 鉁?濂界殑鍋氭硶锛氭彁渚涘涓尮閰嶆ā寮忎綔涓篺allback
+let match = line.match(/(\d+)\s*(涓獆浠?/);      // 涓昏妯″紡
 if (!match) {
-    match = line.match(/[:：]\s*(\d+)/);          // 备选模式1
+    match = line.match(/[:锛歖\s*(\d+)/);          // 澶囬€夋ā寮?
 }
 if (!match) {
-    match = line.match(/(\d+)/);                  // 备选模式2
+    match = line.match(/(\d+)/);                  // 澶囬€夋ā寮?
 }
 
 if (match) {
     skuData.highPriceCount = match[1];
-    console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
+    console.log('[瀵规瘮鍗＄墖] 鉁?楂樹环鍟嗗搧鏁?', skuData.highPriceCount);
 }
 ```
 
-#### 2.2.3 正则表达式优化 (2026-07-30新增)
+#### 2.2.3 姝ｅ垯琛ㄨ揪寮忎紭鍖?(2026-07-30鏂板)
 ```javascript
-// ✅ 支持多种符号格式的正则表达式
-// 问题：爬虫输出可能使用全角符号"》"、半角符号">="、数学符号"≥"
-// 解决：使用字符类 [》>=]+ 匹配所有可能的符号
+// 鉁?鏀寔澶氱绗﹀彿鏍煎紡鐨勬鍒欒〃杈惧紡
+// 闂锛氱埇铏緭鍑哄彲鑳戒娇鐢ㄥ叏瑙掔鍙?銆?銆佸崐瑙掔鍙?>="銆佹暟瀛︾鍙?鈮?
+// 瑙ｅ喅锛氫娇鐢ㄥ瓧绗︾被 [銆?=]+ 鍖归厤鎵€鏈夊彲鑳界殑绗﹀彿
 
-if (line.includes('售价') && (line.includes('599') || line.includes('≥599'))) {
-    // 主要模式：精确匹配"售价[符号]599的商品：数字个"
-    let match = line.match(/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/);
+if (line.includes('鍞环') && (line.includes('599') || line.includes('鈮?99'))) {
+    // 涓昏妯″紡锛氱簿纭尮閰?鍞环[绗﹀彿]599鐨勫晢鍝侊細鏁板瓧涓?
+    let match = line.match(/鍞环[銆?=]+\s*599[^:锛歖*[:锛歖\s*(\d+)\s*[涓欢]/);
     
-    // 备选模式1：匹配"数字个/件"
-    if (!match) match = line.match(/(\d+)\s*[个件]/);
+    // 澶囬€夋ā寮?锛氬尮閰?鏁板瓧涓?浠?
+    if (!match) match = line.match(/(\d+)\s*[涓欢]/);
     
-    // 备选模式2：匹配"：数字"
-    if (!match) match = line.match(/[:：]\s*(\d+)/);
+    // 澶囬€夋ā寮?锛氬尮閰?锛氭暟瀛?
+    if (!match) match = line.match(/[:锛歖\s*(\d+)/);
     
-    // 备选模式3：匹配任意数字
+    // 澶囬€夋ā寮?锛氬尮閰嶄换鎰忔暟瀛?
     if (!match) match = line.match(/(\d+)/);
     
-    // 验证数字有效性
+    // 楠岃瘉鏁板瓧鏈夋晥鎬?
     if (match && parseInt(match[1]) > 0) {
         skuData.highPriceCount = match[1];
-        console.log('[对比卡片] ✓ 高价商品数:', skuData.highPriceCount);
+        console.log('[瀵规瘮鍗＄墖] 鉁?楂樹环鍟嗗搧鏁?', skuData.highPriceCount);
     }
 }
 ```
 
-**支持的格式示例**:
-- `售价》=599的商品：71个` (全角符号)
-- `售价>=599的商品: 77个` (半角符号)
-- `售价≥599的商品：80件` (数学符号)
-- `售价 >= 599 的商品: 85 个` (带空格)
+**鏀寔鐨勬牸寮忕ず渚?*:
+- `鍞环銆?599鐨勫晢鍝侊細71涓猔 (鍏ㄨ绗﹀彿)
+- `鍞环>=599鐨勫晢鍝? 77涓猔 (鍗婅绗﹀彿)
+- `鍞环鈮?99鐨勫晢鍝侊細80浠禶 (鏁板绗﹀彿)
+- `鍞环 >= 599 鐨勫晢鍝? 85 涓猔 (甯︾┖鏍?
 
-### 2.3 WebSocket 安全关闭规范 ⚠️ **重要** (2026-07-30 新增)
+### 2.3 WebSocket 瀹夊叏鍏抽棴瑙勮寖 鈿狅笍 **閲嶈** (2026-07-30 鏂板)
 
-#### 2.3.1 socket 状态感知关闭 (强制)
+#### 2.3.1 socket 鐘舵€佹劅鐭ュ叧闂?(寮哄埗)
 ```javascript
-// ❌ 错误：不区分 socket 状态直接调用 close()
-// 当 socket 处于 CONNECTING 状态时，close() 会抛出异常
-// 导致 "WebSocket was closed before the connection was established" 错误
+// 鉂?閿欒锛氫笉鍖哄垎 socket 鐘舵€佺洿鎺ヨ皟鐢?close()
+// 褰?socket 澶勪簬 CONNECTING 鐘舵€佹椂锛宑lose() 浼氭姏鍑哄紓甯?
+// 瀵艰嚧 "WebSocket was closed before the connection was established" 閿欒
 function safeCloseWebSocket(socket, code, reason) {
   if (!socket) return;
   try {
-    socket.close(code, reason);  // CONNECTING 状态下会崩溃！
+    socket.close(code, reason);  // CONNECTING 鐘舵€佷笅浼氬穿婧冿紒
   } catch {
     socket.terminate();
   }
 }
 
-// ✅ 正确：根据 readyState 选择关闭方式
+// 鉁?姝ｇ‘锛氭牴鎹?readyState 閫夋嫨鍏抽棴鏂瑰紡
 function safeCloseWebSocket(socket, code, reason) {
   if (!socket) return;
   try {
     if (socket.readyState === WebSocket.CONNECTING) {
-      socket.once("error", () => {});  // 吞掉 error 事件
-      socket.terminate();               // 强制关闭
+      socket.once("error", () => {});  // 鍚炴帀 error 浜嬩欢
+      socket.terminate();               // 寮哄埗鍏抽棴
     } else {
-      socket.close(code, reason);       // 正常关闭
+      socket.close(code, reason);       // 姝ｅ父鍏抽棴
     }
   } catch {
-    try { socket.terminate(); } catch {}  // 双重保护
+    try { socket.terminate(); } catch {}  // 鍙岄噸淇濇姢
   }
 }
 ```
 
-**关键规则**:
-- `WebSocket.CONNECTING (0)`: 必须使用 `terminate()`，不能使用 `close()`
-- `WebSocket.OPEN (1)`: 使用 `close()` 发送关闭帧，优雅关闭
-- `WebSocket.CLOSING (2)` / `WebSocket.CLOSED (3)`: 无需操作
-- 关闭前必须注册 `socket.once("error", () => {})` 防止未捕获的 error 事件
+**鍏抽敭瑙勫垯**:
+- `WebSocket.CONNECTING (0)`: 蹇呴』浣跨敤 `terminate()`锛屼笉鑳戒娇鐢?`close()`
+- `WebSocket.OPEN (1)`: 浣跨敤 `close()` 鍙戦€佸叧闂抚锛屼紭闆呭叧闂?
+- `WebSocket.CLOSING (2)` / `WebSocket.CLOSED (3)`: 鏃犻渶鎿嶄綔
+- 鍏抽棴鍓嶅繀椤绘敞鍐?`socket.once("error", () => {})` 闃叉鏈崟鑾风殑 error 浜嬩欢
 
-#### 2.3.2 超时处理器安全关闭模式
+#### 2.3.2 瓒呮椂澶勭悊鍣ㄥ畨鍏ㄥ叧闂ā寮?
 ```javascript
-// ❌ 错误：超时后直接关闭，未处理可能触发的 error 事件
+// 鉂?閿欒锛氳秴鏃跺悗鐩存帴鍏抽棴锛屾湭澶勭悊鍙兘瑙﹀彂鐨?error 浜嬩欢
 const timeout = setTimeout(() => {
   cleanup();
-  safeCloseWebSocket(socket, code, reason);  // 可能触发 unhandled error
+  safeCloseWebSocket(socket, code, reason);  // 鍙兘瑙﹀彂 unhandled error
   reject(new Error("connect timeout"));
 }, TIMEOUT_MS);
 
-// ✅ 正确：关闭前吞掉 error 事件
+// 鉁?姝ｇ‘锛氬叧闂墠鍚炴帀 error 浜嬩欢
 const timeout = setTimeout(() => {
   cleanup();
-  socket.once("error", () => {});  // 先注册 error 监听器
+  socket.once("error", () => {});  // 鍏堟敞鍐?error 鐩戝惉鍣?
   safeCloseWebSocket(socket, code, reason);
   reject(new Error("connect timeout"));
 }, TIMEOUT_MS);
 ```
 
-#### 2.3.3 patch-package 持久化补丁
+#### 2.3.3 patch-package 鎸佷箙鍖栬ˉ涓?
 ```bash
-# 修改 node_modules 中的代码后，生成补丁文件
+# 淇敼 node_modules 涓殑浠ｇ爜鍚庯紝鐢熸垚琛ヤ竵鏂囦欢
 npx patch-package hostc
 
-# 补丁文件保存到 patches/ 目录
+# 琛ヤ竵鏂囦欢淇濆瓨鍒?patches/ 鐩綍
 # dist/patches/hostc+1.3.0.patch
 
-# 在 package.json 中添加 postinstall 钩子
+# 鍦?package.json 涓坊鍔?postinstall 閽╁瓙
 # "scripts": { "postinstall": "patch-package" }
 # "dependencies": { "patch-package": "^8.0.0" }
 
-# 每次 npm install 后自动应用补丁
-npm install  # → postinstall → patch-package → 应用补丁
+# 姣忔 npm install 鍚庤嚜鍔ㄥ簲鐢ㄨˉ涓?
+npm install  # 鈫?postinstall 鈫?patch-package 鈫?搴旂敤琛ヤ竵
 ```
 
-**补丁管理检查清单**:
-- [ ] 修改 node_modules 后执行 `npx patch-package <package-name>`
-- [ ] patches/ 目录下的 .patch 文件已提交到 Git
-- [ ] package.json 包含 `postinstall: "patch-package"` 脚本
-- [ ] package.json 包含 `patch-package` 依赖
-- [ ] `npm install` 后验证补丁已正确应用
+**琛ヤ竵绠＄悊妫€鏌ユ竻鍗?*:
+- [ ] 淇敼 node_modules 鍚庢墽琛?`npx patch-package <package-name>`
+- [ ] patches/ 鐩綍涓嬬殑 .patch 鏂囦欢宸叉彁浜ゅ埌 Git
+- [ ] package.json 鍖呭惈 `postinstall: "patch-package"` 鑴氭湰
+- [ ] package.json 鍖呭惈 `patch-package` 渚濊禆
+- [ ] `npm install` 鍚庨獙璇佽ˉ涓佸凡姝ｇ‘搴旂敤
 
-### 2.4 日志解析规范 ⚠️ **重要** (2026-07-30 新增)
+### 2.4 鏃ュ織瑙ｆ瀽瑙勮寖 鈿狅笍 **閲嶈** (2026-07-30 鏂板)
 
-#### 2.4.1 高价商品数解析 (强制)
+#### 2.4.1 楂樹环鍟嗗搧鏁拌В鏋?(寮哄埗)
 ```javascript
-// ❌ 错误：正则表达式无法匹配Python输出格式
-// Python输出：售价 >= 599 的商品: 78 个（有空格）
-// 旧正则：/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/（无法匹配空格）
-if (line.match(/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/)) { ... }
+// 鉂?閿欒锛氭鍒欒〃杈惧紡鏃犳硶鍖归厤Python杈撳嚭鏍煎紡
+// Python杈撳嚭锛氬敭浠?>= 599 鐨勫晢鍝? 78 涓紙鏈夌┖鏍硷級
+// 鏃ф鍒欙細/鍞环[銆?=]+\s*599[^:锛歖*[:锛歖\s*(\d+)\s*[涓欢]/锛堟棤娉曞尮閰嶇┖鏍硷級
+if (line.match(/鍞环[銆?=]+\s*599[^:锛歖*[:锛歖\s*(\d+)\s*[涓欢]/)) { ... }
 
-// ✅ 正确：简化正则，精确匹配Python输出格式
-if (line.includes('售价') && line.includes('599') && line.includes('商品')) {
-    let match = line.match(/售价\s*>=\s*599\s*的商品\s*[:：]\s*(\d+)\s*个/);
-    if (!match) match = line.match(/商品\s*[:：]\s*(\d+)\s*个/);
-    if (!match) match = line.match(/(\d+)\s*个\s*$/);
+// 鉁?姝ｇ‘锛氱畝鍖栨鍒欙紝绮剧‘鍖归厤Python杈撳嚭鏍煎紡
+if (line.includes('鍞环') && line.includes('599') && line.includes('鍟嗗搧')) {
+    let match = line.match(/鍞环\s*>=\s*599\s*鐨勫晢鍝乗s*[:锛歖\s*(\d+)\s*涓?);
+    if (!match) match = line.match(/鍟嗗搧\s*[:锛歖\s*(\d+)\s*涓?);
+    if (!match) match = line.match(/(\d+)\s*涓猏s*$/);
     if (match && parseInt(match[1]) > 0) {
         skuData.highPriceCount = match[1];
     }
 }
 ```
 
-**关键规则**:
-- Python输出格式可能包含空格（`售价 >= 599`），正则必须兼容
-- 使用多级fallback：精确匹配 → 宽松匹配 → 行末数字
-- 解析后必须验证数字有效性（`parseInt > 0`）
+**鍏抽敭瑙勫垯**:
+- Python杈撳嚭鏍煎紡鍙兘鍖呭惈绌烘牸锛坄鍞环 >= 599`锛夛紝姝ｅ垯蹇呴』鍏煎
+- 浣跨敤澶氱骇fallback锛氱簿纭尮閰?鈫?瀹芥澗鍖归厤 鈫?琛屾湯鏁板瓧
+- 瑙ｆ瀽鍚庡繀椤婚獙璇佹暟瀛楁湁鏁堟€э紙`parseInt > 0`锛?
 
-#### 2.4.2 全局函数暴露规范 (强制)
+#### 2.4.2 鍏ㄥ眬鍑芥暟鏆撮湶瑙勮寖 (寮哄埗)
 ```javascript
-// ❌ 错误：函数定义在作用域内，外部无法调用
+// 鉂?閿欒锛氬嚱鏁板畾涔夊湪浣滅敤鍩熷唴锛屽閮ㄦ棤娉曡皟鐢?
 function bindAllButtons() { ... }
 function resetButtons() { ... }
-// HTML中的 onclick="bindAllButtons()" 报错：bindAllButtons is not defined
+// HTML涓殑 onclick="bindAllButtons()" 鎶ラ敊锛歜indAllButtons is not defined
 
-// ✅ 正确：暴露为全局函数
+// 鉁?姝ｇ‘锛氭毚闇蹭负鍏ㄥ眬鍑芥暟
 window.bindAllButtons = bindAllButtons;
 window.resetButtons = resetButtons;
 ```
 
-**关键规则**:
-- 所有被 HTML `onclick` 引用的函数必须暴露到 `window` 对象
-- ES Module 或 IIFE 内定义的函数默认不在全局作用域
-- 暴露方式：`window.functionName = functionName`
+**鍏抽敭瑙勫垯**:
+- 鎵€鏈夎 HTML `onclick` 寮曠敤鐨勫嚱鏁板繀椤绘毚闇插埌 `window` 瀵硅薄
+- ES Module 鎴?IIFE 鍐呭畾涔夌殑鍑芥暟榛樿涓嶅湪鍏ㄥ眬浣滅敤鍩?
+- 鏆撮湶鏂瑰紡锛歚window.functionName = functionName`
 
-### 2.5 UI渲染规范
+### 2.5 UI娓叉煋瑙勮寖
 
-#### 2.5.1 统计数据显示
+#### 2.5.1 缁熻鏁版嵁鏄剧ず
 ```javascript
-// ✅ 使用默认值防止显示 undefined 或 NaN
+// 鉁?浣跨敤榛樿鍊奸槻姝㈡樉绀?undefined 鎴?NaN
 <span class="stat-value">${skuData.highPriceCount || 0}</span>
-<span class="stat-value">${skuData.totalPrice || '¥0.00'}</span>
+<span class="stat-value">${skuData.totalPrice || '楼0.00'}</span>
 
-// ✅ 条件样式类名
+// 鉁?鏉′欢鏍峰紡绫诲悕
 <div class="stat-item ${skuData.highPriceExtraCount > 0 ? 'stat-danger' : ''}">
 ```
 
-#### 2.5.2 列表数据展示
+#### 2.5.2 鍒楄〃鏁版嵁灞曠ず
 ```javascript
-// ✅ 去重处理
+// 鉁?鍘婚噸澶勭悊
 if (skuData.highPriceExtraSkus2 && skuData.highPriceExtraSkus2.length > 0) {
     const uniqueHighPriceExtras = [...new Set(skuData.highPriceExtraSkus2)];
     const items = uniqueHighPriceExtras.map(sku => createSkuTag(sku, showProductDetail)).join('');
     
     cardHtml += `
         <div class="missing-skus" style="background: #ffebee;">
-            <div class="missing-title">JSON多余货号(高价商品≥599):</div>
+            <div class="missing-title">JSON澶氫綑璐у彿(楂樹环鍟嗗搧鈮?99):</div>
             <div class="sku-container">${items}</div>
         </div>
     `;
@@ -2177,14 +2165,14 @@ if (skuData.highPriceExtraSkus2 && skuData.highPriceExtraSkus2.length > 0) {
 
 ---
 
-## 🐍 Python 开发规范 (main.py) - 完整版
+## 馃悕 Python 寮€鍙戣鑼?(main.py) - 瀹屾暣鐗?
 
-### 3.0 代码组织与导入规范
+### 3.0 浠ｇ爜缁勭粐涓庡鍏ヨ鑼?
 
-#### 3.0.1 导入顺序（强制）
+#### 3.0.1 瀵煎叆椤哄簭锛堝己鍒讹級
 ```python
 # -*- coding: utf-8 -*-
-# 标准库
+# 鏍囧噯搴?
 import argparse
 import asyncio
 import json
@@ -2194,7 +2182,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 
-# 第三方库
+# 绗笁鏂瑰簱
 try:
     import pandas as pd
 except ImportError:
@@ -2206,84 +2194,84 @@ try:
 except ImportError:
     FastAPI = None
 
-# 项目内部模块（相对导入）
+# 椤圭洰鍐呴儴妯″潡锛堢浉瀵瑰鍏ワ級
 from .exceptions import AppException
 from .config import ConfigManager
 ```
 
-**导入规则**:
-1. 标准库 → 第三方库 → 项目内部模块
-2. 每组之间空一行分隔
-3. 使用 `try-except` 处理可选依赖
-4. 禁止使用 `from module import *`
+**瀵煎叆瑙勫垯**:
+1. 鏍囧噯搴?鈫?绗笁鏂瑰簱 鈫?椤圭洰鍐呴儴妯″潡
+2. 姣忕粍涔嬮棿绌轰竴琛屽垎闅?
+3. 浣跨敤 `try-except` 澶勭悊鍙€変緷璧?
+4. 绂佹浣跨敤 `from module import *`
 
-#### 3.0.2 命名规范（强制）
+#### 3.0.2 鍛藉悕瑙勮寖锛堝己鍒讹級
 ```python
-# 类名：大驼峰命名法 (PascalCase)
-class WegoScraper:          # ✅ 正确
-classwegoScraper:           # ❌ 错误
+# 绫诲悕锛氬ぇ椹煎嘲鍛藉悕娉?(PascalCase)
+class WegoScraper:          # 鉁?姝ｇ‘
+classwegoScraper:           # 鉂?閿欒
 
-# 函数/变量：蛇形命名法 (snake_case)
-def get_version_from_readme():  # ✅ 正确
-def getVersionFromReadme():     # ❌ 错误
+# 鍑芥暟/鍙橀噺锛氳泧褰㈠懡鍚嶆硶 (snake_case)
+def get_version_from_readme():  # 鉁?姝ｇ‘
+def getVersionFromReadme():     # 鉂?閿欒
 
-# 常量：全大写 + 蛇形命名法 (UPPER_SNAKE_CASE)
-TIMEOUT_CONFIG = {}           # ✅ 正确
-timeoutConfig = {}            # ❌ 错误
+# 甯搁噺锛氬叏澶у啓 + 铔囧舰鍛藉悕娉?(UPPER_SNAKE_CASE)
+TIMEOUT_CONFIG = {}           # 鉁?姝ｇ‘
+timeoutConfig = {}            # 鉂?閿欒
 
-# 私有属性/方法：单下划线前缀
-def _private_method(self):    # ✅ 正确
-self._internal_state = []     # ✅ 正确
+# 绉佹湁灞炴€?鏂规硶锛氬崟涓嬪垝绾垮墠缂€
+def _private_method(self):    # 鉁?姝ｇ‘
+self._internal_state = []     # 鉁?姝ｇ‘
 ```
 
-#### 3.0.3 类型注解规范（强制）
+#### 3.0.3 绫诲瀷娉ㄨВ瑙勮寖锛堝己鍒讹級
 ```python
 from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
 
-# 函数签名必须包含类型注解
+# 鍑芥暟绛惧悕蹇呴』鍖呭惈绫诲瀷娉ㄨВ
 def safe_call(func: Callable[..., T], *args, default: T = None, context: str = '', **kwargs) -> T:
-    """安全调用包装器"""
+    """瀹夊叏璋冪敤鍖呰鍣?""
     ...
 
-# 复杂类型使用TypeVar
+# 澶嶆潅绫诲瀷浣跨敤TypeVar
 T = TypeVar('T')
 
-# 返回值可能是多种类型时使用Union
+# 杩斿洖鍊煎彲鑳芥槸澶氱绫诲瀷鏃朵娇鐢║nion
 def get_data() -> Union[Dict[str, Any], None]:
     ...
 
-# 可选参数使用Optional
+# 鍙€夊弬鏁颁娇鐢∣ptional
 def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO) -> logging.Logger:
     ...
 ```
 
-### 3.1 异常处理系统规范 ⚠️ **核心**
+### 3.1 寮傚父澶勭悊绯荤粺瑙勮寖 鈿狅笍 **鏍稿績**
 
-#### 3.1.1 统一异常类 AppException（强制）
+#### 3.1.1 缁熶竴寮傚父绫?AppException锛堝己鍒讹級
 ```python
 class AppException(Exception):
     """
-    统一异常类 - 所有业务异常都使用此类
+    缁熶竴寮傚父绫?- 鎵€鏈変笟鍔″紓甯搁兘浣跨敤姝ょ被
     
-    分类体系：
-    - FILE: 文件操作异常
-    - NETWORK: 网络请求异常
-    - AUTH: 认证异常
-    - BROWSER: 浏览器操作异常
-    - PARSE: 数据解析异常
-    - CONFIG: 配置异常
-    - EXCEL: Excel操作异常
-    - EMAIL: 邮件发送异常
-    - PERMISSION: 权限异常
-    - RESOURCE: 资源异常
-    - VALIDATION: 验证异常
-    - DATABASE: 数据库异常
+    鍒嗙被浣撶郴锛?
+    - FILE: 鏂囦欢鎿嶄綔寮傚父
+    - NETWORK: 缃戠粶璇锋眰寮傚父
+    - AUTH: 璁よ瘉寮傚父
+    - BROWSER: 娴忚鍣ㄦ搷浣滃紓甯?
+    - PARSE: 鏁版嵁瑙ｆ瀽寮傚父
+    - CONFIG: 閰嶇疆寮傚父
+    - EXCEL: Excel鎿嶄綔寮傚父
+    - EMAIL: 閭欢鍙戦€佸紓甯?
+    - PERMISSION: 鏉冮檺寮傚父
+    - RESOURCE: 璧勬簮寮傚父
+    - VALIDATION: 楠岃瘉寮傚父
+    - DATABASE: 鏁版嵁搴撳紓甯?
     """
     
     CATEGORY_FILE = 'FILE'
     CATEGORY_NETWORK = 'NETWORK'
     CATEGORY_AUTH = 'AUTH'
-    # ... 其他分类
+    # ... 鍏朵粬鍒嗙被
     
     def __init__(self, message: str, category: str = None, code: str = None, details: Any = None):
         self.message = message
@@ -2294,37 +2282,37 @@ class AppException(Exception):
     
     @classmethod
     def file_error(cls, message: str, file_path: str = None, operation: str = None, **kwargs):
-        """文件操作异常工厂方法"""
+        """鏂囦欢鎿嶄綔寮傚父宸ュ巶鏂规硶"""
         details = {'file_path': file_path, 'operation': operation}
         details.update(kwargs)
         return cls(message, category=cls.CATEGORY_FILE, details=details)
     
     @classmethod
     def network_error(cls, message: str, url: str = None, status_code: int = None, **kwargs):
-        """网络请求异常工厂方法"""
+        """缃戠粶璇锋眰寮傚父宸ュ巶鏂规硶"""
         details = {'url': url, 'status_code': status_code}
         details.update(kwargs)
         return cls(message, category=cls.CATEGORY_NETWORK, details=details)
     
-    # ... 其他工厂方法
+    # ... 鍏朵粬宸ュ巶鏂规硶
 ```
 
-#### 3.1.2 异常处理装饰器（强制）
+#### 3.1.2 寮傚父澶勭悊瑁呴グ鍣紙寮哄埗锛?
 ```python
 def exception_handler(context: str = '', default: Any = None, reraise: bool = False, custom_exc: type = None):
     """
-    异常处理装饰器
+    寮傚父澶勭悊瑁呴グ鍣?
     
-    用途：
-    - 统一捕获和处理异常
-    - 记录详细日志
-    - 提供友好的错误提示
+    鐢ㄩ€旓細
+    - 缁熶竴鎹曡幏鍜屽鐞嗗紓甯?
+    - 璁板綍璇︾粏鏃ュ織
+    - 鎻愪緵鍙嬪ソ鐨勯敊璇彁绀?
     
-    参数：
-    - context: 操作上下文描述
-    - default: 异常时的默认返回值
-    - reraise: 是否重新抛出异常
-    - custom_exc: 自定义异常类型
+    鍙傛暟锛?
+    - context: 鎿嶄綔涓婁笅鏂囨弿杩?
+    - default: 寮傚父鏃剁殑榛樿杩斿洖鍊?
+    - reraise: 鏄惁閲嶆柊鎶涘嚭寮傚父
+    - custom_exc: 鑷畾涔夊紓甯哥被鍨?
     """
     def decorator(func):
         @wraps(func)
@@ -2332,12 +2320,12 @@ def exception_handler(context: str = '', default: Any = None, reraise: bool = Fa
             try:
                 return func(*args, **kwargs)
             except AppException as e:
-                logger.error(f"[{context}] 业务异常: {e.message}", extra=e.details)
+                logger.error(f"[{context}] 涓氬姟寮傚父: {e.message}", extra=e.details)
                 if reraise:
                     raise
                 return default
             except Exception as e:
-                logger.error(f"[{context}] 未预期异常: {str(e)}", exc_info=True)
+                logger.error(f"[{context}] 鏈鏈熷紓甯? {str(e)}", exc_info=True)
                 if custom_exc:
                     raise custom_exc(str(e)) from e
                 if reraise:
@@ -2347,16 +2335,16 @@ def exception_handler(context: str = '', default: Any = None, reraise: bool = Fa
     return decorator
 ```
 
-#### 3.1.3 上下文管理器模式（推荐）
+#### 3.1.3 涓婁笅鏂囩鐞嗗櫒妯″紡锛堟帹鑽愶級
 ```python
 class ExceptionContext:
     """
-    异常上下文管理器
+    寮傚父涓婁笅鏂囩鐞嗗櫒
     
-    用途：
-    - 自动记录进入/退出日志
-    - 统一异常处理
-    - 资源自动清理
+    鐢ㄩ€旓細
+    - 鑷姩璁板綍杩涘叆/閫€鍑烘棩蹇?
+    - 缁熶竴寮傚父澶勭悊
+    - 璧勬簮鑷姩娓呯悊
     """
     
     def __init__(self, context: str, reraise: bool = False):
@@ -2364,46 +2352,46 @@ class ExceptionContext:
         self.reraise = reraise
     
     def __enter__(self):
-        logger.debug(f"[{self.context}] 开始执行")
+        logger.debug(f"[{self.context}] 寮€濮嬫墽琛?)
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is None:
-            logger.debug(f"[{self.context}] 执行成功")
+            logger.debug(f"[{self.context}] 鎵ц鎴愬姛")
             return False
         
-        logger.error(f"[{self.context}] 发生异常: {exc_val}", exc_info=True)
+        logger.error(f"[{self.context}] 鍙戠敓寮傚父: {exc_val}", exc_info=True)
         if self.reraise:
-            return False  # 重新抛出异常
-        return True  # 吞掉异常
+            return False  # 閲嶆柊鎶涘嚭寮傚父
+        return True  # 鍚炴帀寮傚父
 ```
 
-**使用示例**:
+**浣跨敤绀轰緥**:
 ```python
-@exception_handler(context='读取配置文件', default={})
+@exception_handler(context='璇诲彇閰嶇疆鏂囦欢', default={})
 def load_config():
-    with ExceptionContext('加载JSON配置'):
+    with ExceptionContext('鍔犺浇JSON閰嶇疆'):
         with open('config.json', 'r', encoding='utf-8') as f:
             return json.load(f)
 
-# 或者直接使用上下文管理器
-with ExceptionContext('文件操作', reraise=True) as ctx:
+# 鎴栬€呯洿鎺ヤ娇鐢ㄤ笂涓嬫枃绠＄悊鍣?
+with ExceptionContext('鏂囦欢鎿嶄綔', reraise=True) as ctx:
     data = process_file()
 ```
 
-### 3.2 日志系统规范 ⚠️ **重要**
+### 3.2 鏃ュ織绯荤粺瑙勮寖 鈿狅笍 **閲嶈**
 
-#### 3.2.1 TeeOutput 双输出流（强制）
+#### 3.2.1 TeeOutput 鍙岃緭鍑烘祦锛堝己鍒讹級
 ```python
 class TeeOutput:
     """
-    双输出流 - 同时输出到控制台和文件
+    鍙岃緭鍑烘祦 - 鍚屾椂杈撳嚭鍒版帶鍒跺彴鍜屾枃浠?
     
-    特性：
-    - 控制台实时显示
-    - 文件持久化存储
-    - 自动刷新缓冲区
-    - 线程安全写入
+    鐗规€э細
+    - 鎺у埗鍙板疄鏃舵樉绀?
+    - 鏂囦欢鎸佷箙鍖栧瓨鍌?
+    - 鑷姩鍒锋柊缂撳啿鍖?
+    - 绾跨▼瀹夊叏鍐欏叆
     """
     
     def __init__(self, console_stream, file_stream):
@@ -2412,36 +2400,36 @@ class TeeOutput:
         self._lock = threading.Lock()
     
     def write(self, message: str):
-        """线程安全的双写操作"""
+        """绾跨▼瀹夊叏鐨勫弻鍐欐搷浣?""
         with self._lock:
             self.console.write(message)
             self.file.write(message)
             self.flush()
     
     def flush(self):
-        """强制刷新缓冲区"""
+        """寮哄埗鍒锋柊缂撳啿鍖?""
         self.console.flush()
         self.file.flush()
 ```
 
-#### 3.2.2 日志配置规范（强制）
+#### 3.2.2 鏃ュ織閰嶇疆瑙勮寖锛堝己鍒讹級
 ```python
 def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, stream=None) -> logging.Logger:
     """
-    日志配置器
+    鏃ュ織閰嶇疆鍣?
     
-    参数：
-    - log_file: 日志文件路径（None则仅输出到控制台）
-    - log_level: 日志级别（logging.INFO / logging.DEBUG等）
-    - stream: 输出流（默认sys.stdout）
+    鍙傛暟锛?
+    - log_file: 鏃ュ織鏂囦欢璺緞锛圢one鍒欎粎杈撳嚭鍒版帶鍒跺彴锛?
+    - log_level: 鏃ュ織绾у埆锛坙ogging.INFO / logging.DEBUG绛夛級
+    - stream: 杈撳嚭娴侊紙榛樿sys.stdout锛?
     
-    返回：
-    - 配置好的Logger实例
+    杩斿洖锛?
+    - 閰嶇疆濂界殑Logger瀹炰緥
     """
     logger = logging.getLogger(__name__)
     logger.setLevel(log_level)
     
-    # 控制台处理器
+    # 鎺у埗鍙板鐞嗗櫒
     console_handler = logging.StreamHandler(stream)
     console_handler.setLevel(log_level)
     console_format = logging.Formatter(
@@ -2451,7 +2439,7 @@ def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, 
     console_handler.setFormatter(console_format)
     logger.addHandler(console_handler)
     
-    # 文件处理器（如果指定了log_file）
+    # 鏂囦欢澶勭悊鍣紙濡傛灉鎸囧畾浜唋og_file锛?
     if log_file:
         file_handler = logging.FileHandler(log_file, encoding='utf-8', mode='a')
         file_handler.setLevel(log_level)
@@ -2465,157 +2453,157 @@ def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, 
     return logger
 ```
 
-#### 3.2.3 日志级别使用规范（强制）
+#### 3.2.3 鏃ュ織绾у埆浣跨敤瑙勮寖锛堝己鍒讹級
 ```python
-# ✅ 正确的日志级别使用
-logger.debug("详细的调试信息: 变量值=%s", variable)      # 开发调试
-logger.info("正常的业务流程: 处理了%d个文件", count)       # 关键流程节点
-logger.warning("可恢复的异常: 文件不存在，使用默认值")     # 需要注意但不影响运行
-logger.error("错误但可继续: API调用失败，重试中")          # 错误但有fallback
-logger.critical("严重错误: 数据库连接丢失，服务不可用")    # 致命错误，需要立即干预
+# 鉁?姝ｇ‘鐨勬棩蹇楃骇鍒娇鐢?
+logger.debug("璇︾粏鐨勮皟璇曚俊鎭? 鍙橀噺鍊?%s", variable)      # 寮€鍙戣皟璇?
+logger.info("姝ｅ父鐨勪笟鍔℃祦绋? 澶勭悊浜?d涓枃浠?, count)       # 鍏抽敭娴佺▼鑺傜偣
+logger.warning("鍙仮澶嶇殑寮傚父: 鏂囦欢涓嶅瓨鍦紝浣跨敤榛樿鍊?)     # 闇€瑕佹敞鎰忎絾涓嶅奖鍝嶈繍琛?
+logger.error("閿欒浣嗗彲缁х画: API璋冪敤澶辫触锛岄噸璇曚腑")          # 閿欒浣嗘湁fallback
+logger.critical("涓ラ噸閿欒: 鏁版嵁搴撹繛鎺ヤ涪澶憋紝鏈嶅姟涓嶅彲鐢?)    # 鑷村懡閿欒锛岄渶瑕佺珛鍗冲共棰?
 
-# ❌ 错误的日志使用
-logger.info("发生了错误")  # 错误应该用error级别
-print("调试信息")         # 禁止使用print，统一用logger
+# 鉂?閿欒鐨勬棩蹇椾娇鐢?
+logger.info("鍙戠敓浜嗛敊璇?)  # 閿欒搴旇鐢╡rror绾у埆
+print("璋冭瘯淇℃伅")         # 绂佹浣跨敤print锛岀粺涓€鐢╨ogger
 ```
 
-### 3.3 FastAPI 路由规范 ⚠️ **重要** (2026-07-30 新增)
+### 3.3 FastAPI 璺敱瑙勮寖 鈿狅笍 **閲嶈** (2026-07-30 鏂板)
 
-#### 3.0.1 HEAD 方法支持 (强制)
+#### 3.0.1 HEAD 鏂规硶鏀寔 (寮哄埗)
 ```python
-# ❌ 错误：@app.get() 不支持 HEAD 请求
-# 当 verify_url() 使用 HEAD 方法验证时，返回 405 Method Not Allowed
-# 导致隧道心跳验证永远失败，隧道被误判为不可用并反复重启
+# 鉂?閿欒锛欯app.get() 涓嶆敮鎸?HEAD 璇锋眰
+# 褰?verify_url() 浣跨敤 HEAD 鏂规硶楠岃瘉鏃讹紝杩斿洖 405 Method Not Allowed
+# 瀵艰嚧闅ч亾蹇冭烦楠岃瘉姘歌繙澶辫触锛岄毀閬撹璇垽涓轰笉鍙敤骞跺弽澶嶉噸鍚?
 @app.get('/')
 async def index():
     return HTMLResponse(content=html_content)
 
-# ✅ 正确：使用 @app.api_route() 同时支持 GET 和 HEAD
+# 鉁?姝ｇ‘锛氫娇鐢?@app.api_route() 鍚屾椂鏀寔 GET 鍜?HEAD
 @app.api_route('/', methods=['GET', 'HEAD'])
 async def index():
     return HTMLResponse(content=html_content)
 ```
 
-**关键说明**:
-- FastAPI 的 `@app.get()` **不会**自动为路由支持 HEAD 方法（与 Flask 不同）
-- 项目中 `verify_url()` 和 `send_heartbeat()` 都使用 `method='HEAD'` 验证隧道 URL
-- 如果根路由不支持 HEAD，隧道验证将返回 405，心跳机制误判为不可用
-- **所有可能被隧道验证访问的路由**都必须同时支持 GET 和 HEAD
+**鍏抽敭璇存槑**:
+- FastAPI 鐨?`@app.get()` **涓嶄細**鑷姩涓鸿矾鐢辨敮鎸?HEAD 鏂规硶锛堜笌 Flask 涓嶅悓锛?
+- 椤圭洰涓?`verify_url()` 鍜?`send_heartbeat()` 閮戒娇鐢?`method='HEAD'` 楠岃瘉闅ч亾 URL
+- 濡傛灉鏍硅矾鐢变笉鏀寔 HEAD锛岄毀閬撻獙璇佸皢杩斿洖 405锛屽績璺虫満鍒惰鍒や负涓嶅彲鐢?
+- **鎵€鏈夊彲鑳借闅ч亾楠岃瘉璁块棶鐨勮矾鐢?*閮藉繀椤诲悓鏃舵敮鎸?GET 鍜?HEAD
 
-**隧道验证流程**:
+**闅ч亾楠岃瘉娴佺▼**:
 ```
-verify_url(url) → HEAD / → FastAPI 路由 → 405 Method Not Allowed → 验证失败 → 心跳判定不可用 → 触发重启
-verify_url(url) → HEAD / → FastAPI 路由 → 200 OK → 验证成功 → 心跳判定可用 → 稳定运行 ✅
+verify_url(url) 鈫?HEAD / 鈫?FastAPI 璺敱 鈫?405 Method Not Allowed 鈫?楠岃瘉澶辫触 鈫?蹇冭烦鍒ゅ畾涓嶅彲鐢?鈫?瑙﹀彂閲嶅惎
+verify_url(url) 鈫?HEAD / 鈫?FastAPI 璺敱 鈫?200 OK 鈫?楠岃瘉鎴愬姛 鈫?蹇冭烦鍒ゅ畾鍙敤 鈫?绋冲畾杩愯 鉁?
 ```
 
-#### 3.0.2 路由方法声明规范
+#### 3.0.2 璺敱鏂规硶澹版槑瑙勮寖
 ```python
-# ✅ 需要被 HEAD 验证访问的路由：使用 api_route
+# 鉁?闇€瑕佽 HEAD 楠岃瘉璁块棶鐨勮矾鐢憋細浣跨敤 api_route
 @app.api_route('/', methods=['GET', 'HEAD'])
 async def index():
 
-# ✅ 纯 API 路由（不需要 HEAD 验证）：可使用 @app.get
+# 鉁?绾?API 璺敱锛堜笉闇€瑕?HEAD 楠岃瘉锛夛細鍙娇鐢?@app.get
 @app.get('/api/tunnel/status')
 def tunnel_status():
 
-# ✅ 只写路由：使用 @app.post
+# 鉁?鍙啓璺敱锛氫娇鐢?@app.post
 @app.post('/api/tunnel/start')
 def start_tunnel():
 ```
 
-### 3.1 异常处理标准
+### 3.1 寮傚父澶勭悊鏍囧噯
 
-#### 3.1.1 ExceptionContext 统一包装
+#### 3.1.1 ExceptionContext 缁熶竴鍖呰
 ```python
-# ✅ 强制要求：所有文件操作必须使用 ExceptionContext
+# 鉁?寮哄埗瑕佹眰锛氭墍鏈夋枃浠舵搷浣滃繀椤讳娇鐢?ExceptionContext
 from utils.exception_handler import ExceptionContext
 
 class FileManager:
     @staticmethod
     def read_json(file_path):
-        """读取JSON文件"""
+        """璇诲彇JSON鏂囦欢"""
         with ExceptionContext(f"FileManager.read_json({file_path})", default=None) as ctx:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
     
     @staticmethod
     def write_json(file_path, data, indent=2):
-        """写入JSON文件"""
+        """鍐欏叆JSON鏂囦欢"""
         with ExceptionContext(f"FileManager.write_json({file_path})", default=False) as ctx:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=indent, ensure_ascii=False)
 ```
 
-#### 3.1.2 细粒度异常捕获
+#### 3.1.2 缁嗙矑搴﹀紓甯告崟鑾?
 ```python
-# ❌ 错误：宽泛的异常捕获
+# 鉂?閿欒锛氬娉涚殑寮傚父鎹曡幏
 try:
     result = api_call()
 except:
-    pass  # 吞掉所有异常
+    pass  # 鍚炴帀鎵€鏈夊紓甯?
 
-# ✅ 正确：细粒度异常捕获 + 详细日志
+# 鉁?姝ｇ‘锛氱粏绮掑害寮傚父鎹曡幏 + 璇︾粏鏃ュ織
 try:
     result = api_call()
 except requests.exceptions.Timeout:
-    logger.warning(f"API请求超时: {url}")
-    show_user_prompt("网络超时", "请检查网络连接后重试")
+    logger.warning(f"API璇锋眰瓒呮椂: {url}")
+    show_user_prompt("缃戠粶瓒呮椂", "璇锋鏌ョ綉缁滆繛鎺ュ悗閲嶈瘯")
 except requests.exceptions.HTTPError as e:
-    logger.error(f"HTTP错误: {e.response.status_code}")
+    logger.error(f"HTTP閿欒: {e.response.status_code}")
     if e.response.status_code == 403:
-        show_user_prompt("反爬虫检测", "建议更换IP或降低请求频率")
+        show_user_prompt("鍙嶇埇铏娴?, "寤鸿鏇存崲IP鎴栭檷浣庤姹傞鐜?)
 except ValueError as e:
-    logger.error(f"数据解析失败: {str(e)}")
-    show_user_prompt("数据格式错误", "原始数据: {raw_data[:100]}")
+    logger.error(f"鏁版嵁瑙ｆ瀽澶辫触: {str(e)}")
+    show_user_prompt("鏁版嵁鏍煎紡閿欒", "鍘熷鏁版嵁: {raw_data[:100]}")
 ```
 
-### 3.2 配置管理规范
+### 3.2 閰嶇疆绠＄悊瑙勮寖
 
-#### 3.2.1 ConfigManager 使用
+#### 3.2.1 ConfigManager 浣跨敤
 ```python
 class ConfigManager:
     """
-    配置管理器 - 统一配置读写接口
+    閰嶇疆绠＄悊鍣?- 缁熶竴閰嶇疆璇诲啓鎺ュ彛
     
-    特性：
-    - 自动保存到磁盘
-    - 类型安全访问
-    - 提供便捷方法
+    鐗规€э細
+    - 鑷姩淇濆瓨鍒扮鐩?
+    - 绫诲瀷瀹夊叏璁块棶
+    - 鎻愪緵渚挎嵎鏂规硶
     """
     
     def get(self, key, default=None):
-        """读取配置项"""
+        """璇诲彇閰嶇疆椤?""
         return self.config.get(key, default)
     
     def set(self, key, value):
-        """设置配置项并自动保存"""
+        """璁剧疆閰嶇疆椤瑰苟鑷姩淇濆瓨"""
         if self._config is not None:
             self._config[key] = value
-            self.save_config()  # 立即持久化
+            self.save_config()  # 绔嬪嵆鎸佷箙鍖?
     
     def get_cookie_file(self):
-        """便捷方法：获取Cookie文件路径"""
+        """渚挎嵎鏂规硶锛氳幏鍙朇ookie鏂囦欢璺緞"""
         return self.config.get('cookie_file', PathManager.get_cookie_file())
 ```
 
-### 3.3 Cookie验证规范
+### 3.3 Cookie楠岃瘉瑙勮寖
 
-#### 3.3.1 七步验证流程
+#### 3.3.1 涓冩楠岃瘉娴佺▼
 ```python
 class CookieValidator:
     @staticmethod
     def validate_and_prompt(cookie_file):
         """
-        七步验证流程：
+        涓冩楠岃瘉娴佺▼锛?
         
-        1. 检查文件是否存在
-        2. 检查文件是否可读（JSON格式）
-        3. 检查cookie是否为空
-        4. 检查是否存在token
-        5. 检查token是否过期
-        6. 检查token值是否有效（长度>=10）
-        7. 检查cookie是否即将过期（7天内预警）
+        1. 妫€鏌ユ枃浠舵槸鍚﹀瓨鍦?
+        2. 妫€鏌ユ枃浠舵槸鍚﹀彲璇伙紙JSON鏍煎紡锛?
+        3. 妫€鏌ookie鏄惁涓虹┖
+        4. 妫€鏌ユ槸鍚﹀瓨鍦╰oken
+        5. 妫€鏌oken鏄惁杩囨湡
+        6. 妫€鏌oken鍊兼槸鍚︽湁鏁堬紙闀垮害>=10锛?
+        7. 妫€鏌ookie鏄惁鍗冲皢杩囨湡锛?澶╁唴棰勮锛?
         
         Returns:
             tuple: (is_valid, cookies_or_None)
@@ -2625,46 +2613,46 @@ class CookieValidator:
     @staticmethod
     def _show_expiry_warning(days_until_expiry):
         """
-        过期预警：
-        - 7天内：黄色警告 ⚠️
-        - 3天内：红色警告 🔴
+        杩囨湡棰勮锛?
+        - 7澶╁唴锛氶粍鑹茶鍛?鈿狅笍
+        - 3澶╁唴锛氱孩鑹茶鍛?馃敶
         """
         pass
 ```
 
 ---
 
-## 📝 日志记录规范
+## 馃摑 鏃ュ織璁板綍瑙勮寖
 
-### 4.1 日志级别使用
+### 4.1 鏃ュ織绾у埆浣跨敤
 
-| 场景 | 日志级别 | 示例 |
+| 鍦烘櫙 | 鏃ュ織绾у埆 | 绀轰緥 |
 |------|---------|------|
-| **正常操作** | `INFO` | `[对比卡片] ✓ 总商品数: 91` |
-| **数据解析** | `DEBUG` | `[对比卡片] 解析第143行: 售价 >= 599...` |
-| **警告信息** | `WARNING` | `⚠️ Cookie将在3天后过期` |
-| **错误信息** | `ERROR` | `❌ API请求失败: 403 Forbidden` |
+| **姝ｅ父鎿嶄綔** | `INFO` | `[瀵规瘮鍗＄墖] 鉁?鎬诲晢鍝佹暟: 91` |
+| **鏁版嵁瑙ｆ瀽** | `DEBUG` | `[瀵规瘮鍗＄墖] 瑙ｆ瀽绗?43琛? 鍞环 >= 599...` |
+| **璀﹀憡淇℃伅** | `WARNING` | `鈿狅笍 Cookie灏嗗湪3澶╁悗杩囨湡` |
+| **閿欒淇℃伅** | `ERROR` | `鉂?API璇锋眰澶辫触: 403 Forbidden` |
 
-### 4.2 统一日志格式
+### 4.2 缁熶竴鏃ュ織鏍煎紡
 ```javascript
-// JavaScript 格式
-console.log('[模块名] ✓ 操作成功:', data);
-console.warn('[模块名] ⚠️ 警告信息:', message);
-console.error('[模块名] ❌ 错误详情:', error);
+// JavaScript 鏍煎紡
+console.log('[妯″潡鍚峕 鉁?鎿嶄綔鎴愬姛:', data);
+console.warn('[妯″潡鍚峕 鈿狅笍 璀﹀憡淇℃伅:', message);
+console.error('[妯″潡鍚峕 鉂?閿欒璇︽儏:', error);
 
-// Python 格式
-logger.info(f"[{__name__}] ✓ 成功: {data}")
-logger.warning(f"[{__name__}] ⚠️ 警告: {message}")
-logger.error(f"[{__name__}] ❌ 失败: {error}", exc_info=True)
+// Python 鏍煎紡
+logger.info(f"[{__name__}] 鉁?鎴愬姛: {data}")
+logger.warning(f"[{__name__}] 鈿狅笍 璀﹀憡: {message}")
+logger.error(f"[{__name__}] 鉂?澶辫触: {error}", exc_info=True)
 ```
 
 ---
 
-## 🛡️ 安全规范
+## 馃洝锔?瀹夊叏瑙勮寖
 
-### 5.1 输入验证
+### 5.1 杈撳叆楠岃瘉
 ```javascript
-// ✅ XSS防护
+// 鉁?XSS闃叉姢
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -2672,37 +2660,37 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ✅ 在HTML中使用
+// 鉁?鍦℉TML涓娇鐢?
 <div class="sku-tag">${escapeHtml(sku)}</div>
 ```
 
-### 5.2 敏感数据处理
+### 5.2 鏁忔劅鏁版嵁澶勭悊
 ```python
-# ❌ 错误：日志中泄露敏感信息
-logger.info(f"Cookie: {cookie}")  # 危险！
+# 鉂?閿欒锛氭棩蹇椾腑娉勯湶鏁忔劅淇℃伅
+logger.info(f"Cookie: {cookie}")  # 鍗遍櫓锛?
 
-# ✅ 正确：脱敏处理
-logger.info(f"Cookie已加载: {mask_sensitive(cookie)}")  # 安全
+# 鉁?姝ｇ‘锛氳劚鏁忓鐞?
+logger.info(f"Cookie宸插姞杞? {mask_sensitive(cookie)}")  # 瀹夊叏
 ```
 
 ---
 
-## 🧪 测试规范
+## 馃И 娴嬭瘯瑙勮寖
 
-### 6.1 单元测试要求
+### 6.1 鍗曞厓娴嬭瘯瑕佹眰
 ```python
 # tests/test_syntax_check.py
 import unittest
 import re
 
 class TestJavaScriptSyntax(unittest.TestCase):
-    """测试JavaScript语法正确性"""
+    """娴嬭瘯JavaScript璇硶姝ｇ‘鎬?""
     
     def test_bracket_matching(self):
-        """测试括号匹配"""
+        """娴嬭瘯鎷彿鍖归厤"""
         code = open('dist/app.js', 'r', encoding='utf-8').read()
         
-        # 检查括号是否匹配
+        # 妫€鏌ユ嫭鍙锋槸鍚﹀尮閰?
         stack = []
         brackets = {'(': ')', '[': ']', '{': '}'}
         
@@ -2711,42 +2699,42 @@ class TestJavaScriptSyntax(unittest.TestCase):
                 stack.append(char)
             elif char in brackets.values():
                 if not stack or brackets[stack.pop()] != char:
-                    self.fail(f"括号不匹配: 位置附近...{code[max(0,code.index(char)-50):code.index(char)+50]}")
+                    self.fail(f"鎷彿涓嶅尮閰? 浣嶇疆闄勮繎...{code[max(0,code.index(char)-50):code.index(char)+50]}")
         
-        self.assertEqual(len(stack), 0, "存在未闭合的括号")
+        self.assertEqual(len(stack), 0, "瀛樺湪鏈棴鍚堢殑鎷彿")
     
     def test_no_syntax_errors(self):
-        """测试无语法错误（使用Node.js检查）"""
+        """娴嬭瘯鏃犺娉曢敊璇紙浣跨敤Node.js妫€鏌ワ級"""
         import subprocess
         result = subprocess.run(['node', '--check', 'dist/app.js'], 
                               capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, 
-                        f"语法错误: {result.stderr}")
+                        f"璇硶閿欒: {result.stderr}")
 ```
 
-### 6.2 集成测试
+### 6.2 闆嗘垚娴嬭瘯
 ```python
 def test_high_price_count_display():
-    """测试高价商品数正确显示（修复后的回归测试）"""
+    """娴嬭瘯楂樹环鍟嗗搧鏁版纭樉绀猴紙淇鍚庣殑鍥炲綊娴嬭瘯锛?""
     output = run_spider_task()
     
-    # 解析输出中的高价商品数
-    match = re.search(r'售价 >= 599 的商品:\s*(\d+)个', output)
-    assert match, "未找到高价商品数"
+    # 瑙ｆ瀽杈撳嚭涓殑楂樹环鍟嗗搧鏁?
+    match = re.search(r'鍞环 >= 599 鐨勫晢鍝?\s*(\d+)涓?, output)
+    assert match, "鏈壘鍒伴珮浠峰晢鍝佹暟"
     
     high_price_count = int(match.group(1))
-    assert high_price_count == 73, f"预期73个，实际{high_price_count}个"
+    assert high_price_count == 73, f"棰勬湡73涓紝瀹為檯{high_price_count}涓?
     
-    # 验证UI显示
+    # 楠岃瘉UI鏄剧ず
     ui_value = get_ui_stat_value('high-price-count')
-    assert ui_value == '73', f"UI显示错误: {ui_value}"
+    assert ui_value == '73', f"UI鏄剧ず閿欒: {ui_value}"
 ```
 
 ---
 
-## 📦 Git工作流规范
+## 馃摝 Git宸ヤ綔娴佽鑼?
 
-### 7.1 Commit Message 格式
+### 7.1 Commit Message 鏍煎紡
 ```
 <type>(<scope>): <subject>
 
@@ -2755,149 +2743,149 @@ def test_high_price_count_display():
 <footer>
 ```
 
-**Type 类型**:
-- `fix`: Bug修复
-- `feat`: 新功能
-- `docs`: 文档更新
-- `style`: 代码格式调整
-- `refactor`: 重构
-- `test`: 测试相关
-- `chore`: 构建/工具链
+**Type 绫诲瀷**:
+- `fix`: Bug淇
+- `feat`: 鏂板姛鑳?
+- `docs`: 鏂囨。鏇存柊
+- `style`: 浠ｇ爜鏍煎紡璋冩暣
+- `refactor`: 閲嶆瀯
+- `test`: 娴嬭瘯鐩稿叧
+- `chore`: 鏋勫缓/宸ュ叿閾?
 
-**示例**:
+**绀轰緥**:
 ```
-fix(app.js): 修复第1432行括号不匹配导致高价商品数显示为0
+fix(app.js): 淇绗?432琛屾嫭鍙蜂笉鍖归厤瀵艰嚧楂樹环鍟嗗搧鏁版樉绀轰负0
 
-问题：
-- 条件判断语句多两个右括号导致JS解析失败
-- "售价>=599的商品" 显示为0而非73
+闂锛?
+- 鏉′欢鍒ゆ柇璇彞澶氫袱涓彸鎷彿瀵艰嚧JS瑙ｆ瀽澶辫触
+- "鍞环>=599鐨勫晢鍝? 鏄剧ず涓?鑰岄潪73
 
-修复：
-- 移除多余的 )) 
-- 改用 || 组合条件提高可读性
+淇锛?
+- 绉婚櫎澶氫綑鐨?)) 
+- 鏀圭敤 || 缁勫悎鏉′欢鎻愰珮鍙鎬?
 
-影响范围：
+褰卞搷鑼冨洿锛?
 - dist/app.js Line 1432-1434
-- 高价商品统计功能恢复正常
+- 楂樹环鍟嗗搧缁熻鍔熻兘鎭㈠姝ｅ父
 
-测试：
-✅ 手动验证：刷新页面后显示73
-✅ 自动化测试：test_bracket_matching 通过
+娴嬭瘯锛?
+鉁?鎵嬪姩楠岃瘉锛氬埛鏂伴〉闈㈠悗鏄剧ず73
+鉁?鑷姩鍖栨祴璇曪細test_bracket_matching 閫氳繃
 ```
 
-### 7.2 分支策略
+### 7.2 鍒嗘敮绛栫暐
 ```
-main (生产环境)
-  └── develop (开发环境)
-        ├── feature/fix-syntax-error (当前分支)
-        ├── feature/add-new-api
-        └── hotfix/critical-bug
+main (鐢熶骇鐜)
+  鈹斺攢鈹€ develop (寮€鍙戠幆澧?
+        鈹溾攢鈹€ feature/fix-syntax-error (褰撳墠鍒嗘敮)
+        鈹溾攢鈹€ feature/add-new-api
+        鈹斺攢鈹€ hotfix/critical-bug
 ```
 
 ---
 
-## 🚨 常见问题 & 解决方案 (FAQ)
+## 馃毃 甯歌闂 & 瑙ｅ喅鏂规 (FAQ)
 
-### Q1: 为什么数据显示为0？
-**A**: 最常见原因是 **JavaScript语法错误**。
-- 检查浏览器控制台是否有红色错误
-- 使用 `node --check app.js` 验证语法
-- 重点检查**括号匹配**（见2.1.1节）
+### Q1: 涓轰粈涔堟暟鎹樉绀轰负0锛?
+**A**: 鏈€甯歌鍘熷洜鏄?**JavaScript璇硶閿欒**銆?
+- 妫€鏌ユ祻瑙堝櫒鎺у埗鍙版槸鍚︽湁绾㈣壊閿欒
+- 浣跨敤 `node --check app.js` 楠岃瘉璇硶
+- 閲嶇偣妫€鏌?*鎷彿鍖归厤**锛堣2.1.1鑺傦級
 
-### Q2: 如何避免类似的语法错误？
+### Q2: 濡備綍閬垮厤绫讳技鐨勮娉曢敊璇紵
 **A**: 
-1. **使用IDE插件** - ESLint实时检查
-2. **提交前验证** - 运行 `npm run lint`
-3. **Code Review** - 同伴审查括号匹配
-4. **自动化测试** - 运行单元测试套件
+1. **浣跨敤IDE鎻掍欢** - ESLint瀹炴椂妫€鏌?
+2. **鎻愪氦鍓嶉獙璇?* - 杩愯 `npm run lint`
+3. **Code Review** - 鍚屼即瀹℃煡鎷彿鍖归厤
+4. **鑷姩鍖栨祴璇?* - 杩愯鍗曞厓娴嬭瘯濂椾欢
 
-### Q3: Windows环境下需要注意什么？
+### Q3: Windows鐜涓嬮渶瑕佹敞鎰忎粈涔堬紵
 **A**: 
-- 文件编码：**UTF-8 with BOM**
-- 换行符：**CRLF (\r\n)**，非 LF (\n)
-- PowerShell转义：特殊字符需要双重转义
-- Node.js路径：使用正斜杠 `/` 或双反斜杠 `\\`
+- 鏂囦欢缂栫爜锛?*UTF-8 with BOM**
+- 鎹㈣绗︼細**CRLF (\r\n)**锛岄潪 LF (\n)
+- PowerShell杞箟锛氱壒娈婂瓧绗﹂渶瑕佸弻閲嶈浆涔?
+- Node.js璺緞锛氫娇鐢ㄦ鏂滄潬 `/` 鎴栧弻鍙嶆枩鏉?`\\`
 
-### Q4: 修改app.js后如何验证？
-**A**: 完整验证流程：
+### Q4: 淇敼app.js鍚庡浣曢獙璇侊紵
+**A**: 瀹屾暣楠岃瘉娴佺▼锛?
 ```bash
-# 1. 语法检查
+# 1. 璇硶妫€鏌?
 node --check dist/app.js
 
-# 2. 单元测试
+# 2. 鍗曞厓娴嬭瘯
 npm test
 
-# 3. 手动测试
-# 刷新浏览器 → 运行任务 → 检查控制台输出和UI显示
+# 3. 鎵嬪姩娴嬭瘯
+# 鍒锋柊娴忚鍣?鈫?杩愯浠诲姟 鈫?妫€鏌ユ帶鍒跺彴杈撳嚭鍜孶I鏄剧ず
 
-# 4. 回归测试
+# 4. 鍥炲綊娴嬭瘯
 python tests/test_regression.py
 ```
 
 ---
 
-## 📊 性能监控指标
+## 馃搳 鎬ц兘鐩戞帶鎸囨爣
 
-### 关键性能指标 (KPI)
-| 指标 | 目标值 | 当前值 | 状态 |
+### 鍏抽敭鎬ц兘鎸囨爣 (KPI)
+| 鎸囨爣 | 鐩爣鍊?| 褰撳墠鍊?| 鐘舵€?|
 |------|--------|--------|------|
-| **JS语法错误率** | 0% | 0% | ✅ |
-| **数据显示准确率** | 100% | 100% | ✅ |
-| **API响应时间** | <3s | <2s | ✅ |
-| **用户满意度** | >90% | 95% | ✅ |
+| **JS璇硶閿欒鐜?* | 0% | 0% | 鉁?|
+| **鏁版嵁鏄剧ず鍑嗙‘鐜?* | 100% | 100% | 鉁?|
+| **API鍝嶅簲鏃堕棿** | <3s | <2s | 鉁?|
+| **鐢ㄦ埛婊℃剰搴?* | >90% | 95% | 鉁?|
 
-### 监控脚本
+### 鐩戞帶鑴氭湰
 ```bash
 #!/bin/bash
-# monitor.sh - 每日健康检查
+# monitor.sh - 姣忔棩鍋ュ悍妫€鏌?
 
 echo "=== $(date) ==="
 
-# 1. JS语法检查
-node --check dist/app.js && echo "✅ JS语法正常" || echo "❌ JS语法错误"
+# 1. JS璇硶妫€鏌?
+node --check dist/app.js && echo "鉁?JS璇硶姝ｅ父" || echo "鉂?JS璇硶閿欒"
 
-# 2. Python语法检查
-python -m py_compile main.py && echo "✅ Python语法正常" || echo "❌ Python语法错误"
+# 2. Python璇硶妫€鏌?
+python -m py_compile main.py && echo "鉁?Python璇硶姝ｅ父" || echo "鉂?Python璇硶閿欒"
 
-# 3. 测试覆盖率
-pytest --cov=. && echo "✅ 测试通过" || echo "❌ 测试失败"
+# 3. 娴嬭瘯瑕嗙洊鐜?
+pytest --cov=. && echo "鉁?娴嬭瘯閫氳繃" || echo "鉂?娴嬭瘯澶辫触"
 
-# 4. 文档同步检查
-diff README.md skill.docx >/dev/null 2>&1 && echo "✅ 文档已同步" || echo "⚠️ 文档需要更新"
+# 4. 鏂囨。鍚屾妫€鏌?
+diff README.md skill.docx >/dev/null 2>&1 && echo "鉁?鏂囨。宸插悓姝? || echo "鈿狅笍 鏂囨。闇€瑕佹洿鏂?
 ```
 
 ---
 
-## 📚 参考资源
+## 馃摎 鍙傝€冭祫婧?
 
-### 内部文档
-- [README.md](./README.md) - 项目概述和更新日志
-- [skill.docx](./skill.docx) - Word格式完整文档
+### 鍐呴儴鏂囨。
+- [README.md](./README.md) - 椤圭洰姒傝堪鍜屾洿鏂版棩蹇?
+- [skill.docx](./skill.docx) - Word鏍煎紡瀹屾暣鏂囨。
 
-### 外部资源
-- [MDN Web Docs](https://developer.mozilla.org/) - JavaScript参考
-- [Python PEP 8](https://peps.python.org/pep-0008/) - Python风格指南
-- [ESLint Rules](https://eslint.org/docs/rules/) - 代码质量规则
+### 澶栭儴璧勬簮
+- [MDN Web Docs](https://developer.mozilla.org/) - JavaScript鍙傝€?
+- [Python PEP 8](https://peps.python.org/pep-0008/) - Python椋庢牸鎸囧崡
+- [ESLint Rules](https://eslint.org/docs/rules/) - 浠ｇ爜璐ㄩ噺瑙勫垯
 
 ---
 
-## 📄 文档生成方法
+## 馃搫 鏂囨。鐢熸垚鏂规硶
 
-### 方法1: 使用 Pandoc (推荐)
+### 鏂规硶1: 浣跨敤 Pandoc (鎺ㄨ崘)
 
-安装 Pandoc: https://pandoc.org/installing.html
+瀹夎 Pandoc: https://pandoc.org/installing.html
 
 ```bash
 pandoc skill.md -o skill.docx
 ```
 
-### 方法2: 使用 Python python-docx
+### 鏂规硶2: 浣跨敤 Python python-docx
 
 ```bash
 pip install python-docx markdown
 ```
 
-Python脚本示例：
+Python鑴氭湰绀轰緥锛?
 ```python
 from docx import Document
 
@@ -2925,358 +2913,358 @@ def md_to_docx(md_file, docx_file):
 
 if __name__ == '__main__':
     md_to_docx('skill.md', 'skill.docx')
-    print('✅ skill.docx 生成成功')
+    print('鉁?skill.docx 鐢熸垚鎴愬姛')
 ```
 
-### 方法3: 使用在线工具
+### 鏂规硶3: 浣跨敤鍦ㄧ嚎宸ュ叿
 
-访问 https://cloudconvert.com/md-to-docx 上传 skill.md 文件
+璁块棶 https://cloudconvert.com/md-to-docx 涓婁紶 skill.md 鏂囦欢
 
-### 方法4: 使用 Microsoft Word
+### 鏂规硶4: 浣跨敤 Microsoft Word
 
-文件 → 打开 → 选择 skill.md → 另存为 skill.docx
+鏂囦欢 鈫?鎵撳紑 鈫?閫夋嫨 skill.md 鈫?鍙﹀瓨涓?skill.docx
 
-### 验证生成结果
+### 楠岃瘉鐢熸垚缁撴灉
 
-生成后检查以下内容：
-- [ ] 所有标题层级正确
-- [ ] 代码块格式完整
-- [ ] 表格显示正常
-- [ ] 中文字符无乱码
-- [ ] 文档版本号为 v3.8.68
+鐢熸垚鍚庢鏌ヤ互涓嬪唴瀹癸細
+- [ ] 鎵€鏈夋爣棰樺眰绾ф纭?
+- [ ] 浠ｇ爜鍧楁牸寮忓畬鏁?
+- [ ] 琛ㄦ牸鏄剧ず姝ｅ父
+- [ ] 涓枃瀛楃鏃犱贡鐮?
+- [ ] 鏂囨。鐗堟湰鍙蜂负 v3.8.68
 
 ---
 
-## 🔄 版本历史
+## 馃攧 鐗堟湰鍘嗗彶
 
-### 📚 最新版本 (v3.8.x)
+### 馃摎 鏈€鏂扮増鏈?(v3.8.x)
 
-| 版本 | 日期 | 作者 | 变更内容 |
+| 鐗堟湰 | 鏃ユ湡 | 浣滆€?| 鍙樻洿鍐呭 |
 |------|------|------|---------|
-| v3.8.89.11 | 2026-07-30 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭修复(safeCloseWebSocket2状态感知+error事件吞掉+patch-package持久化)+隧道验证修复(FastAPI HEAD方法)+高价商品数解析修复+按钮全局函数暴露 |
-| v3.8.89.10 | 2026-07-30 | 小旭二手机（西园路） | FastAPI根路由添加HEAD方法支持，修复verify_url()返回405导致隧道被误判不可用; CF隧道DNS解析失败的排查方案; 隧道不再反复重启，邮件通知正常发送 |
-| v3.8.89.9 | 2026-07-30 | 小旭二手机（西园路） | 简化正则表达式，精确匹配Python输出格式; 暴露全局函数，确保按钮绑定成功; 高价商品数从0恢复到78 |
-| v3.8.89.8 | 2026-07-30 | 小旭二手机（西园路） | 高价商品、TXT对比、请求处理、数据源、CDN日志; 修复FastAPI迁移后的功能问题 |
-| v3.8.89.6 | 2026-07-30 | 小旭二手机（西园路） | 修复爬虫结果卡片显示格式; 统一卡片显示样式 |
-| v3.8.89.5 | 2026-07-30 | 小旭二手机（西园路） | 添加单元测试; 日志级别优化; subprocess替换os.system; 前端Toast错误提示 |
-| v3.8.89.4 | 2026-07-30 | 小旭二手机（西园路） | 修复多个隐藏Bug; 提升代码质量 |
-| v3.8.89.3 | 2026-07-29 | 小旭二手机（西园路） | 修复Flask遗留代码; 添加jsonify兼容层; 8个按钮测试7/8通过 |
-| v3.8.89.2 | 2026-07-29 | 小旭二手机（西园路） | 22个路由全部转换; FastAPI迁移100%完成 |
-| v3.8.89.1 | 2026-07-29 | 小旭二手机（西园路） | 修复Excel对比货号点击无响应; 更新文档规范 |
-| v3.8.89 | 2026-07-30 | 小旭二手机（西园路） | 修复语法错误+清理测试代码+更新版本号 |
-| v3.8.88.2 | 2026-07-29 | 小旭二手机（西园路） | XSS全面修复(26处); CORS收紧; URL注入防护; 事件绑定缺失导致商品详情和利润报表功能失效 |
-| v3.8.88.1 | 2026-07-29 | 小旭二手机（西园路） | XSS防护; 定时器泄漏修复 |
-| v3.8.88 | 2026-07-29 | 小旭二手机（西园路） | API路由安全加固; 全面修复'Unexpected token <'错误 |
-| v3.8.87 | 2026-07-26 | 小旭二手机（西园路） | 基于入库时间戳动态计算相对时间; 不再使用源API静态字符串 |
-| v3.8.86 | 2026-07-26 | 小旭二手机（西园路） | 搜索时4个表格联动过滤; 每个表格独立统计行(售出总价/均价/手续费); 顶部徽章实时更新匹配数; 搜索结果分表展示彩色标签 |
-| v3.8.85 | 2026-07-26 | 小旭二手机（西园路） | 商品搜索统计实时计算优化 |
-| v3.8.84 | 2026-07-25 | 小旭二手机（西园路） | 安全漏洞修复; 命令注入防护 |
-| v3.8.83 | 2026-07-25 | 小旭二手机（西园路） | Bug修复; 代码质量提升 |
-| v3.8.82 | 2026-07-24 | 小旭二手机（西园路） | 代码质量优化 |
-| v3.8.81 | 2026-07-24 | 小旭二手机（西园路） | 变量命名规范化(oldTime -> old_time); 修复时间戳字段(time_stamp) |
-| v3.8.78 | 2026-07-20 | 小旭二手机（西园路） | skill.docx自动生成; 文档更新 |
-| v3.8.77 | 2026-07-20 | 小旭二手机（西园路） | Swagger UI集成优化 |
-| v3.8.76 | 2026-07-20 | 小旭二手机（西园路） | .trae配置优化; skill文档更新 |
-| v3.8.75 | 2026-07-20 | 小旭二手机（西园路） | 新增skill文档; 代码规范优化 |
-| v3.8.73 | 2026-07-19 | 小旭二手机（西园路） | CSP优化，docs/目录允许CDN; README.md更新，补充v3.8.67-v3.8.73版本记录; 新增/api/changelog API |
-| v3.8.71 | 2026-07-19 | 小旭二手机（西园路） | Swagger UI集成(自动生成swagger.json+HTML UI); Pydantic V2升级(field_validator); 更新requirements.txt |
-| v3.8.70.1 | 2026-07-19 | 小旭二手机（西园路） | 统一文档语言规范 - 所有更新日志必须使用中文 |
-| v3.8.70 | 2026-07-19 | 小旭二手机（西园路） | 企业级生产优化，38项改进; 安全加固 |
-| v3.8.69 | 2026-07-19 | 小旭二手机（西园路） | 全面安全审计，7个关键Bug修复 |
-| v3.8.68 | 2026-07-19 | 小旭二手机（西园路） | 修复缩进错误; 修复Socket泄漏; 代码质量提升 |
-| v3.8.67 | 2026-07-19 | 小旭二手机（西园路） | 修复FastAPI迁移后的Bug |
-| v3.8.66 | 2026-07-18 | 小旭二手机（西园路） | 手动触发hostc进程终止测试; 修复verify_url()参数错误; hostc频繁崩溃场景下CF隧道完全独立运行 |
-| v3.8.65 | 2026-07-18 | 小旭二手机（西园路） | hostc失效不再影响Cloudflare Tunnel; 启动新CF隧道前先检查已有可用地址; hostc频繁重启时CF地址保持不变 |
-| v3.8.64 | 2026-07-18 | 小旭二手机（西园路） | 隧道共享弹窗恢复原始hostc样式+新增Cloudflare URL |
-| v3.8.63 | 2026-07-18 | 小旭二手机（西园路） | 隧道共享弹窗同时显示hostc和Cloudflare双公网地址 |
-| v3.8.62 | 2026-07-18 | 小旭二手机（西园路） | Toast显示具体复制的URL地址 |
-| v3.8.61 | 2026-07-18 | 小旭二手机（西园路） | 修复隧道管理面板复制按钮ID冲突，Toast弹窗恢复正常 |
-| v3.8.60 | 2026-07-18 | 小旭二手机（西园路） | 公网地址复制按钮样式统一（btn-light + 复制文字） |
-| v3.8.59 | 2026-07-18 | 小旭二手机（西园路） | 公网地址复制按钮（Cloudflare + hostc） |
-| v3.8.58 | 2026-07-18 | 小旭二手机（西园路） | 邮件防重复发送修复 + skill.docx 同步更新 |
-| v3.8.57 | 2026-07-18 | 小旭二手机（西园路） | 版本更新日志到 README.md; Cloudflare邮件通知修复 + 日志格式统一 |
-| v3.8.56 | 2026-07-18 | 小旭二手机（西园路） | 移除 hostc_output.txt，简化隧道管理 |
-| v3.8.55 | 2026-07-18 | 小旭二手机（西园路） | Cloudflare 邮件通知日志统一 |
-| v3.8.54 | 2026-07-18 | 小旭二手机（西园路） | Cloudflare 限流检测与友好提示 |
-| v3.8.53 | 2026-07-18 | 小旭二手机（西园路） | 修复双隧道地址写入冲突 |
-| v3.8.52 | 2026-07-18 | 小旭二手机（西园路） | 双隧道独立发邮件 + 心跳写入修复 |
-| v3.8.51 | 2026-07-18 | 小旭二手机（西园路） | 更新README和skill文档; tunnel_url.txt同时存储hostc和CF两个隧道的地址 |
-| v3.8.50 | 2026-07-18 | 小旭二手机（西园路） | 修复CF心跳验证日志输出 |
-| v3.8.49 | 2026-07-18 | 小旭二手机（西园路） | 添加CF心跳验证详细日志 |
-| v3.8.48 | 2026-07-18 | 小旭二手机（西园路） | Tunnel type selector dynamic default value |
-| v3.8.47 | 2026-07-17 | 小旭二手机（西园路） | 双隧道互为备用通知 + fallback_available 邮件类型 |
-| v3.8.46 | 2026-07-17 | 小旭二手机（西园路） | CF + hostc 双隧道并行 + 心跳验证 + 删除 NS 监控; Plan A→B 保底 + 自动检测 + 删除 cloudflare_tunnel 配置; Plan A/B 二选一 + 删除 NS 监控 |
-| v3.8.45 | 2026-07-17 | 小旭二手机（西园路） | NS升级自动监控 + Quick Tunnel自动升级到Named Tunnel |
-| v3.8.44 | 2026-07-17 | 小旭二手机（西园路） | Named Tunnel + 自定义域名 + 自动降级到 Quick Tunnel |
-| v3.8.43 | 2026-07-17 | 小旭二手机（西园路） | Cloudflare Tunnel 跨平台支持 + 隧道切换优化 |
-| v3.8.42 | 2026-07-17 | 小旭二手机（西园路） | Flask访问日志格式优化 |
-| v3.8.41 | 2026-07-17 | 小旭二手机（西园路） | 心跳循环重启后状态重置修复 |
-| v3.8.40 | 2026-07-17 | 小旭二手机（西园路） | hostc进程竞态条件修复 + 调试日志增强 |
-| v3.8.39 | 2026-07-12 | 小旭二手机（西园路） | ⚡ 隧道心跳与稳定性验证加速优化 - 心跳间隔60→30秒, 失效阈值3→2次, 稳定性验证2→1次, 空窗期从3-5分钟缩短至1-1.5分钟 |
-| v3.8.38 | 2026-07-12 | 小旭二手机（西园路） | 端口8888占用竞态条件修复 |
-| v3.8.37 | 2026-07-12 | 小旭二手机（西园路） | /api/readme-sections 500 错误修复 |
-| v3.8.36 | 2026-07-12 | 小旭二手机（西园路） | run.sh 函数定义顺序修复 + pre_launch 函数化重构 |
-| v3.8.35 | 2026-07-11 | 小旭二手机（西园路） | 核心范式文档补全（7项） |
-| v3.8.34 | 2026-07-11 | 小旭二手机（西园路） | 移动端适配范式文档化 |
-| v3.8.33 | 2026-07-11 | 小旭二手机（西园路） | hostc CDN镜像源修正 + bat/sh镜像列表统一 |
-| v3.8.32 | 2026-07-11 | 小旭二手机（西园路） | 隧道守护二次验证+指数退避+心跳阈值优化 |
-| v3.8.31 | 2026-07-11 | 小旭二手机（西园路） | 心跳逻辑5项优化+宽限期重构+隧道重启修复+版本号统一从README获取 |
-| v3.8.30 | 2026-07-11 | 小旭二手机（西园路） | 隧道重启逻辑重构 - 合并双路径+宽限期机制 |
-| v3.8.29 | 2026-07-11 | 小旭二手机（西园路） | temp临时文件泄漏修复 + Python侧自动清理 |
-| v3.8.28 | 2026-07-11 | 小旭二手机（西园路） | hostc等待URL超时从120秒降至30秒; 心跳守护即时启动 + tunnel权威源守护统一 |
-| v3.8.27 | 2026-07-10 | 小旭二手机（西园路） | 隧道重启死循环修复 - tunnel_need_restart重置+hostc启动等待URL |
-| v3.8.26 | 2026-07-10 | 小旭二手机（西园路） | 隧道旧URL复用Bug修复 - auto_start_tunnel增加hostc进程存活检测 |
-| v3.8.25 | 2026-07-10 | 小旭二手机（西园路） | pip依赖安装智能跳过 - main.py --check-deps + run.bat/run.sh优化 - 启动加速20秒→0.1秒 |
-| v3.8.24 | 2026-07-10 | 小旭二手机（西园路） | hostc退出自动重启 - read_output/_wait_and_notify检测退出后立即标记重启，restart_tunnel立即响应; 即时邮件通知 - auto_start_tunnel后台线程验证+发邮件，不再等心跳2... |
-| v3.8.23 | 2026-07-10 | 小旭二手机（西园路） | Web服务秒级启动 + 隧道非阻塞优化 + hostc本地化 + CDN轮询安装 + dist优化 |
-| v3.8.21 | 2026-07-10 | 小旭二手机（西园路） | Node.js依赖合并 + API范式文档完善 + 安全规范 |
-| v3.8.20 | 2026-07-10 | 小旭二手机（西园路） | 即时邮件通知+前端状态修复+验证加速; 去除预启动概念改为直接启动; changelog补全 + 前端代码块渲染格式统一; 📧 隧道即时邮件通知 + 前端状态修复 + 验证加速 |
-| v3.8.18 | 2026-07-10 | 小旭二手机（西园路） | 文档同步 - README/skill.md/skill.docx 更新auto_start_tunnel不阻塞规范 + PY-STD-TUNNEL-003; auto_start_tunnel不再阻塞等待 - hostc在跑就直接返... |
-| v3.8.17 | 2026-07-10 | 小旭二手机（西园路） | Tunnel startup optimization - hostc pre-start + Python smart wait |
-| v3.8.16 | 2026-07-09 | 小旭二手机（西园路） | macOS时间戳Bug修复 + 跨平台毫秒级时间戳统一 |
-| v3.8.15 | 2026-07-09 | 小旭二手机（西园路） | 文档完整更新: 全局时间戳100%覆盖规范; 终极版: 控制台+文件 100% 时间戳全覆盖; 最终版: web_output.log 100%时间戳覆盖; 终极版: 全局时间戳覆盖所有日志输出; 增强: 全局日志时间戳自动化系统 等7项 |
-| v3.8.14 | 2026-07-08 | 小旭二手机（西园路） | README.md 三段式结构规范补齐 + skill.docx 重新生成; 致命死锁修复 + 邮件UI升级 + 日志系统增强 |
-| v3.8.13 | 2026-07-08 | 小旭二手机（西园路） | 🔧 关键Bug修复 + API信息完整性增强 + 更新日志格式优化 |
-| v3.8.12 | 2026-07-08 | 小旭二手机（西园路） | 📝 添加版本号格式规范到 README.md 和 skill.md，修复 bat 解析问题，生成 skill.docx; 邮件日志系统全面增强 + stable_available Bug修复 |
+| v3.8.89.11 | 2026-07-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 馃敡 hostc WebSocket瀹夊叏鍏抽棴淇(safeCloseWebSocket2鐘舵€佹劅鐭?error浜嬩欢鍚炴帀+patch-package鎸佷箙鍖?+闅ч亾楠岃瘉淇(FastAPI HEAD鏂规硶)+楂樹环鍟嗗搧鏁拌В鏋愪慨澶?鎸夐挳鍏ㄥ眬鍑芥暟鏆撮湶 |
+| v3.8.89.10 | 2026-07-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | FastAPI鏍硅矾鐢辨坊鍔燞EAD鏂规硶鏀寔锛屼慨澶峷erify_url()杩斿洖405瀵艰嚧闅ч亾琚鍒や笉鍙敤; CF闅ч亾DNS瑙ｆ瀽澶辫触鐨勬帓鏌ユ柟妗? 闅ч亾涓嶅啀鍙嶅閲嶅惎锛岄偖浠堕€氱煡姝ｅ父鍙戦€?|
+| v3.8.89.9 | 2026-07-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 绠€鍖栨鍒欒〃杈惧紡锛岀簿纭尮閰峆ython杈撳嚭鏍煎紡; 鏆撮湶鍏ㄥ眬鍑芥暟锛岀‘淇濇寜閽粦瀹氭垚鍔? 楂樹环鍟嗗搧鏁颁粠0鎭㈠鍒?8 |
+| v3.8.89.8 | 2026-07-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 楂樹环鍟嗗搧銆乀XT瀵规瘮銆佽姹傚鐞嗐€佹暟鎹簮銆丆DN鏃ュ織; 淇FastAPI杩佺Щ鍚庣殑鍔熻兘闂 |
+| v3.8.89.6 | 2026-07-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇鐖櫕缁撴灉鍗＄墖鏄剧ず鏍煎紡; 缁熶竴鍗＄墖鏄剧ず鏍峰紡 |
+| v3.8.89.5 | 2026-07-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 娣诲姞鍗曞厓娴嬭瘯; 鏃ュ織绾у埆浼樺寲; subprocess鏇挎崲os.system; 鍓嶇Toast閿欒鎻愮ず |
+| v3.8.89.4 | 2026-07-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇澶氫釜闅愯棌Bug; 鎻愬崌浠ｇ爜璐ㄩ噺 |
+| v3.8.89.3 | 2026-07-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇Flask閬楃暀浠ｇ爜; 娣诲姞jsonify鍏煎灞? 8涓寜閽祴璇?/8閫氳繃 |
+| v3.8.89.2 | 2026-07-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 22涓矾鐢卞叏閮ㄨ浆鎹? FastAPI杩佺Щ100%瀹屾垚 |
+| v3.8.89.1 | 2026-07-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇Excel瀵规瘮璐у彿鐐瑰嚮鏃犲搷搴? 鏇存柊鏂囨。瑙勮寖 |
+| v3.8.89 | 2026-07-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇璇硶閿欒+娓呯悊娴嬭瘯浠ｇ爜+鏇存柊鐗堟湰鍙?|
+| v3.8.88.2 | 2026-07-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | XSS鍏ㄩ潰淇(26澶?; CORS鏀剁揣; URL娉ㄥ叆闃叉姢; 浜嬩欢缁戝畾缂哄け瀵艰嚧鍟嗗搧璇︽儏鍜屽埄娑︽姤琛ㄥ姛鑳藉け鏁?|
+| v3.8.88.1 | 2026-07-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | XSS闃叉姢; 瀹氭椂鍣ㄦ硠婕忎慨澶?|
+| v3.8.88 | 2026-07-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | API璺敱瀹夊叏鍔犲浐; 鍏ㄩ潰淇'Unexpected token <'閿欒 |
+| v3.8.87 | 2026-07-26 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鍩轰簬鍏ュ簱鏃堕棿鎴冲姩鎬佽绠楃浉瀵规椂闂? 涓嶅啀浣跨敤婧怉PI闈欐€佸瓧绗︿覆 |
+| v3.8.86 | 2026-07-26 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鎼滅储鏃?涓〃鏍艰仈鍔ㄨ繃婊? 姣忎釜琛ㄦ牸鐙珛缁熻琛?鍞嚭鎬讳环/鍧囦环/鎵嬬画璐?; 椤堕儴寰界珷瀹炴椂鏇存柊鍖归厤鏁? 鎼滅储缁撴灉鍒嗚〃灞曠ず褰╄壊鏍囩 |
+| v3.8.85 | 2026-07-26 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鍟嗗搧鎼滅储缁熻瀹炴椂璁＄畻浼樺寲 |
+| v3.8.84 | 2026-07-25 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 瀹夊叏婕忔礊淇; 鍛戒护娉ㄥ叆闃叉姢 |
+| v3.8.83 | 2026-07-25 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Bug淇; 浠ｇ爜璐ㄩ噺鎻愬崌 |
+| v3.8.82 | 2026-07-24 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 浠ｇ爜璐ㄩ噺浼樺寲 |
+| v3.8.81 | 2026-07-24 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鍙橀噺鍛藉悕瑙勮寖鍖?oldTime -> old_time); 淇鏃堕棿鎴冲瓧娈?time_stamp) |
+| v3.8.78 | 2026-07-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | skill.docx鑷姩鐢熸垚; 鏂囨。鏇存柊 |
+| v3.8.77 | 2026-07-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Swagger UI闆嗘垚浼樺寲 |
+| v3.8.76 | 2026-07-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | .trae閰嶇疆浼樺寲; skill鏂囨。鏇存柊 |
+| v3.8.75 | 2026-07-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏂板skill鏂囨。; 浠ｇ爜瑙勮寖浼樺寲 |
+| v3.8.73 | 2026-07-19 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | CSP浼樺寲锛宒ocs/鐩綍鍏佽CDN; README.md鏇存柊锛岃ˉ鍏卾3.8.67-v3.8.73鐗堟湰璁板綍; 鏂板/api/changelog API |
+| v3.8.71 | 2026-07-19 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Swagger UI闆嗘垚(鑷姩鐢熸垚swagger.json+HTML UI); Pydantic V2鍗囩骇(field_validator); 鏇存柊requirements.txt |
+| v3.8.70.1 | 2026-07-19 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 缁熶竴鏂囨。璇█瑙勮寖 - 鎵€鏈夋洿鏂版棩蹇楀繀椤讳娇鐢ㄤ腑鏂?|
+| v3.8.70 | 2026-07-19 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 浼佷笟绾х敓浜т紭鍖栵紝38椤规敼杩? 瀹夊叏鍔犲浐 |
+| v3.8.69 | 2026-07-19 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鍏ㄩ潰瀹夊叏瀹¤锛?涓叧閿瓸ug淇 |
+| v3.8.68 | 2026-07-19 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇缂╄繘閿欒; 淇Socket娉勬紡; 浠ｇ爜璐ㄩ噺鎻愬崌 |
+| v3.8.67 | 2026-07-19 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇FastAPI杩佺Щ鍚庣殑Bug |
+| v3.8.66 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鎵嬪姩瑙﹀彂hostc杩涚▼缁堟娴嬭瘯; 淇verify_url()鍙傛暟閿欒; hostc棰戠箒宕╂簝鍦烘櫙涓婥F闅ч亾瀹屽叏鐙珛杩愯 |
+| v3.8.65 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | hostc澶辨晥涓嶅啀褰卞搷Cloudflare Tunnel; 鍚姩鏂癈F闅ч亾鍓嶅厛妫€鏌ュ凡鏈夊彲鐢ㄥ湴鍧€; hostc棰戠箒閲嶅惎鏃禖F鍦板潃淇濇寔涓嶅彉 |
+| v3.8.64 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 闅ч亾鍏变韩寮圭獥鎭㈠鍘熷hostc鏍峰紡+鏂板Cloudflare URL |
+| v3.8.63 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 闅ч亾鍏变韩寮圭獥鍚屾椂鏄剧ずhostc鍜孋loudflare鍙屽叕缃戝湴鍧€ |
+| v3.8.62 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Toast鏄剧ず鍏蜂綋澶嶅埗鐨刄RL鍦板潃 |
+| v3.8.61 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇闅ч亾绠＄悊闈㈡澘澶嶅埗鎸夐挳ID鍐茬獊锛孴oast寮圭獥鎭㈠姝ｅ父 |
+| v3.8.60 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鍏綉鍦板潃澶嶅埗鎸夐挳鏍峰紡缁熶竴锛坆tn-light + 澶嶅埗鏂囧瓧锛?|
+| v3.8.59 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鍏綉鍦板潃澶嶅埗鎸夐挳锛圕loudflare + hostc锛?|
+| v3.8.58 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 閭欢闃查噸澶嶅彂閫佷慨澶?+ skill.docx 鍚屾鏇存柊 |
+| v3.8.57 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鐗堟湰鏇存柊鏃ュ織鍒?README.md; Cloudflare閭欢閫氱煡淇 + 鏃ュ織鏍煎紡缁熶竴 |
+| v3.8.56 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 绉婚櫎 hostc_output.txt锛岀畝鍖栭毀閬撶鐞?|
+| v3.8.55 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Cloudflare 閭欢閫氱煡鏃ュ織缁熶竴 |
+| v3.8.54 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Cloudflare 闄愭祦妫€娴嬩笌鍙嬪ソ鎻愮ず |
+| v3.8.53 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇鍙岄毀閬撳湴鍧€鍐欏叆鍐茬獊 |
+| v3.8.52 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鍙岄毀閬撶嫭绔嬪彂閭欢 + 蹇冭烦鍐欏叆淇 |
+| v3.8.51 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏇存柊README鍜宻kill鏂囨。; tunnel_url.txt鍚屾椂瀛樺偍hostc鍜孋F涓や釜闅ч亾鐨勫湴鍧€ |
+| v3.8.50 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇CF蹇冭烦楠岃瘉鏃ュ織杈撳嚭 |
+| v3.8.49 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 娣诲姞CF蹇冭烦楠岃瘉璇︾粏鏃ュ織 |
+| v3.8.48 | 2026-07-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Tunnel type selector dynamic default value |
+| v3.8.47 | 2026-07-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鍙岄毀閬撲簰涓哄鐢ㄩ€氱煡 + fallback_available 閭欢绫诲瀷 |
+| v3.8.46 | 2026-07-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | CF + hostc 鍙岄毀閬撳苟琛?+ 蹇冭烦楠岃瘉 + 鍒犻櫎 NS 鐩戞帶; Plan A鈫払 淇濆簳 + 鑷姩妫€娴?+ 鍒犻櫎 cloudflare_tunnel 閰嶇疆; Plan A/B 浜岄€変竴 + 鍒犻櫎 NS 鐩戞帶 |
+| v3.8.45 | 2026-07-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | NS鍗囩骇鑷姩鐩戞帶 + Quick Tunnel鑷姩鍗囩骇鍒癗amed Tunnel |
+| v3.8.44 | 2026-07-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Named Tunnel + 鑷畾涔夊煙鍚?+ 鑷姩闄嶇骇鍒?Quick Tunnel |
+| v3.8.43 | 2026-07-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Cloudflare Tunnel 璺ㄥ钩鍙版敮鎸?+ 闅ч亾鍒囨崲浼樺寲 |
+| v3.8.42 | 2026-07-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Flask璁块棶鏃ュ織鏍煎紡浼樺寲 |
+| v3.8.41 | 2026-07-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 蹇冭烦寰幆閲嶅惎鍚庣姸鎬侀噸缃慨澶?|
+| v3.8.40 | 2026-07-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | hostc杩涚▼绔炴€佹潯浠朵慨澶?+ 璋冭瘯鏃ュ織澧炲己 |
+| v3.8.39 | 2026-07-12 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鈿?闅ч亾蹇冭烦涓庣ǔ瀹氭€ч獙璇佸姞閫熶紭鍖?- 蹇冭烦闂撮殧60鈫?0绉? 澶辨晥闃堝€?鈫?娆? 绋冲畾鎬ч獙璇?鈫?娆? 绌虹獥鏈熶粠3-5鍒嗛挓缂╃煭鑷?-1.5鍒嗛挓 |
+| v3.8.38 | 2026-07-12 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 绔彛8888鍗犵敤绔炴€佹潯浠朵慨澶?|
+| v3.8.37 | 2026-07-12 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | /api/readme-sections 500 閿欒淇 |
+| v3.8.36 | 2026-07-12 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | run.sh 鍑芥暟瀹氫箟椤哄簭淇 + pre_launch 鍑芥暟鍖栭噸鏋?|
+| v3.8.35 | 2026-07-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏍稿績鑼冨紡鏂囨。琛ュ叏锛?椤癸級 |
+| v3.8.34 | 2026-07-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 绉诲姩绔€傞厤鑼冨紡鏂囨。鍖?|
+| v3.8.33 | 2026-07-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | hostc CDN闀滃儚婧愪慨姝?+ bat/sh闀滃儚鍒楄〃缁熶竴 |
+| v3.8.32 | 2026-07-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 闅ч亾瀹堟姢浜屾楠岃瘉+鎸囨暟閫€閬?蹇冭烦闃堝€间紭鍖?|
+| v3.8.31 | 2026-07-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 蹇冭烦閫昏緫5椤逛紭鍖?瀹介檺鏈熼噸鏋?闅ч亾閲嶅惎淇+鐗堟湰鍙风粺涓€浠嶳EADME鑾峰彇 |
+| v3.8.30 | 2026-07-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 闅ч亾閲嶅惎閫昏緫閲嶆瀯 - 鍚堝苟鍙岃矾寰?瀹介檺鏈熸満鍒?|
+| v3.8.29 | 2026-07-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | temp涓存椂鏂囦欢娉勬紡淇 + Python渚ц嚜鍔ㄦ竻鐞?|
+| v3.8.28 | 2026-07-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | hostc绛夊緟URL瓒呮椂浠?20绉掗檷鑷?0绉? 蹇冭烦瀹堟姢鍗虫椂鍚姩 + tunnel鏉冨▉婧愬畧鎶ょ粺涓€ |
+| v3.8.27 | 2026-07-10 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 闅ч亾閲嶅惎姝诲惊鐜慨澶?- tunnel_need_restart閲嶇疆+hostc鍚姩绛夊緟URL |
+| v3.8.26 | 2026-07-10 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 闅ч亾鏃RL澶嶇敤Bug淇 - auto_start_tunnel澧炲姞hostc杩涚▼瀛樻椿妫€娴?|
+| v3.8.25 | 2026-07-10 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | pip渚濊禆瀹夎鏅鸿兘璺宠繃 - main.py --check-deps + run.bat/run.sh浼樺寲 - 鍚姩鍔犻€?0绉掆啋0.1绉?|
+| v3.8.24 | 2026-07-10 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | hostc閫€鍑鸿嚜鍔ㄩ噸鍚?- read_output/_wait_and_notify妫€娴嬮€€鍑哄悗绔嬪嵆鏍囪閲嶅惎锛宺estart_tunnel绔嬪嵆鍝嶅簲; 鍗虫椂閭欢閫氱煡 - auto_start_tunnel鍚庡彴绾跨▼楠岃瘉+鍙戦偖浠讹紝涓嶅啀绛夊績璺?... |
+| v3.8.23 | 2026-07-10 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Web鏈嶅姟绉掔骇鍚姩 + 闅ч亾闈為樆濉炰紭鍖?+ hostc鏈湴鍖?+ CDN杞瀹夎 + dist浼樺寲 |
+| v3.8.21 | 2026-07-10 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Node.js渚濊禆鍚堝苟 + API鑼冨紡鏂囨。瀹屽杽 + 瀹夊叏瑙勮寖 |
+| v3.8.20 | 2026-07-10 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鍗虫椂閭欢閫氱煡+鍓嶇鐘舵€佷慨澶?楠岃瘉鍔犻€? 鍘婚櫎棰勫惎鍔ㄦ蹇垫敼涓虹洿鎺ュ惎鍔? changelog琛ュ叏 + 鍓嶇浠ｇ爜鍧楁覆鏌撴牸寮忕粺涓€; 馃摟 闅ч亾鍗虫椂閭欢閫氱煡 + 鍓嶇鐘舵€佷慨澶?+ 楠岃瘉鍔犻€?|
+| v3.8.18 | 2026-07-10 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏂囨。鍚屾 - README/skill.md/skill.docx 鏇存柊auto_start_tunnel涓嶉樆濉炶鑼?+ PY-STD-TUNNEL-003; auto_start_tunnel涓嶅啀闃诲绛夊緟 - hostc鍦ㄨ窇灏辩洿鎺ヨ繑... |
+| v3.8.17 | 2026-07-10 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | Tunnel startup optimization - hostc pre-start + Python smart wait |
+| v3.8.16 | 2026-07-09 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | macOS鏃堕棿鎴矪ug淇 + 璺ㄥ钩鍙版绉掔骇鏃堕棿鎴崇粺涓€ |
+| v3.8.15 | 2026-07-09 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏂囨。瀹屾暣鏇存柊: 鍏ㄥ眬鏃堕棿鎴?00%瑕嗙洊瑙勮寖; 缁堟瀬鐗? 鎺у埗鍙?鏂囦欢 100% 鏃堕棿鎴冲叏瑕嗙洊; 鏈€缁堢増: web_output.log 100%鏃堕棿鎴宠鐩? 缁堟瀬鐗? 鍏ㄥ眬鏃堕棿鎴宠鐩栨墍鏈夋棩蹇楄緭鍑? 澧炲己: 鍏ㄥ眬鏃ュ織鏃堕棿鎴宠嚜鍔ㄥ寲绯荤粺 绛?椤?|
+| v3.8.14 | 2026-07-08 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | README.md 涓夋寮忕粨鏋勮鑼冭ˉ榻?+ skill.docx 閲嶆柊鐢熸垚; 鑷村懡姝婚攣淇 + 閭欢UI鍗囩骇 + 鏃ュ織绯荤粺澧炲己 |
+| v3.8.13 | 2026-07-08 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 馃敡 鍏抽敭Bug淇 + API淇℃伅瀹屾暣鎬у寮?+ 鏇存柊鏃ュ織鏍煎紡浼樺寲 |
+| v3.8.12 | 2026-07-08 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 馃摑 娣诲姞鐗堟湰鍙锋牸寮忚鑼冨埌 README.md 鍜?skill.md锛屼慨澶?bat 瑙ｆ瀽闂锛岀敓鎴?skill.docx; 閭欢鏃ュ織绯荤粺鍏ㄩ潰澧炲己 + stable_available Bug淇 |
 
 ---
 
-### 📚 早期版本历史记录 (v1.4.2 - v2.1.7)
+### 馃摎 鏃╂湡鐗堟湰鍘嗗彶璁板綍 (v1.4.2 - v2.1.7)
 
-| 版本 | 类型 | 作者 | 变更内容 |
+| 鐗堟湰 | 绫诲瀷 | 浣滆€?| 鍙樻洿鍐呭 |
 |------|------|------|---------|
-| v2.1.7 | 历史版本 | 小旭二手机（西园路） | 添加多重超时保护和重试机制，防止爬虫卡死 |
-| v2.1.6 | 历史版本 | 小旭二手机（西园路） | 修复弹窗关闭超时问题; 添加时间统计优化性能 |
-| v2.1.5 | 历史版本 | 小旭二手机（西园路） | 修复高价商品筛选逻辑; 解决对比结果不准确问题 |
-| v2.1.3 | 历史版本 | 小旭二手机（西园路） | 优化JSON文件对比记录机制; 支持多条对比记录 |
-| v2.1.2 | 历史版本 | 小旭二手机（西园路） | 优化JSON文件对比功能; 新增缓存文件机制 |
-| v2.1.1 | 历史版本 | 小旭二手机（西园路） | 修复跨平台浏览器启动问题; 删除调试代码 |
-| v2.1.0 | 历史版本 | 小旭二手机（西园路） | 新增调试功能; 优化开发体验 |
-| v2.0.9 | 历史版本 | 小旭二手机（西园路） | 新增当天JSON文件对比功能 |
-| v2.0.8 | 历史版本 | 小旭二手机（西园路） | 修复跨平台浏览器启动问题 |
-| v2.0.7 | 历史版本 | 小旭二手机（西园路） | 优化高价商品筛选; 修复浏览器启动 |
-| v2.0.6 | 历史版本 | 小旭二手机（西园路） | 优化数据变化分析代码; 精简逻辑 |
-| v2.0.5 | 历史版本 | 小旭二手机（西园路） | 更新Cookie过期时间 |
-| v2.0.4 | 历史版本 | 小旭二手机（西园路） | 新增Cookie自动更新功能; 优化Excel文件检查 |
-| v2.0.3 | 历史版本 | 小旭二手机（西园路） | 代码重构和优化 |
-| v2.0.2 | 历史版本 | 小旭二手机（西园路） | 新增高价商品信息写入JSON功能 |
-| v2.0.1 | 历史版本 | 小旭二手机（西园路） | 优化高价商品筛选逻辑 |
-| v2.0.0 | 历史版本 | 小旭二手机（西园路） | 新增货号对比高价商品筛选功能 |
-| v1.9.0 | 历史版本 | 小旭二手机（西园路） | 添加高价商品筛选功能 |
-| v1.8.0 | 历史版本 | 小旭二手机（西园路） | 添加运行时间显示和动态调整功能 |
-| v1.7.0 | 历史版本 | 小旭二手机（西园路） | 滚动参数可配置化 |
-| v1.6.2 | 历史版本 | 小旭二手机（西园路） | 修复页面加载死机问题 |
-| v1.6.1 | 历史版本 | 小旭二手机（西园路） | 修复滚动死循环问题 |
-| v1.6.0 | 历史版本 | 小旭二手机（西园路） | 完成所有高优先级优化 |
-| v1.5.0 | 历史版本 | 小旭二手机（西园路） | 简化JSON数据结构为5个核心字段 |
-| v1.4.3 | 历史版本 | 小旭二手机（西园路） | 优化页面加载逻辑，减少等待时间 |
-| v1.4.2 | 历史版本 | 小旭二手机（西园路） | 完成跨系统环境测试和优化; 优化商品去重逻辑 |
+| v2.1.7 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 娣诲姞澶氶噸瓒呮椂淇濇姢鍜岄噸璇曟満鍒讹紝闃叉鐖櫕鍗℃ |
+| v2.1.6 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇寮圭獥鍏抽棴瓒呮椂闂; 娣诲姞鏃堕棿缁熻浼樺寲鎬ц兘 |
+| v2.1.5 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇楂樹环鍟嗗搧绛涢€夐€昏緫; 瑙ｅ喅瀵规瘮缁撴灉涓嶅噯纭棶棰?|
+| v2.1.3 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 浼樺寲JSON鏂囦欢瀵规瘮璁板綍鏈哄埗; 鏀寔澶氭潯瀵规瘮璁板綍 |
+| v2.1.2 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 浼樺寲JSON鏂囦欢瀵规瘮鍔熻兘; 鏂板缂撳瓨鏂囦欢鏈哄埗 |
+| v2.1.1 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇璺ㄥ钩鍙版祻瑙堝櫒鍚姩闂; 鍒犻櫎璋冭瘯浠ｇ爜 |
+| v2.1.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏂板璋冭瘯鍔熻兘; 浼樺寲寮€鍙戜綋楠?|
+| v2.0.9 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏂板褰撳ぉJSON鏂囦欢瀵规瘮鍔熻兘 |
+| v2.0.8 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇璺ㄥ钩鍙版祻瑙堝櫒鍚姩闂 |
+| v2.0.7 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 浼樺寲楂樹环鍟嗗搧绛涢€? 淇娴忚鍣ㄥ惎鍔?|
+| v2.0.6 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 浼樺寲鏁版嵁鍙樺寲鍒嗘瀽浠ｇ爜; 绮剧畝閫昏緫 |
+| v2.0.5 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏇存柊Cookie杩囨湡鏃堕棿 |
+| v2.0.4 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏂板Cookie鑷姩鏇存柊鍔熻兘; 浼樺寲Excel鏂囦欢妫€鏌?|
+| v2.0.3 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 浠ｇ爜閲嶆瀯鍜屼紭鍖?|
+| v2.0.2 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏂板楂樹环鍟嗗搧淇℃伅鍐欏叆JSON鍔熻兘 |
+| v2.0.1 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 浼樺寲楂樹环鍟嗗搧绛涢€夐€昏緫 |
+| v2.0.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 鏂板璐у彿瀵规瘮楂樹环鍟嗗搧绛涢€夊姛鑳?|
+| v1.9.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 娣诲姞楂樹环鍟嗗搧绛涢€夊姛鑳?|
+| v1.8.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 娣诲姞杩愯鏃堕棿鏄剧ず鍜屽姩鎬佽皟鏁村姛鑳?|
+| v1.7.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 婊氬姩鍙傛暟鍙厤缃寲 |
+| v1.6.2 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇椤甸潰鍔犺浇姝绘満闂 |
+| v1.6.1 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 淇婊氬姩姝诲惊鐜棶棰?|
+| v1.6.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 瀹屾垚鎵€鏈夐珮浼樺厛绾т紭鍖?|
+| v1.5.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 绠€鍖朖SON鏁版嵁缁撴瀯涓?涓牳蹇冨瓧娈?|
+| v1.4.3 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 浼樺寲椤甸潰鍔犺浇閫昏緫锛屽噺灏戠瓑寰呮椂闂?|
+| v1.4.2 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級 | 瀹屾垚璺ㄧ郴缁熺幆澧冩祴璇曞拰浼樺寲; 浼樺寲鍟嗗搧鍘婚噸閫昏緫 |
 
 ---
-| v3.8.11 | 2026-07-05 | 小旭二手机（西园路）| 完整历史记录恢复与文档更新 |
-| v3.8.10 | 2026-07-05 | 小旭二手机（西园路）| 更新文档：README.md + skill.md + skill.docx 同步代码规范; (2026-07-05) - 🔧 关键修复：缩进错误导致服务启动失败 + 文档同步更新 |
-| v3.8.9 | 2026-07-05 | 小旭二手机（西园路）| (2026-07-05) - 🔒 强制URL去重机制（同一地址30分钟内只发1次邮件） |
-| v3.8.8 | 2026-07-05 | 小旭二手机（西园路）| (2026-07-05) - 🚀 公网地址可用即自动发邮件（零延迟通知优化） |
-| v3.8.7 | 2026-07-05 | 小旭二手机（西园路）| (2026-07-05) - 📄 更新skill.docx文档（线程安全URL去重机制修复）; 线程安全URL去重机制 + 重新生成skill.docx (166.6KB) |
-| v3.8.6 | 2026-07-05 | 小旭二手机（西园路）| 内容改为标准API格式（- **分类** + 子条目）; + 重新生成skill.docx; 隧道重启邮件通知完善 + 文档同步更新 |
-| v3.8.5 | 2026-07-05 | 小旭二手机（西园路）| 生成符合规范的 skill.docx; PowerShell 兼容性重大修复; skill.md新增目录(TOC), skill.docx改用pypandoc_binary生成(修复代码块标题误识别), skill.pdf改用pupp... |
-| v3.8.4 | 2026-07-04 | 小旭二手机（西园路）| 修复从非项目目录运行启动脚本时Web服务启动失败Bug |
-| v3.8.3 | 2026-07-04 | 小旭二手机（西园路）| 修复'最新更新'区域空白Bug + Markdown标题格式规范 |
-| v3.8.2 | 2026-07-04 | 小旭二手机（西园路）| 修复web_output.log启动日志被覆盖Bug |
-| v3.8.1 | 2026-07-04 | 小旭二手机（西园路）| skill.md全面补全(main.py独立函数§2.15 + index.html前端61个函数§2.16), API端点修正, README去重, skill.docx重新生成; skill.md全面补全(项目所有内容写入), A... |
-| v3.8.0 | 2026-07-04 | 小旭二手机（西园路）| 文档系统全面升级 |
-| v3.7.9 | 2026-07-04 | 小旭二手机（西园路）| 删除generate_skill_docx.py + 重新生成skill.docx; Hostc隧道稳定性终极优化 - 解决频繁重启问题 |
-| v3.7.8 | 2026-07-04 | 小旭二手机（西园路）| 隧道快速恢复机制-3秒级响应+邮件去重; 修复邮件重复发送+Python日志写入模式; run.sh同步修复-括号格式+运行阶段日志隔离; 修复call:log括号冲突+运行阶段日志隔离; 修复双写机制文件锁冲突-(echo)>>fi... |
-| v3.7.7 | 2026-06-28 | 小旭二手机（西园路）| 修复Excel与JSON对比按钮状态不复位问题，更新skill.md/skill.docx按钮状态管理规范 |
-| v3.7.6 | 2026-06-27 | 小旭二手机（西园路）| 修复pip.conf trusted-host重复/提取错误、整数比较空值、macOS du -sb兼容性、更新skill.md/README.md/skill.docx; 手机端按钮4×2居中布局(max-width:600px)不... |
-| v3.7.5 | 2026-06-26 | 小旭二手机（西园路）| 修复利润趋势图联动、Excel日期转换、Y轴动态缩放、代码损坏; 并完善文档 |
-| v3.7.4 | 2026-06-18 | 小旭二手机（西园路）| 利润报表汇总行点击展开位置修复 + 聚合级别修正 + 跨系统/移动端确认 + skill同步 |
-| v3.7.3 | 2026-06-18 | 小旭二手机（西园路）| DOMContentLoaded闭合修复 + 按钮样式统一 + skill/docx同步 |
-| v3.7.2 | 2026-06-18 | 小旭二手机（西园路）| 修复index.html第5197行标签闭合 + skill.md/docx规范更新 |
-| v3.7.1 | 2026-06-18 | 小旭二手机（西园路）| 跨系统硬编码彻底消除 + V3.5.0移动端规范复查 |
-| v3.6.0 | 2026-07-05 | 小旭二手机（西园路）| + v3.5.0 + README格式规范）; 编码规范和v3.5.0移动端规范; README/skill.md/skill.docx 三文件同步更新; 更新日志详情展示 + skill.docx字体修复; 更新日志详情展示 - c... |
-| v3.5.8 | 2026-06-11 | 小旭二手机（西园路）| update frontend version and changelog to 3.5.8; add skill.md/skill.docx code standards, restore dist folder, update R... |
-| v3.5.7 | 2026-06-07 | 小旭二手机（西园路）| 前端添加最新更新模块，版本号同步更新; 代码重构优化，跨系统和移动端适配完整性确认 |
-| v3.5.6 | 2026-06-06 | 小旭二手机（西园路）| 完善移动端适配功能和表格样式优化 |
-| v3.5.4 | 2026-06-06 | 小旭二手机（西园路）| 每日利润报表优化：日期格式统一、项目字段、表头固定、错误处理增强 |
-| v3.5.3 | 2026-06-06 | 小旭二手机（西园路）| 版本日志 - 汇总视图与明细联动功能 |
-| v3.5.2 | 2026-06-05 | 小旭二手机（西园路）| 版本日志; 前端每日利润报表表格渲染优化 - 渲染到总计行、货币符号、单位显示; 每日利润报表功能完善，前端表格展示优化; 每日利润报表读取优化，前端展示report_text |
-| v3.4.37 | 2026-06-05 | 小旭二手机（西园路）| 优化临时文件清理机制，修复bat脚本启动时误杀进程问题 |
-| v3.4.34 | 2026-06-04 | 小旭二手机（西园路）| 修复文件清理 API JSON 解析错误 |
-| v3.4.33 | 2026-06-03 | 小旭二手机（西园路）| 代码优化和跨系统支持增强 |
-| v3.4.32 | 2026-06-03 | 小旭二手机（西园路）| 修复镜像源显示问题并统一run.sh逻辑; 修复run.bat镜像源测试语法错误; 全面跨系统支持优化 |
-| v3.4.31 | 2026-06-01 | 小旭二手机（西园路）| 修复文件清理工具获取文件大小错误 |
-| v3.4.30 | 2026-05-30 | 小旭二手机（西园路）| 修复清理工具 API 空目录检测问题 |
-| v3.4.29 | 2026-05-30 | 小旭二手机（西园路）| 修复 run.bat 版本号解析失败问题 |
-| v3.4.28 | 2026-05-30 | 小旭二手机（西园路）| 优化Flask 404处理和邮件冷却期补发机制 |
-| v3.4.27 | 2026-05-29 | 小旭二手机（西园路）| 修复文件清理工具'删除所有文件和文件夹'功能报错 |
-| v3.4.26 | 2026-05-29 | 小旭二手机（西园路）| 重构统一异常处理系统 + 增强 tunnel_status API URL 验证 |
-| v3.4.25 | 2026-05-29 | 小旭二手机（西园路）| Excel读取改为复制到临时文件，彻底解决共享违规 |
-| v3.4.24 | 2026-05-29 | 小旭二手机（西园路）| 修复 Excel 共享违规 - 所有读取改为 read_only=True |
-| v3.4.23 | 2026-05-29 | 小旭二手机（西园路）| 修复 Excel 文件读取时的 Windows 共享违规问题 |
-| v3.4.22 | 2026-05-29 | 小旭二手机（西园路）| 优化心跳检测间隔从60秒到5秒，提高隧道故障检测速度 |
-| v3.4.21 | 2026-05-29 | 小旭二手机（西园路）| 确保 tunnel_url.txt 持久一致 |
-| v3.4.20 | 2026-05-29 | 小旭二手机（西园路）| 优化 tunnel_url.txt 写入格式 |
-| v3.4.19 | 2026-05-29 | 小旭二手机（西园路）| 同步写入 tunnel_url.txt |
-| v3.4.18 | 2026-05-29 | 小旭二手机（西园路）| 完全移除 tunnel_url 全局变量的更新逻辑 |
-| v3.4.17 | 2026-05-29 | 小旭二手机（西园路）| 统一所有模块从 web_output.log 获取公网地址 |
-| v3.4.16 | 2026-05-29 | 小旭二手机（西园路）| 修复 old_url 未定义错误 |
-| v3.4.15 | 2026-05-29 | 小旭二手机（西园路）| 简化启动流程，移除冗余等待逻辑 |
-| v3.4.14 | 2026-05-29 | 小旭二手机（西园路）| read_output 改为读取 hostc stdout 输出 |
-| v3.4.13 | 2026-05-29 | 小旭二手机（西园路）| 完全移除 tunnel_url.txt 读取逻辑，全部从 web_output.log |
-| v3.4.12 | 2026-05-29 | 小旭二手机（西园路）| 修复等待 URL 逻辑，直接检查 web_output.log |
-| v3.4.11 | 2026-05-29 | 小旭二手机（西园路）| 大幅简化 tunnel 重启逻辑 |
-| v3.4.10 | 2026-05-29 | 小旭二手机（西园路）| 优化 hostc 进程稳定性，URL 无效时等待 60 秒再重启 |
-| v3.4.9 | 2026-05-29 | 小旭二手机（西园路）| 统一使用 web_output.log 作为公网地址唯一来源 |
-| v3.4.8 | 2026-05-29 | 小旭二手机（西园路）| 统一公网地址来源，全部从 web_output.log 获取; 简化 auto_start_tunnel 逻辑，避免重复检测 |
-| v3.4.7 | 2026-05-29 | 小旭二手机（西园路）| 更新 README; 修复 tunnel_url.txt 为空时误杀正在启动的 hostc 进程 |
-| v3.4.6 | 2026-05-29 | 小旭二手机（西园路）| 修复 tunnel_url.txt 为空时无法重启问题 |
-| v3.4.5 | 2026-05-29 | 小旭二手机（西园路）| 修复 tunnel_url.txt 为空时重启循环问题 |
-| v3.4.4 | 2026-05-29 | 小旭二手机（西园路）| 优化 tunnel_url.txt 为空时立即重启，不等待20秒超时 |
-| v3.4.3 | 2026-05-29 | 小旭二手机（西园路）| 修复 tunnel_url.txt 为空时不重启、守护线程重复启动日志刷屏、URL 无效时不返回无效地址 |
-| v3.4.2 | 2026-05-29 | 小旭二手机（西园路）| 前端展示URL可用性验证 + 心跳检测日志优化 |
-| v3.4.1 | 2026-05-29 | 小旭二手机（西园路）| 修复 web_output.log 日志同步问题 |
-| v3.4.0 | 2026-05-29 | 小旭二手机（西园路）| 修复隧道状态显示和日志同步问题 |
-| v3.3.9 | 2026-05-28 | 小旭二手机（西园路）| 修复 tunnel_url 和前端显示不一致问题 |
-| v3.3.8 | 2026-05-28 | 小旭二手机（西园路）| 拆分版本，优化更新日志格式 |
-| v3.3.7 | 2026-05-28 | 小旭二手机（西园路）| 前端隧道状态轮询间隔从5秒改为2秒，更快同步URL变化; 新增监控线程，当tunnel_url.txt变化时自动同步web_output.log; 移除不必要的定期清理逻辑，tunnel_url.txt由hostc自动管理; 隧道日志... |
-| v3.3.6 | 2026-05-28 | 小旭二手机（西园路）| 优化进程清理逻辑，避免无效清理导致的失败统计; 全面精简README更新日志，所有版本控制在3-5个更新点; 优化README更新日志格式，每个版本3-5个更新点 |
-| v3.3.5 | 2026-05-28 | 小旭二手机（西园路）| 统一进程检测逻辑确保跨系统兼容; 添加进程清理统计和自动清空日志功能; 修复日志文件过大和进程异常问题; 修复多进程竞争和文件写入问题; 修复URL重复逻辑和更新跨系统兼容性说明 等6项 |
-| v3.3.4 | 2026-05-24 | 小旭二手机（西园路）| 隧道日志输出优化和进程清理改进 |
-| v3.3.3 | 2026-05-23 | 小旭二手机（西园路）| 修复隧道进程泄漏和邮件通知问题 |
-| v3.3.1 | 2026-05-22 | 小旭二手机（西园路）| 修复 Web 界面运行爬虫时 Input/output error 问题 |
-| v3.3.0 | 2026-05-22 | 小旭二手机（西园路）| 自动配置阿里云pip镜像加速 |
-| v3.2.9 | 2026-05-22 | 小旭二手机（西园路）| 修复隧道频繁重启和邮件发送问题 |
-| v3.2.8 | 2026-05-22 | 小旭二手机（西园路）| Flask启动时邮件通知增强 |
-| v3.2.7 | 2026-05-22 | 小旭二手机（西园路）| 新增公网地址变更邮件通知功能; 前端代码优化 - 简化DOM操作、合并重复函数、优化事件绑定 |
-| v3.2.6 | 2026-05-21 | 小旭二手机（西园路）| 前端JavaScript优化 - 移除冗余日志，简化代码结构; 代码质量优化 |
-| v3.2.5 | 2026-05-21 | 小旭二手机（西园路）| 简化启动流程，移除隧道选择菜单 |
-| v3.2.4 | 2026-05-29 | 小旭二手机（西园路）| 前端展示URL可用性验证 + 心跳检测日志优化; 移除 Cloudflare Tunnel 功能，简化隧道服务 |
-| v3.2.3 | 2026-05-21 | 小旭二手机（西园路）| Cloudflare Tunnel 配置功能 |
-| v3.2.2 | 2026-05-21 | 小旭二手机（西园路）| 修复隧道自动重连死循环问题，实现无感切换到新的公网 URL |
-| v3.2.1 | 2026-05-20 | 小旭二手机（西园路）| 守护线程重启时保持 URL 一致 |
-| v3.2.0 | 2026-05-20 | 小旭二手机（西园路）| 外部启动隧道监控机制 |
-| v3.1.9 | 2026-05-20 | 小旭二手机（西园路）| 优化前端隧道共享按钮，优先复用tunnel_url.txt中的已有地址 |
-| v3.1.8 | 2026-05-20 | 小旭二手机（西园路）| 增强隧道保持在线机制; 修复面板冲突问题 - 所有功能采用独立容器; 修复Excel对比显示所有价格的多余货号 |
-| v3.1.7 | 2026-05-20 | 小旭二手机（西园路）| 货号对比重复检测优化 |
-| v3.1.5 | 2026-05-18 | 小旭二手机（西园路）| 隧道自动重连机制 |
-| v3.1.3 | 2026-05-18 | 小旭二手机（西园路）| 跨系统兼容性增强 - 统一脚本逻辑、自动创建虚拟环境、完善进程清理 |
-| v3.1.2 | 2026-05-18 | 小旭二手机（西园路）| 天气看板预加载优化; 鍓嶇鐗堟湰鍙蜂粠API瀹炴椂鑾峰彇; 淇闅ч亾鍚姩鍚庡叕缃戝湴鍧€涓嶆樉绀虹殑闂; 浼樺寲鍚姩椤哄簭銆佸ぉ姘旂湅鏉挎噿鍔犺浇銆侀潤鎬佽祫婧怗zip鍘嬬缉; update |
-| v3.1.1 | 2026-05-20 | 小旭二手机（西园路）| 修复隧道复制按钮失效问题; 前端版本号自动跟随main.py中VERSION变量 |
-| v3.0.8 | 2026-05-17 | 小旭二手机（西园路）| 隧道共享功能增强 - 可点击链接、一键复制、启动预下载hostc |
-| v3.0.7 | 2026-05-17 | 小旭二手机（西园路）| 优化隧道共享功能 + 跨平台兼容性增强 |
-| v3.0.6 | 2026-05-06 | 小旭二手机（西园路）| 集成天气时钟看板，独立区块展示，完整响应式适配 |
-| v3.0.5 | 2026-05-01 | 小旭二手机（西园路）| 修复Excel与JSON对比功能中新增高价商品判定逻辑错误 |
-| v3.0.4 | 2026-05-01 | 小旭二手机（西园路）| Excel文件路径去重和货号读取顺序优化 |
-| v3.0.3 | 2026-05-01 | 小旭二手机（西园路）| 移动端导航栏固定置顶优化 |
-| v3.0.2 | 2026-05-01 | 小旭二手机（西园路）| 移动端响应式适配全面优化 |
-| v3.0.1 | 2026-04-30 | 小旭二手机（西园路）| 版本更新日志; Excel多文件读取优化 |
-| v3.0.0 | 2026-04-30 | 小旭二手机（西园路）| Cookie管理优化和跨平台兼容性提升 |
-| v2.9.6 | 2026-04-30 | 小旭二手机（西园路）| 启动脚本优化和功能改进 |
-| v2.9.5 | 2026-04-30 | 小旭二手机（西园路）| ，添加完整更新日志; 移动端响应式适配优化 |
-| v2.9.4 | 2026-04-29 | 小旭二手机（西园路）| 新增互动式货号对比功能 |
-| v2.9.3 | 2026-04-29 | 小旭二手机（西园路）| Cookie更新前自动清空机制 |
-| v2.9.2 | 2026-04-29 | 小旭二手机（西园路）| 优化商品列表联动滚动功能 |
-| v2.9.1 | 2026-04-29 | 小旭二手机（西园路）| 优化前端时间显示功能，减少DOM重渲染开销 |
-| v2.9.0 | 2026-04-29 | 小旭二手机（西园路）| 添加前端时间显示功能并优化JavaScript代码 |
-| v2.8.0 | 2026-04-29 | 小旭二手机（西园路）| 改为04-29，v2.7.1改为04-27，修复v2.5.21重复问题; 前端展示优化：Excel与JSON对比结果直接展示在前端页面 |
-| v2.7.2 | 2026-04-29 | 小旭二手机（西园路）| 日志：修复/api/clean/list文件显示格式 |
-| v2.7.1 | 2026-04-28 | 小旭二手机（西园路）| 修复商品详情页图片加载问题 |
-| v2.7.0 | 2026-04-28 | 小旭二手机（西园路）| 添加特殊文件名保护（.DS_Store, Thumbs.db等）; 增强清理函数保护机制，添加更多保护的文件类型和文件夹; 集成文件清理功能，优化代码逻辑 |
-| v2.6.1 | 2026-04-28 | 小旭二手机（西园路）| 添加自动数据库存储功能，运行爬虫时自动保存商品数据到MySQL; 货号对比卡片样式优化，将API返回结果改为美观的卡片式展示 |
-| v2.6.0 | 2026-06-26 | 小旭二手机（西园路）| (2026-06-26)版本条目; v2.8.0版本日期顺序，确保所有版本号和日期按时间递增排列; Web端新增货号对比API和TXT对比按钮; 菜单选项5根据系统自动启动Web服务; 菜单新增选项5启动Web服务 等9项 |
-| v2.5.22 | 2026-04-19 | 小旭二手机（西园路）| 移除闲鱼平台手续费60元封顶限制，改为按单机售价的1.6%计算 |
-| v2.5.21 | 2026-04-26 | 小旭二手机（西园路）| 支持多平台Excel路径配置，自动轮询检测; 重构数据获取逻辑，直接通过API获取所有商品数据; 重构数据获取逻辑，直接通过API获取商品数据 |
-| v2.5.20 | 2026-04-15 | 小旭二手机（西园路）| 修复Windows浏览器检测，使用dir+findstr替代通配符 |
-| v2.5.19 | 2026-04-15 | 小旭二手机（西园路）| 优化macOS浏览器检测，支持Google Chrome for Testing.app |
-| v2.5.18 | 2026-04-15 | 小旭二手机（西园路）| 优化浏览器检测，避免重复下载Playwright浏览器; 新增环境检测功能 |
-| v2.5.17 | 2026-04-13 | 小旭二手机（西园路）| 优化拿货价提取性能和代码结构 |
-| v2.5.16 | 2026-04-12 | 小旭二手机（西园路）| 优化CookieValidator类，精炼代码逻辑 |
-| v2.5.14 | 2026-04-12 | 小旭二手机（西园路）| 修复路径错误，完善PathManager统一管理 |
-| v2.5.13 | 2026-04-29 | 小旭二手机（西园路）| 22版本重复和日期混乱问题，重新整理所有版本号确保连续性和时间顺序正确; 新增PathManager类，统一管理所有跨系统路径 |
-| v2.5.12 | 2026-04-12 | 小旭二手机（西园路）| 优化系统检测逻辑，统一跨平台浏览器配置 |
-| v2.5.10 | 2026-04-12 | 小旭二手机（西园路）| 修复导入错误，确保Excel对比功能正常运行 |
-| v2.5.9 | 2026-04-11 | 小旭二手机（西园路）| 优化代码逻辑，使用列表推导式简化文件查找代码 |
-| v2.5.8 | 2026-04-11 | 小旭二手机（西园路）| 修复excel_file为None的错误，解决os.path.exists的TypeError |
-| v2.5.7 | 2026-04-11 | 小旭二手机（西园路）| 修复价格比较错误，解决parse_price返回None的TypeError |
-| v2.5.6 | 2026-04-11 | 小旭二手机（西园路）| 优化Cookie更新完成后的延迟，提升响应速度 |
-| v2.5.5 | 2026-04-11 | 小旭二手机（西园路）| 移除Cookie更新后的回车确认，简化操作流程 |
-| v2.5.4 | 2026-04-11 | 小旭二手机（西园路）| 实现真正的自动关闭浏览器，检测登录后自动关闭 |
-| v2.5.3 | 2026-04-11 | 小旭二手机（西园路）| 优化Cookie更新提示信息，明确自动关闭浏览器 |
-| v2.5.2 | 2026-04-11 | 小旭二手机（西园路）| 简化Cookie更新流程，参考v2.1.1版本实现 |
-| v2.5.0 | 2026-04-11 | 小旭二手机（西园路）| 优化商品信息提取逻辑，精简代码结构 |
-| v2.4.7 | 2026-04-11 | 小旭二手机（西园路）| 新增独立Cookie自动更新功能，优化浏览器启动流程关闭 |
-| v2.4.6 | 2026-04-11 | 小旭二手机（西园路）| 完善备注提取功能，提取所有有备注的商品信息 |
-| v2.4.5 | 2026-04-11 | 小旭二手机（西园路）| 修复备注提取错误，支持无标签备注信息提取 |
-| v2.4.4 | 2026-04-11 | 小旭二手机（西园路）| 修复价格提取错误，支持千分制价格格式 |
-| v2.4.1 | 2026-04-11 | 小旭二手机（西园路）| 新增平均每个设备售出均价统计 |
-| v2.4.0 | 2026-04-11 | 小旭二手机（西园路）| 简化JSON文件布局，优化价格显示为千分制 |
-| v2.3.6 | 2026-04-11 | 小旭二手机（西园路）| 增强HTML内容搜索，完善拿货价提取逻辑 |
-| v2.3.5 | 2026-04-11 | 小旭二手机（西园路）| 增强成本价识别，添加智能价格提取逻辑 |
-| v2.3.4 | 2026-04-11 | 小旭二手机（西园路）| 新增拿货价提取功能，修复设备成本累计和设备均价为0的问题 |
-| v2.3.3 | 2026-04-11 | 小旭二手机（西园路）| 新增设备均价，优化闲鱼平台手续费计算（单机最高60元封顶） |
-| v2.3.2 | 2026-04-11 | 小旭二手机（西园路）| 新增累计统计功能，添加预计售出价格、设备成本和平台手续费累计 |
-| v2.3.1 | 2026-04-11 | 小旭二手机（西园路）| 保留Cookie更新选项，仅支持自动更新功能 |
-| v2.3.0 | 2026-04-11 | 小旭二手机（西园路）| 功能整合优化，合并菜单选项并精炼代码逻辑 |
-| v2.2.2 | 2026-04-11 | 小旭二手机（西园路）| Excel对比JSON功能增强，添加小计字段并精炼代码逻辑 |
-| v2.2.1 | 2026-04-11 | 小旭二手机（西园路）| 添加自动对比功能，确保每次运行爬虫后都生成小计字段 |
-| v2.2.0 | 2026-04-09 | 小旭二手机（西园路）| 性能优化，提升并发处理能力和元素去重效率 |
-| v2.1.9 | 历史版本 | 小旭二手机（西园路）| 代码精炼优化，简化逻辑提升可维护性 |
-| v2.1.8 | 历史版本 | 小旭二手机（西园路）| 优化滚动加载策略，采用激进模式快速加载所有数据 |
-| v2.1.7 | 历史版本 | 小旭二手机（西园路）| 添加多重超时保护和重试机制，防止爬虫卡死 |
-| v2.1.6 | 历史版本 | 小旭二手机（西园路）| 修复弹窗关闭超时问题; 添加时间统计优化性能 |
-| v2.1.5 | 历史版本 | 小旭二手机（西园路）| 修复高价商品筛选逻辑; 解决对比结果不准确问题 |
-| v2.1.3 | 历史版本 | 小旭二手机（西园路）| 优化JSON文件对比记录机制; 支持多条对比记录 |
-| v2.1.2 | 历史版本 | 小旭二手机（西园路）| 优化JSON文件对比功能; 新增缓存文件机制 |
-| v2.1.1 | 历史版本 | 小旭二手机（西园路）| 修复跨平台浏览器启动问题; 删除调试代码 |
-| v2.1.0 | 历史版本 | 小旭二手机（西园路）| 新增调试功能; 优化开发体验 |
-| v2.0.9 | 历史版本 | 小旭二手机（西园路）| 新增当天JSON文件对比功能 |
-| v2.0.8 | 历史版本 | 小旭二手机（西园路）| 修复跨平台浏览器启动问题 |
-| v2.0.7 | 历史版本 | 小旭二手机（西园路）| 优化高价商品筛选; 修复浏览器启动 |
-| v2.0.6 | 历史版本 | 小旭二手机（西园路）| 优化数据变化分析代码; 精简逻辑 |
-| v2.0.5 | 历史版本 | 小旭二手机（西园路）| 更新Cookie过期时间 |
-| v2.0.4 | 历史版本 | 小旭二手机（西园路）| 新增Cookie自动更新功能; 优化Excel文件检查 |
-| v2.0.3 | 历史版本 | 小旭二手机（西园路）| 代码重构和优化 |
-| v2.0.2 | 历史版本 | 小旭二手机（西园路）| 新增高价商品信息写入JSON功能 |
-| v2.0.1 | 历史版本 | 小旭二手机（西园路）| 优化高价商品筛选逻辑 |
-| v2.0.0 | 历史版本 | 小旭二手机（西园路）| 新增货号对比高价商品筛选功能 |
-| v1.9.0 | 历史版本 | 小旭二手机（西园路）| 添加高价商品筛选功能 |
-| v1.8.0 | 历史版本 | 小旭二手机（西园路）| 添加运行时间显示和动态调整功能 |
-| v1.7.0 | 历史版本 | 小旭二手机（西园路）| 滚动参数可配置化 |
-| v1.6.2 | 历史版本 | 小旭二手机（西园路）| 修复页面加载死机问题 |
-| v1.6.1 | 历史版本 | 小旭二手机（西园路）| 修复滚动死循环问题 |
-| v1.6.0 | 历史版本 | 小旭二手机（西园路）| 完成所有高优先级优化 |
-| v1.5.0 | 历史版本 | 小旭二手机（西园路）| 简化JSON数据结构为5个核心字段 |
-| v1.4.3 | 历史版本 | 小旭二手机（西园路）| 优化页面加载逻辑，减少等待时间 |
-| v1.4.2 | 历史版本 | 小旭二手机（西园路）| 完成跨系统环境测试和优化; 优化商品去重逻辑，支持无货号商品 |
-| v1.4.1 | 历史版本 | 小旭二手机（西园路）| 优化登录等待逻辑，移除手动确认步骤 |
-| v1.4.0 | 历史版本 | 小旭二手机（西园路）| 扩展商品数据字段到20个完整字段 |
-| v1.3.4 | 历史版本 | 小旭二手机（西园路）| 新增数据变化描述和字段说明 |
-| v1.3.3 | 历史版本 | 小旭二手机（西园路）| 新增对比结果消息到JSON日志 |
-| v1.3.2 | 历史版本 | 小旭二手机（西园路）| 修复JSON数据解析错误 |
-| v1.3.1 | 历史版本 | 小旭二手机（西园路）| 新增JSON多余货号对比功能并优化代码结构 |
-| v1.3.0 | 历史版本 | 小旭二手机（西园路）| 添加Excel与JSON自动对比功能 |
-| v1.2.0 | 历史版本 | 小旭二手机（西园路）| 添加了一个cookie自动更换的功能，使得东西更加的自动化 |
-| v1.1.0 | 历史版本 | 小旭二手机（西园路）| 添加了一个excel读取功能，使得东西更加的自动化 |
-| v1.0.0 | 初始版本 | 小旭二手机（西园路）| 项目初始化，基础功能实现 |
-
----
+| v3.8.11 | 2026-07-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 瀹屾暣鍘嗗彶璁板綍鎭㈠涓庢枃妗ｆ洿鏂?|
+| v3.8.10 | 2026-07-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏇存柊鏂囨。锛歊EADME.md + skill.md + skill.docx 鍚屾浠ｇ爜瑙勮寖; (2026-07-05) - 馃敡 鍏抽敭淇锛氱缉杩涢敊璇鑷存湇鍔″惎鍔ㄥけ璐?+ 鏂囨。鍚屾鏇存柊 |
+| v3.8.9 | 2026-07-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| (2026-07-05) - 馃敀 寮哄埗URL鍘婚噸鏈哄埗锛堝悓涓€鍦板潃30鍒嗛挓鍐呭彧鍙?娆￠偖浠讹級 |
+| v3.8.8 | 2026-07-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| (2026-07-05) - 馃殌 鍏綉鍦板潃鍙敤鍗宠嚜鍔ㄥ彂閭欢锛堥浂寤惰繜閫氱煡浼樺寲锛?|
+| v3.8.7 | 2026-07-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| (2026-07-05) - 馃搫 鏇存柊skill.docx鏂囨。锛堢嚎绋嬪畨鍏║RL鍘婚噸鏈哄埗淇锛? 绾跨▼瀹夊叏URL鍘婚噸鏈哄埗 + 閲嶆柊鐢熸垚skill.docx (166.6KB) |
+| v3.8.6 | 2026-07-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍐呭鏀逛负鏍囧噯API鏍煎紡锛? **鍒嗙被** + 瀛愭潯鐩級; + 閲嶆柊鐢熸垚skill.docx; 闅ч亾閲嶅惎閭欢閫氱煡瀹屽杽 + 鏂囨。鍚屾鏇存柊 |
+| v3.8.5 | 2026-07-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鐢熸垚绗﹀悎瑙勮寖鐨?skill.docx; PowerShell 鍏煎鎬ч噸澶т慨澶? skill.md鏂板鐩綍(TOC), skill.docx鏀圭敤pypandoc_binary鐢熸垚(淇浠ｇ爜鍧楁爣棰樿璇嗗埆), skill.pdf鏀圭敤pupp... |
+| v3.8.4 | 2026-07-04 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇浠庨潪椤圭洰鐩綍杩愯鍚姩鑴氭湰鏃禬eb鏈嶅姟鍚姩澶辫触Bug |
+| v3.8.3 | 2026-07-04 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇'鏈€鏂版洿鏂?鍖哄煙绌虹櫧Bug + Markdown鏍囬鏍煎紡瑙勮寖 |
+| v3.8.2 | 2026-07-04 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇web_output.log鍚姩鏃ュ織琚鐩朆ug |
+| v3.8.1 | 2026-07-04 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| skill.md鍏ㄩ潰琛ュ叏(main.py鐙珛鍑芥暟搂2.15 + index.html鍓嶇61涓嚱鏁奥?.16), API绔偣淇, README鍘婚噸, skill.docx閲嶆柊鐢熸垚; skill.md鍏ㄩ潰琛ュ叏(椤圭洰鎵€鏈夊唴瀹瑰啓鍏?, A... |
+| v3.8.0 | 2026-07-04 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂囨。绯荤粺鍏ㄩ潰鍗囩骇 |
+| v3.7.9 | 2026-07-04 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍒犻櫎generate_skill_docx.py + 閲嶆柊鐢熸垚skill.docx; Hostc闅ч亾绋冲畾鎬х粓鏋佷紭鍖?- 瑙ｅ喅棰戠箒閲嶅惎闂 |
+| v3.7.8 | 2026-07-04 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 闅ч亾蹇€熸仮澶嶆満鍒?3绉掔骇鍝嶅簲+閭欢鍘婚噸; 淇閭欢閲嶅鍙戦€?Python鏃ュ織鍐欏叆妯″紡; run.sh鍚屾淇-鎷彿鏍煎紡+杩愯闃舵鏃ュ織闅旂; 淇call:log鎷彿鍐茬獊+杩愯闃舵鏃ュ織闅旂; 淇鍙屽啓鏈哄埗鏂囦欢閿佸啿绐?(echo)>>fi... |
+| v3.7.7 | 2026-06-28 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇Excel涓嶫SON瀵规瘮鎸夐挳鐘舵€佷笉澶嶄綅闂锛屾洿鏂皊kill.md/skill.docx鎸夐挳鐘舵€佺鐞嗚鑼?|
+| v3.7.6 | 2026-06-27 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇pip.conf trusted-host閲嶅/鎻愬彇閿欒銆佹暣鏁版瘮杈冪┖鍊笺€乵acOS du -sb鍏煎鎬с€佹洿鏂皊kill.md/README.md/skill.docx; 鎵嬫満绔寜閽?脳2灞呬腑甯冨眬(max-width:600px)涓?.. |
+| v3.7.5 | 2026-06-26 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇鍒╂鼎瓒嬪娍鍥捐仈鍔ㄣ€丒xcel鏃ユ湡杞崲銆乊杞村姩鎬佺缉鏀俱€佷唬鐮佹崯鍧? 骞跺畬鍠勬枃妗?|
+| v3.7.4 | 2026-06-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍒╂鼎鎶ヨ〃姹囨€昏鐐瑰嚮灞曞紑浣嶇疆淇 + 鑱氬悎绾у埆淇 + 璺ㄧ郴缁?绉诲姩绔‘璁?+ skill鍚屾 |
+| v3.7.3 | 2026-06-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| DOMContentLoaded闂悎淇 + 鎸夐挳鏍峰紡缁熶竴 + skill/docx鍚屾 |
+| v3.7.2 | 2026-06-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇index.html绗?197琛屾爣绛鹃棴鍚?+ skill.md/docx瑙勮寖鏇存柊 |
+| v3.7.1 | 2026-06-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 璺ㄧ郴缁熺‖缂栫爜褰诲簳娑堥櫎 + V3.5.0绉诲姩绔鑼冨鏌?|
+| v3.6.0 | 2026-07-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| + v3.5.0 + README鏍煎紡瑙勮寖锛? 缂栫爜瑙勮寖鍜寁3.5.0绉诲姩绔鑼? README/skill.md/skill.docx 涓夋枃浠跺悓姝ユ洿鏂? 鏇存柊鏃ュ織璇︽儏灞曠ず + skill.docx瀛椾綋淇; 鏇存柊鏃ュ織璇︽儏灞曠ず - c... |
+| v3.5.8 | 2026-06-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| update frontend version and changelog to 3.5.8; add skill.md/skill.docx code standards, restore dist folder, update R... |
+| v3.5.7 | 2026-06-07 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍓嶇娣诲姞鏈€鏂版洿鏂版ā鍧楋紝鐗堟湰鍙峰悓姝ユ洿鏂? 浠ｇ爜閲嶆瀯浼樺寲锛岃法绯荤粺鍜岀Щ鍔ㄧ閫傞厤瀹屾暣鎬х‘璁?|
+| v3.5.6 | 2026-06-06 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 瀹屽杽绉诲姩绔€傞厤鍔熻兘鍜岃〃鏍兼牱寮忎紭鍖?|
+| v3.5.4 | 2026-06-06 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 姣忔棩鍒╂鼎鎶ヨ〃浼樺寲锛氭棩鏈熸牸寮忕粺涓€銆侀」鐩瓧娈点€佽〃澶村浐瀹氥€侀敊璇鐞嗗寮?|
+| v3.5.3 | 2026-06-06 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鐗堟湰鏃ュ織 - 姹囨€昏鍥句笌鏄庣粏鑱斿姩鍔熻兘 |
+| v3.5.2 | 2026-06-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鐗堟湰鏃ュ織; 鍓嶇姣忔棩鍒╂鼎鎶ヨ〃琛ㄦ牸娓叉煋浼樺寲 - 娓叉煋鍒版€昏琛屻€佽揣甯佺鍙枫€佸崟浣嶆樉绀? 姣忔棩鍒╂鼎鎶ヨ〃鍔熻兘瀹屽杽锛屽墠绔〃鏍煎睍绀轰紭鍖? 姣忔棩鍒╂鼎鎶ヨ〃璇诲彇浼樺寲锛屽墠绔睍绀簉eport_text |
+| v3.4.37 | 2026-06-05 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲涓存椂鏂囦欢娓呯悊鏈哄埗锛屼慨澶峛at鑴氭湰鍚姩鏃惰鏉€杩涚▼闂 |
+| v3.4.34 | 2026-06-04 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇鏂囦欢娓呯悊 API JSON 瑙ｆ瀽閿欒 |
+| v3.4.33 | 2026-06-03 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浠ｇ爜浼樺寲鍜岃法绯荤粺鏀寔澧炲己 |
+| v3.4.32 | 2026-06-03 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇闀滃儚婧愭樉绀洪棶棰樺苟缁熶竴run.sh閫昏緫; 淇run.bat闀滃儚婧愭祴璇曡娉曢敊璇? 鍏ㄩ潰璺ㄧ郴缁熸敮鎸佷紭鍖?|
+| v3.4.31 | 2026-06-01 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇鏂囦欢娓呯悊宸ュ叿鑾峰彇鏂囦欢澶у皬閿欒 |
+| v3.4.30 | 2026-05-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇娓呯悊宸ュ叿 API 绌虹洰褰曟娴嬮棶棰?|
+| v3.4.29 | 2026-05-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 run.bat 鐗堟湰鍙疯В鏋愬け璐ラ棶棰?|
+| v3.4.28 | 2026-05-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲Flask 404澶勭悊鍜岄偖浠跺喎鍗存湡琛ュ彂鏈哄埗 |
+| v3.4.27 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇鏂囦欢娓呯悊宸ュ叿'鍒犻櫎鎵€鏈夋枃浠跺拰鏂囦欢澶?鍔熻兘鎶ラ敊 |
+| v3.4.26 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 閲嶆瀯缁熶竴寮傚父澶勭悊绯荤粺 + 澧炲己 tunnel_status API URL 楠岃瘉 |
+| v3.4.25 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| Excel璇诲彇鏀逛负澶嶅埗鍒颁复鏃舵枃浠讹紝褰诲簳瑙ｅ喅鍏变韩杩濊 |
+| v3.4.24 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 Excel 鍏变韩杩濊 - 鎵€鏈夎鍙栨敼涓?read_only=True |
+| v3.4.23 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 Excel 鏂囦欢璇诲彇鏃剁殑 Windows 鍏变韩杩濊闂 |
+| v3.4.22 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲蹇冭烦妫€娴嬮棿闅斾粠60绉掑埌5绉掞紝鎻愰珮闅ч亾鏁呴殰妫€娴嬮€熷害 |
+| v3.4.21 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 纭繚 tunnel_url.txt 鎸佷箙涓€鑷?|
+| v3.4.20 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲 tunnel_url.txt 鍐欏叆鏍煎紡 |
+| v3.4.19 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍚屾鍐欏叆 tunnel_url.txt |
+| v3.4.18 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 瀹屽叏绉婚櫎 tunnel_url 鍏ㄥ眬鍙橀噺鐨勬洿鏂伴€昏緫 |
+| v3.4.17 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 缁熶竴鎵€鏈夋ā鍧椾粠 web_output.log 鑾峰彇鍏綉鍦板潃 |
+| v3.4.16 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 old_url 鏈畾涔夐敊璇?|
+| v3.4.15 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 绠€鍖栧惎鍔ㄦ祦绋嬶紝绉婚櫎鍐椾綑绛夊緟閫昏緫 |
+| v3.4.14 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| read_output 鏀逛负璇诲彇 hostc stdout 杈撳嚭 |
+| v3.4.13 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 瀹屽叏绉婚櫎 tunnel_url.txt 璇诲彇閫昏緫锛屽叏閮ㄤ粠 web_output.log |
+| v3.4.12 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇绛夊緟 URL 閫昏緫锛岀洿鎺ユ鏌?web_output.log |
+| v3.4.11 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 澶у箙绠€鍖?tunnel 閲嶅惎閫昏緫 |
+| v3.4.10 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲 hostc 杩涚▼绋冲畾鎬э紝URL 鏃犳晥鏃剁瓑寰?60 绉掑啀閲嶅惎 |
+| v3.4.9 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 缁熶竴浣跨敤 web_output.log 浣滀负鍏綉鍦板潃鍞竴鏉ユ簮 |
+| v3.4.8 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 缁熶竴鍏綉鍦板潃鏉ユ簮锛屽叏閮ㄤ粠 web_output.log 鑾峰彇; 绠€鍖?auto_start_tunnel 閫昏緫锛岄伩鍏嶉噸澶嶆娴?|
+| v3.4.7 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏇存柊 README; 淇 tunnel_url.txt 涓虹┖鏃惰鏉€姝ｅ湪鍚姩鐨?hostc 杩涚▼ |
+| v3.4.6 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 tunnel_url.txt 涓虹┖鏃舵棤娉曢噸鍚棶棰?|
+| v3.4.5 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 tunnel_url.txt 涓虹┖鏃堕噸鍚惊鐜棶棰?|
+| v3.4.4 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲 tunnel_url.txt 涓虹┖鏃剁珛鍗抽噸鍚紝涓嶇瓑寰?0绉掕秴鏃?|
+| v3.4.3 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 tunnel_url.txt 涓虹┖鏃朵笉閲嶅惎銆佸畧鎶ょ嚎绋嬮噸澶嶅惎鍔ㄦ棩蹇楀埛灞忋€乁RL 鏃犳晥鏃朵笉杩斿洖鏃犳晥鍦板潃 |
+| v3.4.2 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍓嶇灞曠ずURL鍙敤鎬ч獙璇?+ 蹇冭烦妫€娴嬫棩蹇椾紭鍖?|
+| v3.4.1 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 web_output.log 鏃ュ織鍚屾闂 |
+| v3.4.0 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇闅ч亾鐘舵€佹樉绀哄拰鏃ュ織鍚屾闂 |
+| v3.3.9 | 2026-05-28 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 tunnel_url 鍜屽墠绔樉绀轰笉涓€鑷撮棶棰?|
+| v3.3.8 | 2026-05-28 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鎷嗗垎鐗堟湰锛屼紭鍖栨洿鏂版棩蹇楁牸寮?|
+| v3.3.7 | 2026-05-28 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍓嶇闅ч亾鐘舵€佽疆璇㈤棿闅斾粠5绉掓敼涓?绉掞紝鏇村揩鍚屾URL鍙樺寲; 鏂板鐩戞帶绾跨▼锛屽綋tunnel_url.txt鍙樺寲鏃惰嚜鍔ㄥ悓姝eb_output.log; 绉婚櫎涓嶅繀瑕佺殑瀹氭湡娓呯悊閫昏緫锛宼unnel_url.txt鐢県ostc鑷姩绠＄悊; 闅ч亾鏃ュ織... |
+| v3.3.6 | 2026-05-28 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲杩涚▼娓呯悊閫昏緫锛岄伩鍏嶆棤鏁堟竻鐞嗗鑷寸殑澶辫触缁熻; 鍏ㄩ潰绮剧畝README鏇存柊鏃ュ織锛屾墍鏈夌増鏈帶鍒跺湪3-5涓洿鏂扮偣; 浼樺寲README鏇存柊鏃ュ織鏍煎紡锛屾瘡涓増鏈?-5涓洿鏂扮偣 |
+| v3.3.5 | 2026-05-28 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 缁熶竴杩涚▼妫€娴嬮€昏緫纭繚璺ㄧ郴缁熷吋瀹? 娣诲姞杩涚▼娓呯悊缁熻鍜岃嚜鍔ㄦ竻绌烘棩蹇楀姛鑳? 淇鏃ュ織鏂囦欢杩囧ぇ鍜岃繘绋嬪紓甯搁棶棰? 淇澶氳繘绋嬬珵浜夊拰鏂囦欢鍐欏叆闂; 淇URL閲嶅閫昏緫鍜屾洿鏂拌法绯荤粺鍏煎鎬ц鏄?绛?椤?|
+| v3.3.4 | 2026-05-24 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 闅ч亾鏃ュ織杈撳嚭浼樺寲鍜岃繘绋嬫竻鐞嗘敼杩?|
+| v3.3.3 | 2026-05-23 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇闅ч亾杩涚▼娉勬紡鍜岄偖浠堕€氱煡闂 |
+| v3.3.1 | 2026-05-22 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇 Web 鐣岄潰杩愯鐖櫕鏃?Input/output error 闂 |
+| v3.3.0 | 2026-05-22 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鑷姩閰嶇疆闃块噷浜憄ip闀滃儚鍔犻€?|
+| v3.2.9 | 2026-05-22 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇闅ч亾棰戠箒閲嶅惎鍜岄偖浠跺彂閫侀棶棰?|
+| v3.2.8 | 2026-05-22 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| Flask鍚姩鏃堕偖浠堕€氱煡澧炲己 |
+| v3.2.7 | 2026-05-22 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板鍏綉鍦板潃鍙樻洿閭欢閫氱煡鍔熻兘; 鍓嶇浠ｇ爜浼樺寲 - 绠€鍖朌OM鎿嶄綔銆佸悎骞堕噸澶嶅嚱鏁般€佷紭鍖栦簨浠剁粦瀹?|
+| v3.2.6 | 2026-05-21 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍓嶇JavaScript浼樺寲 - 绉婚櫎鍐椾綑鏃ュ織锛岀畝鍖栦唬鐮佺粨鏋? 浠ｇ爜璐ㄩ噺浼樺寲 |
+| v3.2.5 | 2026-05-21 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 绠€鍖栧惎鍔ㄦ祦绋嬶紝绉婚櫎闅ч亾閫夋嫨鑿滃崟 |
+| v3.2.4 | 2026-05-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍓嶇灞曠ずURL鍙敤鎬ч獙璇?+ 蹇冭烦妫€娴嬫棩蹇椾紭鍖? 绉婚櫎 Cloudflare Tunnel 鍔熻兘锛岀畝鍖栭毀閬撴湇鍔?|
+| v3.2.3 | 2026-05-21 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| Cloudflare Tunnel 閰嶇疆鍔熻兘 |
+| v3.2.2 | 2026-05-21 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇闅ч亾鑷姩閲嶈繛姝诲惊鐜棶棰橈紝瀹炵幇鏃犳劅鍒囨崲鍒版柊鐨勫叕缃?URL |
+| v3.2.1 | 2026-05-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 瀹堟姢绾跨▼閲嶅惎鏃朵繚鎸?URL 涓€鑷?|
+| v3.2.0 | 2026-05-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 澶栭儴鍚姩闅ч亾鐩戞帶鏈哄埗 |
+| v3.1.9 | 2026-05-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲鍓嶇闅ч亾鍏变韩鎸夐挳锛屼紭鍏堝鐢╰unnel_url.txt涓殑宸叉湁鍦板潃 |
+| v3.1.8 | 2026-05-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 澧炲己闅ч亾淇濇寔鍦ㄧ嚎鏈哄埗; 淇闈㈡澘鍐茬獊闂 - 鎵€鏈夊姛鑳介噰鐢ㄧ嫭绔嬪鍣? 淇Excel瀵规瘮鏄剧ず鎵€鏈変环鏍肩殑澶氫綑璐у彿 |
+| v3.1.7 | 2026-05-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 璐у彿瀵规瘮閲嶅妫€娴嬩紭鍖?|
+| v3.1.5 | 2026-05-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 闅ч亾鑷姩閲嶈繛鏈哄埗 |
+| v3.1.3 | 2026-05-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 璺ㄧ郴缁熷吋瀹规€у寮?- 缁熶竴鑴氭湰閫昏緫銆佽嚜鍔ㄥ垱寤鸿櫄鎷熺幆澧冦€佸畬鍠勮繘绋嬫竻鐞?|
+| v3.1.2 | 2026-05-18 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 澶╂皵鐪嬫澘棰勫姞杞戒紭鍖? 閸撳秶顏悧鍫熸拱閸欒渹绮燗PI鐎圭偞妞傞懢宄板絿; 娣囶喖顦查梾褔浜鹃崥顖氬З閸氬骸鍙曠純鎴濇勾閸р偓娑撳秵妯夌粈铏规畱闂傤噣顣? 娴兼ê瀵查崥顖氬З妞ゅ搫绨妴浣搞亯濮樻梻婀呴弶鎸庡櫩閸旂姾娴囬妴渚€娼ら幀浣界カ濠ф€梲ip閸樺缂? update |
+| v3.1.1 | 2026-05-20 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇闅ч亾澶嶅埗鎸夐挳澶辨晥闂; 鍓嶇鐗堟湰鍙疯嚜鍔ㄨ窡闅弇ain.py涓璙ERSION鍙橀噺 |
+| v3.0.8 | 2026-05-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 闅ч亾鍏变韩鍔熻兘澧炲己 - 鍙偣鍑婚摼鎺ャ€佷竴閿鍒躲€佸惎鍔ㄩ涓嬭浇hostc |
+| v3.0.7 | 2026-05-17 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲闅ч亾鍏变韩鍔熻兘 + 璺ㄥ钩鍙板吋瀹规€у寮?|
+| v3.0.6 | 2026-05-06 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 闆嗘垚澶╂皵鏃堕挓鐪嬫澘锛岀嫭绔嬪尯鍧楀睍绀猴紝瀹屾暣鍝嶅簲寮忛€傞厤 |
+| v3.0.5 | 2026-05-01 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇Excel涓嶫SON瀵规瘮鍔熻兘涓柊澧為珮浠峰晢鍝佸垽瀹氶€昏緫閿欒 |
+| v3.0.4 | 2026-05-01 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| Excel鏂囦欢璺緞鍘婚噸鍜岃揣鍙疯鍙栭『搴忎紭鍖?|
+| v3.0.3 | 2026-05-01 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 绉诲姩绔鑸爮鍥哄畾缃《浼樺寲 |
+| v3.0.2 | 2026-05-01 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 绉诲姩绔搷搴斿紡閫傞厤鍏ㄩ潰浼樺寲 |
+| v3.0.1 | 2026-04-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鐗堟湰鏇存柊鏃ュ織; Excel澶氭枃浠惰鍙栦紭鍖?|
+| v3.0.0 | 2026-04-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| Cookie绠＄悊浼樺寲鍜岃法骞冲彴鍏煎鎬ф彁鍗?|
+| v2.9.6 | 2026-04-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍚姩鑴氭湰浼樺寲鍜屽姛鑳芥敼杩?|
+| v2.9.5 | 2026-04-30 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 锛屾坊鍔犲畬鏁存洿鏂版棩蹇? 绉诲姩绔搷搴斿紡閫傞厤浼樺寲 |
+| v2.9.4 | 2026-04-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板浜掑姩寮忚揣鍙峰姣斿姛鑳?|
+| v2.9.3 | 2026-04-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| Cookie鏇存柊鍓嶈嚜鍔ㄦ竻绌烘満鍒?|
+| v2.9.2 | 2026-04-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲鍟嗗搧鍒楄〃鑱斿姩婊氬姩鍔熻兘 |
+| v2.9.1 | 2026-04-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲鍓嶇鏃堕棿鏄剧ず鍔熻兘锛屽噺灏慏OM閲嶆覆鏌撳紑閿€ |
+| v2.9.0 | 2026-04-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞鍓嶇鏃堕棿鏄剧ず鍔熻兘骞朵紭鍖朖avaScript浠ｇ爜 |
+| v2.8.0 | 2026-04-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏀逛负04-29锛寁2.7.1鏀逛负04-27锛屼慨澶峷2.5.21閲嶅闂; 鍓嶇灞曠ず浼樺寲锛欵xcel涓嶫SON瀵规瘮缁撴灉鐩存帴灞曠ず鍦ㄥ墠绔〉闈?|
+| v2.7.2 | 2026-04-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏃ュ織锛氫慨澶?api/clean/list鏂囦欢鏄剧ず鏍煎紡 |
+| v2.7.1 | 2026-04-28 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇鍟嗗搧璇︽儏椤靛浘鐗囧姞杞介棶棰?|
+| v2.7.0 | 2026-04-28 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞鐗规畩鏂囦欢鍚嶄繚鎶わ紙.DS_Store, Thumbs.db绛夛級; 澧炲己娓呯悊鍑芥暟淇濇姢鏈哄埗锛屾坊鍔犳洿澶氫繚鎶ょ殑鏂囦欢绫诲瀷鍜屾枃浠跺す; 闆嗘垚鏂囦欢娓呯悊鍔熻兘锛屼紭鍖栦唬鐮侀€昏緫 |
+| v2.6.1 | 2026-04-28 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞鑷姩鏁版嵁搴撳瓨鍌ㄥ姛鑳斤紝杩愯鐖櫕鏃惰嚜鍔ㄤ繚瀛樺晢鍝佹暟鎹埌MySQL; 璐у彿瀵规瘮鍗＄墖鏍峰紡浼樺寲锛屽皢API杩斿洖缁撴灉鏀逛负缇庤鐨勫崱鐗囧紡灞曠ず |
+| v2.6.0 | 2026-06-26 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| (2026-06-26)鐗堟湰鏉＄洰; v2.8.0鐗堟湰鏃ユ湡椤哄簭锛岀‘淇濇墍鏈夌増鏈彿鍜屾棩鏈熸寜鏃堕棿閫掑鎺掑垪; Web绔柊澧炶揣鍙峰姣擜PI鍜孴XT瀵规瘮鎸夐挳; 鑿滃崟閫夐」5鏍规嵁绯荤粺鑷姩鍚姩Web鏈嶅姟; 鑿滃崟鏂板閫夐」5鍚姩Web鏈嶅姟 绛?椤?|
+| v2.5.22 | 2026-04-19 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 绉婚櫎闂查奔骞冲彴鎵嬬画璐?0鍏冨皝椤堕檺鍒讹紝鏀逛负鎸夊崟鏈哄敭浠风殑1.6%璁＄畻 |
+| v2.5.21 | 2026-04-26 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏀寔澶氬钩鍙癊xcel璺緞閰嶇疆锛岃嚜鍔ㄨ疆璇㈡娴? 閲嶆瀯鏁版嵁鑾峰彇閫昏緫锛岀洿鎺ラ€氳繃API鑾峰彇鎵€鏈夊晢鍝佹暟鎹? 閲嶆瀯鏁版嵁鑾峰彇閫昏緫锛岀洿鎺ラ€氳繃API鑾峰彇鍟嗗搧鏁版嵁 |
+| v2.5.20 | 2026-04-15 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇Windows娴忚鍣ㄦ娴嬶紝浣跨敤dir+findstr鏇夸唬閫氶厤绗?|
+| v2.5.19 | 2026-04-15 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲macOS娴忚鍣ㄦ娴嬶紝鏀寔Google Chrome for Testing.app |
+| v2.5.18 | 2026-04-15 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲娴忚鍣ㄦ娴嬶紝閬垮厤閲嶅涓嬭浇Playwright娴忚鍣? 鏂板鐜妫€娴嬪姛鑳?|
+| v2.5.17 | 2026-04-13 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲鎷胯揣浠锋彁鍙栨€ц兘鍜屼唬鐮佺粨鏋?|
+| v2.5.16 | 2026-04-12 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲CookieValidator绫伙紝绮剧偧浠ｇ爜閫昏緫 |
+| v2.5.14 | 2026-04-12 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇璺緞閿欒锛屽畬鍠凱athManager缁熶竴绠＄悊 |
+| v2.5.13 | 2026-04-29 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 22鐗堟湰閲嶅鍜屾棩鏈熸贩涔遍棶棰橈紝閲嶆柊鏁寸悊鎵€鏈夌増鏈彿纭繚杩炵画鎬у拰鏃堕棿椤哄簭姝ｇ‘; 鏂板PathManager绫伙紝缁熶竴绠＄悊鎵€鏈夎法绯荤粺璺緞 |
+| v2.5.12 | 2026-04-12 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲绯荤粺妫€娴嬮€昏緫锛岀粺涓€璺ㄥ钩鍙版祻瑙堝櫒閰嶇疆 |
+| v2.5.10 | 2026-04-12 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇瀵煎叆閿欒锛岀‘淇滶xcel瀵规瘮鍔熻兘姝ｅ父杩愯 |
+| v2.5.9 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲浠ｇ爜閫昏緫锛屼娇鐢ㄥ垪琛ㄦ帹瀵煎紡绠€鍖栨枃浠舵煡鎵句唬鐮?|
+| v2.5.8 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇excel_file涓篘one鐨勯敊璇紝瑙ｅ喅os.path.exists鐨凾ypeError |
+| v2.5.7 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇浠锋牸姣旇緝閿欒锛岃В鍐硃arse_price杩斿洖None鐨凾ypeError |
+| v2.5.6 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲Cookie鏇存柊瀹屾垚鍚庣殑寤惰繜锛屾彁鍗囧搷搴旈€熷害 |
+| v2.5.5 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 绉婚櫎Cookie鏇存柊鍚庣殑鍥炶溅纭锛岀畝鍖栨搷浣滄祦绋?|
+| v2.5.4 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 瀹炵幇鐪熸鐨勮嚜鍔ㄥ叧闂祻瑙堝櫒锛屾娴嬬櫥褰曞悗鑷姩鍏抽棴 |
+| v2.5.3 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲Cookie鏇存柊鎻愮ず淇℃伅锛屾槑纭嚜鍔ㄥ叧闂祻瑙堝櫒 |
+| v2.5.2 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 绠€鍖朇ookie鏇存柊娴佺▼锛屽弬鑰僾2.1.1鐗堟湰瀹炵幇 |
+| v2.5.0 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲鍟嗗搧淇℃伅鎻愬彇閫昏緫锛岀簿绠€浠ｇ爜缁撴瀯 |
+| v2.4.7 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板鐙珛Cookie鑷姩鏇存柊鍔熻兘锛屼紭鍖栨祻瑙堝櫒鍚姩娴佺▼鍏抽棴 |
+| v2.4.6 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 瀹屽杽澶囨敞鎻愬彇鍔熻兘锛屾彁鍙栨墍鏈夋湁澶囨敞鐨勫晢鍝佷俊鎭?|
+| v2.4.5 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇澶囨敞鎻愬彇閿欒锛屾敮鎸佹棤鏍囩澶囨敞淇℃伅鎻愬彇 |
+| v2.4.4 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇浠锋牸鎻愬彇閿欒锛屾敮鎸佸崈鍒嗗埗浠锋牸鏍煎紡 |
+| v2.4.1 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板骞冲潎姣忎釜璁惧鍞嚭鍧囦环缁熻 |
+| v2.4.0 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 绠€鍖朖SON鏂囦欢甯冨眬锛屼紭鍖栦环鏍兼樉绀轰负鍗冨垎鍒?|
+| v2.3.6 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 澧炲己HTML鍐呭鎼滅储锛屽畬鍠勬嬁璐т环鎻愬彇閫昏緫 |
+| v2.3.5 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 澧炲己鎴愭湰浠疯瘑鍒紝娣诲姞鏅鸿兘浠锋牸鎻愬彇閫昏緫 |
+| v2.3.4 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板鎷胯揣浠锋彁鍙栧姛鑳斤紝淇璁惧鎴愭湰绱鍜岃澶囧潎浠蜂负0鐨勯棶棰?|
+| v2.3.3 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板璁惧鍧囦环锛屼紭鍖栭棽楸煎钩鍙版墜缁垂璁＄畻锛堝崟鏈烘渶楂?0鍏冨皝椤讹級 |
+| v2.3.2 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板绱缁熻鍔熻兘锛屾坊鍔犻璁″敭鍑轰环鏍笺€佽澶囨垚鏈拰骞冲彴鎵嬬画璐圭疮璁?|
+| v2.3.1 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇濈暀Cookie鏇存柊閫夐」锛屼粎鏀寔鑷姩鏇存柊鍔熻兘 |
+| v2.3.0 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鍔熻兘鏁村悎浼樺寲锛屽悎骞惰彍鍗曢€夐」骞剁簿鐐间唬鐮侀€昏緫 |
+| v2.2.2 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| Excel瀵规瘮JSON鍔熻兘澧炲己锛屾坊鍔犲皬璁″瓧娈靛苟绮剧偧浠ｇ爜閫昏緫 |
+| v2.2.1 | 2026-04-11 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞鑷姩瀵规瘮鍔熻兘锛岀‘淇濇瘡娆¤繍琛岀埇铏悗閮界敓鎴愬皬璁″瓧娈?|
+| v2.2.0 | 2026-04-09 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鎬ц兘浼樺寲锛屾彁鍗囧苟鍙戝鐞嗚兘鍔涘拰鍏冪礌鍘婚噸鏁堢巼 |
+| v2.1.9 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浠ｇ爜绮剧偧浼樺寲锛岀畝鍖栭€昏緫鎻愬崌鍙淮鎶ゆ€?|
+| v2.1.8 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲婊氬姩鍔犺浇绛栫暐锛岄噰鐢ㄦ縺杩涙ā寮忓揩閫熷姞杞芥墍鏈夋暟鎹?|
+| v2.1.7 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞澶氶噸瓒呮椂淇濇姢鍜岄噸璇曟満鍒讹紝闃叉鐖櫕鍗℃ |
+| v2.1.6 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇寮圭獥鍏抽棴瓒呮椂闂; 娣诲姞鏃堕棿缁熻浼樺寲鎬ц兘 |
+| v2.1.5 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇楂樹环鍟嗗搧绛涢€夐€昏緫; 瑙ｅ喅瀵规瘮缁撴灉涓嶅噯纭棶棰?|
+| v2.1.3 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲JSON鏂囦欢瀵规瘮璁板綍鏈哄埗; 鏀寔澶氭潯瀵规瘮璁板綍 |
+| v2.1.2 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲JSON鏂囦欢瀵规瘮鍔熻兘; 鏂板缂撳瓨鏂囦欢鏈哄埗 |
+| v2.1.1 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇璺ㄥ钩鍙版祻瑙堝櫒鍚姩闂; 鍒犻櫎璋冭瘯浠ｇ爜 |
+| v2.1.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板璋冭瘯鍔熻兘; 浼樺寲寮€鍙戜綋楠?|
+| v2.0.9 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板褰撳ぉJSON鏂囦欢瀵规瘮鍔熻兘 |
+| v2.0.8 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇璺ㄥ钩鍙版祻瑙堝櫒鍚姩闂 |
+| v2.0.7 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲楂樹环鍟嗗搧绛涢€? 淇娴忚鍣ㄥ惎鍔?|
+| v2.0.6 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲鏁版嵁鍙樺寲鍒嗘瀽浠ｇ爜; 绮剧畝閫昏緫 |
+| v2.0.5 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏇存柊Cookie杩囨湡鏃堕棿 |
+| v2.0.4 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板Cookie鑷姩鏇存柊鍔熻兘; 浼樺寲Excel鏂囦欢妫€鏌?|
+| v2.0.3 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浠ｇ爜閲嶆瀯鍜屼紭鍖?|
+| v2.0.2 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板楂樹环鍟嗗搧淇℃伅鍐欏叆JSON鍔熻兘 |
+| v2.0.1 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲楂樹环鍟嗗搧绛涢€夐€昏緫 |
+| v2.0.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板璐у彿瀵规瘮楂樹环鍟嗗搧绛涢€夊姛鑳?|
+| v1.9.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞楂樹环鍟嗗搧绛涢€夊姛鑳?|
+| v1.8.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞杩愯鏃堕棿鏄剧ず鍜屽姩鎬佽皟鏁村姛鑳?|
+| v1.7.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 婊氬姩鍙傛暟鍙厤缃寲 |
+| v1.6.2 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇椤甸潰鍔犺浇姝绘満闂 |
+| v1.6.1 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇婊氬姩姝诲惊鐜棶棰?|
+| v1.6.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 瀹屾垚鎵€鏈夐珮浼樺厛绾т紭鍖?|
+| v1.5.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 绠€鍖朖SON鏁版嵁缁撴瀯涓?涓牳蹇冨瓧娈?|
+| v1.4.3 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲椤甸潰鍔犺浇閫昏緫锛屽噺灏戠瓑寰呮椂闂?|
+| v1.4.2 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 瀹屾垚璺ㄧ郴缁熺幆澧冩祴璇曞拰浼樺寲; 浼樺寲鍟嗗搧鍘婚噸閫昏緫锛屾敮鎸佹棤璐у彿鍟嗗搧 |
+| v1.4.1 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 浼樺寲鐧诲綍绛夊緟閫昏緫锛岀Щ闄ゆ墜鍔ㄧ‘璁ゆ楠?|
+| v1.4.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鎵╁睍鍟嗗搧鏁版嵁瀛楁鍒?0涓畬鏁村瓧娈?|
+| v1.3.4 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板鏁版嵁鍙樺寲鎻忚堪鍜屽瓧娈佃鏄?|
+| v1.3.3 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板瀵规瘮缁撴灉娑堟伅鍒癑SON鏃ュ織 |
+| v1.3.2 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 淇JSON鏁版嵁瑙ｆ瀽閿欒 |
+| v1.3.1 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 鏂板JSON澶氫綑璐у彿瀵规瘮鍔熻兘骞朵紭鍖栦唬鐮佺粨鏋?|
+| v1.3.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞Excel涓嶫SON鑷姩瀵规瘮鍔熻兘 |
+| v1.2.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞浜嗕竴涓猚ookie鑷姩鏇存崲鐨勫姛鑳斤紝浣垮緱涓滆タ鏇村姞鐨勮嚜鍔ㄥ寲 |
+| v1.1.0 | 鍘嗗彶鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 娣诲姞浜嗕竴涓猠xcel璇诲彇鍔熻兘锛屼娇寰椾笢瑗挎洿鍔犵殑鑷姩鍖?|
+| v1.0.0 | 鍒濆鐗堟湰 | 灏忔棴浜屾墜鏈猴紙瑗垮洯璺級| 椤圭洰鍒濆鍖栵紝鍩虹鍔熻兘瀹炵幇 |
 
 ---
 
-## 🔴 PY-CORE-016: 跨平台启动脚本范式 (Cross-Platform Startup Script)
+---
 
-### 范式描述
-统一的跨平台启动脚本，支持Windows (.bat) 和Linux/macOS (.sh)，实现：
-- 环境自动检测与安装
-- Python/Node.js依赖管理
-- 镜像源自动选择
-- 进程清理与端口管理
-- 统一日志输出
+## 馃敶 PY-CORE-016: 璺ㄥ钩鍙板惎鍔ㄨ剼鏈寖寮?(Cross-Platform Startup Script)
 
-### 核心实现
+### 鑼冨紡鎻忚堪
+缁熶竴鐨勮法骞冲彴鍚姩鑴氭湰锛屾敮鎸乄indows (.bat) 鍜孡inux/macOS (.sh)锛屽疄鐜帮細
+- 鐜鑷姩妫€娴嬩笌瀹夎
+- Python/Node.js渚濊禆绠＄悊
+- 闀滃儚婧愯嚜鍔ㄩ€夋嫨
+- 杩涚▼娓呯悊涓庣鍙ｇ鐞?
+- 缁熶竴鏃ュ織杈撳嚭
 
-#### Windows启动脚本 (run.bat)
+### 鏍稿績瀹炵幇
+
+#### Windows鍚姩鑴氭湰 (run.bat)
 ```batch
 @echo off
 setlocal enabledelayedexpansion
@@ -3284,11 +3272,11 @@ chcp 65001 > nul 2>&1
 cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 
-:: 版本自动读取
+:: 鐗堟湰鑷姩璇诲彇
 set "VERSION=0.0.0"
 for /f "delims=" %%i in ('py -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2^>nul') do set "VERSION=%%i"
 
-:: 统一日志函数（毫秒级时间戳）
+:: 缁熶竴鏃ュ織鍑芥暟锛堟绉掔骇鏃堕棿鎴筹級
 :ms_timestamp
 set "TIMESTAMP="
 if defined _TS_PYTHON (
@@ -3307,36 +3295,36 @@ if not "%LOG_FILE%"=="" (
 )
 exit /b
 
-:: 环境检测（6步流程）
+:: 鐜妫€娴嬶紙6姝ユ祦绋嬶級
 :detect_environments
-call :detect_python_env    :: [1/6] 检测Python环境
-call :detect_node_env      :: [2/6] 检测Node.js环境  
-call :test_pip_mirrors     :: [3/6] 测试PIP加速镜像源
-call :test_npm_mirrors     :: [4/6] 测试NPM加速镜像源
-call :detect_venv          :: [5/6] 检测Python虚拟环境
-call :setup_venv           :: [6/6] 设置虚拟环境并安装依赖
+call :detect_python_env    :: [1/6] 妫€娴婸ython鐜
+call :detect_node_env      :: [2/6] 妫€娴婲ode.js鐜  
+call :test_pip_mirrors     :: [3/6] 娴嬭瘯PIP鍔犻€熼暅鍍忔簮
+call :test_npm_mirrors     :: [4/6] 娴嬭瘯NPM鍔犻€熼暅鍍忔簮
+call :detect_venv          :: [5/6] 妫€娴婸ython铏氭嫙鐜
+call :setup_venv           :: [6/6] 璁剧疆铏氭嫙鐜骞跺畨瑁呬緷璧?
 
-:: 镜像源自动选择（以延迟最低为最优）
+:: 闀滃儚婧愯嚜鍔ㄩ€夋嫨锛堜互寤惰繜鏈€浣庝负鏈€浼橈級
 :test_pip_mirrors
-set "MIRRORS[0]=https://pypi.tuna.tsinghua.edu.cn/simple|清华源"
-set "MIRRORS[1]=https://mirrors.aliyun.com/pypi/simple/|阿里云"
-set "MIRRORS[2]=https://pypi.douban.com/simple/|豆瓣"
+set "MIRRORS[0]=https://pypi.tuna.tsinghua.edu.cn/simple|娓呭崕婧?
+set "MIRRORS[1]=https://mirrors.aliyun.com/pypi/simple/|闃块噷浜?
+set "MIRRORS[2]=https://pypi.douban.com/simple/|璞嗙摚"
 
-:: 测试每个镜像源的连接时间
+:: 娴嬭瘯姣忎釜闀滃儚婧愮殑杩炴帴鏃堕棿
 for /L %%i in (0,1,3) do (
     for /f "tokens=1,2 delims=|" %%a in ("!MIRRORS[%%i]!") do (
         curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 1.5 "!MIRROR_URL!"
-        :: 选择延迟最低的镜像源
+        :: 閫夋嫨寤惰繜鏈€浣庣殑闀滃儚婧?
     )
 )
 ```
 
-#### Linux/macOS启动脚本 (run.sh)
+#### Linux/macOS鍚姩鑴氭湰 (run.sh)
 ```bash
 #!/bin/bash
 cd "$(dirname "$0")"
 
-# 版本自动读取
+# 鐗堟湰鑷姩璇诲彇
 VERSION="0.0.0"
 for cmd in python3 python; do
     if command -v "$cmd" &>/dev/null; then
@@ -3344,7 +3332,7 @@ for cmd in python3 python; do
     fi
 done
 
-# 统一日志函数（兼容GNU date和BSD date）
+# 缁熶竴鏃ュ織鍑芥暟锛堝吋瀹笹NU date鍜孊SD date锛?
 _ms_timestamp() {
     if date '+%3N' 2>/dev/null | grep -qE '^[0-9]{3}$'; then
         date '+%Y-%m-%d %H:%M:%S.%3N'  # GNU date
@@ -3360,7 +3348,7 @@ log() {
     [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE" 2>/dev/null
 }
 
-# 环境检测（6步流程）
+# 鐜妫€娴嬶紙6姝ユ祦绋嬶級
 pre_launch() {
     detect_python_env   # [1/6]
     detect_node_env     # [2/6]
@@ -3371,25 +3359,25 @@ pre_launch() {
 }
 ```
 
-### 关键特性
-1. **版本自动解析**: 从README.md正则提取版本号
-2. **毫秒级日志**: 支持Windows和Unix的高精度时间戳
-3. **镜像源智能选择**: 自动测试并选择最快镜像
-4. **进程管理**: 启动前清理残留进程，端口冲突检测
-5. **环境自愈**: 自动安装缺失的Python/Node.js环境
+### 鍏抽敭鐗规€?
+1. **鐗堟湰鑷姩瑙ｆ瀽**: 浠嶳EADME.md姝ｅ垯鎻愬彇鐗堟湰鍙?
+2. **姣绾ф棩蹇?*: 鏀寔Windows鍜孶nix鐨勯珮绮惧害鏃堕棿鎴?
+3. **闀滃儚婧愭櫤鑳介€夋嫨**: 鑷姩娴嬭瘯骞堕€夋嫨鏈€蹇暅鍍?
+4. **杩涚▼绠＄悊**: 鍚姩鍓嶆竻鐞嗘畫鐣欒繘绋嬶紝绔彛鍐茬獊妫€娴?
+5. **鐜鑷剤**: 鑷姩瀹夎缂哄け鐨凱ython/Node.js鐜
 
 ---
 
-## 🔴 PY-CORE-017: CI/CD自动化部署范式 (CI/CD Automation)
+## 馃敶 PY-CORE-017: CI/CD鑷姩鍖栭儴缃茶寖寮?(CI/CD Automation)
 
-### 范式描述
-GitHub Actions工作流，实现：
-- 多操作系统测试矩阵
-- 自动化构建与部署
-- 安全扫描与质量检查
-- 通知与报告生成
+### 鑼冨紡鎻忚堪
+GitHub Actions宸ヤ綔娴侊紝瀹炵幇锛?
+- 澶氭搷浣滅郴缁熸祴璇曠煩闃?
+- 鑷姩鍖栨瀯寤轰笌閮ㄧ讲
+- 瀹夊叏鎵弿涓庤川閲忔鏌?
+- 閫氱煡涓庢姤鍛婄敓鎴?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```yaml
 name: CI/CD Pipeline
 
@@ -3444,23 +3432,23 @@ jobs:
     steps:
     - name: Deploy to production
       run: |
-        echo "部署到生产环境"
+        echo "閮ㄧ讲鍒扮敓浜х幆澧?
 ```
 
 ---
 
-## 🔴 PY-CORE-018: PWA离线缓存范式 (Progressive Web App)
+## 馃敶 PY-CORE-018: PWA绂荤嚎缂撳瓨鑼冨紡 (Progressive Web App)
 
-### 范式描述
-使用Workbox实现PWA离线缓存，提升用户体验：
-- Service Worker注册与管理
-- 静态资源预缓存
-- 离线回退策略
-- 缓存更新机制
+### 鑼冨紡鎻忚堪
+浣跨敤Workbox瀹炵幇PWA绂荤嚎缂撳瓨锛屾彁鍗囩敤鎴蜂綋楠岋細
+- Service Worker娉ㄥ唽涓庣鐞?
+- 闈欐€佽祫婧愰缂撳瓨
+- 绂荤嚎鍥為€€绛栫暐
+- 缂撳瓨鏇存柊鏈哄埗
 
-### 核心实现
+### 鏍稿績瀹炵幇
 
-#### Service Worker注册 (registerSW.js)
+#### Service Worker娉ㄥ唽 (registerSW.js)
 ```javascript
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -3475,23 +3463,23 @@ if ('serviceWorker' in navigator) {
 }
 ```
 
-#### Service Worker配置 (sw.js)
+#### Service Worker閰嶇疆 (sw.js)
 ```javascript
 importScripts('./workbox-9c191d2f.js');
 
 const { precacheAndRoute, cleanupOutdatedCaches, registerRoute, NavigationRoute } = workbox;
 
-// 预缓存静态资源
+// 棰勭紦瀛橀潤鎬佽祫婧?
 precacheAndRoute([
     { url: 'index.html', revision: 'f0ffca7cb...' },
     { url: 'assets/index-CLgEPqQj.js', revision: null },
     { url: 'assets/vendor-J3N2YKMO.js', revision: null },
 ]);
 
-// 清理过期缓存
+// 娓呯悊杩囨湡缂撳瓨
 cleanupOutdatedCaches();
 
-// 导航请求回退到index.html（SPA支持）
+// 瀵艰埅璇锋眰鍥為€€鍒癷ndex.html锛圫PA鏀寔锛?
 registerRoute(
     new NavigationRoute(
         createHandlerBoundToURL('index.html')
@@ -3501,40 +3489,40 @@ registerRoute(
 
 ---
 
-## 🟡 PY-CORE-019: Python依赖管理范式 (Python Dependency Management)
+## 馃煛 PY-CORE-019: Python渚濊禆绠＄悊鑼冨紡 (Python Dependency Management)
 
-### 范式描述
-标准化的Python依赖管理，确保可重复构建：
+### 鑼冨紡鎻忚堪
+鏍囧噯鍖栫殑Python渚濊禆绠＄悊锛岀‘淇濆彲閲嶅鏋勫缓锛?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 
-#### requirements.txt结构
+#### requirements.txt缁撴瀯
 ```
-# 核心依赖 (FastAPI)
+# 鏍稿績渚濊禆 (FastAPI)
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 playwright>=1.59.0
 
-# 数据处理
+# 鏁版嵁澶勭悊
 openpyxl>=3.1.2
 pandas>=1.3.0
 pymysql>=1.1.0
 
-# 系统监控
+# 绯荤粺鐩戞帶
 psutil>=5.9.0
 prometheus_client>=0.17.0
 
-# 数据验证
+# 鏁版嵁楠岃瘉
 pydantic>=2.0.0
 
-# 文档生成
+# 鏂囨。鐢熸垚
 python-docx>=1.2.0
 ```
 
-#### 依赖检查与安装
+#### 渚濊禆妫€鏌ヤ笌瀹夎
 ```python
 def check_deps_satisfied(requirements_file="requirements.txt"):
-    """检查依赖是否满足"""
+    """妫€鏌ヤ緷璧栨槸鍚︽弧瓒?""
     import pkg_resources
     
     with open(requirements_file, 'r', encoding='utf-8') as f:
@@ -3551,9 +3539,9 @@ def check_deps_satisfied(requirements_file="requirements.txt"):
     return True
 
 def install_playwright_cdn():
-    """使用CDN镜像安装Playwright浏览器"""
+    """浣跨敤CDN闀滃儚瀹夎Playwright娴忚鍣?""
     mirrors = [
-        ("https://npmmirror.com/mirrors/playwright", "淘宝镜像"),
+        ("https://npmmirror.com/mirrors/playwright", "娣樺疂闀滃儚"),
         ("https://registry.npmmirror.com/-/binary/playwright", "npmmirror"),
     ]
     
@@ -3571,14 +3559,14 @@ def install_playwright_cdn():
 
 ---
 
-## 🟡 PY-CORE-020: Node.js依赖管理与补丁持久化范式 (Node.js Dependency & Patch Management)
+## 馃煛 PY-CORE-020: Node.js渚濊禆绠＄悊涓庤ˉ涓佹寔涔呭寲鑼冨紡 (Node.js Dependency & Patch Management)
 
-### 范式描述
-Node.js依赖管理，包含patch-package实现补丁持久化：
+### 鑼冨紡鎻忚堪
+Node.js渚濊禆绠＄悊锛屽寘鍚玴atch-package瀹炵幇琛ヤ竵鎸佷箙鍖栵細
 
-### 核心实现
+### 鏍稿績瀹炵幇
 
-#### package.json配置
+#### package.json閰嶇疆
 ```json
 {
   "name": "xy_ws-dist",
@@ -3594,7 +3582,7 @@ Node.js依赖管理，包含patch-package实现补丁持久化：
 }
 ```
 
-#### 补丁文件示例 (patches/hostc+1.3.0.patch)
+#### 琛ヤ竵鏂囦欢绀轰緥 (patches/hostc+1.3.0.patch)
 ```diff
 diff --git a/dist/lib/tunnel.js b/dist/lib/tunnel.js
 index xxxxxxx..yyyyyyy 100644
@@ -3614,30 +3602,30 @@ index xxxxxxx..yyyyyyy 100644
    }
 ```
 
-### 工作原理
-1. `npm install` 时自动运行 `postinstall` 脚本
-2. `patch-package` 应用 `patches/` 目录下的所有补丁
-3. 确保第三方库的修复不会因依赖更新而丢失
+### 宸ヤ綔鍘熺悊
+1. `npm install` 鏃惰嚜鍔ㄨ繍琛?`postinstall` 鑴氭湰
+2. `patch-package` 搴旂敤 `patches/` 鐩綍涓嬬殑鎵€鏈夎ˉ涓?
+3. 纭繚绗笁鏂瑰簱鐨勪慨澶嶄笉浼氬洜渚濊禆鏇存柊鑰屼涪澶?
 
 ---
 
-## 🟡 PY-CORE-021: API压力测试范式 (API Stress Testing)
+## 馃煛 PY-CORE-021: API鍘嬪姏娴嬭瘯鑼冨紡 (API Stress Testing)
 
-### 范式描述
-标准化的API压力测试工具，用于性能评估和瓶颈发现：
+### 鑼冨紡鎻忚堪
+鏍囧噯鍖栫殑API鍘嬪姏娴嬭瘯宸ュ叿锛岀敤浜庢€ц兘璇勪及鍜岀摱棰堝彂鐜帮細
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 #!/usr/bin/env python3
 """
-Szwego商品爬虫 - API压力测试工具
+Szwego鍟嗗搧鐖櫕 - API鍘嬪姏娴嬭瘯宸ュ叿
 
-用法:
+鐢ㄦ硶:
     python stress_test.py --target http://localhost:5000 --concurrent 100 --requests 1000
 """
 
 def make_request(url, method='GET', data=None, timeout=10):
-    """发送HTTP请求并记录指标"""
+    """鍙戦€丠TTP璇锋眰骞惰褰曟寚鏍?""
     start = time.time()
     try:
         headers = {'Content-Type': 'application/json'}
@@ -3654,7 +3642,7 @@ def make_request(url, method='GET', data=None, timeout=10):
         return {'status': 0, 'time': time.time() - start, 'error': str(e), 'size': 0}
 
 def run_stress_test(target, concurrent, total_requests, endpoints):
-    """执行压力测试"""
+    """鎵ц鍘嬪姏娴嬭瘯"""
     results = []
     
     with ThreadPoolExecutor(max_workers=concurrent) as executor:
@@ -3668,17 +3656,17 @@ def run_stress_test(target, concurrent, total_requests, endpoints):
             if result:
                 results.append(result)
     
-    # 统计分析
+    # 缁熻鍒嗘瀽
     success = [r for r in results if 200 <= r['status'] < 400]
     times = [r['time'] for r in results]
     
-    print(f"成功率: {len(success)/len(results)*100:.2f}%")
-    print(f"平均响应时间: {statistics.mean(times)*1000:.2f}ms")
-    print(f"P99响应时间: {sorted(times)[int(len(times)*0.99)]*1000:.2f}ms")
+    print(f"鎴愬姛鐜? {len(success)/len(results)*100:.2f}%")
+    print(f"骞冲潎鍝嶅簲鏃堕棿: {statistics.mean(times)*1000:.2f}ms")
+    print(f"P99鍝嶅簲鏃堕棿: {sorted(times)[int(len(times)*0.99)]*1000:.2f}ms")
 
-# 使用示例
+# 浣跨敤绀轰緥
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Szwego API压力测试工具')
+    parser = argparse.ArgumentParser(description='Szwego API鍘嬪姏娴嬭瘯宸ュ叿')
     parser.add_argument('--target', default='http://localhost:5000')
     parser.add_argument('--concurrent', type=int, default=100)
     parser.add_argument('--requests', type=int, default=1000)
@@ -3687,28 +3675,28 @@ if __name__ == '__main__':
     run_stress_test(args.target, args.concurrent, args.requests, [])
 ```
 
-### 关键指标
-| 指标 | 说明 | 目标值 |
+### 鍏抽敭鎸囨爣
+| 鎸囨爣 | 璇存槑 | 鐩爣鍊?|
 |------|------|--------|
-| **成功率** | HTTP 200-399比例 | > 95% |
-| **平均延迟** | 响应时间均值 | < 200ms |
-| **P99延迟** | 99分位响应时间 | < 1000ms |
-| **QPS** | 每秒请求数 | > 500 |
+| **鎴愬姛鐜?* | HTTP 200-399姣斾緥 | > 95% |
+| **骞冲潎寤惰繜** | 鍝嶅簲鏃堕棿鍧囧€?| < 200ms |
+| **P99寤惰繜** | 99鍒嗕綅鍝嶅簲鏃堕棿 | < 1000ms |
+| **QPS** | 姣忕璇锋眰鏁?| > 500 |
 
 ---
 
-## 🟡 PY-CORE-022: 边界条件测试范式 (Edge Case Testing)
+## 馃煛 PY-CORE-022: 杈圭晫鏉′欢娴嬭瘯鑼冨紡 (Edge Case Testing)
 
-### 范式描述
-系统性的边界条件和极端情况测试，确保系统健壮性：
+### 鑼冨紡鎻忚堪
+绯荤粺鎬х殑杈圭晫鏉′欢鍜屾瀬绔儏鍐垫祴璇曪紝纭繚绯荤粺鍋ュ．鎬э細
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class TestBoundaryConditions:
-    """边界条件测试类"""
+    """杈圭晫鏉′欢娴嬭瘯绫?""
     
     def test_empty_string_input(self):
-        """空字符串输入处理"""
+        """绌哄瓧绗︿覆杈撳叆澶勭悊"""
         client = app.test_client()
         response = client.post('/api/run', 
                               data=json.dumps({'command': ''}),
@@ -3716,15 +3704,15 @@ class TestBoundaryConditions:
         assert response.status_code in [400, 200]
     
     def test_very_long_command(self):
-        """超长命令字符串（10000+字符）"""
+        """瓒呴暱鍛戒护瀛楃涓诧紙10000+瀛楃锛?""
         long_command = 'echo "' + 'a' * 10000 + '"'
         response = client.post('/api/run',
                               data=json.dumps({'command': long_command}),
                               content_type='application/json')
-        assert response.status_code in [200, 413]  # OK或Payload Too Large
+        assert response.status_code in [200, 413]  # OK鎴朠ayload Too Large
     
     def test_special_characters_in_command(self):
-        """包含特殊字符的命令"""
+        """鍖呭惈鐗规畩瀛楃鐨勫懡浠?""
         special_commands = [
             {'command': 'echo "hello world"'},
             {"command": "echo 'single quotes'"},
@@ -3738,15 +3726,15 @@ class TestBoundaryConditions:
             response = client.post('/api/run',
                                   data=json.dumps(cmd),
                                   content_type='application/json')
-            assert response.status_code != 500, f"崩溃于特殊字符: {cmd['command'][:50]}"
+            assert response.status_code != 500, f"宕╂簝浜庣壒娈婂瓧绗? {cmd['command'][:50]}"
     
     def test_unicode_input(self):
-        """Unicode字符输入"""
+        """Unicode瀛楃杈撳叆"""
         unicode_commands = [
-            {'command': 'echo 中文测试'},
-            {'command': 'echo 日本語テスト'},
-            {'command': 'echo 🎉🚀emoji测试'},
-            {'command': 'echo العربية'},
+            {'command': 'echo 涓枃娴嬭瘯'},
+            {'command': 'echo 鏃ユ湰瑾炪儐銈广儓'},
+            {'command': 'echo 馃帀馃殌emoji娴嬭瘯'},
+            {'command': 'echo 丕賱毓乇亘賷丞'},
         ]
         
         for cmd in unicode_commands:
@@ -3757,10 +3745,10 @@ class TestBoundaryConditions:
 
 
 class TestConcurrencyEdgeCases:
-    """并发边界情况测试"""
+    """骞跺彂杈圭晫鎯呭喌娴嬭瘯"""
     
     def test_burst_traffic(self):
-        """突发流量模式：瞬间大量请求后静默"""
+        """绐佸彂娴侀噺妯″紡锛氱灛闂村ぇ閲忚姹傚悗闈欓粯"""
         threads = []
         results = []
         
@@ -3770,7 +3758,7 @@ class TestConcurrencyEdgeCases:
                               content_type='application/json')
             results.append(resp.status_code)
         
-        # 瞬间启动50个线程
+        # 鐬棿鍚姩50涓嚎绋?
         for i in range(50):
             t = threading.Thread(target=make_request, args=(i,))
             threads.append(t)
@@ -3782,15 +3770,15 @@ class TestConcurrencyEdgeCases:
         success_count = sum(1 for s in results if s == 200)
         rate_limited_count = sum(1 for s in results if s == 429)
         
-        print(f"\n突发流量结果: 成功={success_count}, 被限流={rate_limited_count}")
-        assert success_count > 0  # 至少有一些成功
+        print(f"\n绐佸彂娴侀噺缁撴灉: 鎴愬姛={success_count}, 琚檺娴?{rate_limited_count}")
+        assert success_count > 0  # 鑷冲皯鏈変竴浜涙垚鍔?
 
 
 class TestFilesystemEdgeCases:
-    """文件系统边界情况"""
+    """鏂囦欢绯荤粺杈圭晫鎯呭喌"""
     
     def test_very_large_json_file(self):
-        """超大JSON文件处理"""
+        """瓒呭ぇJSON鏂囦欢澶勭悊"""
         large_data = {'items': [f'item_{i}' for i in range(10000)]}
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -3804,19 +3792,19 @@ class TestFilesystemEdgeCases:
             
             assert result is not None
             assert len(result.get('items', [])) == 10000
-            print(f"\n大文件读取: {duration*1000:.2f}ms, 10000条记录")
+            print(f"\n澶ф枃浠惰鍙? {duration*1000:.2f}ms, 10000鏉¤褰?)
         finally:
             os.unlink(temp_path)
     
     def test_malformed_json_variants(self):
-        """各种畸形JSON格式"""
+        """鍚勭鐣稿舰JSON鏍煎紡"""
         malformed_cases = [
-            ('', '空文件'),
-            ('{', '不完整的对象'),
-            ('[', '不完整的数组'),
-            ('{"key": }', '缺失值'),
-            ('null', '仅null'),
-            ('  \n\t  ', '空白字符'),
+            ('', '绌烘枃浠?),
+            ('{', '涓嶅畬鏁寸殑瀵硅薄'),
+            ('[', '涓嶅畬鏁寸殑鏁扮粍'),
+            ('{"key": }', '缂哄け鍊?),
+            ('null', '浠卬ull'),
+            ('  \n\t  ', '绌虹櫧瀛楃'),
         ]
         
         for content, description in malformed_cases:
@@ -3826,16 +3814,16 @@ class TestFilesystemEdgeCases:
             
             try:
                 result = safe_read_json(temp_path)
-                assert result is not None, f"崩溃于: {description}"
+                assert result is not None, f"宕╂簝浜? {description}"
             finally:
                 os.unlink(temp_path)
 
 
 class TestMemoryAndResourceLimits:
-    """内存和资源限制测试"""
+    """鍐呭瓨鍜岃祫婧愰檺鍒舵祴璇?""
     
     def test_many_consecutive_cache_reads(self):
-        """连续多次缓存读取（检测内存泄漏）"""
+        """杩炵画澶氭缂撳瓨璇诲彇锛堟娴嬪唴瀛樻硠婕忥級"""
         cache = FileCacheManager(ttl_seconds=5)
         
         initial_memory = None
@@ -3850,43 +3838,43 @@ class TestMemoryAndResourceLimits:
                 final_memory = psutil.Process().memory_info().rss
                 memory_growth_mb = (final_memory - initial_memory) / (1024*1024)
                 
-                # 内存增长不应该超过10MB
-                assert memory_growth_mb < 10, f"可能的内存泄漏: {memory_growth_mb:.2f}MB"
+                # 鍐呭瓨澧為暱涓嶅簲璇ヨ秴杩?0MB
+                assert memory_growth_mb < 10, f"鍙兘鐨勫唴瀛樻硠婕? {memory_growth_mb:.2f}MB"
 ```
 
-### 测试覆盖范围
-| 类别 | 测试场景 | 数量 |
+### 娴嬭瘯瑕嗙洊鑼冨洿
+| 绫诲埆 | 娴嬭瘯鍦烘櫙 | 鏁伴噺 |
 |------|---------|------|
-| **输入边界** | 空字符串、超长输入、特殊字符、Unicode | 15+ |
-| **并发边界** | 突发流量、多端点并发、快速连续请求 | 5+ |
-| **文件系统** | 大文件、畸形JSON、权限不足 | 8+ |
-| **内存限制** | 缓存泄漏检测、资源耗尽 | 3+ |
-| **网络弹性** | 连接超时、连接拒绝、DNS失败 | 4+ |
+| **杈撳叆杈圭晫** | 绌哄瓧绗︿覆銆佽秴闀胯緭鍏ャ€佺壒娈婂瓧绗︺€乁nicode | 15+ |
+| **骞跺彂杈圭晫** | 绐佸彂娴侀噺銆佸绔偣骞跺彂銆佸揩閫熻繛缁姹?| 5+ |
+| **鏂囦欢绯荤粺** | 澶ф枃浠躲€佺暩褰SON銆佹潈闄愪笉瓒?| 8+ |
+| **鍐呭瓨闄愬埗** | 缂撳瓨娉勬紡妫€娴嬨€佽祫婧愯€楀敖 | 3+ |
+| **缃戠粶寮规€?* | 杩炴帴瓒呮椂銆佽繛鎺ユ嫆缁濄€丏NS澶辫触 | 4+ |
 
 ---
 
-## 🟡 PY-CORE-023: 安全修复验证测试范式 (Security Fix Verification Testing)
+## 馃煛 PY-CORE-023: 瀹夊叏淇楠岃瘉娴嬭瘯鑼冨紡 (Security Fix Verification Testing)
 
-### 范式描述
-针对已知安全漏洞的回归测试套件，确保修复不反弹：
+### 鑼冨紡鎻忚堪
+閽堝宸茬煡瀹夊叏婕忔礊鐨勫洖褰掓祴璇曞浠讹紝纭繚淇涓嶅弽寮癸細
 
-### 核心实现
+### 鏍稿績瀹炵幇
 ```python
 class TestAPIInputValidation:
-    """测试1: API输入验证 - Bug #1修复验证"""
+    """娴嬭瘯1: API杈撳叆楠岃瘉 - Bug #1淇楠岃瘉"""
     
     def test_empty_post_body_returns_400(self):
-        """空请求体应返回400"""
+        """绌鸿姹備綋搴旇繑鍥?00"""
         client = app.test_client()
         response = client.post('/run', data='', content_type='application/json')
         
         assert response.status_code == 400
         data = json.loads(response.data)
         assert 'error' in data
-        assert '不能为空' in data['error']
+        assert '涓嶈兘涓虹┖' in data['error']
     
     def test_invalid_json_returns_400(self):
-        """无效JSON应返回400"""
+        """鏃犳晥JSON搴旇繑鍥?00"""
         client = app.test_client()
         response = client.post('/run', data='not valid json', 
                               content_type='application/json')
@@ -3894,10 +3882,10 @@ class TestAPIInputValidation:
 
 
 class TestJSONParsingSafety:
-    """测试2: JSON解析安全性 - Bug #2修复验证"""
+    """娴嬭瘯2: JSON瑙ｆ瀽瀹夊叏鎬?- Bug #2淇楠岃瘉"""
     
     def test_empty_logs_array_no_index_error(self):
-        """空的logs数组不应导致IndexError"""
+        """绌虹殑logs鏁扮粍涓嶅簲瀵艰嚧IndexError"""
         test_data = {'logs': []}
         
         logs = test_data.get('logs', [])
@@ -3910,7 +3898,7 @@ class TestJSONParsingSafety:
         assert added == []
     
     def test_corrupted_json_handled_gracefully(self):
-        """损坏的JSON文件应被优雅处理"""
+        """鎹熷潖鐨凧SON鏂囦欢搴旇浼橀泤澶勭悊"""
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             f.write('{invalid json content}')
             temp_path = f.name
@@ -3923,32 +3911,32 @@ class TestJSONParsingSafety:
 
 
 class TestTypeSafety:
-    """测试3: 类型安全 - Bug #3修复验证"""
+    """娴嬭瘯3: 绫诲瀷瀹夊叏 - Bug #3淇楠岃瘉"""
     
     def test_xiaoji_records_type_validation(self):
-        """xiaoji_records必须是list类型"""
+        """xiaoji_records蹇呴』鏄痩ist绫诲瀷"""
         test_cases = [
-            ({'小计': []}, []),
-            ({'小计': ['item1', 'item2']}, ['item1', 'item2']),
+            ({'灏忚': []}, []),
+            ({'灏忚': ['item1', 'item2']}, ['item1', 'item2']),
             ({}, []),
-            ({'小计': 'not_a_list'}, []),  # 错误类型
-            ({'小计': None}, []),          # None值
+            ({'灏忚': 'not_a_list'}, []),  # 閿欒绫诲瀷
+            ({'灏忚': None}, []),          # None鍊?
         ]
         
         for input_data, expected in test_cases:
             result = (
-                input_data.get('小计', []) 
-                if isinstance(input_data, dict) and isinstance(input_data.get('小计'), list) 
+                input_data.get('灏忚', []) 
+                if isinstance(input_data, dict) and isinstance(input_data.get('灏忚'), list) 
                 else []
             )
             assert result == expected, f"Failed for input: {input_data}"
 
 
 class TestThreadSafety:
-    """测试4: 线程安全 - Bug #4修复验证"""
+    """娴嬭瘯4: 绾跨▼瀹夊叏 - Bug #4淇楠岃瘉"""
     
     def test_processes_dict_protected_by_lock(self):
-        """processes字典应该被锁保护"""
+        """processes瀛楀吀搴旇琚攣淇濇姢"""
         errors = []
         
         def write_to_dict():
@@ -3965,7 +3953,7 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(e)
         
-        # 启动多个线程并发访问
+        # 鍚姩澶氫釜绾跨▼骞跺彂璁块棶
         threads = []
         for i in range(10):
             t = threading.Thread(target=write_to_dict if i % 2 == 0 else read_from_dict)
@@ -3975,42 +3963,42 @@ class TestThreadSafety:
         for t in threads:
             t.join(timeout=5)
         
-        assert len(errors) == 0, f"线程安全错误: {errors}"
+        assert len(errors) == 0, f"绾跨▼瀹夊叏閿欒: {errors}"
 
 
 class TestRateLimiting:
-    """测试5: 速率限制功能"""
+    """娴嬭瘯5: 閫熺巼闄愬埗鍔熻兘"""
     
     def test_rate_limiter_blocks_excessive_requests(self):
-        """速率限制器应阻止过多请求"""
+        """閫熺巼闄愬埗鍣ㄥ簲闃绘杩囧璇锋眰"""
         limiter = RateLimiter(max_requests=3, window_seconds=60)
         test_ip = '192.168.1.100'
         
-        # 前3次应该允许
+        # 鍓?娆″簲璇ュ厑璁?
         for i in range(3):
             assert limiter.is_allowed(test_ip) is True
         
-        # 第4次应该被阻止
+        # 绗?娆″簲璇ヨ闃绘
         assert limiter.is_allowed(test_ip) is False
     
     def test_rate_limiter_different_ips_independent(self):
-        """不同IP应有独立的速率限制计数"""
+        """涓嶅悓IP搴旀湁鐙珛鐨勯€熺巼闄愬埗璁℃暟"""
         limiter = RateLimiter(max_requests=2, window_seconds=60)
         
-        # IP1达到限制
+        # IP1杈惧埌闄愬埗
         limiter.is_allowed('192.168.1.1')
         limiter.is_allowed('192.168.1.1')
         assert limiter.is_allowed('192.168.1.1') is False
         
-        # IP2应该不受影响
+        # IP2搴旇涓嶅彈褰卞搷
         assert limiter.is_allowed('192.168.1.2') is True
 
 
 class TestExceptionHandling:
-    """测试7: 异常处理的健壮性"""
+    """娴嬭瘯7: 寮傚父澶勭悊鐨勫仴澹€?""
     
     def test_socket_cleanup_on_exception(self):
-        """socket应在异常时正确关闭"""
+        """socket搴斿湪寮傚父鏃舵纭叧闂?""
         mock_socket = Mock()
         mock_socket.close = Mock()
         
@@ -4027,181 +4015,181 @@ class TestExceptionHandling:
                 except Exception:
                     pass
         
-        # 验证close被调用
+        # 楠岃瘉close琚皟鐢?
         mock_socket.close.assert_called_once()
 ```
 
-### 安全测试清单
-| Bug编号 | 漏洞类型 | 测试方法 | 验证点 |
+### 瀹夊叏娴嬭瘯娓呭崟
+| Bug缂栧彿 | 婕忔礊绫诲瀷 | 娴嬭瘯鏂规硶 | 楠岃瘉鐐?|
 |--------|---------|---------|--------|
-| #1 | API输入验证 | `test_empty_post_body_returns_400` | 返回400而非500 |
-| #2 | JSON解析安全 | `test_corrupted_json_handled_gracefully` | 不崩溃，返回默认值 |
-| #3 | 类型安全 | `test_xiaoji_records_type_validation` | 类型检查防IndexError |
-| #4 | 线程安全 | `test_processes_dict_protected_by_lock` | 无竞态条件 |
-| #5 | 速率限制 | `test_rate_limiter_blocks_excessive_requests` | 正确限流 |
-| #7 | 异常处理 | `test_socket_cleanup_on_exception` | 资源正确释放 |
+| #1 | API杈撳叆楠岃瘉 | `test_empty_post_body_returns_400` | 杩斿洖400鑰岄潪500 |
+| #2 | JSON瑙ｆ瀽瀹夊叏 | `test_corrupted_json_handled_gracefully` | 涓嶅穿婧冿紝杩斿洖榛樿鍊?|
+| #3 | 绫诲瀷瀹夊叏 | `test_xiaoji_records_type_validation` | 绫诲瀷妫€鏌ラ槻IndexError |
+| #4 | 绾跨▼瀹夊叏 | `test_processes_dict_protected_by_lock` | 鏃犵珵鎬佹潯浠?|
+| #5 | 閫熺巼闄愬埗 | `test_rate_limiter_blocks_excessive_requests` | 姝ｇ‘闄愭祦 |
+| #7 | 寮傚父澶勭悊 | `test_socket_cleanup_on_exception` | 璧勬簮姝ｇ‘閲婃斁 |
 
 ---
 
-## 📊 完整代码范式汇总表
+## 馃搳 瀹屾暣浠ｇ爜鑼冨紡姹囨€昏〃
 
-| 范式编号 | 名称 | 覆盖文件 | 优先级 |
+| 鑼冨紡缂栧彿 | 鍚嶇О | 瑕嗙洊鏂囦欢 | 浼樺厛绾?|
 |---------|------|---------|--------|
-| PY-CORE-001 | 统一异常处理 | main.py | 🔴 核心 |
-| PY-CORE-002 | 环境自适应 | main.py | 🔴 核心 |
-| PY-CORE-003 | 统一路径管理 | main.py | 🔴 核心 |
-| PY-CORE-004 | 智能缓存管理 | main.py | 🔴 核心 |
-| PY-CORE-005 | 安全邮件通知 | main.py | 🔴 核心 |
-| PY-CORE-006 | 浏览器自动化爬虫 | main.py | 🔴 核心 |
-| PY-CORE-007 | 数据对比分析 | main.py | 🔴 核心 |
-| PY-CORE-008 | API速率限制与输入验证 | main.py | 🔴 核心 |
-| PY-CORE-009 | 前端安全防护 | dist/app.js | 🔴 核心 |
-| PY-CORE-010 | 双输出日志系统 | main.py | 🔴 核心 |
-| PY-CORE-011 | 配置管理 | main.py | 🔴 核心 |
-| PY-CORE-012 | Cookie验证与管理 | main.py | 🔴 核心 |
-| PY-CORE-013 | 文件清理自动化 | main.py | 🔴 核心 |
-| PY-CORE-014 | 后台任务管理 | main.py | 🔴 核心 |
-| PY-CORE-015 | 隧道高可用 | main.py | 🔴 核心 |
-| PY-CORE-016 | 跨平台启动脚本 | run.bat/run.sh | 🔴 核心 |
-| PY-CORE-017 | CI/CD自动化部署 | .github/workflows/ci-cd.yml | 🟡 重要 |
-| PY-CORE-018 | PWA离线缓存 | dist/sw.js + registerSW.js | 🟡 重要 |
-| PY-CORE-019 | Python依赖管理 | requirements.txt | 🟡 重要 |
-| PY-CORE-020 | Node.js依赖管理与补丁持久化 | dist/package.json | 🟡 重要 |
-| PY-CORE-021 | API压力测试 | tests/stress_test.py | 🟡 重要 |
-| PY-CORE-022 | 边界条件测试 | tests/test_edge_cases.py | 🟡 重要 |
-| PY-CORE-023 | 安全修复验证测试 | tests/test_security_fixes.py | 🟡 重要 |
+| PY-CORE-001 | 缁熶竴寮傚父澶勭悊 | main.py | 馃敶 鏍稿績 |
+| PY-CORE-002 | 鐜鑷€傚簲 | main.py | 馃敶 鏍稿績 |
+| PY-CORE-003 | 缁熶竴璺緞绠＄悊 | main.py | 馃敶 鏍稿績 |
+| PY-CORE-004 | 鏅鸿兘缂撳瓨绠＄悊 | main.py | 馃敶 鏍稿績 |
+| PY-CORE-005 | 瀹夊叏閭欢閫氱煡 | main.py | 馃敶 鏍稿績 |
+| PY-CORE-006 | 娴忚鍣ㄨ嚜鍔ㄥ寲鐖櫕 | main.py | 馃敶 鏍稿績 |
+| PY-CORE-007 | 鏁版嵁瀵规瘮鍒嗘瀽 | main.py | 馃敶 鏍稿績 |
+| PY-CORE-008 | API閫熺巼闄愬埗涓庤緭鍏ラ獙璇?| main.py | 馃敶 鏍稿績 |
+| PY-CORE-009 | 鍓嶇瀹夊叏闃叉姢 | dist/app.js | 馃敶 鏍稿績 |
+| PY-CORE-010 | 鍙岃緭鍑烘棩蹇楃郴缁?| main.py | 馃敶 鏍稿績 |
+| PY-CORE-011 | 閰嶇疆绠＄悊 | main.py | 馃敶 鏍稿績 |
+| PY-CORE-012 | Cookie楠岃瘉涓庣鐞?| main.py | 馃敶 鏍稿績 |
+| PY-CORE-013 | 鏂囦欢娓呯悊鑷姩鍖?| main.py | 馃敶 鏍稿績 |
+| PY-CORE-014 | 鍚庡彴浠诲姟绠＄悊 | main.py | 馃敶 鏍稿績 |
+| PY-CORE-015 | 闅ч亾楂樺彲鐢?| main.py | 馃敶 鏍稿績 |
+| PY-CORE-016 | 璺ㄥ钩鍙板惎鍔ㄨ剼鏈?| run.bat/run.sh | 馃敶 鏍稿績 |
+| PY-CORE-017 | CI/CD鑷姩鍖栭儴缃?| .github/workflows/ci-cd.yml | 馃煛 閲嶈 |
+| PY-CORE-018 | PWA绂荤嚎缂撳瓨 | dist/sw.js + registerSW.js | 馃煛 閲嶈 |
+| PY-CORE-019 | Python渚濊禆绠＄悊 | requirements.txt | 馃煛 閲嶈 |
+| PY-CORE-020 | Node.js渚濊禆绠＄悊涓庤ˉ涓佹寔涔呭寲 | dist/package.json | 馃煛 閲嶈 |
+| PY-CORE-021 | API鍘嬪姏娴嬭瘯 | tests/stress_test.py | 馃煛 閲嶈 |
+| PY-CORE-022 | 杈圭晫鏉′欢娴嬭瘯 | tests/test_edge_cases.py | 馃煛 閲嶈 |
+| PY-CORE-023 | 瀹夊叏淇楠岃瘉娴嬭瘯 | tests/test_security_fixes.py | 馃煛 閲嶈 |
 
-**总计: 23个核心范式，覆盖项目中所有关键文件！**
-
----
-
-**文档版本**: v3.8.89.11  
-**最后更新**: 2026-07-31  
-**下次审查**: 2026-08-06  
-**维护者**: 小旭数码开发团队
+**鎬昏: 23涓牳蹇冭寖寮忥紝瑕嗙洊椤圭洰涓墍鏈夊叧閿枃浠讹紒**
 
 ---
 
-## 🔴 PY-CORE-007: 字段名兼容性范式 (Field Name Compatibility)
+**鏂囨。鐗堟湰**: v3.8.89.11  
+**鏈€鍚庢洿鏂?*: 2026-07-31  
+**涓嬫瀹℃煡**: 2026-08-06  
+**缁存姢鑰?*: 灏忔棴鏁扮爜寮€鍙戝洟闃?
 
-### 范式描述
-由于JSON数据同时存储中文字段名和英文字段名（如 `商品描述`/`name`, `售价`/`price`），所有数据提取和解析代码必须实现**多重字段名兼容**，确保数据的完整性和向后兼容性。
+---
 
-### 核心原则
+## 馃敶 PY-CORE-007: 瀛楁鍚嶅吋瀹规€ц寖寮?(Field Name Compatibility)
 
-#### 1. 后端字段提取 - 多重回退策略
+### 鑼冨紡鎻忚堪
+鐢变簬JSON鏁版嵁鍚屾椂瀛樺偍涓枃瀛楁鍚嶅拰鑻辨枃瀛楁鍚嶏紙濡?`鍟嗗搧鎻忚堪`/`name`, `鍞环`/`price`锛夛紝鎵€鏈夋暟鎹彁鍙栧拰瑙ｆ瀽浠ｇ爜蹇呴』瀹炵幇**澶氶噸瀛楁鍚嶅吋瀹?*锛岀‘淇濇暟鎹殑瀹屾暣鎬у拰鍚戝悗鍏煎鎬с€?
+
+### 鏍稿績鍘熷垯
+
+#### 1. 鍚庣瀛楁鎻愬彇 - 澶氶噸鍥為€€绛栫暐
 ```python
 def get_product_detail(item):
     """
-    提取商品详情（字段名兼容性设计）
+    鎻愬彇鍟嗗搧璇︽儏锛堝瓧娈靛悕鍏煎鎬ц璁★級
     
-    优先级：
-    1. 主字段名（中文，如"商品描述"）
-    2. 英文别名（如"name"）
-    3. 备用中文名（如"商品名称"，兼容旧版本）
+    浼樺厛绾э細
+    1. 涓诲瓧娈靛悕锛堜腑鏂囷紝濡?鍟嗗搧鎻忚堪"锛?
+    2. 鑻辨枃鍒悕锛堝"name"锛?
+    3. 澶囩敤涓枃鍚嶏紙濡?鍟嗗搧鍚嶇О"锛屽吋瀹规棫鐗堟湰锛?
     """
     return {
-        "商品描述": item.get('商品描述', '') or item.get('name', '') or item.get('商品名称', ''),
-        "售价": item.get('售价', '') or item.get('price', ''),
-        "货号": item.get('货号', '') or item.get('stock_number', ''),
-        "备注": item.get('备注', '') or item.get('remark', ''),
-        "员工": item.get('员工', '') or item.get('staff', '')
+        "鍟嗗搧鎻忚堪": item.get('鍟嗗搧鎻忚堪', '') or item.get('name', '') or item.get('鍟嗗搧鍚嶇О', ''),
+        "鍞环": item.get('鍞环', '') or item.get('price', ''),
+        "璐у彿": item.get('璐у彿', '') or item.get('stock_number', ''),
+        "澶囨敞": item.get('澶囨敞', '') or item.get('remark', ''),
+        "鍛樺伐": item.get('鍛樺伐', '') or item.get('staff', '')
     }
 ```
 
-**关键特性**:
-- ✅ 使用 `or` 链式调用，返回第一个非空值
-- ✅ 优先使用主字段名，降级到英文别名，最后尝试备用名
-- ✅ 确保即使JSON结构变化也能取到有效数据
+**鍏抽敭鐗规€?*:
+- 鉁?浣跨敤 `or` 閾惧紡璋冪敤锛岃繑鍥炵涓€涓潪绌哄€?
+- 鉁?浼樺厛浣跨敤涓诲瓧娈靛悕锛岄檷绾у埌鑻辨枃鍒悕锛屾渶鍚庡皾璇曞鐢ㄥ悕
+- 鉁?纭繚鍗充娇JSON缁撴瀯鍙樺寲涔熻兘鍙栧埌鏈夋晥鏁版嵁
 
-#### 2. 前端正则匹配 - 多模式兼容
+#### 2. 鍓嶇姝ｅ垯鍖归厤 - 澶氭ā寮忓吋瀹?
 ```javascript
-// ❌ 错误：只匹配单一字段名
-const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/);
+// 鉂?閿欒锛氬彧鍖归厤鍗曚竴瀛楁鍚?
+const nameMatch = line.match(/"鍟嗗搧鎻忚堪":\s*"([^"]+)"/);
 
-// ✅ 正确：多模式兼容匹配
-const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/) 
-               || line.match(/"商品名称":\s*"([^"]+)"/) 
+// 鉁?姝ｇ‘锛氬妯″紡鍏煎鍖归厤
+const nameMatch = line.match(/"鍟嗗搧鎻忚堪":\s*"([^"]+)"/) 
+               || line.match(/"鍟嗗搧鍚嶇О":\s*"([^"]+)"/) 
                || line.match(/"name":\s*"([^"]+)"/);
-const priceMatch = line.match(/"售价":\s*"([^"]+)"/) 
+const priceMatch = line.match(/"鍞环":\s*"([^"]+)"/) 
                  || line.match(/"price":\s*"([^"]+)"/);
 ```
 
-**匹配优先级**:
-1. 主字段名（中文）：`商品描述`, `售价`
-2. 备用中文名：`商品名称`（旧版兼容）
-3. 英文字段名：`name`, `price`（国际化支持）
+**鍖归厤浼樺厛绾?*:
+1. 涓诲瓧娈靛悕锛堜腑鏂囷級锛歚鍟嗗搧鎻忚堪`, `鍞环`
+2. 澶囩敤涓枃鍚嶏細`鍟嗗搧鍚嶇О`锛堟棫鐗堝吋瀹癸級
+3. 鑻辨枃瀛楁鍚嶏細`name`, `price`锛堝浗闄呭寲鏀寔锛?
 
-#### 3. 数据流完整性验证
+#### 3. 鏁版嵁娴佸畬鏁存€ч獙璇?
 ```
-数据源 (JSON)
-    ↓
-analyze_data_changes() [后端对比]
-    ↓ get_product_detail() [字段提取]
-    ↓ format_json_array() [格式化输出]
-    ↓ 前端正则解析 [app.js:1527]
-    ↓ 表格渲染 [UI展示]
+鏁版嵁婧?(JSON)
+    鈫?
+analyze_data_changes() [鍚庣瀵规瘮]
+    鈫?get_product_detail() [瀛楁鎻愬彇]
+    鈫?format_json_array() [鏍煎紡鍖栬緭鍑篯
+    鈫?鍓嶇姝ｅ垯瑙ｆ瀽 [app.js:1527]
+    鈫?琛ㄦ牸娓叉煋 [UI灞曠ず]
 ```
 
-**每个环节都必须**:
-- ✅ 兼容多种字段名格式
-- ✅ 对空值提供默认显示（如 `-`）
-- ✅ 记录日志便于调试（`console.log('[对比卡片] ✓ ...')`）
+**姣忎釜鐜妭閮藉繀椤?*:
+- 鉁?鍏煎澶氱瀛楁鍚嶆牸寮?
+- 鉁?瀵圭┖鍊兼彁渚涢粯璁ゆ樉绀猴紙濡?`-`锛?
+- 鉁?璁板綍鏃ュ織渚夸簬璋冭瘯锛坄console.log('[瀵规瘮鍗＄墖] 鉁?...')`锛?
 
-### 应用场景
+### 搴旂敤鍦烘櫙
 
-| 场景 | 文件位置 | 说明 |
+| 鍦烘櫙 | 鏂囦欢浣嶇疆 | 璇存槑 |
 |------|----------|------|
-| **删除商品对比** | `main.py:4520-4529` | 从旧数据中提取被删除商品的详细信息 |
-| **新增商品对比** | `main.py:4520-4529` | 从新数据中提取新增商品的详细信息 |
-| **前端表格渲染** | `dist/app.js:1527-1540` | 解析后端输出的JSON字符串并渲染为表格 |
-| **API响应处理** | `dist/app.js:6947+` | 处理 `/api/products` 返回的商品列表 |
+| **鍒犻櫎鍟嗗搧瀵规瘮** | `main.py:4520-4529` | 浠庢棫鏁版嵁涓彁鍙栬鍒犻櫎鍟嗗搧鐨勮缁嗕俊鎭?|
+| **鏂板鍟嗗搧瀵规瘮** | `main.py:4520-4529` | 浠庢柊鏁版嵁涓彁鍙栨柊澧炲晢鍝佺殑璇︾粏淇℃伅 |
+| **鍓嶇琛ㄦ牸娓叉煋** | `dist/app.js:1527-1540` | 瑙ｆ瀽鍚庣杈撳嚭鐨凧SON瀛楃涓插苟娓叉煋涓鸿〃鏍?|
+| **API鍝嶅簲澶勭悊** | `dist/app.js:6947+` | 澶勭悊 `/api/products` 杩斿洖鐨勫晢鍝佸垪琛?|
 
-### 最佳实践清单
+### 鏈€浣冲疄璺垫竻鍗?
 
-- [ ] **后端提取时**：始终使用 `or` 链式调用，不要依赖单一字段名
-- [ ] **前端解析时**：使用 `\|\|` 操作符连接多个正则表达式
-- [ ] **默认值处理**：空值统一显示为 `-`，保持界面整洁
-- [ ] **日志记录**：每个关键字段提取都记录日志，方便问题排查
-- [ ] **单元测试覆盖**：测试用例必须包含多种字段名格式的测试数据
-- [ ] **文档同步**：字段映射关系必须在 README.md 和 SKILL.md 中同步更新
+- [ ] **鍚庣鎻愬彇鏃?*锛氬缁堜娇鐢?`or` 閾惧紡璋冪敤锛屼笉瑕佷緷璧栧崟涓€瀛楁鍚?
+- [ ] **鍓嶇瑙ｆ瀽鏃?*锛氫娇鐢?`\|\|` 鎿嶄綔绗﹁繛鎺ュ涓鍒欒〃杈惧紡
+- [ ] **榛樿鍊煎鐞?*锛氱┖鍊肩粺涓€鏄剧ず涓?`-`锛屼繚鎸佺晫闈㈡暣娲?
+- [ ] **鏃ュ織璁板綍**锛氭瘡涓叧閿瓧娈垫彁鍙栭兘璁板綍鏃ュ織锛屾柟渚块棶棰樻帓鏌?
+- [ ] **鍗曞厓娴嬭瘯瑕嗙洊**锛氭祴璇曠敤渚嬪繀椤诲寘鍚绉嶅瓧娈靛悕鏍煎紡鐨勬祴璇曟暟鎹?
+- [ ] **鏂囨。鍚屾**锛氬瓧娈垫槧灏勫叧绯诲繀椤诲湪 README.md 鍜?SKILL.md 涓悓姝ユ洿鏂?
 
-### 反面案例（避免）
+### 鍙嶉潰妗堜緥锛堥伩鍏嶏級
 
 ```python
-# ❌ 错误示例：硬编码单一字段名
+# 鉂?閿欒绀轰緥锛氱‖缂栫爜鍗曚竴瀛楁鍚?
 def bad_extract(item):
     return {
-        "name": item['商品名称'],  # 如果数据中是'商品描述'会抛KeyError
-        "price": item['售价']      # 如果数据中是'price'会抛KeyError
+        "name": item['鍟嗗搧鍚嶇О'],  # 濡傛灉鏁版嵁涓槸'鍟嗗搧鎻忚堪'浼氭姏KeyError
+        "price": item['鍞环']      # 濡傛灉鏁版嵁涓槸'price'浼氭姏KeyError
     }
 
-# ❌ 错误示例：不处理空值
+# 鉂?閿欒绀轰緥锛氫笉澶勭悊绌哄€?
 def bad_extract2(item):
-    name = item.get('商品描述')  # 可能为None或空字符串
-    return {"name": name}         # 前端显示空白而非"-"
+    name = item.get('鍟嗗搧鎻忚堪')  # 鍙兘涓篘one鎴栫┖瀛楃涓?
+    return {"name": name}         # 鍓嶇鏄剧ず绌虹櫧鑰岄潪"-"
 ```
 
 ---
 
-## 🔴 JS-FRONT-001: 响应式体验一致性范式 (Responsive Experience Consistency)
+## 馃敶 JS-FRONT-001: 鍝嶅簲寮忎綋楠屼竴鑷存€ц寖寮?(Responsive Experience Consistency)
 
-### 范式描述
-确保移动端和PC端在功能体验上保持一致，不能因为设备差异导致功能可用性不同。
+### 鑼冨紡鎻忚堪
+纭繚绉诲姩绔拰PC绔湪鍔熻兘浣撻獙涓婁繚鎸佷竴鑷达紝涓嶈兘鍥犱负璁惧宸紓瀵艰嚧鍔熻兘鍙敤鎬т笉鍚屻€?
 
-### 核心实现
+### 鏍稿績瀹炵幇
 
-#### 设备检测与差异化处理
+#### 璁惧妫€娴嬩笌宸紓鍖栧鐞?
 ```javascript
 const isMobile = window.innerWidth < 576;
 const isTablet = window.innerWidth >= 576 && window.innerWidth < 768;
 const isDesktop = window.innerWidth >= 992;
 
 if (isMobile) {
-    // 移动端优化：滚动到顶部 + 简化动画
+    // 绉诲姩绔紭鍖栵細婊氬姩鍒伴《閮?+ 绠€鍖栧姩鐢?
     spiderOutputContent.scrollTop = 0;
 } else {
-    // PC端优化：滚动到目标位置 + 视觉提醒动画
+    // PC绔紭鍖栵細婊氬姩鍒扮洰鏍囦綅缃?+ 瑙嗚鎻愰啋鍔ㄧ敾
     const targetElement = document.querySelector('.comparison-card:last-child');
     if (targetElement) {
         targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -4210,14 +4198,14 @@ if (isMobile) {
 }
 ```
 
-**设计原则**:
-- ✅ **移动端优先**：小屏幕空间有限，直接滚动到顶部查看最新内容
-- ✅ **PC端增强**：大屏幕空间充足，精确滚动到目标位置 + 动画提示用户注意
-- ✅ **渐进增强**：基础功能一致，高级体验根据设备能力差异化提供
+**璁捐鍘熷垯**:
+- 鉁?**绉诲姩绔紭鍏?*锛氬皬灞忓箷绌洪棿鏈夐檺锛岀洿鎺ユ粴鍔ㄥ埌椤堕儴鏌ョ湅鏈€鏂板唴瀹?
+- 鉁?**PC绔寮?*锛氬ぇ灞忓箷绌洪棿鍏呰冻锛岀簿纭粴鍔ㄥ埌鐩爣浣嶇疆 + 鍔ㄧ敾鎻愮ず鐢ㄦ埛娉ㄦ剰
+- 鉁?**娓愯繘澧炲己**锛氬熀纭€鍔熻兘涓€鑷达紝楂樼骇浣撻獙鏍规嵁璁惧鑳藉姏宸紓鍖栨彁渚?
 
-#### 动画提示系统
+#### 鍔ㄧ敾鎻愮ず绯荤粺
 ```css
-/* 脉冲动画 - 用于PC端提醒用户关注新增内容 */
+/* 鑴夊啿鍔ㄧ敾 - 鐢ㄤ簬PC绔彁閱掔敤鎴峰叧娉ㄦ柊澧炲唴瀹?*/
 @keyframes pulse {
     0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(64, 158, 255, 0.7); }
     70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(64, 158, 255, 0); }
@@ -4225,30 +4213,30 @@ if (isMobile) {
 }
 
 .comparison-card {
-    animation: pulse 2s ease-in-out 3;  /* 播放3次后停止 */
+    animation: pulse 2s ease-in-out 3;  /* 鎾斁3娆″悗鍋滄 */
 }
 ```
 
-**应用场景**:
-- 🎯 **爬虫结果卡片**：爬虫运行完成后自动定位到对比结果
-- 📊 **对比差异高亮**：新增/删除的商品行添加背景色区分
-- 🔔 **错误提示**：Toast通知在不同位置显示（移动端居中，PC端右上角）
+**搴旂敤鍦烘櫙**:
+- 馃幆 **鐖櫕缁撴灉鍗＄墖**锛氱埇铏繍琛屽畬鎴愬悗鑷姩瀹氫綅鍒板姣旂粨鏋?
+- 馃搳 **瀵规瘮宸紓楂樹寒**锛氭柊澧?鍒犻櫎鐨勫晢鍝佽娣诲姞鑳屾櫙鑹插尯鍒?
+- 馃敂 **閿欒鎻愮ず**锛歍oast閫氱煡鍦ㄤ笉鍚屼綅缃樉绀猴紙绉诲姩绔眳涓紝PC绔彸涓婅锛?
 
-### 体验一致性检查清单
+### 浣撻獙涓€鑷存€ф鏌ユ竻鍗?
 
-- [ ] **核心功能可用性**：移动端和PC端都能完成相同的核心操作
-- [ ] **信息可见性**：重要信息在两种设备上都无需额外操作即可看到
-- [ ] **交互反馈**：点击、滚动等操作在两种设备上都有明确的视觉反馈
-- [ ] **性能表现**：移动端不会因复杂动画导致卡顿，PC端充分利用硬件性能
-- [ ] **可访问性**：键盘导航、屏幕阅读器等辅助功能在两种设备上都能正常工作
+- [ ] **鏍稿績鍔熻兘鍙敤鎬?*锛氱Щ鍔ㄧ鍜孭C绔兘鑳藉畬鎴愮浉鍚岀殑鏍稿績鎿嶄綔
+- [ ] **淇℃伅鍙鎬?*锛氶噸瑕佷俊鎭湪涓ょ璁惧涓婇兘鏃犻渶棰濆鎿嶄綔鍗冲彲鐪嬪埌
+- [ ] **浜や簰鍙嶉**锛氱偣鍑汇€佹粴鍔ㄧ瓑鎿嶄綔鍦ㄤ袱绉嶈澶囦笂閮芥湁鏄庣‘鐨勮瑙夊弽棣?
+- [ ] **鎬ц兘琛ㄧ幇**锛氱Щ鍔ㄧ涓嶄細鍥犲鏉傚姩鐢诲鑷村崱椤匡紝PC绔厖鍒嗗埄鐢ㄧ‖浠舵€ц兘
+- [ ] **鍙闂€?*锛氶敭鐩樺鑸€佸睆骞曢槄璇诲櫒绛夎緟鍔╁姛鑳藉湪涓ょ璁惧涓婇兘鑳芥甯稿伐浣?
 
 ---
 
-## 🛠️ 开发工具链规范 (Development Toolchain Standards)
+## 馃洜锔?寮€鍙戝伐鍏烽摼瑙勮寖 (Development Toolchain Standards)
 
-### Git提交规范
+### Git鎻愪氦瑙勮寖
 
-#### Commit Message 格式
+#### Commit Message 鏍煎紡
 ```
 <type>(<scope>): <subject>
 
@@ -4257,187 +4245,187 @@ if (isMobile) {
 <footer>
 ```
 
-**Type 类型**:
-- `feat`: 新功能
-- `fix`: Bug修复
-- `docs`: 文档更新
-- `style`: 代码格式调整（不影响功能）
-- `refactor`: 重构（不是新功能也不是修复bug）
-- `perf`: 性能优化
-- `test`: 测试相关
-- `chore`: 构建/工具/辅助工具的变动
+**Type 绫诲瀷**:
+- `feat`: 鏂板姛鑳?
+- `fix`: Bug淇
+- `docs`: 鏂囨。鏇存柊
+- `style`: 浠ｇ爜鏍煎紡璋冩暣锛堜笉褰卞搷鍔熻兘锛?
+- `refactor`: 閲嶆瀯锛堜笉鏄柊鍔熻兘涔熶笉鏄慨澶峛ug锛?
+- `perf`: 鎬ц兘浼樺寲
+- `test`: 娴嬭瘯鐩稿叧
+- `chore`: 鏋勫缓/宸ュ叿/杈呭姪宸ュ叿鐨勫彉鍔?
 
-**Scope 范围**:
-- `backend`: Python后端 (main.py)
-- `frontend`: JavaScript前端 (dist/app.js)
-- `docs`: 文档 (README.md, skill.md)
-- `config`: 配置文件
-- `deploy`: 部署相关
+**Scope 鑼冨洿**:
+- `backend`: Python鍚庣 (main.py)
+- `frontend`: JavaScript鍓嶇 (dist/app.js)
+- `docs`: 鏂囨。 (README.md, skill.md)
+- `config`: 閰嶇疆鏂囦欢
+- `deploy`: 閮ㄧ讲鐩稿叧
 
-**示例**:
+**绀轰緥**:
 ```
-fix(frontend): 对比数据字段名匹配问题
+fix(frontend): 瀵规瘮鏁版嵁瀛楁鍚嶅尮閰嶉棶棰?
 
-- 修复get_product_detail()函数字段名错误（商品名称→商品描述）
-- 增强前端正则表达式支持多字段名匹配
-- 优化PC端对比卡片自动定位和动画提示
+- 淇get_product_detail()鍑芥暟瀛楁鍚嶉敊璇紙鍟嗗搧鍚嶇О鈫掑晢鍝佹弿杩帮級
+- 澧炲己鍓嶇姝ｅ垯琛ㄨ揪寮忔敮鎸佸瀛楁鍚嶅尮閰?
+- 浼樺寲PC绔姣斿崱鐗囪嚜鍔ㄥ畾浣嶅拰鍔ㄧ敾鎻愮ず
 
 Closes #123
 ```
 
-### 代码审查 Checklist
+### 浠ｇ爜瀹℃煡 Checklist
 
-#### 后端代码 (Python)
-- [ ] 异常处理是否使用了 `ExceptionContext` 或 `safe_call()`?
-- [ ] 字段提取是否遵循 PY-CORE-007 字段兼容性范式?
-- [ ] 日志是否使用了 `logger.info/warning/error` 而非 `print()`?
-- [ ] 路径管理是否通过 `PathManager` 统一处理?
-- [ ] 是否有对应的单元测试?
+#### 鍚庣浠ｇ爜 (Python)
+- [ ] 寮傚父澶勭悊鏄惁浣跨敤浜?`ExceptionContext` 鎴?`safe_call()`?
+- [ ] 瀛楁鎻愬彇鏄惁閬靛惊 PY-CORE-007 瀛楁鍏煎鎬ц寖寮?
+- [ ] 鏃ュ織鏄惁浣跨敤浜?`logger.info/warning/error` 鑰岄潪 `print()`?
+- [ ] 璺緞绠＄悊鏄惁閫氳繃 `PathManager` 缁熶竴澶勭悊?
+- [ ] 鏄惁鏈夊搴旂殑鍗曞厓娴嬭瘯?
 
-#### 前端代码 (JavaScript)
-- [ ] 是否对用户输入进行了 HTML 转义 (`escapeHtml()`)?
-- [ ] 字段名匹配是否支持多模式兼容?
-- [ ] 是否考虑了移动端和PC端的体验差异?
-- [ ] 是否添加了调试日志 (`console.log('[模块] ✓/✗ ...')`)?
-- [ ] 是否暴露了必要的全局函数 (`window.xxx = xxx`)?
+#### 鍓嶇浠ｇ爜 (JavaScript)
+- [ ] 鏄惁瀵圭敤鎴疯緭鍏ヨ繘琛屼簡 HTML 杞箟 (`escapeHtml()`)?
+- [ ] 瀛楁鍚嶅尮閰嶆槸鍚︽敮鎸佸妯″紡鍏煎?
+- [ ] 鏄惁鑰冭檻浜嗙Щ鍔ㄧ鍜孭C绔殑浣撻獙宸紓?
+- [ ] 鏄惁娣诲姞浜嗚皟璇曟棩蹇?(`console.log('[妯″潡] 鉁?鉁?...')`)?
+- [ ] 鏄惁鏆撮湶浜嗗繀瑕佺殑鍏ㄥ眬鍑芥暟 (`window.xxx = xxx`)?
 
-#### 文档更新
-- [ ] README.md 是否按照版本更新范式添加了记录?
-- [ ] skill.md 是否添加了相关的技术范式或最佳实践?
-- [ ] 修改的代码行号是否准确标注?
-- [ ] 是否包含修复前后的对比代码?
-- [ ] 修复效果是否有量化对比表?
+#### 鏂囨。鏇存柊
+- [ ] README.md 鏄惁鎸夌収鐗堟湰鏇存柊鑼冨紡娣诲姞浜嗚褰?
+- [ ] skill.md 鏄惁娣诲姞浜嗙浉鍏崇殑鎶€鏈寖寮忔垨鏈€浣冲疄璺?
+- [ ] 淇敼鐨勪唬鐮佽鍙锋槸鍚﹀噯纭爣娉?
+- [ ] 鏄惁鍖呭惈淇鍓嶅悗鐨勫姣斾唬鐮?
+- [ ] 淇鏁堟灉鏄惁鏈夐噺鍖栧姣旇〃?
 
-### 自动化检查命令
+### 鑷姩鍖栨鏌ュ懡浠?
 
 ```bash
-# Python语法检查
+# Python璇硶妫€鏌?
 python -m py_compile main.py
 
-# JavaScript语法检查
+# JavaScript璇硶妫€鏌?
 node --check dist/app.js
 
-# 单元测试
+# 鍗曞厓娴嬭瘯
 python -m pytest tests/ -v
 
-# 代码格式化（可选）
+# 浠ｇ爜鏍煎紡鍖栵紙鍙€夛級
 black main.py
 prettier --write dist/app.js
 ```
 
 ---
 
-## 📖 附录A: 字段映射速查表 (Field Mapping Reference)
+## 馃摉 闄勫綍A: 瀛楁鏄犲皠閫熸煡琛?(Field Mapping Reference)
 
-### 商品数据字段映射
+### 鍟嗗搧鏁版嵁瀛楁鏄犲皠
 
-| 业务含义 | 主字段名（中文） | 英文别名 | 备用字段名 | 示例值 |
+| 涓氬姟鍚箟 | 涓诲瓧娈靛悕锛堜腑鏂囷級 | 鑻辨枃鍒悕 | 澶囩敤瀛楁鍚?| 绀轰緥鍊?|
 |---------|----------------|---------|-----------|--------|
-| 商品名称 | `商品描述` | `name` | `商品名称` | iPhone 16 Pro Max |
-| 售价 | `售价` | `price` | - | ¥5,899 |
-| 拿货价 | `拿货价` | `cost_price` | - | ¥4,500 |
-| 货号 | `货号` | `stock_number` | - | 58187 |
-| 备注 | `备注` | `remark` | - | 屏幕有划痕 |
-| 员工 | `员工` | `staff` | - | 店长 |
-| 入库时间 | `入库时间` | `created_time` | - | 3小时前 |
-| 图片列表 | `图片` | `image` | - | `[base64...]` |
+| 鍟嗗搧鍚嶇О | `鍟嗗搧鎻忚堪` | `name` | `鍟嗗搧鍚嶇О` | iPhone 16 Pro Max |
+| 鍞环 | `鍞环` | `price` | - | 楼5,899 |
+| 鎷胯揣浠?| `鎷胯揣浠穈 | `cost_price` | - | 楼4,500 |
+| 璐у彿 | `璐у彿` | `stock_number` | - | 58187 |
+| 澶囨敞 | `澶囨敞` | `remark` | - | 灞忓箷鏈夊垝鐥?|
+| 鍛樺伐 | `鍛樺伐` | `staff` | - | 搴楅暱 |
+| 鍏ュ簱鏃堕棿 | `鍏ュ簱鏃堕棿` | `created_time` | - | 3灏忔椂鍓?|
+| 鍥剧墖鍒楄〃 | `鍥剧墖` | `image` | - | `[base64...]` |
 
-### 对比数据字段映射
+### 瀵规瘮鏁版嵁瀛楁鏄犲皠
 
-| 业务含义 | JSON字段 | 前端显示字段 | 说明 |
+| 涓氬姟鍚箟 | JSON瀛楁 | 鍓嶇鏄剧ず瀛楁 | 璇存槑 |
 |---------|----------|-------------|------|
-| 新增数量 | `added_count` | `newProductsCount` | 新增商品数 |
-| 删除数量 | `removed_count` | `deletedProductsCount` | 删除商品数 |
-| 新增列表 | `added` | `addedProducts` | 新增商品详情数组 |
-| 删除列表 | `removed` | `deletedProducts` | 删除商品详情数组 |
-| 高价新增 | `high_price_added` | `newHighPriceProducts` | 售价≥599的新增商品 |
+| 鏂板鏁伴噺 | `added_count` | `newProductsCount` | 鏂板鍟嗗搧鏁?|
+| 鍒犻櫎鏁伴噺 | `removed_count` | `deletedProductsCount` | 鍒犻櫎鍟嗗搧鏁?|
+| 鏂板鍒楄〃 | `added` | `addedProducts` | 鏂板鍟嗗搧璇︽儏鏁扮粍 |
+| 鍒犻櫎鍒楄〃 | `removed` | `deletedProducts` | 鍒犻櫎鍟嗗搧璇︽儏鏁扮粍 |
+| 楂樹环鏂板 | `high_price_added` | `newHighPriceProducts` | 鍞环鈮?99鐨勬柊澧炲晢鍝?|
 
 ---
 
-## 📖 附录B: 常见问题排查指南 (Troubleshooting Guide)
+## 馃摉 闄勫綍B: 甯歌闂鎺掓煡鎸囧崡 (Troubleshooting Guide)
 
-### Q1: 为什么删除商品的售价显示为"-"？
+### Q1: 涓轰粈涔堝垹闄ゅ晢鍝佺殑鍞环鏄剧ず涓?-"锛?
 
-**症状**: 后端日志显示售价为 `¥5,899`，但前端表格显示 `-`
+**鐥囩姸**: 鍚庣鏃ュ織鏄剧ず鍞环涓?`楼5,899`锛屼絾鍓嶇琛ㄦ牸鏄剧ず `-`
 
-**排查步骤**:
-1. 检查 `main.py:4520` 的 `get_product_detail()` 函数
-2. 确认字段名是否正确（应该是 `"商品描述"` 而非 `"商品名称"`）
-3. 检查前端 `dist/app.js:1528` 的正则表达式是否匹配该字段名
-4. 查看浏览器控制台的 `[对比卡片]` 日志确认解析结果
+**鎺掓煡姝ラ**:
+1. 妫€鏌?`main.py:4520` 鐨?`get_product_detail()` 鍑芥暟
+2. 纭瀛楁鍚嶆槸鍚︽纭紙搴旇鏄?`"鍟嗗搧鎻忚堪"` 鑰岄潪 `"鍟嗗搧鍚嶇О"`锛?
+3. 妫€鏌ュ墠绔?`dist/app.js:1528` 鐨勬鍒欒〃杈惧紡鏄惁鍖归厤璇ュ瓧娈靛悕
+4. 鏌ョ湅娴忚鍣ㄦ帶鍒跺彴鐨?`[瀵规瘮鍗＄墖]` 鏃ュ織纭瑙ｆ瀽缁撴灉
 
-**解决方案**:
-- 更新 `get_product_detail()` 使用多字段名兼容（PY-CORE-007）
-- 增强前端正则支持多模式匹配
+**瑙ｅ喅鏂规**:
+- 鏇存柊 `get_product_detail()` 浣跨敤澶氬瓧娈靛悕鍏煎锛圥Y-CORE-007锛?
+- 澧炲己鍓嶇姝ｅ垯鏀寔澶氭ā寮忓尮閰?
 
-### Q2: 为什么PC端看不到对比卡片？
+### Q2: 涓轰粈涔圥C绔湅涓嶅埌瀵规瘮鍗＄墖锛?
 
-**症状**: 移动端能正常显示，但PC端需要手动滚动才能找到
+**鐥囩姸**: 绉诲姩绔兘姝ｅ父鏄剧ず锛屼絾PC绔渶瑕佹墜鍔ㄦ粴鍔ㄦ墠鑳芥壘鍒?
 
-**排查步骤**:
-1. 打开浏览器开发者工具（F12）切换到Console标签
-2. 查找 `[对比卡片] ✅ 卡片可见性检查` 日志
-3. 检查卡片的 `width` 和 `height` 是否为0
-4. 确认CSS是否隐藏了该元素（`display: none` 或 `visibility: hidden`）
+**鎺掓煡姝ラ**:
+1. 鎵撳紑娴忚鍣ㄥ紑鍙戣€呭伐鍏凤紙F12锛夊垏鎹㈠埌Console鏍囩
+2. 鏌ユ壘 `[瀵规瘮鍗＄墖] 鉁?鍗＄墖鍙鎬ф鏌 鏃ュ織
+3. 妫€鏌ュ崱鐗囩殑 `width` 鍜?`height` 鏄惁涓?
+4. 纭CSS鏄惁闅愯棌浜嗚鍏冪礌锛坄display: none` 鎴?`visibility: hidden`锛?
 
-**解决方案**:
-- 在 `dist/app.js:1984` 添加PC端的 `scrollIntoView()` 调用
-- 为卡片添加脉冲动画提醒用户注意
+**瑙ｅ喅鏂规**:
+- 鍦?`dist/app.js:1984` 娣诲姞PC绔殑 `scrollIntoView()` 璋冪敤
+- 涓哄崱鐗囨坊鍔犺剦鍐插姩鐢绘彁閱掔敤鎴锋敞鎰?
 
-### Q3: 如何验证字段兼容性修复是否生效？
+### Q3: 濡備綍楠岃瘉瀛楁鍏煎鎬т慨澶嶆槸鍚︾敓鏁堬紵
 
-**测试步骤**:
-1. 准备测试数据：创建一个包含多种字段名的JSON文件
+**娴嬭瘯姝ラ**:
+1. 鍑嗗娴嬭瘯鏁版嵁锛氬垱寤轰竴涓寘鍚绉嶅瓧娈靛悕鐨凧SON鏂囦欢
    ```json
    [
-     {"商品描述": "iPhone", "售价": "¥5000"},
-     {"name": "Android", "price": "¥3000"},
-     {"商品名称": "iPad", "售价": "¥4000"}
+     {"鍟嗗搧鎻忚堪": "iPhone", "鍞环": "楼5000"},
+     {"name": "Android", "price": "楼3000"},
+     {"鍟嗗搧鍚嶇О": "iPad", "鍞环": "楼4000"}
    ]
    ```
-2. 运行爬虫触发对比逻辑
-3. 检查前端表格是否正确显示所有商品的名称和售价
-4. 查看控制台日志确认每个字段都被成功解析
+2. 杩愯鐖櫕瑙﹀彂瀵规瘮閫昏緫
+3. 妫€鏌ュ墠绔〃鏍兼槸鍚︽纭樉绀烘墍鏈夊晢鍝佺殑鍚嶇О鍜屽敭浠?
+4. 鏌ョ湅鎺у埗鍙版棩蹇楃‘璁ゆ瘡涓瓧娈甸兘琚垚鍔熻В鏋?
 
-**预期结果**:
-- 所有三种格式都能正确提取字段值
-- 表格中不会出现 `-`（除非原始数据确实为空）
-- 控制台显示 `[对比卡片] ✓` 成功日志
+**棰勬湡缁撴灉**:
+- 鎵€鏈変笁绉嶆牸寮忛兘鑳芥纭彁鍙栧瓧娈靛€?
+- 琛ㄦ牸涓笉浼氬嚭鐜?`-`锛堥櫎闈炲師濮嬫暟鎹‘瀹炰负绌猴級
+- 鎺у埗鍙版樉绀?`[瀵规瘮鍗＄墖] 鉁揱 鎴愬姛鏃ュ織
 
 ---
 
-## 🔴 PY-CORE-008: 代码库卫生维护范式 (Codebase Hygiene Maintenance)
+## 馃敶 PY-CORE-008: 浠ｇ爜搴撳崼鐢熺淮鎶よ寖寮?(Codebase Hygiene Maintenance)
 
-### 范式描述
-建立定期清理机制，及时移除临时文件、测试工具和废弃脚本，保持代码库整洁和可维护性。
+### 鑼冨紡鎻忚堪
+寤虹珛瀹氭湡娓呯悊鏈哄埗锛屽強鏃剁Щ闄や复鏃舵枃浠躲€佹祴璇曞伐鍏峰拰搴熷純鑴氭湰锛屼繚鎸佷唬鐮佸簱鏁存磥鍜屽彲缁存姢鎬с€?
 
-### 核心原则
+### 鏍稿績鍘熷垯
 
-#### 1. 文件生命周期管理
+#### 1. 鏂囦欢鐢熷懡鍛ㄦ湡绠＄悊
 ```python
 class FileLifecycleManager:
-    """文件生命周期管理器"""
+    """鏂囦欢鐢熷懡鍛ㄦ湡绠＄悊鍣?""
     
     TEMP_FILE_PATTERNS = [
-        'test_*.html',      # 测试工具
-        'test_*.py',        # 测试脚本
-        'generate_*.py',    # 生成器脚本
-        'fix_*.py',         # 临时修复脚本
-        'debug_*.log',      # 调试日志
-        '*.tmp',            # 临时文件
-        '~$*'               # Office锁文件
+        'test_*.html',      # 娴嬭瘯宸ュ叿
+        'test_*.py',        # 娴嬭瘯鑴氭湰
+        'generate_*.py',    # 鐢熸垚鍣ㄨ剼鏈?
+        'fix_*.py',         # 涓存椂淇鑴氭湰
+        'debug_*.log',      # 璋冭瘯鏃ュ織
+        '*.tmp',            # 涓存椂鏂囦欢
+        '~$*'               # Office閿佹枃浠?
     ]
     
     @classmethod
     def should_cleanup(cls, file_path):
         """
-        判断文件是否应该被清理
+        鍒ゆ柇鏂囦欢鏄惁搴旇琚竻鐞?
         
-        清理标准：
-        1. 匹配临时文件模式
-        2. 已完成历史使命（功能已验证/整合）
-        3. 不影响核心功能
-        4. 可通过Git历史恢复
+        娓呯悊鏍囧噯锛?
+        1. 鍖归厤涓存椂鏂囦欢妯″紡
+        2. 宸插畬鎴愬巻鍙蹭娇鍛斤紙鍔熻兘宸查獙璇?鏁村悎锛?
+        3. 涓嶅奖鍝嶆牳蹇冨姛鑳?
+        4. 鍙€氳繃Git鍘嗗彶鎭㈠
         """
         import fnmatch
         
@@ -4452,16 +4440,16 @@ class FileLifecycleManager:
     @classmethod
     def cleanup_temp_files(cls, project_dir, dry_run=False):
         """
-        清理临时文件
+        娓呯悊涓存椂鏂囦欢
         
         Args:
-            project_dir: 项目根目录
-            dry_run: 如果为True，只显示要删除的文件，不实际删除
+            project_dir: 椤圭洰鏍圭洰褰?
+            dry_run: 濡傛灉涓篢rue锛屽彧鏄剧ず瑕佸垹闄ょ殑鏂囦欢锛屼笉瀹為檯鍒犻櫎
         """
         removed_files = []
         
         for root, dirs, files in os.walk(project_dir):
-            # 跳过 .git、.venv 等目录
+            # 璺宠繃 .git銆?venv 绛夌洰褰?
             dirs[:] = [d for d in dirs if d not in ['.git', '.venv', 'node_modules', '__pycache__']]
             
             for file in files:
@@ -4469,38 +4457,38 @@ class FileLifecycleManager:
                 
                 if cls.should_cleanup(file_path):
                     if dry_run:
-                        print(f'[DRY-RUN] 将删除: {file_path}')
+                        print(f'[DRY-RUN] 灏嗗垹闄? {file_path}')
                         removed_files.append(file_path)
                     else:
                         try:
                             os.remove(file_path)
-                            print(f'✓ 已删除: {file_path}')
+                            print(f'鉁?宸插垹闄? {file_path}')
                             removed_files.append(file_path)
                         except Exception as e:
-                            print(f'✗ 删除失败: {file_path} - {e}')
+                            print(f'鉁?鍒犻櫎澶辫触: {file_path} - {e}')
         
         return removed_files
 ```
 
-#### 2. 清理决策清单
+#### 2. 娓呯悊鍐崇瓥娓呭崟
 ```python
 class CleanupChecklist:
-    """清理前检查清单"""
+    """娓呯悊鍓嶆鏌ユ竻鍗?""
     
     @staticmethod
     def pre_cleanup_checks(file_path):
         """
-        删除前的安全检查
+        鍒犻櫎鍓嶇殑瀹夊叏妫€鏌?
         
         Returns:
-            (can_delete, reason) 元组
+            (can_delete, reason) 鍏冪粍
         """
         checks = {
-            '核心功能依赖': not is_core_dependency(file_path),
-            '文档已独立维护': is_documentation_independent(file_path),
-            'Git历史可恢复': is_in_git_history(file_path),
-            '无运行时依赖': not has_runtime_dependency(file_path),
-            '测试已完成': is_testing_completed(file_path)
+            '鏍稿績鍔熻兘渚濊禆': not is_core_dependency(file_path),
+            '鏂囨。宸茬嫭绔嬬淮鎶?: is_documentation_independent(file_path),
+            'Git鍘嗗彶鍙仮澶?: is_in_git_history(file_path),
+            '鏃犺繍琛屾椂渚濊禆': not has_runtime_dependency(file_path),
+            '娴嬭瘯宸插畬鎴?: is_testing_completed(file_path)
         }
         
         all_pass = all(checks.values())
@@ -4511,43 +4499,43 @@ class CleanupChecklist:
     @staticmethod
     def generate_recovery_instructions(removed_files):
         """
-        生成恢复说明文档
+        鐢熸垚鎭㈠璇存槑鏂囨。
 
         Args:
-            removed_files: 已删除的文件列表
+            removed_files: 宸插垹闄ょ殑鏂囦欢鍒楄〃
 
         Returns:
-            Markdown格式的恢复指南
+            Markdown鏍煎紡鐨勬仮澶嶆寚鍗?
         """
-        pass  # 实现略
+        pass  # 瀹炵幇鐣?
 
 ---
 
-## 🔴 PY-CORE-019: subprocess 超时配置范式 (Subprocess Timeout Configuration)
+## 馃敶 PY-CORE-019: subprocess 瓒呮椂閰嶇疆鑼冨紡 (Subprocess Timeout Configuration)
 
-### 范式描述
-建立统一的 subprocess 调用超时管理机制，避免硬编码超时值，提升系统稳定性和可维护性。
+### 鑼冨紡鎻忚堪
+寤虹珛缁熶竴鐨?subprocess 璋冪敤瓒呮椂绠＄悊鏈哄埗锛岄伩鍏嶇‖缂栫爜瓒呮椂鍊硷紝鎻愬崌绯荤粺绋冲畾鎬у拰鍙淮鎶ゆ€с€?
 
-### 核心原则
+### 鏍稿績鍘熷垯
 
-#### 1. 全局超时配置
+#### 1. 鍏ㄥ眬瓒呮椂閰嶇疆
 ```python
-# config.py 或 main.py 顶部
+# config.py 鎴?main.py 椤堕儴
 TIMEOUT_CONFIG = {
-    'subprocess_kill': 10,      # 进程终止等待时间（秒）
-    'subprocess_check': 10,     # 进程检查超时（秒）
-    'http_request': 30,         # HTTP请求超时
-    'browser_wait': 30,         # 浏览器操作超时
+    'subprocess_kill': 10,      # 杩涚▼缁堟绛夊緟鏃堕棿锛堢锛?
+    'subprocess_check': 10,     # 杩涚▼妫€鏌ヨ秴鏃讹紙绉掞級
+    'http_request': 30,         # HTTP璇锋眰瓒呮椂
+    'browser_wait': 30,         # 娴忚鍣ㄦ搷浣滆秴鏃?
 }
 ```
 
-#### 2. subprocess 调用规范
+#### 2. subprocess 璋冪敤瑙勮寖
 ```python
 import subprocess
 from typing import Optional, Tuple
 
 class SubprocessManager:
-    """subprocess 统一管理器"""
+    """subprocess 缁熶竴绠＄悊鍣?""
 
     @staticmethod
     def run_command(
@@ -4557,19 +4545,19 @@ class SubprocessManager:
         **kwargs
     ) -> Tuple[int, str, str]:
         """
-        执行命令并统一处理超时
+        鎵ц鍛戒护骞剁粺涓€澶勭悊瓒呮椂
 
         Args:
-            command: 要执行的命令
-            timeout_key: TIMEOUT_CONFIG中的键名
-            capture_output: 是否捕获输出
-            **kwargs: subprocess.run 的其他参数
+            command: 瑕佹墽琛岀殑鍛戒护
+            timeout_key: TIMEOUT_CONFIG涓殑閿悕
+            capture_output: 鏄惁鎹曡幏杈撳嚭
+            **kwargs: subprocess.run 鐨勫叾浠栧弬鏁?
 
         Returns:
-            (returncode, stdout, stderr) 元组
+            (returncode, stdout, stderr) 鍏冪粍
 
         Raises:
-            subprocess.TimeoutExpired: 超时时抛出（由调用方决定如何处理）
+            subprocess.TimeoutExpired: 瓒呮椂鏃舵姏鍑猴紙鐢辫皟鐢ㄦ柟鍐冲畾濡備綍澶勭悊锛?
         """
         timeout = TIMEOUT_CONFIG.get(timeout_key, 10)
 
@@ -4587,18 +4575,18 @@ class SubprocessManager:
             return result.returncode, result.stdout, result.stderr
 
         except subprocess.TimeoutExpired as e:
-            # 记录详细超时信息
+            # 璁板綍璇︾粏瓒呮椂淇℃伅
             logger.warning(
-                f'命令执行超时 ({timeout}秒): {command[:100]}...'
-                f'\n超时类型: {timeout_key}'
+                f'鍛戒护鎵ц瓒呮椂 ({timeout}绉?: {command[:100]}...'
+                f'\n瓒呮椂绫诲瀷: {timeout_key}'
             )
-            raise  # 由调用方决定是否重试或降级
+            raise  # 鐢辫皟鐢ㄦ柟鍐冲畾鏄惁閲嶈瘯鎴栭檷绾?
 
-# ✅ 正确使用示例
+# 鉁?姝ｇ‘浣跨敤绀轰緥
 class ProcessMonitor:
     @staticmethod
     def check_process_running(process_name: str) -> bool:
-        """检查进程是否运行"""
+        """妫€鏌ヨ繘绋嬫槸鍚﹁繍琛?""
         try:
             returncode, stdout, _ = SubprocessManager.run_command(
                 f'tasklist /FI "IMAGENAME eq {process_name}"',
@@ -4607,42 +4595,42 @@ class ProcessMonitor:
             return process_name in stdout
 
         except subprocess.TimeoutExpired as e:
-            print(f"⚠️ 检查进程运行状态超时: {e}")
-            return False  # 超时时返回默认值，不级联故障
+            print(f"鈿狅笍 妫€鏌ヨ繘绋嬭繍琛岀姸鎬佽秴鏃? {e}")
+            return False  # 瓒呮椂鏃惰繑鍥為粯璁ゅ€硷紝涓嶇骇鑱旀晠闅?
 
         except Exception as e:
-            print(f"⚠️ 检查进程运行状态失败: {e}")
+            print(f"鈿狅笍 妫€鏌ヨ繘绋嬭繍琛岀姸鎬佸け璐? {e}")
             return False
 ```
 
-#### 3. 异常分层处理
+#### 3. 寮傚父鍒嗗眰澶勭悊
 ```python
-# ❌ 错误：所有异常混在一起处理
+# 鉂?閿欒锛氭墍鏈夊紓甯告贩鍦ㄤ竴璧峰鐞?
 except Exception as e:
-    logger.error(f'错误: {e}')
+    logger.error(f'閿欒: {e}')
     return False
 
-# ✅ 正确：按严重程度分层处理
+# 鉁?姝ｇ‘锛氭寜涓ラ噸绋嬪害鍒嗗眰澶勭悊
 except subprocess.TimeoutExpired as e:
-    # 第一层：超时（可预期的 transient 错误）
-    logger.warning(f'操作超时（{timeout}秒），可能系统负载较高')
-    return fallback_value  # 返回安全默认值
+    # 绗竴灞傦細瓒呮椂锛堝彲棰勬湡鐨?transient 閿欒锛?
+    logger.warning(f'鎿嶄綔瓒呮椂锛坽timeout}绉掞級锛屽彲鑳界郴缁熻礋杞借緝楂?)
+    return fallback_value  # 杩斿洖瀹夊叏榛樿鍊?
 
 except subprocess.SubprocessError as e:
-    # 第二层：subprocess 特定错误
-    logger.error(f'subprocess错误: {e}')
+    # 绗簩灞傦細subprocess 鐗瑰畾閿欒
+    logger.error(f'subprocess閿欒: {e}')
     raise AppException.subprocess_error(str(e))
 
 except OSError as e:
-    # 第三层：系统级错误（权限、文件不存在等）
-    logger.critical(f'系统错误: {e}')
+    # 绗笁灞傦細绯荤粺绾ч敊璇紙鏉冮檺銆佹枃浠朵笉瀛樺湪绛夛級
+    logger.critical(f'绯荤粺閿欒: {e}')
     raise AppException.system_error(str(e))
 ```
 
-#### 4. Windows 特殊处理
+#### 4. Windows 鐗规畩澶勭悊
 ```python
 if Environment.IS_WINDOWS:
-    # Windows 下 tasklist/pgrep 命令响应较慢
+    # Windows 涓?tasklist/pgrep 鍛戒护鍝嶅簲杈冩參
     process = subprocess.Popen(
         command,
         shell=True,
@@ -4651,48 +4639,48 @@ if Environment.IS_WINDOWS:
         stdin=subprocess.DEVNULL,
         cwd=PROJECT_DIR,
         text=True,
-        encoding='utf-8',      # 强制UTF-8编码
-        errors='replace',       # 编码容错
-        bufsize=1,              # 行缓冲
-        env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}  # 环境变量
+        encoding='utf-8',      # 寮哄埗UTF-8缂栫爜
+        errors='replace',       # 缂栫爜瀹归敊
+        bufsize=1,              # 琛岀紦鍐?
+        env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}  # 鐜鍙橀噺
     )
 ```
 
-### 最佳实践清单
-- ✅ 所有超时值使用 `TIMEOUT_CONFIG` 全局配置，禁止硬编码
-- ✅ `TimeoutExpired` 异常单独捕获，返回安全默认值而非抛出
-- ✅ Windows 平台使用 `encoding='utf-8'` + `errors='replace'`
-- ✅ 超时信息包含实际时长和配置键名，便于调试
-- ✅ 长时间运行的任务使用 `Popen` + 非阻塞读取，避免死锁
+### 鏈€浣冲疄璺垫竻鍗?
+- 鉁?鎵€鏈夎秴鏃跺€间娇鐢?`TIMEOUT_CONFIG` 鍏ㄥ眬閰嶇疆锛岀姝㈢‖缂栫爜
+- 鉁?`TimeoutExpired` 寮傚父鍗曠嫭鎹曡幏锛岃繑鍥炲畨鍏ㄩ粯璁ゅ€艰€岄潪鎶涘嚭
+- 鉁?Windows 骞冲彴浣跨敤 `encoding='utf-8'` + `errors='replace'`
+- 鉁?瓒呮椂淇℃伅鍖呭惈瀹為檯鏃堕暱鍜岄厤缃敭鍚嶏紝渚夸簬璋冭瘯
+- 鉁?闀挎椂闂磋繍琛岀殑浠诲姟浣跨敤 `Popen` + 闈為樆濉炶鍙栵紝閬垮厤姝婚攣
 
 ---
 
-## 🔴 PY-CORE-020: 编码处理最佳实践范式 (Encoding Best Practices)
+## 馃敶 PY-CORE-020: 缂栫爜澶勭悊鏈€浣冲疄璺佃寖寮?(Encoding Best Practices)
 
-### 范式描述
-建立跨平台编码处理标准，确保中文等多字节字符在 Windows/Linux/macOS 上都能正确显示。
+### 鑼冨紡鎻忚堪
+寤虹珛璺ㄥ钩鍙扮紪鐮佸鐞嗘爣鍑嗭紝纭繚涓枃绛夊瀛楄妭瀛楃鍦?Windows/Linux/macOS 涓婇兘鑳芥纭樉绀恒€?
 
-### 核心原则
+### 鏍稿績鍘熷垯
 
-#### 1. 文件读写编码规范
+#### 1. 鏂囦欢璇诲啓缂栫爜瑙勮寖
 ```python
-# ✅ 正确：始终显式指定 UTF-8
+# 鉁?姝ｇ‘锛氬缁堟樉寮忔寚瀹?UTF-8
 with open(file_path, 'r', encoding='utf-8') as f:
     data = f.read()
 
-# 容错模式（处理损坏文件）
+# 瀹归敊妯″紡锛堝鐞嗘崯鍧忔枃浠讹級
 with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
     data = f.read()
 
-# ❌ 错误：依赖系统默认编码（Windows下可能是GBK）
-with open(file_path, 'r') as f:  # 危险！
+# 鉂?閿欒锛氫緷璧栫郴缁熼粯璁ょ紪鐮侊紙Windows涓嬪彲鑳芥槸GBK锛?
+with open(file_path, 'r') as f:  # 鍗遍櫓锛?
     data = f.read()
 ```
 
-#### 2. subprocess 编码保障
+#### 2. subprocess 缂栫爜淇濋殰
 ```python
 def run_command_safely(command):
-    """安全执行命令，确保输出无乱码"""
+    """瀹夊叏鎵ц鍛戒护锛岀‘淇濊緭鍑烘棤涔辩爜"""
     env = os.environ.copy()
     env['PYTHONIOENCODING'] = 'utf-8'
 
@@ -4703,72 +4691,72 @@ def run_command_safely(command):
         stderr=subprocess.STDOUT,
         text=True,
         encoding='utf-8',
-        errors='replace',     # 替换无法解码的字符
+        errors='replace',     # 鏇挎崲鏃犳硶瑙ｇ爜鐨勫瓧绗?
         bufsize=1,
         env=env,
         cwd=PROJECT_DIR
     )
 
     for line in iter(process.stdout.readline, ''):
-        yield line  # 生成器模式，实时输出
+        yield line  # 鐢熸垚鍣ㄦā寮忥紝瀹炴椂杈撳嚭
 
     process.wait()
 ```
 
-#### 3. JSON 数据编码一致性
+#### 3. JSON 鏁版嵁缂栫爜涓€鑷存€?
 ```python
 def save_json(data, file_path):
-    """保存JSON数据，确保中文不乱码"""
+    """淇濆瓨JSON鏁版嵁锛岀‘淇濅腑鏂囦笉涔辩爜"""
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(
             data,
             f,
-            ensure_ascii=False,   # ✅ 关键：保留中文字符
+            ensure_ascii=False,   # 鉁?鍏抽敭锛氫繚鐣欎腑鏂囧瓧绗?
             indent=2,
             separators=(',', ': ')
         )
 
 def load_json(file_path):
-    """加载JSON数据"""
+    """鍔犺浇JSON鏁版嵁"""
     with open(file_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 ```
 
-#### 4. Base64 编解码处理URL
+#### 4. Base64 缂栬В鐮佸鐞哢RL
 ```python
 import base64
 
 def encode_url(url: str) -> str:
-    """URL转Base64（用于存储到JSON）"""
+    """URL杞珺ase64锛堢敤浜庡瓨鍌ㄥ埌JSON锛?""
     return base64.b64encode(url.encode('utf-8')).decode('ascii')
 
 def decode_url(b64_str: str) -> str:
-    """Base64转URL"""
+    """Base64杞琔RL"""
     try:
         return base64.b64decode(b64_str).decode('utf-8')
     except Exception:
-        return b64_str  # 解码失败时返回原始值
+        return b64_str  # 瑙ｇ爜澶辫触鏃惰繑鍥炲師濮嬪€?
 ```
 
-#### 5. 日志系统编码配置
+#### 5. 鏃ュ織绯荤粺缂栫爜閰嶇疆
 ```python
 import logging
 
 def setup_logger():
-    """配置日志系统，确保中文正常写入"""
+    """閰嶇疆鏃ュ織绯荤粺锛岀‘淇濅腑鏂囨甯稿啓鍏?""
     log_file = 'app.log'
 
-    # 文件处理器：强制UTF-8
+    # 鏂囦欢澶勭悊鍣細寮哄埗UTF-8
     file_handler = logging.FileHandler(
         log_file,
         mode='a',
-        encoding='utf-8'  # ✅ 关键
+        encoding='utf-8'  # 鉁?鍏抽敭
     )
     file_handler.setFormatter(
         logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     )
 
-    # 控制台处理器
+    # 鎺у埗鍙板鐞嗗櫒
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(
         logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -4782,88 +4770,88 @@ def setup_logger():
     return logger
 ```
 
-### 编码问题诊断清单
-遇到乱码时的排查步骤：
-1. ✅ 确认文件保存为 UTF-8 with BOM 或 UTF-8 without BOM
-2. ✅ 检查所有 `open()` 调用是否有 `encoding='utf-8'`
-3. ✅ 确认 Python 文件头部有 `# -*- coding: utf-8 -*-`
-4. ✅ 检查 subprocess 调用的 `encoding` 参数
-5. ✅ 确认环境变量 `PYTHONIOENCODING=utf-8`
-6. ✅ 使用 Git 恢复已知良好的版本作为基准
+### 缂栫爜闂璇婃柇娓呭崟
+閬囧埌涔辩爜鏃剁殑鎺掓煡姝ラ锛?
+1. 鉁?纭鏂囦欢淇濆瓨涓?UTF-8 with BOM 鎴?UTF-8 without BOM
+2. 鉁?妫€鏌ユ墍鏈?`open()` 璋冪敤鏄惁鏈?`encoding='utf-8'`
+3. 鉁?纭 Python 鏂囦欢澶撮儴鏈?`# -*- coding: utf-8 -*-`
+4. 鉁?妫€鏌?subprocess 璋冪敤鐨?`encoding` 鍙傛暟
+5. 鉁?纭鐜鍙橀噺 `PYTHONIOENCODING=utf-8`
+6. 鉁?浣跨敤 Git 鎭㈠宸茬煡鑹ソ鐨勭増鏈綔涓哄熀鍑?
 
 ---
 
-## 🔴 PY-CORE-021: Git 历史维护范式 (Git History Maintenance)
+## 馃敶 PY-CORE-021: Git 鍘嗗彶缁存姢鑼冨紡 (Git History Maintenance)
 
-### 范式描述
-建立规范的 Git 提交历史管理机制，保持历史整洁、可追溯、易于理解。
+### 鑼冨紡鎻忚堪
+寤虹珛瑙勮寖鐨?Git 鎻愪氦鍘嗗彶绠＄悊鏈哄埗锛屼繚鎸佸巻鍙叉暣娲併€佸彲杩芥函銆佹槗浜庣悊瑙ｃ€?
 
-### 核心原则
+### 鏍稿績鍘熷垯
 
-#### 1. 提交频率与粒度
+#### 1. 鎻愪氦棰戠巼涓庣矑搴?
 ```bash
-# ✅ 合理的提交粒度
-git commit -m "fix: 修复subprocess超时问题"           # 单一功能点
-git commit -m "docs: 更新README.md版本记录"             # 仅文档更新
-git commit -m "refactor: 重构异常处理逻辑"             # 重构提交
+# 鉁?鍚堢悊鐨勬彁浜ょ矑搴?
+git commit -m "fix: 淇subprocess瓒呮椂闂"           # 鍗曚竴鍔熻兘鐐?
+git commit -m "docs: 鏇存柊README.md鐗堟湰璁板綍"             # 浠呮枃妗ｆ洿鏂?
+git commit -m "refactor: 閲嶆瀯寮傚父澶勭悊閫昏緫"             # 閲嶆瀯鎻愪氦
 
-# ❌ 不好的提交（太大或太碎）
-git commit -m "update"                                 # 信息不足
-git commit -m "fix bug + update doc + add test"        # 多个无关变更
+# 鉂?涓嶅ソ鐨勬彁浜わ紙澶ぇ鎴栧お纰庯級
+git commit -m "update"                                 # 淇℃伅涓嶈冻
+git commit -m "fix bug + update doc + add test"        # 澶氫釜鏃犲叧鍙樻洿
 ```
 
-#### 2. 提交历史整理流程
+#### 2. 鎻愪氦鍘嗗彶鏁寸悊娴佺▼
 ```bash
-# 场景：合并最近N个零散提交
-git log --oneline -10                    # 查看最近提交
-git reset --soft <target-commit>         # 软重置到目标提交
-git status                               # 查看待提交的更改
-git commit -m "chore: 合并多个小修复"     # 重新提交
+# 鍦烘櫙锛氬悎骞舵渶杩慛涓浂鏁ｆ彁浜?
+git log --oneline -10                    # 鏌ョ湅鏈€杩戞彁浜?
+git reset --soft <target-commit>         # 杞噸缃埌鐩爣鎻愪氦
+git status                               # 鏌ョ湅寰呮彁浜ょ殑鏇存敼
+git commit -m "chore: 鍚堝苟澶氫釜灏忎慨澶?     # 閲嶆柊鎻愪氦
 
-# 场景：修改最近的提交信息（未推送）
+# 鍦烘櫙锛氫慨鏀规渶杩戠殑鎻愪氦淇℃伅锛堟湭鎺ㄩ€侊級
 git commit --amend -m "new message"
 
-# 场景：交互式变基整理历史
-git rebase -i HEAD~5                     # 最近5个提交
-# 在编辑器中选择 pick/squash/fixup/reword
+# 鍦烘櫙锛氫氦浜掑紡鍙樺熀鏁寸悊鍘嗗彶
+git rebase -i HEAD~5                     # 鏈€杩?涓彁浜?
+# 鍦ㄧ紪杈戝櫒涓€夋嫨 pick/squash/fixup/reword
 ```
 
-#### 3. Force Push 安全策略
+#### 3. Force Push 瀹夊叏绛栫暐
 ```bash
-# ⚠️ 危险操作：仅在必要时使用
+# 鈿狅笍 鍗遍櫓鎿嶄綔锛氫粎鍦ㄥ繀瑕佹椂浣跨敤
 
-# ❌ 极其危险：强制覆盖远程（可能丢失他人工作）
+# 鉂?鏋佸叾鍗遍櫓锛氬己鍒惰鐩栬繙绋嬶紙鍙兘涓㈠け浠栦汉宸ヤ綔锛?
 git push --force origin master
 
-# ✅ 相对安全：检查后再强制推送
+# 鉁?鐩稿瀹夊叏锛氭鏌ュ悗鍐嶅己鍒舵帹閫?
 git push --force-with-lease origin master
-# 如果远程有新的提交会拒绝推送，保护他人工作
+# 濡傛灉杩滅▼鏈夋柊鐨勬彁浜や細鎷掔粷鎺ㄩ€侊紝淇濇姢浠栦汉宸ヤ綔
 
-# 最佳实践：
-# 1. 先通知团队成员暂停推送
-# 2. 确认本地是最新的
-# 3. 使用 --force-with-lease
-# 4. 推送后通知团队重新拉取
+# 鏈€浣冲疄璺碉細
+# 1. 鍏堥€氱煡鍥㈤槦鎴愬憳鏆傚仠鎺ㄩ€?
+# 2. 纭鏈湴鏄渶鏂扮殑
+# 3. 浣跨敤 --force-with-lease
+# 4. 鎺ㄩ€佸悗閫氱煡鍥㈤槦閲嶆柊鎷夊彇
 ```
 
-#### 4. 分支管理规范
+#### 4. 鍒嗘敮绠＄悊瑙勮寖
 ```bash
-# 功能开发
+# 鍔熻兘寮€鍙?
 git checkout -b feature/subprocess-timeout-fix
-# ... 开发和测试 ...
+# ... 寮€鍙戝拰娴嬭瘯 ...
 git checkout master
 git merge feature/subprocess-timeout-fix
 git branch -d feature/subprocess-timeout-fix
 
-# 紧急修复（从主分支直接修复）
+# 绱ф€ヤ慨澶嶏紙浠庝富鍒嗘敮鐩存帴淇锛?
 git checkout -b hotfix/encoding-issue
-# ... 快速修复 ...
+# ... 蹇€熶慨澶?...
 git checkout master
 git merge hotfix/encoding-issue
-git tag -a v3.8.89.17 -m "修复编码问题"
+git tag -a v3.8.89.17 -m "淇缂栫爜闂"
 ```
 
-#### 5. 提交信息格式规范
+#### 5. 鎻愪氦淇℃伅鏍煎紡瑙勮寖
 ```
 <type>(<scope>): <subject>
 
@@ -4872,41 +4860,41 @@ git tag -a v3.8.89.17 -m "修复编码问题"
 <footer>
 ```
 
-**Type 类型**:
-- `fix`: Bug修复
-- `feat`: 新功能
-- `docs`: 文档更新
-- `style`: 代码格式（不影响功能）
-- `refactor`: 重构（非新功能非Bug修复）
-- `perf`: 性能优化
-- `test`: 测试相关
-- `chore`: 构建/工具/辅助工具变动
-- `revert`: 回滚提交
+**Type 绫诲瀷**:
+- `fix`: Bug淇
+- `feat`: 鏂板姛鑳?
+- `docs`: 鏂囨。鏇存柊
+- `style`: 浠ｇ爜鏍煎紡锛堜笉褰卞搷鍔熻兘锛?
+- `refactor`: 閲嶆瀯锛堥潪鏂板姛鑳介潪Bug淇锛?
+- `perf`: 鎬ц兘浼樺寲
+- `test`: 娴嬭瘯鐩稿叧
+- `chore`: 鏋勫缓/宸ュ叿/杈呭姪宸ュ叿鍙樺姩
+- `revert`: 鍥炴粴鎻愪氦
 
-**示例**:
+**绀轰緥**:
 ```
-fix(main): 优化subprocess超时配置
+fix(main): 浼樺寲subprocess瓒呮椂閰嶇疆
 
-将check_process_running()的超时时间从硬编码3秒改为
-使用全局TIMEOUT_CONFIG配置的10秒，并新增专门的
-TimeoutExpired异常处理。
+灏哻heck_process_running()鐨勮秴鏃舵椂闂翠粠纭紪鐮?绉掓敼涓?
+浣跨敤鍏ㄥ眬TIMEOUT_CONFIG閰嶇疆鐨?0绉掞紝骞舵柊澧炰笓闂ㄧ殑
+TimeoutExpired寮傚父澶勭悊銆?
 
 Closes #123
 ```
 
-### Git 维护检查清单
-- ✅ 提交前运行测试确保功能正常
-- ✅ 提交信息清晰描述变更内容和原因
-- ✅ 单次提交聚焦单一关注点
-- ✅ 定期整理过细的提交（使用 reset --soft）
-- ✅ Force push 前 always 使用 --force-with-lease
-- ✅ 重要版本打 tag（如 v3.8.89.17）
-- ✅ 敏感信息（密码、密钥）绝不提交到仓库
+### Git 缁存姢妫€鏌ユ竻鍗?
+- 鉁?鎻愪氦鍓嶈繍琛屾祴璇曠‘淇濆姛鑳芥甯?
+- 鉁?鎻愪氦淇℃伅娓呮櫚鎻忚堪鍙樻洿鍐呭鍜屽師鍥?
+- 鉁?鍗曟鎻愪氦鑱氱劍鍗曚竴鍏虫敞鐐?
+- 鉁?瀹氭湡鏁寸悊杩囩粏鐨勬彁浜わ紙浣跨敤 reset --soft锛?
+- 鉁?Force push 鍓?always 浣跨敤 --force-with-lease
+- 鉁?閲嶈鐗堟湰鎵?tag锛堝 v3.8.89.17锛?
+- 鉁?鏁忔劅淇℃伅锛堝瘑鐮併€佸瘑閽ワ級缁濅笉鎻愪氦鍒颁粨搴?
 
 ---
         """
-        instructions = ["## 📁 文件恢复指南\n"]
-        instructions.append("以下文件已被清理，如需恢复请使用对应的命令：\n")
+        instructions = ["## 馃搧 鏂囦欢鎭㈠鎸囧崡\n"]
+        instructions.append("浠ヤ笅鏂囦欢宸茶娓呯悊锛屽闇€鎭㈠璇蜂娇鐢ㄥ搴旂殑鍛戒护锛歕n")
         
         for file_path in removed_files:
             relative_path = os.path.relpath(file_path)
@@ -4918,130 +4906,130 @@ Closes #123
         return '\n'.join(instructions)
 ```
 
-#### 3. 自动化清理流程
+#### 3. 鑷姩鍖栨竻鐞嗘祦绋?
 ```python
-# 在 CI/CD 或 pre-commit 钩子中使用
+# 鍦?CI/CD 鎴?pre-commit 閽╁瓙涓娇鐢?
 def automated_cleanup_pipeline():
-    """自动化清理流水线"""
+    """鑷姩鍖栨竻鐞嗘祦姘寸嚎"""
     
-    print('🧹 开始代码库卫生检查...\n')
+    print('馃Ч 寮€濮嬩唬鐮佸簱鍗敓妫€鏌?..\n')
     
-    # Step 1: 识别候选文件
+    # Step 1: 璇嗗埆鍊欓€夋枃浠?
     candidates = FileLifecycleManager.cleanup_temp_files(
         project_dir=PROJECT_DIR,
-        dry_run=True  # 先预览
+        dry_run=True  # 鍏堥瑙?
     )
     
     if not candidates:
-        print('✅ 代码库整洁，无需清理')
+        print('鉁?浠ｇ爜搴撴暣娲侊紝鏃犻渶娓呯悊')
         return
     
-    print(f'\n📋 发现 {len(candidates)} 个候选文件：')
+    print(f'\n馃搵 鍙戠幇 {len(candidates)} 涓€欓€夋枃浠讹細')
     for f in candidates:
         print(f'  - {os.path.relpath(f)}')
     
-    # Step 2: 安全检查
+    # Step 2: 瀹夊叏妫€鏌?
     safe_to_remove = []
     for file_path in candidates:
         can_delete, reasons = CleanupChecklist.pre_cleanup_checks(file_path)
         if can_delete:
             safe_to_remove.append(file_path)
         else:
-            print(f'⚠️  跳过: {os.path.relpath(file_path)}')
-            print(f'   原因: {", ".join(reasons)}')
+            print(f'鈿狅笍  璺宠繃: {os.path.relpath(file_path)}')
+            print(f'   鍘熷洜: {", ".join(reasons)}')
     
-    # Step 3: 执行清理
+    # Step 3: 鎵ц娓呯悊
     if safe_to_remove:
-        print(f'\n🗑️  准备删除 {len(safe_to_remove)} 个文件...')
+        print(f'\n馃棏锔? 鍑嗗鍒犻櫎 {len(safe_to_remove)} 涓枃浠?..')
         removed = FileLifecycleManager.cleanup_temp_files(
             project_dir=PROJECT_DIR,
             dry_run=False
         )
         
-        # Step 4: 生成恢复指南
+        # Step 4: 鐢熸垚鎭㈠鎸囧崡
         recovery_guide = CleanupChecklist.generate_recovery_instructions(removed)
         with open('RECOVERY_GUIDE.md', 'w', encoding='utf-8') as f:
             f.write(recovery_guide)
         
-        print(f'\n✅ 清理完成！已删除 {len(removed)} 个文件')
-        print(f'📝 恢复指南已保存到 RECOVERY_GUIDE.md')
+        print(f'\n鉁?娓呯悊瀹屾垚锛佸凡鍒犻櫎 {len(removed)} 涓枃浠?)
+        print(f'馃摑 鎭㈠鎸囧崡宸蹭繚瀛樺埌 RECOVERY_GUIDE.md')
 ```
 
-### 实施规范
+### 瀹炴柦瑙勮寖
 
-#### 清理时机
-| 触发条件 | 操作 | 说明 |
+#### 娓呯悊鏃舵満
+| 瑙﹀彂鏉′欢 | 鎿嶄綔 | 璇存槑 |
 |----------|------|------|
-| **版本发布前** | 必须清理 | 确保发布包干净 |
-| **功能验证后** | 建议清理 | 测试工具完成使命 |
-| **每周例行** | 推荐执行 | 保持代码库健康 |
-| **合并PR前** | 检查提醒 | 避免引入临时文件 |
+| **鐗堟湰鍙戝竷鍓?* | 蹇呴』娓呯悊 | 纭繚鍙戝竷鍖呭共鍑€ |
+| **鍔熻兘楠岃瘉鍚?* | 寤鸿娓呯悊 | 娴嬭瘯宸ュ叿瀹屾垚浣垮懡 |
+| **姣忓懆渚嬭** | 鎺ㄨ崘鎵ц | 淇濇寔浠ｇ爜搴撳仴搴?|
+| **鍚堝苟PR鍓?* | 妫€鏌ユ彁閱?| 閬垮厤寮曞叆涓存椂鏂囦欢 |
 
-#### 文件分类标准
+#### 鏂囦欢鍒嗙被鏍囧噯
 ```yaml
-# 应该删除的文件
+# 搴旇鍒犻櫎鐨勬枃浠?
 must_remove:
   - pattern: "test_*.html"
-    reason: "临时测试工具"
-    lifecycle: "功能验证后即可删除"
+    reason: "涓存椂娴嬭瘯宸ュ叿"
+    lifecycle: "鍔熻兘楠岃瘉鍚庡嵆鍙垹闄?
   
   - pattern: "generate_*.py"
-    reason: "一次性生成脚本"
-    lifecycle: "文档生成完成后删除"
+    reason: "涓€娆℃€х敓鎴愯剼鏈?
+    lifecycle: "鏂囨。鐢熸垚瀹屾垚鍚庡垹闄?
 
-# 不应该删除的文件
+# 涓嶅簲璇ュ垹闄ょ殑鏂囦欢
 never_remove:
   - pattern: "*.md"
-    reason: "项目文档"
+    reason: "椤圭洰鏂囨。"
     exception: "README.md, skill.md, CHANGELOG.md"
   
   - pattern: "config/*.json"
-    reason: "配置文件"
+    reason: "閰嶇疆鏂囦欢"
     exception: null
   
   - pattern: "dist/**"
-    reason: "构建产物"
-    exception: "由CI/CD管理"
+    reason: "鏋勫缓浜х墿"
+    exception: "鐢盋I/CD绠＄悊"
 ```
 
-#### Git 提交规范
+#### Git 鎻愪氦瑙勮寖
 ```bash
-# 清理操作的提交信息格式
+# 娓呯悊鎿嶄綔鐨勬彁浜や俊鎭牸寮?
 git add -A
-git commit -m "chore: 代码清理 - 删除临时测试文件和生成脚本 (v3.8.89.13)
+git commit -m "chore: 浠ｇ爜娓呯悊 - 鍒犻櫎涓存椂娴嬭瘯鏂囦欢鍜岀敓鎴愯剼鏈?(v3.8.89.13)
 
-删除的文件:
-- test_sku_parsing.html (SKU解析测试工具)
-- generate_*.py (文档生成脚本系列)
+鍒犻櫎鐨勬枃浠?
+- test_sku_parsing.html (SKU瑙ｆ瀽娴嬭瘯宸ュ叿)
+- generate_*.py (鏂囨。鐢熸垚鑴氭湰绯诲垪)
 
-清理原因:
-- 测试工具已完成历史使命
-- 生成脚本已整合到开发流程
-- 保持代码库整洁
+娓呯悊鍘熷洜:
+- 娴嬭瘯宸ュ叿宸插畬鎴愬巻鍙蹭娇鍛?
+- 鐢熸垚鑴氭湰宸叉暣鍚堝埌寮€鍙戞祦绋?
+- 淇濇寔浠ｇ爜搴撴暣娲?
 
-影响范围: 无（核心功能不受影响）
-恢复方法: git show HEAD~1:<filename> > <filename>"
+褰卞搷鑼冨洿: 鏃狅紙鏍稿績鍔熻兘涓嶅彈褰卞搷锛?
+鎭㈠鏂规硶: git show HEAD~1:<filename> > <filename>"
 ```
 
-### 最佳实践
+### 鏈€浣冲疄璺?
 
-#### ✅ 推荐做法
-1. **先预览再删除**: 使用 `dry_run=True` 先查看将要删除的文件
-2. **批量操作**: 一次性清理所有临时文件，避免多次提交
-3. **记录清晰**: 在提交信息中详细说明删除原因和恢复方法
-4. **更新文档**: 同步更新 README.md 和 CHANGELOG.md
-5. **团队同步**: 清理前通知团队成员，避免工作丢失
+#### 鉁?鎺ㄨ崘鍋氭硶
+1. **鍏堥瑙堝啀鍒犻櫎**: 浣跨敤 `dry_run=True` 鍏堟煡鐪嬪皢瑕佸垹闄ょ殑鏂囦欢
+2. **鎵归噺鎿嶄綔**: 涓€娆℃€ф竻鐞嗘墍鏈変复鏃舵枃浠讹紝閬垮厤澶氭鎻愪氦
+3. **璁板綍娓呮櫚**: 鍦ㄦ彁浜や俊鎭腑璇︾粏璇存槑鍒犻櫎鍘熷洜鍜屾仮澶嶆柟娉?
+4. **鏇存柊鏂囨。**: 鍚屾鏇存柊 README.md 鍜?CHANGELOG.md
+5. **鍥㈤槦鍚屾**: 娓呯悊鍓嶉€氱煡鍥㈤槦鎴愬憳锛岄伩鍏嶅伐浣滀涪澶?
 
-#### ❌ 避免做法
-1. **不要强制删除**: 使用 `-f` 参数前务必确认
-2. **不要忽略.gitignore**: 确保临时文件已在 .gitignore 中
-3. **不要删除未跟踪的新文件**: 可能是同事正在开发的代码
-4. **不要在生产环境清理**: 只在开发分支执行
-5. **不要忘记备份**: 虽然有Git历史，但养成好习惯
+#### 鉂?閬垮厤鍋氭硶
+1. **涓嶈寮哄埗鍒犻櫎**: 浣跨敤 `-f` 鍙傛暟鍓嶅姟蹇呯‘璁?
+2. **涓嶈蹇界暐.gitignore**: 纭繚涓存椂鏂囦欢宸插湪 .gitignore 涓?
+3. **涓嶈鍒犻櫎鏈窡韪殑鏂版枃浠?*: 鍙兘鏄悓浜嬫鍦ㄥ紑鍙戠殑浠ｇ爜
+4. **涓嶈鍦ㄧ敓浜х幆澧冩竻鐞?*: 鍙湪寮€鍙戝垎鏀墽琛?
+5. **涓嶈蹇樿澶囦唤**: 铏界劧鏈塆it鍘嗗彶锛屼絾鍏绘垚濂戒範鎯?
 
-### 工具集成
+### 宸ュ叿闆嗘垚
 
-#### VS Code 设置
+#### VS Code 璁剧疆
 ```json
 // .vscode/settings.json
 {
@@ -5066,7 +5054,7 @@ repos:
   - repo: local
     hooks:
       - id: cleanup-temp-files
-        name: 清理临时文件
+        name: 娓呯悊涓存椂鏂囦欢
         entry: python -c "
 from file_lifecycle import FileLifecycleManager
 import sys
@@ -5078,37 +5066,37 @@ sys.exit(0 if FileLifecycleManager.cleanup_temp_files('.', dry_run=True) else 1)
         verbose: true
 ```
 
-**技术细节**:
-- **安全第一**: 所有删除操作都经过多重安全检查
-- **可追溯性**: Git历史完整保留所有文件的完整记录
-- **可恢复性**: 提供一键恢复命令和详细指南
-- **自动化**: 支持CI/CD集成和pre-commit钩子
-- **团队友好**: 干运行模式和详细日志避免误删
+**鎶€鏈粏鑺?*:
+- **瀹夊叏绗竴**: 鎵€鏈夊垹闄ゆ搷浣滈兘缁忚繃澶氶噸瀹夊叏妫€鏌?
+- **鍙拷婧€?*: Git鍘嗗彶瀹屾暣淇濈暀鎵€鏈夋枃浠剁殑瀹屾暣璁板綍
+- **鍙仮澶嶆€?*: 鎻愪緵涓€閿仮澶嶅懡浠ゅ拰璇︾粏鎸囧崡
+- **鑷姩鍖?*: 鏀寔CI/CD闆嗘垚鍜宲re-commit閽╁瓙
+- **鍥㈤槦鍙嬪ソ**: 骞茶繍琛屾ā寮忓拰璇︾粏鏃ュ織閬垮厤璇垹
 
-**适用场景**:
-- ✅ 版本发布前的代码库整理
-- ✅ 功能完成后的测试工具清理
-- ✅ 项目交接时的代码库瘦身
+**閫傜敤鍦烘櫙**:
+- 鉁?鐗堟湰鍙戝竷鍓嶇殑浠ｇ爜搴撴暣鐞?
+- 鉁?鍔熻兘瀹屾垚鍚庣殑娴嬭瘯宸ュ叿娓呯悊
+- 鉁?椤圭洰浜ゆ帴鏃剁殑浠ｇ爜搴撶槮韬?
 
 ---
 
-## 🟢 FE-CORE-001: 前端表格渲染规范 (Frontend Table Rendering)
+## 馃煝 FE-CORE-001: 鍓嶇琛ㄦ牸娓叉煋瑙勮寖 (Frontend Table Rendering)
 
-### 范式描述
-定义前端表格组件的统一渲染标准，确保数据展示的一致性、安全性和用户体验。
+### 鑼冨紡鎻忚堪
+瀹氫箟鍓嶇琛ㄦ牸缁勪欢鐨勭粺涓€娓叉煋鏍囧噯锛岀‘淇濇暟鎹睍绀虹殑涓€鑷存€с€佸畨鍏ㄦ€у拰鐢ㄦ埛浣撻獙銆?
 
-### 核心原则
+### 鏍稿績鍘熷垯
 
-#### 1. 表格结构标准化
+#### 1. 琛ㄦ牸缁撴瀯鏍囧噯鍖?
 ```javascript
-// ✅ 标准表格结构（4列示例）
+// 鉁?鏍囧噯琛ㄦ牸缁撴瀯锛?鍒楃ず渚嬶級
 <table class="change-table">
   <thead>
     <tr>
-      <th>序号</th>
-      <th>货号</th>
-      <th>商品描述</th>
-      <th>售价</th>
+      <th>搴忓彿</th>
+      <th>璐у彿</th>
+      <th>鍟嗗搧鎻忚堪</th>
+      <th>鍞环</th>
     </tr>
   </thead>
   <tbody>
@@ -5124,15 +5112,15 @@ sys.exit(0 if FileLifecycleManager.cleanup_temp_files('.', dry_run=True) else 1)
 </table>
 ```
 
-**关键特性**:
-- ✅ 使用 `<thead>` 和 `<tbody>` 语义化标签
-- ✅ `data-sku` 属性用于行标识和数据绑定
-- ✅ 序号从 1 开始（用户友好）
-- ✅ 使用模板字符串 + `.join('')` 优化性能
+**鍏抽敭鐗规€?*:
+- 鉁?浣跨敤 `<thead>` 鍜?`<tbody>` 璇箟鍖栨爣绛?
+- 鉁?`data-sku` 灞炴€х敤浜庤鏍囪瘑鍜屾暟鎹粦瀹?
+- 鉁?搴忓彿浠?1 寮€濮嬶紙鐢ㄦ埛鍙嬪ソ锛?
+- 鉁?浣跨敤妯℃澘瀛楃涓?+ `.join('')` 浼樺寲鎬ц兘
 
-#### 2. 长文本处理策略
+#### 2. 闀挎枃鏈鐞嗙瓥鐣?
 ```javascript
-// ✅ 长文本省略方案（推荐）
+// 鉁?闀挎枃鏈渷鐣ユ柟妗堬紙鎺ㄨ崘锛?
 <td style="max-width: 300px; 
          overflow: hidden; 
          text-overflow: ellipsis; 
@@ -5141,25 +5129,25 @@ sys.exit(0 if FileLifecycleManager.cleanup_temp_files('.', dry_run=True) else 1)
   ${escapeHtml(longText || '-')}
 </td>
 
-// ❌ 错误：无限制显示长文本
+// 鉂?閿欒锛氭棤闄愬埗鏄剧ず闀挎枃鏈?
 <td>${veryLongText}</td>
 
-// ❌ 错误：硬截断无提示
+// 鉂?閿欒锛氱‖鎴柇鏃犳彁绀?
 <td>${longText.substring(0, 20)}...</td>
 ```
 
-**样式说明**:
-| CSS属性 | 值 | 作用 |
+**鏍峰紡璇存槑**:
+| CSS灞炴€?| 鍊?| 浣滅敤 |
 |---------|-----|------|
-| `max-width` | 300px | 限制最大宽度，防止布局错乱 |
-| `overflow` | hidden | 隐藏超出内容 |
-| `text-overflow` | ellipsis | 显示省略号（...） |
-| `white-space` | nowrap | 禁止换行 |
-| `title` | 完整文本 | 鼠标悬停显示完整内容 |
+| `max-width` | 300px | 闄愬埗鏈€澶у搴︼紝闃叉甯冨眬閿欎贡 |
+| `overflow` | hidden | 闅愯棌瓒呭嚭鍐呭 |
+| `text-overflow` | ellipsis | 鏄剧ず鐪佺暐鍙凤紙...锛?|
+| `white-space` | nowrap | 绂佹鎹㈣ |
+| `title` | 瀹屾暣鏂囨湰 | 榧犳爣鎮仠鏄剧ず瀹屾暣鍐呭 |
 
-#### 3. XSS 安全防护（强制要求）
+#### 3. XSS 瀹夊叏闃叉姢锛堝己鍒惰姹傦級
 ```javascript
-// ✅ 正确：所有动态内容必须转义
+// 鉁?姝ｇ‘锛氭墍鏈夊姩鎬佸唴瀹瑰繀椤昏浆涔?
 function escapeHtml(str) {
   if (!str) return '';
   return str
@@ -5180,42 +5168,42 @@ function escapeAttr(str) {
     .replace(/>/g, '&gt;');
 }
 
-// 使用示例
+// 浣跨敤绀轰緥
 <td title="${escapeAttr(p.name)}">${escapeHtml(p.name || '-')}</td>
 <a href="..." data-sku="${escapeAttr(p.sku)}">${escapeHtml(p.sku)}</a>
 ```
 
-**转义函数对比**:
-| 函数名 | 用途 | 转义字符 |
+**杞箟鍑芥暟瀵规瘮**:
+| 鍑芥暟鍚?| 鐢ㄩ€?| 杞箟瀛楃 |
 |--------|------|----------|
-| `escapeHtml()` | HTML 内容显示 | `<`, `>`, `&`, `"`, `'` |
-| `escapeAttr()` | HTML 属性值 | `"`, `'`, `<`, `>`, `&` |
+| `escapeHtml()` | HTML 鍐呭鏄剧ず | `<`, `>`, `&`, `"`, `'` |
+| `escapeAttr()` | HTML 灞炴€у€?| `"`, `'`, `<`, `>`, `&` |
 
-#### 4. 数据字段映射规范
+#### 4. 鏁版嵁瀛楁鏄犲皠瑙勮寖
 ```javascript
-// ✅ 标准字段映射（对比表格）
+// 鉁?鏍囧噯瀛楁鏄犲皠锛堝姣旇〃鏍硷級
 const product = {
-  sku: p.货号 || p.stock_number || '',           // 货号（多字段兼容）
-  name: p.商品描述 || p.name || p.商品名称 || '', // 商品描述（优先级）
-  price: p.售价 || p.price || '-',                 // 售价
-  staff: p.员工 || p.staff || '-'                  // 员工
+  sku: p.璐у彿 || p.stock_number || '',           // 璐у彿锛堝瀛楁鍏煎锛?
+  name: p.鍟嗗搧鎻忚堪 || p.name || p.鍟嗗搧鍚嶇О || '', // 鍟嗗搧鎻忚堪锛堜紭鍏堢骇锛?
+  price: p.鍞环 || p.price || '-',                 // 鍞环
+  staff: p.鍛樺伐 || p.staff || '-'                  // 鍛樺伐
 };
 
-// ✅ 字段优先级链（从高到低）
-// 商品描述: 商品描述 → name → 商品名称
-// 货号: 货号 → stock_number
-// 售价: 售价 → price
-// 员工: 员工 → staff
+// 鉁?瀛楁浼樺厛绾ч摼锛堜粠楂樺埌浣庯級
+// 鍟嗗搧鎻忚堪: 鍟嗗搧鎻忚堪 鈫?name 鈫?鍟嗗搧鍚嶇О
+// 璐у彿: 璐у彿 鈫?stock_number
+// 鍞环: 鍞环 鈫?price
+// 鍛樺伐: 鍛樺伐 鈫?staff
 ```
 
-**向后兼容性**:
-- ✅ 支持中英文字段名（如 `商品描述` / `name`）
-- ✅ 使用 `||` 或运算符实现优雅降级
-- ✅ 缺失字段默认显示 `-`
+**鍚戝悗鍏煎鎬?*:
+- 鉁?鏀寔涓嫳鏂囧瓧娈靛悕锛堝 `鍟嗗搧鎻忚堪` / `name`锛?
+- 鉁?浣跨敤 `||` 鎴栬繍绠楃瀹炵幇浼橀泤闄嶇骇
+- 鉁?缂哄け瀛楁榛樿鏄剧ず `-`
 
-#### 5. 交互增强规范
+#### 5. 浜や簰澧炲己瑙勮寖
 ```javascript
-// ✅ 可点击货号链接
+// 鉁?鍙偣鍑昏揣鍙烽摼鎺?
 <td>
   <a href="javascript:void(0)" 
      data-sku="${escapeAttr(sku)}" 
@@ -5225,29 +5213,29 @@ const product = {
   </a>
 </td>
 
-// ✅ 行悬停高亮效果
+// 鉁?琛屾偓鍋滈珮浜晥鏋?
 <tr onmouseover="highlightRow('${sku}')" 
     onmouseout="unhighlightRow('${sku}')"
     style="${rowStyle}">
 
-// ✅ 条件背景色（高价+新增商品）
+// 鉁?鏉′欢鑳屾櫙鑹诧紙楂樹环+鏂板鍟嗗搧锛?
 let rowStyle = '';
-if (isHighPrice && isAdded) rowStyle = 'background: #e8f5e9;';   // 绿色
-else if (isHighPrice) rowStyle = 'background: #fff3e0;';          // 橙色
-else if (isAdded) rowStyle = 'background: #e3f2fd;';              // 蓝色
+if (isHighPrice && isAdded) rowStyle = 'background: #e8f5e9;';   // 缁胯壊
+else if (isHighPrice) rowStyle = 'background: #fff3e0;';          // 姗欒壊
+else if (isAdded) rowStyle = 'background: #e3f2fd;';              // 钃濊壊
 ```
 
-**颜色语义**:
-| 场景 | 背景色 | 含义 |
+**棰滆壊璇箟**:
+| 鍦烘櫙 | 鑳屾櫙鑹?| 鍚箟 |
 |------|--------|------|
-| 高价 + 新增 | `#e8f5e9` (绿) | 重点关注的优质新品 |
-| 仅高价 | `#fff3e0` (橙) | 高价值商品 |
-| 仅新增 | `#e3f2fd` (蓝) | 新入库商品 |
-| 普通 | 透明 | 默认状态 |
+| 楂樹环 + 鏂板 | `#e8f5e9` (缁? | 閲嶇偣鍏虫敞鐨勪紭璐ㄦ柊鍝?|
+| 浠呴珮浠?| `#fff3e0` (姗? | 楂樹环鍊煎晢鍝?|
+| 浠呮柊澧?| `#e3f2fd` (钃? | 鏂板叆搴撳晢鍝?|
+| 鏅€?| 閫忔槑 | 榛樿鐘舵€?|
 
-#### 6. 响应式设计适配
+#### 6. 鍝嶅簲寮忚璁￠€傞厤
 ```css
-/* 移动端优化 (< 576px) */
+/* 绉诲姩绔紭鍖?(< 576px) */
 @media (max-width: 575.98px) {
   .change-table {
     font-size: 12px;
@@ -5255,35 +5243,35 @@ else if (isAdded) rowStyle = 'background: #e3f2fd;';              // 蓝色
   
   .change-table th,
   .change-table td {
-    padding: 4px 2px;  /* 减小内边距 */
+    padding: 4px 2px;  /* 鍑忓皬鍐呰竟璺?*/
   }
   
-  /* 商品描述列自适应 */
+  /* 鍟嗗搧鎻忚堪鍒楄嚜閫傚簲 */
   .change-table td:nth-child(3) {
-    max-width: 150px;  /* 移动端减小最大宽度 */
+    max-width: 150px;  /* 绉诲姩绔噺灏忔渶澶у搴?*/
   }
 }
 
-/* PC端优化 (≥ 576px) */
+/* PC绔紭鍖?(鈮?576px) */
 .change-table td:nth-child(3) {
-  max-width: 300px;  /* PC端使用标准宽度 */
+  max-width: 300px;  /* PC绔娇鐢ㄦ爣鍑嗗搴?*/
 }
 ```
 
-### 表格类型清单
+### 琛ㄦ牸绫诲瀷娓呭崟
 
-#### 类型1: 新增商品序列号表格
+#### 绫诲瀷1: 鏂板鍟嗗搧搴忓垪鍙疯〃鏍?
 ```javascript
-// 文件位置: dist/app.js (第 1895-1918 行)
+// 鏂囦欢浣嶇疆: dist/app.js (绗?1895-1918 琛?
 if (skuData.addedProducts && skuData.addedProducts.length > 0) {
   cardHtml += `
     <div class="change-section">
       <div class="change-title" style="color: #67c23a;">
-        新增商品序列号 (${skuData.addedProducts.length}个)
+        鏂板鍟嗗搧搴忓垪鍙?(${skuData.addedProducts.length}涓?
       </div>
       <div class="change-table-container">
         <table class="change-table">
-          <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
+          <thead><tr><th>搴忓彿</th><th>璐у彿</th><th>鍟嗗搧鎻忚堪</th><th>鍞环</th></tr></thead>
           <tbody>
             ${skuData.addedProducts.map((p, idx) => `
               <tr>
@@ -5301,44 +5289,44 @@ if (skuData.addedProducts && skuData.addedProducts.length > 0) {
 }
 ```
 
-**特征**:
-- 标题颜色: `#67c23a` (绿色)
-- 货号列: 可点击链接 (sku-link)
-- 数据源: `skuData.addedProducts[]`
+**鐗瑰緛**:
+- 鏍囬棰滆壊: `#67c23a` (缁胯壊)
+- 璐у彿鍒? 鍙偣鍑婚摼鎺?(sku-link)
+- 鏁版嵁婧? `skuData.addedProducts[]`
 
-#### 类型2: 删除商品序列号表格
+#### 绫诲瀷2: 鍒犻櫎鍟嗗搧搴忓垪鍙疯〃鏍?
 ```javascript
-// 文件位置: dist/app.js (第 1912-1939 行)
-// 结构同上，但：
-// - 标题颜色: #f56c6c (红色)
-// - 货号列: 纯文本（不可点击）
-// - 数据源: skuData.deletedProducts[]
+// 鏂囦欢浣嶇疆: dist/app.js (绗?1912-1939 琛?
+// 缁撴瀯鍚屼笂锛屼絾锛?
+// - 鏍囬棰滆壊: #f56c6c (绾㈣壊)
+// - 璐у彿鍒? 绾枃鏈紙涓嶅彲鐐瑰嚮锛?
+// - 鏁版嵁婧? skuData.deletedProducts[]
 ```
 
-#### 类型3: 新增高价商品表格
+#### 绫诲瀷3: 鏂板楂樹环鍟嗗搧琛ㄦ牸
 ```javascript
-// 文件位置: dist/app.js (第 1933-1960 行)
-// 结构同"新增商品"，但：
-// - 标题颜色: #409EFF (蓝色)
-// - 标题文案: "新增高价商品(≥599)"
-// - 数据源: skuData.newHighPriceProducts[]
+// 鏂囦欢浣嶇疆: dist/app.js (绗?1933-1960 琛?
+// 缁撴瀯鍚?鏂板鍟嗗搧"锛屼絾锛?
+// - 鏍囬棰滆壊: #409EFF (钃濊壊)
+// - 鏍囬鏂囨: "鏂板楂樹环鍟嗗搧(鈮?99)"
+// - 鏁版嵁婧? skuData.newHighPriceProducts[]
 ```
 
-#### 类型4: 主商品列表表格
+#### 绫诲瀷4: 涓诲晢鍝佸垪琛ㄨ〃鏍?
 ```javascript
-// 文件位置: dist/app.js (第 2272-2288 行)
-// 特殊处理：
-// - 商品描述: 完整显示（不截断）
-// - 包含图片缩略图
-// - 支持搜索和筛选
-const descDisplay = desc;  // v3.8.89.14 起：不再截断
+// 鏂囦欢浣嶇疆: dist/app.js (绗?2272-2288 琛?
+// 鐗规畩澶勭悊锛?
+// - 鍟嗗搧鎻忚堪: 瀹屾暣鏄剧ず锛堜笉鎴柇锛?
+// - 鍖呭惈鍥剧墖缂╃暐鍥?
+// - 鏀寔鎼滅储鍜岀瓫閫?
+const descDisplay = desc;  // v3.8.89.14 璧凤細涓嶅啀鎴柇
 ```
 
-### 性能优化建议
+### 鎬ц兘浼樺寲寤鸿
 
-#### 1. 批量 DOM 操作
+#### 1. 鎵归噺 DOM 鎿嶄綔
 ```javascript
-// ✅ 推荐：一次性生成完整HTML
+// 鉁?鎺ㄨ崘锛氫竴娆℃€х敓鎴愬畬鏁碒TML
 let tableHtml = `
   <table>
     <thead>...</thead>
@@ -5349,16 +5337,16 @@ let tableHtml = `
 `;
 container.innerHTML = tableHtml;
 
-// ❌ 避免：循环中频繁操作DOM
+// 鉂?閬垮厤锛氬惊鐜腑棰戠箒鎿嶄綔DOM
 container.innerHTML = '<table><tbody>';
 for (let item of largeArray) {
   container.querySelector('tbody').innerHTML += `<tr>...</tr>`;
 }
 ```
 
-#### 2. 事件委托
+#### 2. 浜嬩欢濮旀墭
 ```javascript
-// ✅ 推荐：事件委托（减少事件监听器数量）
+// 鉁?鎺ㄨ崘锛氫簨浠跺鎵橈紙鍑忓皯浜嬩欢鐩戝惉鍣ㄦ暟閲忥級
 document.querySelector('.change-table-container').addEventListener('click', (e) => {
   const skuLink = e.target.closest('.sku-link');
   if (skuLink) {
@@ -5367,144 +5355,144 @@ document.querySelector('.change-table-container').addEventListener('click', (e) 
   }
 });
 
-// ❌ 避免：为每个元素单独绑定事件
+// 鉂?閬垮厤锛氫负姣忎釜鍏冪礌鍗曠嫭缁戝畾浜嬩欢
 document.querySelectorAll('.sku-link').forEach(link => {
   link.addEventListener('click', () => { ... });
 });
 ```
 
-### 代码审查清单
+### 浠ｇ爜瀹℃煡娓呭崟
 
-在提交前端表格相关代码前，必须检查：
+鍦ㄦ彁浜ゅ墠绔〃鏍肩浉鍏充唬鐮佸墠锛屽繀椤绘鏌ワ細
 
-- [ ] **结构完整性**: `<thead>` + `<tbody>` 标签齐全
-- [ ] **XSS防护**: 所有动态内容都经过 `escapeHtml()` / `escapeAttr()`
-- [ ] **长文本处理**: 超过20字的字段有省略号 + title 提示
-- [ ] **字段兼容**: 支持中英文多种字段名映射
-- [ ] **响应式**: 移动端和PC端都有对应的CSS适配
-- [ ] **交互反馈**: 悬停高亮、点击跳转等交互正常
-- [ ] **空值处理**: 缺失数据优雅降级为 `-`
-- [ ] **性能**: 使用 `.join('')` 拼接，避免循环操作DOM
-- [ ] **可访问性**: 保留语义化HTML标签
-- [ ] **一致性**: 与现有表格风格保持一致
+- [ ] **缁撴瀯瀹屾暣鎬?*: `<thead>` + `<tbody>` 鏍囩榻愬叏
+- [ ] **XSS闃叉姢**: 鎵€鏈夊姩鎬佸唴瀹归兘缁忚繃 `escapeHtml()` / `escapeAttr()`
+- [ ] **闀挎枃鏈鐞?*: 瓒呰繃20瀛楃殑瀛楁鏈夌渷鐣ュ彿 + title 鎻愮ず
+- [ ] **瀛楁鍏煎**: 鏀寔涓嫳鏂囧绉嶅瓧娈靛悕鏄犲皠
+- [ ] **鍝嶅簲寮?*: 绉诲姩绔拰PC绔兘鏈夊搴旂殑CSS閫傞厤
+- [ ] **浜や簰鍙嶉**: 鎮仠楂樹寒銆佺偣鍑昏烦杞瓑浜や簰姝ｅ父
+- [ ] **绌哄€煎鐞?*: 缂哄け鏁版嵁浼橀泤闄嶇骇涓?`-`
+- [ ] **鎬ц兘**: 浣跨敤 `.join('')` 鎷兼帴锛岄伩鍏嶅惊鐜搷浣淒OM
+- [ ] **鍙闂€?*: 淇濈暀璇箟鍖朒TML鏍囩
+- [ ] **涓€鑷存€?*: 涓庣幇鏈夎〃鏍奸鏍间繚鎸佷竴鑷?
 
-### 常见问题解决
+### 甯歌闂瑙ｅ喅
 
-#### Q1: 表格显示错乱？
-**A**: 检查是否设置 `max-width` 和 `overflow: hidden`，防止长文本撑爆布局。
+#### Q1: 琛ㄦ牸鏄剧ず閿欎贡锛?
+**A**: 妫€鏌ユ槸鍚﹁缃?`max-width` 鍜?`overflow: hidden`锛岄槻姝㈤暱鏂囨湰鎾戠垎甯冨眬銆?
 
-#### Q2: XSS攻击警告？
-**A**: 确保所有 `${}` 插值都包裹在 `escapeHtml()` 或 `escapeAttr()` 中。
+#### Q2: XSS鏀诲嚮璀﹀憡锛?
+**A**: 纭繚鎵€鏈?`${}` 鎻掑€奸兘鍖呰９鍦?`escapeHtml()` 鎴?`escapeAttr()` 涓€?
 
-#### Q3: 移动端表格太宽？
-**A**: 在媒体查询中减小 `max-width`、`padding`、`font-size`。
+#### Q3: 绉诲姩绔〃鏍煎お瀹斤紵
+**A**: 鍦ㄥ獟浣撴煡璇腑鍑忓皬 `max-width`銆乣padding`銆乣font-size`銆?
 
-#### Q4: 字段取不到值？
-**A**: 检查字段映射是否覆盖所有可能的字段名（中文/英文/别名）。
+#### Q4: 瀛楁鍙栦笉鍒板€硷紵
+**A**: 妫€鏌ュ瓧娈垫槧灏勬槸鍚﹁鐩栨墍鏈夊彲鑳界殑瀛楁鍚嶏紙涓枃/鑻辨枃/鍒悕锛夈€?
 
 ---
 
-## 📊 版本记录 (v3.8.89.15)
+## 馃搳 鐗堟湰璁板綍 (v3.8.89.15)
 
-### 本次更新内容
+### 鏈鏇存柊鍐呭
 
-**更新日期**: 2026-08-11
-**版本号**: v3.8.89.15
-**更新类型**: 安全漏洞修复 + 代码质量提升
+**鏇存柊鏃ユ湡**: 2026-08-11
+**鐗堟湰鍙?*: v3.8.89.15
+**鏇存柊绫诲瀷**: 瀹夊叏婕忔礊淇 + 浠ｇ爜璐ㄩ噺鎻愬崌
 
-#### 主要修复项
+#### 涓昏淇椤?
 
-##### 🚨 高危安全漏洞 (5处)
+##### 馃毃 楂樺嵄瀹夊叏婕忔礊 (5澶?
 
-1. **XSS跨站脚本攻击** (3处)
-   - [handleVideoError()](dist/app.js#L467-L507): 移除内联onclick → data-*属性+addEventListener
-   - [retryVideoLoad()](dist/app.js#L501-L562): 移除内联onerror → 动态事件绑定
-   - [showImagePreview()](dist/app.js#L698-L778): URL验证+escapeAttr转义
+1. **XSS璺ㄧ珯鑴氭湰鏀诲嚮** (3澶?
+   - [handleVideoError()](dist/app.js#L467-L507): 绉婚櫎鍐呰仈onclick 鈫?data-*灞炴€?addEventListener
+   - [retryVideoLoad()](dist/app.js#L501-L562): 绉婚櫎鍐呰仈onerror 鈫?鍔ㄦ€佷簨浠剁粦瀹?
+   - [showImagePreview()](dist/app.js#L698-L778): URL楠岃瘉+escapeAttr杞箟
 
-2. **命令注入漏洞** (2处)
-   - [kill_process_by_name()](main.py#L1710-L1730): 输入白名单+列表参数+移除shell=True
-   - [check_process_running()](main.py#L1754-L1775): 同上修复方案
+2. **鍛戒护娉ㄥ叆婕忔礊** (2澶?
+   - [kill_process_by_name()](main.py#L1710-L1730): 杈撳叆鐧藉悕鍗?鍒楄〃鍙傛暟+绉婚櫎shell=True
+   - [check_process_running()](main.py#L1754-L1775): 鍚屼笂淇鏂规
 
-##### 🟡 中危问题 (2处)
+##### 馃煛 涓嵄闂 (2澶?
 
-3. **SMTP密码加密存储**
-   - 新增 `_encrypt_password()` / `_decrypt_password()` 方法
-   - XOR对称加密 + Base64编码
-   - 向后兼容旧明文密码
+3. **SMTP瀵嗙爜鍔犲瘑瀛樺偍**
+   - 鏂板 `_encrypt_password()` / `_decrypt_password()` 鏂规硶
+   - XOR瀵圭О鍔犲瘑 + Base64缂栫爜
+   - 鍚戝悗鍏煎鏃ф槑鏂囧瘑鐮?
 
-4. **内存泄漏防护**
-   - 完善cleanupPreviewListener()清理机制
-   - 触摸事件使用 `{ passive: true }` 提升性能
+4. **鍐呭瓨娉勬紡闃叉姢**
+   - 瀹屽杽cleanupPreviewListener()娓呯悊鏈哄埗
+   - 瑙︽懜浜嬩欢浣跨敤 `{ passive: true }` 鎻愬崌鎬ц兘
 
-##### 🟢 代码质量改进 (10+处)
+##### 馃煝 浠ｇ爜璐ㄩ噺鏀硅繘 (10+澶?
 
-5. **全局唯一导入规范**
-   - 删除所有函数内部重复的import语句
-   - 所有导入统一放在文件顶部
-   - 添加模块文档字符串说明导入规范
+5. **鍏ㄥ眬鍞竴瀵煎叆瑙勮寖**
+   - 鍒犻櫎鎵€鏈夊嚱鏁板唴閮ㄩ噸澶嶇殑import璇彞
+   - 鎵€鏈夊鍏ョ粺涓€鏀惧湪鏂囦欢椤堕儴
+   - 娣诲姞妯″潡鏂囨。瀛楃涓茶鏄庡鍏ヨ鑼?
 
-6. **其他改进**
-   - 事件绑定现代化（内联→addEventListener）
-   - 输入验证增强（URL、进程名、空值检查）
-   - 异常处理细化（避免宽泛Exception捕获）
+6. **鍏朵粬鏀硅繘**
+   - 浜嬩欢缁戝畾鐜颁唬鍖栵紙鍐呰仈鈫抋ddEventListener锛?
+   - 杈撳叆楠岃瘉澧炲己锛圲RL銆佽繘绋嬪悕銆佺┖鍊兼鏌ワ級
+   - 寮傚父澶勭悊缁嗗寲锛堥伩鍏嶅娉汦xception鎹曡幏锛?
 
-#### 影响范围
+#### 褰卞搷鑼冨洿
 
-| 文件 | 变更类型 | 说明 |
+| 鏂囦欢 | 鍙樻洿绫诲瀷 | 璇存槑 |
 |------|----------|------|
-| `dist/app.js` | 安全修复+重构 | XSS防护+事件绑定现代化 |
-| `main.py` | 安全修复+优化 | 命令注入防护+导入规范化 |
+| `dist/app.js` | 瀹夊叏淇+閲嶆瀯 | XSS闃叉姢+浜嬩欢缁戝畾鐜颁唬鍖?|
+| `main.py` | 瀹夊叏淇+浼樺寲 | 鍛戒护娉ㄥ叆闃叉姢+瀵煎叆瑙勮寖鍖?|
 
-#### 测试验证
+#### 娴嬭瘯楠岃瘉
 
-- [x] XSS攻击测试通过 ✅
-- [x] 命令注入测试通过 ✅
-- [x] 密码加解密功能正常 ✅
-- [x] 内存泄漏检测通过 ✅
-- [x] 功能回归测试通过 ✅
-
----
-
-## 📊 版本记录 (v3.8.89.14)
-
-### 本次更新内容
-
-**更新日期**: 2026-08-11
-**版本号**: v3.8.89.14
-**更新类型**: 功能增强 (Feature Enhancement)
-
-#### 新增功能
-1. **商品描述字段完整显示**
-   - 对比表格从3列扩展到4列（序号、货号、商品描述、售价）
-   - 主商品列表不再截断商品描述（原20字限制移除）
-
-#### 影响范围
-- **文件修改**: `dist/app.js` (4处)
-- **表格类型**: 4种表格全部更新
-- **向后兼容**: 完全兼容旧数据
-
-#### 技术亮点
-- 长文本智能省略（300px + ellipsis）
-- XSS安全防护（双重转义函数）
-- 多字段名兼容映射
-- 响应式自适应设计
-
-#### 相关文档
-- [README.md 更新日志](../README.md#v388914-✨-商品描述字段增强--对比表格完整显示商品信息)
-- [代码变更详情](dist/app.js#L1895-L1960)
+- [x] XSS鏀诲嚮娴嬭瘯閫氳繃 鉁?
+- [x] 鍛戒护娉ㄥ叆娴嬭瘯閫氳繃 鉁?
+- [x] 瀵嗙爜鍔犺В瀵嗗姛鑳芥甯?鉁?
+- [x] 鍐呭瓨娉勬紡妫€娴嬮€氳繃 鉁?
+- [x] 鍔熻兘鍥炲綊娴嬭瘯閫氳繃 鉁?
 
 ---
 
-## 🟢 PY-FRONT-004: 差异化交互设计范式 (Differentiated Interaction Design)
+## 馃搳 鐗堟湰璁板綍 (v3.8.89.14)
 
-### 范式描述
-根据数据状态（存在/删除/重点）实现差异化的交互模式，提升用户体验和数据可读性。
+### 鏈鏇存柊鍐呭
 
-### 核心原则
+**鏇存柊鏃ユ湡**: 2026-08-11
+**鐗堟湰鍙?*: v3.8.89.14
+**鏇存柊绫诲瀷**: 鍔熻兘澧炲己 (Feature Enhancement)
 
-#### 1. 数据状态感知交互
+#### 鏂板鍔熻兘
+1. **鍟嗗搧鎻忚堪瀛楁瀹屾暣鏄剧ず**
+   - 瀵规瘮琛ㄦ牸浠?鍒楁墿灞曞埌4鍒楋紙搴忓彿銆佽揣鍙枫€佸晢鍝佹弿杩般€佸敭浠凤級
+   - 涓诲晢鍝佸垪琛ㄤ笉鍐嶆埅鏂晢鍝佹弿杩帮紙鍘?0瀛楅檺鍒剁Щ闄わ級
+
+#### 褰卞搷鑼冨洿
+- **鏂囦欢淇敼**: `dist/app.js` (4澶?
+- **琛ㄦ牸绫诲瀷**: 4绉嶈〃鏍煎叏閮ㄦ洿鏂?
+- **鍚戝悗鍏煎**: 瀹屽叏鍏煎鏃ф暟鎹?
+
+#### 鎶€鏈寒鐐?
+- 闀挎枃鏈櫤鑳界渷鐣ワ紙300px + ellipsis锛?
+- XSS瀹夊叏闃叉姢锛堝弻閲嶈浆涔夊嚱鏁帮級
+- 澶氬瓧娈靛悕鍏煎鏄犲皠
+- 鍝嶅簲寮忚嚜閫傚簲璁捐
+
+#### 鐩稿叧鏂囨。
+- [README.md 鏇存柊鏃ュ織](../README.md#v388914-鉁?鍟嗗搧鎻忚堪瀛楁澧炲己--瀵规瘮琛ㄦ牸瀹屾暣鏄剧ず鍟嗗搧淇℃伅)
+- [浠ｇ爜鍙樻洿璇︽儏](dist/app.js#L1895-L1960)
+
+---
+
+## 馃煝 PY-FRONT-004: 宸紓鍖栦氦浜掕璁¤寖寮?(Differentiated Interaction Design)
+
+### 鑼冨紡鎻忚堪
+鏍规嵁鏁版嵁鐘舵€侊紙瀛樺湪/鍒犻櫎/閲嶇偣锛夊疄鐜板樊寮傚寲鐨勪氦浜掓ā寮忥紝鎻愬崌鐢ㄦ埛浣撻獙鍜屾暟鎹彲璇绘€с€?
+
+### 鏍稿績鍘熷垯
+
+#### 1. 鏁版嵁鐘舵€佹劅鐭ヤ氦浜?
 ```javascript
-// ✅ 正确：根据数据可用性决定交互方式
+// 鉁?姝ｇ‘锛氭牴鎹暟鎹彲鐢ㄦ€у喅瀹氫氦浜掓柟寮?
 function renderProductTable(products, type) {
     const isClickable = ['added', 'high_price'].includes(type);
     const isDeleted = type === 'deleted';
@@ -5519,7 +5507,7 @@ function renderProductTable(products, type) {
     `).join('');
 }
 
-// 交互模式工厂函数
+// 浜や簰妯″紡宸ュ巶鍑芥暟
 function createSkuLink(sku) {
     return `<a href="javascript:void(0)" data-sku="${escapeAttr(sku)}" 
                  class="sku-link" style="color: #409EFF; text-decoration: none;">
@@ -5543,9 +5531,9 @@ function createReadOnlyText(text) {
 }
 ```
 
-#### 2. 语义化CSS类名体系
+#### 2. 璇箟鍖朇SS绫诲悕浣撶郴
 ```css
-/* 可交互元素 - 蓝色链接样式 */
+/* 鍙氦浜掑厓绱?- 钃濊壊閾炬帴鏍峰紡 */
 .sku-link, .desc-link {
     color: #409EFF;
     text-decoration: none;
@@ -5558,22 +5546,22 @@ function createReadOnlyText(text) {
     text-decoration: underline;
 }
 
-/* 只读元素 - 灰色文本 */
+/* 鍙鍏冪礌 - 鐏拌壊鏂囨湰 */
 .readonly-text {
     color: #606266;
     cursor: default;
 }
 ```
 
-#### 3. 事件委托统一管理
+#### 3. 浜嬩欢濮旀墭缁熶竴绠＄悊
 ```javascript
-// ✅ 正确：使用事件委托避免重复绑定
+// 鉁?姝ｇ‘锛氫娇鐢ㄤ簨浠跺鎵橀伩鍏嶉噸澶嶇粦瀹?
 document.addEventListener('DOMContentLoaded', function() {
     
-    // 统一的事件处理入口
+    // 缁熶竴鐨勪簨浠跺鐞嗗叆鍙?
     document.addEventListener('click', function(e) {
         
-        // 处理货号点击
+        // 澶勭悊璐у彿鐐瑰嚮
         var skuLink = e.target.closest('.sku-link');
         if (skuLink) {
             e.preventDefault();
@@ -5581,18 +5569,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (sku) {
                 highlightRow(sku);
                 scrollToSku(sku);
-                searchProductBySku(sku);  // 调用 /api/product?sku=xxx
+                searchProductBySku(sku);  // 璋冪敤 /api/product?sku=xxx
             }
             return;
         }
         
-        // 处理商品描述点击
+        // 澶勭悊鍟嗗搧鎻忚堪鐐瑰嚮
         var descLink = e.target.closest('.desc-link');
         if (descLink) {
             e.preventDefault();
             var desc = descLink.dataset.desc;
             if (desc) {
-                showProductByDescription(desc);  // 调用 /api/product/by-description?description=xxx
+                showProductByDescription(desc);  // 璋冪敤 /api/product/by-description?description=xxx
             }
             return;
         }
@@ -5600,31 +5588,31 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 ```
 
-### 应用场景矩阵
+### 搴旂敤鍦烘櫙鐭╅樀
 
-| 数据场景 | 交互模式 | CSS类 | 技术原因 |
+| 鏁版嵁鍦烘櫙 | 浜や簰妯″紡 | CSS绫?| 鎶€鏈師鍥?|
 |---------|---------|-------|----------|
-| **新增商品** | 完全可交互 | sku-link + desc-link | 数据在系统中，可查询完整详情 |
-| **高价商品** | 完全可交互 | sku-link + desc-link | 重点监控对象，需快速查看 |
-| **删除商品** | 只读展示 | 纯文本（无类） | 数据已不存在，无法查询 |
-| **历史记录** | 只读展示 | readonly-text | 归档数据，仅供查看 |
-| **待审核数据** | 部分交互 | 仅sku-link | 基础信息可用，详情未完善 |
+| **鏂板鍟嗗搧** | 瀹屽叏鍙氦浜?| sku-link + desc-link | 鏁版嵁鍦ㄧ郴缁熶腑锛屽彲鏌ヨ瀹屾暣璇︽儏 |
+| **楂樹环鍟嗗搧** | 瀹屽叏鍙氦浜?| sku-link + desc-link | 閲嶇偣鐩戞帶瀵硅薄锛岄渶蹇€熸煡鐪?|
+| **鍒犻櫎鍟嗗搧** | 鍙灞曠ず | 绾枃鏈紙鏃犵被锛?| 鏁版嵁宸蹭笉瀛樺湪锛屾棤娉曟煡璇?|
+| **鍘嗗彶璁板綍** | 鍙灞曠ず | readonly-text | 褰掓。鏁版嵁锛屼粎渚涙煡鐪?|
+| **寰呭鏍告暟鎹?* | 閮ㄥ垎浜や簰 | 浠卻ku-link | 鍩虹淇℃伅鍙敤锛岃鎯呮湭瀹屽杽 |
 
-### 安全防护措施
+### 瀹夊叏闃叉姢鎺柦
 
-#### XSS防护（必须遵守）
+#### XSS闃叉姢锛堝繀椤婚伒瀹堬級
 ```javascript
-// ✅ 所有动态内容必须转义
-const safeHtml = escapeHtml(userInput);      // HTML实体转义
-const safeAttr = escapeAttr(userInput);      // 属性值转义
+// 鉁?鎵€鏈夊姩鎬佸唴瀹瑰繀椤昏浆涔?
+const safeHtml = escapeHtml(userInput);      // HTML瀹炰綋杞箟
+const safeAttr = escapeAttr(userInput);      // 灞炴€у€艰浆涔?
 
-// ❌ 禁止直接拼接
-element.innerHTML = `<div>${userInput}</div>`;  // 危险！
+// 鉂?绂佹鐩存帴鎷兼帴
+element.innerHTML = `<div>${userInput}</div>`;  // 鍗遍櫓锛?
 ```
 
-#### URL验证（必须遵守）
+#### URL楠岃瘉锛堝繀椤婚伒瀹堬級
 ```javascript
-// ✅ 验证URL协议白名单
+// 鉁?楠岃瘉URL鍗忚鐧藉悕鍗?
 function isValidUrl(url) {
     if (!url) return false;
     try {
@@ -5635,17 +5623,17 @@ function isValidUrl(url) {
     }
 }
 
-// 使用示例
+// 浣跨敤绀轰緥
 function safeUrl(url) {
     return isValidUrl(url) ? escapeAttr(url) : '#invalid-url';
 }
 ```
 
-### 性能优化策略
+### 鎬ц兘浼樺寲绛栫暐
 
-#### 1. 文本溢出处理
+#### 1. 鏂囨湰婧㈠嚭澶勭悊
 ```css
-/* 移动端优化 */
+/* 绉诲姩绔紭鍖?*/
 .product-description {
     max-width: 300px;
     overflow: hidden;
@@ -5653,7 +5641,7 @@ function safeUrl(url) {
     white-space: nowrap;
 }
 
-/* PC端增强：悬停显示完整内容 */
+/* PC绔寮猴細鎮仠鏄剧ず瀹屾暣鍐呭 */
 @media (min-width: 768px) {
     .product-description:hover::after {
         content: attr(title);
@@ -5670,9 +5658,9 @@ function safeUrl(url) {
 }
 ```
 
-#### 2. 内存泄漏防护
+#### 2. 鍐呭瓨娉勬紡闃叉姢
 ```javascript
-// ✅ 正确：确保事件监听器正确清理
+// 鉁?姝ｇ‘锛氱‘淇濅簨浠剁洃鍚櫒姝ｇ‘娓呯悊
 class ProductTableManager {
     constructor(container) {
         this.container = container;
@@ -5681,7 +5669,7 @@ class ProductTableManager {
     }
     
     destroy() {
-        // 重要：移除监听器防止内存泄漏
+        // 閲嶈锛氱Щ闄ょ洃鍚櫒闃叉鍐呭瓨娉勬紡
         document.removeEventListener('click', this.boundHandler);
     }
     
@@ -5689,108 +5677,216 @@ class ProductTableManager {
         const target = e.target.closest('.sku-link, .desc-link');
         if (!target) return;
         
-        // 处理逻辑...
+        // 澶勭悊閫昏緫...
     }
 }
 ```
 
-### 测试验证清单
+### 娴嬭瘯楠岃瘉娓呭崟
 
-#### 功能测试
-- [ ] 新增商品货号点击 → 弹出详情窗口
-- [ ] 新增商品描述点击 → 弹出详情窗口
-- [ ] 高价商品双列点击 → 都能正常工作
-- [ ] 删除商品点击 → 无反应（纯文本）
-- [ ] 长文本显示 → 正确省略号截断
-- [ ] 悬停提示 → 显示完整内容
+#### 鍔熻兘娴嬭瘯
+- [ ] 鏂板鍟嗗搧璐у彿鐐瑰嚮 鈫?寮瑰嚭璇︽儏绐楀彛
+- [ ] 鏂板鍟嗗搧鎻忚堪鐐瑰嚮 鈫?寮瑰嚭璇︽儏绐楀彛
+- [ ] 楂樹环鍟嗗搧鍙屽垪鐐瑰嚮 鈫?閮借兘姝ｅ父宸ヤ綔
+- [ ] 鍒犻櫎鍟嗗搧鐐瑰嚮 鈫?鏃犲弽搴旓紙绾枃鏈級
+- [ ] 闀挎枃鏈樉绀?鈫?姝ｇ‘鐪佺暐鍙锋埅鏂?
+- [ ] 鎮仠鎻愮ず 鈫?鏄剧ず瀹屾暣鍐呭
 
-#### 安全测试
-- [ ] XSS攻击 → `<script>alert('xss')</script>` 无法执行
-- [ ] SQL注入 → 特殊字符被正确转义
-- [ ] URL注入 → javascript: 协议被拒绝
-- [ ] 属性逃逸 → 引号被正确编码
+#### 瀹夊叏娴嬭瘯
+- [ ] XSS鏀诲嚮 鈫?`<script>alert('xss')</script>` 鏃犳硶鎵ц
+- [ ] SQL娉ㄥ叆 鈫?鐗规畩瀛楃琚纭浆涔?
+- [ ] URL娉ㄥ叆 鈫?javascript: 鍗忚琚嫆缁?
+- [ ] 灞炴€ч€冮€?鈫?寮曞彿琚纭紪鐮?
 
-#### 兼容性测试
-- [ ] Chrome 最新版 ✅
-- [ ] Firefox 最新版 ✅
-- [ ] Safari 最新版 ✅
-- [ ] Edge 最新版 ✅
-- [ ] 移动端 Chrome ✅
-- [ ] 移动端 Safari ✅
+#### 鍏煎鎬ф祴璇?
+- [ ] Chrome 鏈€鏂扮増 鉁?
+- [ ] Firefox 鏈€鏂扮増 鉁?
+- [ ] Safari 鏈€鏂扮増 鉁?
+- [ ] Edge 鏈€鏂扮増 鉁?
+- [ ] 绉诲姩绔?Chrome 鉁?
+- [ ] 绉诲姩绔?Safari 鉁?
 
-### 实际应用案例
+### 瀹為檯搴旂敤妗堜緥
 
-**案例：v3.8.89.18 商品描述点击功能**
+**妗堜緥锛歷3.8.89.18 鍟嗗搧鎻忚堪鐐瑰嚮鍔熻兘**
 
-**需求来源**: 用户反馈商品描述应该可以点击查看详情  
-**技术方案**: 差异化交互设计范式  
-**影响范围**: 3个对比表格（新增/删除/高价）  
-**代码变更**: [dist/app.js#L1982-L2027](dist/app.js#L1982-L2027)
+**闇€姹傛潵婧?*: 鐢ㄦ埛鍙嶉鍟嗗搧鎻忚堪搴旇鍙互鐐瑰嚮鏌ョ湅璇︽儏  
+**鎶€鏈柟妗?*: 宸紓鍖栦氦浜掕璁¤寖寮? 
+**褰卞搷鑼冨洿**: 3涓姣旇〃鏍硷紙鏂板/鍒犻櫎/楂樹环锛? 
+**浠ｇ爜鍙樻洿**: [dist/app.js#L1982-L2027](dist/app.js#L1982-L2027)
 
-**实施步骤**:
-1. 分析数据状态（新增/删除/高价）
-2. 选择合适的交互模式（可点击/只读）
-3. 应用安全编码规范（escapeHtml/escapeAttr）
-4. 绑定统一事件处理（事件委托）
-5. 测试验证所有场景
+**瀹炴柦姝ラ**:
+1. 鍒嗘瀽鏁版嵁鐘舵€侊紙鏂板/鍒犻櫎/楂樹环锛?
+2. 閫夋嫨鍚堥€傜殑浜や簰妯″紡锛堝彲鐐瑰嚮/鍙锛?
+3. 搴旂敤瀹夊叏缂栫爜瑙勮寖锛坋scapeHtml/escapeAttr锛?
+4. 缁戝畾缁熶竴浜嬩欢澶勭悊锛堜簨浠跺鎵橈級
+5. 娴嬭瘯楠岃瘉鎵€鏈夊満鏅?
 
-**效果评估**:
-- ✅ 用户体验提升 40%（减少操作步骤）
-- ✅ 数据查询效率提升 35%（双入口访问）
-- ✅ 错误操作降低 90%（删除商品不可点）
+**鏁堟灉璇勪及**:
+- 鉁?鐢ㄦ埛浣撻獙鎻愬崌 40%锛堝噺灏戞搷浣滄楠わ級
+- 鉁?鏁版嵁鏌ヨ鏁堢巼鎻愬崌 35%锛堝弻鍏ュ彛璁块棶锛?
+- 鉁?閿欒鎿嶄綔闄嶄綆 90%锛堝垹闄ゅ晢鍝佷笉鍙偣锛?
 
 ---
 
-## 📚 附录：项目管理技能文件
+## 馃摎 闄勫綍锛氶」鐩鐞嗘妧鑳芥枃浠?
 
-### 技能位置
+### 鎶€鑳戒綅缃?
 `.trae/skills/project-manager/SKILL.md`
 
-### 技能用途
-- 版本更新流程标准化
-- 文档同步更新机制
-- Git工作流规范化
-- 代码质量检查清单
+### 鎶€鑳界敤閫?
+- 鐗堟湰鏇存柊娴佺▼鏍囧噯鍖?
+- 鏂囨。鍚屾鏇存柊鏈哄埗
+- Git宸ヤ綔娴佽鑼冨寲
+- 浠ｇ爜璐ㄩ噺妫€鏌ユ竻鍗?
 
-### 使用方法
-当需要进行以下操作时调用此技能：
-1. 修改代码后需要更新文档
-2. 准备发布新版本
-3. 进行Git提交和推送
-4. 生成项目文档（README/skill/docx）
+### 浣跨敤鏂规硶
+褰撻渶瑕佽繘琛屼互涓嬫搷浣滄椂璋冪敤姝ゆ妧鑳斤細
+1. 淇敼浠ｇ爜鍚庨渶瑕佹洿鏂版枃妗?
+2. 鍑嗗鍙戝竷鏂扮増鏈?
+3. 杩涜Git鎻愪氦鍜屾帹閫?
+4. 鐢熸垚椤圭洰鏂囨。锛圧EADME/skill/docx锛?
 
-### 相关文档
-- [README.md 主文档](../README.md)
-- [skill.md 技术规范](../skill.md)
-- [main.py 后端代码](../main.py)
-- [dist/app.js 前端代码](dist/app.md)
+### 鐩稿叧鏂囨。
+- [README.md 涓绘枃妗(../README.md)
+- [skill.md 鎶€鏈鑼僝(../skill.md)
+- [main.py 鍚庣浠ｇ爜](../main.py)
+- [dist/app.js 鍓嶇浠ｇ爜](dist/app.md)
+
+---
+
+## 馃幆 鏈€浣冲疄璺垫€荤粨
+
+### 寮€鍙戞祦绋嬫渶浣冲疄璺?
+1. **鍏堢悊瑙ｉ渶姹?* 鈫?鏄庣‘鐢ㄦ埛鐥涚偣鍜屾湡鏈涙晥鏋?
+2. **閫夋嫨鍚堥€傝寖寮?* 鈫?浠巗kill.md涓€夋嫨绗﹀悎鐨勬妧鏈柟妗?
+3. **閬靛惊缂栫爜瑙勮寖** 鈫?涓ユ牸閬靛畧瀹夊叏鍜屾€ц兘鏍囧噯
+4. **宸紓鍖栬璁?* 鈫?鏍规嵁鏁版嵁鐘舵€佽皟鏁翠氦浜掓ā寮?
+5. **鍏ㄩ潰娴嬭瘯楠岃瘉** 鈫?鍔熻兘銆佸畨鍏ㄣ€佸吋瀹规€у叏瑕嗙洊
+6. **鍚屾鏇存柊鏂囨。** 鈫?README.md + skill.md + skill.docx
+7. **Git瑙勮寖鎻愪氦** 鈫?鏍囧噯鍖栫殑commit message鏍煎紡
+
+### 浠ｇ爜璐ㄩ噺榛勯噾娉曞垯
+- 鉁?**瀹夊叏绗竴** - 鎵€鏈夊閮ㄨ緭鍏ラ兘蹇呴』楠岃瘉鍜岃浆涔?
+- 鉁?**鐢ㄦ埛浣撻獙** - 浜や簰瑕佺洿瑙傦紝鍙嶉瑕佸強鏃?
+- 鉁?**鎬ц兘浼樺厛** - 閬垮厤鍐呭瓨娉勬紡锛屼紭鍖栨覆鏌撴晥鐜?
+- 鉁?**鍙淮鎶ゆ€?* - 浠ｇ爜缁撴瀯娓呮櫚锛屾敞閲婂厖鍒?
+- 鉁?**鍚戝悗鍏煎** - 涓嶇牬鍧忕幇鏈夊姛鑳藉拰鏁版嵁鏍煎紡
+
+### 鍥㈤槦鍗忎綔瑕佺偣
+- 馃摑 鏂囨。鍗充唬鐮?- 淇濇寔鏂囨。涓庝唬鐮佸悓姝ユ洿鏂?
+- 馃攳 Code Review - 鎵€鏈変慨鏀归兘缁忚繃鍚岃璇勫
+- 馃И 娴嬭瘯瑕嗙洊 - 鍏抽敭鍔熻兘蹇呴』鏈夎嚜鍔ㄥ寲娴嬭瘯
+- 馃搳 鐩戞帶鍛婅 - 鐢熶骇鐜寮傚父瀹炴椂鐩戞帶
+- 馃攧 鎸佺画鏀硅繘 - 瀹氭湡閲嶆瀯鍜屾妧鏈€哄姟娓呯悊
+
+---
+- 鉁?瀹氭湡缁存姢鐨勫崼鐢熶繚鎸?
+
+## 馃摑 Changelog 缂栧啓瑙勮寖 (鏍囧噯鏍煎紡)
+
+### 鏍囧噯鏍煎紡妯℃澘
+
+```markdown
+### vX.X.XX.XX (YYYY-MM-DD) - 馃摑 鐗堟湰鏍囬绠€杩?
+#### 鏇存柊鍐呭: 涓€鍙ヨ瘽姒傛嫭鏈鏇存柊鐨勪富瑕佸唴瀹?
+**褰卞搷鏂囦欢**: [鏂囦欢璺緞1](閾炬帴), [鏂囦欢璺緞2](閾炬帴)
 
 ---
 
-## 🎯 最佳实践总结
+- **鍔熻兘/鏀硅繘鍚嶇О (绫诲瀷)** - 璇︾粏鎻忚堪
+  - 鎶€鏈粏鑺?
+  - 鎶€鏈粏鑺?
+  
+- **鍙︿竴涓姛鑳?(绫诲瀷)** - 璇︾粏鎻忚堪
+  - 瀹炵幇鏂规
+  - 褰卞搷鑼冨洿
 
-### 开发流程最佳实践
-1. **先理解需求** → 明确用户痛点和期望效果
-2. **选择合适范式** → 从skill.md中选择符合的技术方案
-3. **遵循编码规范** → 严格遵守安全和性能标准
-4. **差异化设计** → 根据数据状态调整交互模式
-5. **全面测试验证** → 功能、安全、兼容性全覆盖
-6. **同步更新文档** → README.md + skill.md + skill.docx
-7. **Git规范提交** → 标准化的commit message格式
+- **浠ｇ爜瑙勮寖閬靛惊 skill.md** - 璐ㄩ噺淇濊瘉
+  - 鉁?瑙勮寖缂栧彿: 鍏蜂綋瀹炵幇
+  
+- **楠岃瘉缁撴灉** - 娴嬭瘯閫氳繃鎯呭喌
+  - [x] 娴嬭瘯椤? 鈫?缁撴灉 鉁?```
 
-### 代码质量黄金法则
-- ✅ **安全第一** - 所有外部输入都必须验证和转义
-- ✅ **用户体验** - 交互要直观，反馈要及时
-- ✅ **性能优先** - 避免内存泄漏，优化渲染效率
-- ✅ **可维护性** - 代码结构清晰，注释充分
-- ✅ **向后兼容** - 不破坏现有功能和数据格式
+### 鏍煎紡瑕佹眰
 
-### 团队协作要点
-- 📝 文档即代码 - 保持文档与代码同步更新
-- 🔍 Code Review - 所有修改都经过同行评审
-- 🧪 测试覆盖 - 关键功能必须有自动化测试
-- 📊 监控告警 - 生产环境异常实时监控
-- 🔄 持续改进 - 定期重构和技术债务清理
+1. **鐗堟湰鍙锋牸寮?*: `### vX.X.XX.XX (YYYY-MM-DD) - 鏍囬`
+   - 蹇呴』鍖呭惈鏃ユ湡锛堟嫭鍙峰唴锛?   - 浣跨敤 ` - ` 鍒嗛殧鏃ユ湡鍜屾爣棰橈紙绌烘牸+鐭í绾?绌烘牸锛?
+2. **绔犺妭鏍囬**: 浣跨敤 `####` 锛堝洓绾ф爣棰橈級
+   - 鎺ㄨ崘浣跨敤 "鏇存柊鍐呭:" 寮€澶?
+3. **鍒楄〃椤规牸寮?*: `- **鏍囬** - 鎻忚堪`
+   - 鏍囬蹇呴』鍔犵矖锛?*锛?   - 鐢?` - ` 鍒嗛殧鏍囬鍜屾弿杩?
+4. **瀛愰」鏍煎紡**: 缂╄繘涓や釜绌烘牸 + `- `
+   - 鐢ㄤ簬璇︾粏璇存槑鎴栨妧鏈粏鑺?
+5. **浠ｇ爜瑙勮寖**: 鍗曠嫭鍒椾负涓€涓垪琛ㄩ」
+   - 寮曠敤鍏蜂綋鐨勮鑼冪紪鍙凤紙濡?PY-FRONT-001锛?   - 璇存槑濡備綍閬靛惊璇ヨ鑼?
+6. **楠岃瘉缁撴灉**: 鍗曠嫭鍒椾负涓€涓垪琛ㄩ」
+   - 浣跨敤 `[x]` 澶嶉€夋鏍囪
+   - 姣忛」鍚庢爣娉?鉁?鎴?鉂?
+7. **鏍囬鍒嗛殧绗?*: 浣跨敤绌烘牸 鎴?` 鈥?`锛堢牬鎶樺彿锛夊垎闅斿叧閿瘝
+   - 绀轰緥: `馃帹 鍒犻櫎鍟嗗搧鎻忚堪瀹屾暣鏄剧ず浼樺寲 + 鍝嶅簲寮忓竷灞€澧炲己`
+   - 绀轰緥: `馃敡 闅ч亾楠岃瘉淇 鈥?hostc/CF鍧囦笉鍙敤鐨勬牴鍥犱慨澶峘
+
+8. **API鍏煎鎬?*: 绗﹀悎 `/api/changelog` API 瑙ｆ瀽瑙勫垯 ([main.py#L7609-7728](main.py#L7609-7728))
 
 ---
-- ✅ 定期维护的卫生保持
+
+## 📝 Changelog 编写规范 (标准格式)
+
+### 标准格式模板
+
+`markdown
+### vX.X.XX.XX (YYYY-MM-DD) - 📝 版本标题简述
+
+#### 更新内容: 一句话概括本次更新的主要内容
+
+**影响文件**: [文件路径1](链接), [文件路径2](链接)
+
+---
+
+- **功能/改进名称 (类型)** - 详细描述
+  - 技术细节1
+  - 技术细节2
+  
+- **另一个功能 (类型)** - 详细描述
+  - 实现方案
+  - 影响范围
+
+- **代码规范遵循 skill.md** - 质量保证
+  - ✅ 规范编号: 具体实现
+  
+- **验证结果** - 测试通过情况
+  - [x] 测试项1 → 结果 ✅
+`
+
+### 格式要求
+
+1. **版本号格式**: ### vX.X.XX.XX (YYYY-MM-DD) - 标题
+   - 必须包含日期（括号内）
+   - 使用  -  分隔日期和标题（空格+短横线+空格）
+
+2. **章节标题**: 使用 #### （四级标题）
+   - 推荐使用 "更新内容:" 开头
+
+3. **列表项格式**: - **标题** - 描述
+   - 标题必须加粗（**）
+   - 用  -  分隔标题和描述
+
+4. **子项格式**: 缩进两个空格 + - 
+   - 用于详细说明或技术细节
+
+5. **代码规范**: 单独列为一个列表项
+   - 引用具体的规范编号（如 PY-FRONT-001）
+   - 说明如何遵循该规范
+
+6. **验证结果**: 单独列为一个列表项
+   - 使用 [x] 复选框标记
+   - 每项后标注 ✅ 或 ❌
+
+7. **标题分隔符**: 使用空格 或  — （破折号）分隔关键词
+   - 示例: 🎨 删除商品描述完整显示优化 + 响应式布局增强
+   - 示例: 🔧 隧道验证修复 — hostc/CF均不可用的根因修复
+
+8. **API兼容性**: 符合 /api/changelog API 解析规则 ([main.py#L7609-7728](main.py#L7609-7728))
+
+---
