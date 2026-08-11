@@ -7,6 +7,118 @@
 
 ## 🔄 最新更新
 
+### v3.8.89.18 ✨ 商品描述点击查看详情功能 + 差异化交互设计
+
+#### 更新内容: 为新增/高价商品表格添加商品描述点击查看详情功能，删除商品表格保持纯文本展示
+
+**更新日期**: 2026-08-11
+**更新类型**: 功能增强 + 用户体验优化
+**影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [.trae/skills/project-manager/SKILL.md](.trae/skills/project-manager/SKILL.md)
+
+---
+
+##### 1. 商品描述列交互功能增强 (核心功能)
+
+**需求背景**:
+- 用户反馈：商品描述应该像货号一样可以点击查看完整详情
+- 现有实现：只有货号可以点击（sku-link），商品描述只是纯文本展示
+- 期望效果：新增和高价商品的描述可点击，删除商品只读展示
+
+**修改位置**:
+- [dist/app.js#L1982-L1985](dist/app.js#L1982-L1985) - 新增商品序列号表格
+- [dist/app.js#L1997-L2004](dist/app.js#L1997-L2004) - 删除商品序列号表格
+- [dist/app.js#L2024-L2027](dist/app.js#L2024-L2027) - 新增高价商品(≥599)表格
+
+**技术实现方案**:
+
+```javascript
+// ❌ 修改前：商品描述为纯文本
+<td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" 
+    title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</td>
+
+// ✅ 修改后：新增/高价商品 - 可点击链接
+<td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+  <a href="javascript:void(0)" data-desc="${escapeAttr(p.name || '')}" 
+     class="desc-link" style="color: #409EFF; text-decoration: none;" 
+     title="${escapeAttr(p.name || '')}">
+    ${escapeHtml(p.name || '-')}
+  </a>
+</td>
+```
+
+**差异化交互设计逻辑**:
+
+| 表格类型 | 货号 | 商品描述 | 设计原因 |
+|---------|------|---------|----------|
+| **新增商品序列号** | ✅ sku-link 可点击 | ✅ desc-link 可点击 | 商品在系统中，可查询详情 |
+| **删除商品序列号** | ❌ 纯文本 | ❌ 纯文本 | 商品已删除，无法查询 |
+| **新增高价商品(≥599)** | ✅ sku-link 可点击 | ✅ desc-link 可点击 | 重点监控对象 |
+
+**事件绑定机制**:
+```javascript
+// 复用现有的事件委托机制 (app.js#L895-L903)
+document.addEventListener('click', function(e) {
+    var descLink = e.target.closest('.desc-link');
+    if (descLink) {
+        e.preventDefault();
+        var desc = descLink.dataset.desc;
+        if (desc) {
+            showProductByDescription(desc);  // 调用后端API /api/product/by-description
+        }
+        return;
+    }
+});
+```
+
+**安全防护措施**:
+- ✅ 使用 `escapeHtml()` 防止XSS攻击
+- ✅ 使用 `escapeAttr()` 编码data-*属性值
+- ✅ URL验证通过 `isValidUrl()` 函数
+- ✅ 复用现有的安全事件绑定机制
+
+##### 2. 删除商品表格保持纯文本展示 (设计决策)
+
+**技术决策原因**:
+1. **数据不可访问性**: 已删除的商品不在当前JSON数据文件中
+2. **避免错误提示**: 点击后会触发API查询返回"未找到该商品"
+3. **用户体验优化**: 明确区分"可操作"和"只读"数据状态
+4. **视觉一致性**: 纯文本样式暗示"这是历史记录"
+
+**保留的交互特性**:
+- ✅ 鼠标悬停显示完整描述（title属性）
+- ✅ 文本溢出自动省略号（text-overflow: ellipsis）
+- ✅ 最大宽度限制（max-width: 300px）防止布局错乱
+
+##### 3. 代码规范严格遵守 (质量保证)
+
+**遵循 skill.md 规范**:
+
+✅ **前端安全编码规范** (PY-FRONT-001):
+- 所有动态HTML内容使用 `escapeHtml()` 转义
+- 所有属性值使用 `escapeAttr()` 编码
+- 不使用内联事件处理器（onclick/onerror）
+- 使用 `data-*` 属性传递参数
+
+✅ **事件绑定现代化** (PY-FRONT-002):
+- 采用事件委托模式（document级别监听）
+- 使用 `addEventListener` 替代内联事件
+- CSS类名语义化（desc-link, sku-link）
+
+✅ **响应式设计原则** (PY-FRONT-003):
+- 移动端自适应（overflow处理）
+- PC端保持固定宽度（300px）
+- 触摸友好的点击区域大小
+
+**验证结果**:
+- [x] 新增商品描述点击 → 弹出详情窗口（含图片、价格、员工等） ✅
+- [x] 高价商品描述点击 → 同样弹出详情窗口 ✅
+- [x] 删除商品描述点击 → 无反应（纯文本） ✅
+- [x] XSS攻击测试 → 恶意脚本无法注入 ✅
+- [x] 长文本显示测试 → 正确截断并省略 ✅
+- [x] 功能回归测试 → 原有货号点击功能正常 ✅
+
+---
+
 ### v3.8.89.17 🔧 编码问题根治 + subprocess超时优化 + Git历史清理
 
 #### 更新内容: 彻底解决main.py编码损坏问题，优化subprocess超时配置，合并多余Git提交保持历史整洁
