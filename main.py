@@ -1736,11 +1736,14 @@ class Environment:
         """跨系统检查进程是否运行"""
         try:
             if Environment.IS_WINDOWS:
-                result = subprocess.run(f'tasklist /FI "IMAGENAME eq {process_name}"', shell=True, capture_output=True, text=True, timeout=3)
+                result = subprocess.run(f'tasklist /FI "IMAGENAME eq {process_name}"', shell=True, capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])
                 return process_name in result.stdout
             else:
-                result = subprocess.run(f'pgrep -f "{process_name}"', shell=True, capture_output=True, text=True, timeout=3)
+                result = subprocess.run(f'pgrep -f "{process_name}"', shell=True, capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])
                 return result.returncode == 0
+        except subprocess.TimeoutExpired as e:
+            print(f"⚠️ 检查进程运行状态超时（{TIMEOUT_CONFIG['subprocess_kill']}秒）: {e}")
+            return False
         except (subprocess.SubprocessError, OSError, FileNotFoundError) as e:
             print(f"⚠️ 检查进程运行状态失败: {e}")
             return False

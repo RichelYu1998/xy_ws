@@ -4471,12 +4471,398 @@ class CleanupChecklist:
     def generate_recovery_instructions(removed_files):
         """
         生成恢复说明文档
-        
+
         Args:
             removed_files: 已删除的文件列表
-            
+
         Returns:
             Markdown格式的恢复指南
+        """
+        pass  # 实现略
+
+---
+
+## 🔴 PY-CORE-019: subprocess 超时配置范式 (Subprocess Timeout Configuration)
+
+### 范式描述
+建立统一的 subprocess 调用超时管理机制，避免硬编码超时值，提升系统稳定性和可维护性。
+
+### 核心原则
+
+#### 1. 全局超时配置
+```python
+# config.py 或 main.py 顶部
+TIMEOUT_CONFIG = {
+    'subprocess_kill': 10,      # 进程终止等待时间（秒）
+    'subprocess_check': 10,     # 进程检查超时（秒）
+    'http_request': 30,         # HTTP请求超时
+    'browser_wait': 30,         # 浏览器操作超时
+}
+```
+
+#### 2. subprocess 调用规范
+```python
+import subprocess
+from typing import Optional, Tuple
+
+class SubprocessManager:
+    """subprocess 统一管理器"""
+
+    @staticmethod
+    def run_command(
+        command: str,
+        timeout_key: str = 'subprocess_check',
+        capture_output: bool = True,
+        **kwargs
+    ) -> Tuple[int, str, str]:
+        """
+        执行命令并统一处理超时
+
+        Args:
+            command: 要执行的命令
+            timeout_key: TIMEOUT_CONFIG中的键名
+            capture_output: 是否捕获输出
+            **kwargs: subprocess.run 的其他参数
+
+        Returns:
+            (returncode, stdout, stderr) 元组
+
+        Raises:
+            subprocess.TimeoutExpired: 超时时抛出（由调用方决定如何处理）
+        """
+        timeout = TIMEOUT_CONFIG.get(timeout_key, 10)
+
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=capture_output,
+                text=True,
+                timeout=timeout,
+                encoding='utf-8',
+                errors='replace',
+                **kwargs
+            )
+            return result.returncode, result.stdout, result.stderr
+
+        except subprocess.TimeoutExpired as e:
+            # 记录详细超时信息
+            logger.warning(
+                f'命令执行超时 ({timeout}秒): {command[:100]}...'
+                f'\n超时类型: {timeout_key}'
+            )
+            raise  # 由调用方决定是否重试或降级
+
+# ✅ 正确使用示例
+class ProcessMonitor:
+    @staticmethod
+    def check_process_running(process_name: str) -> bool:
+        """检查进程是否运行"""
+        try:
+            returncode, stdout, _ = SubprocessManager.run_command(
+                f'tasklist /FI "IMAGENAME eq {process_name}"',
+                timeout_key='subprocess_check'
+            )
+            return process_name in stdout
+
+        except subprocess.TimeoutExpired as e:
+            print(f"⚠️ 检查进程运行状态超时: {e}")
+            return False  # 超时时返回默认值，不级联故障
+
+        except Exception as e:
+            print(f"⚠️ 检查进程运行状态失败: {e}")
+            return False
+```
+
+#### 3. 异常分层处理
+```python
+# ❌ 错误：所有异常混在一起处理
+except Exception as e:
+    logger.error(f'错误: {e}')
+    return False
+
+# ✅ 正确：按严重程度分层处理
+except subprocess.TimeoutExpired as e:
+    # 第一层：超时（可预期的 transient 错误）
+    logger.warning(f'操作超时（{timeout}秒），可能系统负载较高')
+    return fallback_value  # 返回安全默认值
+
+except subprocess.SubprocessError as e:
+    # 第二层：subprocess 特定错误
+    logger.error(f'subprocess错误: {e}')
+    raise AppException.subprocess_error(str(e))
+
+except OSError as e:
+    # 第三层：系统级错误（权限、文件不存在等）
+    logger.critical(f'系统错误: {e}')
+    raise AppException.system_error(str(e))
+```
+
+#### 4. Windows 特殊处理
+```python
+if Environment.IS_WINDOWS:
+    # Windows 下 tasklist/pgrep 命令响应较慢
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
+        cwd=PROJECT_DIR,
+        text=True,
+        encoding='utf-8',      # 强制UTF-8编码
+        errors='replace',       # 编码容错
+        bufsize=1,              # 行缓冲
+        env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}  # 环境变量
+    )
+```
+
+### 最佳实践清单
+- ✅ 所有超时值使用 `TIMEOUT_CONFIG` 全局配置，禁止硬编码
+- ✅ `TimeoutExpired` 异常单独捕获，返回安全默认值而非抛出
+- ✅ Windows 平台使用 `encoding='utf-8'` + `errors='replace'`
+- ✅ 超时信息包含实际时长和配置键名，便于调试
+- ✅ 长时间运行的任务使用 `Popen` + 非阻塞读取，避免死锁
+
+---
+
+## 🔴 PY-CORE-020: 编码处理最佳实践范式 (Encoding Best Practices)
+
+### 范式描述
+建立跨平台编码处理标准，确保中文等多字节字符在 Windows/Linux/macOS 上都能正确显示。
+
+### 核心原则
+
+#### 1. 文件读写编码规范
+```python
+# ✅ 正确：始终显式指定 UTF-8
+with open(file_path, 'r', encoding='utf-8') as f:
+    data = f.read()
+
+# 容错模式（处理损坏文件）
+with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+    data = f.read()
+
+# ❌ 错误：依赖系统默认编码（Windows下可能是GBK）
+with open(file_path, 'r') as f:  # 危险！
+    data = f.read()
+```
+
+#### 2. subprocess 编码保障
+```python
+def run_command_safely(command):
+    """安全执行命令，确保输出无乱码"""
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding='utf-8',
+        errors='replace',     # 替换无法解码的字符
+        bufsize=1,
+        env=env,
+        cwd=PROJECT_DIR
+    )
+
+    for line in iter(process.stdout.readline, ''):
+        yield line  # 生成器模式，实时输出
+
+    process.wait()
+```
+
+#### 3. JSON 数据编码一致性
+```python
+def save_json(data, file_path):
+    """保存JSON数据，确保中文不乱码"""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,   # ✅ 关键：保留中文字符
+            indent=2,
+            separators=(',', ': ')
+        )
+
+def load_json(file_path):
+    """加载JSON数据"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+```
+
+#### 4. Base64 编解码处理URL
+```python
+import base64
+
+def encode_url(url: str) -> str:
+    """URL转Base64（用于存储到JSON）"""
+    return base64.b64encode(url.encode('utf-8')).decode('ascii')
+
+def decode_url(b64_str: str) -> str:
+    """Base64转URL"""
+    try:
+        return base64.b64decode(b64_str).decode('utf-8')
+    except Exception:
+        return b64_str  # 解码失败时返回原始值
+```
+
+#### 5. 日志系统编码配置
+```python
+import logging
+
+def setup_logger():
+    """配置日志系统，确保中文正常写入"""
+    log_file = 'app.log'
+
+    # 文件处理器：强制UTF-8
+    file_handler = logging.FileHandler(
+        log_file,
+        mode='a',
+        encoding='utf-8'  # ✅ 关键
+    )
+    file_handler.setFormatter(
+        logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    )
+
+    # 控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(
+        logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    )
+
+    logger = logging.getLogger(__name__)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    logger.setLevel(logging.INFO)
+
+    return logger
+```
+
+### 编码问题诊断清单
+遇到乱码时的排查步骤：
+1. ✅ 确认文件保存为 UTF-8 with BOM 或 UTF-8 without BOM
+2. ✅ 检查所有 `open()` 调用是否有 `encoding='utf-8'`
+3. ✅ 确认 Python 文件头部有 `# -*- coding: utf-8 -*-`
+4. ✅ 检查 subprocess 调用的 `encoding` 参数
+5. ✅ 确认环境变量 `PYTHONIOENCODING=utf-8`
+6. ✅ 使用 Git 恢复已知良好的版本作为基准
+
+---
+
+## 🔴 PY-CORE-021: Git 历史维护范式 (Git History Maintenance)
+
+### 范式描述
+建立规范的 Git 提交历史管理机制，保持历史整洁、可追溯、易于理解。
+
+### 核心原则
+
+#### 1. 提交频率与粒度
+```bash
+# ✅ 合理的提交粒度
+git commit -m "fix: 修复subprocess超时问题"           # 单一功能点
+git commit -m "docs: 更新README.md版本记录"             # 仅文档更新
+git commit -m "refactor: 重构异常处理逻辑"             # 重构提交
+
+# ❌ 不好的提交（太大或太碎）
+git commit -m "update"                                 # 信息不足
+git commit -m "fix bug + update doc + add test"        # 多个无关变更
+```
+
+#### 2. 提交历史整理流程
+```bash
+# 场景：合并最近N个零散提交
+git log --oneline -10                    # 查看最近提交
+git reset --soft <target-commit>         # 软重置到目标提交
+git status                               # 查看待提交的更改
+git commit -m "chore: 合并多个小修复"     # 重新提交
+
+# 场景：修改最近的提交信息（未推送）
+git commit --amend -m "new message"
+
+# 场景：交互式变基整理历史
+git rebase -i HEAD~5                     # 最近5个提交
+# 在编辑器中选择 pick/squash/fixup/reword
+```
+
+#### 3. Force Push 安全策略
+```bash
+# ⚠️ 危险操作：仅在必要时使用
+
+# ❌ 极其危险：强制覆盖远程（可能丢失他人工作）
+git push --force origin master
+
+# ✅ 相对安全：检查后再强制推送
+git push --force-with-lease origin master
+# 如果远程有新的提交会拒绝推送，保护他人工作
+
+# 最佳实践：
+# 1. 先通知团队成员暂停推送
+# 2. 确认本地是最新的
+# 3. 使用 --force-with-lease
+# 4. 推送后通知团队重新拉取
+```
+
+#### 4. 分支管理规范
+```bash
+# 功能开发
+git checkout -b feature/subprocess-timeout-fix
+# ... 开发和测试 ...
+git checkout master
+git merge feature/subprocess-timeout-fix
+git branch -d feature/subprocess-timeout-fix
+
+# 紧急修复（从主分支直接修复）
+git checkout -b hotfix/encoding-issue
+# ... 快速修复 ...
+git checkout master
+git merge hotfix/encoding-issue
+git tag -a v3.8.89.17 -m "修复编码问题"
+```
+
+#### 5. 提交信息格式规范
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Type 类型**:
+- `fix`: Bug修复
+- `feat`: 新功能
+- `docs`: 文档更新
+- `style`: 代码格式（不影响功能）
+- `refactor`: 重构（非新功能非Bug修复）
+- `perf`: 性能优化
+- `test`: 测试相关
+- `chore`: 构建/工具/辅助工具变动
+- `revert`: 回滚提交
+
+**示例**:
+```
+fix(main): 优化subprocess超时配置
+
+将check_process_running()的超时时间从硬编码3秒改为
+使用全局TIMEOUT_CONFIG配置的10秒，并新增专门的
+TimeoutExpired异常处理。
+
+Closes #123
+```
+
+### Git 维护检查清单
+- ✅ 提交前运行测试确保功能正常
+- ✅ 提交信息清晰描述变更内容和原因
+- ✅ 单次提交聚焦单一关注点
+- ✅ 定期整理过细的提交（使用 reset --soft）
+- ✅ Force push 前 always 使用 --force-with-lease
+- ✅ 重要版本打 tag（如 v3.8.89.17）
+- ✅ 敏感信息（密码、密钥）绝不提交到仓库
+
+---
         """
         instructions = ["## 📁 文件恢复指南\n"]
         instructions.append("以下文件已被清理，如需恢复请使用对应的命令：\n")
