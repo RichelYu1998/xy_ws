@@ -4662,4 +4662,409 @@ sys.exit(0 if FileLifecycleManager.cleanup_temp_files('.', dry_run=True) else 1)
 - ✅ 版本发布前的代码库整理
 - ✅ 功能完成后的测试工具清理
 - ✅ 项目交接时的代码库瘦身
+
+---
+
+## 🟢 FE-CORE-001: 前端表格渲染规范 (Frontend Table Rendering)
+
+### 范式描述
+定义前端表格组件的统一渲染标准，确保数据展示的一致性、安全性和用户体验。
+
+### 核心原则
+
+#### 1. 表格结构标准化
+```javascript
+// ✅ 标准表格结构（4列示例）
+<table class="change-table">
+  <thead>
+    <tr>
+      <th>序号</th>
+      <th>货号</th>
+      <th>商品描述</th>
+      <th>售价</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${dataArray.map((item, idx) => `
+      <tr data-sku="${item.sku}">
+        <td>${idx + 1}</td>
+        <td>${item.sku}</td>
+        <td>${item.name}</td>
+        <td>${item.price}</td>
+      </tr>
+    `).join('')}
+  </tbody>
+</table>
+```
+
+**关键特性**:
+- ✅ 使用 `<thead>` 和 `<tbody>` 语义化标签
+- ✅ `data-sku` 属性用于行标识和数据绑定
+- ✅ 序号从 1 开始（用户友好）
+- ✅ 使用模板字符串 + `.join('')` 优化性能
+
+#### 2. 长文本处理策略
+```javascript
+// ✅ 长文本省略方案（推荐）
+<td style="max-width: 300px; 
+         overflow: hidden; 
+         text-overflow: ellipsis; 
+         white-space: nowrap;" 
+    title="${escapeAttr(longText)}">
+  ${escapeHtml(longText || '-')}
+</td>
+
+// ❌ 错误：无限制显示长文本
+<td>${veryLongText}</td>
+
+// ❌ 错误：硬截断无提示
+<td>${longText.substring(0, 20)}...</td>
+```
+
+**样式说明**:
+| CSS属性 | 值 | 作用 |
+|---------|-----|------|
+| `max-width` | 300px | 限制最大宽度，防止布局错乱 |
+| `overflow` | hidden | 隐藏超出内容 |
+| `text-overflow` | ellipsis | 显示省略号（...） |
+| `white-space` | nowrap | 禁止换行 |
+| `title` | 完整文本 | 鼠标悬停显示完整内容 |
+
+#### 3. XSS 安全防护（强制要求）
+```javascript
+// ✅ 正确：所有动态内容必须转义
+function escapeHtml(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeAttr(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// 使用示例
+<td title="${escapeAttr(p.name)}">${escapeHtml(p.name || '-')}</td>
+<a href="..." data-sku="${escapeAttr(p.sku)}">${escapeHtml(p.sku)}</a>
+```
+
+**转义函数对比**:
+| 函数名 | 用途 | 转义字符 |
+|--------|------|----------|
+| `escapeHtml()` | HTML 内容显示 | `<`, `>`, `&`, `"`, `'` |
+| `escapeAttr()` | HTML 属性值 | `"`, `'`, `<`, `>`, `&` |
+
+#### 4. 数据字段映射规范
+```javascript
+// ✅ 标准字段映射（对比表格）
+const product = {
+  sku: p.货号 || p.stock_number || '',           // 货号（多字段兼容）
+  name: p.商品描述 || p.name || p.商品名称 || '', // 商品描述（优先级）
+  price: p.售价 || p.price || '-',                 // 售价
+  staff: p.员工 || p.staff || '-'                  // 员工
+};
+
+// ✅ 字段优先级链（从高到低）
+// 商品描述: 商品描述 → name → 商品名称
+// 货号: 货号 → stock_number
+// 售价: 售价 → price
+// 员工: 员工 → staff
+```
+
+**向后兼容性**:
+- ✅ 支持中英文字段名（如 `商品描述` / `name`）
+- ✅ 使用 `||` 或运算符实现优雅降级
+- ✅ 缺失字段默认显示 `-`
+
+#### 5. 交互增强规范
+```javascript
+// ✅ 可点击货号链接
+<td>
+  <a href="javascript:void(0)" 
+     data-sku="${escapeAttr(sku)}" 
+     class="sku-link" 
+     style="color: #409EFF; text-decoration: none;">
+    ${escapeHtml(sku)}
+  </a>
+</td>
+
+// ✅ 行悬停高亮效果
+<tr onmouseover="highlightRow('${sku}')" 
+    onmouseout="unhighlightRow('${sku}')"
+    style="${rowStyle}">
+
+// ✅ 条件背景色（高价+新增商品）
+let rowStyle = '';
+if (isHighPrice && isAdded) rowStyle = 'background: #e8f5e9;';   // 绿色
+else if (isHighPrice) rowStyle = 'background: #fff3e0;';          // 橙色
+else if (isAdded) rowStyle = 'background: #e3f2fd;';              // 蓝色
+```
+
+**颜色语义**:
+| 场景 | 背景色 | 含义 |
+|------|--------|------|
+| 高价 + 新增 | `#e8f5e9` (绿) | 重点关注的优质新品 |
+| 仅高价 | `#fff3e0` (橙) | 高价值商品 |
+| 仅新增 | `#e3f2fd` (蓝) | 新入库商品 |
+| 普通 | 透明 | 默认状态 |
+
+#### 6. 响应式设计适配
+```css
+/* 移动端优化 (< 576px) */
+@media (max-width: 575.98px) {
+  .change-table {
+    font-size: 12px;
+  }
+  
+  .change-table th,
+  .change-table td {
+    padding: 4px 2px;  /* 减小内边距 */
+  }
+  
+  /* 商品描述列自适应 */
+  .change-table td:nth-child(3) {
+    max-width: 150px;  /* 移动端减小最大宽度 */
+  }
+}
+
+/* PC端优化 (≥ 576px) */
+.change-table td:nth-child(3) {
+  max-width: 300px;  /* PC端使用标准宽度 */
+}
+```
+
+### 表格类型清单
+
+#### 类型1: 新增商品序列号表格
+```javascript
+// 文件位置: dist/app.js (第 1895-1918 行)
+if (skuData.addedProducts && skuData.addedProducts.length > 0) {
+  cardHtml += `
+    <div class="change-section">
+      <div class="change-title" style="color: #67c23a;">
+        新增商品序列号 (${skuData.addedProducts.length}个)
+      </div>
+      <div class="change-table-container">
+        <table class="change-table">
+          <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
+          <tbody>
+            ${skuData.addedProducts.map((p, idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td><a href="..." class="sku-link">${p.sku}</a></td>
+                <td style="max-width: 300px; ...">${p.name || '-'}</td>
+                <td>${p.price || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+```
+
+**特征**:
+- 标题颜色: `#67c23a` (绿色)
+- 货号列: 可点击链接 (sku-link)
+- 数据源: `skuData.addedProducts[]`
+
+#### 类型2: 删除商品序列号表格
+```javascript
+// 文件位置: dist/app.js (第 1912-1939 行)
+// 结构同上，但：
+// - 标题颜色: #f56c6c (红色)
+// - 货号列: 纯文本（不可点击）
+// - 数据源: skuData.deletedProducts[]
+```
+
+#### 类型3: 新增高价商品表格
+```javascript
+// 文件位置: dist/app.js (第 1933-1960 行)
+// 结构同"新增商品"，但：
+// - 标题颜色: #409EFF (蓝色)
+// - 标题文案: "新增高价商品(≥599)"
+// - 数据源: skuData.newHighPriceProducts[]
+```
+
+#### 类型4: 主商品列表表格
+```javascript
+// 文件位置: dist/app.js (第 2272-2288 行)
+// 特殊处理：
+// - 商品描述: 完整显示（不截断）
+// - 包含图片缩略图
+// - 支持搜索和筛选
+const descDisplay = desc;  // v3.8.89.14 起：不再截断
+```
+
+### 性能优化建议
+
+#### 1. 批量 DOM 操作
+```javascript
+// ✅ 推荐：一次性生成完整HTML
+let tableHtml = `
+  <table>
+    <thead>...</thead>
+    <tbody>
+      ${largeArray.map(item => `<tr>...</tr>`).join('')}
+    </tbody>
+  </table>
+`;
+container.innerHTML = tableHtml;
+
+// ❌ 避免：循环中频繁操作DOM
+container.innerHTML = '<table><tbody>';
+for (let item of largeArray) {
+  container.querySelector('tbody').innerHTML += `<tr>...</tr>`;
+}
+```
+
+#### 2. 事件委托
+```javascript
+// ✅ 推荐：事件委托（减少事件监听器数量）
+document.querySelector('.change-table-container').addEventListener('click', (e) => {
+  const skuLink = e.target.closest('.sku-link');
+  if (skuLink) {
+    const sku = skuLink.dataset.sku;
+    showProductDetail(sku);
+  }
+});
+
+// ❌ 避免：为每个元素单独绑定事件
+document.querySelectorAll('.sku-link').forEach(link => {
+  link.addEventListener('click', () => { ... });
+});
+```
+
+### 代码审查清单
+
+在提交前端表格相关代码前，必须检查：
+
+- [ ] **结构完整性**: `<thead>` + `<tbody>` 标签齐全
+- [ ] **XSS防护**: 所有动态内容都经过 `escapeHtml()` / `escapeAttr()`
+- [ ] **长文本处理**: 超过20字的字段有省略号 + title 提示
+- [ ] **字段兼容**: 支持中英文多种字段名映射
+- [ ] **响应式**: 移动端和PC端都有对应的CSS适配
+- [ ] **交互反馈**: 悬停高亮、点击跳转等交互正常
+- [ ] **空值处理**: 缺失数据优雅降级为 `-`
+- [ ] **性能**: 使用 `.join('')` 拼接，避免循环操作DOM
+- [ ] **可访问性**: 保留语义化HTML标签
+- [ ] **一致性**: 与现有表格风格保持一致
+
+### 常见问题解决
+
+#### Q1: 表格显示错乱？
+**A**: 检查是否设置 `max-width` 和 `overflow: hidden`，防止长文本撑爆布局。
+
+#### Q2: XSS攻击警告？
+**A**: 确保所有 `${}` 插值都包裹在 `escapeHtml()` 或 `escapeAttr()` 中。
+
+#### Q3: 移动端表格太宽？
+**A**: 在媒体查询中减小 `max-width`、`padding`、`font-size`。
+
+#### Q4: 字段取不到值？
+**A**: 检查字段映射是否覆盖所有可能的字段名（中文/英文/别名）。
+
+---
+
+## 📊 版本记录 (v3.8.89.15)
+
+### 本次更新内容
+
+**更新日期**: 2026-08-11
+**版本号**: v3.8.89.15
+**更新类型**: 安全漏洞修复 + 代码质量提升
+
+#### 主要修复项
+
+##### 🚨 高危安全漏洞 (5处)
+
+1. **XSS跨站脚本攻击** (3处)
+   - [handleVideoError()](dist/app.js#L467-L507): 移除内联onclick → data-*属性+addEventListener
+   - [retryVideoLoad()](dist/app.js#L501-L562): 移除内联onerror → 动态事件绑定
+   - [showImagePreview()](dist/app.js#L698-L778): URL验证+escapeAttr转义
+
+2. **命令注入漏洞** (2处)
+   - [kill_process_by_name()](main.py#L1710-L1730): 输入白名单+列表参数+移除shell=True
+   - [check_process_running()](main.py#L1754-L1775): 同上修复方案
+
+##### 🟡 中危问题 (2处)
+
+3. **SMTP密码加密存储**
+   - 新增 `_encrypt_password()` / `_decrypt_password()` 方法
+   - XOR对称加密 + Base64编码
+   - 向后兼容旧明文密码
+
+4. **内存泄漏防护**
+   - 完善cleanupPreviewListener()清理机制
+   - 触摸事件使用 `{ passive: true }` 提升性能
+
+##### 🟢 代码质量改进 (10+处)
+
+5. **全局唯一导入规范**
+   - 删除所有函数内部重复的import语句
+   - 所有导入统一放在文件顶部
+   - 添加模块文档字符串说明导入规范
+
+6. **其他改进**
+   - 事件绑定现代化（内联→addEventListener）
+   - 输入验证增强（URL、进程名、空值检查）
+   - 异常处理细化（避免宽泛Exception捕获）
+
+#### 影响范围
+
+| 文件 | 变更类型 | 说明 |
+|------|----------|------|
+| `dist/app.js` | 安全修复+重构 | XSS防护+事件绑定现代化 |
+| `main.py` | 安全修复+优化 | 命令注入防护+导入规范化 |
+
+#### 测试验证
+
+- [x] XSS攻击测试通过 ✅
+- [x] 命令注入测试通过 ✅
+- [x] 密码加解密功能正常 ✅
+- [x] 内存泄漏检测通过 ✅
+- [x] 功能回归测试通过 ✅
+
+---
+
+## 📊 版本记录 (v3.8.89.14)
+
+### 本次更新内容
+
+**更新日期**: 2026-08-11
+**版本号**: v3.8.89.14
+**更新类型**: 功能增强 (Feature Enhancement)
+
+#### 新增功能
+1. **商品描述字段完整显示**
+   - 对比表格从3列扩展到4列（序号、货号、商品描述、售价）
+   - 主商品列表不再截断商品描述（原20字限制移除）
+
+#### 影响范围
+- **文件修改**: `dist/app.js` (4处)
+- **表格类型**: 4种表格全部更新
+- **向后兼容**: 完全兼容旧数据
+
+#### 技术亮点
+- 长文本智能省略（300px + ellipsis）
+- XSS安全防护（双重转义函数）
+- 多字段名兼容映射
+- 响应式自适应设计
+
+#### 相关文档
+- [README.md 更新日志](../README.md#v388914-✨-商品描述字段增强--对比表格完整显示商品信息)
+- [代码变更详情](dist/app.js#L1895-L1960)
+
+---
 - ✅ 定期维护的卫生保持
