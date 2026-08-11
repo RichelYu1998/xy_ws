@@ -469,50 +469,91 @@
         }
         
         function handleVideoError(videoElement, videoUrl, isPreview = false) {
-            const url = videoUrl || videoElement.src;
+            if (!videoElement) {
+                logError('视频元素不存在');
+                return;
+            }
+            
+            const url = videoUrl || videoElement.src || '';
             logError('视频加载失败:', url.substring(0, 50) + '...');
             
-            const errorStyle = isPreview 
+            const errorStyle = isPreview
                 ? 'max-width:95%;max-height:90%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;color:white;font-size:16px;text-align:center;padding:20px;border-radius:8px;cursor:pointer;'
                 : 'class="product-thumb-placeholder"';
-            
+
             const errorContent = isPreview
-                ? `<div style="font-size:48px;margin-bottom:10px;">⚠️</div><div>视频加载失败</div><div style="font-size:14px;margin-top:10px;opacity:0.8;">可能是网络问题，点击重试</div>`
-                : `视频加载失败<br>点击重试`;
-            
-            const errorMsg = `<div style="${errorStyle}" onclick="retryVideoLoad(this, '${url.replace(/'/g, "\\'")}', ${isPreview})">${errorContent}</div>`;
-            
+                ? '<div style="font-size:48px;margin-bottom:10px;">⚠️</div><div>视频加载失败</div><div style="font-size:14px;margin-top:10px;opacity:0.8;">可能是网络问题，点击重试</div>'
+                : '视频加载失败<br>点击重试';
+
+            const safeUrl = escapeAttr(url);
+            const errorMsg = `<div style="${errorStyle}" data-video-url="${safeUrl}" data-is-preview="${isPreview}">${errorContent}</div>`;
+
             if (isPreview) {
                 videoElement.outerHTML = errorMsg;
-            } else {
+            } else if (videoElement.parentElement) {
                 videoElement.parentElement.innerHTML = errorMsg;
+                
+                const errorDiv = videoElement.parentElement.querySelector('[data-video-url]');
+                if (errorDiv) {
+                    errorDiv.addEventListener('click', function() {
+                        retryVideoLoad(this, this.dataset.videoUrl, this.dataset.isPreview === 'true');
+                    });
+                }
             }
         }
         
         function retryVideoLoad(errorDiv, videoUrl, isPreview = false) {
+            if (!errorDiv || !videoUrl) {
+                logError('重试参数无效:', { errorDiv: !!errorDiv, videoUrl: !!videoUrl });
+                return;
+            }
+
+            const safeUrl = escapeAttr(videoUrl);
             const videoStyle = isPreview
                 ? 'max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;'
                 : 'class="product-thumb" style="background:#000;"';
-            
+
             const videoPreload = isPreview ? 'auto' : 'metadata';
             const videoAutoplay = isPreview ? 'autoplay' : '';
             const loadingText = isPreview ? '' : '<div class="video-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:12px;">重新加载中...</div>';
-            
+
             const videoHtml = `
-                <video id="previewImage" src="${videoUrl}" controls ${videoAutoplay} preload="${videoPreload}" crossorigin="anonymous" playsinline style="${videoStyle}" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${videoUrl.replace(/'/g, "\\'")}', ${isPreview})" onloadeddata="handleVideoLoad(this)">
+                <video id="previewImage" src="${safeUrl}" controls ${videoAutoplay} preload="${videoPreload}" crossorigin="anonymous" playsinline style="${videoStyle}">
                     您的浏览器不支持视频播放
                 </video>
                 ${loadingText}
             `;
-            
-            if (isPreview) {
-                const preview = document.getElementById('imagePreview');
-                const oldContent = preview?.querySelector('div[style*="max-width:95%"]');
-                if (oldContent) {
-                    oldContent.outerHTML = videoHtml;
+
+            try {
+                if (isPreview) {
+                    const preview = document.getElementById('imagePreview');
+                    if (!preview) {
+                        logError('预览容器不存在');
+                        return;
+                    }
+                    const oldContent = preview.querySelector('div[style*="max-width:95%"]');
+                    if (oldContent) {
+                        oldContent.outerHTML = videoHtml;
+                        
+                        const newVideo = document.getElementById('previewImage');
+                        if (newVideo) {
+                            newVideo.addEventListener('click', function(e) { e.stopPropagation(); });
+                            newVideo.addEventListener('error', function() { handleVideoError(this, videoUrl, true); });
+                            newVideo.addEventListener('loadeddata', handleVideoLoad);
+                        }
+                    }
+                } else if (errorDiv.parentElement) {
+                    errorDiv.parentElement.innerHTML = videoHtml;
+                    
+                    const newVideo = errorDiv.parentElement.querySelector('#previewImage');
+                    if (newVideo) {
+                        newVideo.addEventListener('click', function(e) { e.stopPropagation(); });
+                        newVideo.addEventListener('error', function() { handleVideoError(this, videoUrl, false); });
+                        newVideo.addEventListener('loadeddata', handleVideoLoad);
+                    }
                 }
-            } else {
-                errorDiv.parentElement.innerHTML = videoHtml;
+            } catch (e) {
+                logError('重试加载视频失败:', e.message);
             }
         }
         
@@ -638,62 +679,98 @@
                 index = 0;
             }
             window.currentImageIndex = index;
-            
+
             const decodedUrl = decodeBase64Url(imageUrl);
-            const isVideo = decodedUrl.includes('/pvod/') || /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp|m4a)(\?|$)/i.test(decodedUrl);
             
+            if (!decodedUrl || !isValidUrl(decodedUrl) && !decodedUrl.startsWith('data:')) {
+                logError('无效的图片URL:', decodedUrl);
+                return;
+            }
+
+            const safeUrl = escapeAttr(decodedUrl);
+            const isVideo = decodedUrl.includes('/pvod/') || /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp|m4a)(\?|$)/i.test(decodedUrl);
+
             let mediaContent;
             if (isVideo) {
-                mediaContent = `<video id="previewImage" src="${decodedUrl}" controls autoplay preload="auto" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${decodedUrl.replace(/'/g, "\\'")}', true)">
+                mediaContent = `<video id="previewImage" src="${safeUrl}" controls autoplay preload="auto" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;">
                     您的浏览器不支持视频播放
                 </video>`;
             } else {
-                mediaContent = `<img id="previewImage" src="${decodedUrl}" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;" onclick="event.stopPropagation()">`;
+                mediaContent = `<img id="previewImage" src="${safeUrl}" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;" alt="商品图片">`;
             }
             
             const previewHtml = `
-                <div id="imagePreview" onclick="if(event.target === this) this.remove()" style="position:fixed;z-index:10000;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;cursor:zoom-out;overflow:auto;">
+                <div id="imagePreview" style="position:fixed;z-index:10000;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;cursor:zoom-out;overflow:auto;">
                     <div style="position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);display:flex;justify-content:space-between;padding:0 10px;pointer-events:none;">
-                        <button onclick="prevImage()" class="image-nav-btn">❮</button>
-                        <button onclick="nextImage()" class="image-nav-btn">❯</button>
+                        <button data-action="prev" class="image-nav-btn">❮</button>
+                        <button data-action="next" class="image-nav-btn">❯</button>
                     </div>
                     <div style="text-align:center;position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:white;font-size:14px;background:rgba(0,0,0,0.5);padding:8px 16px;border-radius:20px;">
                         <span id="imageCounter">${window.currentImageIndex + 1} / ${window.currentProductImages.length}</span>
                     </div>
                     ${mediaContent}
-                    <button onclick="this.parentElement.remove()" class="image-close-btn">&times;</button>
+                    <button data-action="close" class="image-close-btn">&times;</button>
                 </div>
             `;
-            document.body.insertAdjacentHTML('beforeend', previewHtml);
-            
-            const preview = document.getElementById('imagePreview');
-            let touchStartX = 0;
-            let touchEndX = 0;
-            
-            preview.addEventListener('touchstart', (e) => {
-                touchStartX = e.changedTouches[0].screenX;
-            }, false);
-            
-            preview.addEventListener('touchend', (e) => {
-                touchEndX = e.changedTouches[0].screenX;
-                handleSwipe();
-            }, false);
-            
-            function handleSwipe() {
-                const swipeThreshold = 50;
-                const diff = touchStartX - touchEndX;
-                
-                if (Math.abs(diff) > swipeThreshold) {
-                    if (diff > 0) {
-                        nextImage();
-                    } else {
-                        prevImage();
-                    }
+
+            try {
+                document.body.insertAdjacentHTML('beforeend', previewHtml);
+
+                const preview = document.getElementById('imagePreview');
+                if (!preview) {
+                    logError('预览元素创建失败');
+                    return;
                 }
+
+                let touchStartX = 0;
+                let touchEndX = 0;
+
+                preview.addEventListener('click', function(e) {
+                    if (e.target === preview || e.target.dataset.action === 'close') {
+                        cleanupPreviewListener();
+                    } else if (e.target.dataset.action === 'prev') {
+                        prevImage();
+                    } else if (e.target.dataset.action === 'next') {
+                        nextImage();
+                    }
+                });
+
+                preview.addEventListener('touchstart', (e) => {
+                    touchStartX = e.changedTouches[0].screenX;
+                }, { passive: true });
+
+                preview.addEventListener('touchend', (e) => {
+                    touchEndX = e.changedTouches[0].screenX;
+                    
+                    const swipeThreshold = 50;
+                    const diff = touchStartX - touchEndX;
+
+                    if (Math.abs(diff) > swipeThreshold) {
+                        if (diff > 0) {
+                            nextImage();
+                        } else {
+                            prevImage();
+                        }
+                    }
+                }, { passive: true });
+
+                const videoElement = preview.querySelector('#previewImage');
+                if (videoElement && videoElement.tagName === 'VIDEO') {
+                    videoElement.addEventListener('click', function(e) { 
+                        e.stopPropagation(); 
+                    });
+                    videoElement.addEventListener('error', function() { 
+                        handleVideoError(this, decodedUrl, true); 
+                    });
+                }
+
+                document.addEventListener('keydown', handleKeyDown);
+                document.addEventListener('cleanup-preview', cleanupPreviewListener);
+
+                log('图片预览已打开:', index + 1, '/', window.currentProductImages.length);
+            } catch (e) {
+                logError('创建预览失败:', e.message);
             }
-            
-            document.addEventListener('keydown', handleKeyDown);
-            document.addEventListener('cleanup-preview', cleanupPreviewListener);
         }
 
         function cleanupPreviewListener() {
@@ -1898,11 +1975,12 @@
                             <div class="change-title" style="color: #67c23a;">新增商品序列号 (${skuData.addedProducts.length}个)</div>
                             <div class="change-table-container">
                                 <table class="change-table">
-                                    <thead><tr><th>序号</th><th>货号</th><th>售价</th></tr></thead>
+                                    <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
                                         ${skuData.addedProducts.map((p, idx) => `<tr>
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0)" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(p.sku)}</a></td>
+                                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
@@ -1918,11 +1996,12 @@
                             <div class="change-title" style="color: #f56c6c;">删除商品序列号 (${skuData.deletedProducts.length}个)</div>
                             <div class="change-table-container">
                                 <table class="change-table">
-                                    <thead><tr><th>序号</th><th>货号</th><th>售价</th></tr></thead>
+                                    <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
                                         ${skuData.deletedProducts.map((p, idx) => `<tr>
                                             <td>${idx + 1}</td>
                                             <td>${p.sku}</td>
+                                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
@@ -1938,11 +2017,12 @@
                             <div class="change-title" style="color: #409EFF;">新增高价商品(≥599) (${skuData.newHighPriceProducts.length}个)</div>
                             <div class="change-table-container">
                                 <table class="change-table">
-                                    <thead><tr><th>序号</th><th>货号</th><th>售价</th></tr></thead>
+                                    <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
                                         ${skuData.newHighPriceProducts.map((p, idx) => `<tr>
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0)" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(p.sku)}</a></td>
+                                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
@@ -2281,7 +2361,7 @@
                         if (isHighPrice && isAdded) rowStyle = 'background: #e8f5e9;';
                         else if (isHighPrice) rowStyle = 'background: #fff3e0;';
                         else if (isAdded) rowStyle = 'background: #e3f2fd;';
-                        const descDisplay = desc.length > 20 ? desc.substring(0, 20) + '...' : desc;
+                        const descDisplay = desc;
                         
                         tableHtml += `<tr data-sku="${sku}" data-desc="${desc.replace(/"/g, '&quot;')}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
                             <td>${i + 1}</td>
