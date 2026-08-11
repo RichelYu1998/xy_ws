@@ -1625,6 +1625,26 @@ D:/ws/xy_ws/
 
 ---
 
+## 🔄 最新更新 (v3.8.89.19)
+
+### 🎨 删除商品描述完整显示优化
+
+**更新日期**: 2026-08-11
+**影响文件**: dist/app.js#L2004
+
+##### 核心改进
+- 删除商品描述从截断改为完整显示（移除max-width/overflow/text-overflow限制）
+- 添加word-break/white-space/min-width实现自动换行
+- 移动端：长描述多行显示，无横向滚动
+- PC端：完整显示，容器可横向滚动
+
+##### 代码规范遵循 skill.md
+✅ PY-FRONT-001: escapeHtml() + escapeAttr() 安全编码
+✅ PY-FRONT-003: 响应式设计原则（移动端优先）
+✅ PY-FRONT-004: 差异化交互设计（新增/高价可点击，删除纯文本）
+
+---
+
 ## 🔄 最新更新 (v3.8.89.11)
 
 ### 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复
