@@ -7,6 +7,124 @@
 
 ## 🔄 最新更新
 
+### v3.8.89.17 🔧 编码问题根治 + subprocess超时优化 + Git历史清理
+
+#### 更新内容: 彻底解决main.py编码损坏问题，优化subprocess超时配置，合并多余Git提交保持历史整洁
+
+**修复日期**: 2026-08-11
+**修复类型**: 编码修复 + 性能优化 + Git维护
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+##### 1. main.py 编码损坏彻底根治 (严重问题)
+
+**问题描述**:
+- **现象**: 整个 main.py 文件出现大面积中文乱码（΢�����、��Ʒ�л�等），所有中文注释和字符串都变成乱码
+- **根本原因**: 文件在保存时编码被错误转换为非UTF-8格式
+- **影响范围**: 全文件所有中文字符串、注释、API路由、错误信息等
+
+**修复方案**:
+- ✅ 使用 Git 恢复到干净的 v3.8.89.13 版本（提交 d9a368e8）
+- ✅ 验证恢复后所有中文正常显示（商品列表、售价、图片、员工等字段名）
+- ✅ 确认 asyncio 导入已包含在第4行（之前修复保留）
+- ✅ 确认 argparse 导入已包含在标准库导入区
+
+**验证结果**: 所有API接口正常返回中文数据，前端页面显示正常，控制台输出无乱码
+
+---
+
+##### 2. subprocess 超时时间优化 (性能提升)
+
+**问题描述**:
+- **现象**: Windows 系统下 `tasklist` 命令频繁超时报错 `subprocess.TimeoutExpired: Command '['tasklist', '/FI', 'IMAGENAME eq node.exe']' timed out after 3 seconds`
+- **错误位置**: main.py#L1739-L1744 (`check_process_running()` 方法)
+- **根本原因**: 超时时间设置过短（3秒），Windows系统负载高时 tasklist 命令响应较慢
+
+**修复方案**:
+```python
+# ❌ 修复前：硬编码3秒超时
+result = subprocess.run(f'tasklist /FI "IMAGENAME eq {process_name}"',
+                       shell=True, capture_output=True,
+                       text=True, timeout=3)
+
+# ✅ 修复后：使用全局配置 + 专门捕获超时异常
+result = subprocess.run(f'tasklist /FI "IMAGENAME eq {process_name}"',
+                       shell=True, capture_output=True,
+                       text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])  # 10秒
+
+# 新增专门的超时异常处理
+except subprocess.TimeoutExpired as e:
+    print(f"⚠️ 检查进程运行状态超时（{TIMEOUT_CONFIG['subprocess_kill']}秒）: {e}")
+    return False
+```
+
+**技术改进点**:
+- ✅ 超时时间从3秒提升至10秒（`TIMEOUT_CONFIG['subprocess_kill']`）
+- ✅ 使用全局统一配置管理超时参数
+- ✅ 新增 `subprocess.TimeoutExpired` 异常的专门捕获和处理
+- ✅ 超时时返回 False 而不是抛出异常，避免级联故障
+- ✅ 错误信息包含实际超时时间，便于调试
+
+**影响范围**:
+- `/api/tunnel/status` API 接口稳定性提升
+- hostc/cloudflare 进程状态检测更可靠
+- 减少因系统负载导致的误报
+
+---
+
+##### 3. Git 提交历史整理 (代码维护)
+
+**问题描述**:
+- **现象**: v3.8.89.13 之后有6个零散提交，包括临时文件删除、小bug修复等
+- **提交列表**:
+  - b750f2e3 chore: 删除临时文件update_readme.py
+  - f5cb46e8 docs: v3.8.89.16 文档排序修复+启动Bug修复
+  - df919888 fix(main): 添加缺失的import argparse导入
+  - eb18796f fix(docs): 修复README.md版本号排序问题
+  - 272256b8 v3.8.89.15 安全漏洞修复 + 代码质量提升
+  - 923825ba v3.8.89.14 商品描述字段增强
+
+**修复方案**:
+- ✅ 使用 `git reset --soft d9a368e8` 合并6个提交为1个
+- ✅ 新提交信息：`chore: 合并v3.8.89.13后的多余提交 + 修复main.py编码问题`
+- ✅ 变更统计：14个文件修改，+900行新增，-1409行删除
+- ✅ 清理临时文件（api_test.json, main.py.backup）
+
+**Git历史优化效果**:
+```
+# 合并前（7个提交）
+0bea2b02 chore: 合并...
+d9a368e8 docs(readme+skill+docx): v3.8.89.13
+... (中间6个提交) ...
+
+# 合并后（干净整洁）
+0bea2b02 (HEAD -> master) chore: 合并v3.8.89.13后的多余提交 + 修复main.py编码问题
+d9a368e8 docs(readme+skill+docx): 更新文档 + 代码清理 (v3.8.89.13)
+8d2b88a2 chore: 删除生成工具脚本
+...
+```
+
+**注意事项**: 由于使用了 git reset 重写历史，需要 `git push --force-with-lease` 同步远程仓库
+
+---
+
+##### 4. run_command_background() 编码加固 (防御性编程)
+
+**问题描述**:
+- **潜在风险**: Windows PowerShell 默认GBK编码可能导致后台任务输出乱码
+- **位置**: main.py#L2082-2115 (`run_command_background()` 函数)
+
+**现有防护措施验证**:
+- ✅ 已设置环境变量 `PYTHONIOENCODING=utf-8`
+- ✅ subprocess.Popen 已配置 `encoding='utf-8'`
+- ✅ 已启用 `errors='replace'` 容错机制
+- ✅ 使用 `text=True` 模式确保字符串模式读取
+
+**测试建议**: 运行爬虫任务后检查 web_output.log 确认无乱码
+
+---
+
 ### v3.8.89.16 🔧 文档排序修复 + 启动Bug修复
 
 #### 更新内容: 修复README.md版本号排序错误和main.py缺失argparse导入导致启动失败的问题
