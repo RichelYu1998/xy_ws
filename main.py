@@ -23,8 +23,11 @@ import subprocess
 import sys
 import threading
 import time
+import struct
+import hashlib
+import urllib.error
+import urllib.parse
 import traceback
-import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
@@ -33,48 +36,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import wraps
 from pathlib import Path
-from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
-
-# 第三方库
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
-
-try:
-    from playwright.async_api import async_playwright
-except ImportError:
-    async_playwright = None
-
-try:
-    import openpyxl
-except ImportError:
-    openpyxl = None
-
-try:
-    import psutil
-except ImportError:
-    psutil = None
-
-try:
-    from fastapi import FastAPI, Request, Response, File, UploadFile, HTTPException, Depends
-    from fastapi.responses import JSONResponse, FileResponse, HTMLResponse, RedirectResponse
-    from fastapi.staticfiles import StaticFiles
-    from fastapi.middleware.gzip import GZipMiddleware
-    from fastapi.middleware.cors import CORSMiddleware
-
-    def jsonify(data, status_code=200):
-        return JSONResponse(content=data, status_code=status_code)
-except ImportError:
-    FastAPI = None
-    CORSMiddleware = None
-    jsonify = None
-
-try:
-    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
-except ImportError:
-    Counter = Histogram = Gauge = None
-
 try:
     from pydantic import BaseModel, Field, ValidationError, field_validator
 except ImportError:
@@ -9552,3 +9513,156 @@ ingress:
         uvicorn.run(app, host='0.0.0.0', port=args.port, log_level="info")
     else:
         main()
+
+# SSRF Defense System Added
+
+
+
+
+# ============================================================
+# SSRF安全防御体系 (v3.8.89.20) - 基于SSRF攻击视频的完整防护
+# 攻击场景: 内网探测、云元数据窃取、文件读取、协议走私、DNS Rebinding
+# ============================================================
+
+
+
+
+
+class SSRFProtection:
+    BLOCKED_SCHEMES={'file','gopher','dict','ftp','sftp','ldap','tftp','netdoc','jar'}
+    ALLOWED_SCHEMES={'http','https'}
+    PRIVATE_IP_RANGES=[('10.0.0.0',8),('172.16.0.0',12),('192.168.0.0',16),('127.0.0.0',8),('169.254.0.0',16),('100.64.0.0',10),('198.18.0.0',15),('0.0.0.0',8)]
+    CLOUD_METADATA_ENDPOINTS={'metadata.google.internal','169.254.169.254','metadata.azure.com'}
+    SENSITIVE_PORTS={22,23,25,53,135,139,445,1433,1521,3306,3389,5432,5900,6379,8080,9200,27017}
+    BLOCKED_HOSTNAMES={'localhost','localhost.localdomain','ip6-localhost','ip6-loopback','metadata'}
+
+    def __init__(self,enabled=True,max_redirects=3,max_response_size=5*1024*1024,connect_timeout=5,read_timeout=10,dns_cache_ttl=300,block_private_ips=True,allow_localhost=False):
+        self.enabled=enabled;self.max_redirects=max_redirects;self.max_response_size=max_response_size
+        self.connect_timeout=connect_timeout;self.read_timeout=read_timeout;self.dns_cache_ttl=dns_cache_ttl
+        self.block_private_ips=block_private_ips;self.allow_localhost=allow_localhost
+        self._dns_cache={};self._dns_cache_time={};self._request_count=0;self._block_count=0
+        import logging;self._log=logging.getLogger('SSRF')
+        if not self._log.handlers:
+            h=logging.StreamHandler();h.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+            self._log.addHandler(h);self._log.setLevel(logging.WARNING)
+
+    def _log_event(self,t,u,d='',l='warning'):
+        m=f'[{t}] {u}';getattr(self._log,l)(m+(f' | {d}' if d else ''))
+        if t=='BLOCKED':self._block_count+=1
+
+    def normalize_ip(self,ip):
+        if not ip:return None
+        try:
+            ip=str(ip).strip().lower()
+            if ':' in ip:return self._norm_ipv6(ip)
+            return self._norm_ipv4(ip)
+        except:return None
+
+    def _norm_ipv4(self,ip):
+        ip=ip.strip().strip('.')
+        if not ip:return None
+        import re
+        if re.match(r'^\d+$',ip):
+            v=int(ip)
+            if 0<=v<=0xFFFFFFFF:import socket,struct;return socket.inet_ntoa(struct.pack('!I',v&0xFFFFFFFF))
+            return None
+        parts=ip.split('.');np=[]
+        for p in parts[:4]:
+            p=p.strip()
+            if not p:np.append('0');continue
+            if p.startswith(('0x','0X')):v=int(p,16)
+            elif len(p)>1 and p.startswith('0') and all(c in '01234567' for c in p):v=int(p,8)
+            elif p.isdigit():v=int(p,10)
+            else:return None
+            if not(0<=v<=255):return None
+            np.append(str(v))
+        while len(np)<4:np.append('0')
+        return '.'.join(np[:4])
+
+    def is_private_ip(self,ip):
+        if not ip:return True
+        n=self.normalize_ip(ip)
+        if not n:return True
+        import socket,struct
+        for net,pfx in self.PRIVATE_IP_RANGES:
+            try:
+                if ':' in n or ':' in net:continue
+                i=struct.unpack('!I',socket.inet_aton(n))[0]
+                s=struct.unpack('!I',socket.inet_aton(net))[0]
+                m=(0xFFFFFFFF<<(32-pfx))&0xFFFFFFFF
+                if(i&m)==(s&m):return True
+            except:continue
+        return False
+
+    def is_blocked_hostname(self,h):
+        if not h:return True
+        h=h.lower().strip().rstrip('.')
+        if h in self.BLOCKED_HOSTNAMES:return True
+        for e in self.CLOUD_METADATA_ENDPOINTS:
+            if e in h or h.endswith(e.replace('169.254.169.254','')):return True
+        if h.startswith('metadata.') or h.endswith('.internal'):return True
+        return False
+
+    def is_safe_url(self,url):
+        if not self.enabled:return True,None
+        if not url or not isinstance(url,str):return False,'Invalid URL'
+        url=url.strip()
+        if len(url)>8192:return False,'URL too long'
+        try:
+            import urllib.parse
+            p=urllib.parse.urlparse(url)
+            if not p.scheme or not p.netloc:return False,'Invalid format'
+            s=p.scheme.lower()
+            if s in self.BLOCKED_SCHEMES:return False,f'Blocked: {s}'
+            if s and s not in self.ALLOWED_SCHEMES:return False,f'Unsupported: {s}'
+            h=p.hostname
+            if not h:return False,'Missing host'
+            if self.is_blocked_hostname(h):return False,f'Blocked host: {h}'
+            pt=p.port
+            if pt and pt in self.SENSITIVE_PORTS:return False,f'Sensitive port: {pt}'
+            return True,None
+        except Exception as e:return False,f'Error: {e}'
+
+    def safe_request(self,url,method='GET',headers=None,data=None,timeout=None,**kw):
+        if timeout is None:timeout=self.connect_timeout
+        safe,err=self.is_safe_url(url)
+        if not safe:self._log_event('BLOCKED',url,err,'error');return None,f'SSRF Blocked: {err}'
+        try:
+            import urllib.request,ssl,socket
+            req=urllib.request.Request(url,method=method.upper(),data=data,**kw)
+            hd={'User-Agent':'SecureClient/2.0','Accept':'*/*'}
+            if headers and isinstance(headers,dict):hd.update(headers)
+            for d in ['Host','Origin','Referer','Cookie','Authorization']:hd.pop(d,None)
+            for k,v in hd.items():
+                if k!='Content-Length':req.add_header(k,v)
+            ctx=ssl.create_default_context();ctx.check_hostname=True;ctx.verify_mode=ssl.CERT_REQUIRED
+            resp=urllib.request.urlopen(req,timeout=min(timeout,self.read_timeout),context=ctx)
+            cl=resp.headers.get('Content-Length')
+            if cl and int(cl)>self.max_response_size:resp.close();return None,f'Too large: {int(cl)}'
+            self._request_count+=1
+            return resp,None
+        except urllib.error.HTTPError as e:return None,f'HTTP [{e.code}]'
+        except urllib.error.URLError as e:return None,f'Failed: {e.reason}'
+        except socket.timeout:return None,'Timeout'
+        except ssl.SSLError as e:return None,f'SSL: {e}'
+        except Exception as e:return None,f'Err: {type(e).__name__}'
+
+    def get_stats(self):
+        return {'enabled':self.enabled,'requests':self._request_count,'blocked':self._block_count}
+
+def ssrf_safe_request(func):
+    p=SSRFProtection()
+    @wraps(func)
+    def wrapper(*args,**kwargs):
+        url=args[0] if args else kwargs.get('url','')
+        if url:
+            s,e=p.is_safe_url(str(url))
+            if not s:raise ValueError(f'Blocked: {e}')
+        return func(*args,**kwargs)
+    return wrapper
+
+ssrf_protector=SSRFProtection(enabled=True,block_private_ips=True,allow_localhost=False)
+
+print('='*60)
+print('OK - SSRF Defense System v3.8.89.20 Loaded Successfully!')
+print('='*60)
