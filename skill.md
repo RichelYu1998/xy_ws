@@ -19,9 +19,56 @@
 
 ---
 
+> **📌 当前版本**: v1.0.00.02 (2026-08-20) - Git回退到稳定版本
+>
+> **⚠️ 重要更新**:
+> - Git回退到 v1.0.00.01 (2026-08-11) UTF-8编码标准化与文档修复版本
+> - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
+> - 无任何额外的.py文件，避免导入依赖问题
+> - 当前commit: `1b285645`
+
 作者: 小旭二手机（西园路）
 
 本文档定义了微购相册管理系统的完整代码开发规范、架构设计、最佳实践和技术标准。
+
+## 📊 项目架构总览 (v1.0.00.01+ 稳定版本)
+
+### 技术栈
+- **后端**: Python 3.14 + FastAPI + Pydantic V2
+- **前端**: JavaScript (ES6+) + HTML5 + CSS3
+- **数据库**: JSON文件存储 + Excel文件
+- **部署**: hostc隧道 / Cloudflare Tunnel双通道方案
+- **浏览器自动化**: Playwright (async)
+
+### 核心模块结构
+
+#### Python后端模块 (main.py) - 单文件架构 ⭐
+
+⚠️ **重要说明 (v1.0.00.02)**:
+- 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
+- Git已回退到v1.0.00.01稳定版本（commit: 1b285645）
+- 无任何额外的.py文件，避免导入依赖问题
+
+**项目文件结构**:
+```
+D:/ws/xy_ws/
+├── main.py              # ✅ 唯一的Python文件（包含所有功能）
+├── README.md            # 项目文档和Changelog
+├── skill.md             # 开发规范文档（本文件）
+├── skill.docx           # Word格式规范文档
+├── config/              # 配置目录
+│   ├── config.json      # 主配置文件
+│   ├── cookies.json     # Cookie存储
+│   └── ...
+├── dist/                # 前端资源（Web界面）
+│   ├── app.js           # 主应用JS
+│   ├── index.html       # 入口HTML
+│   └── assets/          # 字体、图标等静态资源
+├── file/                # 数据文件目录
+│   └── *.json           # 历史数据记录
+└── tools/               # 工具目录
+    └── cloudflared/     # Cloudflare工具
+```
 
 
 Python后端模块 (main.py)
