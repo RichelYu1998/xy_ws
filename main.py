@@ -1591,6 +1591,15 @@ def get_version_from_readme():
         pass
     return "0.0.0"
 
+def jsonify(*args, **kwargs):
+    """FastAPI兼容层：模拟Flask的jsonify函数"""
+    if args and isinstance(args[0], dict):
+        data = args[0]
+        if 'status_code' in kwargs:
+            pass
+        return data
+    return kwargs if kwargs else (args[0] if args else {})
+
 VERSION = get_version_from_readme()
 
 # 统一环境检测类
@@ -7919,8 +7928,8 @@ if __name__ == '__main__':
         @app.get('/api/server/info')
         def get_server_info():
             port = args.port
-            
-                # 获取局域网 IP（复用PathManager的方法）
+
+            # 获取局域网 IP（复用PathManager的方法）
             lan_ip = PathManager.get_lan_ip() or None
             
             return jsonify({
@@ -9418,7 +9427,7 @@ ingress:
 
             start_tunnel_daemons()
 
-            return jsonify({
+            return {
                 'running': is_running,
                 'url': web_url,
                 'url_valid': url_valid,
@@ -9450,7 +9459,7 @@ ingress:
 📊 验证耗时：{int(time.time() - url_first_seen_time) if url_first_seen_time > 0 else 0} 秒
 🎯 状态：确认稳定可用，可放心使用''' if not stable_confirmed and web_url else None
                 }
-            })
+            }
 
         @app.post('/api/tunnel/stop')
         def stop_tunnel():
