@@ -7,7 +7,7 @@
 > 2. **字符串处理**：Python 代码中使用 `encoding='utf-8'` 进行文件读写
 > 3. **Web 响应**：HTTP 响应头指定 `charset=utf-8`
 > 4. **数据库**：MySQL/SQLite 使用 `utf8mb4` 字符集
-> 5. **邮件发送**：MIME 编码使用 UTF-8 (`Header(text, 'utf-8')`)
+> 5. **邮件发送**：MIME 编码使用 UTF-8 (`Header(text, charset='utf-8')`)
 > 6. **日志文件**：统一使用 UTF-8 编码写入
 >
 > ## 违规后果：
@@ -466,7 +466,7 @@ class EmailNotifier:
         
         # 构建MIME多部分邮件（纯文本 + HTML）
         msg = MIMEMultipart('alternative')
-        msg['Subject'] = Header(f'【{event_title}】{时间}', 'utf-8')
+        msg['Subject'] = Header(f'【{event_title}】{时间}', charset='utf-8')
         
         # 纯文本版本
         body = f"""{event_title}
