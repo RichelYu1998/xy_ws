@@ -37,6 +37,59 @@ from email.mime.text import MIMEText
 from functools import wraps
 from pathlib import Path
 try:
+    import psutil
+except ImportError:
+    psutil = None
+
+try:
+    from prometheus_client import Counter, Histogram, Gauge
+except ImportError:
+    Counter = Histogram = Gauge = None
+
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
+
+try:
+    import pymysql
+except ImportError:
+    pymysql = None
+
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
+try:
+    from playwright.async_api import async_playwright
+except ImportError:
+    async_playwright = None
+try:
+    from fastapi import FastAPI, HTTPException, Query, Header, Depends, File, UploadFile, Form, BackgroundTasks
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, HTMLResponse
+    import uvicorn
+except ImportError:
+    FastAPI = HTTPException = Query = Header = Depends = File = UploadFile = Form = BackgroundTasks = None
+    CORSMiddleware = None
+    JSONResponse = FileResponse = StreamingResponse = None
+try:
+    from starlette.middleware.gzip import GZipMiddleware
+except ImportError:
+    GZipMiddleware = None
+    uvicorn = None
+
+try:
+    from starlette.requests import Request
+    from starlette.responses import Response
+except ImportError:
+    Request = Response = None
+try:
+    import psutil
+except ImportError:
+    psutil = None
+from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
+try:
     from pydantic import BaseModel, Field, ValidationError, field_validator
 except ImportError:
     try:
@@ -1722,11 +1775,11 @@ def safe_print(*args, **kwargs):
                 # 替换emoji为ASCII字符
                 safe_arg = arg
                 emoji_map = {
-                    '🔍': '[检查]',
+                    '[搜索]': '[检查]',
                     '❌': '[错误]',
-                    '✓': '[OK]',
+                    '[OK]': '[OK]',
                     '⚠️': '[警告]',
-                    '✗': '[失败]',
+                    '[FAIL]': '[失败]',
                     '📝': '[说明]',
                     '💡': '[提示]',
                     '🚀': '[启动]',
@@ -2225,7 +2278,7 @@ class PathManager:
         should_log = config['enable_logging'] and not quiet
         
         if should_log:
-            print(f"[{current_time}] [URL-Source] 🔍 开始获取公网地址...")
+            print(f"[{current_time}] [URL-Source] [搜索] 开始获取公网地址...")
         
         # ========== 策略1：从 tunnel_url.txt 读取（权威源）==========
         try:
@@ -3210,7 +3263,7 @@ class CookieValidator:
     def validate_and_prompt(cookie_file):
         """验证cookie并给出友好提示，返回: (is_valid, cookies_or_None)"""
         print_separator()
-        print('🔍 验证Cookie状态...')
+        print('[验证] Cookie状态检查...')
         print_separator()
         
         # 1. 检查文件是否存在
@@ -3245,7 +3298,7 @@ class CookieValidator:
                 solutions=['运行"4. 更新Cookie"功能', '重新登录账号', '确认Cookie已正确保存'])
             return False, None
         
-        print(f'✓ Cookie文件存在，共 {len(cookies)} 个Cookie')
+        print(f'[OK] Cookie文件存在，共 {len(cookies)} 个Cookie')
         
         # 4. 检查是否存在token
         token_cookie = next((c for c in cookies if 'token' in c.get('name', '').lower()), None)
@@ -3256,7 +3309,7 @@ class CookieValidator:
                 tip='Token是保持登录状态的关键Cookie')
             return False, None
         
-        print(f'✓ 找到Token: {token_cookie["name"]}')
+        print(f'[OK] 找到Token: {token_cookie["name"]}')
         
         # 5. 检查token是否过期
         expires = token_cookie.get('expires')
@@ -3273,7 +3326,7 @@ class CookieValidator:
             return False, None
         
         expires_time = datetime.fromtimestamp(expires).strftime('%Y-%m-%d %H:%M:%S') if expires else '未知'
-        print(f'✓ Token有效期至: {expires_time}')
+        print(f'[OK] Token有效期至: {expires_time}')
         
         # 6. 检查token值是否有效
         token_value = token_cookie.get('value', '')
@@ -3284,7 +3337,7 @@ class CookieValidator:
                 tip='正常的Token应该是一长串加密字符串')
             return False, None
         
-        print(f'✓ Token值有效 (长度: {len(token_value)} 字符)')
+        print(f'[OK] Token值有效 (长度: {len(token_value)} 字符)')
         
         # 7. 检查cookie是否即将过期（7天内）
         if expires:
@@ -4106,7 +4159,7 @@ class WegoScraper:
                             product['拿货价'] = f'¥{cost_price_int:,}'
                             success_count += 1
                             product_name = str(product.get('商品名称', ''))[:30]
-                            print(f'  ✓ 获取拿货价: {product_name}... -> {product["拿货价"]}')
+                            print(f'  [OK] 获取拿货价: {product_name}... -> {product["拿货价"]}')
                         except (ValueError, TypeError):
                             product_name = str(product.get('商品名称', ''))[:30]
                             print(f'  ⚠ 拿货价格式错误: {product_name}...')
@@ -4565,7 +4618,7 @@ class WegoScraper:
                     product['cost_price'] = cache_cost
         
         if merged_count > 0:
-            print(f'✓ 已从cache合并 {merged_count} 个商品的价格信息')
+            print(f'[OK] 已从cache合并 {merged_count} 个商品的价格信息')
         
         total_count = len(data)
         high_price_products = self.filter_high_price_products(data)
@@ -5586,7 +5639,7 @@ def update_cookie():
     if FileManager.file_exists(cookie_file):
         print(f'清空现有Cookie文件: {cookie_file}')
         FileManager.write_json(cookie_file, [])
-        print('✓ Cookie文件已清空')
+        print('[OK] Cookie文件已清空')
     
     async def get_cookie():
         async with async_playwright() as p:
@@ -5650,7 +5703,7 @@ def update_cookie():
                     auth_cookies = [c for c in cookies if 'token' in c['name'].lower() or 'session' in c['name'].lower() or 'auth' in c['name'].lower()]
                     
                     if auth_cookies:
-                        print('✓ 检测到登录成功，自动关闭浏览器...')
+                        print('[OK] 检测到登录成功，自动关闭浏览器...')
                         login_detected = True
                         break
                 except Exception as e:
@@ -5673,8 +5726,8 @@ def update_cookie():
             
             FileManager.write_json(cookie_file, szwego_cookies)
             
-            print(f'✓ Cookie已保存到 {cookie_file}')
-            print(f'✓ 共保存 {len(szwego_cookies)} 个Cookie')
+            print(f'[OK] Cookie已保存到 {cookie_file}')
+            print(f'[OK] 共保存 {len(szwego_cookies)} 个Cookie')
             
             print_separator()
             print('Cookie有效期信息：')
@@ -5699,16 +5752,16 @@ def update_cookie():
                 config_data['cookies'] = szwego_cookies
                 
                 FileManager.write_json(config_file, config_data)
-                print('✓ config.json中的Cookie已更新')
+                print('[OK] config.json中的Cookie已更新')
             
             await browser.close()
-            print('✓ 浏览器已自动关闭')
+            print('[OK] 浏览器已自动关闭')
             
             return True
     
     try:
         asyncio.run(get_cookie())
-        print('\n✓ Cookie更新完成')
+        print('\n[OK] Cookie更新完成')
     except Exception as e:
         handle_exception(e, 'update_cookie更新Cookie')
 
@@ -5936,7 +5989,7 @@ if __name__ == '__main__':
                         cookies = await context.cookies()
                         token_cookie = next((c for c in cookies if c['name'] == 'token'), None)
                         if token_cookie and token_cookie['value']:
-                            print('\n✓ 检测到登录成功！正在获取Cookie...')
+                            print('\n[OK] 检测到登录成功！正在获取Cookie...')
                             login_detected = True
                             break
                     except Exception as e:
@@ -5958,7 +6011,7 @@ if __name__ == '__main__':
                 cookie_file = "config/cookies.json"
                 with open(cookie_file, "w", encoding="utf-8") as f:
                     json.dump(szwego_cookies, f, ensure_ascii=False, indent=2)
-                print(f'✓ Cookie已保存 ({len(szwego_cookies)}个)')
+                print(f'[OK] Cookie已保存 ({len(szwego_cookies)}个)')
 
                 await browser.close()
                 return szwego_cookies
@@ -6016,7 +6069,7 @@ if __name__ == '__main__':
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
 
-        print(f'\n✓ 配置文件创建成功！')
+        print(f'\n[OK] 配置文件创建成功！')
         print("\n========================================")
         print("   初始化完成！")
         print("========================================")
@@ -8206,7 +8259,7 @@ if __name__ == '__main__':
                                     stable_url = web_url
                                     stable_url_confirm_count = 1
                                     url_first_seen_time = time.time()
-                                    print(f"[Tunnel] 🔍 检测到新URL，开始稳定性验证 (1/{stable_url_min_confirms}): {web_url}")
+                                    print(f"[Tunnel] [搜索] 检测到新URL，开始稳定性验证 (1/{stable_url_min_confirms}): {web_url}")
                                 elif stable_url_confirm_count < stable_url_min_confirms:
                                     stable_url_confirm_count += 1
                                     print(f"[Tunnel] ✅ URL稳定性验证 ({stable_url_confirm_count}/{stable_url_min_confirms}): {web_url}")
@@ -8403,7 +8456,7 @@ if __name__ == '__main__':
                     sys.stdout.flush()
 
                 if has_hostc_process:
-                    print(f"[Tunnel] 🔍 hostc在运行，后台等待URL出现后验证发邮件")
+                    print(f"[Tunnel] [搜索] hostc在运行，后台等待URL出现后验证发邮件")
                     sys.stdout.flush()
 
                     def _wait_and_notify_hostc_url():
@@ -9053,7 +9106,7 @@ ingress:
                         cf_stable_url = cf_url
                         cf_stable_confirm_count = 1
                         cf_url_first_seen_time = time.time()
-                        print(f"[CF-Heartbeat] 🔍 CF 新URL，开始稳定性验证 (1/{cf_stable_min_confirms}): {cf_url}")
+                        print(f"[CF-Heartbeat] [搜索] CF 新URL，开始稳定性验证 (1/{cf_stable_min_confirms}): {cf_url}")
                         print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时0秒")
                         write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
                         if cf_url != cf_last_email_sent_url:
