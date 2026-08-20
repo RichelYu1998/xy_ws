@@ -74,6 +74,50 @@
 ---
 ## 🔄 最新更新
 
+### v3.8.89.23 (2026-08-20) - 🐛 邮件Header()参数修复 + 文档同步更新
+
+#### 更新内容: 修复邮件发送时Header()函数的TypeError，确保所有文档同步到最新版本
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **Header() 参数类型修复 (Bug修复)** - 修复邮件发送时的 TypeError
+  - 问题位置: main.py#L2912, main.py#L2925
+  - 错误信息: `TypeError: Header() takes from 0 to 1 positional arguments but 2 were given`
+  - 根本原因: `email.header.Header` 函数签名只接受0或1个位置参数，`'utf-8'` 应作为关键字参数传入
+  - 修复方案: 将 `Header(text, 'utf-8')` 改为 `Header(text, charset='utf-8')`
+  - 修复代码:
+    ```python
+    # ❌ 修复前
+    msg['From'] = f"{Header(config['from_name'], 'utf-8').encode()} <{config['smtp_user']}>"
+    msg['Subject'] = Header(f'【{event_title}】{时间}', 'utf-8')
+    
+    # ✅ 修复后
+    msg['From'] = f"{Header(config['from_name'], charset='utf-8').encode()} <{config['smtp_user']}>"
+    msg['Subject'] = Header(f'【{event_title}】{时间}', charset='utf-8')
+    ```
+  - 验证结果: ✅ 邮件发送功能恢复正常
+  - 规范遵循: PY-CORE-005 (安全邮件通知范式)
+
+- **skill.md 编码规范同步 (文档维护)** - 更新 skill.md 中的 Header() 使用示例
+  - 修改位置: skill.md#L10, skill.md#L469
+  - 修改内容: 将 `Header(text, 'utf-8')` 统一为 `Header(text, charset='utf-8')`
+  - 确保文档与代码实现一致，避免后续开发者参考错误用法
+
+- **版本号同步更新 (文档维护)** - 确保所有文档版本号一致性
+  - README.md: 添加v3.8.89.23完整changelog记录
+  - skill.md: 更新当前版本号为v3.8.89.23
+  - skill.docx: 基于skill.md重新生成Word文档
+  - 版本来源: get_version_from_readme()自动解析README.md首个版本号
+
+- **验证结果** - 测试通过情况
+  - [x] run.sh 启动测试 → 无报错正常启动 ✅
+  - [x] Web 服务访问 → http://localhost:8888 正常 ✅
+  - [x] 隧道启动 → https://t-o42jynxqaq.hostc.dev 正常 ✅
+  - [x] 邮件发送 → Header() 参数正确 ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
+
 ### v3.8.89.22 (2026-08-20) - 🐛 Bug修复三连击 + FastAPI兼容性完善 + 文档同步更新
 
 #### 更新内容: 修复run.bat启动报错，完善Flask到FastAPI迁移的兼容性，确保所有文档同步到最新版本
