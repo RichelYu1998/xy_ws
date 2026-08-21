@@ -74,6 +74,36 @@
 ---
 ## 🔄 最新更新
 
+### v3.8.89.26 (2026-08-21) - 🔒 Import唯一性范式 + 内联导入清理
+
+#### 更新内容: 修复5处import问题，新增Import唯一性强制范式到skill.md
+
+**影响文件**: [main.py](main.py), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **Import唯一性修复 (代码规范)** - 修复5处import违规
+  - 重复导入: `import psutil` 在第45行和第93行重复声明 → 删除第93行重复块
+  - 内联导入: `import uvicorn` 在第9594行（已在第76行导入）→ 删除
+  - 内联导入: `import logging;` 在SSRF类__init__中（已在第13行导入）→ 删除
+  - 内联导入: `import urllib.parse` 在is_safe_url中（已在第31行导入）→ 删除
+  - 内联导入: `import urllib.request,ssl,socket` 在safe_request中（已在顶部导入）→ 删除
+  - 规范遵循: PY-CORE-024 规则4.1/4.2 (Import唯一性范式)
+
+- **Import唯一性范式写入skill.md (文档更新)** - 新增强制范式
+  - 规则4.1: 位置唯一性 — import只能出现在文件顶部
+  - 规则4.2: 声明唯一性 — 同一模块禁止重复导入
+  - 规则4.3: 禁止别名混淆安全模块
+  - 规则4.4: 验证方法 — AST检查函数内部import + 去重检查
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **验证结果** - 测试通过情况
+  - [x] py_compile 语法检查 → PASSED ✅
+  - [x] ast.parse 语法检查 → PASSED ✅
+  - [x] 无函数内部内联导入（try/except ImportError除外）✅
+  - [x] 无重复import声明 ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
+
 ### v3.8.89.25 (2026-08-21) - 🔒 安全加固第二轮 + CORS/命令注入/信息泄露修复
 
 #### 更新内容: 修复CORS配置、命令注入、信息泄露、API文档暴露等安全问题

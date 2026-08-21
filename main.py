@@ -89,10 +89,6 @@ try:
     from starlette.responses import Response
 except ImportError:
     Request = Response = None
-try:
-    import psutil
-except ImportError:
-    psutil = None
 from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
 try:
     from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -9591,7 +9587,7 @@ ingress:
         async def favicon():
             return FileResponse(path=os.path.join(PROJECT_DIR, 'dist', 'favicon', 'favicon.ico'))
 
-        import uvicorn
+
         print(f"\n🚀 FastAPI 服务启动中...")
         print(f"   地址: http://0.0.0.0:{args.port}")
         print(f"   文档: http://0.0.0.0:{args.port}/docs")
@@ -9626,7 +9622,7 @@ class SSRFProtection:
         self.connect_timeout=connect_timeout;self.read_timeout=read_timeout;self.dns_cache_ttl=dns_cache_ttl
         self.block_private_ips=block_private_ips;self.allow_localhost=allow_localhost
         self._dns_cache={};self._dns_cache_time={};self._request_count=0;self._block_count=0
-        import logging;self._log=logging.getLogger('SSRF')
+        self._log=logging.getLogger('SSRF')
         if not self._log.handlers:
             h=logging.StreamHandler();h.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
             self._log.addHandler(h);self._log.setLevel(logging.WARNING)
@@ -9648,7 +9644,7 @@ class SSRFProtection:
         if not ip:return None
         if re.match(r'^\d+$',ip):
             v=int(ip)
-            if 0<=v<=0xFFFFFFFF:import socket,struct;return socket.inet_ntoa(struct.pack('!I',v&0xFFFFFFFF))
+            if 0<=v<=0xFFFFFFFF:return socket.inet_ntoa(struct.pack('!I',v&0xFFFFFFFF))
             return None
         parts=ip.split('.');np=[]
         for p in parts[:4]:
@@ -9692,7 +9688,7 @@ class SSRFProtection:
         url=url.strip()
         if len(url)>8192:return False,'URL too long'
         try:
-            import urllib.parse
+
             p=urllib.parse.urlparse(url)
             if not p.scheme or not p.netloc:return False,'Invalid format'
             s=p.scheme.lower()
@@ -9711,7 +9707,7 @@ class SSRFProtection:
         safe,err=self.is_safe_url(url)
         if not safe:self._log_event('BLOCKED',url,err,'error');return None,f'SSRF Blocked: {err}'
         try:
-            import urllib.request,ssl,socket
+
             req=urllib.request.Request(url,method=method.upper(),data=data,**kw)
             hd={'User-Agent':'SecureClient/2.0','Accept':'*/*'}
             if headers and isinstance(headers,dict):hd.update(headers)
