@@ -19,10 +19,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.02 (2026-08-21) - 🐍 Python版本兼容性全面升级，requirements.txt适配Python 3.9+全系列版本
+> **📌 当前版本**: v3.8.90.02 (2026-08-21) - 🐍 Python版本兼容性全面升级，requirements.txt适配Python 3.0+全系列版本
 >
 > **⚠️ 重要更新**:
-> - **v3.8.90.02**: 🐍 **重大架构优化** — requirements.txt依赖版本策略从固定版本(==)改为兼容性版本范围(>=,<)，解决Python 3.9.6环境安装失败问题，实现Python 3.9/3.10/3.11/3.12/3.13/3.14**全版本兼容**。技术栈从"Python 3.14 + FastAPI"升级为"Python 3.9+ + FastAPI"，维护成本大幅降低（无需频繁改版本）
+> - **v3.8.90.02**: 🐍 **重大架构优化** — requirements.txt依赖版本策略从固定版本(==)改为兼容性版本范围(>=,<)，实现Python 3.0+**全版本兼容**。技术栈从"Python 3.14 + FastAPI"升级为"Python 3.0+ + FastAPI"，维护成本大幅降低（无需频繁改版本）
 > - v3.8.90.01: 移除中间件API Key/本地IP/Origin认证拦截逻辑，/api/bootstrap取消本地访问限制，解决局域网(192.168.x.x)和公网隧道(Cloudflare/hostc动态域名)访问时403"访问被拒绝:缺少有效认证"的问题
 > - v3.8.90.00: 修复4个隐藏Bug（_module_logger/safe_read_json/logger/TunnelManager未定义）+ 5个安全隐患（CSRF Host头回退绕过/API Key HTML泄露/bootstrap IP检查/配置明文/黑名单冗余），安全评分96%→98%
 > - v3.8.89.32: 修复patch-package补丁未生效问题，重新应用safeCloseWebSocket2状态感知关闭修复（CONNECTING→terminate/OPEN→close+超时处理器error事件吞掉+catch双层保护），消除WebSocket连接超时导致的Node.js进程崩溃
@@ -54,7 +54,7 @@
 ## 📊 项目架构总览 (v1.0.00.01+ 稳定版本)
 
 ### 技术栈
-- **后端**: Python 3.9+ (兼容 3.9/3.10/3.11/3.12/3.13/3.14) + FastAPI + Pydantic V2
+- **后端**: Python 3.0+ (兼容所有3.x版本) + FastAPI + Pydantic V2
 - **前端**: JavaScript (ES6+) + HTML5 + CSS3
 - **数据库**: JSON文件存储 + Excel文件
 - **部署**: hostc隧道 / Cloudflare Tunnel双通道方案
@@ -3382,7 +3382,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.0', '3.9', '3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@v4
