@@ -324,6 +324,54 @@ jobs:
 
 ---
 
+## 📐 代码规范 (Code Standards)
+
+### 🔴 Import 语句规范 (PY-CORE-000)
+
+**核心原则**: 所有 `import` 语句必须在文件开头（main.py L1-L117），**禁止函数内部内联 import**
+
+**规范详情**:
+- ✅ **正确**: 所有 import 集中在文件顶部的导入区域
+- ❌ **错误**: 在函数、方法内部使用 `import` 或 `from...import`
+- ✅ **例外**: 可选依赖使用 `try-except` 包裹（仍在文件开头）
+
+**已清理的内联 import (v3.8.90.05)**:
+| 位置 | 删除的 import | 原因 |
+|------|--------------|------|
+| L1974 | `import ipaddress` | ipaddress 已在 L11 导入 |
+| L10382 | `import base64` | base64 已在 L5 导入 |
+| L10450 | `import base64` | base64 已在 L5 导入 |
+
+**检查命令**:
+```bash
+# 检查是否存在内联 import
+grep -n "^\s*import \|\s*from .*import" main.py | grep -v "^1-\|^2-\|^3-" | head -20
+# 如果无输出，说明规范检查通过 ✅
+```
+
+### 📄 文档生成说明
+
+**skill.docx 生成方式**:
+由于项目遵循单文件架构原则，`md_to_docx.py` 已删除。如需重新生成 `skill.docx`：
+
+**方式 1: 使用 pandoc（推荐）**
+```bash
+pandoc skill.md -o skill.docx
+```
+
+**方式 2: 手动转换**
+1. 打开 Word 或 WPS Office
+2. 选择 `文件 → 打开`
+3. 选择 `skill.md` 文件
+4. 另存为 `skill.docx` 格式
+
+**注意**: 
+- `skill.docx` 是 `skill.md` 的 Word 格式副本
+- 每次更新 `skill.md` 后需要同步更新 `skill.docx`
+- Git 提交时应包含最新的 `skill.docx`
+
+---
+
 ## 🔄 最新更新
 
 ### v3.8.90.02 (2026-08-21) - 🐍 Python版本兼容性全面升级 — requirements.txt适配Python 3.0+全系列版本

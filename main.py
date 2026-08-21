@@ -1971,7 +1971,6 @@ LOCAL_TRUSTED_ORIGINS = frozenset([
 
 def _is_private_ip(ip_str):
     try:
-        import ipaddress
         return ipaddress.ip_address(ip_str) in (
             ipaddress.ip_network('10.0.0.0/8'),
             ipaddress.ip_network('172.16.0.0/12'),
@@ -10379,7 +10378,6 @@ class SecureConfigManager:
         if env_key:
             if hashes is not None and PBKDF2HMAC is not None:
                 try:
-                    import base64
                     with open(salt_file,'rb') as f:salt=f.read()
                     kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
                     return base64.urlsafe_b64encode(kdf.derive(env_key.encode()))
@@ -10447,7 +10445,6 @@ class SecureConfigManager:
     @classmethod
     def initialize_encryption(cls,password=None):
         """初始化加密系统"""
-        import base64
         key_file=PROJECT_DIR/'config'/'.encryption_key'
         salt_file=PROJECT_DIR/'config'/'.salt'
         if os.path.exists(key_file):
