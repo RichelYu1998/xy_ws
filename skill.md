@@ -33,7 +33,7 @@
 > - kill_process_by_name: 添加进程名格式验证，改用列表参数
 > - 信息泄露: detail=str(e)替换为通用错误消息
 > - 版本号同步更新至v3.8.89.28（所有文档已同步）
-> - v3.8.89.28: 修复邮件From头构造Bug，`Header.encode()` 抛AttributeError导致所有隧道通知邮件发送失败，改用 `formataddr()` 标准库函数
+> - v3.8.89.28: 修复邮件From头+Subject头两处构造Bug，`Header.encode()` 抛AttributeError导致所有隧道通知邮件发送失败；From头改用 `formataddr()` 标准库函数，Subject头改用字符串赋值（Python3.14新policy下Header对象在as_string()时崩溃）
 > - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
 > - 无任何额外的.py文件，避免导入依赖问题
 > - 当前commit: 待推送
