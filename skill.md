@@ -19,9 +19,11 @@
 
 ---
 
-> **📌 当前版本**: v3.8.89.30 (2026-08-21) - 🧹 启动脚本残留进程自动清理 + Playwright驱动node进程精准清理 + run.sh进程清理补齐 + 安全加固第四轮 + 命令白名单shell=False/CSRF Origin验证/API Key认证 + 邮件Header()崩溃修复 + 安全加固第三轮 + CSP/隧道注入/速率限制 + 内联导入清理 + CORS/命令注入/信息泄露修复
+> **📌 当前版本**: v3.8.89.31 (2026-08-21) - 🔒 安全检查系统整合进main.py + Playwright移动端安全检查 + 依赖审计 + 配置加密管理
 >
 > **⚠️ 重要更新**:
+> - v3.8.89.31: 安全检查系统整合进main.py单文件架构，新增Playwright+移动端安全检查（8项），依赖审计API，配置加密管理API，删除quick_security_check.py/security_audit.py/config_secure_template.py
+> - 新增API端点: `/api/security/check`（安全检查）、`/api/security/audit`（依赖审计）、`/api/security/encrypt-init`（配置加密初始化）
 > - 第一轮：修复6类安全漏洞（路径遍历、弱随机数、不安全SSL、内联导入、冗余别名、命令注入防护）
 > - 第二轮：CORS通配符限制、API文档禁用、命令注入修复、信息泄露修复
 > - 所有import统一在文件顶部，禁止内联导入
@@ -32,7 +34,8 @@
 > - FastAPI: 禁用/docs、/redoc、/openapi.json端点
 > - kill_process_by_name: 添加进程名格式验证，改用列表参数
 > - 信息泄露: detail=str(e)替换为通用错误消息
-> - 版本号同步更新至v3.8.89.30（所有文档已同步）
+> - 版本号同步更新至v3.8.89.31（所有文档已同步）
+> - v3.8.89.31: 安全检查系统整合进main.py单文件架构，删除quick_security_check.py/security_audit.py/config_secure_template.py，新增SecurityChecker+DependencyAuditor+SecureConfigManager三个类，新增Playwright+移动端8项安全检查（浏览器上下文隔离/动态内容操作安全/文件下载上传安全/浏览器指纹反检测/移动端环境安全/网络流量安全/截图快照安全/Playwright进程安全），新增API端点/api/security/check+/api/security/audit+/api/security/encrypt-init，requirements.txt补充安全审计+代码质量+测试+移动端增强依赖，SECURITY_CHECKLIST.md合并进README.md+skill.md后删除
 > - v3.8.89.30: 启动脚本残留进程自动清理，run.bat/run.sh启动时分层清理node/python/hostc进程：①精准清理命令行含playwright的node进程（wmic+findstr/taskkill PID）②兜底清理所有node进程（taskkill /IM / pkill）③run.sh补齐playwright+node清理，与run.bat逻辑对齐，从源头消除Playwright "Connection closed while reading from the driver" 错误
 > - v3.8.89.29: 安全加固第四轮，完善3个薄弱点：①命令白名单+shell=False（shlex.split解析+仅允许python+main.py）②CSRF防护（写操作验证Origin/Referer）③API Key认证（secrets.token_urlsafe生成+secrets.compare_digest验证+前端monkey-patch fetch自动注入）
 > - v3.8.89.28: 修复邮件From头+Subject头两处构造Bug，`Header.encode()` 抛AttributeError导致所有隧道通知邮件发送失败；From头改用 `formataddr()` 标准库函数，Subject头改用字符串赋值（Python3.14新policy下Header对象在as_string()时崩溃）
