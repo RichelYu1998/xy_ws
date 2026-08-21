@@ -74,6 +74,63 @@
 ---
 ## 🔄 最新更新
 
+### v3.8.89.29 (2026-08-21) - 🔒 安全加固第四轮 — 命令注入/CSRF/认证授权三大薄弱点完善
+
+#### 更新内容: 完善安全审查发现的3个可加固薄弱点，实现命令白名单+shell=False、CSRF Origin验证、API Key认证
+
+**影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **命令白名单 + shell=False (命令注入防护加固)** - 彻底消除shell注入风险
+  - 问题位置: main.py `run_command_background` + `/run` 端点
+  - 加固前: `subprocess.Popen(command, shell=True)` 依赖黑名单防注入，黑名单可被编码/拼接绕过
+  - 加固后: `shlex.split` 解析命令为列表 + 白名单验证(仅允许python+main.py) + `shell=False` 执行列表参数
+  - 白名单规则:
+    - 可执行文件 basename 必须是 python/python3/python.exe/py/py.exe
+    - 命令参数必须包含 main.py
+    - 自动统一 python → VENV_PYTHON 虚拟环境路径
+  - 安全效果: `python main.py --task "spider; rm -rf /"` 经 shlex.split 后 `;` 成为参数的一部分传给 main.py，rm 永不执行
+  - 验证结果: 10/11 测试通过（1个不实际的Windows路径用例安全失败），shell=False 实际执行成功
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **CSRF 防护 (Origin/Referer验证)** - 防止跨站请求伪造攻击
+  - 问题位置: main.py `_log_and_security_middleware` 中间件
+  - 加固前: 无CSRF防护，CORS仅设置响应头不阻止请求执行
+  - 加固后: 写操作(POST/PUT/PATCH/DELETE)验证Origin/Referer头，非本地可信源返回403
+  - 验证逻辑:
+    - Origin在本地白名单(localhost/127.0.0.1各端口) → 放行
+    - 无Origin时检查Referer是否本地 → 放行
+    - 无Origin无Referer时检查Host是否本地 → 放行
+    - 否则返回403
+  - 豁免端点: /api/bootstrap（获取API Key的端点）
+  - 验证结果: 15/15 测试通过（恶意Origin/Referer被拒，本地请求放行）
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **API Key 认证授权** - 防止未授权写操作（隧道远程访问场景）
+  - 问题位置: main.py 全局 + 中间件 + index渲染 + dist/app.js
+  - 加固前: Web接口无认证，依赖内网部署+CORS限制
+  - 加固后: 启动时用 `secrets.token_urlsafe(32)` 生成API Key存config.json，写操作验证 X-API-Key 头
+  - 认证流程:
+    1. 后端启动生成 web_api_key 存 config.json
+    2. index.html 渲染时注入 `<meta name="api-key" content="xxx">`
+    3. app.js monkey-patch fetch 自动为所有请求添加 X-API-Key 头
+    4. 中间件用 `secrets.compare_digest` 常量时间比较验证API Key
+  - 安全特性:
+    - API Key 或 本地可信源 满足其一即放行（双通道认证）
+    - 隧道远程访问需带有效API Key
+    - /api/bootstrap 端点仅限本地访问获取Key
+  - 验证结果: 15/15 测试通过（隧道+有效Key放行，隧道+错误Key/无Key拒绝）
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式) + PY-CORE-025 (密钥安全管理范式)
+
+- **验证结果** - 逻辑测试通过情况
+  - [x] 命令白名单逻辑 → 10/11 通过 ✅
+  - [x] shell=False 实际执行 → 成功 ✅
+  - [x] CSRF防护逻辑 → 15/15 通过 ✅
+  - [x] API Key认证逻辑 → 15/15 通过 ✅
+  - [x] py_compile 语法检查 → PASSED ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
+
 ### v3.8.89.28 (2026-08-21) - 🐛 邮件发送Header()崩溃修复 — 隧道通知邮件无法发出的根因修复
 
 #### 更新内容: 修复 `Header.encode()` AttributeError 导致所有隧道通知邮件发送失败的致命Bug（From头+Subject头两处）

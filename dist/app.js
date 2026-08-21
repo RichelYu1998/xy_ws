@@ -1,4 +1,22 @@
-﻿function escapeHtml(text) {
+﻿// API Key 认证: 自动为所有请求添加 X-API-Key 头 (v3.8.89.29)
+        (function() {
+            const _originalFetch = window.fetch;
+            window.fetch = function(url, options) {
+                options = options || {};
+                if (!options.headers) options.headers = {};
+                const metaKey = document.querySelector('meta[name="api-key"]');
+                if (metaKey && metaKey.content) {
+                    if (options.headers instanceof Headers) {
+                        if (!options.headers.has('X-API-Key')) options.headers.set('X-API-Key', metaKey.content);
+                    } else {
+                        if (!options.headers['X-API-Key']) options.headers['X-API-Key'] = metaKey.content;
+                    }
+                }
+                return _originalFetch.call(this, url, options);
+            };
+        })();
+
+        function escapeHtml(text) {
             if (!text) return '';
             const div = document.createElement('div');
             div.textContent = text;
