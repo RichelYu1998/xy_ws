@@ -74,6 +74,75 @@
 ---
 ## 🔄 最新更新
 
+### v3.8.89.25 (2026-08-21) - 🔒 安全加固第二轮 + CORS/命令注入/信息泄露修复
+
+#### 更新内容: 修复CORS配置、命令注入、信息泄露、API文档暴露等安全问题
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **CORS配置修复 (安全修复)** - 限制允许的源，禁止通配符
+  - 问题位置: main.py CORS中间件配置
+  - 漏洞描述: `allow_origins=["*"]` + `allow_credentials=True` 是危险组合，允许任意网站携带凭证发起跨域请求
+  - 修复方案: 将通配符替换为明确的本地开发地址列表
+  - 修复代码:
+    ```python
+    # ❌ 修复前
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    
+    # ✅ 修复后
+    allow_origins=[
+        "http://localhost", "http://localhost:8888",
+        "http://127.0.0.1", "http://127.0.0.1:8888",
+        # ... 明确的本地地址
+    ],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    ```
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **API文档暴露修复 (安全修复)** - 生产环境禁用Swagger/ReDoc
+  - 问题位置: main.py FastAPI初始化
+  - 漏洞描述: 默认暴露 `/docs` (Swagger UI) 和 `/redoc`，泄露API结构
+  - 修复方案: 设置 `docs_url=None`, `redoc_url=None`, `openapi_url=None`
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **命令注入修复 (安全修复)** - kill_process_by_name和check_process_running
+  - 问题位置: main.py Environment.kill_process_by_name() 和 check_process_running()
+  - 漏洞描述: `process_name` 直接拼接到shell命令字符串，可被注入恶意参数
+  - 修复方案: 添加进程名格式验证（只允许字母数字._-），改用列表参数避免shell解析
+  - 修复代码:
+    ```python
+    # ❌ 修复前
+    subprocess.run(f'taskkill /F /IM {process_name}', shell=True, ...)
+    
+    # ✅ 修复后
+    if not re.match(r'^[a-zA-Z0-9._-]+$', process_name):
+        return
+    subprocess.run(['taskkill', '/F', '/IM', process_name], ...)
+    ```
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **信息泄露修复 (安全修复)** - 异常详情不再返回给客户端
+  - 问题位置: main.py 多处HTTPException (3处)
+  - 漏洞描述: `detail=str(e)` 将内部异常信息暴露给客户端，可能泄露文件路径、库版本等
+  - 修复方案: 替换为通用错误消息 `'Internal server error'`
+  - 同时移除了 `traceback.format_exc()` 在错误响应中的使用
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **验证结果** - 测试通过情况
+  - [x] py_compile 语法检查 → PASSED ✅
+  - [x] ast.parse 语法检查 → PASSED ✅
+  - [x] CORS配置 → 通配符已移除 ✅
+  - [x] API文档 → /docs /redoc 已禁用 ✅
+  - [x] 命令注入 → shell=True已移除（进程管理部分）✅
+  - [x] 信息泄露 → detail=str(e) 已替换 ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
+
 ### v3.8.89.24 (2026-08-21) - 🔒 安全漏洞修复 + 代码规范严格化
 
 #### 更新内容: 修复6类安全漏洞，所有import统一在文件顶部，删除临时脚本文件
