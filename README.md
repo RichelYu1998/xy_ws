@@ -133,6 +133,48 @@ bandit -r . -f json -o bandit_report.json
 ---
 ## 🔄 最新更新
 
+### v3.8.89.32 (2026-08-21) - 🔧 hostc WebSocket安全关闭补丁重新应用 — patch-package补丁未生效导致进程崩溃
+
+#### 更新内容: 修复dist/node_modules/hostc/dist/index.js中patch-package补丁未生效问题，重新应用safeCloseWebSocket2状态感知关闭修复，消除WebSocket连接超时导致的进程崩溃
+
+**影响文件**: [dist/node_modules/hostc/dist/index.js](dist/node_modules/hostc/dist/index.js), [dist/patches/hostc+1.3.0.patch](dist/patches/hostc+1.3.0.patch), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **hostc WebSocket补丁重新应用 (Bug修复)** — patch-package补丁文件存在但未应用到node_modules，导致原始缺陷代码仍在运行
+  - 问题现象: 启动时报错 `Error: WebSocket was closed before the connection was established` + `Unhandled 'error' event`，Node.js进程崩溃
+  - 根因: `npm install` 或其他操作覆盖了node_modules，patch-package postinstall钩子未执行或执行失败
+  - 修复: 手动应用补丁并重新生成patch文件，确保hostc+1.3.0.patch内容正确
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **safeCloseWebSocket2状态感知关闭 (核心修复)** — CONNECTING状态用terminate()，OPEN状态用close()
+  - 修复点1: 超时处理器关闭socket前注册 `socket.once("error", () => {})` 吞掉error事件
+  - 修复点2: `safeCloseWebSocket2` 判断 `socket.readyState === CONNECTING` 时用 `terminate()` 强制关闭
+  - 修复点3: catch块中添加双层try-catch保护 `try { socket.terminate(); } catch {}`
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **补丁持久化验证 (维护操作)** — 确认postinstall钩子和patch文件均正确
+  - `dist/package.json` 中 `"postinstall": "patch-package"` 已配置 ✅
+  - `dist/patches/hostc+1.3.0.patch` 补丁文件已重新生成 ✅
+  - `npx patch-package --patch-dir patches hostc` 执行成功 ✅
+  - 规范遵循: PY-STD-DOC-001 (文档规范范式)
+
+- **验证结果** - 补丁应用验证
+  - [x] hostc/dist/index.js 超时处理器含 `socket.once("error", () => {})` → ✅
+  - [x] safeCloseWebSocket2 含 CONNECTING 状态判断 → ✅
+  - [x] catch块含双层try-catch → ✅
+  - [x] patch-package执行成功 → ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **hostc 启动** | 进程崩溃 ❌ | 正常启动 ✅ |
+| **WebSocket 超时** | Unhandled error ❌ | 优雅关闭 ✅ |
+| **补丁持久化** | 未生效 ❌ | postinstall 自动应用 ✅ |
+
+---
+
 ### v3.8.89.31 (2026-08-21) - 🔒 安全检查系统整合 + Playwright移动端安全检查 — 单文件架构统一
 
 #### 更新内容: 将quick_security_check.py/security_audit.py/config_secure_template.py三个独立脚本整合进main.py，新增Playwright+移动端8项安全检查、依赖审计API、配置加密管理API，删除所有非main.py的.py文件
@@ -1920,6 +1962,29 @@ Files: 6 files changed, 747 insertions(+), 13 deletions(-)
 ---
 
 ## 📚 历史版本记录
+
+### v3.8.89.32 (2026-08-21) - 🔧 hostc WebSocket安全关闭补丁重新应用 + patch-package补丁未生效修复
+
+#### 问题: patch-package补丁文件存在但未应用到node_modules，导致hostc WebSocket连接超时进程崩溃
+**现象**: 启动时报错 `Error: WebSocket was closed before the connection was established` + `Unhandled 'error' event`，Node.js进程崩溃退出
+
+**根本原因**:
+1. **补丁未生效**: `npm install` 或其他操作覆盖了node_modules，patch-package postinstall钩子未执行，导致hostc/dist/index.js恢复为原始缺陷代码
+2. **safeCloseWebSocket2缺陷仍在**: CONNECTING状态直接调用close()抛异常，超时处理器未注册error监听器
+
+**修复方案**:
+- 手动应用补丁到 `dist/node_modules/hostc/dist/index.js`
+- 重新生成 `dist/patches/hostc+1.3.0.patch` 确保内容正确
+- 验证 `patch-package` postinstall钩子配置正确
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **hostc 启动** | 进程崩溃 ❌ | 正常启动 ✅ |
+| **WebSocket 超时** | Unhandled error ❌ | 优雅关闭 ✅ |
+| **补丁持久化** | 未生效 ❌ | postinstall 自动应用 ✅ |
+
+---
 
 ### v3.8.89.11 (2026-07-30) - 🔧 hostc WebSocket安全关闭修复 + 隧道验证修复 + 高价商品数解析修复
 

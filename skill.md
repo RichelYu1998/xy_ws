@@ -19,9 +19,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.89.31 (2026-08-21) - 🔒 安全检查系统整合进main.py + Playwright移动端安全检查 + 依赖审计 + 配置加密管理
+> **📌 当前版本**: v3.8.89.32 (2026-08-21) - 🔧 hostc WebSocket安全关闭补丁重新应用 + patch-package补丁未生效修复
 >
 > **⚠️ 重要更新**:
+> - v3.8.89.32: 修复patch-package补丁未生效问题，重新应用safeCloseWebSocket2状态感知关闭修复（CONNECTING→terminate/OPEN→close+超时处理器error事件吞掉+catch双层保护），消除WebSocket连接超时导致的Node.js进程崩溃
 > - v3.8.89.31: 安全检查系统整合进main.py单文件架构，新增Playwright+移动端安全检查（8项），依赖审计API，配置加密管理API，删除quick_security_check.py/security_audit.py/config_secure_template.py
 > - 新增API端点: `/api/security/check`（安全检查）、`/api/security/audit`（依赖审计）、`/api/security/encrypt-init`（配置加密初始化）
 > - 第一轮：修复6类安全漏洞（路径遍历、弱随机数、不安全SSL、内联导入、冗余别名、命令注入防护）
@@ -34,7 +35,7 @@
 > - FastAPI: 禁用/docs、/redoc、/openapi.json端点
 > - kill_process_by_name: 添加进程名格式验证，改用列表参数
 > - 信息泄露: detail=str(e)替换为通用错误消息
-> - 版本号同步更新至v3.8.89.31（所有文档已同步）
+> - 版本号同步更新至v3.8.89.32（所有文档已同步）
 > - v3.8.89.31: 安全检查系统整合进main.py单文件架构，删除quick_security_check.py/security_audit.py/config_secure_template.py，新增SecurityChecker+DependencyAuditor+SecureConfigManager三个类，新增Playwright+移动端8项安全检查（浏览器上下文隔离/动态内容操作安全/文件下载上传安全/浏览器指纹反检测/移动端环境安全/网络流量安全/截图快照安全/Playwright进程安全），新增API端点/api/security/check+/api/security/audit+/api/security/encrypt-init，requirements.txt补充安全审计+代码质量+测试+移动端增强依赖，SECURITY_CHECKLIST.md合并进README.md+skill.md后删除
 > - v3.8.89.30: 启动脚本残留进程自动清理，run.bat/run.sh启动时分层清理node/python/hostc进程：①精准清理命令行含playwright的node进程（wmic+findstr/taskkill PID）②兜底清理所有node进程（taskkill /IM / pkill）③run.sh补齐playwright+node清理，与run.bat逻辑对齐，从源头消除Playwright "Connection closed while reading from the driver" 错误
 > - v3.8.89.29: 安全加固第四轮，完善3个薄弱点：①命令白名单+shell=False（shlex.split解析+仅允许python+main.py）②CSRF防护（写操作验证Origin/Referer）③API Key认证（secrets.token_urlsafe生成+secrets.compare_digest验证+前端monkey-patch fetch自动注入）
@@ -1638,9 +1639,32 @@ D:/ws/xy_ws/
 
 ---
 
-## 🔄 最新更新 (v3.8.89.11)
+## 🔄 最新更新 (v3.8.89.32)
 
-### 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复
+### 🔧 hostc WebSocket安全关闭补丁重新应用 — patch-package补丁未生效修复
+
+#### 问题: patch-package补丁文件存在但未应用到node_modules，导致hostc WebSocket连接超时进程崩溃
+**现象**: 启动时报错 `Error: WebSocket was closed before the connection was established` + `Unhandled 'error' event`，Node.js进程崩溃退出
+
+**根本原因**:
+1. **补丁未生效**: `npm install` 或其他操作覆盖了node_modules，patch-package postinstall钩子未执行，导致hostc/dist/index.js恢复为原始缺陷代码
+2. **safeCloseWebSocket2缺陷仍在**: CONNECTING状态直接调用close()抛异常，超时处理器未注册error监听器
+
+**修复方案**:
+- 手动应用补丁到 `dist/node_modules/hostc/dist/index.js`
+- 重新生成 `dist/patches/hostc+1.3.0.patch` 确保内容正确
+- 验证 `patch-package` postinstall钩子配置正确
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **hostc 启动** | 进程崩溃 ❌ | 正常启动 ✅ |
+| **WebSocket 超时** | Unhandled error ❌ | 优雅关闭 ✅ |
+| **补丁持久化** | 未生效 ❌ | postinstall 自动应用 ✅ |
+
+---
+
+### 🔧 hostc WebSocket 安全关闭修复 — 进程崩溃根因修复 (v3.8.89.11 原始修复)
 
 #### 问题: hostc 隧道启动时报错 `WebSocket was closed before the connection was established` 并导致进程崩溃
 **现象**: 项目启动时 hostc 隧道尝试建立 WebSocket 连接，超时或失败后调用 `safeCloseWebSocket2` 关闭 socket，触发未捕获的 `error` 事件导致 Node.js 进程崩溃退出
@@ -2839,6 +2863,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.89.32 | 2026-08-21 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭补丁重新应用(patch-package未生效修复+safeCloseWebSocket2状态感知关闭重新应用+补丁持久化验证) |
 | v3.8.89.11 | 2026-07-30 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭修复(safeCloseWebSocket2状态感知+error事件吞掉+patch-package持久化)+隧道验证修复(FastAPI HEAD方法)+高价商品数解析修复+按钮全局函数暴露 |
 | v3.8.89.10 | 2026-07-30 | 小旭二手机（西园路） | FastAPI根路由添加HEAD方法支持，修复verify_url()返回405导致隧道被误判不可用; CF隧道DNS解析失败的排查方案; 隧道不再反复重启，邮件通知正常发送 |
 | v3.8.89.9 | 2026-07-30 | 小旭二手机（西园路） | 简化正则表达式，精确匹配Python输出格式; 暴露全局函数，确保按钮绑定成功; 高价商品数从0恢复到78 |
