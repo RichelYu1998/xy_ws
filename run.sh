@@ -62,6 +62,8 @@ pre_launch() {
     log "[*] 清理残留进程..."
     pkill -9 -f "python.*main.py" 2>/dev/null || true
     pkill -9 -f "hostc" 2>/dev/null || true
+    pkill -9 -f "playwright" 2>/dev/null || true
+    pkill -9 node 2>/dev/null || true
     sleep 1
 
     PORT_WAIT_COUNT=0
