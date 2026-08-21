@@ -62,9 +62,15 @@ class TestProjectStructure:
         assert main_py.exists(), "main.py 不存在"
     
     def test_check_script_exists(self):
-        """测试版本检查脚本是否存在"""
-        check_script = PROJECT_ROOT / "check_python_version.py"
-        assert check_script.exists(), "check_python_version.py 不存在"
+        """测试版本检查函数是否已集成到 main.py"""
+        main_py = PROJECT_ROOT / "main.py"
+        assert main_py.exists(), "main.py 不存在"
+        
+        # 检查 main.py 中是否包含版本检查函数
+        content = main_py.read_text(encoding='utf-8')
+        assert 'def check_python_version' in content, "main.py 中未找到 check_python_version() 函数"
+        assert 'def get_version_info' in content, "main.py 中未找到 get_version_info() 函数"
+        assert 'def check_features' in content, "main.py 中未找到 check_features() 函数"
     
     def test_tox_config_exists(self):
         """测试 tox 配置是否存在"""

@@ -140,12 +140,16 @@ bandit -r . -f json -o bandit_report.json
 
 ### 📋 版本检查工具
 
-#### 1️⃣ 快速版本检查脚本
-- **文件**: [check_python_version.py](check_python_version.py)
+#### 1️⃣ 内置版本检查功能（集成在 main.py 中）
+- **位置**: [main.py](main.py) - `check_python_version()` 函数
 - **功能**: 检查当前 Python 版本是否满足 >=3.0 要求
 - **运行命令**:
   ```bash
-  python3 check_python_version.py
+  # 方式1: 直接调用 main.py 中的函数
+  python3 -c "from main import check_python_version; check_python_version()"
+  
+  # 方式2: 启动时自动检查（main.py 入口处已集成）
+  python3 main.py
   ```
 
 **输出示例**:
@@ -252,21 +256,34 @@ tox
 
 | 检查项 | 状态 | 说明 |
 |--------|------|------|
-| **版本检查脚本** | ✅ 已创建 | check_python_version.py |
+| **版本检查功能** | ✅ 已集成 | main.py 内置 `check_python_version()` 函数 |
 | **单元测试套件** | ✅ 已通过 | 10/10 测试全部通过 |
 | **Tox 配置** | ✅ 已配置 | 支持 6 个 Python 版本 |
 | **本地测试** | ✅ 通过 | Python 3.9.6 环境验证成功 |
 
-### 🔧 在主程序中集成版本检查
+### 🔧 在主程序中集成版本检查（已完成 ✅）
 
-在 `main.py` 开头添加：
+**已集成到 main.py** — 版本检查功能已内置在 [main.py](main.py) 中：
+
+**集成位置**: main.py L122-L191
+- `get_version_info()` - 获取详细版本信息
+- `check_python_version()` - 主检查函数
+- `check_features()` - 特性支持检查
+
+**使用方式**:
 ```python
-import sys
+# 在 main.py 中调用（启动时自动执行）
+if __name__ == "__main__":
+    # Python 版本检查（已在入口处集成）
+    check_python_version((3, 0))  # 检查是否 >= 3.0
+    
+    # ... 其他启动逻辑 ...
+```
 
-# 检查 Python 版本
-if sys.version_info < (3, 0):
-    print(f"错误: 需要 Python >=3.0，当前: {sys.version}")
-    sys.exit(1)
+**API 端点访问**:
+项目还提供了 HTTP API 端点进行远程版本检查：
+```bash
+curl http://localhost:8888/api/system/version
 ```
 
 ### 💡 高级用法：CI/CD 集成
@@ -299,7 +316,7 @@ jobs:
           pip install pytest
       
       - name: Run version check
-        run: python check_python_version.py
+        run: python3 -c "from main import check_python_version; check_python_version()"
       
       - name: Run tests
         run: pytest tests/ -v
