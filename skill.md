@@ -73,10 +73,15 @@
 **项目文件结构**:
 ```
 D:/ws/xy_ws/
-├── main.py              # ✅ 唯一的Python文件（包含所有功能）
+├── main.py              # ✅ 唯一的Python文件（包含所有功能，含版本检查函数）
 ├── README.md            # 项目文档和Changelog
 ├── skill.md             # 开发规范文档（本文件）
 ├── skill.docx           # Word格式规范文档
+├── tests/               # 单元测试目录
+│   ├── __init__.py      # 测试包初始化
+│   └── test_version.py  # Python版本兼容性测试套件
+├── tox.ini              # Tox多版本测试配置（支持3.9-3.14）
+├── md_to_docx.py        # MD转DOCX工具脚本
 ├── config/              # 配置目录
 │   ├── config.json      # 主配置文件
 │   ├── cookies.json     # Cookie存储
@@ -91,9 +96,19 @@ D:/ws/xy_ws/
     └── cloudflared/     # Cloudflare工具
 ```
 
+**重要说明 (v3.8.90.03)**:
+- **单文件架构**: 所有Python业务代码集中在 `main.py` 中（包括版本检查功能）
+- **版本检查集成**: `check_python_version()` 函数已内置在 main.py L122-L191
+- **无独立检查脚本**: 已删除 `check_python_version.py`，遵循单文件架构原则
+- **测试文件例外**: `tests/` 目录下的测试文件不违反单文件架构（属于质量保证体系）
+
 
 Python后端模块 (main.py)
 main.py
+├── 版本兼容性检查 (v3.8.90.03 新增)
+│   ├── get_version_info() - 获取详细Python版本信息
+│   ├── check_python_version() - 主版本检查函数（>=3.0）
+│   └── check_features() - Python特性支持检查
 ├── 异常处理系统
 │   ├── AppException - 统一异常类
 │   ├── ExceptionHandler - 异常处理器
