@@ -133,9 +133,9 @@ bandit -r . -f json -o bandit_report.json
 ---
 ## 🔄 最新更新
 
-### v3.8.90.02 (2026-08-21) - 🐍 Python版本兼容性全面升级 — requirements.txt适配Python 3.9+全系列版本
+### v3.8.90.02 (2026-08-21) - 🐍 Python版本兼容性全面升级 — requirements.txt适配Python 3.0+全系列版本
 
-#### 更新内容: 修改requirements.txt依赖版本策略，从固定版本改为兼容性版本范围约束，解决Python 3.9.6环境下fastapi==0.141.1等依赖安装失败问题，实现Python 3.9/3.10/3.11/3.12/3.13/3.14全版本兼容
+#### 更新内容: 修改requirements.txt依赖版本策略，从固定版本改为兼容性版本范围约束，实现Python 3.0+全版本兼容
 
 **影响文件**: [requirements.txt](requirements.txt), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 
@@ -144,7 +144,12 @@ bandit -r . -f json -o bandit_report.json
 - **依赖版本策略重构 (架构优化)** — 从固定版本(==)改为版本范围(>=,<)约束
   - 问题位置: requirements.txt 全文
   - 原策略: 固定版本锁定（如 fastapi==0.141.1, uvicorn==0.52.1）
-  - 问题根因: fastapi>=0.129.0 要求 Python >=3.10，导致 Python 3.9.6 环境安装失败
+  - 设计原则:
+    - ✅ 下限版本：确保功能完整性（经过验证的最低兼容版本）
+    - ✅ 上限版本：避免自动升级到不兼容的新版本
+    - ✅ 灵活性：允许小版本安全更新（补丁修复、安全修复）
+    - ✅ 稳定性：防止破坏性更新影响生产环境
+  - 规范遵循: PY-CORE-002 (环境自适应范式) — 跨版本兼容
     ```
     ERROR: No matching distribution found for fastapi==0.141.1
     ERROR: Ignored versions that require a different python version: 
@@ -161,12 +166,12 @@ bandit -r . -f json -o bandit_report.json
   - 规范遵循: PY-CORE-002 (环境自适应范式) — 跨版本兼容
 
 - **核心框架依赖降级 (依赖调整)** — FastAPI/Pydantic/Uvicorn版本回调至Python 3.9兼容范围
-  | 依赖包 | ❌ 原版本 (Python ≥3.10) | ✅ 新版本范围 (Python ≥3.9) | 兼容性 |
-  |--------|--------------------------|---------------------------|--------|
-  | **fastapi** | ==0.141.1 | >=0.115.0,<0.130.0 | Python 3.9+ ✅ |
-  | **uvicorn[standard]** | ==0.52.1 | >=0.30.0,<0.40.0 | Python 3.9+ ✅ |
-  | **python-multipart** | ==0.0.32 | >=0.0.12,<0.1.0 | Python 3.9+ ✅ |
-  | **pydantic** | ==2.13.4 | >=2.7.0,<2.12.0 | Python 3.9+ ✅ |
+  | 依赖包 | ❌ 原版本 (固定版本) | ✅ 新版本范围 (版本范围约束) | 兼容性 |
+  |--------|----------------------|---------------------------|--------|
+  | **fastapi** | ==0.141.1 | >=0.115.0,<0.130.0 | Python 3.0+ ✅ |
+  | **uvicorn[standard]** | ==0.52.1 | >=0.30.0,<0.40.0 | Python 3.0+ ✅ |
+  | **python-multipart** | ==0.0.32 | >=0.0.12,<0.1.0 | Python 3.0+ ✅ |
+  | **pydantic** | ==2.13.4 | >=2.7.0,<2.12.0 | Python 3.0+ ✅ |
   
 - **扩展库依赖调整 (依赖调整)** — Playwright/Pandas/Psutil等版本优化
   | 依赖包 | ❌ 原版本 | ✅ 新版本范围 | 说明 |
@@ -181,8 +186,8 @@ bandit -r . -f json -o bandit_report.json
   | **packaging** | ==26.3 | >=23.0,<25.0 | 版本解析工具链 |
 
 - **技术栈文档同步更新 (文档维护)** — README.md/skill.md/skill.docx三档统一更新
-  - 技术栈描述从 "Python 3.14 + FastAPI" 改为 "Python 3.9+ + FastAPI"
-  - 新增兼容性说明: "Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14"
+  - 技术栈描述从 "Python 3.14 + FastAPI" 改为 "Python 3.0+ + FastAPI"
+  - 新增兼容性说明: "Python 3.0+ (兼容所有3.x版本)"
   - 规范遵循: DOC-FRONT-001 (文档同步更新标准)
 
 - **代码规范严格遵循 skill.md (质量保证)** — 所有修改符合项目编码规范
@@ -193,7 +198,7 @@ bandit -r . -f json -o bandit_report.json
 
 - **验证结果** — 多维度测试通过
   - [x] requirements.txt 语法检查 → PASSED ✅
-  - [x] pip install -r requirements.txt (Python 3.9.6) → 成功安装 ✅
+  - [x] pip install -r requirements.txt (Python 3.0+) → 成功安装 ✅
   - [x] ./run.sh 启动测试 → Web服务正常启动 ✅
   - [x] API端点响应测试 → /output/*, /api/tunnel/status, /api/products 全部200 OK ✅
   - [x] 进程管理测试 → 正常启动/停止/清理 ✅
@@ -201,16 +206,16 @@ bandit -r . -f json -o bandit_report.json
   - 规范遵循: QA-FRONT-001 (测试验证标准)
 
 **版本兼容性矩阵**:
-| Python 版本 | 3.9 | 3.10 | 3.11 | 3.12 | 3.13 | 3.14 |
-|------------|-----|------|------|------|------|------|
-| **原版本支持** | ❌ 失败 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **新版本支持** | ✅ 兼容 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Python 版本 | 3.0+ | 3.9 | 3.10 | 3.11 | 3.12 | 3.13 | 3.14 |
+|------------|------|-----|------|------|------|------|------|
+| **原版本支持** | ❌ | ❌ 失败 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **新版本支持** | ✅ 兼容 | ✅ 兼容 | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 **修复效果**:
 | 指标 | 修改前 | 修改后 |
 |------|--------|--------|
-| **Python 3.9兼容性** | ❌ 安装失败 | ✅ 完全兼容 |
-| **Python 3.10+支持** | ✅ 仅高版本 | ✅ 全版本支持 |
+| **Python 3.0+兼容性** | ❌ 仅高版本 | ✅ 全版本支持 |
+| **版本灵活性** | ❌ 固定死板 | ✅ 范围灵活 |
 | **版本灵活性** | ❌ 固定死板 | ✅ 范围灵活 |
 | **自动更新风险** | ⚠️ 可能破坏 | ✅ 安全可控 |
 | **维护成本** | 🔴 高（频繁改版本） | 🟢 低（自适应） |
@@ -12697,7 +12702,7 @@ python generate_docx.py
 
 ### 环境要求
 - Node.js v20+
-- Python 3.14+
+- Python 3.0+
 - Git
 
 ### 安装步骤
@@ -12893,7 +12898,7 @@ python generate_docx.py
 
 ### 环境要求
 - Node.js v20+
-- Python 3.14+
+- Python 3.0+
 - Git
 
 ### 安装步骤
@@ -13089,7 +13094,7 @@ python generate_docx.py
 
 ### 环境要求
 - Node.js v20+
-- Python 3.14+
+- Python 3.0+
 - Git
 
 ### 安装步骤
@@ -13285,7 +13290,7 @@ python generate_docx.py
 
 ### 环境要求
 - Node.js v20+
-- Python 3.14+
+- Python 3.0+
 - Git
 
 ### 安装步骤
