@@ -134,6 +134,105 @@ main.py
 
 ──────────────────────────────────────────────────
 
+🔴 DOC-CORE-001: 文档文件管理范式 (Documentation File Management)
+
+**范式描述**
+统一管理项目中所有 Markdown (.md) 文档文件，确保文档结构清晰、维护简单、避免冗余。
+
+**核心原则**
+1. **MD 文件数量限制**: 项目中 **只允许存在两个 .md 文件**：
+   - `README.md` — 项目主文档（包含使用说明、Changelog、功能介绍等）
+   - `skill.md` — 开发规范文档（包含代码规范、架构设计、技术标准等）
+
+2. **多余 MD 文件处理**: 
+   - ❌ **禁止创建额外的 .md 文件**（如 VERSION_CHECK_README.md、SECURITY_CHECKLIST.md 等）
+   - ✅ **必须将内容合并到 README.md 或 skill.md 中**
+   - ✅ **合并后立即删除原文件**
+
+3. **内容归属规则**:
+   | 内容类型 | 归属文件 | 说明 |
+   |---------|---------|------|
+   | 使用说明/快速开始/安装指南 | README.md | 面向用户 |
+   | Changelog/版本历史 | README.md | 项目演进记录 |
+   | 功能介绍/特性说明 | README.md | 产品文档 |
+   | 代码规范/编码标准 | skill.md | 开发者指南 |
+   | 架构设计/技术方案 | skill.md | 技术文档 |
+   | 安全规范/检查清单 | skill.md | 合规要求 |
+   | 版本验证/测试方案 | README.md | 运维工具 |
+   | CI/CD 配置示例 | README.md | 部署文档 |
+
+4. **合并流程**:
+   ```
+   步骤1: 创建新的 .md 文件（临时）
+       ↓
+   步骤2: 完成内容编写
+       ↓
+   步骤3: 根据内容类型判断归属（README.md 或 skill.md）
+       ↓
+   步骤4: 将内容合并到目标文件的合适章节
+       ↓
+   步骤5: 删除临时 .md 文件
+       ↓
+   步骤6: Git 提交时确保只有 README.md 和 skill.md 两个 .md 文件
+   ```
+
+5. **违规后果**:
+   - ❌ 项目中出现第3个 .md 文件 → **代码审查不通过**
+   - ❌ 未及时删除临时 .md 文件 → **Git 提交被拒绝**
+   - ❌ 内容未合并直接删除 → **信息丢失**
+
+6. **自动化检查**:
+   ```bash
+   # 检查 .md 文件数量（应该在 Git hooks 中执行）
+   MD_COUNT=$(find . -name "*.md" -not -path "./.git/*" | wc -l)
+   if [ $MD_COUNT -gt 2 ]; then
+       echo "❌ 错误: 发现 $MD_COUNT 个 .md 文件，只允许 2 个 (README.md + skill.md)"
+       exit 1
+   fi
+   
+   # 检查是否只有 README.md 和 skill.md
+   MD_FILES=$(find . -name "*.md" -not -path "./.git/*" -type f)
+   EXPECTED="README.md
+skill.md"
+   
+   if [ "$MD_FILES" != "$EXPECTED" ]; then
+       echo "❌ 错误: 发现非预期的 .md 文件:"
+       echo "$MD_FILES"
+       exit 1
+   fi
+   ```
+
+**实施案例 (v3.8.90.02)**
+
+✅ **正确操作**: Python 版本验证文档整合
+- 原文件: `VERSION_CHECK_README.md` (临时创建)
+- 合并目标: `README.md` → 新增"🐍 Python 版本兼容性验证"章节
+- 操作结果: 
+  1. ✅ 将版本检查脚本说明、单元测试、Tox配置等内容合并进 README.md
+  2. ✅ 删除 `VERSION_CHECK_README.md`
+  3. ✅ 最终只剩 `README.md` + `skill.md` 两个 .md 文件
+
+❌ **错误示范**: 直接保留多个 .md 文件
+```
+# 错误：项目中出现多个 .md 文件
+README.md          ✅ 允许
+skill.md           ✅ 允许
+VERSION_CHECK_README.md  ❌ 禁止！应该合并后删除
+SECURITY_CHECKLIST.md    ❌ 禁止！应该合并后删除
+API_DOCS.md              ❌ 禁止！应该合并后删除
+```
+
+**核心价值**
+- ✅ **简化维护**: 只需关注两个文件，降低文档维护成本
+- ✅ **避免冗余**: 防止同一信息分散在多个文件中导致不一致
+- ✅ **提升查找效率**: 开发者知道去哪里找特定类型的信息
+- ✅ **强制整洁**: 通过硬性规定保持项目结构干净
+
+**记住这句话作为铁律**:
+> **"md文件只有readme。md以及skill。md 多余的md文件直接合到这里面"**
+
+---
+
 📚 完整项目范式体系 (Project Paradigm System)
 
 基于项目代码深度分析，以下是微购相册项目的完整技术范式和最佳实践。
