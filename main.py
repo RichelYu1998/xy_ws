@@ -1730,10 +1730,13 @@ class Environment:
     def kill_process_by_name(process_name):
         """跨系统终止进程"""
         try:
+            if not re.match(r'^[a-zA-Z0-9._-]+$', process_name):
+                print(f"⚠️ 无效的进程名: {process_name}")
+                return
             if Environment.IS_WINDOWS:
-                subprocess.run(f'taskkill /F /IM {process_name}', shell=True, capture_output=True, timeout=TIMEOUT_CONFIG['subprocess_wait'])
+                subprocess.run(['taskkill', '/F', '/IM', process_name], capture_output=True, timeout=TIMEOUT_CONFIG['subprocess_wait'])
             else:
-                subprocess.run(f'pkill -f "{process_name}"', shell=True, capture_output=True, timeout=TIMEOUT_CONFIG['subprocess_wait'])
+                subprocess.run(['pkill', '-f', process_name], capture_output=True, timeout=TIMEOUT_CONFIG['subprocess_wait'])
         except (subprocess.SubprocessError, OSError, FileNotFoundError) as e:
             print(f"⚠️ 终止进程失败: {e}")
     
@@ -1764,10 +1767,10 @@ class Environment:
         """跨系统检查进程是否运行"""
         try:
             if Environment.IS_WINDOWS:
-                result = subprocess.run(f'tasklist /FI "IMAGENAME eq {process_name}"', shell=True, capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])
+                result = subprocess.run(['tasklist', '/FI', f'IMAGENAME eq {process_name}'], capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])
                 return process_name in result.stdout
             else:
-                result = subprocess.run(f'pgrep -f "{process_name}"', shell=True, capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])
+                result = subprocess.run(['pgrep', '-f', process_name], capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])
                 return result.returncode == 0
         except subprocess.TimeoutExpired as e:
             print(f"⚠️ 检查进程运行状态超时（{TIMEOUT_CONFIG['subprocess_kill']}秒）: {e}")
@@ -1844,18 +1847,30 @@ def sec_sp(base_dir, user_path):
 
 app = FastAPI(
     title="Szwego商品爬虫",
-    description="Szwego商品爬虫Web服务",    version="3.8.90"
-)
+    description="Szwego商品爬虫Web服务",
+    version="3.8.90",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 if CORSMiddleware:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[
+            "http://localhost",
+            "http://localhost:8888",
+            "http://127.0.0.1",
+            "http://127.0.0.1:8888",
+            "http://localhost:5000",
+            "http://127.0.0.1:5000",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+        ],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
     )
 
 if PROMETHEUS_AVAILABLE:
@@ -6556,7 +6571,7 @@ if __name__ == '__main__':
                 process.stdin.flush()
                 return JSONResponse(content={'success': True, 'message': '输入已发送'})
             except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+                raise HTTPException(status_code=500, detail='Internal server error')
 
         @app.post('/kill')
         async def kill_task(req: KillTaskRequest):
@@ -6634,7 +6649,7 @@ if __name__ == '__main__':
             except HTTPException:
                 raise
             except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+                raise HTTPException(status_code=500, detail='Internal server error')
 
         @app.get('/api/sku/compare')
         async def compare_sku():
@@ -6676,9 +6691,9 @@ if __name__ == '__main__':
             except HTTPException:
                 raise
             except Exception as e:
-                error_detail = str(e) + '\n' + traceback.format_exc()
+                error_detail = 'Internal server error'
                 print(f'get_daily_profit错误: {error_detail}')
-                raise HTTPException(status_code=500, detail=str(e))
+                raise HTTPException(status_code=500, detail='Internal server error')
 
         @app.api_route('/api/sku/compare/txt', methods=['GET', 'POST'])
         async def compare_sku_txt(request: Request):
