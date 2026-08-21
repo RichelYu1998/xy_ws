@@ -966,7 +966,7 @@
                             if (item.type === 'section') {
                                 var sectionTitle = document.createElement('div');
                                 sectionTitle.style.cssText = 'font-weight: 700; color: #303133; font-size: 15px; margin-bottom: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px;';
-                                sectionTitle.innerHTML = '<i class="fa fa-bookmark" style="color: #409EFF; margin-right: 6px;"></i>' + item.title;
+                                sectionTitle.innerHTML = '<i class="fa fa-bookmark" style="color: #409EFF; margin-right: 6px;"></i>' + escapeHtml(item.title);
                                 itemDiv.appendChild(sectionTitle);
                                 if (item.content && item.content.trim()) {
                                     var rawContent = item.content.trim();
@@ -979,7 +979,7 @@
                                     for (var pi = 0; pi < parts.length; pi++) {
                                         var textPart = parts[pi].trim();
                                         if (textPart) {
-                                            textPart = textPart
+                                            textPart = escapeHtml(textPart)
                                                 .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#303133;">$1</strong>')
                                                 .replace(/^(\*\*.+?\*\*)$/gm, '$1')
                                                 .replace(/\n{2,}/g, '</p><p style="margin-bottom:8px;">')
@@ -1000,7 +1000,7 @@
                                     item.sub_items.forEach(function(sub) {
                                         var subLi = document.createElement('li');
                                         subLi.style.cssText = 'font-size: 13px; color: #606266; line-height: 1.8; position: relative; padding-left: 16px; margin-bottom: 4px;';
-                                        subLi.innerHTML = '<span style="position: absolute; left: 0; color: #409EFF;">•</span>' + sub;
+                                        subLi.innerHTML = '<span style="position: absolute; left: 0; color: #409EFF;">•</span>' + escapeHtml(sub);
                                         subList.appendChild(subLi);
                                     });
                                     itemDiv.appendChild(subList);
@@ -1008,7 +1008,7 @@
                             } else {
                                 var itemTitle = document.createElement('div');
                                 itemTitle.style.cssText = 'font-weight: 600; color: #303133; font-size: 14px;';
-                                itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' + item.title + (item.desc ? ' <span style="font-weight: 400; color: #606266;">- ' + item.desc + '</span>' : '');
+                                itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' + escapeHtml(item.title) + (item.desc ? ' <span style="font-weight: 400; color: #606266;">- ' + escapeHtml(item.desc) + '</span>' : '');
                                 itemDiv.appendChild(itemTitle);
                                 if (item.sub_items && item.sub_items.length) {
                                     var subList = document.createElement('ul');
@@ -1016,7 +1016,7 @@
                                     item.sub_items.forEach(function(sub) {
                                         var subLi = document.createElement('li');
                                         subLi.style.cssText = 'font-size: 13px; color: #606266; line-height: 1.6; position: relative; padding-left: 12px;';
-                                        subLi.innerHTML = '<span style="position: absolute; left: 0; color: #c0c4cc;">·</span>' + sub;
+                                        subLi.innerHTML = '<span style="position: absolute; left: 0; color: #c0c4cc;">·</span>' + escapeHtml(sub);
                                         subList.appendChild(subLi);
                                     });
                                     itemDiv.appendChild(subList);
@@ -1101,7 +1101,7 @@
                                         var mList = tl.match(/^-\s+\*\*(.+?)\*\*[:：]?\s*(.*)/);
                                         if (mList) {
                                             var li = document.createElement('p');
-                                            li.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> <strong>' + mList[1] + '</strong>' + (mList[2] ? ' - ' + mList[2] : '');
+                                            li.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> <strong>' + escapeHtml(mList[1]) + '</strong>' + (mList[2] ? ' - ' + escapeHtml(mList[2]) : '');
                                             usageContainer.appendChild(li);
                                         } else {
                                             var p = document.createElement('p');

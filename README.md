@@ -12391,7 +12391,7 @@ python generate_docx.py
 
 ### 环境要求
 - Node.js v20+
-- Python 3.x
+- Python 3.14+
 - Git
 
 ### 安装步骤
@@ -12400,13 +12400,30 @@ python generate_docx.py
 git clone <repository-url>
 cd xy_ws
 
-# 安装依赖
-npm install
+# 安装Python依赖（12个第三方包）
 pip install -r requirements.txt
+# 安装Playwright浏览器引擎
+playwright install chromium
 
-# 启动开发服务器
-npm run dev
+# 启动服务
+run.bat
 ```
+
+### 依赖清单（requirements.txt）
+| 包 | 版本 | 用途 |
+|---|---|---|
+| fastapi | 0.141.1 | Web框架 |
+| uvicorn[standard] | 0.52.1 | ASGI服务器 |
+| python-multipart | 0.0.32 | 表单/文件上传 |
+| pydantic | 2.13.4 | 数据验证 |
+| playwright | 1.62.0 | 浏览器自动化 |
+| openpyxl | 3.1.5 | Excel读写 |
+| pandas | 2.3.3 | 数据处理 |
+| pymysql | 1.2.0 | MySQL连接 |
+| psutil | 7.2.2 | 系统监控 |
+| prometheus-client | 0.26.0 | 指标采集 |
+| cryptography | 46.0.0 | 配置加密 |
+| packaging | 26.3 | 版本号解析 |
 
 ---
 
@@ -12570,7 +12587,7 @@ python generate_docx.py
 
 ### 环境要求
 - Node.js v20+
-- Python 3.x
+- Python 3.14+
 - Git
 
 ### 安装步骤
@@ -12579,13 +12596,30 @@ python generate_docx.py
 git clone <repository-url>
 cd xy_ws
 
-# 安装依赖
-npm install
+# 安装Python依赖（12个第三方包）
 pip install -r requirements.txt
+# 安装Playwright浏览器引擎
+playwright install chromium
 
-# 启动开发服务器
-npm run dev
+# 启动服务
+run.bat
 ```
+
+### 依赖清单（requirements.txt）
+| 包 | 版本 | 用途 |
+|---|---|---|
+| fastapi | 0.141.1 | Web框架 |
+| uvicorn[standard] | 0.52.1 | ASGI服务器 |
+| python-multipart | 0.0.32 | 表单/文件上传 |
+| pydantic | 2.13.4 | 数据验证 |
+| playwright | 1.62.0 | 浏览器自动化 |
+| openpyxl | 3.1.5 | Excel读写 |
+| pandas | 2.3.3 | 数据处理 |
+| pymysql | 1.2.0 | MySQL连接 |
+| psutil | 7.2.2 | 系统监控 |
+| prometheus-client | 0.26.0 | 指标采集 |
+| cryptography | 46.0.0 | 配置加密 |
+| packaging | 26.3 | 版本号解析 |
 
 ---
 
@@ -12749,7 +12783,7 @@ python generate_docx.py
 
 ### 环境要求
 - Node.js v20+
-- Python 3.x
+- Python 3.14+
 - Git
 
 ### 安装步骤
@@ -12758,13 +12792,30 @@ python generate_docx.py
 git clone <repository-url>
 cd xy_ws
 
-# 安装依赖
-npm install
+# 安装Python依赖（12个第三方包）
 pip install -r requirements.txt
+# 安装Playwright浏览器引擎
+playwright install chromium
 
-# 启动开发服务器
-npm run dev
+# 启动服务
+run.bat
 ```
+
+### 依赖清单（requirements.txt）
+| 包 | 版本 | 用途 |
+|---|---|---|
+| fastapi | 0.141.1 | Web框架 |
+| uvicorn[standard] | 0.52.1 | ASGI服务器 |
+| python-multipart | 0.0.32 | 表单/文件上传 |
+| pydantic | 2.13.4 | 数据验证 |
+| playwright | 1.62.0 | 浏览器自动化 |
+| openpyxl | 3.1.5 | Excel读写 |
+| pandas | 2.3.3 | 数据处理 |
+| pymysql | 1.2.0 | MySQL连接 |
+| psutil | 7.2.2 | 系统监控 |
+| prometheus-client | 0.26.0 | 指标采集 |
+| cryptography | 46.0.0 | 配置加密 |
+| packaging | 26.3 | 版本号解析 |
 
 ---
 
@@ -12928,7 +12979,7 @@ python generate_docx.py
 
 ### 环境要求
 - Node.js v20+
-- Python 3.x
+- Python 3.14+
 - Git
 
 ### 安装步骤
@@ -12937,13 +12988,30 @@ python generate_docx.py
 git clone <repository-url>
 cd xy_ws
 
-# 安装依赖
-npm install
+# 安装Python依赖（12个第三方包）
 pip install -r requirements.txt
+# 安装Playwright浏览器引擎
+playwright install chromium
 
-# 启动开发服务器
-npm run dev
+# 启动服务
+run.bat
 ```
+
+### 依赖清单（requirements.txt）
+| 包 | 版本 | 用途 |
+|---|---|---|
+| fastapi | 0.141.1 | Web框架 |
+| uvicorn[standard] | 0.52.1 | ASGI服务器 |
+| python-multipart | 0.0.32 | 表单/文件上传 |
+| pydantic | 2.13.4 | 数据验证 |
+| playwright | 1.62.0 | 浏览器自动化 |
+| openpyxl | 3.1.5 | Excel读写 |
+| pandas | 2.3.3 | 数据处理 |
+| pymysql | 1.2.0 | MySQL连接 |
+| psutil | 7.2.2 | 系统监控 |
+| prometheus-client | 0.26.0 | 指标采集 |
+| cryptography | 46.0.0 | 配置加密 |
+| packaging | 26.3 | 版本号解析 |
 
 ---
 

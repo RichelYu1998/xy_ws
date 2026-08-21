@@ -2139,6 +2139,18 @@ try:
 except ImportError:
     FastAPI = None
 
+try:
+    from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+except ImportError:
+    Fernet = hashes = PBKDF2HMAC = None
+
+try:
+    from packaging import version as packaging_version
+except ImportError:
+    packaging_version = None
+
 项目内部模块（相对导入）
 from .exceptions import AppException
 from .config import ConfigManager
@@ -3391,26 +3403,32 @@ registerRoute(
 
 ### 核心实现
 
-#### requirements.txt结构
-核心依赖 (FastAPI)
-fastapi>=0.100.0
-uvicorn[standard]>=0.23.0
-playwright>=1.59.0
+#### requirements.txt结构（与main.py顶部import一一对应）
+核心框架
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+python-multipart==0.0.32
+pydantic==2.13.4
+
+浏览器自动化
+playwright==1.62.0
 
 数据处理
-openpyxl>=3.1.2
-pandas>=1.3.0
-pymysql>=1.1.0
+openpyxl==3.1.5
+pandas==2.3.3
+
+数据库
+pymysql==1.2.0
 
 系统监控
-psutil>=5.9.0
-prometheus_client>=0.17.0
+psutil==7.2.2
+prometheus-client==0.26.0
 
-数据验证
-pydantic>=2.0.0
+安全与加密
+cryptography==46.0.0
 
-文档生成
-python-docx>=1.2.0
+版本解析
+packaging==26.3
 
 #### 依赖检查与安装
 def check_deps_satisfied(requirements_file="requirements.txt"):
