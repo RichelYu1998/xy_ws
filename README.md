@@ -76,14 +76,14 @@
 
 ### v3.8.89.28 (2026-08-21) - 🐛 邮件发送Header()崩溃修复 — 隧道通知邮件无法发出的根因修复
 
-#### 更新内容: 修复 `Header.encode()` AttributeError 导致所有隧道通知邮件发送失败的致命Bug
+#### 更新内容: 修复 `Header.encode()` AttributeError 导致所有隧道通知邮件发送失败的致命Bug（From头+Subject头两处）
 
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 
 ---
 
 - **邮件From头构造Bug修复 (致命Bug修复)** - Header对象无encode()方法导致邮件全部发送失败
-  - 问题位置: main.py `EmailNotifier.send_tunnel_notification` 邮件From头构造
+  - 问题位置: main.py `EmailNotifier.send_tunnel_notification` 邮件From头构造 (L2938)
   - Bug描述: `Header(config['from_name'], charset='utf-8').encode()` 中 `Header` 对象没有 `encode()` 方法，每次发邮件都抛 `AttributeError`，导致隧道URL验证通过后邮件根本发不出去
   - 故障证据: web_output.log 记录至少两次发送尝试（13:22:26 cloudflare、13:23:03 hostc）全部失败，错误信息均为 `'Header' object has no attribute 'encode'`
   - 修复方案: 改用标准库 `email.utils.formataddr()` 函数构造From头，自动按RFC 2047编码中文显示名
@@ -98,11 +98,27 @@
   - 验证输出: `=?utf-8?b?5YWs572RSVDnm5Hmjqc=?= <980187223@qq.com>`（RFC 2047标准编码）
   - 规范遵循: PY-CORE-024 (安全漏洞防护范式) + PY-FRONT-001 (标准库优先原则)
 
-- **验证结果** - 测试通过情况
+- **邮件Subject头构造Bug修复 (致命Bug修复)** - Header对象在Python3.14新policy下as_string()崩溃
+  - 问题位置: main.py `EmailNotifier.send_tunnel_notification` 邮件Subject头构造 (L2951)
+  - Bug描述: `msg['Subject'] = Header(text, charset='utf-8')` 赋值的是 `Header` 对象，Python 3.14 的 email policy 在 `msg.as_string()` 调用 `_fold()` 时执行 `h.encode()`，而 `Header` 对象没有该方法，导致即使From头修复后仍在 `server.sendmail(..., msg.as_string())` 处崩溃
+  - 故障证据: 独立测试脚本实发邮件，SMTP连接/登录均成功，但 `msg.as_string()` 抛 `AttributeError: 'Header' object has no attribute 'encode'`（traceback指向 `_policybase.py` 的 `_fold`）
+  - 修复方案: Subject直接赋值字符串，由 email policy 自动处理 UTF-8 编码折叠
+  - 修复代码:
+    ```python
+    # ❌ 修复前（as_string崩溃）
+    msg['Subject'] = Header(f'【{event_title}】{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', charset='utf-8')
+    
+    # ✅ 修复后（字符串赋值，policy自动编码）
+    msg['Subject'] = f'【{event_title}】{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+    ```
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式) + PY-FRONT-001 (标准库优先原则)
+
+- **验证结果** - 实发邮件测试通过情况
   - [x] py_compile 语法检查 → PASSED ✅
   - [x] formataddr 输出验证 → RFC 2047编码正确 ✅
   - [x] Header.encode() 调用 → 0处 ✅
-  - [x] 邮件发送链路 → SMTP连接/登录/发送逻辑完整 ✅
+  - [x] 独立脚本实发邮件 → SMTP连接/登录/发送全链路成功 ✅
+  - [x] 邮件实际送达 → 收件箱验证 ✅
   - 规范遵循: QA-FRONT-001 (测试验证标准)
 
 ### v3.8.89.27 (2026-08-21) - 🔒 安全加固第三轮 + CSP/隧道注入/速率限制

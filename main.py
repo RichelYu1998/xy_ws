@@ -2948,7 +2948,7 @@ class EmailNotifier:
             }
             event_title = event_titles.get(event_type, f'{"✅ 新" if event_type == "new" else "✅"}公网地址')
             
-            msg['Subject'] = Header(f'【{event_title}】{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', charset='utf-8')
+            msg['Subject'] = f'【{event_title}】{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
             
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
