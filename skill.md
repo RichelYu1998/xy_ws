@@ -19,7 +19,7 @@
 
 ---
 
-> **📌 当前版本**: v3.8.89.28 (2026-08-21) - 🐛 邮件发送Header()崩溃修复 + 隧道通知邮件无法发出的根因修复 + 安全加固第三轮 + CSP/隧道注入/速率限制 + 内联导入清理 + CORS/命令注入/信息泄露修复
+> **📌 当前版本**: v3.8.89.29 (2026-08-21) - 🔒 安全加固第四轮 + 命令白名单shell=False/CSRF Origin验证/API Key认证 + 邮件Header()崩溃修复 + 安全加固第三轮 + CSP/隧道注入/速率限制 + 内联导入清理 + CORS/命令注入/信息泄露修复
 >
 > **⚠️ 重要更新**:
 > - 第一轮：修复6类安全漏洞（路径遍历、弱随机数、不安全SSL、内联导入、冗余别名、命令注入防护）
@@ -32,7 +32,8 @@
 > - FastAPI: 禁用/docs、/redoc、/openapi.json端点
 > - kill_process_by_name: 添加进程名格式验证，改用列表参数
 > - 信息泄露: detail=str(e)替换为通用错误消息
-> - 版本号同步更新至v3.8.89.28（所有文档已同步）
+> - 版本号同步更新至v3.8.89.29（所有文档已同步）
+> - v3.8.89.29: 安全加固第四轮，完善3个薄弱点：①命令白名单+shell=False（shlex.split解析+仅允许python+main.py）②CSRF防护（写操作验证Origin/Referer）③API Key认证（secrets.token_urlsafe生成+secrets.compare_digest验证+前端monkey-patch fetch自动注入）
 > - v3.8.89.28: 修复邮件From头+Subject头两处构造Bug，`Header.encode()` 抛AttributeError导致所有隧道通知邮件发送失败；From头改用 `formataddr()` 标准库函数，Subject头改用字符串赋值（Python3.14新policy下Header对象在as_string()时崩溃）
 > - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
 > - 无任何额外的.py文件，避免导入依赖问题
@@ -3921,7 +3922,7 @@ class TestExceptionHandling:
 
 ---
 
-**文档版本**: v3.8.89.28  
+**文档版本**: v3.8.89.29  
 **最后更新**: 2026-08-21  
 **下次审查**: 2026-09-21  
 **维护者**: 小旭数码开发团队

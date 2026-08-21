@@ -17,6 +17,7 @@ import random
 import secrets
 import re
 import select
+import shlex
 import shutil
 import smtplib
 import socket
@@ -1866,8 +1867,27 @@ if CORSMiddleware:
         ],
         allow_credentials=True,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key"],
     )
+
+# ============================================================
+# API Key 认证 + CSRF 防护 (v3.8.89.29)
+# ============================================================
+_web_config_mgr = ConfigManager()
+WEB_API_KEY = _web_config_mgr.get('web_api_key')
+if not WEB_API_KEY:
+    WEB_API_KEY = secrets.token_urlsafe(32)
+    _web_config_mgr.set('web_api_key', WEB_API_KEY)
+
+LOCAL_TRUSTED_ORIGINS = frozenset([
+    'http://localhost', 'http://127.0.0.1',
+    'http://localhost:8888', 'http://127.0.0.1:8888',
+    'http://localhost:5000', 'http://127.0.0.1:5000',
+    'http://localhost:8080', 'http://127.0.0.1:8080',
+])
+
+WRITE_METHODS = frozenset(['POST', 'PUT', 'PATCH', 'DELETE'])
+CSRF_EXEMPT_PATHS = frozenset(['/api/bootstrap'])
 
 if PROMETHEUS_AVAILABLE:
     REQUEST_COUNT = Counter('http_requests_total', '总请求数', ['method', 'endpoint', 'status'])
@@ -2136,32 +2156,24 @@ def run_command_background(task_id, command):
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
         
-        if Environment.IS_WINDOWS:
-            process = subprocess.Popen(
-                command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL,
-                cwd=PROJECT_DIR,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                bufsize=1,
-                env=env
-            )
+        if isinstance(command, str):
+            cmd_list = shlex.split(command)
         else:
-            process = subprocess.Popen(
-                command,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                stdin=subprocess.DEVNULL,
-                cwd=PROJECT_DIR,
-                text=True,
-                bufsize=1,
-                env=env
-            )
+            cmd_list = list(command)
+        
+        process = subprocess.Popen(
+            cmd_list,
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            cwd=PROJECT_DIR,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            bufsize=1,
+            env=env
+        )
         
         with _processes_lock:
             processes[task_id] = process
@@ -6157,6 +6169,37 @@ if __name__ == '__main__':
                     if cl > 1024 * 1024:
                         _request_logger.warning(f'大请求体: {cl / 1024:.1f}KB')
 
+            if request.method in WRITE_METHODS and path not in CSRF_EXEMPT_PATHS and not path.startswith('/static') and not path.startswith('/favicon'):
+                api_key = request.headers.get('x-api-key', '')
+                has_valid_key = bool(api_key) and secrets.compare_digest(api_key, WEB_API_KEY)
+
+                is_local = False
+                origin = request.headers.get('origin', '')
+                if origin:
+                    if origin in LOCAL_TRUSTED_ORIGINS:
+                        is_local = True
+                else:
+                    referer = request.headers.get('referer', '')
+                    if referer:
+                        try:
+                            parsed = urllib.parse.urlparse(referer)
+                            ref_origin = f'{parsed.scheme}://{parsed.netloc}'
+                            if ref_origin in LOCAL_TRUSTED_ORIGINS:
+                                is_local = True
+                        except Exception:
+                            pass
+                    else:
+                        host = request.headers.get('host', '')
+                        if any(h in host for h in ['localhost', '127.0.0.1']):
+                            is_local = True
+
+                if not has_valid_key and not is_local:
+                    _request_logger.warning(f'[CSRF/Auth] 拒绝写操作: {request.method} {path} | IP: {client_ip}')
+                    return JSONResponse(
+                        status_code=403,
+                        content={'error': '访问被拒绝: 缺少有效认证'}
+                    )
+
             response = await call_next(request)
 
             if not path.startswith('/static'):
@@ -6220,6 +6263,16 @@ if __name__ == '__main__':
             return response
 
 
+
+        @app.get('/api/bootstrap')
+        async def api_bootstrap(request: Request):
+            client_ip = request.client.host if request.client else 'unknown'
+            is_local = any(h in client_ip for h in ['127.0.0.1', '::1', 'localhost'])
+            if not is_local:
+                origin = request.headers.get('origin', '')
+                if origin not in LOCAL_TRUSTED_ORIGINS:
+                    return JSONResponse(status_code=403, content={'error': '仅限本地访问'})
+            return JSONResponse(content={'api_key': WEB_API_KEY})
 
         @app.get('/health')
         async def health_check():
@@ -6477,6 +6530,8 @@ if __name__ == '__main__':
             with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
                 content = f.read()
             content = re.sub(r'版本:\s*[\d.]+', f'版本: {current_version}', content)
+            if '<meta name="api-key"' not in content:
+                content = content.replace('<head>', f'<head><meta name="api-key" content="{WEB_API_KEY}">', 1)
             return HTMLResponse(
                 content=content,
                 headers={
@@ -6548,15 +6603,29 @@ if __name__ == '__main__':
             if len(command) > 10000:
                 raise HTTPException(status_code=400, detail='命令长度超过限制（最大10000字符）')
 
-            if command.startswith('python '):
-                command = command.replace('python ', VENV_PYTHON + ' ', 1)
-            if command.startswith('python3 '):
-                command = command.replace('python3 ', VENV_PYTHON + ' ', 1)
+            try:
+                cmd_list = shlex.split(command)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f'命令格式错误: {e}')
+
+            if len(cmd_list) < 2:
+                raise HTTPException(status_code=400, detail='命令格式无效: 至少需要可执行文件和参数')
+
+            exe_base = os.path.basename(cmd_list[0]).lower()
+            allowed_exe = {'python', 'python3', 'python.exe', 'py', 'py.exe'}
+            if exe_base not in allowed_exe and not (exe_base.startswith('python') and ('python' in exe_base or 'python3' in exe_base)):
+                raise HTTPException(status_code=400, detail=f'不允许的可执行文件: {cmd_list[0]}')
+
+            if not any(os.path.basename(arg) == 'main.py' for arg in cmd_list[1:]):
+                raise HTTPException(status_code=400, detail='命令必须包含 main.py')
+
+            if exe_base in ('python', 'python3', 'python.exe'):
+                cmd_list[0] = VENV_PYTHON
 
             task_id = str(uuid.uuid4())[:8]
             with _tasks_lock:
-                tasks[task_id] = {'command': command, 'status': 'starting', 'output': '', 'returncode': None, 'error': None}
-            thread = threading.Thread(target=run_command_background, args=(task_id, command))
+                tasks[task_id] = {'command': ' '.join(cmd_list), 'status': 'starting', 'output': '', 'returncode': None, 'error': None}
+            thread = threading.Thread(target=run_command_background, args=(task_id, cmd_list))
             thread.start()
             return JSONResponse(content={'success': True, 'task_id': task_id, 'message': f'命令已启动 (系统: {Environment.SYSTEM})'})
 
