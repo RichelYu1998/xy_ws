@@ -81,7 +81,6 @@ D:/ws/xy_ws/
 │   ├── __init__.py      # 测试包初始化
 │   └── test_version.py  # Python版本兼容性测试套件
 ├── tox.ini              # Tox多版本测试配置（支持3.9-3.14）
-├── md_to_docx.py        # MD转DOCX工具脚本
 ├── config/              # 配置目录
 │   ├── config.json      # 主配置文件
 │   ├── cookies.json     # Cookie存储
@@ -96,10 +95,11 @@ D:/ws/xy_ws/
     └── cloudflared/     # Cloudflare工具
 ```
 
-**重要说明 (v3.8.90.03)**:
+**重要说明 (v3.8.90.05)**:
 - **单文件架构**: 所有Python业务代码集中在 `main.py` 中（包括版本检查功能）
 - **版本检查集成**: `check_python_version()` 函数已内置在 main.py L122-L191
-- **无独立检查脚本**: 已删除 `check_python_version.py`，遵循单文件架构原则
+- **Import规范**: 所有import语句必须在文件开头（L1-L117），禁止函数内部内联import
+- **无独立脚本**: 已删除 `check_python_version.py` 和 `md_to_docx.py`，遵循单文件架构原则
 - **测试文件例外**: `tests/` 目录下的测试文件不违反单文件架构（属于质量保证体系）
 
 
@@ -251,6 +251,94 @@ API_DOCS.md              ❌ 禁止！应该合并后删除
 📚 完整项目范式体系 (Project Paradigm System)
 
 基于项目代码深度分析，以下是微购相册项目的完整技术范式和最佳实践。
+
+──────────────────────────────────────────────────
+
+🔴 PY-CORE-000: Import 语句规范 (Import Statement Standard)
+
+**范式描述**
+强制要求所有 import 语句必须位于文件开头，禁止在函数/方法内部使用内联 import。
+
+**核心原则**
+
+1. **Import 位置**: 所有 import 必须在文件顶部（main.py 的 L1-L117 区域）
+2. **禁止内联 import**: ❌ 严禁在函数、方法、类内部使用 `import` 或 `from...import`
+3. **异常处理**: 可选依赖使用 `try-except` 包裹（仍在文件开头）
+4. **分组规范**:
+   - 标准库模块
+   - 第三方库模块（按字母排序）
+   - 本地模块
+
+**正确示例 ✅**
+```python
+# 文件开头 (L1-L117)
+# 标准库
+import sys
+import os
+import json
+from pathlib import Path
+from datetime import datetime
+
+# 第三方库（可选依赖用 try-except）
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+try:
+    from fastapi import FastAPI
+except ImportError:
+    FastAPI = None
+
+# 使用时直接调用（无需再次 import）
+def some_function():
+    if psutil:
+        return psutil.cpu_percent()
+```
+
+**错误示例 ❌**
+```python
+# ❌ 错误：函数内部的内联 import
+def _is_private_ip(ip_str):
+    try:
+        import ipaddress  # 禁止！应该在文件开头导入
+        return ipaddress.ip_address(ip_str) in (...)
+
+# ❌ 错误：重复导入已在开头导入的模块
+def initialize_encryption(cls, password=None):
+    import base64  # 禁止！base64 已在 L5 导入
+```
+
+**实施案例 (v3.8.90.05)**
+
+✅ **清理的内联 import** (已修复):
+| 位置 | 原代码 | 修复方式 |
+|------|--------|---------|
+| L1974 | `import ipaddress` | ❌ 删除（ipaddress 已在 L11 导入） |
+| L10382 | `import base64` | ❌ 删除（base64 已在 L5 导入） |
+| L10450 | `import base64` | ❌ 删除（base64 已在 L5 导入） |
+
+**自动化检查脚本**:
+```bash
+# 检查是否存在内联 import（应在 Git hooks 中执行）
+INLINE_IMPORTS=$(grep -n "^\s*import \|\s*from .*import" main.py | grep -v "^1-\|^2-\|^3-" | head -20)
+if [ -n "$INLINE_IMPORTS" ]; then
+    echo "❌ 错误: 发现内联 import（非文件开头）:"
+    echo "$INLINE_IMPORTS"
+    exit 1
+fi
+echo "✅ Import 规范检查通过"
+```
+
+**核心价值**
+- ✅ **性能优化**: 避免运行时重复导入开销
+- ✅ **依赖清晰**: 一目了然看到所有依赖关系
+- ✅ **符合 PEP8**: 遵循 Python 官方编码规范
+- ✅ **IDE 支持**: 更好的代码补全和静态分析
+- ✅ **避免错误**: 防止循环导入和命名冲突
+
+**记住这条铁律**:
+> **"所有的 import 都要在文件开头，禁止函数内部内联 import"**
 
 ──────────────────────────────────────────────────
 
