@@ -103,6 +103,18 @@ except ImportError:
     except ImportError:
         BaseModel = Field = ValidationError = field_validator = None
 
+try:
+    from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+except ImportError:
+    Fernet = hashes = PBKDF2HMAC = None
+
+try:
+    from packaging import version as packaging_version
+except ImportError:
+    packaging_version = None
+
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 for _stream in (sys.stdout, sys.stderr):
@@ -10266,10 +10278,10 @@ class DependencyAuditor:
         }
 
     def _ver_lt(self,v1,v2):
-        try:
-            from packaging import version
-            return version.parse(v1)<version.parse(v2)
-        except ImportError:pass
+        if packaging_version is not None:
+            try:
+                return packaging_version.parse(v1)<packaging_version.parse(v2)
+            except Exception:pass
         p1=[int(x) for x in v1.split('.') if x.isdigit()]
         p2=[int(x) for x in v2.split('.') if x.isdigit()]
         for i in range(max(len(p1),len(p2))):
@@ -10299,22 +10311,21 @@ class SecureConfigManager:
         if os.path.exists(key_file) and os.path.exists(salt_file):
             key=self._load_key(key_file,salt_file)
             if key:
-                try:
-                    from cryptography.fernet import Fernet
-                    self._fernet=Fernet(key)
-                except Exception:pass
+                if Fernet is not None:
+                    try:
+                        self._fernet=Fernet(key)
+                    except Exception:pass
 
     def _load_key(self,key_file,salt_file):
         env_key=os.environ.get('CONFIG_ENCRYPTION_KEY')
         if env_key:
-            try:
-                from cryptography.hazmat.primitives import hashes
-                from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-                import base64
-                with open(salt_file,'rb') as f:salt=f.read()
-                kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
-                return base64.urlsafe_b64encode(kdf.derive(env_key.encode()))
-            except Exception:return None
+            if hashes is not None and PBKDF2HMAC is not None:
+                try:
+                    import base64
+                    with open(salt_file,'rb') as f:salt=f.read()
+                    kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
+                    return base64.urlsafe_b64encode(kdf.derive(env_key.encode()))
+                except Exception:return None
         if os.path.exists(key_file):
             with open(key_file,'rb') as f:return f.read()
         return None
@@ -10385,10 +10396,9 @@ class SecureConfigManager:
             return True,'加密系统已初始化'
         if not password or len(password)<8:
             return False,'密码长度至少需要8个字符'
+        if Fernet is None or hashes is None or PBKDF2HMAC is None:
+            return False,'cryptography库未安装'
         try:
-            from cryptography.hazmat.primitives import hashes
-            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-            from cryptography.fernet import Fernet
             salt=os.urandom(16)
             kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
             key=base64.urlsafe_b64encode(kdf.derive(password.encode()))

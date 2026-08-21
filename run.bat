@@ -61,7 +61,7 @@ call :log ========================================
 
 call :log_blank
 call :log [*] 清理残留进程...
-for /f "tokens=2 delims=," %%p in ('wmic process where "name='node.exe'" get processid^,commandline /format:csv 2^>nul ^| findstr /i "playwright"') do (
+for /f "tokens=3 delims=," %%p in ('wmic process where "name='node.exe'" get processid^,commandline /format:csv 2^>nul ^| findstr /i "playwright"') do (
     taskkill /F /PID %%p >nul 2>&1
 )
 taskkill /F /IM hostc.exe >nul 2>&1
@@ -82,7 +82,7 @@ goto port_wait_loop
 :port_wait_done
 if %PORT_WAIT_COUNT% geq %PORT_MAX_WAIT% (
     call :log [WARNING] 端口8888等待超时，强制清理占用进程...
-    for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8888.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
+    for /f "tokens=6" %%p in ('netstat -ano ^| findstr ":8888.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
     ping -n 2 127.0.0.1 >nul 2>&1
 )
 call :log [*] 残留进程清理完成
@@ -145,6 +145,12 @@ call :log_blank
 call :log 正在清理进程...
 taskkill /f /im python.exe >nul 2>&1
 taskkill /f /im node.exe >nul 2>&1
+if exist temp_pip_time.txt del temp_pip_time.txt 2>nul
+if exist temp_pip_int.txt del temp_pip_int.txt 2>nul
+if exist temp_npm_time.txt del temp_npm_time.txt 2>nul
+if exist temp_npm_int.txt del temp_npm_int.txt 2>nul
+if exist temp_h_time.txt del temp_h_time.txt 2>nul
+if exist temp_h_int.txt del temp_h_int.txt 2>nul
 call :log 清理完成
 goto :eof
 
@@ -273,7 +279,7 @@ if not defined PYTHON_CMD (
 
 call :log_blank
 call :log Python版本：
-"!PYTHON_CMD!" --version
+"!PYTHON_CMD!" --version 2>nul || call :log [WARNING] 无法获取Python版本信息
 
 call :log [*] 检测虚拟环境状态...
 if defined VIRTUAL_ENV (
@@ -412,6 +418,7 @@ for /L %%i in (0,1,3) do (
         if exist temp_pip_time.txt (
             set /p TEST_TIME=<temp_pip_time.txt
             del temp_pip_time.txt 2>nul
+            for /f "delims=0123456789." %%c in ("!TEST_TIME!") do set "TEST_TIME=9999"
         )
         
         if not defined TEST_TIME set "TEST_TIME=9999"
@@ -422,6 +429,7 @@ for /L %%i in (0,1,3) do (
             if exist temp_pip_int.txt (
                 set /p PIP_INT_TIME=<temp_pip_int.txt
                 del temp_pip_int.txt 2>nul
+                for /f "delims=0123456789" %%c in ("!PIP_INT_TIME!") do set "PIP_INT_TIME=9999"
             )
         )
         if "!PIP_INT_TIME!"=="" set "PIP_INT_TIME=9999"
@@ -475,14 +483,16 @@ for /L %%i in (0,1,2) do (
         if exist temp_h_time.txt (
             set /p H_TIME=<temp_h_time.txt
             del temp_h_time.txt 2>nul
+            for /f "delims=0123456789." %%c in ("!H_TIME!") do set "H_TIME=9999"
         )
-        
+
         set "H_INT=9999"
         if not "!H_TIME!"=="0" if not "!H_TIME!"=="0.000000" (
             "!PYTHON_CMD!" -c "print(int(float('!H_TIME!')*1000))" > temp_h_int.txt 2>nul
             if exist temp_h_int.txt (
                 set /p H_INT=<temp_h_int.txt
                 del temp_h_int.txt 2>nul
+                for /f "delims=0123456789" %%c in ("!H_INT!") do set "H_INT=9999"
             )
         )
         if "!H_INT!"=="" set "H_INT=9999"
@@ -546,16 +556,18 @@ for /L %%i in (0,1,1) do (
         if exist temp_npm_time.txt (
             set /p NPM_TEST_TIME=<temp_npm_time.txt
             del temp_npm_time.txt 2>nul
+            for /f "delims=0123456789." %%c in ("!NPM_TEST_TIME!") do set "NPM_TEST_TIME=9999"
         )
-        
+
         if not defined NPM_TEST_TIME set "NPM_TEST_TIME=9999"
-        
+
         set "NPM_INT_TIME=9999"
         if not "!NPM_TEST_TIME!"=="0" if not "!NPM_TEST_TIME!"=="0.000000" (
             "!PYTHON_CMD!" -c "print(int(float('!NPM_TEST_TIME!')*1000))" > temp_npm_int.txt 2>nul
             if exist temp_npm_int.txt (
                 set /p NPM_INT_TIME=<temp_npm_int.txt
                 del temp_npm_int.txt 2>nul
+                for /f "delims=0123456789" %%c in ("!NPM_INT_TIME!") do set "NPM_INT_TIME=9999"
             )
         )
         if "!NPM_INT_TIME!"=="" set "NPM_INT_TIME=9999"
@@ -733,8 +745,11 @@ call :log   - target_url: 目标URL
 call :log   - headers.cookie: Cookie值
 call :log   - cookies中的token和sensorsdata值
 call :log_blank
+set "CHOICE="
 set /p CHOICE="按回车键继续，或输入 Q 退出: "
 
+if not defined CHOICE set "CHOICE="
+for /f "delims=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" %%c in ("!CHOICE!") do set "CHOICE="
 if /i "!CHOICE!"=="Q" goto cleanup_exit
 
 :run_web
@@ -750,6 +765,9 @@ call :log 正在启动 Web 服务...
 call :log_blank
 
 if not defined WEB_PORT set "WEB_PORT=8888"
+for /f "delims=0123456789" %%c in ("!WEB_PORT!") do set "WEB_PORT=8888"
+if !WEB_PORT! lss 1 set "WEB_PORT=8888"
+if !WEB_PORT! gtr 65535 set "WEB_PORT=8888"
 call :ms_timestamp
 call :log [!TIMESTAMP!] === Web服务启动 ===
 start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT!" < nul

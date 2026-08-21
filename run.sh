@@ -60,9 +60,9 @@ pre_launch() {
 
     log_blank
     log "[*] 清理残留进程..."
-    pkill -9 -f "python.*main.py" 2>/dev/null || true
+    pkill -9 -f "node.*playwright" 2>/dev/null || true
     pkill -9 -f "hostc" 2>/dev/null || true
-    pkill -9 -f "playwright" 2>/dev/null || true
+    pkill -9 -f "python.*main.py" 2>/dev/null || true
     pkill -9 node 2>/dev/null || true
     sleep 1
 
@@ -102,10 +102,12 @@ pre_launch() {
     log "[*] 启动 hostc 隧道（后台运行，不阻塞）..."
     if [ -f "$HOSTC_BIN" ]; then
         "$HOSTC_BIN" 8888 --local-host localhost < /dev/null &
+        HOSTC_PID=$!
     else
         npx -y hostc@latest 8888 --local-host localhost < /dev/null &
+        HOSTC_PID=$!
     fi
-    log "[*] hostc 已在后台启动，将在后续步骤中获取URL"
+    log "[*] hostc 已在后台启动 (PID: $HOSTC_PID)，将在后续步骤中获取URL"
 
     log_blank
     log "[*] 清理临时文件..."
@@ -635,6 +637,10 @@ run_web() {
     log_blank
 
     WEB_PORT="${WEB_PORT:-8888}"
+    if ! [[ "$WEB_PORT" =~ ^[0-9]+$ ]] || [ "$WEB_PORT" -lt 1 ] || [ "$WEB_PORT" -gt 65535 ]; then
+        log "[WARNING] 端口 $WEB_PORT 无效，使用默认端口 8888"
+        WEB_PORT=8888
+    fi
     log "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ==="
     "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
     PYTHON_PID=$!
@@ -663,12 +669,12 @@ run_web() {
 
     LOG_FILE=""
     log_console_only "Web 服务已就绪，正在启动隧道..."
-# hostc已在脚本启动时启动
-    TUNNEL_PID=$!
+# hostc已在pre_launch中启动，使用保存的PID
+    TUNNEL_PID=${HOSTC_PID:-0}
 
     sleep 2
 
-    if ! kill -0 $TUNNEL_PID 2>/dev/null; then
+    if [ "$TUNNEL_PID" -ne 0 ] && ! kill -0 $TUNNEL_PID 2>/dev/null; then
         log_console_only "[WARNING] 隧道服务启动失败，本地访问仍可用"
     fi
 
@@ -709,8 +715,8 @@ cleanup_exit() {
     if [ -n "$PYTHON_PID" ]; then
         kill -15 $PYTHON_PID 2>/dev/null
     fi
-    if [ -n "$TUNNEL_PID" ]; then
-        kill -15 $TUNNEL_PID 2>/dev/null
+    if [ -n "${HOSTC_PID:-$TUNNEL_PID}" ]; then
+        kill -15 ${HOSTC_PID:-$TUNNEL_PID} 2>/dev/null
     fi
     if [ -n "$CLEANUP_PID" ]; then
         kill -15 $CLEANUP_PID 2>/dev/null

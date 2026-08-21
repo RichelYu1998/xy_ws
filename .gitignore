@@ -28,6 +28,8 @@ file/web_output.log
 # Sensitive config files
 config/cookies.json
 config/config.json
+config/.encryption_key
+config/.salt
 
 # OS files
 .DS_Store
