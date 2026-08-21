@@ -19,7 +19,7 @@
 
 ---
 
-> **📌 当前版本**: v3.8.89.25 (2026-08-21) - 🔒 安全加固第二轮 + CORS/命令注入/信息泄露修复
+> **📌 当前版本**: v3.8.89.26 (2026-08-21) - 🔒 Import唯一性范式 + 内联导入清理 + CORS/命令注入/信息泄露修复
 >
 > **⚠️ 重要更新**:
 > - 第一轮：修复6类安全漏洞（路径遍历、弱随机数、不安全SSL、内联导入、冗余别名、命令注入防护）
@@ -32,7 +32,7 @@
 > - FastAPI: 禁用/docs、/redoc、/openapi.json端点
 > - kill_process_by_name: 添加进程名格式验证，改用列表参数
 > - 信息泄露: detail=str(e)替换为通用错误消息
-> - 版本号同步更新至v3.8.89.25（所有文档已同步）
+> - 版本号同步更新至v3.8.89.26（所有文档已同步）
 > - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
 > - 无任何额外的.py文件，避免导入依赖问题
 > - 当前commit: 待推送
@@ -3920,7 +3920,7 @@ class TestExceptionHandling:
 
 ---
 
-**文档版本**: v3.8.89.25  
+**文档版本**: v3.8.89.26  
 **最后更新**: 2026-08-21  
 **下次审查**: 2026-09-21  
 **维护者**: 小旭数码开发团队
@@ -5596,29 +5596,89 @@ ctx = ssl.create_default_context()
 # ctx.verify_mode = ssl.CERT_NONE
 ```
 
-#### 4. Import 规范 (Import Standards)
-- 所有 `import` 语句必须在文件顶部，禁止在函数内部使用内联导入
-- 仅允许在 `try/except ImportError` 块中导入可选依赖（这是Python标准模式）
-- 禁止使用别名混淆安全模块（如 `import re as _secre`）
+#### 4. Import 规范 (Import Standards) — 🔴 强制范式
+
+**核心原则：import 只可以出现在文件开头，并且保证唯一性。**
+
+##### 规则 4.1：位置唯一性 — import 只能在文件顶部
+- 所有 `import` 语句必须集中在文件顶部（标准库 → 第三方库 → 本地模块的顺序）
+- **严禁**在函数体、类方法、条件分支、循环体内出现 `import` 语句
+- **严禁**在文件中下部（如 `if __name__ == '__main__':` 块内）出现 `import` 语句
+- **唯一例外**：`try/except ImportError` 块用于导入可选依赖（第三方库可能未安装），且该块必须在文件顶部区域
+
+##### 规则 4.2：声明唯一性 — 同一模块禁止重复导入
+- 同一模块在整个文件中只能 `import` 一次，禁止重复声明
+- 如需在多处使用，只需在顶部导入一次，全局可用
+- `try/except ImportError` 块中已导入的模块，不得在其他地方再次导入
+
+##### 规则 4.3：禁止别名混淆
+- 禁止使用下划线前缀别名混淆安全模块（如 `import re as _secre`）
+- 标准库模块应使用标准名称，确保代码可审计性
+
+##### 规则 4.4：验证方法
+每次修改 main.py 后，必须运行以下检查确保 import 合规：
 
 ```python
-# ✅ 正确：所有import在文件顶部
-import ipaddress
+# 验证脚本：检查 import 唯一性和位置
+import ast, re
+
+with open('main.py', 'r', encoding='utf-8-sig') as f:
+    source = f.read()
+    lines = source.splitlines()
+
+# 检查1：函数内部不得有 import（try/except ImportError 除外）
+tree = ast.parse(source)
+violations = []
+for node in ast.walk(tree):
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        for child in ast.walk(node):
+            if isinstance(child, (ast.Import, ast.ImportFrom)):
+                # 检查是否在 try/except ImportError 块内
+                violations.append((node.name, child.lineno))
+
+# 检查2：同一模块不得重复 import
+import_lines = [l.strip() for l in lines if l.strip().startswith(('import ', 'from '))]
+# 去重检查...
+```
+
+##### 代码示例
+
+```python
+# ✅ 正确：所有 import 在文件顶部，按标准库→第三方→本地排序
+import os
+import re
 import secrets
+import socket
+import ssl
 import urllib.request
 from html import escape
+from pathlib import Path
 
-# ❌ 禁止：函数内部内联导入
-def some_function():
-    import os          # 禁止！
-    import traceback   # 禁止！
-    pass
-
-# ✅ 例外：可选依赖的延迟导入
+# ✅ 正确：可选依赖用 try/except ImportError（仍在文件顶部区域）
 try:
     import psutil
 except ImportError:
     psutil = None
+
+# ❌ 禁止：函数内部内联导入
+def some_function():
+    import os          # 违反规则 4.1！
+    import traceback   # 违反规则 4.1！
+    pass
+
+# ❌ 禁止：文件下部 if __name__ 块内导入
+if __name__ == '__main__':
+    import uvicorn     # 违反规则 4.1！已在顶部导入过
+    uvicorn.run(app)
+
+# ❌ 禁止：重复导入（违反规则 4.2）
+import logging         # 顶部已导入
+# ... 5000行后 ...
+def __init__(self):
+    import logging     # 违反规则 4.2！重复声明
+
+# ❌ 禁止：别名混淆（违反规则 4.3）
+import re as _secre    # 违反规则 4.3！
 ```
 
 #### 5. 命令注入防护 (Command Injection Prevention)
