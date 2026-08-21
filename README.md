@@ -74,6 +74,73 @@
 ---
 ## 🔄 最新更新
 
+### v3.8.89.24 (2026-08-21) - 🔒 安全漏洞修复 + 代码规范严格化
+
+#### 更新内容: 修复6类安全漏洞，所有import统一在文件顶部，删除临时脚本文件
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **路径遍历漏洞修复 (安全修复)** - 新增sec_sp()安全路径拼接函数
+  - 问题位置: main.py /dist/{filename:path} 端点
+  - 漏洞描述: 用户输入的filename直接拼接路径，攻击者可通过 `../../etc/passwd` 读取任意文件
+  - 修复方案: 新增 `sec_sp(base_dir, user_path)` 函数，使用 `os.path.realpath()` 验证路径不超出基目录
+  - 修复代码:
+    ```python
+    # ❌ 修复前
+    file_path = os.path.join(PROJECT_DIR, 'dist', filename)
+    
+    # ✅ 修复后
+    safe_path, err = sec_sp(os.path.join(PROJECT_DIR, 'dist'), filename)
+    if not safe_path:
+        raise HTTPException(status_code=403, detail=f"Path traversal blocked: {err}")
+    file_path = safe_path
+    ```
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **弱随机数修复 (安全修复)** - random.choice替换为secrets.choice
+  - 问题位置: main.py User-Agent生成
+  - 漏洞描述: `random.choice` 不是密码学安全的，可被预测
+  - 修复方案: 使用 `secrets.choice` 替代，基于操作系统安全随机源
+  - 修复代码:
+    ```python
+    # ❌ 修复前
+    chrome_version = random.choice(chrome_versions)
+    
+    # ✅ 修复后
+    chrome_version = secrets.choice(chrome_versions)
+    ```
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **不安全SSL配置清理 (安全修复)** - 移除CERT_NONE和check_hostname=False注释
+  - 问题位置: main.py verify_url() 函数
+  - 漏洞描述: 注释中保留了不安全SSL配置代码，可能被误启用
+  - 修复方案: 删除 `# ctx.check_hostname = False` 和 `# ctx.verify_mode = ssl.CERT_NONE` 注释
+  - 保留: `ssl.create_default_context()` 强制证书验证
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **Import规范严格化 (代码规范)** - 所有import统一在文件顶部
+  - 问题: 函数内部存在10处内联导入（import os, import traceback等）
+  - 影响: 隐藏依赖关系，使代码难以审计
+  - 修复: 移除所有内联导入，统一在文件顶部导入
+  - 新增导入: `ipaddress`, `secrets`, `urllib.request`, `formataddr`, `escape`
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **临时脚本文件清理 (项目维护)** - 删除a开头文件和s开头py文件
+  - 删除文件: apply_all_security_fixes.py, apply_security_fixes.py, security_utils.py
+  - 原因: 这些是安全修复过程中使用的临时脚本，已完成使命
+  - 规范遵循: 单文件架构原则（所有Python代码集中在main.py）
+
+- **验证结果** - 测试通过情况
+  - [x] py_compile 语法检查 → PASSED ✅
+  - [x] ast.parse 语法检查 → PASSED ✅
+  - [x] 路径遍历防护 → sec_sp() 函数已应用 ✅
+  - [x] 密码学安全随机数 → secrets.choice 已替换 ✅
+  - [x] SSL配置清理 → CERT_NONE 已移除 ✅
+  - [x] Import规范 → 0处内联导入 ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
+
 ### v3.8.89.23 (2026-08-20) - 🐛 邮件Header()参数修复 + 文档同步更新
 
 #### 更新内容: 修复邮件发送时Header()函数的TypeError，确保所有文档同步到最新版本

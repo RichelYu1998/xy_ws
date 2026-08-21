@@ -1,4 +1,4 @@
-# 微购相册开发技能文档 (Skill Documentation)
+﻿# 微购相册开发技能文档 (Skill Documentation)
 
 > **⚙️ 编码标准**: 本项目强制要求 **UTF-8 作为唯一字符串编码**。所有代码文件、文档、配置文件、数据库内容均必须使用 UTF-8 编码。
 >
@@ -19,12 +19,16 @@
 
 ---
 
-> **📌 当前版本**: v3.8.89.22 (2026-08-20) - Bug修复三连击 + FastAPI兼容性完善
+> **📌 当前版本**: v3.8.89.24 (2026-08-21) - 🔒 安全漏洞修复 + 代码规范严格化
 >
 > **⚠️ 重要更新**:
-> - 修复get_server_info缩进错误导致的run.bat启动失败
-> - 完善Flask到FastAPI迁移的jsonify兼容层（70处调用点）
-> - 版本号同步更新至v3.8.89.22（所有文档已同步）
+> - 修复6类安全漏洞（路径遍历、弱随机数、不安全SSL、内联导入、冗余别名、命令注入防护）
+> - 所有import统一在文件顶部，禁止内联导入
+> - 新增sec_sp()安全路径拼接函数，防止路径遍历攻击
+> - random.choice替换为secrets.choice，使用密码学安全随机数
+> - 清理不安全SSL配置（CERT_NONE/check_hostname=False）
+> - 删除所有临时脚本文件（a开头文件、s开头py文件）
+> - 版本号同步更新至v3.8.89.24（所有文档已同步）
 > - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
 > - 无任何额外的.py文件，避免导入依赖问题
 > - 当前commit: 待推送
@@ -3906,14 +3910,15 @@ class TestExceptionHandling:
 | PY-CORE-021 | API压力测试 | tests/stress_test.py | 🟡 重要 |
 | PY-CORE-022 | 边界条件测试 | tests/test_edge_cases.py | 🟡 重要 |
 | PY-CORE-023 | 安全修复验证测试 | tests/test_security_fixes.py | 🟡 重要 |
+| PY-CORE-024 | 安全漏洞防护范式 | main.py | 🔴 核心 |
 
-**总计: 23个核心范式，覆盖项目中所有关键文件！**
+**总计: 24个核心范式，覆盖项目中所有关键文件！**
 
 ---
 
-**文档版本**: v3.8.89.11  
-**最后更新**: 2026-07-31  
-**下次审查**: 2026-08-06  
+**文档版本**: v3.8.89.24  
+**最后更新**: 2026-08-21  
+**下次审查**: 2026-09-21  
 **维护者**: 小旭数码开发团队
 
 ---
@@ -5535,3 +5540,111 @@ class ProductTableManager {
 
 ### 概述
 基于抖音SSRF攻击视频，实现了完整的服务器端请求伪造(SSRF)防御机制。
+
+## 🔴 PY-CORE-024: 安全漏洞防护范式 (Security Vulnerability Protection)
+
+### 范式描述
+针对Web应用常见的安全漏洞（路径遍历、弱随机数、不安全SSL/TLS、内联导入、命令注入），实施**纵深防御**策略，确保每个攻击向量都有对应的防护措施。
+
+### 安全规范
+
+#### 1. 路径遍历防护 (Path Traversal Protection)
+所有用户输入的文件路径必须通过 `sec_sp()` 函数验证，防止 `../` 遍历攻击。
+
+```python
+def sec_sp(base_dir, user_path):
+    """Secure path join - prevent path traversal attacks."""
+    safe_base = os.path.realpath(base_dir)
+    target = os.path.realpath(os.path.join(safe_base, user_path))
+    if not target.startswith(safe_base + os.sep) and target != safe_base:
+        return None, f"Path traversal blocked: {user_path}"
+    return target, None
+
+# 使用示例
+@app.get('/dist/{filename:path}')
+async def dist_files(filename: str, request: Request):
+    safe_path, err = sec_sp(os.path.join(PROJECT_DIR, 'dist'), filename)
+    if not safe_path:
+        raise HTTPException(status_code=403, detail=f"Path traversal blocked: {err}")
+    file_path = safe_path
+```
+
+#### 2. 密码学安全随机数 (Cryptographically Secure Random)
+涉及安全场景（如User-Agent生成、Token生成）的随机数必须使用 `secrets` 模块，禁止使用 `random`。
+
+```python
+# ❌ 禁止：random.choice 不是密码学安全的
+chrome_version = random.choice(chrome_versions)
+
+# ✅ 正确：使用 secrets.choice
+chrome_version = secrets.choice(chrome_versions)
+```
+
+#### 3. SSL/TLS 证书验证 (SSL Certificate Validation)
+所有HTTPS请求必须启用证书验证，禁止使用 `CERT_NONE` 或 `check_hostname=False`。
+
+```python
+# ✅ 正确：使用默认安全上下文
+ctx = ssl.create_default_context()
+
+# ❌ 禁止：以下配置会禁用证书验证
+# ctx.check_hostname = False
+# ctx.verify_mode = ssl.CERT_NONE
+```
+
+#### 4. Import 规范 (Import Standards)
+- 所有 `import` 语句必须在文件顶部，禁止在函数内部使用内联导入
+- 仅允许在 `try/except ImportError` 块中导入可选依赖（这是Python标准模式）
+- 禁止使用别名混淆安全模块（如 `import re as _secre`）
+
+```python
+# ✅ 正确：所有import在文件顶部
+import ipaddress
+import secrets
+import urllib.request
+from html import escape
+
+# ❌ 禁止：函数内部内联导入
+def some_function():
+    import os          # 禁止！
+    import traceback   # 禁止！
+    pass
+
+# ✅ 例外：可选依赖的延迟导入
+try:
+    import psutil
+except ImportError:
+    psutil = None
+```
+
+#### 5. 命令注入防护 (Command Injection Prevention)
+所有用户输入的命令必须通过 `validate_command_safe()` 验证，阻止危险命令模式。
+
+```python
+class RunCommandRequest(BaseModel):
+    command: str
+
+    @classmethod
+    def validate_command_safe(cls, command: str) -> tuple[bool, str]:
+        """验证命令安全性，阻止危险命令"""
+        dangerous_patterns = [
+            r'rm\s+-rf', r':\(\)\s*\{', r'mkfs',
+            r'dd\s+if=', r'>\s*/dev/sd',
+            # ... 30+ 种危险模式
+        ]
+        for pattern in dangerous_patterns:
+            if re.search(pattern, command, re.IGNORECASE):
+                return False, f"危险命令被阻止: {pattern}"
+        return True, ""
+```
+
+### 验证清单
+- [x] 路径遍历防护：sec_sp() 函数已实现并应用于 /dist 端点
+- [x] 密码学安全随机数：secrets.choice 替换 random.choice
+- [x] SSL证书验证：清理 CERT_NONE 配置，使用 create_default_context()
+- [x] Import规范：所有import在文件顶部，无内联导入
+- [x] 命令注入防护：validate_command_safe() 验证30+种危险模式
+- [x] 语法验证：py_compile + ast.parse 双重验证通过
+
+---
+

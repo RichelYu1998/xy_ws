@@ -8,11 +8,13 @@ import glob
 import gzip
 import importlib.metadata as im
 import io
+import ipaddress
 import json
 import logging
 import os
 import platform
 import random
+import secrets
 import re
 import select
 import shutil
@@ -27,6 +29,7 @@ import struct
 import hashlib
 import urllib.error
 import urllib.parse
+import urllib.request
 import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -34,7 +37,9 @@ from datetime import datetime, timedelta
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 from functools import wraps
+from html import escape
 from pathlib import Path
 try:
     import psutil
@@ -1663,7 +1668,7 @@ class Environment:
         """获取用户代理字符串，根据系统类型返回不同的UA（动态版本号）"""
         chrome_versions = ['120.0.0.0', '121.0.0.0', '122.0.0.0', '123.0.0.0', '124.0.0.0',
                           '125.0.0.0', '126.0.0.0', '127.0.0.0', '128.0.0.0', '129.0.0.0']
-        chrome_version = random.choice(chrome_versions)
+        chrome_version = secrets.choice(chrome_versions)
 
         if Environment.IS_WINDOWS:
             return f'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version} Safari/537.36'
@@ -1826,6 +1831,16 @@ def get_python_executable():
         return 'python' if Environment.IS_WINDOWS else 'python3'
 
 VENV_PYTHON = get_python_executable()
+
+
+
+def sec_sp(base_dir, user_path):
+    """Secure path join - prevent path traversal attacks."""
+    safe_base = os.path.realpath(base_dir)
+    target = os.path.realpath(os.path.join(safe_base, user_path))
+    if not target.startswith(safe_base + os.sep) and target != safe_base:
+        return None, f"Path traversal blocked: {user_path}"
+    return target, None
 
 app = FastAPI(
     title="Szwego商品爬虫",
@@ -4844,7 +4859,6 @@ class StockNumberComparator:
         return None
 
     def load_json_data(self):
-        import os
         if not self.json_file:
             print('[StockNumberComparator] Warning: No JSON file found')
             return []
@@ -6461,7 +6475,10 @@ if __name__ == '__main__':
 
         @app.get('/dist/{filename:path}')
         async def dist_files(filename: str, request: Request):
-            file_path = os.path.join(PROJECT_DIR, 'dist', filename)
+            safe_path, err = sec_sp(os.path.join(PROJECT_DIR, 'dist'), filename)
+            if not safe_path:
+                raise HTTPException(status_code=403, detail=f"Path traversal blocked: {err}")
+            file_path = safe_path
 
             if not os.path.isfile(file_path):
                 raise HTTPException(status_code=404, detail="File not found")
@@ -6659,7 +6676,6 @@ if __name__ == '__main__':
             except HTTPException:
                 raise
             except Exception as e:
-                import traceback
                 error_detail = str(e) + '\n' + traceback.format_exc()
                 print(f'get_daily_profit错误: {error_detail}')
                 raise HTTPException(status_code=500, detail=str(e))
@@ -7258,7 +7274,6 @@ if __name__ == '__main__':
                 }
                 return jsonify(result)
             except Exception as e:
-                import traceback
                 error_detail = str(e) + '\n' + traceback.format_exc()
                 print(f'get_daily_profit错误: {error_detail}')
                 return jsonify({'error': str(e), 'detail': error_detail}, status_code=500)
@@ -7741,7 +7756,6 @@ if __name__ == '__main__':
                         'items': current_items
                     })
                 result = {'success': True, 'changelog': changelog}
-                import sys
                 _debug_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 print(f'[{_debug_time}] [DEBUG] changelog API 返回: {len(changelog)} 个版本', file=sys.stderr)
                 if changelog:
@@ -7750,8 +7764,6 @@ if __name__ == '__main__':
                         print(f'[{_debug_time}] [DEBUG]   项目{idx}: type={item.get("type")}, title={str(item.get("title", ""))[:50]}', file=sys.stderr)
                 return jsonify(result)
             except Exception as e:
-                import traceback
-                import sys
                 _error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 print(f'[{_error_time}] [ERROR] changelog 解析失败: {e}', file=sys.stderr)
                 traceback.print_exc(file=sys.stderr)
@@ -8172,8 +8184,6 @@ if __name__ == '__main__':
                     ctx = ssl.create_default_context()
                     # 注意：不推荐禁用证书验证，除非有特殊需求
                     # 如果必须禁用，请添加配置选项和环境变量控制
-                    # ctx.check_hostname = False
-                    # ctx.verify_mode = ssl.CERT_NONE
                     
                     req = urllib.request.Request(url, method='HEAD')
                     req.add_header('User-Agent', 'hostc-verify/1.0')
@@ -8794,8 +8804,6 @@ if __name__ == '__main__':
 
         def find_cloudflared_binary():
             """跨平台 cloudflared 二进制文件检测"""
-            import platform
-            import shutil
             
             system = platform.system().lower()
             machine = platform.machine().lower()
@@ -9623,7 +9631,6 @@ class SSRFProtection:
     def _norm_ipv4(self,ip):
         ip=ip.strip().strip('.')
         if not ip:return None
-        import re
         if re.match(r'^\d+$',ip):
             v=int(ip)
             if 0<=v<=0xFFFFFFFF:import socket,struct;return socket.inet_ntoa(struct.pack('!I',v&0xFFFFFFFF))
@@ -9645,7 +9652,6 @@ class SSRFProtection:
         if not ip:return True
         n=self.normalize_ip(ip)
         if not n:return True
-        import socket,struct
         for net,pfx in self.PRIVATE_IP_RANGES:
             try:
                 if ':' in n or ':' in net:continue
