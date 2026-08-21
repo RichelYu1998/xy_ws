@@ -74,6 +74,51 @@
 ---
 ## 🔄 最新更新
 
+### v3.8.89.30 (2026-08-21) - 🧹 启动脚本残留进程自动清理 — Playwright驱动node进程导致连接失败的根因修复
+
+#### 更新内容: 在run.bat/run.sh启动时自动清理残留的node/python/hostc进程，从源头消除Playwright "Connection closed while reading from the driver" 错误
+
+**影响文件**: [run.bat](run.bat), [run.sh](run.sh), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **Playwright驱动node进程精准清理 (稳定性修复)** - 解决崩溃后残留node进程导致下次启动连接失败
+  - 问题位置: run.bat `:main_start` 段 + run.sh `pre_launch()` 函数
+  - 根因分析: Playwright驱动以独立node进程运行，爬虫崩溃后node进程残留，下次启动时新实例与残留进程冲突，抛出 `Connection closed while reading from the driver`
+  - 修复方案: 启动脚本分层清理，先精准杀命令行含playwright的node进程，再用兜底策略清理所有node进程
+  - run.bat清理逻辑:
+    ```batch
+    :: 精准清理Playwright驱动node进程
+    for /f "tokens=2 delims=," %%p in ('wmic process where "name='node.exe'" get processid^,commandline /format:csv 2^>nul ^| findstr /i "playwright"') do (
+        taskkill /F /PID %%p >nul 2>&1
+    )
+    :: 兜底清理所有残留进程
+    taskkill /F /IM hostc.exe >nul 2>&1
+    taskkill /F /IM python.exe >nul 2>&1
+    taskkill /F /IM node.exe >nul 2>&1
+    ```
+  - run.sh清理逻辑:
+    ```bash
+    pkill -9 -f "python.*main.py" 2>/dev/null || true
+    pkill -9 -f "hostc" 2>/dev/null || true
+    pkill -9 -f "playwright" 2>/dev/null || true
+    pkill -9 node 2>/dev/null || true
+    ```
+  - 规范遵循: PY-CORE-016 (跨平台启动脚本范式)
+
+- **run.sh残留进程清理补齐 (跨平台一致性修复)** - run.sh原仅清理python/hostc，遗漏Playwright驱动node进程
+  - 问题位置: run.sh `pre_launch()` 函数进程清理段
+  - 修复前: `pkill -9 -f "python.*main.py"` + `pkill -9 -f "hostc"`，未清理playwright/node进程
+  - 修复后: 新增 `pkill -9 -f "playwright"` 精准清理 + `pkill -9 node` 兜底清理，与run.bat逻辑对齐
+  - 规范遵循: PY-CORE-016 (跨平台启动脚本范式)
+
+- **验证结果** - 进程清理逻辑验证通过情况
+  - [x] run.bat语法检查 → 正常 ✅
+  - [x] run.sh语法检查 → 正常 ✅
+  - [x] Playwright驱动node进程清理 → 精准命中 ✅
+  - [x] 跨平台清理逻辑一致 → bat/sh对齐 ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
+
 ### v3.8.89.29 (2026-08-21) - 🔒 安全加固第四轮 — 命令注入/CSRF/认证授权三大薄弱点完善
 
 #### 更新内容: 完善安全审查发现的3个可加固薄弱点，实现命令白名单+shell=False、CSRF Origin验证、API Key认证

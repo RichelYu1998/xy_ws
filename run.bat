@@ -61,6 +61,10 @@ call :log ========================================
 
 call :log_blank
 call :log [*] 清理残留进程...
+for /f "tokens=2 delims=," %%p in ('wmic process where "name='node.exe'" get processid^,commandline /format:csv 2^>nul ^| findstr /i "playwright"') do (
+    taskkill /F /PID %%p >nul 2>&1
+)
+taskkill /F /IM hostc.exe >nul 2>&1
 taskkill /F /IM python.exe >nul 2>&1
 taskkill /F /IM node.exe >nul 2>&1
 ping -n 2 127.0.0.1 >nul 2>&1

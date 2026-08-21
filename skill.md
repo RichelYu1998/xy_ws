@@ -19,7 +19,7 @@
 
 ---
 
-> **📌 当前版本**: v3.8.89.29 (2026-08-21) - 🔒 安全加固第四轮 + 命令白名单shell=False/CSRF Origin验证/API Key认证 + 邮件Header()崩溃修复 + 安全加固第三轮 + CSP/隧道注入/速率限制 + 内联导入清理 + CORS/命令注入/信息泄露修复
+> **📌 当前版本**: v3.8.89.30 (2026-08-21) - 🧹 启动脚本残留进程自动清理 + Playwright驱动node进程精准清理 + run.sh进程清理补齐 + 安全加固第四轮 + 命令白名单shell=False/CSRF Origin验证/API Key认证 + 邮件Header()崩溃修复 + 安全加固第三轮 + CSP/隧道注入/速率限制 + 内联导入清理 + CORS/命令注入/信息泄露修复
 >
 > **⚠️ 重要更新**:
 > - 第一轮：修复6类安全漏洞（路径遍历、弱随机数、不安全SSL、内联导入、冗余别名、命令注入防护）
@@ -32,7 +32,8 @@
 > - FastAPI: 禁用/docs、/redoc、/openapi.json端点
 > - kill_process_by_name: 添加进程名格式验证，改用列表参数
 > - 信息泄露: detail=str(e)替换为通用错误消息
-> - 版本号同步更新至v3.8.89.29（所有文档已同步）
+> - 版本号同步更新至v3.8.89.30（所有文档已同步）
+> - v3.8.89.30: 启动脚本残留进程自动清理，run.bat/run.sh启动时分层清理node/python/hostc进程：①精准清理命令行含playwright的node进程（wmic+findstr/taskkill PID）②兜底清理所有node进程（taskkill /IM / pkill）③run.sh补齐playwright+node清理，与run.bat逻辑对齐，从源头消除Playwright "Connection closed while reading from the driver" 错误
 > - v3.8.89.29: 安全加固第四轮，完善3个薄弱点：①命令白名单+shell=False（shlex.split解析+仅允许python+main.py）②CSRF防护（写操作验证Origin/Referer）③API Key认证（secrets.token_urlsafe生成+secrets.compare_digest验证+前端monkey-patch fetch自动注入）
 > - v3.8.89.28: 修复邮件From头+Subject头两处构造Bug，`Header.encode()` 抛AttributeError导致所有隧道通知邮件发送失败；From头改用 `formataddr()` 标准库函数，Subject头改用字符串赋值（Python3.14新policy下Header对象在as_string()时崩溃）
 > - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
@@ -3241,8 +3242,27 @@ pre_launch() {
 1. **版本自动解析**: 从README.md正则提取版本号
 2. **毫秒级日志**: 支持Windows和Unix的高精度时间戳
 3. **镜像源智能选择**: 自动测试并选择最快镜像
-4. **进程管理**: 启动前清理残留进程，端口冲突检测
+4. **进程管理**: 启动前分层清理残留进程（精准+兜底），端口冲突检测
 5. **环境自愈**: 自动安装缺失的Python/Node.js环境
+
+### 残留进程分层清理策略 (v3.8.89.30+)
+
+启动脚本在主流程开始前执行分层进程清理，从源头消除Playwright驱动残留node进程导致的 `Connection closed while reading from the driver` 错误：
+
+**清理顺序（精准→兜底）**:
+
+| 顺序 | 目标 | Windows (run.bat) | Linux/macOS (run.sh) |
+|------|------|-------------------|----------------------|
+| 1 | Playwright驱动node进程 | `wmic` 查命令行含playwright的node.exe → `taskkill /PID` | `pkill -9 -f "playwright"` |
+| 2 | hostc隧道进程 | `taskkill /F /IM hostc.exe` | `pkill -9 -f "hostc"` |
+| 3 | python主进程 | `taskkill /F /IM python.exe` | `pkill -9 -f "python.*main.py"` |
+| 4 | 所有剩余node进程（兜底） | `taskkill /F /IM node.exe` | `pkill -9 node` |
+
+**设计要点**:
+- **精准优先**: 先用命令行特征匹配杀Playwright驱动node进程，避免误杀其他node应用
+- **兜底保障**: 再用进程名通配杀所有node进程，防止遗漏的驱动残留
+- **跨平台对齐**: run.bat与run.sh清理逻辑保持一致，仅命令语法不同
+- **端口冲突检测**: 清理后检测8888端口占用，超时则强制清理占用PID
 
 ---
 
