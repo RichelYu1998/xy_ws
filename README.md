@@ -74,6 +74,37 @@
 ---
 ## 🔄 最新更新
 
+### v3.8.89.28 (2026-08-21) - 🐛 邮件发送Header()崩溃修复 — 隧道通知邮件无法发出的根因修复
+
+#### 更新内容: 修复 `Header.encode()` AttributeError 导致所有隧道通知邮件发送失败的致命Bug
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **邮件From头构造Bug修复 (致命Bug修复)** - Header对象无encode()方法导致邮件全部发送失败
+  - 问题位置: main.py `EmailNotifier.send_tunnel_notification` 邮件From头构造
+  - Bug描述: `Header(config['from_name'], charset='utf-8').encode()` 中 `Header` 对象没有 `encode()` 方法，每次发邮件都抛 `AttributeError`，导致隧道URL验证通过后邮件根本发不出去
+  - 故障证据: web_output.log 记录至少两次发送尝试（13:22:26 cloudflare、13:23:03 hostc）全部失败，错误信息均为 `'Header' object has no attribute 'encode'`
+  - 修复方案: 改用标准库 `email.utils.formataddr()` 函数构造From头，自动按RFC 2047编码中文显示名
+  - 修复代码:
+    ```python
+    # ❌ 修复前（崩溃）
+    msg['From'] = f"{Header(config['from_name'], charset='utf-8').encode()} <{config['smtp_user']}>"
+    
+    # ✅ 修复后（标准库正确用法）
+    msg['From'] = formataddr((config['from_name'], config['smtp_user']))
+    ```
+  - 验证输出: `=?utf-8?b?5YWs572RSVDnm5Hmjqc=?= <980187223@qq.com>`（RFC 2047标准编码）
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式) + PY-FRONT-001 (标准库优先原则)
+
+- **验证结果** - 测试通过情况
+  - [x] py_compile 语法检查 → PASSED ✅
+  - [x] formataddr 输出验证 → RFC 2047编码正确 ✅
+  - [x] Header.encode() 调用 → 0处 ✅
+  - [x] 邮件发送链路 → SMTP连接/登录/发送逻辑完整 ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
+
 ### v3.8.89.27 (2026-08-21) - 🔒 安全加固第三轮 + CSP/隧道注入/速率限制
 
 #### 更新内容: 修复隧道命令注入、CSP不安全指令、缺少速率限制、安全头缺失

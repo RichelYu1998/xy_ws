@@ -2935,7 +2935,7 @@ class EmailNotifier:
             print(f"[{_current_time}] [EmailNotifier-Thread:{_thread_id}] 📬 接收人: {config['to_email']}")
             
             msg = MIMEMultipart('alternative')
-            msg['From'] = f"{Header(config['from_name'], charset='utf-8').encode()} <{config['smtp_user']}>"
+            msg['From'] = formataddr((config['from_name'], config['smtp_user']))
             msg['To'] = config['to_email']
             event_titles = {
                 'new': '✅ 新公网地址',
