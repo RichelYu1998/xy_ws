@@ -1871,14 +1871,8 @@ if CORSMiddleware:
     )
 
 # ============================================================
-# API Key 认证 + CSRF 防护 (v3.8.89.29)
+# CSRF 防护常量 (v3.8.89.29) - API Key 在 ConfigManager 定义后初始化
 # ============================================================
-_web_config_mgr = ConfigManager()
-WEB_API_KEY = _web_config_mgr.get('web_api_key')
-if not WEB_API_KEY:
-    WEB_API_KEY = secrets.token_urlsafe(32)
-    _web_config_mgr.set('web_api_key', WEB_API_KEY)
-
 LOCAL_TRUSTED_ORIGINS = frozenset([
     'http://localhost', 'http://127.0.0.1',
     'http://localhost:8888', 'http://127.0.0.1:8888',
@@ -1888,6 +1882,7 @@ LOCAL_TRUSTED_ORIGINS = frozenset([
 
 WRITE_METHODS = frozenset(['POST', 'PUT', 'PATCH', 'DELETE'])
 CSRF_EXEMPT_PATHS = frozenset(['/api/bootstrap'])
+WEB_API_KEY = None
 
 if PROMETHEUS_AVAILABLE:
     REQUEST_COUNT = Counter('http_requests_total', '总请求数', ['method', 'endpoint', 'status'])
@@ -3301,6 +3296,16 @@ class ConfigManager:
 
     def get_user_agent(self):
         return self.config.get('user_agent', WegoScraper.get_user_agent())
+
+
+# ============================================================
+# API Key 认证初始化 (v3.8.89.29) - 必须在 ConfigManager 定义之后
+# ============================================================
+_web_config_mgr = ConfigManager()
+WEB_API_KEY = _web_config_mgr.get('web_api_key')
+if not WEB_API_KEY:
+    WEB_API_KEY = secrets.token_urlsafe(32)
+    _web_config_mgr.set('web_api_key', WEB_API_KEY)
 
 
 class CookieValidator:
