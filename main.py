@@ -3366,9 +3366,9 @@ class CookieValidator:
                 solutions=['运行"4. 更新Cookie"功能', '确保使用正确的账号登录', '登录成功后再关闭浏览器'],
                 tip='Token是保持登录状态的关键Cookie')
             return False, None
-        
-        print(f'[OK] 找到Token: {token_cookie["name"]}')
-        
+
+        logger.debug('[CookieValidator] 找到Token Cookie')
+
         # 5. 检查token是否过期
         expires = token_cookie.get('expires')
         if expires and expires < time.time():
@@ -3394,9 +3394,9 @@ class CookieValidator:
                 solutions=['运行"4. 更新Cookie"功能', '重新登录账号', '确认Token已正确保存'],
                 tip='正常的Token应该是一长串加密字符串')
             return False, None
-        
-        print(f'[OK] Token值有效 (长度: {len(token_value)} 字符)')
-        
+
+        logger.debug('[CookieValidator] Token值验证通过')
+
         # 7. 检查cookie是否即将过期（7天内）
         if expires:
             days_until_expiry = int((expires - time.time()) / 86400)
@@ -6344,6 +6344,34 @@ if __name__ == '__main__':
             except Exception as e:
                 return JSONResponse(status_code=500, content={'error': str(e)})
 
+        @app.get('/api/security/check')
+        async def security_check_endpoint():
+            try:
+                checker=SecurityChecker()
+                report=checker.run_all_checks()
+                return JSONResponse(content=report)
+            except Exception as e:
+                return JSONResponse(status_code=500,content={'error':f'安全检查失败: {type(e).__name__}'})
+
+        @app.get('/api/security/audit')
+        async def security_audit_endpoint():
+            try:
+                auditor=DependencyAuditor()
+                report=auditor.audit()
+                return JSONResponse(content=report)
+            except Exception as e:
+                return JSONResponse(status_code=500,content={'error':f'依赖审计失败: {type(e).__name__}'})
+
+        @app.post('/api/security/encrypt-init')
+        async def security_encrypt_init(request):
+            try:
+                body=await request.json()
+                password=body.get('password','')
+                success,msg=SecureConfigManager.initialize_encryption(password)
+                return JSONResponse(content={'success':success,'message':msg})
+            except Exception as e:
+                return JSONResponse(status_code=500,content={'error':f'加密初始化失败: {type(e).__name__}'})
+
         @app.get('/api/swagger.json')
         async def swagger_spec():
             spec = {
@@ -6783,17 +6811,24 @@ if __name__ == '__main__':
                 if not json_files:
                     return jsonify({'error': '没有找到JSON文件'}, status_code=404)
                 latest_json = max(json_files, key=os.path.getmtime)
-                
+
                 with open(latest_json, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
-                
+
                 txt_stock_numbers_raw = []
                 if request.method == 'POST':
                     req_data = await request.json()
                     input_skus = req_data.get('skus', '')
+
+                    if len(input_skus) > 50000:
+                        return jsonify({'error': '输入数据过长（最大50000字符）'}, status_code=400)
+
                     txt_stock_numbers_raw = [s.strip() for s in re.split(r'[\s,\n\r\t]+', input_skus) if s.strip()]
+
+                    if len(txt_stock_numbers_raw) > 10000:
+                        return jsonify({'error': '货号数量过多（最大10000个）'}, status_code=400)
                 else:
                     input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
                     if os.path.exists(input_file):
@@ -6892,7 +6927,8 @@ if __name__ == '__main__':
                 }
                 return jsonify(result)
             except Exception as e:
-                return jsonify({'error': str(e)}, status_code=500)
+                logger.error(f'[compare_sku_txt] 对比失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'error': 'SKU对比失败'}, status_code=500)
 
         @app.get('/api/sku/compare/excel')
         async def compare_sku_excel():
@@ -7511,6 +7547,14 @@ if __name__ == '__main__':
             sku = sku.strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}, status_code=400)
+
+            if len(sku) > 100:
+                return jsonify({'error': '货号过长（最大100字符）'}, status_code=400)
+
+            if not re.match(r'^[a-zA-Z0-9\u4e00-\u9fa5\-_]+$', sku):
+                logger.warning(f'[search_product] 检测到可疑货号: {sku[:50]}')
+                return jsonify({'error': '货号包含非法字符（仅允许字母、数字、中文、横线和下划线）'}, status_code=400)
+
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'error': '没有找到JSON文件'}, status_code=404)
@@ -7565,13 +7609,22 @@ if __name__ == '__main__':
                         return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
                 return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
             except Exception as e:
-                return jsonify({'error': str(e)}, status_code=500)
+                logger.error(f'[search_product] 搜索失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'error': '搜索商品失败'}, status_code=500)
 
         @app.get('/api/product/by-description')
         async def get_product_by_description(description: str = ''):
             description = description.strip()
             if not description:
                 return JSONResponse(content={'error': '请提供商品描述'}, status_code=400)
+
+            if len(description) > 500:
+                return JSONResponse(content={'error': '商品描述过长（最大500字符）'}, status_code=400)
+
+            if re.search(r'[<>"\'&]', description):
+                logger.warning(f'[get_product_by_description] 检测到可疑字符 in description: {description[:50]}...')
+                return JSONResponse(content={'error': '商品描述包含非法字符'}, status_code=400)
+
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'found': False, 'error': '没有找到JSON文件'})
@@ -7609,18 +7662,22 @@ if __name__ == '__main__':
                         return jsonify({'found': True, 'product': p})
                 return jsonify({'found': False, 'error': '未找到该商品'})
             except Exception as e:
-                return jsonify({'found': False, 'error': str(e)})
+                logger.error(f'[get_product_by_description] 查询失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'found': False, 'error': '查询商品信息失败'})
 
         @app.post('/api/clean/list')
         async def api_clean_list(request: Request):
             try:
                 data = await request.json()
                 directory = data.get('directory', '')
-                
+
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
                 elif not os.path.isabs(directory):
-                    directory = os.path.join(PROJECT_DIR, directory)
+                    safe_dir, err = sec_sp(PROJECT_DIR, directory)
+                    if not safe_dir:
+                        return jsonify({'success': False, 'error': f'路径遍历攻击被阻止: {err}'})
+                    directory = safe_dir
                 
                 if not os.path.exists(directory):
                     return jsonify({'success': False, 'error': f'目录不存在: {directory}'})
@@ -7632,7 +7689,8 @@ if __name__ == '__main__':
                 
                 return jsonify({'success': True, 'output': log_stream.getvalue()})
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+                logger.error(f'[api_clean_list] 操作失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '文件列表获取失败，请查看服务器日志'})
 
         @app.post('/api/clean/group')
         async def api_clean_group(request: Request):
@@ -7642,16 +7700,20 @@ if __name__ == '__main__':
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
                 elif not os.path.isabs(directory):
-                    directory = os.path.join(PROJECT_DIR, directory)
-                dry_run = data.get('dry_run', False)
+                    safe_dir, err = sec_sp(PROJECT_DIR, directory)
+                    if not safe_dir:
+                        return jsonify({'success': False, 'error': f'路径遍历攻击被阻止: {err}'})
+                    directory = safe_dir
+                dry_run = bool(data.get('dry_run', False))
                 log_file = os.path.join(directory, 'clean_files.log')
-                
+
                 log_stream = io.StringIO()
                 clean_old_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
-                
+
                 return jsonify({'success': True, 'output': log_stream.getvalue()})
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+                logger.error(f'[api_clean_group] 操作失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '文件分组清理失败，请查看服务器日志'})
 
         @app.post('/api/clean/time')
         async def api_clean_time():
@@ -7661,17 +7723,23 @@ if __name__ == '__main__':
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
                 elif not os.path.isabs(directory):
-                    directory = os.path.join(PROJECT_DIR, directory)
+                    safe_dir, err = sec_sp(PROJECT_DIR, directory)
+                    if not safe_dir:
+                        return jsonify({'success': False, 'error': f'路径遍历攻击被阻止: {err}'})
+                    directory = safe_dir
                 minutes = data.get('minutes', 5)
-                dry_run = data.get('dry_run', False)
+                if not isinstance(minutes, (int, float)) or minutes < 0 or minutes > 525600:
+                    return jsonify({'success': False, 'error': 'minutes参数无效（必须是0-525600之间的数字）'})
+                dry_run = bool(data.get('dry_run', False))
                 log_file = os.path.join(directory, 'clean_files.log')
-                
+
                 log_stream = io.StringIO()
                 clean_old_files_by_time(directory=directory, minutes=minutes, dry_run=dry_run, log_file=log_file, stream=log_stream)
                 
                 return jsonify({'success': True, 'output': log_stream.getvalue()})
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+                logger.error(f'[api_clean_time] 操作失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '按时间清理失败，请查看服务器日志'})
 
         @app.post('/api/clean/all')
         async def api_clean_all(request: Request):
@@ -7681,8 +7749,11 @@ if __name__ == '__main__':
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
                 elif not os.path.isabs(directory):
-                    directory = os.path.join(PROJECT_DIR, directory)
-                dry_run = data.get('dry_run', False)
+                    safe_dir, err = sec_sp(PROJECT_DIR, directory)
+                    if not safe_dir:
+                        return jsonify({'success': False, 'error': f'路径遍历攻击被阻止: {err}'})
+                    directory = safe_dir
+                dry_run = bool(data.get('dry_run', False))
                 log_file = os.path.join(directory, 'clean_files.log')
 
                 log_stream = io.StringIO()
@@ -7692,7 +7763,8 @@ if __name__ == '__main__':
                 response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
                 return Response(response_data, media_type='application/json')
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+                logger.error(f'[api_clean_all] 操作失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '全量清理失败，请查看服务器日志'})
 
         @app.post('/api/clean/png')
         async def api_clean_png(request: Request):
@@ -7702,10 +7774,13 @@ if __name__ == '__main__':
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
                 elif not os.path.isabs(directory):
-                    directory = os.path.join(PROJECT_DIR, directory)
-                dry_run = data.get('dry_run', False)
+                    safe_dir, err = sec_sp(PROJECT_DIR, directory)
+                    if not safe_dir:
+                        return jsonify({'success': False, 'error': f'路径遍历攻击被阻止: {err}'})
+                    directory = safe_dir
+                dry_run = bool(data.get('dry_run', False))
                 log_file = os.path.join(directory, 'clean_files.log')
-                
+
                 log_stream = io.StringIO()
                 clean_png_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
                 
@@ -7713,7 +7788,8 @@ if __name__ == '__main__':
                 response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
                 return Response(response_data, media_type='application/json')
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+                logger.error(f'[api_clean_png] 操作失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': 'PNG清理失败，请查看服务器日志'})
 
         @app.post('/api/clean/media')
         async def api_clean_media(request: Request):
@@ -7723,10 +7799,13 @@ if __name__ == '__main__':
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
                 elif not os.path.isabs(directory):
-                    directory = os.path.join(PROJECT_DIR, directory)
-                dry_run = data.get('dry_run', False)
+                    safe_dir, err = sec_sp(PROJECT_DIR, directory)
+                    if not safe_dir:
+                        return jsonify({'success': False, 'error': f'路径遍历攻击被阻止: {err}'})
+                    directory = safe_dir
+                dry_run = bool(data.get('dry_run', False))
                 log_file = os.path.join(directory, 'clean_files.log')
-                
+
                 log_stream = io.StringIO()
                 clean_media_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
                 
@@ -7734,7 +7813,8 @@ if __name__ == '__main__':
                 response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
                 return Response(response_data, media_type='application/json')
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+                logger.error(f'[api_clean_media] 操作失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '媒体文件清理失败，请查看服务器日志'})
 
         @app.get('/api/version')
         async def get_version():
@@ -7863,7 +7943,8 @@ if __name__ == '__main__':
                 _error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 print(f'[{_error_time}] [ERROR] changelog 解析失败: {e}', file=sys.stderr)
                 traceback.print_exc(file=sys.stderr)
-                return jsonify({'success': False, 'error': str(e)}, status_code=500)
+                logger.error(f'[api_changelog] 解析失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '更新日志解析失败'}, status_code=500)
 
         @app.get('/api/changelog-debug')
         def get_changelog_debug():
@@ -7889,7 +7970,8 @@ if __name__ == '__main__':
                     'changelog_preview': '\n'.join(debug_lines[:100])
                 })
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)}, status_code=500)
+                logger.error(f'[api_changelog_debug] 获取失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '调试信息获取失败'}, status_code=500)
 
         @app.get('/api/readme-sections')
         def get_readme_sections():
@@ -7985,7 +8067,8 @@ if __name__ == '__main__':
                     'install_steps': install_steps
                 })
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)}, status_code=500)
+                logger.error(f'[api_readme_sections] 获取失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': 'README章节解析失败'}, status_code=500)
 
         @app.get('/api/email/config')
         def get_email_config():
@@ -7999,18 +8082,50 @@ if __name__ == '__main__':
         async def save_email_config(request: Request):
             try:
                 data = await request.json()
+
+                smtp_host = data.get('smtp_host', 'smtp.qq.com')
+                if not isinstance(smtp_host, str) or len(smtp_host) > 255 or not smtp_host.strip():
+                    return jsonify({'success': False, 'error': 'SMTP主机地址无效'})
+
+                try:
+                    smtp_port = int(data.get('smtp_port', 587))
+                except (ValueError, TypeError):
+                    return jsonify({'success': False, 'error': 'SMTP端口号无效'})
+                if smtp_port < 1 or smtp_port > 65535:
+                    return jsonify({'success': False, 'error': 'SMTP端口超出有效范围(1-65535)'})
+
+                smtp_user = data.get('smtp_user', '')
+                if not isinstance(smtp_user, str) or len(smtp_user) > 128:
+                    return jsonify({'success': False, 'error': 'SMTP用户名无效'})
+
+                smtp_password = data.get('smtp_password', '')
+                if not isinstance(smtp_password, str) or len(smtp_password) > 256:
+                    return jsonify({'success': False, 'error': 'SMTP密码无效'})
+
+                from_name = data.get('from_name', '公网IP监控')
+                if not isinstance(from_name, str) or len(from_name) > 64:
+                    return jsonify({'success': False, 'error': '发件人名称过长'})
+
+                to_email = data.get('to_email', '980187223@qq.com')
+                if not isinstance(to_email, str) or len(to_email) > 128:
+                    return jsonify({'success': False, 'error': '收件人邮箱无效'})
+                email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                if not re.match(email_regex, to_email.strip()):
+                    return jsonify({'success': False, 'error': '收件人邮箱格式不正确'})
+
                 notifier = EmailNotifier()
                 notifier.save_email_config(
-                    smtp_host=data.get('smtp_host', 'smtp.qq.com'),
-                    smtp_port=int(data.get('smtp_port', 587)),
-                    smtp_user=data.get('smtp_user', ''),
-                    smtp_password=data.get('smtp_password', ''),
-                    from_name=data.get('from_name', '公网IP监控'),
-                    to_email=data.get('to_email', '980187223@qq.com')
+                    smtp_host=smtp_host.strip(),
+                    smtp_port=smtp_port,
+                    smtp_user=smtp_user,
+                    smtp_password=smtp_password,
+                    from_name=from_name[:64],
+                    to_email=to_email.strip()
                 )
                 return jsonify({'success': True, 'message': '邮件配置已保存'})
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+                logger.error(f'[save_email_config] 保存失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '邮件配置保存失败'})
 
         @app.post('/api/email/test')
         async def test_email(request: Request):
@@ -8031,7 +8146,8 @@ if __name__ == '__main__':
                 else:
                     return jsonify({'success': False, 'error': '请先启用邮件通知'})
             except Exception as e:
-                return jsonify({'success': False, 'error': str(e)})
+                logger.error(f'[test_email] 发送失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '测试邮件发送失败'})
 
         @app.get('/api/server/info')
         def get_server_info():
@@ -9444,11 +9560,12 @@ ingress:
                     'config': new_config
                 })
             except Exception as e:
+                logger.error(f'[tunnel_update_config] 更新失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({
                     'success': False,
-                    'error': str(e)[:200]
+                    'error': '隧道配置更新失败'
                 }), 500
-        
+
         @app.post('/api/url-source/health-check')
         def url_source_force_health_check():
             """强制执行健康检查"""
@@ -9464,9 +9581,10 @@ ingress:
                     'health_result': health
                 })
             except Exception as e:
+                logger.error(f'[url_source_health_check] 健康检查失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({
                     'success': False,
-                    'error': str(e)[:200]
+                    'error': 'URL健康检查失败'
                 }), 500
 
         @app.get('/api/tunnel/status')
@@ -9832,4 +9950,464 @@ ssrf_protector=SSRFProtection(enabled=True,block_private_ips=True,allow_localhos
 
 print('='*60)
 print('OK - SSRF Defense System v3.8.89.20 Loaded Successfully!')
+print('='*60)
+
+# ============================================================
+# 安全检查与审计系统 (v3.8.89.31) - 整合quick_security_check + security_audit + config_secure
+# 包含: Playwright移动端安全检查、依赖审计、配置加密管理
+# ============================================================
+
+_SECURITY_CHECKS=None
+
+def _get_security_checks():
+    global _SECURITY_CHECKS
+    if _SECURITY_CHECKS is not None:
+        return _SECURITY_CHECKS
+    _main_file=PROJECT_DIR/'main.py'
+    _app_js=PROJECT_DIR/'dist'/'app.js'
+    _gitignore=PROJECT_DIR/'.gitignore'
+    _SECURITY_CHECKS={
+        'injection':[
+            {'name':'SQL注入防护','description':'检查是否存在不安全的SQL操作','files':[_main_file],'patterns':[
+                (r'cursor\.execute\s*\([^)]*%\s*[sd]',False,'字符串格式化SQL查询'),
+                (r'cursor\.execute\s*\([^)]*\+\s*["\']',False,'字符串拼接SQL'),
+                (rf'f[\"\'].*SELECT.*FROM.*\{{\{{',False,'f-string SQL注入'),
+                (r'pymysql\.connect|sqlite3\.connect',None,'数据库连接（需确认参数化）'),
+            ]},
+            {'name':'命令注入防护','description':'检查subprocess/os.system调用安全性','files':[_main_file],'patterns':[
+                (r'os\.system\s*\(',False,'os.system()危险调用'),
+                (r'subprocess\.(call|run|Popen)\s*\([^)]*shell\s*=\s*True',False,'shell=True危险模式'),
+                (r'subprocess\.(call|run|Popen)\s*\([^)]*\+\s*["\']',False,'命令拼接'),
+                (r'subprocess\.(call|run|Popen)\s*\(\s*\[',True,'安全的列表参数传递'),
+                (r'shell\s*=\s*False',True,'禁用shell解释'),
+                (r'dangerous_patterns|BLACKLISTED_COMMANDS',True,'存在命令黑名单检测'),
+            ]},
+            {'name':'XSS防护','description':'检查前端XSS防护机制','files':[_app_js],'patterns':[
+                (r'function\s+escapeHtml',True,'HTML转义函数定义'),
+                (r'innerHTML\s*=.*escapeHtml',True,'innerHTML使用转义'),
+                (r'innerHTML\s*=\s*[^;]*[^e]scapeHtml',False,'未转义的innerHTML赋值'),
+                (r'\.html\s*\([^)]*[^e]scapeHtml',False,'jQuery.html()未转义'),
+                (r'document\.write\s*\(',False,'document.write()危险调用'),
+                (r'eval\s*\(',False,'eval()危险函数'),
+            ]},
+        ],
+        'deserialization':[
+            {'name':'反序列化安全','description':'检查反序列化操作的安全性','files':[_main_file],'patterns':[
+                (r'pickle\.loads?\s*\(',False,'pickle反序列化（代码执行风险）'),
+                (r'yaml\.load\s*\((?!.*SafeLoader)',False,'yaml.load不安全加载器'),
+                (r'marshal\.loads?\s*\(',False,'marshal反序列化（代码执行风险）'),
+                (r'eval\s*\(',False,'eval()代码执行'),
+                (r'exec\s*\(',False,'exec()代码执行'),
+                (r'json\.loads?\s*\(',True,'JSON安全反序列化'),
+                (r'yaml\.safe_load',True,'YAML安全加载器'),
+            ]},
+        ],
+        'sensitive_data':[
+            {'name':'硬编码凭证检测','description':'检查是否有硬编码的密码/密钥/Token','files':[_main_file],'patterns':[
+                (r'password\s*=\s*[\'"][^\'"]{8,}[\'"]',False,'硬编码密码'),
+                (r'secret_key\s*=\s*[\'"][^\'"]+?[\'"]',False,'硬编码密钥'),
+                (r'api_key\s*=\s*[\'"][^\'"]+?[\'"]',False,'硬编码API Key'),
+                (r'token\s*=\s*[\'"][^\'"]+?[\'"]',False,'硬编码Token'),
+                (r'os\.environ\.get\s*\([\'"](?:PASSWORD|SECRET|KEY|TOKEN)',True,'环境变量读取敏感信息'),
+                (r'config\[.*(?:password|secret|token)',None,'配置文件读取（需确认加密）'),
+            ]},
+            {'name':'日志信息泄露','description':'检查日志中是否泄露敏感信息','files':[_main_file],'patterns':[
+                (r'(?:logger|print)\(.*(?:password|token|secret).*f[\"\']',False,'日志打印密码/token'),
+                (r'print\(.*Token.*\{.*\}',False,'print输出Token信息'),
+                (r'logger\.(?:debug|info)\(.*(?:password|token)',False,'日志记录敏感字段'),
+                (r'except.*:\s*(?:return|raise).*str\(e\)',False,'异常信息直接返回给客户端'),
+                (r'logger\.error\(.*str\(e\)',None,'异常日志（需确认无敏感数据）'),
+            ]},
+        ],
+        'access_control':[
+            {'name':'路径遍历防护','description':'检查文件路径操作的安全性','files':[_main_file],'patterns':[
+                (r'def\s+sec_sp',True,'路径安全函数定义'),
+                (r'os\.path\.realpath',True,'路径规范化处理'),
+                (r'startswith.*base_dir',True,'前缀匹配检查'),
+                (r'open\s*\([^)]*\+\s*(?:user|request)\.',False,'用户输入直接拼接文件路径'),
+                (r'os\.path\.join\s*\([^)]*\.\.[\/\\]',False,'路径包含..（可能遍历）'),
+            ]},
+            {'name':'认证与授权','description':'检查API访问控制机制','files':[_main_file],'patterns':[
+                (r'secrets\.compare_digest',True,'时间安全比较'),
+                (r'@app\.(post|put|delete).*async def',True,'写操作端点定义'),
+                (r'x-api-key',True,'API Key头检查'),
+                (r'CSRF_EXEMPT_PATHS|csrf_token',True,'CSRF防护机制'),
+                (r'request\.client\.host',True,'IP地址获取（用于白名单）'),
+                (r'LOCAL_TRUSTED_ORIGINS',True,'可信来源白名单'),
+            ]},
+            {'name':'SSRF防护','description':'检查服务端请求伪造防护','files':[_main_file],'patterns':[
+                (r'class\s+SecureClient',True,'安全HTTP客户端类'),
+                (r'PRIVATE_IP_RANGES',True,'私有IP黑名单'),
+                (r'is_safe_url',True,'URL安全检查函数'),
+                (r'SENSITIVE_PORTS',True,'敏感端口过滤'),
+                (r'BLOCKED_HOSTNAMES',True,'阻止的主机名列表'),
+                (r'requests\.get\s*\([^)]*url\s*=\s*(?:user|request)',False,'用户输入URL直接请求'),
+            ]},
+        ],
+        'configuration':[
+            {'name':'CORS配置安全','description':'检查跨域资源共享配置','files':[_main_file],'patterns':[
+                (r'allow_origins\s*=\s*\[\s*\*',False,'CORS允许所有来源（危险）'),
+                (r'allow_origins\s*=\s*\[',True,'CORS源白名单配置'),
+                (r'allow_credentials\s*=\s*True',None,'允许凭据（需配合严格白名单）'),
+                (r'CORSMiddleware',True,'CORS中间件启用'),
+            ]},
+            {'name':'DEBUG模式控制','description':'检查调试模式设置','files':[_main_file],'patterns':[
+                (r'DEBUG\s*=\s*True',False,'生产环境开启DEBUG'),
+                (r'app\.debug\s*=\s*True',False,'应用调试模式开启'),
+                (r'logging\.setLevel\s*\(.*DEBUG',None,'日志级别DEBUG（开发用）'),
+                (r'logger\s*=\s*logging\.getLogger',True,'结构化日志使用'),
+            ]},
+            {'name':'.gitignore完整性','description':'检查敏感文件是否被忽略','files':[_gitignore],'patterns':[
+                (r'config/.*\.json',True,'配置JSON文件已忽略'),
+                (r'\.env',True,'环境变量文件已忽略'),
+                (r'\.encryption_key',True,'加密密钥文件已忽略'),
+                (r'__pycache__/',True,'Python缓存已忽略'),
+                (r'\.pyc$',True,'编译文件已忽略'),
+            ]},
+        ],
+        'cryptography':[
+            {'name':'密码学实践','description':'检查随机数生成和密钥管理','files':[_main_file],'patterns':[
+                (r'secrets\.token_urlsafe',True,'安全令牌生成'),
+                (r'secrets\.choice',True,'加密安全随机选择'),
+                (r'secrets\.compare_digest',True,'时间安全比较'),
+                (r'random\.randint|random\.choice|random\.random',False,'不安全随机数'),
+                (r'hashlib\.md5(?!\()',None,'MD5哈希（仅用于非安全场景）'),
+                (r'PBKDF2HMAC|bcrypt|argon2',True,'安全密钥派生'),
+            ]},
+        ],
+        'playwright_mobile':[
+            {'name':'浏览器上下文隔离','description':'检查Playwright浏览器会话隔离，防止Cookie/LocalStorage泄露','files':[_main_file],'patterns':[
+                (r'browser\.new_context\(\)',True,'独立浏览器上下文创建'),
+                (r'context\.close\(\)',True,'上下文关闭清理'),
+                (r'await\s+browser\.close\(\)',True,'浏览器实例关闭'),
+                (r'browser_context.*storage_state',None,'存储状态管理（需确认隔离）'),
+                (r'context\.add_cookies',None,'Cookie操作（需确认作用域）'),
+            ]},
+            {'name':'动态内容操作安全','description':'检查自动化点击操作是否有防误触机制','files':[_main_file],'patterns':[
+                (r'page\.click\(',None,'页面点击操作（需确认目标验证）'),
+                (r'page\.wait_for_selector',True,'元素等待机制'),
+                (r'page\.url|page\.title\(\)',True,'页面状态验证'),
+                (r'\.is_visible\(\)|\.is_enabled\(\)',True,'元素可见性检查'),
+                (r'confirm_dialog|accept_dialog',None,'弹窗处理（需二次确认）'),
+            ]},
+            {'name':'文件下载上传安全','description':'检查文件操作的类型校验和路径限制','files':[_main_file],'patterns':[
+                (r'download\.(save_as|path)',None,'文件下载（需限制目录）'),
+                (r'set_input_files\(',None,'文件上传（需MIME检测）'),
+                (r'filetype\.|mime_type|MIMEType',True,'文件类型检测'),
+                (r'\.download_path|download_dir',True,'下载目录限制'),
+                (r'allow_files|accept',None,'文件白名单过滤'),
+            ]},
+            {'name':'浏览器指纹与反检测','description':'检查User-Agent和浏览器特征伪装安全性','files':[_main_file],'patterns':[
+                (r'user_agent.*Mozilla',True,'User-Agent设置'),
+                (r'viewport.*width.*height',True,'视口配置'),
+                (r'--disable-blink-features=AutomationControlled',True,'反自动化检测'),
+                (r'--no-sandbox',None,'沙箱禁用（开发环境可接受）'),
+                (r'locale|timezone_id',None,'地区设置（需一致性）'),
+            ]},
+            {'name':'移动端环境安全','description':'检查移动端模拟器和设备参数安全性','files':[_main_file],'patterns':[
+                (r'device_scale_factor|is_mobile|has_touch',True,'移动设备模拟参数'),
+                (r'user_agent.*Mobile|iPhone|Android',True,'移动端UA标识'),
+                (r'viewport.*\{.*width:\s*375',None,'iPhone视口配置'),
+                (r'viewport.*\{.*width:\s*360',None,'Android视口配置'),
+                (r'geolocation|latitude|longitude',None,'GPS位置模拟（需服务端校验）'),
+            ]},
+            {'name':'网络流量安全','description':'检查HTTPS强制和代理防护','files':[_main_file],'patterns':[
+                (r'ignore_https_errors\s*=\s*True',False,'忽略SSL证书错误（危险）'),
+                (r'--proxy-server|--proxy-bypass-list',None,'代理配置（测试环境谨慎）'),
+                (r'route\.continue\(|route\.fetch\(\)',None,'路由拦截（可能篡改流量）'),
+                (r'context\.set_extra_http_headers',True,'自定义请求头'),
+                (r'Accept-Encoding|Accept-Language',None,'请求头完整性'),
+            ]},
+            {'name':'截图与快照安全','description':'检查页面截图是否泄露敏感信息','files':[_main_file],'patterns':[
+                (r'page\.screenshot\(',None,'页面截图（避免包含敏感数据）'),
+                (r'page\.pdf\(\)',None,'PDF生成（可能包含隐私信息）'),
+                (r'screenshot\.png|screenshot\.jpg',None,'截图文件存储（需加密或限时删除）'),
+                (r'full_page\s*=\s*True',None,'全页截图（风险更高）'),
+                (r'clip.*\{.*x:.*y:',True,'区域截图（更安全）'),
+            ]},
+            {'name':'Playwright进程安全','description':'检查浏览器子进程管理和资源清理','files':[_main_file],'patterns':[
+                (r'async with async_playwright',True,'上下文管理器使用'),
+                (r'try.*finally.*browser\.close',True,'异常时资源清理'),
+                (r'taskkill.*chrome|taskkill.*chromium|pkill.*chrome',True,'残留进程清理'),
+                (r'executable_path.*chrome',None,'自定义浏览器路径（需验证完整性）'),
+                (r'headless\s*=\s*(?:False|0)',None,'有头模式（生产环境建议无头）'),
+            ]},
+        ],
+    }
+    return _SECURITY_CHECKS
+
+_CATEGORY_DISPLAY_NAMES={
+    'injection':'一、注入攻击防护',
+    'deserialization':'二、反序列化漏洞防护',
+    'sensitive_data':'三、敏感信息泄露防护',
+    'access_control':'四、权限控制失效防护',
+    'configuration':'五、依赖与配置安全',
+    'cryptography':'六、密码学安全实践',
+    'playwright_mobile':'七、Playwright + 移动端安全',
+}
+
+class SecurityChecker:
+    """安全检查器 - 整合原quick_security_check.py"""
+
+    def __init__(self,verbose=False):
+        self.verbose=verbose
+        self.results={}
+        self.total_checks=0
+        self.passed_checks=0
+        self.failed_checks=0
+
+    def _check_file(self,file_path):
+        if not os.path.exists(file_path):return ""
+        try:
+            with open(file_path,'r',encoding='utf-8',errors='ignore') as f:return f.read()
+        except Exception:return ""
+
+    def _run_pattern_check(self,content,pattern,expected,description):
+        matches=re.findall(pattern,content,re.IGNORECASE|re.MULTILINE)
+        found=len(matches)>0
+        if expected is None:
+            message=f"{description} - {'发现' if found else '未发现'}"
+            return True,message
+        elif expected and found:
+            return True,f"✅ {description}"
+        elif not expected and not found:
+            return True,f"✅ {description} (未检测到)"
+        elif expected and not found:
+            return False,f"❌ 缺少: {description}"
+        else:
+            return False,f"❌ 发现安全问题: {description}"
+
+    def run_all_checks(self):
+        checks=_get_security_checks()
+        categories_passed={}
+        for category_name,category_checks in checks.items():
+            display_name=_CATEGORY_DISPLAY_NAMES.get(category_name,category_name)
+            category_ok=True
+            for check in category_checks:
+                for file_path in check['files']:
+                    content=self._check_file(file_path)
+                    if not content:continue
+                    for pattern,expected,desc in check['patterns']:
+                        self.total_checks+=1
+                        passed,_=self._run_pattern_check(content,pattern,expected,desc)
+                        if passed:
+                            self.passed_checks+=1
+                        else:
+                            self.failed_checks+=1
+                            category_ok=False
+            categories_passed[category_name]=category_ok
+        score=(self.passed_checks/self.total_checks*100) if self.total_checks>0 else 0
+        return {
+            'timestamp':datetime.now().isoformat(),
+            'total':self.total_checks,
+            'passed':self.passed_checks,
+            'failed':self.failed_checks,
+            'score':round(score,1),
+            'categories':categories_passed,
+        }
+
+_KNOWN_VULNERABLE_VERSIONS={
+    'requests':{'<2.31.0':'CVE-2023-32681 (Header注入)'},
+    'urllib3':{'<2.0.7':'CVE-2023-45803 (Cookie注入)'},
+    'pillow':{'<10.1.0':'CVE-2023-44471 (缓冲区溢出)'},
+    'pyyaml':{'<6.0.1':'CVE-2024-34351 (YAML反序列化)'},
+}
+
+_SECURE_MINIMUM_VERSIONS={
+    'fastapi':'0.100.0','uvicorn':'0.23.0','pydantic':'2.0.0',
+    'playwright':'1.45.0','pymysql':'1.1.0','psutil':'5.9.0',
+    'cryptography':'42.0.0','pillow':'10.0.0','requests':'2.32.0',
+}
+
+class DependencyAuditor:
+    """依赖安全审计器 - 整合原security_audit.py"""
+
+    def __init__(self):
+        self.installed_packages={}
+        self.vulnerabilities=[]
+
+    def get_installed_packages(self):
+        try:
+            result=subprocess.run([sys.executable,'-m','pip','list','--format=json'],capture_output=True,text=True,timeout=30)
+            packages=json.loads(result.stdout)
+            return {pkg['name'].lower():pkg['version'] for pkg in packages}
+        except Exception:return {}
+
+    def parse_requirements(self):
+        req_file=PROJECT_DIR/'requirements.txt'
+        if not os.path.exists(req_file):return []
+        requirements=[]
+        with open(req_file,'r',encoding='utf-8') as f:
+            for line in f:
+                line=line.strip()
+                if line and not line.startswith('#'):
+                    parts=line.split('>=') if '>=' in line else line.split('==')
+                    if len(parts)==2:
+                        requirements.append((parts[0].strip().lower(),parts[1].strip()))
+        return requirements
+
+    def audit(self):
+        self.installed_packages=self.get_installed_packages()
+        required_packages=self.parse_requirements()
+        total_issues=0
+        for package,req_ver in required_packages:
+            inst_ver=self.installed_packages.get(package.lower())
+            if inst_ver and package.lower() in _KNOWN_VULNERABLE_VERSIONS:
+                for vuln_ver,desc in _KNOWN_VULNERABLE_VERSIONS[package.lower()].items():
+                    min_ver=vuln_ver.lstrip('<').strip()
+                    if self._ver_lt(inst_ver,min_ver):
+                        self.vulnerabilities.append({'package':package,'installed':inst_ver,'issue':desc})
+                        total_issues+=1
+        return {
+            'total_packages':len(required_packages),
+            'installed_count':len(self.installed_packages),
+            'vulnerabilities_found':total_issues,
+            'vulnerabilities':self.vulnerabilities,
+        }
+
+    def _ver_lt(self,v1,v2):
+        try:
+            from packaging import version
+            return version.parse(v1)<version.parse(v2)
+        except ImportError:pass
+        p1=[int(x) for x in v1.split('.') if x.isdigit()]
+        p2=[int(x) for x in v2.split('.') if x.isdigit()]
+        for i in range(max(len(p1),len(p2))):
+            a=p1[i] if i<len(p1) else 0
+            b=p2[i] if i<len(p2) else 0
+            if a<b:return True
+            elif a>b:return False
+        return False
+
+_SENSITIVE_CONFIG_FIELDS=['login.password','headers.cookie','email.smtp_password']
+
+class SecureConfigManager:
+    """安全配置管理器 - 整合原config_secure_template.py"""
+
+    _instance=None
+    _fernet=None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance=super().__new__(cls)
+            cls._instance._initialize()
+        return cls._instance
+
+    def _initialize(self):
+        key_file=PROJECT_DIR/'config'/'.encryption_key'
+        salt_file=PROJECT_DIR/'config'/'.salt'
+        if os.path.exists(key_file) and os.path.exists(salt_file):
+            key=self._load_key(key_file,salt_file)
+            if key:
+                try:
+                    from cryptography.fernet import Fernet
+                    self._fernet=Fernet(key)
+                except Exception:pass
+
+    def _load_key(self,key_file,salt_file):
+        env_key=os.environ.get('CONFIG_ENCRYPTION_KEY')
+        if env_key:
+            try:
+                from cryptography.hazmat.primitives import hashes
+                from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+                import base64
+                with open(salt_file,'rb') as f:salt=f.read()
+                kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
+                return base64.urlsafe_b64encode(kdf.derive(env_key.encode()))
+            except Exception:return None
+        if os.path.exists(key_file):
+            with open(key_file,'rb') as f:return f.read()
+        return None
+
+    def encrypt_value(self,value):
+        if not self._fernet:raise RuntimeError("加密器未初始化")
+        encrypted=self._fernet.encrypt(value.encode())
+        return f"ENC({encrypted.decode()})"
+
+    def decrypt_value(self,encrypted_value):
+        if not encrypted_value.startswith("ENC("):return encrypted_value
+        if not self._fernet:raise RuntimeError("加密器未初始化")
+        try:
+            encrypted=encrypted_value[4:-1]
+            return self._fernet.decrypt(encrypted.encode()).decode()
+        except Exception:return ""
+
+    def load_config(self):
+        config_file=PROJECT_DIR/'config'/'config.json'
+        if not os.path.exists(config_file):return {}
+        with open(config_file,'r',encoding='utf-8') as f:config=json.load(f)
+        return self._decrypt_sensitive(config)
+
+    def save_config(self,config):
+        config=self._encrypt_sensitive(config)
+        config_file=PROJECT_DIR/'config'/'config.json'
+        os.makedirs(os.path.dirname(config_file),exist_ok=True)
+        with open(config_file,'w',encoding='utf-8') as f:
+            json.dump(config,f,ensure_ascii=False,indent=2)
+
+    def _get_nested(self,obj,path):
+        keys=path.split('.')
+        current=obj
+        for key in keys:
+            if isinstance(current,dict) and key in current:current=current[key]
+            else:return None
+        return current
+
+    def _set_nested(self,obj,path,value):
+        keys=path.split('.')
+        current=obj
+        for key in keys[:-1]:
+            if key not in current or not isinstance(current[key],dict):current[key]={}
+            current=current[key]
+        current[keys[-1]]=value
+
+    def _encrypt_sensitive(self,config):
+        for field_path in _SENSITIVE_CONFIG_FIELDS:
+            value=self._get_nested(config,field_path)
+            if value and not str(value).startswith("ENC("):
+                self._set_nested(config,field_path,self.encrypt_value(str(value)))
+        return config
+
+    def _decrypt_sensitive(self,config):
+        for field_path in _SENSITIVE_CONFIG_FIELDS:
+            value=self._get_nested(config,field_path)
+            if value and str(value).startswith("ENC("):
+                self._set_nested(config,field_path,self.decrypt_value(str(value)))
+        return config
+
+    @classmethod
+    def initialize_encryption(cls,password=None):
+        """初始化加密系统"""
+        import base64
+        key_file=PROJECT_DIR/'config'/'.encryption_key'
+        salt_file=PROJECT_DIR/'config'/'.salt'
+        if os.path.exists(key_file):
+            return True,'加密系统已初始化'
+        if not password or len(password)<8:
+            return False,'密码长度至少需要8个字符'
+        try:
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+            from cryptography.fernet import Fernet
+            salt=os.urandom(16)
+            kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
+            key=base64.urlsafe_b64encode(kdf.derive(password.encode()))
+            os.makedirs(os.path.dirname(key_file),exist_ok=True)
+            with open(key_file,'wb') as f:f.write(key)
+            with open(salt_file,'wb') as f:f.write(salt)
+            config_file=PROJECT_DIR/'config'/'config.json'
+            if os.path.exists(config_file):
+                mgr=cls()
+                if mgr._fernet is None:
+                    mgr._fernet=Fernet(key)
+                with open(config_file,'r',encoding='utf-8') as f:config=json.load(f)
+                config=mgr._encrypt_sensitive(config)
+                with open(config_file,'w',encoding='utf-8') as f:
+                    json.dump(config,f,ensure_ascii=False,indent=2)
+            return True,'加密系统初始化成功'
+        except Exception as e:
+            return False,f'初始化失败: {e}'
+
+print('='*60)
+print('OK - Security Check & Audit System v3.8.89.31 Loaded!')
 print('='*60)

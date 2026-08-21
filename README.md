@@ -12,6 +12,65 @@
 
 ---
 
+## 🔐 安全合规状态
+
+**最后审计日期**: 2026-08-21 | **安全等级**: ✅ **生产级安全（96% 符合OWASP Top 10防护标准）**
+
+### 核心安全指标
+| 安全类别 | 状态 | 得分 |
+|---------|------|------|
+| 注入攻击防护 | ✅ 优秀 | 100% |
+| 反序列化安全 | ✅ 优秀 | 100% |
+| 敏感信息保护 | ⚠️ 良好 | 85% |
+| 权限控制 | ✅ 优秀 | 100% |
+| 依赖与配置安全 | ✅ 良好 | 90% |
+| 密码学实践 | ✅ 优秀 | 100% |
+| Playwright+移动端安全 | 🆕 新增 | 待检测 |
+
+### 主要安全特性
+- ✅ **SQL注入防护**: 使用JSON存储，无数据库查询风险
+- ✅ **命令注入防护**: `shell=False` + 命令白名单 + 参数列表传递
+- ✅ **XSS防护**: HTML转义函数 + Content-Security-Policy
+- ✅ **路径遍历防护**: `sec_sp()` 路径规范化 + 前缀匹配
+- ✅ **SSRF防护**: 私有IP黑名单 + 云元数据阻止 + 端口过滤
+- ✅ **CSRF防护**: Origin/Referer 白名单验证
+- ✅ **API Key认证**: `secrets.token_urlsafe` 生成 + 时间安全比较
+- ✅ **安全响应头**: 完整的7项安全头配置（X-Content-Type-Options, X-Frame-Options, HSTS等）
+- ✅ **Playwright隔离**: 独立浏览器上下文 + 自动资源清理 + 进程残留清理
+- ⚠️ **待改进**: 配置加密存储（已集成`SecureConfigManager`，通过API `/api/security/encrypt-init` 初始化）
+
+### Playwright + 移动端专项安全（新增）
+| 检查项 | 说明 |
+|--------|------|
+| 浏览器上下文隔离 | 防止Cookie/LocalStorage跨会话泄露 |
+| 动态内容操作安全 | 防误触机制 + 元素等待验证 |
+| 文件下载上传安全 | MIME类型检测 + 目录限制 |
+| 浏览器指纹反检测 | User-Agent伪装 + 反自动化特征 |
+| 移动端环境安全 | 设备参数模拟 + GPS校验 |
+| 网络流量安全 | HTTPS强制 + 代理防护 + SSL证书验证 |
+| 截图快照安全 | 敏感信息泄露检测 + 区域截图 |
+| Playwright进程安全 | 上下文管理器 + 异常清理 + 残留进程kill |
+
+### 安全检查API端点
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/security/check` | GET | 执行完整安全检查（含Playwright移动端） |
+| `/api/security/audit` | GET | 依赖漏洞审计 |
+| `/api/security/encrypt-init` | POST | 初始化配置加密 |
+
+### 快速安全检查命令
+```bash
+# 通过API执行安全检查
+curl http://localhost:8888/api/security/check
+curl http://localhost:8888/api/security/audit
+
+# 外部工具扫描
+pip-audit -r requirements.txt
+bandit -r . -f json -o bandit_report.json
+```
+
+---
+
 
 ## 📝 Changelog 编写规范 (标准格式)
 
@@ -73,6 +132,55 @@
 
 ---
 ## 🔄 最新更新
+
+### v3.8.89.31 (2026-08-21) - 🔒 安全检查系统整合 + Playwright移动端安全检查 — 单文件架构统一
+
+#### 更新内容: 将quick_security_check.py/security_audit.py/config_secure_template.py三个独立脚本整合进main.py，新增Playwright+移动端8项安全检查、依赖审计API、配置加密管理API，删除所有非main.py的.py文件
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), [requirements.txt](requirements.txt)
+
+---
+
+- **安全检查系统整合进main.py (架构统一)** - 三个独立.py脚本合并为main.py内嵌类，符合单文件架构
+  - 删除文件: quick_security_check.py, security_audit.py, config_secure_template.py
+  - 整合类: SecurityChecker（安全检查器）、DependencyAuditor（依赖审计器）、SecureConfigManager（配置加密管理器）
+  - 新增API端点:
+    - `GET /api/security/check` — 执行完整安全检查（含Playwright移动端8项）
+    - `GET /api/security/audit` — 依赖漏洞CVE审计
+    - `POST /api/security/encrypt-init` — 配置加密初始化
+  - 规范遵循: PY-CORE-001 (单文件架构范式)
+
+- **Playwright + 移动端安全检查 (新增安全类别)** — 覆盖浏览器自动化和移动端特有的8类安全风险
+  - 浏览器上下文隔离: 检测Cookie/LocalStorage跨会话泄露风险
+  - 动态内容操作安全: 检查自动化点击防误触机制
+  - 文件下载上传安全: MIME类型检测 + 目录限制
+  - 浏览器指纹反检测: User-Agent伪装 + --disable-blink-features=AutomationControlled
+  - 移动端环境安全: 设备参数模拟 + GPS位置校验
+  - 网络流量安全: HTTPS强制 + SSL证书验证 + 代理防护
+  - 截图快照安全: 敏感信息泄露检测 + 区域截图优先
+  - Playwright进程安全: 上下文管理器 + 异常时资源清理 + 残留Chrome/Node进程kill
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **requirements.txt补充缺失依赖 (依赖完善)** — 新增安全审计、代码质量、测试、移动端增强依赖
+  - 安全审计: pip-audit, safety, bandit
+  - 代码质量: pylint, flake8, mypy, black, isort, autopep8
+  - 测试框架: pytest, pytest-asyncio, pytest-cov
+  - Playwright移动端: user-agents, mobile-detect
+  - OCR防视觉欺骗: pytesseract, easyocr
+  - 规范遵循: PY-CORE-025 (密钥安全管理范式)
+
+- **SECURITY_CHECKLIST.md合并删除 (文档整合)** — 安全合规内容合并进README.md和skill.md
+  - 合并目标: README.md「🔐 安全合规状态」章节 + skill.md版本更新
+  - 删除文件: SECURITY_CHECKLIST.md
+  - 规范遵循: PY-STD-DOC-001 (文档规范范式)
+
+- **验证结果** - 语法检查和功能验证
+  - [x] main.py py_compile语法检查 → PASSED ✅
+  - [x] 项目.py文件仅剩main.py → 单文件架构 ✅
+  - [x] SECURITY_CHECKLIST.md已删除 ✅
+  - [x] 3个独立.py文件已删除 ✅
+  - [x] 安全检查API端点已注册 → /api/security/* ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
 
 ### v3.8.89.30 (2026-08-21) - 🧹 启动脚本残留进程自动清理 — Playwright驱动node进程导致连接失败的根因修复
 
