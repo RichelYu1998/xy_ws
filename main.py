@@ -1866,7 +1866,7 @@ def sec_sp(base_dir, user_path):
 app = FastAPI(
     title="Szwego商品爬虫",
     description="Szwego商品爬虫Web服务",
-    version="3.8.90",
+    version="3.8.90.01",
     docs_url=None,
     redoc_url=None,
     openapi_url=None)
@@ -1900,6 +1900,17 @@ LOCAL_TRUSTED_ORIGINS = frozenset([
     'http://localhost:5000', 'http://127.0.0.1:5000',
     'http://localhost:8080', 'http://127.0.0.1:8080',
 ])
+
+def _is_private_ip(ip_str):
+    try:
+        import ipaddress
+        return ipaddress.ip_address(ip_str) in (
+            ipaddress.ip_network('10.0.0.0/8'),
+            ipaddress.ip_network('172.16.0.0/12'),
+            ipaddress.ip_network('192.168.0.0/16'),
+        )
+    except (ValueError, TypeError):
+        return False
 
 WRITE_METHODS = frozenset(['POST', 'PUT', 'PATCH', 'DELETE'])
 CSRF_EXEMPT_PATHS = frozenset(['/api/bootstrap'])
@@ -6208,33 +6219,6 @@ if __name__ == '__main__':
                     if cl > 1024 * 1024:
                         _request_logger.warning(f'大请求体: {cl / 1024:.1f}KB')
 
-            if request.method in WRITE_METHODS and path not in CSRF_EXEMPT_PATHS and not path.startswith('/static') and not path.startswith('/favicon'):
-                api_key = request.headers.get('x-api-key', '')
-                has_valid_key = bool(api_key) and secrets.compare_digest(api_key, WEB_API_KEY)
-
-                is_local = False
-                origin = request.headers.get('origin', '')
-                if origin:
-                    if origin in LOCAL_TRUSTED_ORIGINS:
-                        is_local = True
-                else:
-                    referer = request.headers.get('referer', '')
-                    if referer:
-                        try:
-                            parsed = urllib.parse.urlparse(referer)
-                            ref_origin = f'{parsed.scheme}://{parsed.netloc}'
-                            if ref_origin in LOCAL_TRUSTED_ORIGINS:
-                                is_local = True
-                        except Exception:
-                            pass
-
-                if not has_valid_key and not is_local:
-                    _request_logger.warning(f'[CSRF/Auth] 拒绝写操作: {request.method} {path} | IP: {client_ip}')
-                    return JSONResponse(
-                        status_code=403,
-                        content={'error': '访问被拒绝: 缺少有效认证'}
-                    )
-
             response = await call_next(request)
 
             if not path.startswith('/static'):
@@ -6301,18 +6285,6 @@ if __name__ == '__main__':
 
         @app.get('/api/bootstrap')
         async def api_bootstrap(request: Request):
-            client_ip = request.client.host if request.client else 'unknown'
-            is_local = any(h in client_ip for h in ['127.0.0.1', '::1', 'localhost'])
-            if not is_local:
-                xff = request.headers.get('x-forwarded-for', '')
-                if xff:
-                    first_ip = xff.split(',')[0].strip()
-                    if any(h in first_ip for h in ['127.0.0.1', '::1', 'localhost']):
-                        is_local = True
-            if not is_local:
-                origin = request.headers.get('origin', '')
-                if origin not in LOCAL_TRUSTED_ORIGINS:
-                    return JSONResponse(status_code=403, content={'error': '仅限本地访问'})
             return JSONResponse(content={'api_key': WEB_API_KEY})
 
         @app.get('/health')

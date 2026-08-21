@@ -19,9 +19,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.00 (2026-08-21) - 🔒 安全隐患全面修复 + 隐藏Bug清零（9项P0-P3问题全部解决）
+> **📌 当前版本**: v3.8.90.01 (2026-08-21) - 🔓 移除写操作认证拦截，支持局域网/公网隧道全源访问
 >
 > **⚠️ 重要更新**:
+> - v3.8.90.01: 移除中间件API Key/本地IP/Origin认证拦截逻辑，/api/bootstrap取消本地访问限制，解决局域网(192.168.x.x)和公网隧道(Cloudflare/hostc动态域名)访问时403"访问被拒绝:缺少有效认证"的问题
 > - v3.8.90.00: 修复4个隐藏Bug（_module_logger/safe_read_json/logger/TunnelManager未定义）+ 5个安全隐患（CSRF Host头回退绕过/API Key HTML泄露/bootstrap IP检查/配置明文/黑名单冗余），安全评分96%→98%
 > - v3.8.89.32: 修复patch-package补丁未生效问题，重新应用safeCloseWebSocket2状态感知关闭修复（CONNECTING→terminate/OPEN→close+超时处理器error事件吞掉+catch双层保护），消除WebSocket连接超时导致的Node.js进程崩溃
 > - v3.8.89.31: 安全检查系统整合进main.py单文件架构，新增Playwright+移动端安全检查（8项），依赖审计API，配置加密管理API，删除quick_security_check.py/security_audit.py/config_secure_template.py
