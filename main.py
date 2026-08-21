@@ -6184,6 +6184,8 @@ if __name__ == '__main__':
                 response.headers['X-Frame-Options'] = 'DENY'
             response.headers['X-XSS-Protection'] = '1; mode=block'
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+            response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=(), payment=()'
 
             origin = request.headers.get('origin', '')
             allowed_origins = [
@@ -6207,13 +6209,13 @@ if __name__ == '__main__':
                 response.headers['Access-Control-Max-Age'] = '86400'
 
             if path == '/docs/':
-                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:;"
+                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:;"
             elif path == '/':
-                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://code.jquery.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https: cdn.jsdelivr.net; img-src 'self' data: https:; media-src 'self' https:;"
+                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://code.jquery.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https: cdn.jsdelivr.net; img-src 'self' data: https:; media-src 'self' https:;"
             elif path.startswith('/dist/'):
-                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:; connect-src 'self' https://api.bigdatacloud.net https://api.open-meteo.com https://air-quality-api.open-meteo.com;"
+                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:; connect-src 'self' https://api.bigdatacloud.net https://api.open-meteo.com https://air-quality-api.open-meteo.com;"
             elif not path.startswith('/api/'):
-                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:;"
+                response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:;"
 
             return response
 
@@ -6536,7 +6538,10 @@ if __name__ == '__main__':
                 )
 
         @app.post('/run')
-        async def run_command(req: RunCommandRequest):
+        async def run_command(req: RunCommandRequest, request: Request):
+            client_ip = request.client.host if request.client else 'unknown'
+            if not api_rate_limiter.is_allowed(client_ip):
+                return JSONResponse(status_code=429, content={'error': '请求过于频繁', 'retry_after': api_rate_limiter.get_retry_after(client_ip)}, headers={'Retry-After': str(api_rate_limiter.get_retry_after(client_ip))})
             command = req.command
 
             # 命令长度限制
@@ -8559,17 +8564,20 @@ if __name__ == '__main__':
                 if not os.path.isfile(hostc_bin):
                     hostc_bin = 'npx hostc'
                 
+                if not isinstance(port, int) or not (1 <= port <= 65535):
+                    print(f"[Tunnel] ⚠️ 无效的端口号: {port}, 使用默认8888")
+                    port = 8888
+                
                 env = os.environ.copy()
                 env['HOSTC_DEBUG'] = '1'
                 
                 tunnel_process = subprocess.Popen(
-                    f'{hostc_bin} {port} --local-host localhost',
+                    [hostc_bin, str(port), '--local-host', 'localhost'] if hostc_bin != 'npx hostc' else ['npx', 'hostc', str(port), '--local-host', 'localhost'],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL,
                     text=True,
                     bufsize=0,
-                    shell=True,
                     env=env,
                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0) if Environment.IS_WINDOWS else 0
                 )

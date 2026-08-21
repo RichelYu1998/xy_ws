@@ -74,6 +74,68 @@
 ---
 ## 🔄 最新更新
 
+### v3.8.89.27 (2026-08-21) - 🔒 安全加固第三轮 + CSP/隧道注入/速率限制
+
+#### 更新内容: 修复隧道命令注入、CSP不安全指令、缺少速率限制、安全头缺失
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **隧道命令注入修复 (安全修复)** - port参数验证 + 列表参数执行
+  - 问题位置: main.py 隧道启动 subprocess.Popen
+  - 漏洞描述: `f'{hostc_bin} {port} --local-host localhost'` 中port未验证，可注入shell命令
+  - 修复方案: 添加port类型和范围验证(1-65535)，改用列表参数执行，移除shell=True
+  - 修复代码:
+    ```python
+    # ❌ 修复前
+    subprocess.Popen(f'{hostc_bin} {port} --local-host localhost', shell=True, ...)
+    
+    # ✅ 修复后
+    if not isinstance(port, int) or not (1 <= port <= 65535):
+        port = 8888
+    subprocess.Popen([hostc_bin, str(port), '--local-host', 'localhost'], ...)
+    ```
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **CSP unsafe-eval 移除 (安全修复)** - 所有路径移除不安全CSP指令
+  - 问题位置: main.py 安全头中间件 (4处CSP配置)
+  - 漏洞描述: `unsafe-eval` 允许执行任意JavaScript代码，可被XSS利用
+  - 修复方案: 从所有CSP配置中移除 `unsafe-eval`，保留 `unsafe-inline`（内联样式需要）
+  - 影响路径: `/`, `/docs/`, `/dist/`, 默认路径
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **速率限制添加 (安全修复)** - /run端点添加API速率限制
+  - 问题位置: main.py /run 端点
+  - 漏洞描述: /run端点可被暴力调用，导致资源耗尽
+  - 修复方案: 添加 api_rate_limiter (200请求/60秒) 速率限制
+  - 修复代码:
+    ```python
+    @app.post('/run')
+    async def run_command(req: RunCommandRequest, request: Request):
+        client_ip = request.client.host if request.client else 'unknown'
+        if not api_rate_limiter.is_allowed(client_ip):
+            return JSONResponse(status_code=429, ...)
+    ```
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **安全响应头补全 (安全修复)** - 添加Referrer-Policy和Permissions-Policy
+  - 问题位置: main.py 安全头中间件
+  - 漏洞描述: 缺少Referrer-Policy和Permissions-Policy头
+  - 修复方案: 添加 strict-origin-when-cross-origin 和 geolocation/micophone/camera/payment禁用
+  - 规范遵循: PY-CORE-024 (安全漏洞防护范式)
+
+- **验证结果** - 测试通过情况
+  - [x] py_compile 语法检查 → PASSED ✅
+  - [x] ast.parse 语法检查 → PASSED ✅
+  - [x] unsafe-eval → 0处 ✅
+  - [x] 隧道命令注入 → port验证+列表参数 ✅
+  - [x] /run速率限制 → 已添加 ✅
+  - [x] Referrer-Policy → 已添加 ✅
+  - [x] Permissions-Policy → 已添加 ✅
+  - [x] 内联导入 → 0处 ✅
+  - 规范遵循: QA-FRONT-001 (测试验证标准)
+
 ### v3.8.89.26 (2026-08-21) - 🔒 Import唯一性范式 + 内联导入清理
 
 #### 更新内容: 修复5处import问题，新增Import唯一性强制范式到skill.md
