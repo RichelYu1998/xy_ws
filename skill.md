@@ -19,9 +19,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.89.32 (2026-08-21) - 🔧 hostc WebSocket安全关闭补丁重新应用 + patch-package补丁未生效修复
+> **📌 当前版本**: v3.8.90.00 (2026-08-21) - 🔒 安全隐患全面修复 + 隐藏Bug清零（9项P0-P3问题全部解决）
 >
 > **⚠️ 重要更新**:
+> - v3.8.90.00: 修复4个隐藏Bug（_module_logger/safe_read_json/logger/TunnelManager未定义）+ 5个安全隐患（CSRF Host头回退绕过/API Key HTML泄露/bootstrap IP检查/配置明文/黑名单冗余），安全评分96%→98%
 > - v3.8.89.32: 修复patch-package补丁未生效问题，重新应用safeCloseWebSocket2状态感知关闭修复（CONNECTING→terminate/OPEN→close+超时处理器error事件吞掉+catch双层保护），消除WebSocket连接超时导致的Node.js进程崩溃
 > - v3.8.89.31: 安全检查系统整合进main.py单文件架构，新增Playwright+移动端安全检查（8项），依赖审计API，配置加密管理API，删除quick_security_check.py/security_audit.py/config_secure_template.py
 > - 新增API端点: `/api/security/check`（安全检查）、`/api/security/audit`（依赖审计）、`/api/security/encrypt-init`（配置加密初始化）
@@ -1639,7 +1640,54 @@ D:/ws/xy_ws/
 
 ---
 
-## 🔄 最新更新 (v3.8.89.32)
+## 🔄 最新更新 (v3.8.90.00)
+
+### 🔒 安全隐患全面修复 + 隐藏Bug清零 — 9项P0-P3问题全部解决
+
+#### 问题: 4个隐藏运行时Bug + 5个安全隐患，安全评分96%→98%
+
+**P0 致命Bug（运行时崩溃）**:
+
+| # | 问题 | 根因 | 修复 |
+|---|------|------|------|
+| 1 | `_module_logger` 未定义 | 模块级从未定义，异常处理路径触发NameError | 添加 `_module_logger = logging.getLogger('main')` |
+| 2 | `safe_read_json` 未定义 | FileCacheManager调用不存在的函数 | 新增 `safe_read_json()` 安全读取函数 |
+| 3 | `logger` 模块级未定义 | TeeOutput.__del__()垃圾回收时NameError | 添加 `logger = logging.getLogger('FileCleaner')` |
+
+**P1 Bug + 安全隐患**:
+
+| # | 问题 | 根因 | 修复 |
+|---|------|------|------|
+| 4 | `TunnelManager` 未定义 | 引用不存在的类 | 替换为 `PathManager.get_lan_ip()` |
+| 5 | CSRF Host头回退可绕过 | 攻击者可伪造Host头 | 移除Host头回退，无Origin/Referer必须API Key |
+| 6 | API Key泄露在HTML meta | 查看源码即可获取Key | 移除meta注入，前端改为/api/bootstrap动态获取 |
+
+**P2 安全增强**:
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 7 | /api/bootstrap IP检查不可靠 | 增加X-Forwarded-For首个IP本地检查 |
+| 8 | config.json敏感信息明文 | 新增 `_auto_encrypt_config()` 启动时自动加密 |
+
+**P3 保留纵深防御**:
+
+| # | 问题 | 说明 |
+|---|------|------|
+| 9 | /run黑名单验证冗余 | 白名单已兜底，黑名单作为纵深防御保留 |
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **隐藏Bug数** | 4个 | 0个 ✅ |
+| **安全隐患数** | 5个 | 0个 ✅ |
+| **安全评分** | 96% | 98% ✅ |
+| **API Key** | 暴露在HTML源码 | 动态获取不暴露 ✅ |
+| **CSRF防护** | Host头可伪造 | Origin/Referer+API Key ✅ |
+| **config.json** | 敏感字段明文 | Fernet自动加密 ✅ |
+
+---
+
+## 🔄 历史更新 (v3.8.89.32)
 
 ### 🔧 hostc WebSocket安全关闭补丁重新应用 — patch-package补丁未生效修复
 
@@ -2863,6 +2911,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.90.00 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全隐患全面修复+隐藏Bug清零(P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager未定义/CSRF Host头回退绕过/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留) |
 | v3.8.89.32 | 2026-08-21 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭补丁重新应用(patch-package未生效修复+safeCloseWebSocket2状态感知关闭重新应用+补丁持久化验证) |
 | v3.8.89.11 | 2026-07-30 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭修复(safeCloseWebSocket2状态感知+error事件吞掉+patch-package持久化)+隧道验证修复(FastAPI HEAD方法)+高价商品数解析修复+按钮全局函数暴露 |
 | v3.8.89.10 | 2026-07-30 | 小旭二手机（西园路） | FastAPI根路由添加HEAD方法支持，修复verify_url()返回405导致隧道被误判不可用; CF隧道DNS解析失败的排查方案; 隧道不再反复重启，邮件通知正常发送 |

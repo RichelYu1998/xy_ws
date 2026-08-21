@@ -117,6 +117,9 @@ except ImportError:
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+_module_logger = logging.getLogger('main')
+logger = logging.getLogger('FileCleaner')
+
 for _stream in (sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(encoding='utf-8', errors='replace')
@@ -2114,6 +2117,19 @@ def rate_limit(limiter, endpoint_name='API'):
     return decorator
 
 
+def safe_read_json(file_path, default=None):
+    """安全读取JSON文件，解析失败返回默认值"""
+    if default is None:
+        default = {}
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return default
+    except Exception:
+        return default
+
+
 # ============================================================
 # JSON文件缓存管理器 (v3.8.70)
 # ============================================================
@@ -2897,7 +2913,7 @@ class PathManager:
                     
                     try:
                         port = args.port if 'args' in dir() and hasattr(args, 'port') else 8888
-                        lan_ip = TunnelManager.get_lan_ip()
+                        lan_ip = PathManager.get_lan_ip()
                         header = f"""==================================================
 Szwego商品爬虫 - Web服务
 ==================================================
@@ -6211,10 +6227,6 @@ if __name__ == '__main__':
                                 is_local = True
                         except Exception:
                             pass
-                    else:
-                        host = request.headers.get('host', '')
-                        if any(h in host for h in ['localhost', '127.0.0.1']):
-                            is_local = True
 
                 if not has_valid_key and not is_local:
                     _request_logger.warning(f'[CSRF/Auth] 拒绝写操作: {request.method} {path} | IP: {client_ip}')
@@ -6291,6 +6303,12 @@ if __name__ == '__main__':
         async def api_bootstrap(request: Request):
             client_ip = request.client.host if request.client else 'unknown'
             is_local = any(h in client_ip for h in ['127.0.0.1', '::1', 'localhost'])
+            if not is_local:
+                xff = request.headers.get('x-forwarded-for', '')
+                if xff:
+                    first_ip = xff.split(',')[0].strip()
+                    if any(h in first_ip for h in ['127.0.0.1', '::1', 'localhost']):
+                        is_local = True
             if not is_local:
                 origin = request.headers.get('origin', '')
                 if origin not in LOCAL_TRUSTED_ORIGINS:
@@ -6581,8 +6599,6 @@ if __name__ == '__main__':
             with open(os.path.join(PROJECT_DIR, 'index.html'), 'r', encoding='utf-8') as f:
                 content = f.read()
             content = re.sub(r'版本:\s*[\d.]+', f'版本: {current_version}', content)
-            if '<meta name="api-key"' not in content:
-                content = content.replace('<head>', f'<head><meta name="api-key" content="{WEB_API_KEY}">', 1)
             return HTMLResponse(
                 content=content,
                 headers={
@@ -10421,3 +10437,49 @@ class SecureConfigManager:
 print('='*60)
 print('OK - Security Check & Audit System v3.8.89.31 Loaded!')
 print('='*60)
+
+
+def _auto_encrypt_config():
+    """自动加密config.json中的明文敏感字段（首次运行或加密未激活时）"""
+    try:
+        config_file = Path(PROJECT_DIR) / 'config' / 'config.json'
+        if not config_file.exists():
+            return
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        has_plaintext = False
+        for field_path in _SENSITIVE_CONFIG_FIELDS:
+            keys = field_path.split('.')
+            current = config
+            for key in keys:
+                if isinstance(current, dict) and key in current:
+                    current = current[key]
+                else:
+                    current = None
+                    break
+            if current and isinstance(current, str) and not current.startswith('ENC('):
+                has_plaintext = True
+                break
+        if not has_plaintext:
+            return
+        mgr = SecureConfigManager()
+        if mgr._fernet is None:
+            password = os.environ.get('CONFIG_ENCRYPTION_KEY', '')
+            if not password:
+                password = secrets.token_urlsafe(32)
+                os.environ['CONFIG_ENCRYPTION_KEY'] = password
+            success, _ = SecureConfigManager.initialize_encryption(password)
+            if not success:
+                return
+            mgr = SecureConfigManager()
+        if mgr._fernet is not None:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            config = mgr._encrypt_sensitive(config)
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            print('[SecureConfig] ✅ 已自动加密config.json中的敏感字段')
+    except Exception as e:
+        print(f'[SecureConfig] ⚠️ 自动加密失败: {e}')
+
+_auto_encrypt_config()
