@@ -105,6 +105,12 @@ except ImportError:
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, Exception):
+        pass
+
 TIMEOUT_CONFIG = {
     'socket_connect': int(os.environ.get('TIMEOUT_SOCKET_CONNECT', '5')),
     'socket_read': int(os.environ.get('TIMEOUT_SOCKET_READ', '10')),
