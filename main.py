@@ -1998,6 +1998,18 @@ def sec_sp(base_dir, user_path):
         return None, f"Path traversal blocked: {user_path}"
     return target, None
 
+def _get_allowed_origins():
+    """动态生成允许的CORS源，基于当前WEB_PORT"""
+    port = int(os.environ.get('WEB_PORT', '8888'))
+    origins = [
+        "http://localhost",
+        "http://127.0.0.1",
+    ]
+    for p in sorted(set([port, 8888, 5000, 8080])):
+        origins.append(f"http://localhost:{p}")
+        origins.append(f"http://127.0.0.1:{p}")
+    return origins
+
 app = FastAPI(
     title="Szwego商品爬虫",
     description="Szwego商品爬虫Web服务",
