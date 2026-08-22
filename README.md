@@ -374,6 +374,48 @@ pandoc skill.md -o skill.docx
 
 ## 🔄 最新更新
 
+### v3.8.90.09 (2026-08-22) - 🔧 WEB_PORT环境变量消除硬编码端口 + Playwright安装优化 + 浏览器状态API
+
+#### 更新内容: 消除所有硬编码8888端口改为WEB_PORT环境变量，Playwright安装优化（本地已有跳过+HEAD测速+锁定版本），/api/bootstrap新增浏览器状态字段
+
+**影响文件**: [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh), [requirements.txt](requirements.txt), [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md)
+
+---
+
+- **WEB_PORT环境变量消除硬编码端口** — 端口8888硬编码10+处改为环境变量
+  - run.bat: `if not defined WEB_PORT set "WEB_PORT=8888"`，所有8888改为`!WEB_PORT!`
+  - run.sh: `WEB_PORT="${WEB_PORT:-8888}"`，所有8888改为`$WEB_PORT`
+  - main.py: 所有硬编码8888改为`int(os.environ.get('WEB_PORT', '8888'))`
+  - argparse默认端口: `default=int(os.environ.get('WEB_PORT', '8888'))`
+
+- **_get_allowed_origins()动态生成CORS源** — 替代硬编码端口列表
+  - 新增函数: 基于WEB_PORT动态生成CORS允许源
+  - `LOCAL_TRUSTED_ORIGINS = frozenset(_get_allowed_origins())` 在FastAPI前初始化
+  - CSRF中间件: `allowed_origins = list(LOCAL_TRUSTED_ORIGINS)`
+
+- **install_playwright_cdn()本地已有浏览器跳过安装** — 避免每次启动都尝试安装
+  - 优先检测Playwright Chromium，次选检测系统Chrome
+  - 任一已存在则跳过安装，打印已有路径
+
+- **CDN测速改用HEAD请求** — 避免GET下载大文件浪费流量
+  - 各CDN使用专用测试URL（npmmirror→registry, azureedge→主页, cdn→主页）
+  - HTTPError也视为连通（HEAD返回403/405但服务器可达）
+
+- **playwright锁定版本1.52.0** — 匹配本地chromium版本
+  - `playwright>=1.48.0,<1.60.0` → `playwright==1.52.0`
+
+- **/api/bootstrap新增浏览器状态字段** — 前端可感知浏览器就绪状态
+  - `playwright_chromium`: Playwright Chromium路径
+  - `system_chrome`: 系统Chrome路径
+  - `browser_ready`: 布尔值，任一可用即为True
+  - 前端app.js: 显示浏览器状态（已就绪/未就绪+类型）
+
+- **run.sh修复shebang** — `!/bin/bash` → `#!/bin/bash`
+
+- **CDN全部失败时保留全量镜像源列表** — 增加安装成功概率
+
+---
+
 ### v3.8.90.08 (2026-08-22) - 🔧 Playwright多镜像源安装 + 系统Chrome回退兜底
 
 #### 更新内容: 修复npmmirror 404导致Playwright安装失败，浏览器启动改为四层防护（路径预检→多镜像源安装→系统Chrome回退→报错提示）
