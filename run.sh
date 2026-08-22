@@ -1,4 +1,4 @@
-#!/bin/bash
+!/bin/bash
 
 cd "$(dirname "$0")"
 
@@ -546,18 +546,25 @@ EOF
 
         if [ "$NEED_PIP_INSTALL" -eq 1 ]; then
             PIP_INSTALL_OK=0
-            
+
+            log "[*] 强制升级pip到最新版本..."
             if [ -n "$FASTEST_PIP_MIRROR" ]; then
-                pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --disable-pip-version-check
+                pip install --upgrade pip -i "$FASTEST_PIP_MIRROR"
+            else
+                pip install --upgrade pip
+            fi
+
+            if [ -n "$FASTEST_PIP_MIRROR" ]; then
+                pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR"
                 if [ $? -ne 0 ]; then
                     log "WARNING: 使用镜像源安装失败，尝试默认源..."
-                    pip install -r requirements.txt --disable-pip-version-check
+                    pip install -r requirements.txt
                     if [ $? -ne 0 ]; then
                         PIP_INSTALL_OK=1
                     fi
                 fi
             else
-                pip install -r requirements.txt --disable-pip-version-check
+                pip install -r requirements.txt
                 if [ $? -ne 0 ]; then
                     PIP_INSTALL_OK=1
                 fi

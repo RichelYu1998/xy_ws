@@ -374,6 +374,42 @@ pandoc skill.md -o skill.docx
 
 ## 🔄 最新更新
 
+### v3.8.90.06 (2026-08-22) - 🐍 Python 3.14兼容性修复 + 启动脚本pip强制升级 — 解决pydantic-core源码编译卡死问题
+
+#### 更新内容: 修复Python 3.14环境下pydantic-core无预编译wheel导致pip安装卡死的问题，启动脚本新增pip强制升级步骤
+
+**影响文件**: [requirements.txt](requirements.txt), [run.bat](run.bat), [run.sh](run.sh), [README.md](README.md)
+
+---
+
+- **pydantic版本上限放宽 (Python 3.14兼容)** — 解决pip安装pydantic-core从源码编译卡死
+  - 修改: `pydantic>=2.7.0,<2.12.0` → `pydantic>=2.7.0,<2.13.0`
+  - **根因**: pydantic 2.11.x的pydantic-core没有发布Python 3.14的cp314预编译wheel包，pip只能从.tar.gz源码编译（需要Rust编译器），导致"Preparing metadata (pyproject.toml)"阶段长时间卡死
+  - **修复**: pydantic 2.12.0开始支持Python 3.14，其pydantic-core 2.41.x提供了cp314 wheel，pip直接下载预编译包秒装完成
+  - 参考: [pydantic v2.12 Release - Python 3.14 Support](https://pydantic.dev/articles/pydantic-v2-12-release)
+
+- **run.bat新增pip强制升级 (启动脚本优化)** — 安装依赖前先升级pip到最新版
+  - 新增步骤: `python -m pip install --upgrade pip`（优先使用最快镜像源）
+  - 移除: `--disable-pip-version-check` 参数（既然每次都升级pip，无需禁用版本检查）
+  - 新版pip优先选择wheel预编译包，减少从源码编译的概率
+  - 执行顺序: 升级pip → 安装requirements.txt → 失败时回退默认源重试
+
+- **run.sh同步修改 (跨平台一致性)** — Linux/macOS启动脚本与run.bat保持一致
+  - 新增步骤: `pip install --upgrade pip`（优先使用最快镜像源）
+  - 移除: `--disable-pip-version-check` 参数
+  - 执行顺序与run.bat一致
+
+**修复效果**:
+| 指标 | 修改前 | 修改后 |
+|------|--------|--------|
+| **Python 3.14安装依赖** | ❌ pydantic-core源码编译卡死 | ✅ 直接下载wheel秒装 |
+| **pydantic版本** | 2.11.x (无cp314 wheel) | 2.12.x (有cp314 wheel) |
+| **pydantic-core版本** | 2.33.2 (需Rust编译) | 2.41.5 (预编译wheel) |
+| **pip版本管理** | ⚠️ 不主动升级 | ✅ 每次安装前强制升级 |
+| **跨平台一致性** | ⚠️ bat/sh逻辑不同 | ✅ 完全一致 |
+
+---
+
 ### v3.8.90.05 (2026-08-21) - 🗑️ 删除md_to_docx.py + 📐 建立Import语句规范(PY-CORE-000) — 清理3处内联import，强化单文件架构
 
 #### 更新内容: 删除md_to_docx.py工具脚本，建立PY-CORE-000 Import规范，清理main.py中的内联import语句
