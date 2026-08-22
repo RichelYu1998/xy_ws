@@ -6137,7 +6137,15 @@ def check_deps_satisfied(requirements_file="requirements.txt"):
 
 
 def install_playwright_cdn():
-    """Playwright CDN智能测速+安装"""
+    """Playwright CDN智能测速+安装（本地已有则跳过）"""
+    pw_chromium = Environment._find_playwright_chromium()
+    sys_chrome = Environment._find_system_chrome()
+    if pw_chromium:
+        print(f"[*] Playwright Chromium已存在: {pw_chromium}，跳过安装")
+        return True
+    if sys_chrome:
+        print(f"[*] 系统Chrome已存在: {sys_chrome}，跳过Playwright安装")
+        return True
     CDNS = [
         ("npmmirror", "https://npmmirror.com/mirrors/playwright"),
         ("azureedge", "https://playwright.azureedge.net/builds"),
