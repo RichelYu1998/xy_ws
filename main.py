@@ -5957,7 +5957,6 @@ def update_cookie():
                 print('页面加载完成')
             except Exception as e:
                 print(f'页面加载超时，继续获取Cookie: {e}')
-            
             print_separator()
             print('浏览器已打开')
             print('请在浏览器中完成以下操作：')
