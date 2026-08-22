@@ -4869,6 +4869,15 @@
                     if (data.version) {
                         document.title = 'Szwego商品爬虫 v' + data.version;
                     }
+                    var browserStatusEl = document.getElementById('browser-status');
+                    if (browserStatusEl) {
+                        if (data.browser_ready) {
+                            var browserType = data.playwright_chromium ? 'Playwright Chromium' : '系统Chrome';
+                            browserStatusEl.innerHTML = '<i class="fa fa-check-circle" style="color:#22c55e"></i> 浏览器就绪 (' + browserType + ')';
+                        } else {
+                            browserStatusEl.innerHTML = '<i class="fa fa-exclamation-triangle" style="color:#f59e0b"></i> 浏览器未就绪 (未检测到Chromium)';
+                        }
+                    }
                 }
             } catch (e) {
                 console.error('获取服务器信息失败:', e);
