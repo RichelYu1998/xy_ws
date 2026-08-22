@@ -374,6 +374,31 @@ pandoc skill.md -o skill.docx
 
 ## 🔄 最新更新
 
+### v3.8.90.08 (2026-08-22) - 🔧 Playwright多镜像源安装 + 系统Chrome回退兜底
+
+#### 更新内容: 修复npmmirror 404导致Playwright安装失败，浏览器启动改为四层防护（路径预检→多镜像源安装→系统Chrome回退→报错提示）
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **install_playwright_cdn()修复** — 消除URL双斜杠`//builds`导致404
+  - CDN URL去掉末尾`/`，`PLAYWRIGHT_DOWNLOAD_HOST`设置时`rstrip("/")`
+  - 下载失败时打印错误详情（404/Error信息）
+
+- **3处try-except统一使用install_playwright_cdn()** — 替换简单`subprocess.run`
+  - 不再只用npmmirror单源，改为测速排序后逐个尝试（npmmirror→azureedge→cdn）
+  - 某镜像404时自动切换下一个镜像源
+
+- **安装失败后回退系统Chrome** — 不再直接raise崩溃
+  - 安装后重试`executable_path=None`（Playwright内置）
+  - 仍失败则`Environment._find_system_chrome()`获取系统Chrome
+  - 系统Chrome也不可用才报错
+
+- **四层防护架构**: Playwright路径预检 → 多镜像源自动安装 → 系统Chrome回退 → 友好报错提示
+
+---
+
 ### v3.8.90.07 (2026-08-22) - 🔧 跨平台零硬编码重构 + Playwright自动安装兜底 — 消除所有平台特定硬编码路径，浏览器启动三层防护
 
 #### 更新内容: 重构Environment类实现全平台零硬编码路径检测，Playwright浏览器启动增加三层防护（路径预检→系统Chrome回退→自动安装兜底）
