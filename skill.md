@@ -19,10 +19,12 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.02 (2026-08-21) - 🐍 Python版本兼容性全面升级，requirements.txt适配Python 3.0+全系列版本
+> **📌 当前版本**: v3.8.90.07 (2026-08-22) - 🔧 跨平台零硬編碼重構 + Playwright自動安裝兜底
 >
 > **⚠️ 重要更新**:
-> - **v3.8.90.02**: 🐍 **重大架构优化** — requirements.txt依赖版本策略从固定版本(==)改为兼容性版本范围(>=,<)，实现Python 3.0+**全版本兼容**。技术栈从"Python 3.14 + FastAPI"升级为"Python 3.0+ + FastAPI"，维护成本大幅降低（无需频繁改版本）
+> - **v3.8.90.07**: 🔧 **跨平台零硬编码重构** — Environment类新增EXE_SUFFIX/NODE_PROCESS_NAME/HOSTC_PROCESS_NAME平台常量，get_chrome_path()拆分为4个方法实现三层防护（Playwright路径预检→系统Chrome回退→自动安装兜底），find_cloudflared_binary()动态扫描，allowed_exe动态生成，消除所有硬编码路径和.exe后缀
+> - **v3.8.90.06**: 🐍 Python 3.14兼容性修复 + 启动脚本pip强制升级
+> - **v3.8.90.02**: 🐍 **重大架构优化** — requirements.txt依赖版本策略从固定版本(==)改为兼容性版本范围(>=,<)，实现Python 3.0+**全版本兼容**
 > - v3.8.90.01: 移除中间件API Key/本地IP/Origin认证拦截逻辑，/api/bootstrap取消本地访问限制，解决局域网(192.168.x.x)和公网隧道(Cloudflare/hostc动态域名)访问时403"访问被拒绝:缺少有效认证"的问题
 > - v3.8.90.00: 修复4个隐藏Bug（_module_logger/safe_read_json/logger/TunnelManager未定义）+ 5个安全隐患（CSRF Host头回退绕过/API Key HTML泄露/bootstrap IP检查/配置明文/黑名单冗余），安全评分96%→98%
 > - v3.8.89.32: 修复patch-package补丁未生效问题，重新应用safeCloseWebSocket2状态感知关闭修复（CONNECTING→terminate/OPEN→close+超时处理器error事件吞掉+catch双层保护），消除WebSocket连接超时导致的Node.js进程崩溃
@@ -481,65 +483,80 @@ data = safe_call(lambda: json.load(f), default={}, context='读取JSON')
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-002: 环境自适应范式 (Environment-Aware Design)
+🔴 PY-CORE-002: 环境自适应范式 (Environment-Aware Design) — 零硬编码
 
 范式描述
-通过Environment静态类实现跨平台兼容性，自动适配Windows/Mac/Linux系统差异。
+通过Environment静态类实现跨平台兼容性，自动适配Windows/Mac/Linux系统差异。**所有路径和可执行文件名必须动态获取，禁止硬编码平台特定值（如.exe后缀、C:\路径等）**。
 
 核心实现
 class Environment:
-    """统一环境检测和管理"""
+    """统一环境检测和管理 — 零硬编码"""
     
     SYSTEM = platform.system()
     IS_WINDOWS = SYSTEM == 'Windows'
     IS_MAC = SYSTEM == 'Darwin'
     IS_LINUX = SYSTEM == 'Linux'
     
+    EXE_SUFFIX = '.exe' if IS_WINDOWS else ''
+    NODE_PROCESS_NAME = 'node' + EXE_SUFFIX
+    HOSTC_PROCESS_NAME = 'node' + EXE_SUFFIX if IS_WINDOWS else 'hostc'
+    
+    @staticmethod
+    def _get_playwright_browsers_dir():
+        """获取Playwright浏览器缓存目录，优先读PLAYWRIGHT_BROWSERS_PATH环境变量"""
+        env_path = os.environ.get('PLAYWRIGHT_BROWSERS_PATH')
+        if env_path and os.path.isdir(env_path):
+            return env_path
+        # 按平台动态计算默认路径
+        ...
+    
+    @staticmethod
+    def _find_playwright_chromium():
+        """在缓存目录中os.walk()递归搜索Chromium，不硬编码子目录名"""
+        ...
+    
+    @staticmethod
+    def _find_system_chrome():
+        """搜索系统Chrome，优先读CHROME_PATH环境变量"""
+        ...
+    
+    @staticmethod
+    def get_chrome_path():
+        """三层防护: Playwright内置→系统Chrome→None(由launch try-except兜底)"""
+        if Environment._find_playwright_chromium():
+            return None
+        return Environment._find_system_chrome()
+    
     @staticmethod
     def get_venv_python():
-        """获取虚拟环境Python路径"""
-        if Environment.IS_WINDOWS:
-            return os.path.join(PROJECT_DIR, '.venv', 'Scripts', 'python.exe')
-        else:
-            return os.path.join(PROJECT_DIR, '.venv', 'bin', 'python')
-    
-    @staticmethod
-    def get_browser_args():
-        """根据系统返回不同的浏览器启动参数"""
-        args = ['--no-sandbox', '--disable-setuid-sandbox']
-        if Environment.IS_WINDOWS:
-            args.append('--disable-gpu')
-        elif Environment.IS_LINUX:
-            args.extend(['--disable-gpu', '--disable-dev-shm-usage'])
-        return args
-    
-    @staticmethod
-    def get_user_agent():
-        """动态生成User-Agent（随机Chrome版本号）"""
-        versions = ['120.0.0.0', '121.0.0.0', ..., '129.0.0.0']
-        chrome_version = random.choice(versions)
-        
-        if Environment.IS_WINDOWS:
-            return f'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ... Chrome/{chrome_version}'
-        elif Environment.IS_MAC:
-            return f'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ...'
-        else:
-            return f'Mozilla/5.0 (X11; Linux x86_64) ...'
-    
-    @staticmethod
-    def kill_process_by_name(process_name):
-        """跨系统终止进程"""
-        if Environment.IS_WINDOWS:
-            subprocess.run(f'taskkill /F /IM {process_name}', shell=True)
-        else:
-            subprocess.run(f'pkill -f "{process_name}"', shell=True)
+        """获取虚拟环境Python路径 — 动态获取可执行文件名"""
+        venv_dir = os.path.join(PROJECT_DIR, '.venv')
+        scripts_dir = os.path.join(venv_dir, 'Scripts' if Environment.IS_WINDOWS else 'bin')
+        python_name = os.path.basename(sys.executable) if sys.executable else ('python' + Environment.EXE_SUFFIX)
+        return os.path.join(scripts_dir, python_name)
+
+零硬编码铁律:
+- ❌ **禁止**: `'chrome.exe'`, `'python.exe'`, `'node.exe'`, `r"C:\Program Files\..."`, `'/usr/bin/...'`
+- ✅ **正确**: `'chrome' + Environment.EXE_SUFFIX`, `os.environ.get('PROGRAMFILES')`, `os.environ.get('CHROME_PATH')`
+- ✅ **正确**: `os.path.basename(sys.executable)` 动态获取Python名
+- ✅ **正确**: `os.walk()` 递归搜索可执行文件，不硬编码子目录结构
+
+支持的环境变量:
+| 环境变量 | 用途 | 示例 |
+|---------|------|------|
+| `PLAYWRIGHT_BROWSERS_PATH` | 自定义Playwright浏览器目录 | `/data/browsers` |
+| `CHROME_PATH` | 直接指定Chrome路径 | `/opt/google/chrome/chrome` |
+| `CHROME_LINUX_DIR` | Linux Chrome目录 | `/my-chrome-dir` |
 
 关键特性:
 - ✅ 系统类型自动检测（IS_WINDOWS/IS_MAC/IS_LINUX）
+- ✅ EXE_SUFFIX统一.exe后缀处理
 - ✅ 路径分隔符自动处理
 - ✅ 进程管理命令跨平台适配
 - ✅ 浏览器参数差异化配置
 - ✅ 动态UA防反爬检测
+- ✅ 环境变量覆盖所有硬编码路径
+- ✅ Playwright三层防护（路径预检→系统Chrome→自动安装兜底）
 
 ──────────────────────────────────────────────────
 
@@ -1848,7 +1865,36 @@ D:/ws/xy_ws/
 
 ---
 
-## 🔄 最新更新 (v3.8.90.06)
+## 🔄 最新更新 (v3.8.90.07)
+
+### 🔧 跨平台零硬编码重构 + Playwright自动安装兜底 — 消除所有平台特定硬编码路径，浏览器启动三层防护
+
+#### 更新内容: 重构Environment类实现全平台零硬编码路径检测，Playwright浏览器启动增加三层防护
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **Environment类新增平台常量** — EXE_SUFFIX / NODE_PROCESS_NAME / HOSTC_PROCESS_NAME
+- **get_chrome_path()拆分为4个方法** — _get_playwright_browsers_dir() / _find_playwright_chromium() / _find_system_chrome() / get_chrome_path()
+- **Playwright启动try-except自动安装 (3处)** — 捕获`Executable doesn't exist`→自动安装→重试
+- **find_cloudflared_binary()重构** — os.listdir()动态扫描 + os.access(X_OK) + 跨平台常見路徑
+- **hostc进程名统一** — Environment.HOSTC_PROCESS_NAME
+- **allowed_exe动态生成** — sys.executable + EXE_SUFFIX
+- **get_venv_python()重构** — os.path.basename(sys.executable) 動態獲取
+
+- **代码规范遵循**
+  - ✅ PY-CORE-002: 环境自适应范式（全面升级，零硬编码）
+  - ✅ PY-CORE-003: 统一路径管理范式（消除所有硬编码路径）
+  - ✅ PY-CORE-006: 浏览器自动化爬虫（三层防护）
+
+- **验证结果**
+  - [x] main.py语法检查 → Syntax OK ✅
+  - [x] 硬编码检查 → 0处.exe硬编码 / 0处路径硬编码 ✅
+
+---
+
+## 🔄 历史更新 (v3.8.90.06)
 
 ### 🐍 Python 3.14兼容性修复 + 启动脚本pip强制升级 — 解决pydantic-core源码编译卡死问题
 
@@ -3166,6 +3212,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.90.07 | 2026-08-22 | 小旭二手机（西园路） | 🔧 跨平台零硬編碼重構+Playwright自動安裝兜底(Environment EXE_SUFFIX/動態路徑檢測/三層防護/cloudflared動態掃描/allowed_exe動態生成) |
 | v3.8.90.06 | 2026-08-22 | 小旭二手机（西园路） | 🐍 Python 3.14兼容性修复+启动脚本pip强制升级+run.bat BOM修复+日志文件锁修复(pydantic<2.13.0/pip upgrade/UTF-8无BOM/先杀进程再初始化日志) |
 | v3.8.90.00 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全隐患全面修复+隐藏Bug清零(P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager未定义/CSRF Host头回退绕过/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留) |
 | v3.8.89.32 | 2026-08-21 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭补丁重新应用(patch-package未生效修复+safeCloseWebSocket2状态感知关闭重新应用+补丁持久化验证) |
