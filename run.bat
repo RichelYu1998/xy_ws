@@ -10,7 +10,6 @@ for /f "delims=" %%i in ('py -c "import re; m=re.search(r'###\s+v([\d.]+)', open
 
 if not exist file mkdir file
 set "LOG_FILE=%CD%\file\web_output.log"
-echo. > "!LOG_FILE!"
 
 set "_TS_PYTHON="
 where py >nul 2>&1 && set "_TS_PYTHON=py"
@@ -55,6 +54,12 @@ echo.
 exit /b
 
 :main_start
+taskkill /F /IM hostc.exe >nul 2>&1
+taskkill /F /IM python.exe >nul 2>&1
+taskkill /F /IM node.exe >nul 2>&1
+ping -n 2 127.0.0.1 >nul 2>&1
+echo. > "%CD%\file\web_output.log" 2>nul
+
 call :log ========================================
 call :log Szwego商品爬虫和货号对比工具 - v%VERSION%
 call :log ========================================
@@ -64,10 +69,6 @@ call :log [*] 清理残留进程...
 for /f "tokens=3 delims=," %%p in ('wmic process where "name='node.exe'" get processid^,commandline /format:csv 2^>nul ^| findstr /i "playwright"') do (
     taskkill /F /PID %%p >nul 2>&1
 )
-taskkill /F /IM hostc.exe >nul 2>&1
-taskkill /F /IM python.exe >nul 2>&1
-taskkill /F /IM node.exe >nul 2>&1
-ping -n 2 127.0.0.1 >nul 2>&1
 
 set PORT_WAIT_COUNT=0
 set PORT_MAX_WAIT=10
@@ -676,15 +677,21 @@ if exist requirements.txt (
 
     if "!NEED_PIP_INSTALL!"=="1" (
         set "PIP_INSTALL_OK=0"
+        call :log [*] 强制升级pip到最新版本...
         if defined FASTEST_PIP_MIRROR (
-            "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check -i "!FASTEST_PIP_MIRROR!"
+            "!VENV_PATH!\Scripts\python.exe" -m pip install --upgrade pip -i "!FASTEST_PIP_MIRROR!"
+        ) else (
+            "!VENV_PATH!\Scripts\python.exe" -m pip install --upgrade pip
+        )
+        if defined FASTEST_PIP_MIRROR (
+            "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt -i "!FASTEST_PIP_MIRROR!"
             if errorlevel 1 (
                 call :log WARNING: 使用镜像源安装失败，尝试默认源...
-                "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check
+                "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt
                 if errorlevel 1 set "PIP_INSTALL_OK=1"
             )
         ) else (
-            "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt --disable-pip-version-check
+            "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt
             if errorlevel 1 set "PIP_INSTALL_OK=1"
         )
 

@@ -1,4 +1,4 @@
-﻿# 微购相册开发技能文档 (Skill Documentation)
+# 微购相册开发技能文档 (Skill Documentation)
 
 > **⚙️ 编码标准**: 本项目强制要求 **UTF-8 作为唯一字符串编码**。所有代码文件、文档、配置文件、数据库内容均必须使用 UTF-8 编码。
 >
@@ -95,12 +95,15 @@ D:/ws/xy_ws/
     └── cloudflared/     # Cloudflare工具
 ```
 
-**重要说明 (v3.8.90.05)**:
+**重要说明 (v3.8.90.06)**:
 - **单文件架构**: 所有Python业务代码集中在 `main.py` 中（包括版本检查功能）
 - **版本检查集成**: `check_python_version()` 函数已内置在 main.py L122-L191
 - **Import规范**: 所有import语句必须在文件开头（L1-L117），禁止函数内部内联import
 - **无独立脚本**: 已删除 `check_python_version.py` 和 `md_to_docx.py`，遵循单文件架构原则
 - **测试文件例外**: `tests/` 目录下的测试文件不违反单文件架构（属于质量保证体系）
+- **Python 3.14兼容**: pydantic>=2.7.0,<2.13.0（2.12.0+支持Python 3.14 wheel）
+- **pip强制升级**: 启动脚本安装依赖前先升级pip，优先选择wheel预编译包
+- **BOM修复**: run.bat必须保存为UTF-8无BOM，否则@echo off失效
 
 
 Python后端模块 (main.py)
@@ -1845,7 +1848,54 @@ D:/ws/xy_ws/
 
 ---
 
-## 🔄 最新更新 (v3.8.90.00)
+## 🔄 最新更新 (v3.8.90.06)
+
+### 🐍 Python 3.14兼容性修复 + 启动脚本pip强制升级 — 解决pydantic-core源码编译卡死问题
+
+#### 更新内容: 修复Python 3.14环境下pydantic-core无预编译wheel导致pip安装卡死的问题，启动脚本新增pip强制升级步骤
+
+**影响文件**: [requirements.txt](requirements.txt), [run.bat](run.bat), [run.sh](run.sh), [README.md](README.md)
+
+---
+
+- **pydantic版本上限放宽 (Python 3.14兼容)** — 解决pip安装pydantic-core从源码编译卡死
+  - 修改: `pydantic>=2.7.0,<2.12.0` → `pydantic>=2.7.0,<2.13.0`
+  - **根因**: pydantic 2.11.x的pydantic-core没有发布Python 3.14的cp314预编译wheel包，pip只能从.tar.gz源码编译（需要Rust编译器），导致"Preparing metadata (pyproject.toml)"阶段长时间卡死
+  - **修复**: pydantic 2.12.0开始支持Python 3.14，其pydantic-core 2.41.x提供了cp314 wheel，pip直接下载预编译包秒装完成
+
+- **run.bat新增pip强制升级 (启动脚本优化)** — 安装依赖前先升级pip到最新版
+  - 新增步骤: `python -m pip install --upgrade pip`（优先使用最快镜像源）
+  - 移除: `--disable-pip-version-check` 参数（既然每次都升级pip，无需禁用版本检查）
+  - 新版pip优先选择wheel预编译包，减少从源码编译的概率
+  - 执行顺序: 升级pip → 安装requirements.txt → 失败时回退默认源重试
+
+- **run.sh同步修改 (跨平台一致性)** — Linux/macOS启动脚本与run.bat保持一致
+  - 新增步骤: `pip install --upgrade pip`（优先使用最快镜像源）
+  - 移除: `--disable-pip-version-check` 参数
+  - 执行顺序与run.bat一致
+
+- **run.bat BOM修复 (CMD输出修复)** — 解决@echo off失效导致CMD窗口显示原始命令
+  - **根因**: run.bat文件开头有UTF-8 BOM（EF BB BF），cmd.exe不认识BOM，导致@echo off没有生效
+  - **修复**: 移除BOM，保存为UTF-8无BOM格式
+
+- **日志文件初始化顺序优化 (文件锁修复)** — 解决"The process cannot access the file"错误
+  - **根因**: 脚本开头就尝试清空日志文件，但此时之前的Python进程可能还在运行并持有文件锁
+  - **修复**: 调整顺序：先杀残留进程 → 再清空日志文件 → 再输出日志
+
+**修复效果**:
+| 指标 | 修改前 | 修改后 |
+|------|--------|--------|
+| **Python 3.14安装依赖** | ❌ pydantic-core源码编译卡死 | ✅ 直接下载wheel秒装 |
+| **pydantic版本** | 2.11.x (无cp314 wheel) | 2.12.x (有cp314 wheel) |
+| **pydantic-core版本** | 2.33.2 (需Rust编译) | 2.41.5 (预编译wheel) |
+| **pip版本管理** | ⚠️ 不主动升级 | ✅ 每次安装前强制升级 |
+| **CMD窗口输出** | ❌ 显示原始bat命令 | ✅ 只显示干净日志 |
+| **日志文件锁** | ❌ 被旧进程占用 | ✅ 先杀进程再初始化 |
+| **跨平台一致性** | ⚠️ bat/sh逻辑不同 | ✅ 完全一致 |
+
+---
+
+## 🔄 历史更新 (v3.8.90.00)
 
 ### 🔒 安全隐患全面修复 + 隐藏Bug清零 — 9项P0-P3问题全部解决
 
@@ -3116,6 +3166,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.90.06 | 2026-08-22 | 小旭二手机（西园路） | 🐍 Python 3.14兼容性修复+启动脚本pip强制升级+run.bat BOM修复+日志文件锁修复(pydantic<2.13.0/pip upgrade/UTF-8无BOM/先杀进程再初始化日志) |
 | v3.8.90.00 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全隐患全面修复+隐藏Bug清零(P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager未定义/CSRF Host头回退绕过/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留) |
 | v3.8.89.32 | 2026-08-21 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭补丁重新应用(patch-package未生效修复+safeCloseWebSocket2状态感知关闭重新应用+补丁持久化验证) |
 | v3.8.89.11 | 2026-07-30 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭修复(safeCloseWebSocket2状态感知+error事件吞掉+patch-package持久化)+隧道验证修复(FastAPI HEAD方法)+高价商品数解析修复+按钮全局函数暴露 |
