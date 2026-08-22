@@ -1795,12 +1795,13 @@ class Environment:
         """获取Chrome浏览器路径，支持Windows、Mac和Linux系统
         
         优先级：
-        1. Playwright内置Chromium（存在则返回None，让Playwright自己找）
+        1. Playwright缓存中的Chromium（直接返回路径，避免Playwright版本不匹配）
         2. 系统Chrome（作为fallback）
         3. 都找不到返回None（由launch的try-except兜底自动安装）
         """
-        if Environment._find_playwright_chromium():
-            return None
+        pw_chromium = Environment._find_playwright_chromium()
+        if pw_chromium:
+            return pw_chromium
         return Environment._find_system_chrome()
     
     @staticmethod
@@ -6144,9 +6145,18 @@ def install_playwright_cdn():
     ]
 
     def test_cdn(name, url):
+        test_urls = {
+            "npmmirror": "https://registry.npmmirror.com",
+            "azureedge": "https://playwright.azureedge.net",
+            "cdn": "https://cdn.playwright.dev",
+        }
+        test_url = test_urls.get(name, url)
         try:
             start = time.time()
-            urllib.request.urlopen(url, timeout=3)
+            req = urllib.request.Request(test_url, method='HEAD')
+            urllib.request.urlopen(req, timeout=5)
+            return round(time.time() - start, 3)
+        except urllib.error.HTTPError:
             return round(time.time() - start, 3)
         except Exception as e:
             print(f'[CDN] Test failed {name}: {e}')
@@ -6169,7 +6179,11 @@ def install_playwright_cdn():
         download_order = [(n, u) for n, u, _ in results]
     else:
         print("[WARNING] 所有CDN连通性测试失败，使用官方CDN下载")
-        download_order = [("cdn", "https://cdn.playwright.dev")]
+        download_order = [
+            ("npmmirror", "https://npmmirror.com/mirrors/playwright"),
+            ("azureedge", "https://playwright.azureedge.net/builds"),
+            ("cdn", "https://cdn.playwright.dev"),
+        ]
 
     print("[*] 安装Playwright浏览器...")
     installed = False
@@ -6187,8 +6201,12 @@ def install_playwright_cdn():
             break
         if result.stderr:
             for err_line in result.stderr.split('\n'):
-                if 'Error:' in err_line or '404' in err_line:
+                if 'Error:' in err_line or '404' in err_line or 'Downloading' in err_line:
                     print(f"    {err_line.strip()}")
+        if result.stdout:
+            for out_line in result.stdout.split('\n'):
+                if 'Downloading' in out_line or 'Downloaded' in out_line or 'already' in out_line.lower():
+                    print(f"    {out_line.strip()}")
         print(f"    {name} 下载失败，尝试下一个...")
 
     if not installed:
@@ -8367,7 +8385,10 @@ if __name__ == '__main__':
                 'lan_url': f'http://{lan_ip}:{port}' if lan_ip else None,
                 'lan_ip': lan_ip,
                 'port': port,
-                'version': get_version_from_readme()
+                'version': get_version_from_readme(),
+                'playwright_chromium': Environment._find_playwright_chromium(),
+                'system_chrome': Environment._find_system_chrome(),
+                'browser_ready': bool(Environment._find_playwright_chromium() or Environment._find_system_chrome()),
             })
 
         tunnel_process = None
