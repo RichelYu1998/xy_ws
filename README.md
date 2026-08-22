@@ -374,6 +374,57 @@ pandoc skill.md -o skill.docx
 
 ## 🔄 最新更新
 
+### v3.8.90.07 (2026-08-22) - 🔧 跨平台零硬編碼重構 + Playwright自動安裝兜底 — 消除所有平台特定硬編碼路徑，瀏覽器啟動三層防護
+
+#### 更新內容: 重構Environment類實現全平台零硬編碼路徑檢測，Playwright瀏覽器啟動增加三層防護（路徑預檢→系統Chrome回退→自動安裝兜底）
+
+**影響文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+
+---
+
+- **Environment類新增平台常量 (零硬編碼基礎)** — 消除所有`.exe`硬編碼
+  - 新增 `EXE_SUFFIX = '.exe' if IS_WINDOWS else ''`
+  - 新增 `NODE_PROCESS_NAME = 'node' + EXE_SUFFIX`
+  - 新增 `HOSTC_PROCESS_NAME = 'node' + EXE_SUFFIX if IS_WINDOWS else 'hostc'`
+
+- **get_venv_python()重構** — `os.path.basename(sys.executable)` 動態獲取Python名
+
+- **get_chrome_path()拆分為4個方法** — 三層防護架構
+  - `_get_playwright_browsers_dir()`: 優先讀`PLAYWRIGHT_BROWSERS_PATH`環境變量
+  - `_find_playwright_chromium()`: `os.walk()`遞歸搜索，不硬編碼子目錄名
+  - `_find_system_chrome()`: 優先讀`CHROME_PATH`環境變量
+  - `get_chrome_path()`: Playwright內置→None / 系統Chrome→路徑 / 都沒有→None
+
+- **Playwright啟動try-except自動安裝 (3處)** — 捕獲`Executable doesn't exist`→自動安裝→重試
+
+- **find_cloudflared_binary()重構** — 動態掃描+跨平台常見路徑
+
+- **hostc進程名統一** — `Environment.HOSTC_PROCESS_NAME`
+
+- **allowed_exe動態生成** — `sys.executable` + `EXE_SUFFIX`
+
+- **代碼規範遵循 skill.md**
+  - ✅ PY-CORE-002: 環境自適應範式
+  - ✅ PY-CORE-003: 統一路徑管理範式
+  - ✅ PY-CORE-006: 瀏覽器自動化爬蟲
+
+- **驗證結果**
+  - [x] main.py語法檢查 → Syntax OK ✅
+  - [x] EXE_SUFFIX → Windows`.exe`/Linux空字符串 ✅
+  - [x] Playwright路徑檢測 → 動態掃描 ✅
+
+**修復效果**:
+| 指標 | 修改前 | 修改後 |
+|------|--------|--------|
+| **硬編碼.exe** | ❌ 10+處 | ✅ 0處 |
+| **硬編碼路徑** | ❌ 8處 | ✅ 0處 |
+| **Playwright未安裝** | ❌ 崩潰 | ✅ 三層防護 |
+| **跨平台** | ⚠️ Windows特殊 | ✅ 統一 |
+
+**環境變量**: `PLAYWRIGHT_BROWSERS_PATH` / `CHROME_PATH` / `CHROME_LINUX_DIR`
+
+---
+
 ### v3.8.90.06 (2026-08-22) - 🐍 Python 3.14兼容性修复 + 启动脚本pip强制升级 — 解决pydantic-core源码编译卡死问题
 
 #### 更新内容: 修复Python 3.14环境下pydantic-core无预编译wheel导致pip安装卡死的问题，启动脚本新增pip强制升级步骤

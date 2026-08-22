@@ -1709,33 +1709,99 @@ class Environment:
     # 是否为Linux系统
     IS_LINUX = SYSTEM == 'Linux'
     
+    EXE_SUFFIX = '.exe' if IS_WINDOWS else ''
+    NODE_PROCESS_NAME = 'node' + EXE_SUFFIX
+    HOSTC_PROCESS_NAME = 'node' + EXE_SUFFIX if IS_WINDOWS else 'hostc'
+    
     @staticmethod
     def get_venv_python():
         """获取虚拟环境Python路径"""
-        if Environment.IS_WINDOWS:
-            return os.path.join(PROJECT_DIR, '.venv', 'Scripts', 'python.exe')
-        else:
-            return os.path.join(PROJECT_DIR, '.venv', 'bin', 'python')
+        venv_dir = os.path.join(PROJECT_DIR, '.venv')
+        scripts_dir = os.path.join(venv_dir, 'Scripts' if Environment.IS_WINDOWS else 'bin')
+        python_name = os.path.basename(sys.executable) if sys.executable else ('python' + Environment.EXE_SUFFIX)
+        return os.path.join(scripts_dir, python_name)
     
     @staticmethod
-    def get_chrome_path():
-        """获取Chrome浏览器路径，支持Windows、Mac和Linux系统"""
-        chrome_path = None
-        
+    def _get_playwright_browsers_dir():
+        """获取Playwright浏览器缓存目录，优先读取PLAYWRIGHT_BROWSERS_PATH环境变量"""
+        env_path = os.environ.get('PLAYWRIGHT_BROWSERS_PATH')
+        if env_path and os.path.isdir(env_path):
+            return env_path
         if Environment.IS_WINDOWS:
-            # Windows上使用Playwright内置浏览器，避免权限问题
-            chrome_path = None
+            base = os.environ.get('LOCALAPPDATA', '')
         elif Environment.IS_MAC:
-            if os.path.exists('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'):
-                chrome_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+            base = os.path.join(os.environ.get('HOME', ''), 'Library', 'Caches')
         elif Environment.IS_LINUX:
-            # 优先检测 /chrome-linux64 目录下的Chrome
-            if os.path.exists('/chrome-linux64/chrome'):
-                chrome_path = '/chrome-linux64/chrome'
-            elif os.path.exists('/usr/bin/google-chrome'):
-                chrome_path = '/usr/bin/google-chrome'
+            base = os.path.join(os.environ.get('HOME', ''), '.cache')
+        else:
+            return None
+        pw_dir = os.path.join(base, 'ms-playwright') if base else None
+        return pw_dir if pw_dir and os.path.isdir(pw_dir) else None
+
+    @staticmethod
+    def _find_playwright_chromium():
+        """在Playwright缓存目录中动态搜索Chromium可执行文件，不硬编码子目录名"""
+        pw_dir = Environment._get_playwright_browsers_dir()
+        if not pw_dir:
+            return None
+        base_names = ('chrome', 'chromium')
+        target_names = tuple(n + Environment.EXE_SUFFIX for n in base_names) if Environment.IS_WINDOWS else base_names
+        chromium_dirs = sorted(
+            [d for d in os.listdir(pw_dir) if d.startswith('chromium-')],
+            reverse=True
+        )
+        for cdir in chromium_dirs:
+            root = os.path.join(pw_dir, cdir)
+            for dirpath, dirnames, filenames in os.walk(root):
+                for fname in filenames:
+                    if fname.lower() in target_names:
+                        fpath = os.path.join(dirpath, fname)
+                        if os.access(fpath, os.X_OK) or Environment.IS_WINDOWS:
+                            return fpath
+        return None
+
+    @staticmethod
+    def _find_system_chrome():
+        """搜索系统已安装的Chrome，优先读取CHROME_PATH环境变量"""
+        env_path = os.environ.get('CHROME_PATH')
+        if env_path and os.path.isfile(env_path):
+            return env_path
+        if Environment.IS_WINDOWS:
+            candidates = []
+            for env_var in ('PROGRAMFILES', 'PROGRAMFILES(X86)', 'LOCALAPPDATA'):
+                base = os.environ.get(env_var, '')
+                if base:
+                    candidates.append(os.path.join(base, 'Google', 'Chrome', 'Application', 'chrome' + Environment.EXE_SUFFIX))
+        elif Environment.IS_MAC:
+            candidates = [
+                os.path.join('/Applications', 'Google Chrome.app', 'Contents', 'MacOS', 'Google Chrome'),
+            ]
+        elif Environment.IS_LINUX:
+            candidates = []
+            linux_dir = os.environ.get('CHROME_LINUX_DIR', '/chrome-linux64')
+            if linux_dir:
+                candidates.append(os.path.join(linux_dir, 'chrome'))
+            candidates.append(os.path.join('/usr', 'bin', 'google-chrome'))
+            candidates.append(os.path.join('/usr', 'bin', 'chromium-browser'))
+        else:
+            return None
+        for path in candidates:
+            if path and os.path.isfile(path):
+                return path
+        return None
+
+    @staticmethod
+    def get_chrome_path():
+        """获取Chrome浏览器路径，支持Windows、Mac和Linux系统
         
-        return chrome_path
+        优先级：
+        1. Playwright内置Chromium（存在则返回None，让Playwright自己找）
+        2. 系统Chrome（作为fallback）
+        3. 都找不到返回None（由launch的try-except兜底自动安装）
+        """
+        if Environment._find_playwright_chromium():
+            return None
+        return Environment._find_system_chrome()
     
     @staticmethod
     def get_browser_args():
@@ -1917,7 +1983,7 @@ def get_python_executable():
     except Exception as e:
         print(f"创建虚拟环境失败: {e}")
         # 创建失败，fallback到系统Python
-        return 'python' if Environment.IS_WINDOWS else 'python3'
+        return sys.executable or ('python' + Environment.EXE_SUFFIX if Environment.IS_WINDOWS else 'python3')
 
 VENV_PYTHON = get_python_executable()
 
@@ -4910,7 +4976,22 @@ class WegoScraper:
                 else:
                     print(f'使用Playwright内置Chromium')
                 
-                browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
+                try:
+                    browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
+                except Exception as launch_err:
+                    if 'Executable doesn\'t exist' in str(launch_err) or 'executable doesn\'t exist' in str(launch_err).lower():
+                        print('Playwright内置Chromium不存在，正在自动安装浏览器...')
+                        import subprocess
+                        try:
+                            subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], check=True)
+                            print('浏览器安装完成，正在重新启动...')
+                            browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
+                        except Exception as install_err:
+                            print(f'自动安装失败: {install_err}')
+                            print('请手动运行: python -m playwright install chromium')
+                            raise
+                    else:
+                        raise
                 print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
                 
                 context_start = time.time()
@@ -5815,11 +5896,30 @@ def update_cookie():
             else:
                 print(f'使用Playwright内置Chromium')
             
-            browser = await p.chromium.launch(
-                headless=False, 
-                args=browser_args, 
-                executable_path=chrome_path
-            )
+            try:
+                browser = await p.chromium.launch(
+                    headless=False, 
+                    args=browser_args, 
+                    executable_path=chrome_path
+                )
+            except Exception as launch_err:
+                if "Executable doesn't exist" in str(launch_err) or "executable doesn't exist" in str(launch_err).lower():
+                    print('Playwright内置Chromium不存在，正在自动安装浏览器...')
+                    import subprocess
+                    try:
+                        subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], check=True)
+                        print('浏览器安装完成，正在重新启动...')
+                        browser = await p.chromium.launch(
+                            headless=False, 
+                            args=browser_args, 
+                            executable_path=chrome_path
+                        )
+                    except Exception as install_err:
+                        print(f'自动安装失败: {install_err}')
+                        print('请手动运行: python -m playwright install chromium')
+                        raise
+                else:
+                    raise
             
             context = await browser.new_context(
                 viewport=Environment.get_default_viewport(),
@@ -6135,7 +6235,22 @@ if __name__ == '__main__':
 
         async def get_cookie():
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=False)
+                try:
+                    browser = await p.chromium.launch(headless=False)
+                except Exception as launch_err:
+                    if "Executable doesn't exist" in str(launch_err) or "executable doesn't exist" in str(launch_err).lower():
+                        print('Playwright内置Chromium不存在，正在自动安装浏览器...')
+                        import subprocess
+                        try:
+                            subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], check=True)
+                            print('浏览器安装完成，正在重新启动...')
+                            browser = await p.chromium.launch(headless=False)
+                        except Exception as install_err:
+                            print(f'自动安装失败: {install_err}')
+                            print('请手动运行: python -m playwright install chromium')
+                            raise
+                    else:
+                        raise
                 context = await browser.new_context(
                     viewport=Environment.get_default_viewport(),
                     user_agent=WegoScraper.get_user_agent()
@@ -6720,14 +6835,17 @@ if __name__ == '__main__':
                 raise HTTPException(status_code=400, detail='命令格式无效: 至少需要可执行文件和参数')
 
             exe_base = os.path.basename(cmd_list[0]).lower()
-            allowed_exe = {'python', 'python3', 'python.exe', 'py', 'py.exe'}
-            if exe_base not in allowed_exe and not (exe_base.startswith('python') and ('python' in exe_base or 'python3' in exe_base)):
+            allowed_exe = {os.path.basename(sys.executable).lower()}
+            allowed_exe.update({'python', 'python3', 'py'})
+            if Environment.EXE_SUFFIX:
+                allowed_exe.update({n + Environment.EXE_SUFFIX for n in allowed_exe if not n.endswith(Environment.EXE_SUFFIX)})
+            if exe_base not in allowed_exe and not exe_base.startswith('python'):
                 raise HTTPException(status_code=400, detail=f'不允许的可执行文件: {cmd_list[0]}')
 
             if not any(os.path.basename(arg) == 'main.py' for arg in cmd_list[1:]):
                 raise HTTPException(status_code=400, detail='命令必须包含 main.py')
 
-            if exe_base in ('python', 'python3', 'python.exe'):
+            if exe_base in allowed_exe:
                 cmd_list[0] = VENV_PYTHON
 
             task_id = str(uuid.uuid4())[:8]
@@ -8709,7 +8827,7 @@ if __name__ == '__main__':
                 print(f"[Tunnel] 🔄 强制重启模式，将清理旧进程并重新启动")
                 sys.stdout.flush()
             else:
-                has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+                has_hostc_process = Environment.check_process_running(Environment.HOSTC_PROCESS_NAME)
                 web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
 
                 if web_url and has_hostc_process:
@@ -8764,7 +8882,7 @@ if __name__ == '__main__':
                         global tunnel_need_restart
                         for _ in range(30):
                             time.sleep(2)
-                            has_hostc = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+                            has_hostc = Environment.check_process_running(Environment.HOSTC_PROCESS_NAME)
                             if not has_hostc:
                                 print(f"[Tunnel] ❌ hostc进程已退出，标记需要重启")
                                 tunnel_need_restart = True
@@ -8819,13 +8937,14 @@ if __name__ == '__main__':
                     print(f"[Tunnel] Failed to clear old URL: {clear_err}")
                     sys.stdout.flush()
 
-                # Clean up old node.exe processes BEFORE starting new one
-                Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
+                # Clean up old hostc processes BEFORE starting new one
+                Environment.kill_process_by_name(Environment.HOSTC_PROCESS_NAME)
 
                 # 等待2秒确保旧进程完全退出（避免端口冲突）
                 time.sleep(2)
 
-                hostc_bin = os.path.join(PROJECT_DIR, 'dist', 'node_modules', '.bin', 'hostc.cmd' if Environment.IS_WINDOWS else 'hostc')
+                hostc_script = 'hostc' + ('.cmd' if Environment.IS_WINDOWS else '')
+                hostc_bin = os.path.join(PROJECT_DIR, 'dist', 'node_modules', '.bin', hostc_script)
                 if not os.path.isfile(hostc_bin):
                     hostc_bin = 'npx hostc'
                 
@@ -8975,7 +9094,7 @@ if __name__ == '__main__':
                 print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] - URL有效: {'是' if is_url_valid else '否'}")
                 sys.stdout.flush()
                 
-                Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
+                Environment.kill_process_by_name(Environment.HOSTC_PROCESS_NAME)
                 if tunnel_process:
                     try:
                         tunnel_process.terminate()
@@ -9023,7 +9142,7 @@ if __name__ == '__main__':
                 grace_period_end = None
                 
                 web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
-                has_hostc_process = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+                has_hostc_process = Environment.check_process_running(Environment.HOSTC_PROCESS_NAME)
                 
                 if has_hostc_process and web_url:
                     is_url_valid = False
@@ -9094,16 +9213,21 @@ if __name__ == '__main__':
             
             # 1. 优先检查项目目录（按操作系统分类）
             project_cf = None
+            cf_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "cloudflared")
             if system == "windows":
-                project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "cloudflared", "windows", "cloudflared.exe")
+                cf_dir = os.path.join(cf_base, "windows")
             elif system == "linux":
-                project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "cloudflared", "linux", "cloudflared")
+                cf_dir = os.path.join(cf_base, "linux")
             elif system == "darwin":
-                # macOS: 根据架构选择对应版本
-                if machine in ["arm64", "aarch64"]:
-                    project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "cloudflared", "macos", "cloudflared-arm64")
-                else:
-                    project_cf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "cloudflared", "macos", "cloudflared-amd64")
+                cf_dir = os.path.join(cf_base, "macos")
+            else:
+                cf_dir = None
+            if cf_dir and os.path.isdir(cf_dir):
+                for fname in sorted(os.listdir(cf_dir), reverse=True):
+                    fpath = os.path.join(cf_dir, fname)
+                    if os.path.isfile(fpath) and (os.access(fpath, os.X_OK) or system == "windows"):
+                        project_cf = fpath
+                        break
             
             if project_cf and os.path.exists(project_cf):
                 print(f"[Cloudflare] 在项目目录找到: {project_cf}")
@@ -9115,13 +9239,27 @@ if __name__ == '__main__':
                 print(f"[Cloudflare] 在系统 PATH 中找到: {cf_in_path}")
                 return cf_in_path
             
-            # 3. 检查 Windows 常见路径
+            # 3. 检查系统常见路径
             if system == "windows":
+                common_paths = []
+                for env_var in ('PROGRAMFILES(X86)', 'PROGRAMFILES'):
+                    base = os.environ.get(env_var, '')
+                    if base:
+                        common_paths.append(os.path.join(base, 'cloudflared', 'cloudflared' + Environment.EXE_SUFFIX))
+                local_app = os.environ.get('LOCALAPPDATA', '')
+                if local_app:
+                    common_paths.append(os.path.join(local_app, 'cloudflared', 'cloudflared' + Environment.EXE_SUFFIX))
+            elif system == "linux":
                 common_paths = [
-                    r"C:\Program Files (x86)\cloudflared\cloudflared.exe",
-                    r"C:\Program Files\cloudflared\cloudflared.exe",
-                    os.path.expanduser(r"~\AppData\Local\cloudflared\cloudflared.exe"),
+                    os.path.join('/usr', 'local', 'bin', 'cloudflared'),
+                    os.path.join('/usr', 'bin', 'cloudflared'),
                 ]
+            elif system == "darwin":
+                common_paths = [
+                    os.path.join('/usr', 'local', 'bin', 'cloudflared'),
+                ]
+            else:
+                common_paths = []
                 for path in common_paths:
                     if os.path.exists(path):
                         print(f"[Cloudflare] 在常见路径找到: {path}")
@@ -9454,7 +9592,7 @@ ingress:
         def tunnel_type_api():
             """获取隧道类型状态（CF 和 hostc 同时运行）"""
             cf_available = find_cloudflared_binary() is not None
-            hostc_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+            hostc_running = Environment.check_process_running(Environment.HOSTC_PROCESS_NAME)
             cf_running = cf_process is not None and cf_process.poll() is None
             
             current = 'hostc'
@@ -9667,7 +9805,7 @@ ingress:
             else:
                 web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
             
-            hostc_process_running = Environment.check_process_running('node.exe' if Environment.IS_WINDOWS else 'hostc')
+            hostc_process_running = Environment.check_process_running(Environment.HOSTC_PROCESS_NAME)
             cf_process_running = cf_process is not None and cf_process.poll() is None
             
             is_running = hostc_process_running and web_url is not None
@@ -9761,7 +9899,7 @@ ingress:
             global cf_process, cf_url, cf_mode
             tunnel_auto_restart = False
             tunnel_need_restart = False
-            Environment.kill_process_by_name('node.exe' if Environment.IS_WINDOWS else 'hostc')
+            Environment.kill_process_by_name(Environment.HOSTC_PROCESS_NAME)
             if tunnel_process:
                 try:
                     tunnel_process.terminate()
