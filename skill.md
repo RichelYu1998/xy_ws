@@ -21,9 +21,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.08 (2026-08-22) - 🔧 Playwright多镜像源安装 + 系统Chrome回退兜底
+> **📌 当前版本**: v3.8.90.09 (2026-08-22) - 🔧 WEB_PORT环境变量消除硬编码端口 + Playwright安装优化 + 浏览器状态API
 >
 > **⚠️ 重要更新**:
+> - **v3.8.90.09**: 🔧 **WEB_PORT环境变量+Playwright安装优化+浏览器状态API** — 消除所有硬编码8888端口改为WEB_PORT环境变量，_get_allowed_origins()动态生成CORS源，install_playwright_cdn()本地已有浏览器跳过安装+CDN测速改HEAD请求，playwright锁定1.52.0匹配本地chromium，/api/bootstrap新增浏览器状态字段(playwright_chromium/system_chrome/browser_ready)，run.sh修复shebang
 > - **v3.8.90.08**: 🔧 **Playwright多镜像源安装+系统Chrome回退** — install_playwright_cdn()修复URL双斜杠404，3处try-except统一使用多镜像源安装（npmmirror→azureedge→cdn），安装失败回退系统Chrome而非崩溃，四层防护（路径预检→多镜像源安装→系统Chrome回退→报错提示）
 > - **v3.8.90.06**: 🐍 Python 3.14兼容性修复 + 启动脚本pip强制升级
 > - **v3.8.90.02**: 🐍 **重大架构优化** — requirements.txt依赖版本策略从固定版本(==)改为兼容性版本范围(>=,<)，实现Python 3.0+**全版本兼容**
@@ -38,7 +39,7 @@
 > - 新增sec_sp()安全路径拼接函数，防止路径遍历攻击
 > - random.choice替换为secrets.choice，使用密码学安全随机数
 > - 清理不安全SSL配置（CERT_NONE/check_hostname=False）
-> - CORS: allow_origins从["*"]改为明确的本地地址列表
+> - CORS: allow_origins从["*"]改为动态生成的本地地址列表（_get_allowed_origins()基于WEB_PORT）
 > - FastAPI: 禁用/docs、/redoc、/openapi.json端点
 > - kill_process_by_name: 添加进程名格式验证，改用列表参数
 > - 信息泄露: detail=str(e)替换为通用错误消息
@@ -109,6 +110,12 @@ D:/ws/xy_ws/
 - **pip强制升级**: 启动脚本安装依赖前先升级pip，优先选择wheel预编译包
 - **BOM修复**: run.bat必须保存为UTF-8无BOM，否则@echo off失效
 
+**重要说明 (v3.8.90.09)**:
+- **WEB_PORT环境变量**: 端口不再硬编码8888，统一通过`WEB_PORT`环境变量配置（默认8888）
+- **动态CORS源**: `_get_allowed_origins()`基于WEB_PORT动态生成，`LOCAL_TRUSTED_ORIGINS`在FastAPI实例化前初始化
+- **Playwright安装优化**: 本地已有浏览器跳过安装，CDN测速改用HEAD请求，playwright锁定1.52.0
+- **浏览器状态API**: `/api/bootstrap`新增`playwright_chromium`/`system_chrome`/`browser_ready`字段
+
 
 Python后端模块 (main.py)
 main.py
@@ -134,7 +141,7 @@ main.py
 │   └── FileCacheManager - 文件缓存管理
 ├── 配置管理
 │   ├── ConfigManager - 配置管理器
-│   └── Environment - 环境变量管理
+│   └── Environment - 环境变量管理 (含WEB_PORT端口配置, v3.8.90.09)
 ├── 邮件通知
 │   └── EmailNotifier - 邮件通知类
 ├── 隧道管理
@@ -146,6 +153,8 @@ main.py
 │   └── StockNumberComparator - 数据对比类
 ├── API路由层
 │   ├── FastAPI应用实例
+│   ├── _get_allowed_origins() - 动态CORS源生成 (v3.8.90.09新增)
+│   ├── LOCAL_TRUSTED_ORIGINS - 可信来源白名单 (v3.8.90.09新增)
 │   ├── 速率限制器 (RateLimiter)
 │   └── 输入验证 (Pydantic模型)
 └── 前端交互层 (dist/app.js)
@@ -539,13 +548,16 @@ class Environment:
 
 零硬编码铁律:
 - ❌ **禁止**: `'chrome.exe'`, `'python.exe'`, `'node.exe'`, `r"C:\Program Files\..."`, `'/usr/bin/...'`
+- ❌ **禁止**: 硬编码端口号`8888`、`5000`、`8080`（必须使用`WEB_PORT`环境变量）
 - ✅ **正确**: `'chrome' + Environment.EXE_SUFFIX`, `os.environ.get('PROGRAMFILES')`, `os.environ.get('CHROME_PATH')`
 - ✅ **正确**: `os.path.basename(sys.executable)` 动态获取Python名
 - ✅ **正确**: `os.walk()` 递归搜索可执行文件，不硬编码子目录结构
+- ✅ **正确**: `int(os.environ.get('WEB_PORT', '8888'))` 动态获取端口
 
 支持的环境变量:
 | 环境变量 | 用途 | 示例 |
 |---------|------|------|
+| `WEB_PORT` | Web服务监听端口（默认8888） | `8080` |
 | `PLAYWRIGHT_BROWSERS_PATH` | 自定义Playwright浏览器目录 | `/data/browsers` |
 | `CHROME_PATH` | 直接指定Chrome路径 | `/opt/google/chrome/chrome` |
 | `CHROME_LINUX_DIR` | Linux Chrome目录 | `/my-chrome-dir` |
@@ -558,6 +570,7 @@ class Environment:
 - ✅ 浏览器参数差异化配置
 - ✅ 动态UA防反爬检测
 - ✅ 环境变量覆盖所有硬编码路径
+- ✅ WEB_PORT环境变量覆盖硬编码端口 (v3.8.90.09)
 - ✅ Playwright三层防护（路径预检→系统Chrome→自动安装兜底）
 
 ──────────────────────────────────────────────────
@@ -1867,7 +1880,66 @@ D:/ws/xy_ws/
 
 ---
 
-## 🔄 最新更新 (v3.8.90.08)
+## 🔄 最新更新 (v3.8.90.09)
+
+### v3.8.90.09 (2026-08-22) - 🔧 WEB_PORT环境变量消除硬编码端口 + Playwright安装优化 + 浏览器状态API
+
+**修复问题**: 端口8888在run.bat/run.sh/main.py中硬编码10+处，改端口需改多处代码；install_playwright_cdn()每次启动都尝试安装即使本地已有浏览器；CDN测速下载大文件浪费流量；playwright版本范围过宽导致chromium版本不匹配
+
+**核心改动**:
+
+1. **WEB_PORT环境变量消除硬编码端口**
+   - run.bat: 新增 `if not defined WEB_PORT set "WEB_PORT=8888"`，所有硬编码8888改为`!WEB_PORT!`
+   - run.sh: 新增 `WEB_PORT="${WEB_PORT:-8888}"`，所有硬编码8888改为`$WEB_PORT`
+   - main.py: 所有`8888`硬编码改为`int(os.environ.get('WEB_PORT', '8888'))`（10+处）
+   - argparse默认端口: `default=int(os.environ.get('WEB_PORT', '8888'))`
+
+2. **_get_allowed_origins()动态生成CORS源**
+   - 新增函数: 基于WEB_PORT环境变量动态生成允许的CORS源列表
+   - 替代硬编码: `allowed_origins = ['http://localhost:5000', ...]` → `allowed_origins = list(LOCAL_TRUSTED_ORIGINS)`
+   - LOCAL_TRUSTED_ORIGINS: `frozenset(_get_allowed_origins())` 在FastAPI实例化前初始化
+   - 定义顺序修复: `_get_allowed_origins` 移到FastAPI `app = FastAPI(...)` 之前，避免引用未定义函数
+
+3. **install_playwright_cdn()本地已有浏览器跳过安装**
+   - 优先检测: `Environment._find_playwright_chromium()` → 已存在则跳过
+   - 次选检测: `Environment._find_system_chrome()` → 已存在则跳过Playwright安装
+   - 避免每次启动都执行 `playwright install chromium`
+
+4. **CDN测速改用HEAD请求**
+   - 原方式: `urllib.request.urlopen(url, timeout=3)` — GET请求可能下载大文件
+   - 新方式: `urllib.request.Request(test_url, method='HEAD')` — HEAD请求只获取响应头
+   - 各CDN使用专用测试URL: npmmirror→registry.npmmirror.com, azureedge→playwright.azureedge.net
+   - HTTPError也视为连通（HEAD返回403/405但能到达服务器）
+
+5. **playwright锁定版本1.52.0**
+   - `playwright>=1.48.0,<1.60.0` → `playwright==1.52.0`
+   - 匹配本地已安装的chromium版本，避免版本不匹配
+
+6. **/api/bootstrap新增浏览器状态字段**
+   - `playwright_chromium`: Playwright Chromium路径（None表示未安装）
+   - `system_chrome`: 系统Chrome路径（None表示未安装）
+   - `browser_ready`: 布尔值，任一浏览器可用即为True
+   - 前端app.js: 显示浏览器状态（已就绪/未就绪+具体浏览器类型）
+
+7. **run.sh修复shebang**
+   - `!/bin/bash` → `#!/bin/bash`（缺少`#`号导致脚本无法直接执行）
+
+8. **CDN全部失败时保留全量镜像源列表**
+   - 原逻辑: 全部测试失败只保留官方CDN
+   - 新逻辑: 保留npmmirror→azureedge→cdn全量列表，增加安装成功概率
+
+**修复效果**:
+| 指标 | 修改前 | 修改后 |
+|------|--------|--------|
+| **硬编码端口** | ❌ 10+处8888 | ✅ WEB_PORT环境变量 |
+| **CORS源** | ❌ 硬编码4个端口 | ✅ 动态生成 |
+| **Playwright安装** | ❌ 每次启动都尝试 | ✅ 本地已有则跳过 |
+| **CDN测速** | ❌ GET下载大文件 | ✅ HEAD请求 |
+| **playwright版本** | ⚠️ 范围过宽 | ✅ 锁定1.52.0 |
+| **浏览器状态** | ❌ 前端无法感知 | ✅ API+前端显示 |
+| **run.sh shebang** | ❌ 缺少#号 | ✅ #!/bin/bash |
+
+---
 
 ### v3.8.90.08 (2026-08-22) - 🔧 Playwright多镜像源安装 + 系统Chrome回退兜底
 
@@ -3210,10 +3282,37 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.90.09 | 2026-08-22 | 小旭二手机（西园路） | 🔧 WEB_PORT环境变量消除硬编码端口+Playwright安装优化+浏览器状态API(_get_allowed_origins动态CORS/本地已有浏览器跳过安装/CDN测速HEAD请求/playwright锁定1.52.0/api/bootstrap浏览器状态字段/run.sh修复shebang) |
 | v3.8.90.08 | 2026-08-22 | 小旭二手机（西园路） | 🔧 Playwright多镜像源安装+系统Chrome回退兜底(URL双斜杠修复/多镜像源自动切换/安装失败回退系统Chrome/四层防护) |
+| v3.8.90.07 | 2026-08-22 | 小旭二手机（西园路） | 🔧 跨平台零硬编码重构+Playwright自动安装兜底(Environment EXE_SUFFIX/动态路径检测/三层防护/cloudflared动态扫描/allowed_exe动态生成) |
 | v3.8.90.06 | 2026-08-22 | 小旭二手机（西园路） | 🐍 Python 3.14兼容性修复+启动脚本pip强制升级+run.bat BOM修复+日志文件锁修复(pydantic<2.13.0/pip upgrade/UTF-8无BOM/先杀进程再初始化日志) |
+| v3.8.90.05 | 2026-08-21 | 小旭二手机（西园路） | 🗑️ 删除md_to_docx.py+📐 建立Import语句规范(PY-CORE-000) — 清理3处内联import，强化单文件架构 |
+| v3.8.90.04 | 2026-08-21 | 小旭二手机（西园路） | 🐍 版本检查功能集成到main.py — 删除独立check_python_version.py，遵循单文件架构 |
+| v3.8.90.03 | 2026-08-21 | 小旭二手机（西园路） | 🐍 Python版本兼容性验证系统+文档管理范式 — 新增版本检查/测试/Tox配置，合并多余MD文件 |
+| v3.8.90.02 | 2026-08-21 | 小旭二手机（西园路） | 🐍 Python版本兼容性全面升级 — requirements.txt适配Python 3.0+全系列版本 |
+| v3.8.90.01 | 2026-08-21 | 小旭二手机（西园路） | 🔓 移除写操作认证拦截 — 支持局域网/公网隧道全源访问 |
 | v3.8.90.00 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全隐患全面修复+隐藏Bug清零(P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager未定义/CSRF Host头回退绕过/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留) |
 | v3.8.89.32 | 2026-08-21 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭补丁重新应用(patch-package未生效修复+safeCloseWebSocket2状态感知关闭重新应用+补丁持久化验证) |
+| v3.8.89.31 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全检查系统整合+Playwright移动端安全检查 — 单文件架构统一 |
+| v3.8.89.30 | 2026-08-21 | 小旭二手机（西园路） | 🧹 启动脚本残留进程自动清理 — Playwright驱动node进程导致连接失败的根因修复 |
+| v3.8.89.29 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全加固第四轮 — 命令注入/CSRF/认证授权三大薄弱点完善 |
+| v3.8.89.28 | 2026-08-21 | 小旭二手机（西园路） | 🐛 邮件发送Header()崩溃修复 — 隧道通知邮件无法发出的根因修复 |
+| v3.8.89.27 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全加固第三轮+CSP/隧道注入/速率限制 |
+| v3.8.89.26 | 2026-08-21 | 小旭二手机（西园路） | 🔒 Import唯一性范式+内联导入清理 |
+| v3.8.89.25 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全加固第二轮+CORS/命令注入/信息泄露修复 |
+| v3.8.89.24 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全漏洞修复+代码规范严格化 |
+| v3.8.89.23 | 2026-08-20 | 小旭二手机（西园路） | 🐛 邮件Header()参数修复+文档同步更新 |
+| v3.8.89.22 | 2026-08-20 | 小旭二手机（西园路） | 🐛 Bug修复三连击+FastAPI兼容性完善+文档同步更新 |
+| v3.8.89.21 | 2026-08-20 | 小旭二手机（西园路） | 🔒 SSRF安全防御体系+Import优化+项目清理 |
+| v3.8.89.20 | 2026-08-20 | 小旭二手机（西园路） | 🔙 Git回退到稳定版本+项目精简+单文件架构确认 |
+| v3.8.89.19 | 2026-08-11 | 小旭二手机（西园路） | 🎨 删除商品描述完整显示优化+响应式布局增强 |
+| v3.8.89.18 | 2026-08-11 | 小旭二手机（西园路） | ✨ 商品描述点击查看详情功能+差异化交互设计 |
+| v3.8.89.17 | 2026-08-11 | 小旭二手机（西园路） | 🔧 编码问题根治+subprocess超时优化+Git历史清理 |
+| v3.8.89.16 | 2026-08-10 | 小旭二手机（西园路） | 🔧 文档排序修复+启动Bug修复 |
+| v3.8.89.15 | 2026-08-09 | 小旭二手机（西园路） | 🔒 安全漏洞修复+代码质量提升 |
+| v3.8.89.14 | 2026-08-08 | 小旭二手机（西园路） | ✨ 商品描述字段增强 — 对比表格完整显示商品信息 |
+| v3.8.89.13 | 2026-08-07 | 小旭二手机（西园路） | 🧹 代码清理 — 删除测试工具和生成脚本 |
+| v3.8.89.12 | 2026-07-31 | 小旭二手机（西园路） | 🎯 对比数据字段匹配修复+PC端显示优化 |
 | v3.8.89.11 | 2026-07-30 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭修复(safeCloseWebSocket2状态感知+error事件吞掉+patch-package持久化)+隧道验证修复(FastAPI HEAD方法)+高价商品数解析修复+按钮全局函数暴露 |
 | v3.8.89.10 | 2026-07-30 | 小旭二手机（西园路） | FastAPI根路由添加HEAD方法支持，修复verify_url()返回405导致隧道被误判不可用; CF隧道DNS解析失败的排查方案; 隧道不再反复重启，邮件通知正常发送 |
 | v3.8.89.9 | 2026-07-30 | 小旭二手机（西园路） | 简化正则表达式，精确匹配Python输出格式; 暴露全局函数，确保按钮绑定成功; 高价商品数从0恢复到78 |
@@ -3334,6 +3433,9 @@ if __name__ == '__main__':
 | v1.4.2 | 历史版本 | 小旭二手机（西园路） | 完成跨系统环境测试和优化; 优化商品去重逻辑 |
 
 ---
+
+| 版本 | 日期 | 作者 | 变更内容 |
+|------|------|------|---------|
 | v3.8.11 | 2026-07-05 | 小旭二手机（西园路）| 完整历史记录恢复与文档更新 |
 | v3.8.10 | 2026-07-05 | 小旭二手机（西园路）| 更新文档：README.md + skill.md + skill.docx 同步代码规范; (2026-07-05) - 🔧 关键修复：缩进错误导致服务启动失败 + 文档同步更新 |
 | v3.8.9 | 2026-07-05 | 小旭二手机（西园路）| (2026-07-05) - 🔒 强制URL去重机制（同一地址30分钟内只发1次邮件） |
@@ -5956,6 +6058,8 @@ class ProductTableManager {
 - 🔄 持续改进 - 定期重构和技术债务清理
 
 ---
+
+**卫生保持**:
 - ✅ 定期维护的卫生保持
 
 ## SSRF安全防护系统 (v3.8.89.21新增)
