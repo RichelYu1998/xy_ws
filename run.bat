@@ -8,6 +8,8 @@ title Szwego Crawler Tool
 set "VERSION=0.0.0"
 for /f "delims=" %%i in ('py -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2^>nul') do set "VERSION=%%i"
 
+if not defined WEB_PORT set "WEB_PORT=8888"
+
 if not exist file mkdir file
 set "LOG_FILE=%CD%\file\web_output.log"
 
@@ -74,16 +76,16 @@ set PORT_WAIT_COUNT=0
 set PORT_MAX_WAIT=10
 :port_wait_loop
 if %PORT_WAIT_COUNT% geq %PORT_MAX_WAIT% goto port_wait_done
-netstat -ano | findstr ":8888.*LISTENING" >nul 2>&1
+netstat -ano | findstr ":!WEB_PORT!.*LISTENING" >nul 2>&1
 if errorlevel 1 goto port_wait_done
 set /a PORT_WAIT_COUNT+=1
-call :log [*] 端口8888仍被占用，等待释放... (%PORT_WAIT_COUNT%/%PORT_MAX_WAIT%)
+call :log [*] 端口!WEB_PORT!仍被占用，等待释放... (%PORT_WAIT_COUNT%/%PORT_MAX_WAIT%)
 ping -n 2 127.0.0.1 >nul 2>&1
 goto port_wait_loop
 :port_wait_done
 if %PORT_WAIT_COUNT% geq %PORT_MAX_WAIT% (
-    call :log [WARNING] 端口8888等待超时，强制清理占用进程...
-    for /f "tokens=6" %%p in ('netstat -ano ^| findstr ":8888.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
+    call :log [WARNING] 端口!WEB_PORT!等待超时，强制清理占用进程...
+    for /f "tokens=6" %%p in ('netstat -ano ^| findstr ":!WEB_PORT!.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
     ping -n 2 127.0.0.1 >nul 2>&1
 )
 call :log [*] 残留进程清理完成
@@ -104,7 +106,7 @@ call :log [*] hostc v!HOSTC_VER! 已就绪
 
 call :log_blank
 call :log [*] 启动 hostc 隧道（后台运行，不阻塞）...
-start /b cmd /c ""!HOSTC_BIN!" 8888 --local-host localhost" < nul
+start /b cmd /c ""!HOSTC_BIN!" !WEB_PORT! --local-host localhost" < nul
 call :log [*] hostc 已在后台启动，将在后续步骤中获取URL
 :skip_tunnel
 
