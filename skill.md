@@ -1,6 +1,6 @@
 # 微购相册开发技能文档 (Skill Documentation)
 
-> **⚙️ 编码标准**: 本项目强制要求 **UTF-8 作为唯一字符串编码**。所有代码文件、文档、配置文件、数据库内容均必须使用 UTF-8 编码。
+> **⚙️ 编码标准**: 本项目强制要求 **UTF-8 作为唯一字符串编码**，**简体中文作为唯一中文字体**。
 >
 > ## 强制规范：
 > 1. **文件编码**：所有 `.py`, `.md`, `.json`, `.html`, `.css`, `.js` 等文件必须以 UTF-8 保存
@@ -9,17 +9,19 @@
 > 4. **数据库**：MySQL/SQLite 使用 `utf8mb4` 字符集
 > 5. **邮件发送**：MIME 编码使用 UTF-8 (`Header(text, charset='utf-8')`)
 > 6. **日志文件**：统一使用 UTF-8 编码写入
+> 7. **中文字体**：所有文档、注释、Changelog、commit message **必须使用简体中文**，禁止使用繁体中文
 >
 > ## 违规后果：
 > - ❌ 使用非 UTF-8 编码导致中文乱码
 > - ❌ 混合编码导致程序崩溃或数据损坏
 > - ❌ 团队协作时出现字符集不兼容问题
+> - ❌ 使用繁体中文导致风格不统一、阅读困难
 >
-> **记住：UTF-8 是本项目唯一合法的编码格式，没有例外！**
+> **记住：UTF-8 + 简体中文 是本项目唯一合法的编码和字体格式，没有例外！**
 
 ---
 
-> **📌 当前版本**: v3.8.90.07 (2026-08-22) - 🔧 跨平台零硬編碼重構 + Playwright自動安裝兜底
+> **📌 当前版本**: v3.8.90.07 (2026-08-22) - 🔧 跨平台零硬编码重构 + Playwright自动安装兜底
 >
 > **⚠️ 重要更新**:
 > - **v3.8.90.07**: 🔧 **跨平台零硬编码重构** — Environment类新增EXE_SUFFIX/NODE_PROCESS_NAME/HOSTC_PROCESS_NAME平台常量，get_chrome_path()拆分为4个方法实现三层防护（Playwright路径预检→系统Chrome回退→自动安装兜底），find_cloudflared_binary()动态扫描，allowed_exe动态生成，消除所有硬编码路径和.exe后缀
@@ -1878,10 +1880,10 @@ D:/ws/xy_ws/
 - **Environment类新增平台常量** — EXE_SUFFIX / NODE_PROCESS_NAME / HOSTC_PROCESS_NAME
 - **get_chrome_path()拆分为4个方法** — _get_playwright_browsers_dir() / _find_playwright_chromium() / _find_system_chrome() / get_chrome_path()
 - **Playwright启动try-except自动安装 (3处)** — 捕获`Executable doesn't exist`→自动安装→重试
-- **find_cloudflared_binary()重构** — os.listdir()动态扫描 + os.access(X_OK) + 跨平台常見路徑
+- **find_cloudflared_binary()重构** — os.listdir()动态扫描 + os.access(X_OK) + 跨平台常见路径
 - **hostc进程名统一** — Environment.HOSTC_PROCESS_NAME
 - **allowed_exe动态生成** — sys.executable + EXE_SUFFIX
-- **get_venv_python()重构** — os.path.basename(sys.executable) 動態獲取
+- **get_venv_python()重构** — os.path.basename(sys.executable) 动态获取
 
 - **代码规范遵循**
   - ✅ PY-CORE-002: 环境自适应范式（全面升级，零硬编码）
@@ -3212,7 +3214,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
-| v3.8.90.07 | 2026-08-22 | 小旭二手机（西园路） | 🔧 跨平台零硬編碼重構+Playwright自動安裝兜底(Environment EXE_SUFFIX/動態路徑檢測/三層防護/cloudflared動態掃描/allowed_exe動態生成) |
+| v3.8.90.07 | 2026-08-22 | 小旭二手机（西园路） | 🔧 跨平台零硬编码重构+Playwright自动安装兜底(Environment EXE_SUFFIX/动态路径检测/三层防护/cloudflared动态扫描/allowed_exe动态生成) |
 | v3.8.90.06 | 2026-08-22 | 小旭二手机（西园路） | 🐍 Python 3.14兼容性修复+启动脚本pip强制升级+run.bat BOM修复+日志文件锁修复(pydantic<2.13.0/pip upgrade/UTF-8无BOM/先杀进程再初始化日志) |
 | v3.8.90.00 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全隐患全面修复+隐藏Bug清零(P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager未定义/CSRF Host头回退绕过/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留) |
 | v3.8.89.32 | 2026-08-21 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭补丁重新应用(patch-package未生效修复+safeCloseWebSocket2状态感知关闭重新应用+补丁持久化验证) |
@@ -3424,7 +3426,7 @@ if __name__ == '__main__':
 | v3.1.7 | 2026-05-20 | 小旭二手机（西园路）| 货号对比重复检测优化 |
 | v3.1.5 | 2026-05-18 | 小旭二手机（西园路）| 隧道自动重连机制 |
 | v3.1.3 | 2026-05-18 | 小旭二手机（西园路）| 跨系统兼容性增强 - 统一脚本逻辑、自动创建虚拟环境、完善进程清理 |
-| v3.1.2 | 2026-05-18 | 小旭二手机（西园路）| 天气看板预加载优化; 鍓嶇鐗堟湰鍙蜂粠API瀹炴椂鑾峰彇; 淇闅ч亾鍚姩鍚庡叕缃戝湴鍧€涓嶆樉绀虹殑闂; 浼樺寲鍚姩椤哄簭銆佸ぉ姘旂湅鏉挎噿鍔犺浇銆侀潤鎬佽祫婧怗zip鍘嬬缉; update |
+| v3.1.2 | 2026-05-18 | 小旭二手机（西园路）| 天气看板预加载优化; 鍓岖鐗堟湰鍙蜂粠API瀹炴椂銮峰彇; 淇闅ч亾钖姩钖庡叕缃戝湴鍧€涓嶆樉绀虹殑闂; 浼桦寲钖姩椤哄簭銆佸ぉ姘旗湅𨱒挎噿锷犺浇銆侀润镐佽祫婧怗zip铡嬬缉; update |
 | v3.1.1 | 2026-05-20 | 小旭二手机（西园路）| 修复隧道复制按钮失效问题; 前端版本号自动跟随main.py中VERSION变量 |
 | v3.0.8 | 2026-05-17 | 小旭二手机（西园路）| 隧道共享功能增强 - 可点击链接、一键复制、启动预下载hostc |
 | v3.0.7 | 2026-05-17 | 小旭二手机（西园路）| 优化隧道共享功能 + 跨平台兼容性增强 |
@@ -4011,7 +4013,7 @@ class TestBoundaryConditions:
         """Unicode字符输入"""
         unicode_commands = [
             {'command': 'echo 中文测试'},
-            {'command': 'echo 日本語テスト'},
+            {'command': 'echo 日本语テスト'},
             {'command': 'echo 🎉🚀emoji测试'},
             {'command': 'echo العربية'},
         ]
