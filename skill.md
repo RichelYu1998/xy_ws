@@ -21,10 +21,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.07 (2026-08-22) - 🔧 跨平台零硬编码重构 + Playwright自动安装兜底
+> **📌 当前版本**: v3.8.90.08 (2026-08-22) - 🔧 Playwright多镜像源安装 + 系统Chrome回退兜底
 >
 > **⚠️ 重要更新**:
-> - **v3.8.90.07**: 🔧 **跨平台零硬编码重构** — Environment类新增EXE_SUFFIX/NODE_PROCESS_NAME/HOSTC_PROCESS_NAME平台常量，get_chrome_path()拆分为4个方法实现三层防护（Playwright路径预检→系统Chrome回退→自动安装兜底），find_cloudflared_binary()动态扫描，allowed_exe动态生成，消除所有硬编码路径和.exe后缀
+> - **v3.8.90.08**: 🔧 **Playwright多镜像源安装+系统Chrome回退** — install_playwright_cdn()修复URL双斜杠404，3处try-except统一使用多镜像源安装（npmmirror→azureedge→cdn），安装失败回退系统Chrome而非崩溃，四层防护（路径预检→多镜像源安装→系统Chrome回退→报错提示）
 > - **v3.8.90.06**: 🐍 Python 3.14兼容性修复 + 启动脚本pip强制升级
 > - **v3.8.90.02**: 🐍 **重大架构优化** — requirements.txt依赖版本策略从固定版本(==)改为兼容性版本范围(>=,<)，实现Python 3.0+**全版本兼容**
 > - v3.8.90.01: 移除中间件API Key/本地IP/Origin认证拦截逻辑，/api/bootstrap取消本地访问限制，解决局域网(192.168.x.x)和公网隧道(Cloudflare/hostc动态域名)访问时403"访问被拒绝:缺少有效认证"的问题
@@ -1867,34 +1867,30 @@ D:/ws/xy_ws/
 
 ---
 
-## 🔄 最新更新 (v3.8.90.07)
+## 🔄 最新更新 (v3.8.90.08)
 
-### 🔧 跨平台零硬编码重构 + Playwright自动安装兜底 — 消除所有平台特定硬编码路径，浏览器启动三层防护
+### v3.8.90.08 (2026-08-22) - 🔧 Playwright多镜像源安装 + 系统Chrome回退兜底
 
-#### 更新内容: 重构Environment类实现全平台零硬编码路径检测，Playwright浏览器启动增加三层防护
+**修复问题**: npmmirror镜像源未同步chromium-1217版本，导致`playwright install chromium`返回404，程序直接崩溃
 
-**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**核心改动**:
 
----
+1. **install_playwright_cdn() URL双斜杠修复**
+   - CDN URL去掉末尾`/`，`PLAYWRIGHT_DOWNLOAD_HOST`设置时`rstrip("/")`
+   - 消除`https://npmmirror.com/mirrors/playwright//builds/...`双斜杠
 
-- **Environment类新增平台常量** — EXE_SUFFIX / NODE_PROCESS_NAME / HOSTC_PROCESS_NAME
-- **get_chrome_path()拆分为4个方法** — _get_playwright_browsers_dir() / _find_playwright_chromium() / _find_system_chrome() / get_chrome_path()
-- **Playwright启动try-except自动安装 (3处)** — 捕获`Executable doesn't exist`→自动安装→重试
-- **find_cloudflared_binary()重构** — os.listdir()动态扫描 + os.access(X_OK) + 跨平台常见路径
-- **hostc进程名统一** — Environment.HOSTC_PROCESS_NAME
-- **allowed_exe动态生成** — sys.executable + EXE_SUFFIX
-- **get_venv_python()重构** — os.path.basename(sys.executable) 动态获取
+2. **3处try-except统一使用install_playwright_cdn()**
+   - 替换简单`subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'])`
+   - 多镜像源自动切换：npmmirror → azureedge → cdn
+   - 某镜像404时自动尝试下一个
 
-- **代码规范遵循**
-  - ✅ PY-CORE-002: 环境自适应范式（全面升级，零硬编码）
-  - ✅ PY-CORE-003: 统一路径管理范式（消除所有硬编码路径）
-  - ✅ PY-CORE-006: 浏览器自动化爬虫（三层防护）
+3. **安装失败后回退系统Chrome**
+   - 安装后重试`executable_path=None`（Playwright内置）
+   - 仍失败则`Environment._find_system_chrome()`获取系统Chrome
+   - 系统Chrome也不可用才报错
 
-- **验证结果**
-  - [x] main.py语法检查 → Syntax OK ✅
-  - [x] 硬编码检查 → 0处.exe硬编码 / 0处路径硬编码 ✅
+4. **四层防护架构**: Playwright路径预检 → 多镜像源自动安装 → 系统Chrome回退 → 友好报错提示
 
----
 
 ## 🔄 历史更新 (v3.8.90.06)
 
@@ -3214,7 +3210,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
-| v3.8.90.07 | 2026-08-22 | 小旭二手机（西园路） | 🔧 跨平台零硬编码重构+Playwright自动安装兜底(Environment EXE_SUFFIX/动态路径检测/三层防护/cloudflared动态扫描/allowed_exe动态生成) |
+| v3.8.90.08 | 2026-08-22 | 小旭二手机（西园路） | 🔧 Playwright多镜像源安装+系统Chrome回退兜底(URL双斜杠修复/多镜像源自动切换/安装失败回退系统Chrome/四层防护) |
 | v3.8.90.06 | 2026-08-22 | 小旭二手机（西园路） | 🐍 Python 3.14兼容性修复+启动脚本pip强制升级+run.bat BOM修复+日志文件锁修复(pydantic<2.13.0/pip upgrade/UTF-8无BOM/先杀进程再初始化日志) |
 | v3.8.90.00 | 2026-08-21 | 小旭二手机（西园路） | 🔒 安全隐患全面修复+隐藏Bug清零(P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager未定义/CSRF Host头回退绕过/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留) |
 | v3.8.89.32 | 2026-08-21 | 小旭二手机（西园路） | 🔧 hostc WebSocket安全关闭补丁重新应用(patch-package未生效修复+safeCloseWebSocket2状态感知关闭重新应用+补丁持久化验证) |

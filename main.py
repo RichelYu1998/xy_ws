@@ -4981,15 +4981,19 @@ class WegoScraper:
                 except Exception as launch_err:
                     if 'Executable doesn\'t exist' in str(launch_err) or 'executable doesn\'t exist' in str(launch_err).lower():
                         print('Playwright内置Chromium不存在，正在自动安装浏览器...')
-                        import subprocess
+                        install_playwright_cdn()
                         try:
-                            subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], check=True)
-                            print('浏览器安装完成，正在重新启动...')
-                            browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
-                        except Exception as install_err:
-                            print(f'自动安装失败: {install_err}')
-                            print('请手动运行: python -m playwright install chromium')
-                            raise
+                            browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=None)
+                            print('浏览器安装完成，使用Playwright内置Chromium启动成功')
+                        except Exception as retry_err:
+                            fallback_chrome = Environment._find_system_chrome()
+                            if fallback_chrome:
+                                print(f'Playwright内置Chromium仍不可用，回退到系统Chrome: {fallback_chrome}')
+                                browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=fallback_chrome)
+                            else:
+                                print(f'自动安装失败且无系统Chrome可用: {retry_err}')
+                                print('请手动运行: python -m playwright install chromium')
+                                raise
                     else:
                         raise
                 print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
@@ -5905,19 +5909,27 @@ def update_cookie():
             except Exception as launch_err:
                 if "Executable doesn't exist" in str(launch_err) or "executable doesn't exist" in str(launch_err).lower():
                     print('Playwright内置Chromium不存在，正在自动安装浏览器...')
-                    import subprocess
+                    install_playwright_cdn()
                     try:
-                        subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], check=True)
-                        print('浏览器安装完成，正在重新启动...')
                         browser = await p.chromium.launch(
                             headless=False, 
                             args=browser_args, 
-                            executable_path=chrome_path
+                            executable_path=None
                         )
-                    except Exception as install_err:
-                        print(f'自动安装失败: {install_err}')
-                        print('请手动运行: python -m playwright install chromium')
-                        raise
+                        print('浏览器安装完成，使用Playwright内置Chromium启动成功')
+                    except Exception as retry_err:
+                        fallback_chrome = Environment._find_system_chrome()
+                        if fallback_chrome:
+                            print(f'Playwright内置Chromium仍不可用，回退到系统Chrome: {fallback_chrome}')
+                            browser = await p.chromium.launch(
+                                headless=False, 
+                                args=browser_args, 
+                                executable_path=fallback_chrome
+                            )
+                        else:
+                            print(f'自动安装失败且无系统Chrome可用: {retry_err}')
+                            print('请手动运行: python -m playwright install chromium')
+                            raise
                 else:
                     raise
             
@@ -6127,9 +6139,9 @@ def check_deps_satisfied(requirements_file="requirements.txt"):
 def install_playwright_cdn():
     """Playwright CDN智能测速+安装"""
     CDNS = [
-        ("npmmirror", "https://npmmirror.com/mirrors/playwright/"),
-        ("azureedge", "https://playwright.azureedge.net/builds/"),
-        ("cdn", "https://cdn.playwright.dev/"),
+        ("npmmirror", "https://npmmirror.com/mirrors/playwright"),
+        ("azureedge", "https://playwright.azureedge.net/builds"),
+        ("cdn", "https://cdn.playwright.dev"),
     ]
 
     def test_cdn(name, url):
@@ -6155,18 +6167,17 @@ def install_playwright_cdn():
         results.sort(key=lambda x: x[2])
         fastest_name, fastest_url, fastest_time = results[0]
         print(f"[*] 最终选择最快Playwright CDN: {fastest_name} ({fastest_time}秒)")
-        download_order = [(n, u) for n, u, _ in results if n != fastest_name]
-        download_order.insert(0, (fastest_name, fastest_url))
+        download_order = [(n, u) for n, u, _ in results]
     else:
         print("[WARNING] 所有CDN连通性测试失败，使用官方CDN下载")
-        download_order = [("cdn", "https://cdn.playwright.dev/")]
+        download_order = [("cdn", "https://cdn.playwright.dev")]
 
     print("[*] 安装Playwright浏览器...")
     installed = False
     for name, url in download_order:
         print(f"    尝试从 {name} 下载...", flush=True)
         env = os.environ.copy()
-        env["PLAYWRIGHT_DOWNLOAD_HOST"] = url
+        env["PLAYWRIGHT_DOWNLOAD_HOST"] = url.rstrip("/")
         result = subprocess.run(
             [sys.executable, "-m", "playwright", "install", "chromium"],
             capture_output=True, text=True, env=env
@@ -6175,10 +6186,14 @@ def install_playwright_cdn():
             print(f"[*] Playwright浏览器安装成功 (来源: {name})")
             installed = True
             break
+        if result.stderr:
+            for err_line in result.stderr.split('\n'):
+                if 'Error:' in err_line or '404' in err_line:
+                    print(f"    {err_line.strip()}")
         print(f"    {name} 下载失败，尝试下一个...")
 
     if not installed:
-        print("[WARNING] Playwright浏览器安装失败，将在首次运行时自动安装")
+        print("[WARNING] Playwright浏览器安装失败，将尝试使用系统Chrome")
 
 
 if __name__ == '__main__':
@@ -6240,15 +6255,19 @@ if __name__ == '__main__':
                 except Exception as launch_err:
                     if "Executable doesn't exist" in str(launch_err) or "executable doesn't exist" in str(launch_err).lower():
                         print('Playwright内置Chromium不存在，正在自动安装浏览器...')
-                        import subprocess
+                        install_playwright_cdn()
                         try:
-                            subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], check=True)
-                            print('浏览器安装完成，正在重新启动...')
                             browser = await p.chromium.launch(headless=False)
-                        except Exception as install_err:
-                            print(f'自动安装失败: {install_err}')
-                            print('请手动运行: python -m playwright install chromium')
-                            raise
+                            print('浏览器安装完成，使用Playwright内置Chromium启动成功')
+                        except Exception as retry_err:
+                            fallback_chrome = Environment._find_system_chrome()
+                            if fallback_chrome:
+                                print(f'Playwright内置Chromium仍不可用，回退到系统Chrome: {fallback_chrome}')
+                                browser = await p.chromium.launch(headless=False, executable_path=fallback_chrome)
+                            else:
+                                print(f'自动安装失败且无系统Chrome可用: {retry_err}')
+                                print('请手动运行: python -m playwright install chromium')
+                                raise
                     else:
                         raise
                 context = await browser.new_context(
