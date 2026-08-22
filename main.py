@@ -2001,7 +2001,7 @@ def sec_sp(base_dir, user_path):
 app = FastAPI(
     title="Szwego商品爬虫",
     description="Szwego商品爬虫Web服务",
-    version="3.8.90.01",
+    version=get_version_from_readme(),
     docs_url=None,
     redoc_url=None,
     openapi_url=None)
@@ -2011,16 +2011,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 if CORSMiddleware:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost",
-            "http://localhost:8888",
-            "http://127.0.0.1",
-            "http://127.0.0.1:8888",
-            "http://localhost:5000",
-            "http://127.0.0.1:5000",
-            "http://localhost:8080",
-            "http://127.0.0.1:8080",
-        ],
+        allow_origins=_get_allowed_origins(),
         allow_credentials=True,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key"],
@@ -2029,12 +2020,7 @@ if CORSMiddleware:
 # ============================================================
 # CSRF 防护常量 (v3.8.89.29) - API Key 在 ConfigManager 定义后初始化
 # ============================================================
-LOCAL_TRUSTED_ORIGINS = frozenset([
-    'http://localhost', 'http://127.0.0.1',
-    'http://localhost:8888', 'http://127.0.0.1:8888',
-    'http://localhost:5000', 'http://127.0.0.1:5000',
-    'http://localhost:8080', 'http://127.0.0.1:8080',
-])
+LOCAL_TRUSTED_ORIGINS = frozenset(_get_allowed_origins())
 
 def _is_private_ip(ip_str):
     try:
@@ -2827,7 +2813,7 @@ class PathManager:
             
             # 更新或创建文件
             with open(tunnel_file, 'w', encoding='utf-8') as f:
-                port = 8888
+                port = args.port if "args" in dir() and hasattr(args, "port") else int(os.environ.get("WEB_PORT", "8888"))
                 tunnel_name = url.split('//')[1].split('.')[0] if '//' in url else 'unknown'
                 
                 f.write(f"Success  Tunnel ready\n")
@@ -3057,7 +3043,7 @@ class PathManager:
                         print(f"[Tunnel] 更新 web_output.log 失败: {e}")
                     
                     try:
-                        port = args.port if 'args' in dir() and hasattr(args, 'port') else 8888
+                        port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
                         lan_ip = PathManager.get_lan_ip()
                         header = f"""==================================================
 Szwego商品爬虫 - Web服务
@@ -5831,7 +5817,7 @@ def main():
         
         def start_web():
             print('\n正在启动Web服务...')
-            print(f'访问地址: http://localhost:{args.port if "args" in dir() and hasattr(args, "port") else 8888} (默认端口)')
+            print(f'访问地址: http://localhost:{args.port if "args" in dir() and hasattr(args, "port") else int(os.environ.get("WEB_PORT", "8888"))} (默认端口)')
             print('按 Ctrl+C 停止服务\n')
 
             subprocess.Popen([VENV_PYTHON, 'main.py', '--web'])
@@ -6478,12 +6464,7 @@ if __name__ == '__main__':
             response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=(), payment=()'
 
             origin = request.headers.get('origin', '')
-            allowed_origins = [
-                'http://localhost:5000',
-                'http://127.0.0.1:5000',
-                'http://localhost:8080',
-                'http://127.0.0.1:8080',
-            ]
+            allowed_origins = list(LOCAL_TRUSTED_ORIGINS)
 
             if path.startswith('/api/') or path in ['/run', '/input', '/kill']:
                 if origin and origin in allowed_origins:
@@ -8848,7 +8829,7 @@ if __name__ == '__main__':
                 if existing_cf:
                     pass
                 else:
-                    port = args.port if "args" in globals() and hasattr(args, "port") else 8888
+                    port = args.port if "args" in globals() and hasattr(args, "port") else int(os.environ.get('WEB_PORT', '8888'))
                     print(f"[Tunnel] 🚀 启动新的 Cloudflare Tunnel...")
                     cf_result = start_cloudflare_tunnel(port=port)
                     if cf_result and cf_result.get('success'):
@@ -8858,7 +8839,7 @@ if __name__ == '__main__':
                         cf_err = cf_result.get('error', '未知') if cf_result else '未知'
                         print(f"[Tunnel] ⚠️ Cloudflare Tunnel 启动失败: {cf_err}")
             elif cf_binary:
-                port = args.port if "args" in globals() and hasattr(args, "port") else 8888
+                port = args.port if "args" in globals() and hasattr(args, "port") else int(os.environ.get('WEB_PORT', '8888'))
                 print(f"[Tunnel] 🚀 强制重启 Cloudflare Tunnel...")
                 cf_result = start_cloudflare_tunnel(port=port)
                 if cf_result and cf_result.get('success'):
@@ -8996,8 +8977,9 @@ if __name__ == '__main__':
                     hostc_bin = 'npx hostc'
                 
                 if not isinstance(port, int) or not (1 <= port <= 65535):
-                    print(f"[Tunnel] ⚠️ 无效的端口号: {port}, 使用默认8888")
-                    port = 8888
+                    default_port = int(os.environ.get('WEB_PORT', '8888'))
+                    print(f"[Tunnel] ⚠️ 无效的端口号: {port}, 使用默认{default_port}")
+                    port = default_port
                 
                 env = os.environ.copy()
                 env['HOSTC_DEBUG'] = '1'
@@ -9461,10 +9443,13 @@ ingress:
 
             return tunnel_id, config_yml_path
 
-        def start_cloudflare_tunnel(port=8888, timeout=120):
+        def start_cloudflare_tunnel(port=None, timeout=120):
             """启动 Cloudflare Tunnel（Plan A: Named Tunnel → Plan B: Quick Tunnel，保底至少成功一个）
             启动成功后由 cf_heartbeat_loop 独立验证并发邮件"""
             global cf_process, cf_url, cf_mode
+
+            if port is None:
+                port = int(os.environ.get('WEB_PORT', '8888'))
 
             cf_binary = find_cloudflared_binary()
             if not cf_binary:
