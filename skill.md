@@ -21,9 +21,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.09 (2026-08-22) - 🔧 WEB_PORT环境变量消除硬编码端口 + Playwright安装优化 + 浏览器状态API
+> **📌 当前版本**: v3.8.90.10 (2026-08-24) - 📱 移动端双表联动修复 — 消除滚动同步抖动+点击行联动高亮
 >
 > **⚠️ 重要更新**:
+> - **v3.8.90.10**: 📱 **移动端双表联动修复** — 消除移动端滚动同步抖动(programmaticScroll标志位+双重rAF)，新增点击行联动高亮(toggleLinkedHighlight)，搜索时清除联动状态，PC端与移动端统一联动体验
 > - **v3.8.90.09**: 🔧 **WEB_PORT环境变量+Playwright安装优化+浏览器状态API** — 消除所有硬编码8888端口改为WEB_PORT环境变量，_get_allowed_origins()动态生成CORS源，install_playwright_cdn()本地已有浏览器跳过安装+CDN测速改HEAD请求，playwright锁定1.52.0匹配本地chromium，/api/bootstrap新增浏览器状态字段(playwright_chromium/system_chrome/browser_ready)，run.sh修复shebang
 > - **v3.8.90.08**: 🔧 **Playwright多镜像源安装+系统Chrome回退** — install_playwright_cdn()修复URL双斜杠404，3处try-except统一使用多镜像源安装（npmmirror→azureedge→cdn），安装失败回退系统Chrome而非崩溃，四层防护（路径预检→多镜像源安装→系统Chrome回退→报错提示）
 > - **v3.8.90.06**: 🐍 Python 3.14兼容性修复 + 启动脚本pip强制升级
@@ -1882,6 +1883,39 @@ D:/ws/xy_ws/
 
 ## 🔄 最新更新 (v3.8.90.09)
 
+### v3.8.90.10 (2026-08-24) - 📱 移动端双表联动修复 — 消除滚动同步抖动+点击行联动高亮
+
+**修复问题**: 移动端触摸滚动时总商品列表与高价商品表格来回抖动（滚动同步死循环），PC端正常但移动端无法使用双表联动
+
+**核心改动**:
+
+1. **移动端双表滚动同步抖动修复**
+   - 根因: `syncScroll`设置表格B的`scrollTop`触发表格B的`scroll`事件，反向同步回表格A形成循环
+   - 新增`programmaticScroll`标志位: 区分用户滚动与程序化滚动
+   - 双重`requestAnimationFrame`: 确保浏览器完成渲染后才重置标志位，避免循环触发
+   - 移动端和PC端统一使用同一套滚动同步逻辑
+
+2. **点击行联动高亮 (toggleLinkedHighlight)**
+   - 新增`toggleLinkedHighlight(sku)`函数: 查找所有表格中相同货号的行
+   - 设置蓝色高亮(`#bbdefb`)并平滑滚动到对应位置
+   - 再次点击同一行取消高亮，点击不同行切换高亮
+   - 行渲染添加`onclick`事件触发联动
+   - 货号链接点击也支持联动（复用`toggleLinkedHighlight`替代原`highlightRow`+`scrollToSku`）
+
+3. **搜索时清除联动状态**
+   - 搜索过滤时自动清除之前的高亮联动状态
+   - 避免搜索后残留高亮行导致视觉混乱
+
+**修复效果**:
+| 指标 | 修改前 | 修改后 |
+|------|--------|--------|
+| **移动端滚动同步** | ❌ 来回抖动 | ✅ 平滑同步 |
+| **PC端滚动同步** | ✅ 正常 | ✅ 正常 |
+| **点击行联动** | ❌ 仅PC端hover | ✅ PC+移动端点击联动 |
+| **搜索联动清除** | ❌ 残留高亮 | ✅ 自动清除 |
+
+---
+
 ### v3.8.90.09 (2026-08-22) - 🔧 WEB_PORT环境变量消除硬编码端口 + Playwright安装优化 + 浏览器状态API
 
 **修复问题**: 端口8888在run.bat/run.sh/main.py中硬编码10+处，改端口需改多处代码；install_playwright_cdn()每次启动都尝试安装即使本地已有浏览器；CDN测速下载大文件浪费流量；playwright版本范围过宽导致chromium版本不匹配
@@ -3282,6 +3316,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.90.10 | 2026-08-24 | 小旭二手机（西园路） | 📱 移动端双表联动修复(programmaticScroll标志位+双重rAF消除抖动/toggleLinkedHighlight点击行联动高亮/搜索清除联动状态) |
 | v3.8.90.09 | 2026-08-22 | 小旭二手机（西园路） | 🔧 WEB_PORT环境变量消除硬编码端口+Playwright安装优化+浏览器状态API(_get_allowed_origins动态CORS/本地已有浏览器跳过安装/CDN测速HEAD请求/playwright锁定1.52.0/api/bootstrap浏览器状态字段/run.sh修复shebang) |
 | v3.8.90.08 | 2026-08-22 | 小旭二手机（西园路） | 🔧 Playwright多镜像源安装+系统Chrome回退兜底(URL双斜杠修复/多镜像源自动切换/安装失败回退系统Chrome/四层防护) |
 | v3.8.90.07 | 2026-08-22 | 小旭二手机（西园路） | 🔧 跨平台零硬编码重构+Playwright自动安装兜底(Environment EXE_SUFFIX/动态路径检测/三层防护/cloudflared动态扫描/allowed_exe动态生成) |

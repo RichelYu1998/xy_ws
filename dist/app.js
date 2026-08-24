@@ -380,6 +380,8 @@
             panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         
+        let _activeLinkedSku = null;
+
         function highlightRow(sku, allProductsData) {
             const data = allProductsData || window.allProductsData;
             document.querySelectorAll(`tr[data-sku="${sku}"]`).forEach(row => {
@@ -403,6 +405,30 @@
                     else row.style.background = '';
                 } else {
                     row.style.background = '';
+                }
+            });
+        }
+
+        function toggleLinkedHighlight(sku) {
+            if (!sku) return;
+            if (_activeLinkedSku && _activeLinkedSku !== sku) {
+                unhighlightRow(_activeLinkedSku);
+            }
+            if (_activeLinkedSku === sku) {
+                unhighlightRow(sku);
+                _activeLinkedSku = null;
+                return;
+            }
+            _activeLinkedSku = sku;
+            highlightRow(sku);
+            const allRows = document.querySelectorAll(`tr[data-sku="${sku}"]`);
+            allRows.forEach(row => {
+                const container = row.closest('.change-table-container');
+                if (container) {
+                    const rowRect = row.getBoundingClientRect();
+                    const containerRect = container.getBoundingClientRect();
+                    const rowTop = row.offsetTop - container.offsetTop;
+                    container.scrollTo({ top: rowTop - container.clientHeight / 3, behavior: 'smooth' });
                 }
             });
         }
@@ -908,8 +934,7 @@
                     var sku = skuLink.dataset.sku;
                     if (sku) {
                         console.log('[按钮点击] 查看商品详情:', sku);
-                        highlightRow(sku);
-                        scrollToSku(sku);
+                        toggleLinkedHighlight(sku);
                         searchProductBySku(sku);
                     }
                     return;
@@ -2118,6 +2143,11 @@
             
             if (!searchInput || !searchResultsCount) return;
             
+            if (_activeLinkedSku) {
+                unhighlightRow(_activeLinkedSku);
+                _activeLinkedSku = null;
+            }
+            
             const allRows = document.querySelectorAll('#products-content tbody tr');
             
             const badgeMap = {
@@ -2385,7 +2415,7 @@
                         else if (isAdded) rowStyle = 'background: #e3f2fd;';
                         const descDisplay = desc;
                         
-                        tableHtml += `<tr data-sku="${sku}" data-desc="${desc.replace(/"/g, '&quot;')}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')">
+                        tableHtml += `<tr data-sku="${sku}" data-desc="${desc.replace(/"/g, '&quot;')}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${sku}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0)" data-sku="${escapeAttr(sku)}" class="sku-link">${escapeHtml(sku) || '-'}</a></td>
                             <td><a href="javascript:void(0)" data-desc="${escapeAttr(desc)}" class="desc-link" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${escapeHtml(descDisplay)}</a></td>
@@ -2473,12 +2503,11 @@
                     }
                     
                     const tableContainers = productsContent.querySelectorAll('.change-table-container');
-                    let isScrolling = false;
+                    let programmaticScroll = false;
                     
-                    // 统一的滚动同步函数
                     function syncScroll(sourceContainer, sourceIndex) {
-                        if (isScrolling) return;
-                        isScrolling = true;
+                        if (programmaticScroll) return;
+                        programmaticScroll = true;
                         
                         const scrollTop = sourceContainer.scrollTop;
                         const scrollLeft = sourceContainer.scrollLeft;
@@ -2490,30 +2519,21 @@
                             }
                         });
                         
-                        setTimeout(() => { isScrolling = false; }, 10);
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                programmaticScroll = false;
+                            });
+                        });
                     }
                     
-                    // 为每个表格容器添加滚动事件（桌面端）
                     tableContainers.forEach((container, index) => {
                         container.addEventListener('scroll', function(e) {
-                            syncScroll(e.target, index);
-                        });
-                        
-                        // 移动端触摸滚动支持
-                        let touchStartY = 0;
-                        let touchStartX = 0;
-                        
-                        container.addEventListener('touchstart', function(e) {
-                            touchStartY = e.touches[0].clientY;
-                            touchStartX = e.touches[0].clientX;
-                        }, { passive: true });
-                        
-                        container.addEventListener('touchmove', function(e) {
-                            syncScroll(e.target, index);
+                            const target = e.target.closest('.change-table-container') || container;
+                            syncScroll(target, index);
                         }, { passive: true });
                     });
                     
-                    const isMobile = window.innerWidth < 576;
+                    const isMobile = window.innerWidth < 768;
                     if (!isMobile) {
                         productsContent.scrollTop = productsContent.scrollHeight;
                     }
