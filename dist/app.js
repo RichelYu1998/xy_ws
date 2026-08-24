@@ -2027,7 +2027,7 @@
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.addedProducts.map((p, idx) => `<tr>
+                                        ${skuData.addedProducts.map((p, idx) => `<tr data-sku="${escapeAttr(p.sku)}" onmouseover="highlightRow('${escapeAttr(p.sku)}')" onmouseout="unhighlightRow('${escapeAttr(p.sku)}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${escapeAttr(p.sku)}')">
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0)" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(p.sku)}</a></td>
                                             <td style="word-break: break-word; white-space: normal; min-width: 200px;"><a href="javascript:void(0)" data-desc="${escapeAttr(p.name || '')}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</a></td>
@@ -2048,9 +2048,9 @@
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.deletedProducts.map((p, idx) => `<tr>
+                                        ${skuData.deletedProducts.map((p, idx) => `<tr data-sku="${escapeAttr(p.sku)}" onmouseover="highlightRow('${escapeAttr(p.sku)}')" onmouseout="unhighlightRow('${escapeAttr(p.sku)}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${escapeAttr(p.sku)}')">
                                             <td>${idx + 1}</td>
-                                            <td>${escapeHtml(p.sku)}</td>
+                                            <td><a href="javascript:void(0)" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(p.sku)}</a></td>
                                             <td style="word-break: break-word; white-space: normal; min-width: 200px;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
@@ -2069,7 +2069,7 @@
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.newHighPriceProducts.map((p, idx) => `<tr>
+                                        ${skuData.newHighPriceProducts.map((p, idx) => `<tr data-sku="${escapeAttr(p.sku)}" onmouseover="highlightRow('${escapeAttr(p.sku)}')" onmouseout="unhighlightRow('${escapeAttr(p.sku)}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${escapeAttr(p.sku)}')">
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0)" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(p.sku)}</a></td>
                                             <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><a href="javascript:void(0)" data-desc="${escapeAttr(p.name || '')}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${escapeAttr(p.name || '')}">${escapeHtml(p.name || '-')}</a></td>
@@ -2506,43 +2506,108 @@
                     }
                     
                     const tableContainers = productsContent.querySelectorAll('.change-table-container');
+                    console.log('[联动初始化] 找到表格容器数量:', tableContainers.length);
+                    tableContainers.forEach((container, idx) => {
+                        console.log('[联动初始化] 表格容器', idx, ':', container.querySelector('.change-title')?.textContent || '未知');
+                    });
                     window._programmaticScroll = false;
-                    
+
                     function findFirstVisibleRow(container) {
                         const rows = container.querySelectorAll('tr[data-sku]');
                         const containerRect = container.getBoundingClientRect();
+                        const scrollTop = container.scrollTop;
+                        const scrollHeight = container.scrollHeight;
+                        const clientHeight = container.clientHeight;
+                        const isAtBottom = Math.abs(scrollTop + clientHeight - scrollHeight) < 5;
+
+                        console.log('[findFirstVisibleRow] 容器信息 - scrollTop:', scrollTop, ', scrollHeight:', scrollHeight, ', clientHeight:', clientHeight, ', 是否在底部:', isAtBottom);
+                        console.log('[findFirstVisibleRow] 总行数:', rows.length);
+
+                        const viewMid = containerRect.top + containerRect.height / 2;
+                        let closestRow = null;
+                        let closestDist = Infinity;
+                        let lastFullyVisibleRow = null;
+                        let lastPartiallyVisibleRow = null;
+
                         for (const row of rows) {
                             const rowRect = row.getBoundingClientRect();
-                            if (rowRect.bottom > containerRect.top + 30 && rowRect.top < containerRect.bottom) {
-                                return row;
+                            const isInView = rowRect.bottom > containerRect.top && rowRect.top < containerRect.bottom;
+
+                            if (isInView) {
+                                const rowMid = (rowRect.top + rowRect.bottom) / 2;
+                                const dist = Math.abs(rowMid - viewMid);
+                                if (dist < closestDist) {
+                                    closestDist = dist;
+                                    closestRow = row;
+                                }
+
+                                if (rowRect.top >= containerRect.top && rowRect.bottom <= containerRect.bottom) {
+                                    lastFullyVisibleRow = row;
+                                }
+                                lastPartiallyVisibleRow = row;
+                            } else if (rowRect.top < containerRect.bottom) {
+                                lastPartiallyVisibleRow = row;
                             }
                         }
-                        return null;
+
+                        let resultRow = null;
+                        if (isAtBottom && lastPartiallyVisibleRow) {
+                            resultRow = lastPartiallyVisibleRow;
+                            console.log('[findFirstVisibleRow] ✅ 检测到滚动到底部, 返回最后可见行:', resultRow.getAttribute('data-sku'));
+                        } else {
+                            resultRow = closestRow || lastFullyVisibleRow || lastPartiallyVisibleRow;
+                            console.log('[findFirstVisibleRow] 📍 返回中心行或最后可见行:', resultRow ? resultRow.getAttribute('data-sku') : '无');
+                        }
+
+                        return resultRow;
                     }
                     
                     function syncScroll(sourceContainer, sourceIndex) {
                         if (window._programmaticScroll) return;
                         window._programmaticScroll = true;
-                        
+
                         const scrollLeft = sourceContainer.scrollLeft;
-                        
+
                         const visibleRow = findFirstVisibleRow(sourceContainer);
+                        console.log('[联动] 源表格索引:', sourceIndex, ', 可见行SKU:', visibleRow ? visibleRow.getAttribute('data-sku') : '无');
+
                         if (visibleRow) {
                             const sku = visibleRow.getAttribute('data-sku');
-                            const sourceRowRect = visibleRow.getBoundingClientRect();
-                            const sourceContainerRect = sourceContainer.getBoundingClientRect();
-                            const offsetInView = sourceRowRect.top - sourceContainerRect.top;
-                            
+
                             tableContainers.forEach((otherContainer, otherIndex) => {
                                 if (otherIndex !== sourceIndex) {
                                     if (sku) {
                                         const targetRow = otherContainer.querySelector(`tr[data-sku="${sku}"]`);
+                                        console.log('[联动] 目标表格索引:', otherIndex, ', 查找SKU:', sku, ', 找到行:', !!targetRow);
+
                                         if (targetRow) {
-                                            const targetRowRect = targetRow.getBoundingClientRect();
-                                            const otherContainerRect = otherContainer.getBoundingClientRect();
-                                            const targetRelativeTop = targetRowRect.top - otherContainerRect.top + otherContainer.scrollTop;
-                                            otherContainer.scrollTop = targetRelativeTop - offsetInView;
+                                            const sourceRowRect = visibleRow.getBoundingClientRect();
+                                            const sourceContainerRect = sourceContainer.getBoundingClientRect();
+
+                                            const offsetFromTop = sourceRowRect.top - sourceContainerRect.top;
+                                            const containerHeight = otherContainer.clientHeight;
+
+                                            let targetScrollTop;
+                                            if (sourceContainer.scrollTop + sourceContainer.clientHeight >= sourceContainer.scrollHeight - 5) {
+                                                console.log('[联动] 🎯 源表格在底部, 将目标行滚动到目标表格底部');
+                                                const targetRowHeight = targetRow.offsetHeight || 40;
+                                                const tableBody = otherContainer.querySelector('tbody');
+                                                const tbodyOffsetTop = tableBody ? tableBody.offsetTop : 0;
+                                                targetScrollTop = targetRow.offsetTop + targetRowHeight - containerHeight + tbodyOffsetTop + 20;
+                                            } else {
+                                                const tableBody = otherContainer.querySelector('tbody');
+                                                const tbodyOffsetTop = tableBody ? tableBody.offsetTop : 0;
+                                                targetScrollTop = (targetRow.offsetTop - tbodyOffsetTop) - offsetFromTop;
+                                            }
+
+                                            targetScrollTop = Math.max(0, Math.min(targetScrollTop, otherContainer.scrollHeight - containerHeight));
+
+                                            console.log('[联动] 📍 滚动计算 - 源行偏移:', offsetFromTop.toFixed(2), ', 容器高度:', containerHeight, ', 新滚动值:', targetScrollTop);
+
+                                            otherContainer.scrollTop = targetScrollTop;
+                                            console.log('[联动] ✅ 成功同步到目标表格, SKU:', sku, ', 实际scrollTop:', otherContainer.scrollTop);
                                         } else {
+                                            console.log('[联动] ⚠️ 目标表格中未找到SKU:', sku, ', 使用比例滚动');
                                             const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
                                             const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
                                             const scrollRatioY = maxScrollTop > 0 ? sourceContainer.scrollTop / maxScrollTop : 0;
@@ -2558,6 +2623,7 @@
                                 }
                             });
                         } else {
+                            console.log('[联动] ⚠️ 未找到可见行, 使用比例滚动');
                             const scrollTop = sourceContainer.scrollTop;
                             const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
                             const scrollRatioY = maxScrollTop > 0 ? scrollTop / maxScrollTop : 0;
@@ -2569,7 +2635,7 @@
                                 }
                             });
                         }
-                        
+
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
                                 window._programmaticScroll = false;
@@ -2578,11 +2644,16 @@
                     }
                     
                     tableContainers.forEach((container, index) => {
+                        console.log('[联动] 绑定滚动事件到表格容器', index);
                         container.addEventListener('scroll', function(e) {
                             const target = e.target.closest('.change-table-container') || container;
+                            const title = target.querySelector('.change-title')?.textContent || '未知';
+                            console.log('[联动事件] 滚动触发 - 表格:', index, '(', title, ')');
                             syncScroll(target, index);
                         }, { passive: true });
                     });
+
+                    console.log('[联动初始化] ✅ 所有表格容器的滚动事件已绑定完成');
                     
                     const isMobile = window.innerWidth < 768;
                     if (!isMobile) {

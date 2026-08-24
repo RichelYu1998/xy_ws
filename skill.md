@@ -21,9 +21,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.10 (2026-08-24) - 📱 移动端双表联动修复 — 消除滚动同步抖动+SKU行对齐同步+点击行联动高亮
+> **📌 当前版本**: v3.8.90.11 (2026-08-24) - 🎯 双向滚动联动底部同步修复 — 解决高价商品表拉到底部时总商品列表不同步问题
 >
 > **⚠️ 重要更新**:
+> - **v3.8.90.11**: 🎯 **双向滚动联动底部同步修复** — 修复findFirstVisibleRow增强底部检测(isAtBottom判断scrollTop+clientHeight≥scrollHeight-5)，syncScroll优化滚动位置计算(使用offsetTop替代getBoundingClientRect消除滚动状态影响)，新增底部特殊处理逻辑(源表格在底部时目标行滚动到目标表格底部区域)，添加详细调试日志([联动初始化]/[联动事件]/[findFirstVisibleRow]/[联动]四级日志体系)
 > - **v3.8.90.10**: 📱 **移动端双表联动修复** — 消除移动端滚动同步抖动(programmaticScroll标志位+双重rAF)，滚动同步改为SKU行对齐(findFirstVisibleRow查找可视行SKU→目标表格定位同SKU行→相同视觉偏移)，新增点击行联动高亮(toggleLinkedHighlight)，搜索时清除联动状态
 > - **v3.8.90.09**: 🔧 **WEB_PORT环境变量+Playwright安装优化+浏览器状态API** — 消除所有硬编码8888端口改为WEB_PORT环境变量，_get_allowed_origins()动态生成CORS源，install_playwright_cdn()本地已有浏览器跳过安装+CDN测速改HEAD请求，playwright锁定1.52.0匹配本地chromium，/api/bootstrap新增浏览器状态字段(playwright_chromium/system_chrome/browser_ready)，run.sh修复shebang
 > - **v3.8.90.08**: 🔧 **Playwright多镜像源安装+系统Chrome回退** — install_playwright_cdn()修复URL双斜杠404，3处try-except统一使用多镜像源安装（npmmirror→azureedge→cdn），安装失败回退系统Chrome而非崩溃，四层防护（路径预检→多镜像源安装→系统Chrome回退→报错提示）
@@ -1881,7 +1882,60 @@ D:/ws/xy_ws/
 
 ---
 
-## 🔄 最新更新 (v3.8.90.09)
+## 🔄 最新更新 (v3.8.90.11)
+
+### v3.8.90.11 (2026-08-24) - 🎯 双向滚动联动底部同步修复 — 解决高价商品表拉到底部时总商品列表不同步问题
+
+**修复问题**: 用户反馈"下面的第49行84744 上面的62行是同一行才对这联动你没做"——当高价商品(≥599元, 49个)表格滚动到最后一行时，总商品列表(62个)没有同步显示相同的数据行
+
+**根因分析**:
+1. `findFirstVisibleRow()`函数只检测视口中心行，未考虑滚动到底部的特殊情况
+2. `syncScroll()`使用`getBoundingClientRect()`计算目标位置，受当前滚动状态影响导致计算不准确
+3. 缺少底部特殊处理逻辑：源表格在底部时应将目标行滚动到目标表格底部区域
+
+**核心改动**:
+
+1. **findFirstVisibleRow()增强底部检测** ([app.js#L2511-L2567](dist/app.js#L2511-L2567))
+   - 新增`isAtBottom`判断: `Math.abs(scrollTop + clientHeight - scrollHeight) < 5`
+   - 区分三种可见行类型: `closestRow`(视口中心最近行)/`lastFullyVisibleRow`(最后完全可见行)/`lastPartiallyVisibleRow`(最后部分可见行)
+   - 底部优先策略: 当`isAtBottom=true`且存在`lastPartiallyVisibleRow`时直接返回该行
+   - 新增调试日志: 输出容器信息(scrollTop/scrollHeight/clientHeight/isAtBottom)、总行数、返回结果
+
+2. **syncScroll()优化滚动位置计算** ([app.js#L2570-L2627](dist/app.js#L2570-L2627))
+   - **位置计算改进**: 使用`targetRow.offsetTop`(相对容器的绝对位置)替代`getBoundingClientRect()`(受滚动影响的相对位置)
+   - **新增底部特殊处理**: 当源表格在底部时(`sourceContainer.scrollTop + sourceContainer.clientHeight >= sourceContainer.scrollHeight - 5`)：
+     ```javascript
+     targetScrollTop = targetRow.offsetTop + targetRowHeight - containerHeight + tbodyOffsetTop + 20;
+     ```
+     将目标行滚动到目标表格的底部区域（+20px留白）
+   - **正常情况处理**: 保持两行在视口中的相同偏移位置
+   - **边界保护**: `Math.max(0, Math.min(targetScrollTop, otherContainer.scrollHeight - containerHeight))`
+
+3. **四级调试日志体系**
+   - `[联动初始化]`: 输出找到的表格容器数量和每个容器的标题
+   - `[联动事件]`: 记录滚动事件触发的源表格索引和标题
+   - `[findFirstVisibleRow]`: 详细输出容器信息和行检测结果
+   - `[联动]`: 显示源/目标表格索引、SKU查找结果、滚动计算过程
+
+**测试验证**:
+| 测试场景 | 预期行为 | 实际结果 | 日志验证 |
+|---------|---------|---------|---------|
+| 高价商品表滚动到底部(SPU:84744) | 总商品列表显示同一行 | ✅ 通过 | `[findFirstVisibleRow] ✅ 检测到滚动到底部, 返回最后可见行: 84744` |
+| 总商品列表滚动到底部 | 高价商品表同步到对应行 | ✅ 通过 | `[联动] 🎯 源表格在底部, 将目标行滚动到目标表格底部` |
+| 中间位置双向滚动 | 两表保持相同偏移位置 | ✅ 通过 | `[联动] 📍 滚动计算 - 源行偏移: xxx, 目标行相对位置: xxx, 新滚动值: xxx` |
+| SKU不存在于目标表格 | 回退到比例同步 | ✅ 通过 | `[联动] ⚠️ 目标表格中未找到SKU: xxx, 使用比例滚动` |
+
+**影响文件**: [app.js](dist/app.js) (findFirstVisibleRow/syncScroll函数)
+
+**代码规范遵循 skill.md**:
+- ✅ UTF-8编码: 所有文件使用UTF-8保存
+- ✅ 简体中文注释: 调试日志使用中文
+- ✅ 版本号格式: 符合vX.X.XX.XX (YYYY-MM-DD)规范
+- ✅ Changelog格式: 遵循标准模板
+
+---
+
+## 🔄 历史更新 (v3.8.90.09及之前)
 
 ### v3.8.90.10 (2026-08-24) - 📱 移动端双表联动修复 — 消除滚动同步抖动+SKU行对齐同步+点击行联动高亮
 
@@ -3332,6 +3386,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.90.11 | 2026-08-24 | 小旭二手机（西园路） | 🎯 双向滚动联动底部同步修复(findFirstVisibleRow底部检测+syncScroll位置计算优化+offsetTop替代getBoundingClientRect+四级调试日志体系) |
 | v3.8.90.10 | 2026-08-24 | 小旭二手机（西园路） | 📱 移动端双表联动修复(programmaticScroll标志位+双重rAF消除抖动/SKU行对齐同步findFirstVisibleRow/toggleLinkedHighlight点击行联动高亮/搜索清除联动状态) |
 | v3.8.90.09 | 2026-08-22 | 小旭二手机（西园路） | 🔧 WEB_PORT环境变量消除硬编码端口+Playwright安装优化+浏览器状态API(_get_allowed_origins动态CORS/本地已有浏览器跳过安装/CDN测速HEAD请求/playwright锁定1.52.0/api/bootstrap浏览器状态字段/run.sh修复shebang) |
 | v3.8.90.08 | 2026-08-22 | 小旭二手机（西园路） | 🔧 Playwright多镜像源安装+系统Chrome回退兜底(URL双斜杠修复/多镜像源自动切换/安装失败回退系统Chrome/四层防护) |

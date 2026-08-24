@@ -374,6 +374,42 @@ pandoc skill.md -o skill.docx
 
 ## 🔄 最新更新
 
+### v3.8.90.11 (2026-08-24) - 🎯 双向滚动联动底部同步修复 — 解决高价商品表拉到底部时总商品列表不同步问题
+
+#### 更新内容: 修复双向表格滚动联动的底部同步问题，当高价商品(≥599元,49个)表格滚动到最后一行(SPU:84744)时，总商品列表(62个)正确同步显示相同数据行
+
+**影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md)
+
+---
+
+- **findFirstVisibleRow()增强底部检测 (功能改进)** - 新增isAtBottom判断和底部优先策略
+  - 技术细节1: `Math.abs(scrollTop + clientHeight - scrollHeight) < 5` 检测是否滚动到底部
+  - 技术细节2: 区分三种可见行类型(closestRow/lastFullyVisibleRow/lastPartiallyVisibleRow)
+  - 技术细节3: 底部优先返回lastPartiallyVisibleRow，确保最后一行被选中
+  - 参考位置: [dist/app.js#L2511-L2567](dist/app.js#L2511-L2567)
+
+- **syncScroll()优化滚动位置计算 (功能改进)** - 使用offsetTop替代getBoundingClientRect，新增底部特殊处理
+  - 实现方案1: `targetRow.offsetTop` 获取相对容器的绝对位置（不受当前滚动状态影响）
+  - 实现方案2: 底部特殊处理逻辑 `targetScrollTop = targetRow.offsetTop + targetRowHeight - containerHeight + tbodyOffsetTop + 20`
+  - 实现方案3: 边界保护 `Math.max(0, Math.min(targetScrollTop, maxScroll))` 防止越界
+  - 影响范围: 所有双向表格滚动联动场景
+  - 参考位置: [dist/app.js#L2570-L2627](dist/app.js#L2570-L2627)
+
+- **四级调试日志体系 (质量保证)** - 新增完整的联动过程日志输出
+  - ✅ 规范编号: LOG-FRONT-001 (前端日志规范)
+  - 日志级别1: `[联动初始化]` - 输出表格容器数量和标题
+  - 日志级别2: `[联动事件]` - 记录滚动事件触发源
+  - 日志级别3: `[findFirstVisibleRow]` - 详细容器信息和检测结果
+  - 日志级别4: `[联动]` - SKU查找结果和滚动计算过程
+
+- **验证结果** - 测试通过情况
+  - [x] 高价商品表滚动到底部(SPU:84744) → 总商品列表显示同一行 → 结果 ✅
+  - [x] 总商品列表滚动到底部 → 高价商品表同步到对应行 → 结果 ✅
+  - [x] 中间位置双向滚动 → 两表保持相同偏移位置 → 结果 ✅
+  - [x] SKU不存在于目标表格 → 回退到比例同步 → 结果 ✅
+
+---
+
 ### v3.8.90.10 (2026-08-24) - 📱 移动端双表联动修复 — 消除滚动同步抖动+SKU行对齐同步+点击行联动高亮
 
 #### 更新内容: 修复移动端总商品列表与高价商品表格滚动联动抖动问题，滚动同步改为SKU行对齐（两个表格始终展示同一SKU行在同一视觉位置），新增点击行联动高亮功能
