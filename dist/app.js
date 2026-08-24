@@ -427,8 +427,11 @@
                 if (container) {
                     const rowRect = row.getBoundingClientRect();
                     const containerRect = container.getBoundingClientRect();
-                    const rowTop = row.offsetTop - container.offsetTop;
-                    container.scrollTo({ top: rowTop - container.clientHeight / 3, behavior: 'smooth' });
+                    const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
+                    const targetScrollTop = relativeTop - container.clientHeight / 3;
+                    window._programmaticScroll = true;
+                    container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+                    setTimeout(() => { window._programmaticScroll = false; }, 500);
                 }
             });
         }
@@ -2503,7 +2506,7 @@
                     }
                     
                     const tableContainers = productsContent.querySelectorAll('.change-table-container');
-                    let programmaticScroll = false;
+                    window._programmaticScroll = false;
                     
                     function findFirstVisibleRow(container) {
                         const rows = container.querySelectorAll('tr[data-sku]');
@@ -2518,24 +2521,27 @@
                     }
                     
                     function syncScroll(sourceContainer, sourceIndex) {
-                        if (programmaticScroll) return;
-                        programmaticScroll = true;
+                        if (window._programmaticScroll) return;
+                        window._programmaticScroll = true;
                         
                         const scrollLeft = sourceContainer.scrollLeft;
                         
                         const visibleRow = findFirstVisibleRow(sourceContainer);
                         if (visibleRow) {
                             const sku = visibleRow.getAttribute('data-sku');
-                            const sourceRowOffset = visibleRow.offsetTop - sourceContainer.offsetTop;
-                            const offsetInView = sourceContainer.scrollTop - sourceRowOffset;
+                            const sourceRowRect = visibleRow.getBoundingClientRect();
+                            const sourceContainerRect = sourceContainer.getBoundingClientRect();
+                            const offsetInView = sourceRowRect.top - sourceContainerRect.top;
                             
                             tableContainers.forEach((otherContainer, otherIndex) => {
                                 if (otherIndex !== sourceIndex) {
                                     if (sku) {
                                         const targetRow = otherContainer.querySelector(`tr[data-sku="${sku}"]`);
                                         if (targetRow) {
-                                            const targetRowOffset = targetRow.offsetTop - otherContainer.offsetTop;
-                                            otherContainer.scrollTop = targetRowOffset + offsetInView;
+                                            const targetRowRect = targetRow.getBoundingClientRect();
+                                            const otherContainerRect = otherContainer.getBoundingClientRect();
+                                            const targetRelativeTop = targetRowRect.top - otherContainerRect.top + otherContainer.scrollTop;
+                                            otherContainer.scrollTop = targetRelativeTop - offsetInView;
                                         } else {
                                             const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
                                             const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
@@ -2566,7 +2572,7 @@
                         
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
-                                programmaticScroll = false;
+                                window._programmaticScroll = false;
                             });
                         });
                     }

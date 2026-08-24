@@ -390,9 +390,16 @@ pandoc skill.md -o skill.docx
 - **滚动同步改为SKU行对齐同步 (改进)** — 两个表格始终展示同一SKU行在同一视觉位置
   - 新增`findFirstVisibleRow()`: 找到当前可视区域内的第一个行
   - 获取该行的SKU，在另一个表格中查找同SKU行
-  - 计算源表格中该行在可视区域的偏移量`offsetInView`，将相同偏移应用到目标表格的同SKU行
+  - 用`getBoundingClientRect()`计算精确的视觉偏移量`offsetInView`，将相同偏移应用到目标表格
   - 效果: 滚动时两个表格展示的是同一个商品，视觉位置完全对齐
   - 降级: 若SKU在另一表格中不存在（如低价商品不在高价表中），回退到比例同步
+
+- **点击联动滚动修复 (Bug修复)** — 点击行联动时另一个表格虽然高亮但没滚动到对应行
+  - 根因1: `row.offsetTop - container.offsetTop`计算不准确，行和容器的offsetParent可能不同
+  - 根因2: `programmaticScroll`标志位在不同作用域，`toggleLinkedHighlight`无法访问
+  - 修复1: 改用`getBoundingClientRect()`精确计算行在容器内的位置
+  - 修复2: `programmaticScroll`提升为`window._programmaticScroll`全局变量，两个函数共享
+  - 修复3: 点击联动滚动时设置`window._programmaticScroll=true`，500ms后重置，避免触发反向同步
 
 - **点击行联动高亮 (新功能)** — 点击任意行，所有表格中同货号行高亮并自动滚动到位
   - 新增`toggleLinkedHighlight(sku)`函数: 查找所有表格中相同货号的行，设置蓝色高亮(`#bbdefb`)并平滑滚动到对应位置
@@ -411,7 +418,7 @@ pandoc skill.md -o skill.docx
   - [x] PC端滚动同步正常 ✅
   - [x] 移动端滚动同步无抖动 ✅
   - [x] 滚动时两表展示同一SKU行且视觉位置对齐 ✅
-  - [x] 点击行联动高亮+滚动 ✅
+  - [x] 点击行联动高亮+两表都滚动到对应行 ✅
   - [x] 搜索清除联动状态 ✅
   - [x] `node --check dist/app.js` 语法检查通过 ✅
 
