@@ -2505,25 +2505,64 @@
                     const tableContainers = productsContent.querySelectorAll('.change-table-container');
                     let programmaticScroll = false;
                     
+                    function findFirstVisibleRow(container) {
+                        const rows = container.querySelectorAll('tr[data-sku]');
+                        const containerRect = container.getBoundingClientRect();
+                        for (const row of rows) {
+                            const rowRect = row.getBoundingClientRect();
+                            if (rowRect.bottom > containerRect.top + 30 && rowRect.top < containerRect.bottom) {
+                                return row;
+                            }
+                        }
+                        return null;
+                    }
+                    
                     function syncScroll(sourceContainer, sourceIndex) {
                         if (programmaticScroll) return;
                         programmaticScroll = true;
                         
-                        const scrollTop = sourceContainer.scrollTop;
                         const scrollLeft = sourceContainer.scrollLeft;
-                        const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
-                        const maxScrollLeft = sourceContainer.scrollWidth - sourceContainer.clientWidth;
-                        const scrollRatioY = maxScrollTop > 0 ? scrollTop / maxScrollTop : 0;
-                        const scrollRatioX = maxScrollLeft > 0 ? scrollLeft / maxScrollLeft : 0;
                         
-                        tableContainers.forEach((otherContainer, otherIndex) => {
-                            if (otherIndex !== sourceIndex) {
-                                const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
-                                const otherMaxLeft = otherContainer.scrollWidth - otherContainer.clientWidth;
-                                otherContainer.scrollTop = otherMaxTop > 0 ? scrollRatioY * otherMaxTop : 0;
-                                otherContainer.scrollLeft = otherMaxLeft > 0 ? scrollRatioX * otherMaxLeft : 0;
-                            }
-                        });
+                        const visibleRow = findFirstVisibleRow(sourceContainer);
+                        if (visibleRow) {
+                            const sku = visibleRow.getAttribute('data-sku');
+                            const sourceRowOffset = visibleRow.offsetTop - sourceContainer.offsetTop;
+                            const offsetInView = sourceContainer.scrollTop - sourceRowOffset;
+                            
+                            tableContainers.forEach((otherContainer, otherIndex) => {
+                                if (otherIndex !== sourceIndex) {
+                                    if (sku) {
+                                        const targetRow = otherContainer.querySelector(`tr[data-sku="${sku}"]`);
+                                        if (targetRow) {
+                                            const targetRowOffset = targetRow.offsetTop - otherContainer.offsetTop;
+                                            otherContainer.scrollTop = targetRowOffset + offsetInView;
+                                        } else {
+                                            const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
+                                            const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
+                                            const scrollRatioY = maxScrollTop > 0 ? sourceContainer.scrollTop / maxScrollTop : 0;
+                                            otherContainer.scrollTop = otherMaxTop > 0 ? scrollRatioY * otherMaxTop : 0;
+                                        }
+                                    } else {
+                                        const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
+                                        const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
+                                        const scrollRatioY = maxScrollTop > 0 ? sourceContainer.scrollTop / maxScrollTop : 0;
+                                        otherContainer.scrollTop = otherMaxTop > 0 ? scrollRatioY * otherMaxTop : 0;
+                                    }
+                                    otherContainer.scrollLeft = scrollLeft;
+                                }
+                            });
+                        } else {
+                            const scrollTop = sourceContainer.scrollTop;
+                            const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
+                            const scrollRatioY = maxScrollTop > 0 ? scrollTop / maxScrollTop : 0;
+                            tableContainers.forEach((otherContainer, otherIndex) => {
+                                if (otherIndex !== sourceIndex) {
+                                    const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
+                                    otherContainer.scrollTop = otherMaxTop > 0 ? scrollRatioY * otherMaxTop : 0;
+                                    otherContainer.scrollLeft = scrollLeft;
+                                }
+                            });
+                        }
                         
                         requestAnimationFrame(() => {
                             requestAnimationFrame(() => {
