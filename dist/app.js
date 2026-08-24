@@ -2511,11 +2511,17 @@
                         
                         const scrollTop = sourceContainer.scrollTop;
                         const scrollLeft = sourceContainer.scrollLeft;
+                        const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
+                        const maxScrollLeft = sourceContainer.scrollWidth - sourceContainer.clientWidth;
+                        const scrollRatioY = maxScrollTop > 0 ? scrollTop / maxScrollTop : 0;
+                        const scrollRatioX = maxScrollLeft > 0 ? scrollLeft / maxScrollLeft : 0;
                         
                         tableContainers.forEach((otherContainer, otherIndex) => {
                             if (otherIndex !== sourceIndex) {
-                                otherContainer.scrollTop = scrollTop;
-                                otherContainer.scrollLeft = scrollLeft;
+                                const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
+                                const otherMaxLeft = otherContainer.scrollWidth - otherContainer.clientWidth;
+                                otherContainer.scrollTop = otherMaxTop > 0 ? scrollRatioY * otherMaxTop : 0;
+                                otherContainer.scrollLeft = otherMaxLeft > 0 ? scrollRatioX * otherMaxLeft : 0;
                             }
                         });
                         
