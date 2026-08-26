@@ -21,9 +21,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.12 (2026-08-26) - 🐛 隐藏Bug清零 + 浏览器启动修复 — PROJECT_DIR类型错误+uvicorn导入位置错误+Connection closed驱动修复
+> **📌 当前版本**: v3.8.90.13 (2026-08-26) - 🔒 全面安全审计 + 隐藏Bug清零第二轮 — 信息泄露+限流缺口+缓存控制+裸except+Windows磁盘兼容
 >
 > **⚠️ 重要更新**:
+> - **v3.8.90.13**: 🔒 **全面安全审计+隐藏Bug清零第二轮** — 修复5个隐藏Bug(健康检查版本硬编码3.8.73改为VERSION/disk_usage('/')Windows不兼容改为os.path.abspath(os.sep)/RateLimiter内存泄漏requests字典无限增长/4处裸except改为具体异常类型/异常处理器返回str(error)信息泄露改为通用消息)，新增6项安全防护(sensitive_rate_limiter敏感端点限流20次/分覆盖9个端点/_no_store_headers() Cache-Control no-store防缓存/邮件测试输入验证与config一致/系统路径泄露防护改bool/异常信息脱敏/RateLimiter内存清理del空IP条目)，验证无ReDoS/eval/exec/shell=True/pickle/marshal/不安全SSL/random.choice/可变默认参数
 > - **v3.8.90.12**: 🐛 **隐藏Bug清零+浏览器启动修复** — 修复PROJECT_DIR字符串类型与Path `/`运算符不兼容导致SecureConfig加密崩溃(11处路径拼接TypeError)，修复uvicorn=None错误放置在starlette.middleware.gzip的except块(导致GZipMiddleware缺失时uvicorn被误杀)，修复Playwright驱动与缓存Chromium版本不匹配(1208 vs 1169)导致Connection closed，新增Environment.launch_browser()集中式启动器(Connection closed自动重试3次+Executable不存在自动安装+系统Chrome回退)，get_chrome_path()检测到Playwright缓存有Chromium时返回None让Playwright自选匹配版本，替换3处重复try-except启动代码，确认所有import在文件顶部(L1-L117)无内联导入无重复
 > - **v3.8.90.11**: 🎯 **双向滚动联动底部同步修复** — 修复findFirstVisibleRow增强底部检测(isAtBottom判断scrollTop+clientHeight≥scrollHeight-5)，syncScroll优化滚动位置计算(使用offsetTop替代getBoundingClientRect消除滚动状态影响)，新增底部特殊处理逻辑(源表格在底部时目标行滚动到目标表格底部区域)，添加详细调试日志([联动初始化]/[联动事件]/[findFirstVisibleRow]/[联动]四级日志体系)
 > - **v3.8.90.10**: 📱 **移动端双表联动修复** — 消除移动端滚动同步抖动(programmaticScroll标志位+双重rAF)，滚动同步改为SKU行对齐(findFirstVisibleRow查找可视行SKU→目标表格定位同SKU行→相同视觉偏移)，新增点击行联动高亮(toggleLinkedHighlight)，搜索时清除联动状态

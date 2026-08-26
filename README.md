@@ -374,6 +374,69 @@ pandoc skill.md -o skill.docx
 
 ## 🔄 最新更新
 
+### v3.8.90.13 (2026-08-26) - 🔒 全面安全审计 + 隐藏Bug清零第二轮 — 信息泄露+限流缺口+缓存控制+裸except+Windows磁盘兼容
+
+#### 更新内容: 全面审计main.py所有代码，修复5个隐藏Bug（健康检查版本硬编码/disk_usage Windows不兼容/RateLimiter内存泄漏/4处裸except/异常处理器信息泄露），新增6项安全防护（敏感端点限流/Cache-Control no-store/邮件测试输入验证/系统路径泄露防护/异常信息脱敏/RateLimiter内存清理）
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
+
+---
+
+- **健康检查版本硬编码修复 (Bug修复-P2)** — `/health`端点硬编码`'version': '3.8.73'`，与实际版本不符
+  - 修复: 改为 `'version': VERSION`（从README.md自动解析）
+  - 参考位置: [main.py#L6487](main.py#L6487)
+
+- **disk_usage Windows兼容修复 (Bug修复-P1)** — `psutil.disk_usage('/')`在Windows上抛FileNotFoundError
+  - 根因: Windows没有`/`根路径，需使用系统盘符
+  - 修复: `psutil.disk_usage(os.path.abspath(os.sep))` 跨平台兼容（Windows→C:\，Linux→/）
+  - 参考位置: [main.py#L6495](main.py#L6495)
+
+- **RateLimiter内存泄漏修复 (Bug修复-P1)** — `self.requests`字典无限增长，过期IP条目不清理
+  - 根因: 过期时间窗口内的请求被过滤后，空列表仍留在字典中，IP数量持续增长
+  - 修复: 过滤后若列表为空则`del self.requests[client_ip]`，防止内存泄漏
+  - 参考位置: [main.py#L2196-L2198](main.py#L2196-L2198)
+
+- **裸except清理 (Bug修复-P2)** — 4处`except:`/`except Exception:pass`静默吞掉所有异常
+  - 修复: 替换为具体异常类型 `(ValueError, TypeError, OSError)` / `(struct.error, OSError, ValueError)`
+  - 位置: normalize_ip(L10141)、is_private_ip(L10174)、_ver_lt(L10567)、SecureConfig初始化(L10600)
+
+- **异常处理器信息泄露修复 (安全-P0)** — 全局异常处理器返回`str(error)`完整错误信息给客户端
+  - 风险: 泄露文件路径、数据库结构、堆栈信息，辅助攻击者侦察
+  - 修复: 返回通用消息`'服务器内部错误，请联系管理员查看日志'`，完整错误仅记录日志
+  - 参考位置: [main.py#L2164-L2169](main.py#L2164-L2169)
+
+- **敏感端点限流 (安全-P0)** — 仅`/run`有限流，7个敏感端点无限流
+  - 新增 `sensitive_rate_limiter` (20次/分钟) + `_check_sensitive_rate_limit()` 辅助函数
+  - 覆盖端点: `/api/bootstrap`、`/api/cookie`、`/api/email/config`、`/api/email/test`、`/api/server/info`、`/api/security/encrypt-init`、`/api/tunnel/start`、`/api/tunnel/stop`、`/api/clean/list`
+  - 参考位置: [main.py#L2209-L2225](main.py#L2209-L2225)
+
+- **敏感API响应Cache-Control (安全-P1)** — 敏感响应缺`Cache-Control: no-store`，代理/浏览器可缓存
+  - 新增 `_no_store_headers()` 辅助函数返回`Cache-Control: no-store, no-cache, must-revalidate, max-age=0`
+  - 覆盖端点: `/api/bootstrap`(API Key)、`/api/cookie`(Token状态)、`/api/email/config`(SMTP密码)、`/api/server/info`
+  - 参考位置: [main.py#L2213-L2219](main.py#L2213-L2219)
+
+- **邮件测试输入验证 (安全-P1)** — `/api/email/test`直接使用`data.get()`无验证，与`/api/email/config`不一致
+  - 风险: SMTP主机/端口/邮箱无验证，可注入恶意值
+  - 修复: 添加与`/api/email/config`一致的完整输入验证（长度限制+类型检查+邮箱正则）
+  - 参考位置: [main.py#L8354-L8380](main.py#L8354-L8380)
+
+- **系统路径泄露防护 (安全-P1)** — `/api/server/info`暴露完整Chromium/Chrome路径
+  - 风险: 泄露系统用户名和目录结构（如`C:\Users\Administrator\AppData\...`）
+  - 修复: `playwright_chromium`和`system_chrome`字段改为`bool()`布尔值，仅暴露存在状态
+  - 参考位置: [main.py#L8418-L8420](main.py#L8418-L8420)
+
+- **验证结果** - 测试通过情况
+  - [x] 语法检查 `ast.parse` 通过 → 结果 ✅
+  - [x] 程序启动无SecureConfig错误 → 结果 ✅
+  - [x] 所有裸except已清除(grep无匹配) → 结果 ✅
+  - [x] 无ReDoS风险(正则无嵌套量词) → 结果 ✅
+  - [x] 无eval/exec/shell=True/pickle/marshal → 结果 ✅
+  - [x] 无不安全SSL(CERT_NONE/check_hostname=False) → 结果 ✅
+  - [x] 无random.choice(已用secrets) → 结果 ✅
+  - [x] 无可变默认参数 → 结果 ✅
+
+---
+
 ### v3.8.90.12 (2026-08-26) - 🐛 隐藏Bug清零 + 浏览器启动修复 — PROJECT_DIR类型错误+uvicorn导入位置错误+Connection closed驱动修复
 
 #### 更新内容: 修复3个隐藏Bug（PROJECT_DIR字符串/运算符不兼容导致SecureConfig加密崩溃、uvicorn=None错误放置在starlette except块、Playwright驱动与缓存Chromium版本不匹配导致Connection closed），新增集中式浏览器启动器launch_browser()内置重试与自动安装兜底

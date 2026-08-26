@@ -2161,11 +2161,11 @@ def get_excel_files_with_report():
 
 @app.exception_handler(Exception)
 async def handle_api_exception(request: Request, exc: Exception):
-    """FastAPI全局异常处理器 - 统一处理所有未捕获的异常"""
-    error_msg = handle_exception(exc, 'FastAPI API')
+    """FastAPI全局异常处理器 - 统一处理所有未捕获的异常（不向客户端泄露内部错误细节）"""
+    handle_exception(exc, 'FastAPI API')
     return JSONResponse(
         status_code=500,
-        content={'error': error_msg, 'success': False, 'code': getattr(exc, 'code', 'UNKNOWN')}
+        content={'error': '服务器内部错误，请联系管理员查看日志', 'success': False, 'code': getattr(exc, 'code', 'UNKNOWN')}
     )
 
 
@@ -2191,6 +2191,9 @@ class RateLimiter:
                 t for t in self.requests[client_ip]
                 if current_time - t < self.window_seconds
             ]
+            if not self.requests[client_ip]:
+                del self.requests[client_ip]
+                return True
             if len(self.requests[client_ip]) >= self.max_requests:
                 return False
             self.requests[client_ip].append(current_time)
@@ -2206,6 +2209,25 @@ class RateLimiter:
 
 api_rate_limiter = RateLimiter(max_requests=200, window_seconds=60)
 upload_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
+sensitive_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
+
+
+def _no_store_headers():
+    """返回禁止缓存的响应头，用于敏感API响应"""
+    return {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+    }
+
+
+def _check_sensitive_rate_limit(request):
+    """敏感端点限流检查，返回(RateLimiter, retry_after)或None"""
+    client_ip = request.client.host if request.client else 'unknown'
+    if not sensitive_rate_limiter.is_allowed(client_ip):
+        retry = sensitive_rate_limiter.get_retry_after(client_ip)
+        return retry
+    return None
 
 
 # ============================================================
@@ -6476,13 +6498,16 @@ if __name__ == '__main__':
 
         @app.get('/api/bootstrap')
         async def api_bootstrap(request: Request):
-            return JSONResponse(content={'api_key': WEB_API_KEY})
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
+            return JSONResponse(content={'api_key': WEB_API_KEY}, headers=_no_store_headers())
 
         @app.get('/health')
         async def health_check():
             health_data = {
                 'status': 'healthy',
-                'version': '3.8.73',
+                'version': VERSION,
                 'timestamp': datetime.now().isoformat(),
             }
             status_code = 200
@@ -6490,7 +6515,7 @@ if __name__ == '__main__':
                 try:
                     cpu_percent = psutil.cpu_percent(interval=0.1)
                     memory = psutil.virtual_memory()
-                    disk = psutil.disk_usage('/')
+                    disk = psutil.disk_usage(os.path.abspath(os.sep))
                     health_data['cpu_percent'] = cpu_percent
                     health_data['memory_percent'] = memory.percent
                     health_data['memory_used_gb'] = round(memory.used / (1024**3), 2)
@@ -6557,6 +6582,9 @@ if __name__ == '__main__':
 
         @app.post('/api/security/encrypt-init')
         async def security_encrypt_init(request):
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
                 body=await request.json()
                 password=body.get('password','')
@@ -6948,7 +6976,7 @@ if __name__ == '__main__':
                     'expired': hours_remaining <= 0,
                     'system': Environment.SYSTEM,
                     'cookie_name': 'Token'
-                })
+                }, headers=_no_store_headers())
             except HTTPException:
                 raise
             except Exception as e:
@@ -7861,6 +7889,9 @@ if __name__ == '__main__':
 
         @app.post('/api/clean/list')
         async def api_clean_list(request: Request):
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
                 data = await request.json()
                 directory = data.get('directory', '')
@@ -8265,7 +8296,10 @@ if __name__ == '__main__':
                 return jsonify({'success': False, 'error': 'README章节解析失败'}, status_code=500)
 
         @app.get('/api/email/config')
-        def get_email_config():
+        def get_email_config(request: Request):
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             notifier = EmailNotifier()
             config = notifier.get_email_config()
             if config['smtp_password']:
@@ -8323,16 +8357,43 @@ if __name__ == '__main__':
 
         @app.post('/api/email/test')
         async def test_email(request: Request):
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
                 data = await request.json()
+                smtp_host = data.get('smtp_host', 'smtp.qq.com')
+                if not isinstance(smtp_host, str) or len(smtp_host) > 255 or not smtp_host.strip():
+                    return jsonify({'success': False, 'error': 'SMTP主机地址无效'})
+                try:
+                    smtp_port = int(data.get('smtp_port', 587))
+                except (ValueError, TypeError):
+                    return jsonify({'success': False, 'error': 'SMTP端口号无效'})
+                if smtp_port < 1 or smtp_port > 65535:
+                    return jsonify({'success': False, 'error': 'SMTP端口超出有效范围(1-65535)'})
+                smtp_user = data.get('smtp_user', '')
+                if not isinstance(smtp_user, str) or len(smtp_user) > 128:
+                    return jsonify({'success': False, 'error': 'SMTP用户名无效'})
+                smtp_password = data.get('smtp_password', '')
+                if not isinstance(smtp_password, str) or len(smtp_password) > 256:
+                    return jsonify({'success': False, 'error': 'SMTP密码无效'})
+                from_name = data.get('from_name', '公网IP监控')
+                if not isinstance(from_name, str) or len(from_name) > 64:
+                    return jsonify({'success': False, 'error': '发件人名称过长'})
+                to_email = data.get('to_email', '980187223@qq.com')
+                if not isinstance(to_email, str) or len(to_email) > 128:
+                    return jsonify({'success': False, 'error': '收件人邮箱无效'})
+                email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                if not re.match(email_regex, to_email.strip()):
+                    return jsonify({'success': False, 'error': '收件人邮箱格式不正确'})
                 test_notifier = EmailNotifier()
                 test_notifier.save_email_config(
-                    smtp_host=data.get('smtp_host', 'smtp.qq.com'),
-                    smtp_port=int(data.get('smtp_port', 587)),
-                    smtp_user=data.get('smtp_user', ''),
-                    smtp_password=data.get('smtp_password', ''),
-                    from_name=data.get('from_name', '公网IP监控'),
-                    to_email=data.get('to_email', '980187223@qq.com')
+                    smtp_host=smtp_host.strip(),
+                    smtp_port=smtp_port,
+                    smtp_user=smtp_user,
+                    smtp_password=smtp_password,
+                    from_name=from_name[:64],
+                    to_email=to_email.strip()
                 )
                 success = test_notifier.send_tunnel_notification('https://test.example.com', 'test')
                 if success:
@@ -8344,12 +8405,19 @@ if __name__ == '__main__':
                 return jsonify({'success': False, 'error': '测试邮件发送失败'})
 
         @app.get('/api/server/info')
-        def get_server_info():
+        def get_server_info(request: Request):
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             port = args.port
 
             # 获取局域网 IP（复用PathManager的方法）
             lan_ip = PathManager.get_lan_ip() or None
-            
+
+            # 仅暴露布尔状态，不泄露完整系统路径
+            pw_chromium = Environment._find_playwright_chromium()
+            sys_chrome = Environment._find_system_chrome()
+
             return jsonify({
                 'success': True,
                 'local_url': f'http://localhost:{port}',
@@ -8357,9 +8425,9 @@ if __name__ == '__main__':
                 'lan_ip': lan_ip,
                 'port': port,
                 'version': get_version_from_readme(),
-                'playwright_chromium': Environment._find_playwright_chromium(),
-                'system_chrome': Environment._find_system_chrome(),
-                'browser_ready': bool(Environment._find_playwright_chromium() or Environment._find_system_chrome()),
+                'playwright_chromium': bool(pw_chromium),
+                'system_chrome': bool(sys_chrome),
+                'browser_ready': bool(pw_chromium or sys_chrome),
             })
 
         tunnel_process = None
@@ -9629,7 +9697,10 @@ ingress:
             })
 
         @app.post('/api/tunnel/start')
-        def start_tunnel():
+        def start_tunnel(request: Request):
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, tunnel_consecutive_failures
             global stable_url, stable_url_confirm_count, url_first_seen_time
 
@@ -9908,7 +9979,10 @@ ingress:
             }
 
         @app.post('/api/tunnel/stop')
-        def stop_tunnel():
+        def stop_tunnel(request: Request):
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_need_restart, tunnel_restart_count, tunnel_last_error, tunnel_consecutive_failures
             global cf_process, cf_url, cf_mode
             tunnel_auto_restart = False
@@ -10064,7 +10138,7 @@ class SSRFProtection:
             ip=str(ip).strip().lower()
             if ':' in ip:return self._norm_ipv6(ip)
             return self._norm_ipv4(ip)
-        except:return None
+        except (ValueError, TypeError, OSError):return None
 
     def _norm_ipv4(self,ip):
         ip=ip.strip().strip('.')
@@ -10097,7 +10171,7 @@ class SSRFProtection:
                 s=struct.unpack('!I',socket.inet_aton(net))[0]
                 m=(0xFFFFFFFF<<(32-pfx))&0xFFFFFFFF
                 if(i&m)==(s&m):return True
-            except:continue
+            except (struct.error, OSError, ValueError):continue
         return False
 
     def is_blocked_hostname(self,h):
@@ -10490,7 +10564,7 @@ class DependencyAuditor:
         if packaging_version is not None:
             try:
                 return packaging_version.parse(v1)<packaging_version.parse(v2)
-            except Exception:pass
+            except (ValueError, TypeError):pass
         p1=[int(x) for x in v1.split('.') if x.isdigit()]
         p2=[int(x) for x in v2.split('.') if x.isdigit()]
         for i in range(max(len(p1),len(p2))):
@@ -10523,7 +10597,7 @@ class SecureConfigManager:
                 if Fernet is not None:
                     try:
                         self._fernet=Fernet(key)
-                    except Exception:pass
+                    except (ValueError, TypeError):pass
 
     def _load_key(self,key_file,salt_file):
         env_key=os.environ.get('CONFIG_ENCRYPTION_KEY')
