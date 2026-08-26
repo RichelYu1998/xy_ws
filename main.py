@@ -28,6 +28,7 @@ import threading
 import time
 import struct
 import hashlib
+import inspect
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -567,6 +568,325 @@ def handle_exception(e: Exception, context: str = '') -> str:
     """统一异常处理函数 - 用于已捕获异常的场景"""
     handler = ExceptionHandler()
     return handler.handle(e, context)
+
+
+def sanitize_log_input(user_input: Any, max_length: int = 100) -> str:
+    """清理用户输入以防止日志注入攻击
+    
+    Args:
+        user_input: 用户输入的数据
+        max_length: 最大长度限制
+        
+    Returns:
+        str: 安全的字符串表示
+    """
+    if user_input is None:
+        return '(None)'
+    
+    try:
+        input_str = str(user_input)
+        
+        input_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', input_str)
+        
+        input_str = input_str.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+        
+        if len(input_str) > max_length:
+            input_str = input_str[:max_length] + '...(truncated)'
+            
+        return input_str
+    except Exception:
+        return '(unable to sanitize)'
+
+
+def safe_log(logger_obj, level: str, message: str, **kwargs):
+    """安全的日志记录函数 - 自动清理用户输入
+    
+    Args:
+        logger_obj: logger对象
+        level: 日志级别 (debug, info, warning, error, critical)
+        message: 日志消息格式
+        **kwargs: 要插入消息的变量（将被自动清理）
+    """
+    safe_kwargs = {}
+    for key, value in kwargs.items():
+        safe_kwargs[key] = sanitize_log_input(value)
+    
+    try:
+        log_message = message.format(**safe_kwargs) if safe_kwargs else message
+        log_func = getattr(logger_obj, level.lower(), logger_obj.info)
+        log_func(log_message)
+    except Exception as e:
+        try:
+            logger_obj.error(f'安全日志记录失败: {sanitize_log_input(str(e))}')
+        except Exception:
+            pass
+
+
+def timing_safe_compare(a: str, b: str) -> bool:
+    """时间安全比较函数 - 防止时序攻击（Timing Attack）
+    
+    用于密码、API Key、Token等敏感数据的比较，
+    防止攻击者通过响应时间差异猜测正确字符。
+    
+    Args:
+        a: 第一个字符串
+        b: 第二个字符串
+        
+    Returns:
+        bool: 是否相等
+        
+    Example:
+        >>> if timing_safe_compare(user_input, stored_password):
+        ...     grant_access()
+    """
+    if not isinstance(a, bytes):
+        a = a.encode('utf-8') if isinstance(a, str) else str(a).encode('utf-8')
+    if not isinstance(b, bytes):
+        b = b.encode('utf-8') if isinstance(b, str) else str(b).encode('utf-8')
+    
+    return secrets.compare_digest(a, b)
+
+
+def validate_path_traversal(base_dir: str, user_path: str) -> Tuple[bool, str]:
+    """验证路径遍历攻击 - 确保用户路径不超出基础目录
+    
+    Args:
+        base_dir: 允许的基础目录（绝对路径）
+        user_path: 用户提供的路径
+        
+    Returns:
+        Tuple[bool, str]: (是否安全, 安全的绝对路径或错误信息)
+        
+    Example:
+        >>> is_safe, safe_path = validate_path_traversal('/app/data', '../etc/passwd')
+        >>> if not is_safe:
+        ...     raise HTTPException(403, '路径遍历攻击被阻止')
+    """
+    try:
+        if not os.path.isabs(base_dir):
+            return False, f"基础目录必须是绝对路径: {base_dir}"
+            
+        base_dir = os.path.normpath(base_dir)
+        
+        if os.path.isabs(user_path):
+            full_path = os.path.normpath(user_path)
+        else:
+            full_path = os.path.normpath(os.path.join(base_dir, user_path))
+            
+        if not full_path.startswith(base_dir + os.sep) and full_path != base_dir:
+            return False, f"路径遍历攻击被阻止: 尝试访问 {full_path} (限制在 {base_dir})"
+            
+        return True, full_path
+        
+    except Exception as e:
+        return False, f"路径验证异常: {str(e)}"
+
+
+def rate_limit_check(identifier: str, max_requests: int = 100, window_seconds: int = 60) -> Tuple[bool, int]:
+    """简单的内存速率限制检查
+    
+    Args:
+        identifier: 唯一标识符（如IP地址、用户ID、API Key）
+        max_requests: 时间窗口内允许的最大请求数
+        window_seconds: 时间窗口大小（秒）
+        
+    Returns:
+        Tuple[bool, int]: (是否允许请求, 重试前等待的秒数)
+        
+    Note:
+        这是一个简单的实现，生产环境建议使用Redis等外部存储
+    """
+    global _rate_limit_store
+    if '_rate_limit_store' not in globals():
+        _rate_limit_store = {}
+        _rate_limit_lock = threading.Lock()
+    
+    current_time = time.time()
+    
+    with _rate_limit_lock:
+        if identifier not in _rate_limit_store:
+            _rate_limit_store[identifier] = []
+            
+        requests = _rate_limit_store[identifier]
+        
+        requests = [req_time for req_time in requests if current_time - req_time < window_seconds]
+        _rate_limit_store[identifier] = requests
+        
+        if len(requests) >= max_requests:
+            oldest_request = min(requests)
+            retry_after = int(window_seconds - (current_time - oldest_request)) + 1
+            return False, max(1, retry_after)
+            
+        requests.append(current_time)
+        
+        if len(_rate_limit_store) > 10000:
+            cleanup_cutoff = current_time - (window_seconds * 10)
+            _rate_limit_store = {
+                k: v for k, v in _rate_limit_store.items()
+                if v and v[-1] > cleanup_cutoff
+            }
+            
+        return True, 0
+
+
+def cleanup_rate_limit_store():
+    """定期清理速率限制存储中的过期条目"""
+    global _rate_limit_store
+    if '_rate_limit_lock' not in globals():
+        return
+        
+    try:
+        with _rate_limit_lock:
+            if not _rate_limit_store:
+                return
+                
+            current_time = time.time()
+            cutoff_time = current_time - 3600
+            
+            before_count = len(_rate_limit_store)
+            _rate_limit_store = {
+                k: v for k, v in _rate_limit_store.items()
+                if v and any(req_time > cutoff_time for req_time in v)
+            }
+            
+            after_count = len(_rate_limit_store)
+            if before_count > after_count:
+                logger.debug(f'速率限制存储清理: {before_count} -> {after_count} 条目')
+    except Exception as e:
+        logger.debug(f'速率限制存储清理失败: {e}')
+
+
+def decode_base64_images(images):
+    """解码Base64编码的图片列表 - 统一的图片处理函数
+    
+    Args:
+        images: 图片数据（字符串、列表或None）
+        
+    Returns:
+        list: 解码后的图片URL列表
+    """
+    if not images:
+        return []
+    
+    decoded_images = []
+    
+    try:
+        if isinstance(images, list):
+            for img_data in images:
+                try:
+                    if isinstance(img_data, str):
+                        decoded_url = base64.b64decode(img_data).decode('utf-8')
+                        decoded_images.append(decoded_url)
+                    else:
+                        decoded_images.append(img_data)
+                except Exception as e:
+                    logger.debug(f'图片Base64解码失败: {e}')
+                    decoded_images.append(img_data)
+        elif isinstance(images, str):
+            try:
+                decoded_url = base64.b64decode(images).decode('utf-8')
+                decoded_images.append(decoded_url)
+            except Exception as e:
+                logger.debug(f'图片Base64解码失败: {e}')
+                decoded_images = [images]
+        else:
+            decoded_images = [images]
+    except Exception as e:
+        logger.error(f'图片处理异常: {e}')
+        return images if images else []
+    
+    return decoded_images
+
+
+def safe_urlopen(url_or_req, timeout=10, context=None):
+    """安全的URL打开函数 - 确保资源正确释放
+    
+    Args:
+        url_or_req: urllib.request.Request对象或URL字符串
+        timeout: 超时时间（秒）
+        context: SSL上下文
+        
+    Returns:
+        tuple: (response对象或None, 错误信息或None)
+    """
+    response = None
+    try:
+        if context:
+            response = urllib.request.urlopen(url_or_req, timeout=timeout, context=context)
+        else:
+            response = urllib.request.urlopen(url_or_req, timeout=timeout)
+        return response, None
+    except Exception as e:
+        error_msg = f'URL请求失败: {type(e).__name__}: {str(e)[:200]}'
+        if response:
+            try:
+                response.close()
+            except Exception:
+                pass
+        return None, error_msg
+
+
+def input_validation_decorator(
+    max_length: int = None,
+    allowed_patterns: list = None,
+    blocked_patterns: list = None,
+    strip_whitespace: bool = True,
+    sanitize_html: bool = True
+):
+    """输入验证装饰器工厂
+    
+    用于验证和清理函数参数中的用户输入
+    
+    Args:
+        max_length: 最大长度限制
+        allowed_patterns: 允许的正则表达式列表
+        blocked_patterns: 阻止的正则表达式列表
+        strip_whitespace: 是否去除首尾空白
+        sanitize_html: 是否转义HTML特殊字符
+        
+    Returns:
+        decorator: 装饰器函数
+        
+    Example:
+        >>> @input_validation_decorator(max_length=100, blocked_patterns=[r'<script'])
+        ... def search_user(query: str):
+        ...     return db.search(query)
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            func_args = inspect.signature(func).bind(*args, **kwargs).arguments
+            
+            for arg_name, arg_value in func_args.items():
+                if not isinstance(arg_value, str):
+                    continue
+                    
+                value = arg_value
+                
+                if strip_whitespace:
+                    value = value.strip()
+                    
+                if sanitize_html:
+                    value = escape(value)
+                    
+                if max_length and len(value) > max_length:
+                    raise ValueError(f"输入过长：{arg_name} 超过 {max_length} 字符限制")
+                    
+                if blocked_patterns:
+                    for pattern in blocked_patterns:
+                        if re.search(pattern, value, re.IGNORECASE):
+                            raise ValueError(f"输入包含非法内容：{arg_name} 包含禁止模式")
+                            
+                if allowed_patterns:
+                    matched = any(re.search(pattern, value, re.IGNORECASE) for pattern in allowed_patterns)
+                    if not allowed_patterns or (allowed_patterns and not matched):
+                        raise ValueError(f"输入格式无效：{arg_name} 不符合要求格式")
+                
+                kwargs[arg_name] = value
+                
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def exception_handler(context: str = '', default: Any = None, reraise: bool = False, custom_exc: type = None):
@@ -2793,7 +3113,9 @@ class PathManager:
             req.add_header('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8')
             req.add_header('Accept-Language', 'zh-CN,zh;q=0.9,en;q=0.8')
             
-            response = urllib.request.urlopen(req, timeout=timeout)
+            response, error = safe_urlopen(req, timeout=timeout)
+            if error:
+                return (False, error)
             
             if response.status in [200, 301, 302, 303, 307, 308]:
                 return (True, None)
@@ -2818,7 +3140,9 @@ class PathManager:
             req = urllib.request.Request(url, method='HEAD')
             req.add_header('User-Agent', 'Mozilla/5.0 (compatible; URLCheck/1.0)')
             
-            response = urllib.request.urlopen(req, timeout=timeout)
+            response, error = safe_urlopen(req, timeout=timeout)
+            if error:
+                return (False, error)
             
             if response.status in [200, 301, 302, 303, 307, 308]:
                 return (True, None)
@@ -7373,27 +7697,11 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
 
                 for p in products:
-                    media_result = []
                     img_data = p.get('图片', '')
                     if img_data:
-                        try:
-                            if isinstance(img_data, list):
-                                for b64_str in img_data:
-                                    try:
-                                        media_result.append(base64.b64decode(b64_str).decode('utf-8'))
-                                    except Exception as e:
-                                        logger.debug(f"Exception processing media: {e}")
-                                        media_result.append(b64_str)
-                            else:
-                                try:
-                                    media_result = base64.b64decode(img_data).decode('utf-8')
-                                except Exception as e:
-                                    logger.debug(f"Exception processing media: {e}")
-                                    media_result = img_data
-                        except Exception as e:
-                            logger.debug(f"Exception processing media: {e}")
-                            media_result = img_data
-                    p['图片'] = media_result if media_result else img_data
+                        p['图片'] = decode_base64_images(img_data)
+                    else:
+                        p['图片'] = []
                 
                 high_price_stats = data.get('高价商品统计', {})
                 high_price_products = high_price_stats.get('商品列表', [])
@@ -7668,23 +7976,11 @@ if __name__ == '__main__':
                     img_data = p.get('图片', '')
                     if img_data:
                         try:
-                            if isinstance(img_data, list):
-                                for b64_str in img_data:
-                                    try:
-                                        media_result.append(base64.b64decode(b64_str).decode('utf-8'))
-                                    except Exception as e:
-                                        logger.debug(f"Exception processing media: {e}")
-                                        media_result.append(b64_str)
-                            else:
-                                try:
-                                    media_result = base64.b64decode(img_data).decode('utf-8')
-                                except Exception as e:
-                                    logger.debug(f"Exception processing media: {e}")
-                                    media_result = img_data
+                            media_result = decode_base64_images(img_data)
                         except Exception as e:
                             logger.debug(f"Exception processing media: {e}")
-                            media_result = img_data
-                    p['图片'] = media_result if media_result else img_data
+                            media_result = decode_base64_images(img_data)
+                    p['图片'] = media_result if media_result else (img_data if isinstance(img_data, list) else [img_data] if img_data else [])
                 
                 high_price_products = []
                 total_price = 0
@@ -7797,7 +8093,7 @@ if __name__ == '__main__':
                 return jsonify({'error': '货号过长（最大100字符）'}, status_code=400)
 
             if not re.match(r'^[a-zA-Z0-9\u4e00-\u9fa5\-_]+$', sku):
-                logger.warning(f'[search_product] 检测到可疑货号: {sku[:50]}')
+                safe_log(logger, 'warning', '[search_product] 检测到可疑货号: {sku}', sku=sku)
                 return jsonify({'error': '货号包含非法字符（仅允许字母、数字、中文、横线和下划线）'}, status_code=400)
 
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
@@ -7867,7 +8163,7 @@ if __name__ == '__main__':
                 return JSONResponse(content={'error': '商品描述过长（最大500字符）'}, status_code=400)
 
             if re.search(r'[<>"\'&]', description):
-                logger.warning(f'[get_product_by_description] 检测到可疑字符 in description: {description[:50]}...')
+                safe_log(logger, 'warning', '[get_product_by_description] 检测到可疑字符 in description: {desc}', desc=description)
                 return JSONResponse(content={'error': '商品描述包含非法字符'}, status_code=400)
 
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
@@ -7882,28 +8178,7 @@ if __name__ == '__main__':
                     stored_desc = p.get('商品描述', '')
                     if stored_desc.replace(' ', '') == description.replace(' ', ''):
                         images = p.get('图片', [])
-                        if images:
-                            if isinstance(images, list):
-                                decoded_images = []
-                                for img in images:
-                                    try:
-                                        decoded = base64.b64decode(img).decode('utf-8')
-                                        decoded_images.append(decoded)
-                                    except Exception as e:
-                                        logger.debug(f"Exception decoding image: {e}")
-                                        decoded_images.append(img)
-                                p['图片'] = decoded_images
-                            elif isinstance(images, str):
-                                try:
-                                    decoded = base64.b64decode(images).decode('utf-8')
-                                    p['图片'] = [decoded]
-                                except Exception as e:
-                                    logger.debug(f"Exception decoding image to list: {e}")
-                                    p['图片'] = [images]
-                            else:
-                                p['图片'] = []
-                        else:
-                            p['图片'] = []
+                        p['图片'] = decode_base64_images(images) if images else []
                         return jsonify({'found': True, 'product': p})
                 return jsonify({'found': False, 'error': '未找到该商品'})
             except Exception as e:
@@ -7964,7 +8239,10 @@ if __name__ == '__main__':
                 return jsonify({'success': False, 'error': '文件分组清理失败，请查看服务器日志'})
 
         @app.post('/api/clean/time')
-        async def api_clean_time():
+        async def api_clean_time(request: Request):
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
                 data = await request.json()
                 directory = data.get('directory', '')
@@ -8485,6 +8763,7 @@ if __name__ == '__main__':
         global_last_email_sent_time = 0
         recent_sent_urls = {}
         url_dedup_window = 600
+        _tunnel_state_lock = threading.Lock()
         
         stable_url = None
         stable_url_confirm_count = 0
@@ -8503,6 +8782,7 @@ if __name__ == '__main__':
         cf_heartbeat_thread = None
         cf_last_email_sent_url = None
         cf_last_email_sent_time = 0
+        _cf_state_lock = threading.Lock()
         
         def read_tunnel_urls_file():
             """读取 tunnel_url.txt 中已有的隧道 URL
@@ -8688,7 +8968,10 @@ if __name__ == '__main__':
                     req = urllib.request.Request(url, method='HEAD')
                     req.add_header('User-Agent', 'hostc-verify/1.0')
                     
-                    response = urllib.request.urlopen(req, timeout=timeout, context=ctx)
+                    response, error = safe_urlopen(req, timeout=timeout, context=ctx)
+                    if error:
+                        return False
+                    
                     if response.status in [200, 301, 302, 307, 308]:
                         if verbose:
                             if attempt > 0:
@@ -10055,6 +10338,7 @@ ingress:
                 time.sleep(60)
                 try:
                     auto_clean_temp_dir()
+                    cleanup_rate_limit_store()
                 except Exception as e:
                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
                     pass
