@@ -269,6 +269,282 @@ API_DOCS.md              ❌ 禁止！应该合并后删除
 
 ---
 
+## 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards)
+
+> **来源**: 原 `.trae/skills/xy-ws-manager/SKILL.md` (已整合至本文件，2026-08-26)
+
+### 📌 项目概述
+
+| 属性 | 值 |
+|------|-----|
+| **项目名称** | 微购相册管理系统 (WegoAlbum Manager) |
+| **项目类型** | Web服务 + 数据采集 + 自动化分析 |
+| **技术栈** | Python 3.0+ / FastAPI / Playwright / Pydantic |
+| **编码标准** | UTF-8 (强制) |
+| **安全等级** | 生产级 (98% OWASP Top 10合规) |
+
+---
+
+### 🔐 核心防御性编程规范
+
+#### PY-SEC-001: Import语句管理 (强制)
+
+**规则**: 所有import必须位于 `main.py` 文件顶部，按类别分组
+
+**分组顺序**:
+1. **标准库** (Python内置模块)
+2. **第三方库** (pip安装的包)
+3. **条件导入** (可选依赖，使用try/except)
+4. **本地导入** (项目内部模块)
+
+**违规检测**: 
+```bash
+grep -n "^\s*import\|^\s*from.*import" main.py | awk -F: '$1 > 150 {print}'
+```
+
+#### PY-SEC-002: 异常处理规范 (强制)
+
+**规则**: 必须使用统一的异常处理机制
+
+**层级结构**:
+```
+AppException (自定义基类)
+├── SecurityException (安全相关)
+├── ValidationException (验证失败)
+├── NetworkException (网络错误)
+└── FileOperationException (文件操作)
+```
+
+**禁止事项**:
+- ❌ 禁止空的`except:`块（至少记录日志）
+- ❌ 禁止在except块中返回敏感信息给前端
+- ❌ 禁止捕获过于宽泛的异常类型（如BaseException）
+
+#### PY-SEC-003: 输入验证与清理 (强制)
+
+**规则**: 所有用户输入必须经过验证和清理
+
+**验证工具函数**:
+
+| 函数名 | 用途 | 使用场景 |
+|--------|------|----------|
+| [`sanitize_log_input()`](main.py#L597-L622) | 清理日志输入 | 防止日志注入 |
+| [`safe_log()`](main.py#L625-L650) | 安全日志记录 | 替代直接logger调用 |
+| [`timing_safe_compare()`](main.py#L652-L677) | 时间安全比较 | 密码/Token比较 |
+| [`validate_path_traversal()`](main.py#L679-L708) | 路径遍历防护 | 文件操作 |
+| [`rate_limit_check()`](main.py#L710-L744) | 速率限制 | API频率控制 |
+| [`input_validation_decorator()`](main.py#L746-L787) | 输入验证装饰器 | 函数参数验证 |
+
+#### PY-SEC-004: 线程安全管理 (强制)
+
+**规则**: 全局共享变量必须使用锁保护
+
+**已实现的线程安全锁**:
+
+| 锁名称 | 保护对象 | 用途 |
+|--------|----------|------|
+| `_tunnel_state_lock` | tunnel进程状态变量 | 防止并发修改 |
+| `_cf_state_lock` | Cloudflare状态变量 | CF配置同步 |
+| `_rate_limit_lock` | 速率限制存储 | 并发访问控制 |
+| `email_send_lock` | 邮件发送状态 | 防重复发送 |
+
+**死锁预防**:
+- 统一锁获取顺序 (字母序)
+- 使用`timeout`参数避免无限等待
+- 最小化临界区范围
+
+#### PY-SEC-005: 资源管理规范 (强制)
+
+**规则**: 所有资源必须正确释放，避免泄漏
+
+**资源类型清单**:
+1. **文件句柄**: 使用with上下文管理器
+2. **HTTP连接**: 使用`safe_urlopen()`封装函数
+3. **子进程**: try-finally确保清理 + terminate()
+4. **浏览器实例**: async context manager + finally关闭
+
+**内存监控**:
+- 定期清理速率限制存储 (`cleanup_rate_limit_store()`)
+- 监控字典大小增长 (阈值: 10000条目)
+- 后台线程每60秒执行一次清理
+
+---
+
+### 🛡️ 安全检查清单
+
+#### 开发阶段必检项
+
+- [ ] **PY-SEC-001**: 所有import在main.py顶部
+- [ ] **PY-SEC-002**: 无裸异常捕获，使用ExceptionHandler
+- [ ] **PY-SEC-003**: 用户输入经过sanitize_log_input/safe_log处理
+- [ ] **PY-SEC-004**: 全局变量有锁保护
+- [ ] **PY-SEC-005**: 资源使用with/finally确保释放
+
+#### 代码审查重点
+
+##### 注入攻击防护
+- [x] SQL注入: ✅ 本项目使用JSON存储，无SQL查询
+- [x] 命令注入: `shell=False` + 参数列表传递
+- [x] XSS攻击: `html.escape()`转义用户输出
+- [x] 日志注入: 使用`safe_log()`替代直接拼接
+
+##### 认证与授权
+- [x] API Key认证: `secrets.token_urlsafe()`生成
+- [x] 密码比较: `timing_safe_compare()`时间安全比较
+- [x] CSRF防护: Origin/Referer白名单验证
+- [x] 速率限制: `rate_limit_check()`多层限流
+
+##### 数据保护
+- [x] 敏感信息: 不记录到日志 (password/token/api_key)
+- [x] 配置加密: `SecureConfigManager` Fernet加密
+- [x] 路径安全: `validate_path_traversal()`防止遍历
+- [x] SSRF防护: 私有IP黑名单 + 云元数据阻止
+
+---
+
+### 📊 代码质量指标
+
+#### 目标值
+
+| 指标 | 最低要求 | 当前状态 | 达标情况 |
+|------|----------|----------|----------|
+| 语法错误数 | 0 | 0 | ✅ |
+| Import合规率 | 100% | 100% | ✅ |
+| 异常处理覆盖率 | ≥90% | ~95% | ✅ |
+| 线程安全评分 | ≥8/10 | 9/10 | ✅ |
+| 安全评分 | ≥9/10 | 9.8/10 | ✅ |
+| 代码重复度 | ≤5% | <2% | ✅ |
+
+#### 测试要求
+
+**单元测试覆盖**:
+- 核心工具函数: 100%
+- API端点: ≥80%
+- 异常路径: ≥90%
+
+**集成测试场景**:
+1. 正常请求流程
+2. 异常输入处理
+3. 并发压力测试
+4. 资源泄漏检测
+5. 安全漏洞扫描
+
+---
+
+### 🚀 Git提交规范
+
+#### Commit Message格式
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Type类型**:
+- `feat`: 新功能
+- `fix`: Bug修复
+- `sec`: 安全修复/增强
+- `refactor`: 重构 (不改变行为)
+- `perf`: 性能优化
+- `docs`: 文档更新
+- `test`: 测试相关
+- `chore`: 构建/工具链
+
+**示例**:
+```
+sec(main): 修复日志注入漏洞 + 增强速率限制
+
+- 新增sanitize_log_input()清理用户输入
+- 新增safe_log()安全日志记录
+- 实现rate_limit_check()内存限流
+- 添加cleanup_rate_limit_store()定期清理
+
+Closes: #123
+Security: CVE-2024-XXXXX
+```
+
+#### 提交前检查清单
+
+- [ ] 代码通过语法检查 (`python3 -m py_compile main.py`)
+- [ ] 单元测试全部通过 (`pytest tests/ -v`)
+- [ ] 安全扫描无高危问题 (`bandit -r main.py`)
+- [ ] 符合PY-SEC-*所有规范
+- [ ] 更新CHANGELOG (如涉及功能变更)
+- [ ] 无硬编码密钥或敏感信息
+
+---
+
+### 🆘 常见问题
+
+#### Q1: 如何添加新的防御工具函数?
+
+在`main.py`的**工具函数区域** (约L560-L800) 添加：
+
+```python
+def your_security_function(param):
+    """
+    功能描述
+    
+    Args:
+        param: 参数说明
+        
+    Returns:
+        返回值说明
+        
+    Raises:
+        ValueError: 参数无效时
+        
+    Example:
+        >>> result = your_security_function('test')
+    """
+    # 实现逻辑...
+    pass
+```
+
+然后在需要的地方调用即可。
+
+#### Q2: 如何处理新的第三方依赖?
+
+在`main.py`顶部的**条件导入区**添加：
+
+```python
+try:
+    from new_library import something
+except ImportError:
+    something = None  # 或提供fallback实现
+```
+
+并在代码中使用前检查：
+```python
+if something is not None:
+    something.do_something()
+else:
+    logger.warning('new_library未安装，跳过该功能')
+```
+
+#### Q3: 内存增长如何监控?
+
+项目已实现自动清理机制：
+- 速率限制存储超过10000条目时触发清理
+- 后台线程每60分钟执行一次全面清理
+- 清理策略：删除1小时无活动的条目
+
+可通过日志查看清理情况：
+```
+DEBUG - 速率限制存储清理: 12000 -> 8500 条目
+```
+
+---
+
+> ⚠️ **重要提示**: 本规范是项目代码质量的基石。任何违反规范的代码都不得合并到主分支。如有疑问，请先讨论再实施。
+> 
+> **文档版本**: v2.0.0 | **最后更新**: 2026-08-26 | **审核状态**: ✅ 已通过生产环境验证
+
+---
+
 📚 完整项目范式体系 (Project Paradigm System)
 
 基于项目代码深度分析，以下是微购相册项目的完整技术范式和最佳实践。
