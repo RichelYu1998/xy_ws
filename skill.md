@@ -21,9 +21,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.11 (2026-08-24) - 🎯 双向滚动联动底部同步修复 — 解决高价商品表拉到底部时总商品列表不同步问题
+> **📌 当前版本**: v3.8.90.12 (2026-08-26) - 🐛 隐藏Bug清零 + 浏览器启动修复 — PROJECT_DIR类型错误+uvicorn导入位置错误+Connection closed驱动修复
 >
 > **⚠️ 重要更新**:
+> - **v3.8.90.12**: 🐛 **隐藏Bug清零+浏览器启动修复** — 修复PROJECT_DIR字符串类型与Path `/`运算符不兼容导致SecureConfig加密崩溃(11处路径拼接TypeError)，修复uvicorn=None错误放置在starlette.middleware.gzip的except块(导致GZipMiddleware缺失时uvicorn被误杀)，修复Playwright驱动与缓存Chromium版本不匹配(1208 vs 1169)导致Connection closed，新增Environment.launch_browser()集中式启动器(Connection closed自动重试3次+Executable不存在自动安装+系统Chrome回退)，get_chrome_path()检测到Playwright缓存有Chromium时返回None让Playwright自选匹配版本，替换3处重复try-except启动代码，确认所有import在文件顶部(L1-L117)无内联导入无重复
 > - **v3.8.90.11**: 🎯 **双向滚动联动底部同步修复** — 修复findFirstVisibleRow增强底部检测(isAtBottom判断scrollTop+clientHeight≥scrollHeight-5)，syncScroll优化滚动位置计算(使用offsetTop替代getBoundingClientRect消除滚动状态影响)，新增底部特殊处理逻辑(源表格在底部时目标行滚动到目标表格底部区域)，添加详细调试日志([联动初始化]/[联动事件]/[findFirstVisibleRow]/[联动]四级日志体系)
 > - **v3.8.90.10**: 📱 **移动端双表联动修复** — 消除移动端滚动同步抖动(programmaticScroll标志位+双重rAF)，滚动同步改为SKU行对齐(findFirstVisibleRow查找可视行SKU→目标表格定位同SKU行→相同视觉偏移)，新增点击行联动高亮(toggleLinkedHighlight)，搜索时清除联动状态
 > - **v3.8.90.09**: 🔧 **WEB_PORT环境变量+Playwright安装优化+浏览器状态API** — 消除所有硬编码8888端口改为WEB_PORT环境变量，_get_allowed_origins()动态生成CORS源，install_playwright_cdn()本地已有浏览器跳过安装+CDN测速改HEAD请求，playwright锁定1.52.0匹配本地chromium，/api/bootstrap新增浏览器状态字段(playwright_chromium/system_chrome/browser_ready)，run.sh修复shebang
@@ -52,7 +53,7 @@
 > - v3.8.89.28: 修复邮件From头+Subject头两处构造Bug，`Header.encode()` 抛AttributeError导致所有隧道通知邮件发送失败；From头改用 `formataddr()` 标准库函数，Subject头改用字符串赋值（Python3.14新policy下Header对象在as_string()时崩溃）
 > - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
 > - 无任何额外的.py文件，避免导入依赖问题
-> - 当前commit: 待推送
+> - 当前commit: 待推送（v3.8.90.12 隐藏Bug清零+浏览器启动修复）
 
 作者: 小旭二手机（西园路）
 
@@ -633,6 +634,22 @@ class PathManager:
 - ✅ 动态文件名生成（日期前缀）
 - ✅ 多源数据获取策略（权威源+备用源）
 
+**⚠️ 重要：PROJECT_DIR 类型规范 (v3.8.90.12 修复)**
+
+`PROJECT_DIR` 必须为 `Path` 对象（非字符串），以支持 `/` 运算符路径拼接：
+
+```python
+# ✅ 正确：PROJECT_DIR 为 Path 对象
+PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+key_file = PROJECT_DIR / 'config' / '.encryption_key'  # Path / 运算符
+
+# ❌ 错误：PROJECT_DIR 为字符串，/ 运算符会抛 TypeError
+PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))  # 返回 str
+key_file = PROJECT_DIR / 'config' / '.encryption_key'  # TypeError: unsupported operand type(s) for /: 'str' and 'str'
+```
+
+**v3.8.90.12 修复案例**: 原代码 `PROJECT_DIR` 为字符串，但 SecureConfigManager 等11处使用 `/` 运算符，导致每次启动输出 `[SecureConfig] ⚠️ 自动加密失败: unsupported operand type(s) for /: 'str' and 'str'`，配置加密功能完全失效。修复方式：将 `PROJECT_DIR` 改为 `Path` 对象，`/` 运算符原生支持，同时兼容 `os.path.join()` 和 f-string。
+
 ──────────────────────────────────────────────────
 
 🔴 PY-CORE-004: 智能缓存管理范式 (Intelligent Caching)
@@ -906,6 +923,33 @@ class WegoScraper:
 - ✅ API回退机制（缺失数据补充）
 - ✅ 超时保护（每步2秒超时）
 - ✅ 商品去重（seen_products集合）
+
+**⚠️ 重要：集中式浏览器启动器 (v3.8.90.12 新增)**
+
+所有浏览器启动必须通过 `Environment.launch_browser()` 集中式方法，禁止散落的 `p.chromium.launch()` + try-except：
+
+```python
+# ✅ 正确：使用集中式启动器
+browser = await Environment.launch_browser(
+    p, headless=False, args=browser_args, executable_path=chrome_path
+)
+
+# ❌ 错误：散落的 try-except 启动代码（已废弃）
+try:
+    browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
+except Exception as launch_err:
+    # ... 重复的兜底逻辑 ...
+```
+
+**launch_browser() 内置三层防护**:
+1. **Connection closed 自动重试**: 捕获 `"Connection closed"` 瞬时连接错误，最多重试3次，递增等待(1s/2s/3s)
+2. **Executable 不存在自动安装**: 捕获 `"Executable doesn't exist"`，调用 `install_playwright_cdn()` 安装后重试
+3. **系统Chrome回退**: Playwright内置Chromium仍不可用时，回退到系统Chrome
+
+**get_chrome_path() 版本匹配策略**:
+- 检测到 Playwright 缓存有 Chromium 时返回 `None`（让 Playwright 自选匹配版本）
+- 仅当缓存无 Chromium 时回退到系统 Chrome
+- 避免驱动与缓存版本不匹配导致 `Connection closed while reading from the driver`
 
 ──────────────────────────────────────────────────
 

@@ -374,6 +374,48 @@ pandoc skill.md -o skill.docx
 
 ## 🔄 最新更新
 
+### v3.8.90.12 (2026-08-26) - 🐛 隐藏Bug清零 + 浏览器启动修复 — PROJECT_DIR类型错误+uvicorn导入位置错误+Connection closed驱动修复
+
+#### 更新内容: 修复3个隐藏Bug（PROJECT_DIR字符串/运算符不兼容导致SecureConfig加密崩溃、uvicorn=None错误放置在starlette except块、Playwright驱动与缓存Chromium版本不匹配导致Connection closed），新增集中式浏览器启动器launch_browser()内置重试与自动安装兜底
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
+
+---
+
+- **PROJECT_DIR类型修复 (Bug修复-P0)** — `PROJECT_DIR`为字符串但11处使用`/`运算符(Path专用)导致`TypeError: unsupported operand type(s) for /: 'str' and 'str'`
+  - 根因: `PROJECT_DIR = os.path.dirname(...)` 返回字符串，而SecureConfigManager等11处使用 `PROJECT_DIR/'config'/'.encryption_key'` 语法
+  - 症状: 每次启动输出 `[SecureConfig] ⚠️ 自动加密失败: unsupported operand type(s) for /: 'str' and 'str'`，配置加密功能完全失效
+  - 修复: `PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))` 改为Path对象，`/`运算符原生支持
+  - 影响范围: SecureConfigManager._initialize()、initialize_encryption()、load_config()、save_config()、_get_security_checks()、DependencyAuditor等11处路径拼接
+  - 参考位置: [main.py#L118](main.py#L118)
+
+- **uvicorn导入位置修复 (Bug修复-P1)** — `uvicorn = None` 错误放置在 `starlette.middleware.gzip` 的except块中
+  - 根因: 当starlette.middleware.gzip导入失败但fastapi导入成功时，uvicorn被错误地置为None
+  - 症状: GZipMiddleware缺失时uvicorn被误杀，Web服务无法启动
+  - 修复: 将 `uvicorn = None` 移至fastapi的except块中，与 `import uvicorn` 对应
+  - 参考位置: [main.py#L79-L86](main.py#L79-L86)
+
+- **浏览器启动Connection closed修复 (Bug修复-P0)** — Playwright驱动与缓存Chromium版本不匹配导致 `BrowserType.launch: Connection closed while reading from the driver`
+  - 根因: Playwright缓存同时存在chromium-1169(匹配)和chromium-1208(不匹配)，get_chrome_path()返回版本最大的1208导致驱动不兼容
+  - 修复1: get_chrome_path()检测到Playwright缓存有Chromium时返回None，让Playwright自选匹配版本
+  - 修复2: 新增 `Environment.launch_browser()` 集中式启动器，内置Connection closed自动重试(3次递增等待)+Executable不存在自动安装+系统Chrome回退
+  - 替换3处重复的try-except启动代码: 爬虫主流程(L5013)、备用入口(L5920)、Cookie获取(L6265)
+  - 参考位置: [main.py#L1794-L1807](main.py#L1794-L1807), [main.py#L1822-L1854](main.py#L1822-L1854)
+
+- **Import规范验证 (质量保证)** — 确认所有import在文件顶部(L1-L117)，无内联导入，无重复导入
+  - ✅ 规范编号: PY-CORE-000 (Import语句规范)
+  - 标准库import: 33个(L3-L44)，按字母排序
+  - 第三方库import: 21个(L45-L114)，try-except包裹可选依赖
+  - 无函数内部内联import，无重复模块导入
+
+- **验证结果** - 测试通过情况
+  - [x] 启动时SecureConfig加密错误消失 → 结果 ✅
+  - [x] `python main.py --task 1` 浏览器启动成功(2.62秒) → 结果 ✅
+  - [x] 页面DOM加载成功 → 结果 ✅
+  - [x] 语法检查 `ast.parse` 通过 → 结果 ✅
+
+---
+
 ### v3.8.90.11 (2026-08-24) - 🎯 双向滚动联动底部同步修复 — 解决高价商品表拉到底部时总商品列表不同步问题
 
 #### 更新内容: 修复双向表格滚动联动的底部同步问题，当高价商品(≥599元,49个)表格滚动到最后一行(SPU:84744)时，总商品列表(62个)正确同步显示相同数据行

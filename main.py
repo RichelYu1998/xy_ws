@@ -79,11 +79,11 @@ except ImportError:
     FastAPI = HTTPException = Query = Header = Depends = File = UploadFile = Form = BackgroundTasks = None
     CORSMiddleware = None
     JSONResponse = FileResponse = StreamingResponse = None
+    uvicorn = None
 try:
     from starlette.middleware.gzip import GZipMiddleware
 except ImportError:
     GZipMiddleware = None
-    uvicorn = None
 
 try:
     from starlette.requests import Request
@@ -115,7 +115,7 @@ try:
 except ImportError:
     packaging_version = None
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _module_logger = logging.getLogger('main')
 logger = logging.getLogger('FileCleaner')
 
@@ -1793,15 +1793,17 @@ class Environment:
     @staticmethod
     def get_chrome_path():
         """获取Chrome浏览器路径，支持Windows、Mac和Linux系统
-        
+
         优先级：
-        1. Playwright缓存中的Chromium（直接返回路径，避免Playwright版本不匹配）
+        1. Playwright缓存中存在Chromium时返回None，让Playwright使用自带匹配版本
+           （避免driver与缓存中其它版本chromium不匹配导致
+           "Connection closed while reading from the driver"）
         2. 系统Chrome（作为fallback）
-        3. 都找不到返回None（由launch的try-except兜底自动安装）
+        3. 都找不到返回None（由launch_browser的兜底逻辑自动安装）
         """
         pw_chromium = Environment._find_playwright_chromium()
         if pw_chromium:
-            return pw_chromium
+            return None
         return Environment._find_system_chrome()
     
     @staticmethod
@@ -1816,6 +1818,39 @@ class Environment:
         
         return browser_args
     
+    @staticmethod
+    async def launch_browser(p, *, headless=False, args=None, executable_path=None):
+        """启动Chromium浏览器，内置重试与自动安装兜底
+
+        - 针对"Connection closed while reading from the driver"等瞬时连接错误自动重试
+        - 针对"Executable doesn't exist"自动安装Playwright Chromium并回退系统Chrome
+        """
+        launch_args = args if args is not None else []
+        max_retry = 3
+        for attempt in range(1, max_retry + 1):
+            try:
+                return await p.chromium.launch(headless=headless, args=launch_args, executable_path=executable_path)
+            except Exception as e:
+                msg = str(e)
+                if "Executable doesn't exist" in msg or "executable doesn't exist" in msg.lower():
+                    print('Playwright内置Chromium不存在，正在自动安装浏览器...')
+                    install_playwright_cdn()
+                    try:
+                        return await p.chromium.launch(headless=headless, args=launch_args, executable_path=None)
+                    except Exception as e2:
+                        fallback = Environment._find_system_chrome()
+                        if fallback:
+                            print(f'Playwright内置Chromium仍不可用，回退到系统Chrome: {fallback}')
+                            return await p.chromium.launch(headless=headless, args=launch_args, executable_path=fallback)
+                        print(f'自动安装失败且无系统Chrome可用: {e2}')
+                        print('请手动运行: python -m playwright install chromium')
+                        raise
+                if "Connection closed" in msg and attempt < max_retry:
+                    print(f'浏览器启动连接中断，正在重试({attempt}/{max_retry})...')
+                    await asyncio.sleep(1.0 * attempt)
+                    continue
+                raise
+
     @staticmethod
     def get_user_agent():
         """获取用户代理字符串，根据系统类型返回不同的UA（动态版本号）"""
@@ -4975,26 +5010,9 @@ class WegoScraper:
                 else:
                     print(f'使用Playwright内置Chromium')
                 
-                try:
-                    browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
-                except Exception as launch_err:
-                    if 'Executable doesn\'t exist' in str(launch_err) or 'executable doesn\'t exist' in str(launch_err).lower():
-                        print('Playwright内置Chromium不存在，正在自动安装浏览器...')
-                        install_playwright_cdn()
-                        try:
-                            browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=None)
-                            print('浏览器安装完成，使用Playwright内置Chromium启动成功')
-                        except Exception as retry_err:
-                            fallback_chrome = Environment._find_system_chrome()
-                            if fallback_chrome:
-                                print(f'Playwright内置Chromium仍不可用，回退到系统Chrome: {fallback_chrome}')
-                                browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=fallback_chrome)
-                            else:
-                                print(f'自动安装失败且无系统Chrome可用: {retry_err}')
-                                print('请手动运行: python -m playwright install chromium')
-                                raise
-                    else:
-                        raise
+                browser = await Environment.launch_browser(
+                    p, headless=False, args=browser_args, executable_path=chrome_path
+                )
                 print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
                 
                 context_start = time.time()
@@ -5899,38 +5917,9 @@ def update_cookie():
             else:
                 print(f'使用Playwright内置Chromium')
             
-            try:
-                browser = await p.chromium.launch(
-                    headless=False, 
-                    args=browser_args, 
-                    executable_path=chrome_path
-                )
-            except Exception as launch_err:
-                if "Executable doesn't exist" in str(launch_err) or "executable doesn't exist" in str(launch_err).lower():
-                    print('Playwright内置Chromium不存在，正在自动安装浏览器...')
-                    install_playwright_cdn()
-                    try:
-                        browser = await p.chromium.launch(
-                            headless=False, 
-                            args=browser_args, 
-                            executable_path=None
-                        )
-                        print('浏览器安装完成，使用Playwright内置Chromium启动成功')
-                    except Exception as retry_err:
-                        fallback_chrome = Environment._find_system_chrome()
-                        if fallback_chrome:
-                            print(f'Playwright内置Chromium仍不可用，回退到系统Chrome: {fallback_chrome}')
-                            browser = await p.chromium.launch(
-                                headless=False, 
-                                args=browser_args, 
-                                executable_path=fallback_chrome
-                            )
-                        else:
-                            print(f'自动安装失败且无系统Chrome可用: {retry_err}')
-                            print('请手动运行: python -m playwright install chromium')
-                            raise
-                else:
-                    raise
+            browser = await Environment.launch_browser(
+                p, headless=False, args=browser_args, executable_path=chrome_path
+            )
             
             context = await browser.new_context(
                 viewport=Environment.get_default_viewport(),
@@ -6273,26 +6262,7 @@ if __name__ == '__main__':
 
         async def get_cookie():
             async with async_playwright() as p:
-                try:
-                    browser = await p.chromium.launch(headless=False)
-                except Exception as launch_err:
-                    if "Executable doesn't exist" in str(launch_err) or "executable doesn't exist" in str(launch_err).lower():
-                        print('Playwright内置Chromium不存在，正在自动安装浏览器...')
-                        install_playwright_cdn()
-                        try:
-                            browser = await p.chromium.launch(headless=False)
-                            print('浏览器安装完成，使用Playwright内置Chromium启动成功')
-                        except Exception as retry_err:
-                            fallback_chrome = Environment._find_system_chrome()
-                            if fallback_chrome:
-                                print(f'Playwright内置Chromium仍不可用，回退到系统Chrome: {fallback_chrome}')
-                                browser = await p.chromium.launch(headless=False, executable_path=fallback_chrome)
-                            else:
-                                print(f'自动安装失败且无系统Chrome可用: {retry_err}')
-                                print('请手动运行: python -m playwright install chromium')
-                                raise
-                    else:
-                        raise
+                browser = await Environment.launch_browser(p, headless=False)
                 context = await browser.new_context(
                     viewport=Environment.get_default_viewport(),
                     user_agent=WegoScraper.get_user_agent()
