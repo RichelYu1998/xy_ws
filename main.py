@@ -6428,9 +6428,25 @@ if __name__ == '__main__':
 
             path = request.url.path
 
+            # CSRF 防护: 写操作进行同源校验，Origin 的 host 须与请求 Host 一致 (v3.8.90.14)
+            # 同源校验支持隧道动态域名(Cloudflare/hostc)，避免白名单无法枚举导致 403 回归
+            if request.method in WRITE_METHODS and path not in CSRF_EXEMPT_PATHS and not path.startswith('/static') and not path.startswith('/favicon'):
+                origin = request.headers.get('origin', '') or request.headers.get('referer', '')
+                if origin:
+                    try:
+                        origin_host = urllib.parse.urlparse(origin).hostname
+                        request_host = (request.headers.get('host', '') or '').split(':')[0]
+                        if origin_host and request_host and origin_host != request_host:
+                            return JSONResponse(status_code=403, content={'error': 'CSRF检查失败: 跨站请求被拒绝'}, headers=_no_store_headers())
+                    except Exception:
+                        return JSONResponse(status_code=403, content={'error': 'CSRF检查失败: Origin解析异常'}, headers=_no_store_headers())
+
             if not (path.startswith('/static') or path.startswith('/favicon')):
                 client_ip = request.client.host if request.client else "unknown"
-                _request_logger.info(f'[{request.method}] {path} | IP: {client_ip}')
+                # 日志注入防护: 过滤换行符防止日志伪造 (v3.8.90.14)
+                safe_path = path.replace('\n', '\\n').replace('\r', '\\r')
+                safe_ip = client_ip.replace('\n', '\\n').replace('\r', '\\r') if isinstance(client_ip, str) else client_ip
+                _request_logger.info(f'[{request.method}] {safe_path} | IP: {safe_ip}')
                 if request.method in ['POST', 'PUT', 'PATCH']:
                     content_length = request.headers.get('content-length', 0)
                     cl = int(content_length) if content_length else 0
@@ -6527,7 +6543,8 @@ if __name__ == '__main__':
                         health_data['status'] = 'unhealthy'
                         status_code = 503
                 except Exception as e:
-                    health_data['system_check_error'] = str(e)
+                    logger.debug(f"健康检查系统信息采集异常: {type(e).__name__}: {e}")
+                    health_data['system_check_error'] = 'system_check_unavailable'
             else:
                 health_data['system_check'] = 'psutil未安装'
             if json_cache is not None:
@@ -6560,7 +6577,8 @@ if __name__ == '__main__':
                     except Exception as e:                        logger.debug(f"Silent exception: {e}")
                 return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
             except Exception as e:
-                return JSONResponse(status_code=500, content={'error': str(e)})
+                logger.error(f'指标采集异常: {type(e).__name__}: {e}', exc_info=True)
+                return JSONResponse(status_code=500, content={'error': '指标采集失败'})
 
         @app.get('/api/security/check')
         async def security_check_endpoint():
@@ -6597,7 +6615,7 @@ if __name__ == '__main__':
         async def swagger_spec():
             spec = {
                 'openapi': '3.0.0',
-                'info': {'title': 'Szwego商品爬虫API', 'version': '3.8.73', 'description': 'Szwego商品爬虫Web服务API文档'},
+                'info': {'title': 'Szwego商品爬虫API', 'version': VERSION, 'description': 'Szwego商品爬虫Web服务API文档'},
                 'servers': [{'url': '/api'}],
                 'paths': {
                     '/version': {'get': {'summary': '获取版本信息', 'tags': ['系统'], 'responses': {'200': {'description': '版本信息'}}}},
@@ -7340,7 +7358,8 @@ if __name__ == '__main__':
                 }
                 return jsonify(result)
             except Exception as e:
-                return jsonify({'error': str(e)}, status_code=500)
+                logger.error(f'商品删除接口异常: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'error': '服务器内部错误'}, status_code=500)
 
         @app.get('/api/products')
         async def get_all_products():
@@ -7443,7 +7462,8 @@ if __name__ == '__main__':
                     'created_time': created_time
                 })
             except Exception as e:
-                return jsonify({'error': str(e)}, status_code=500)
+                logger.error(f'商品列表接口异常: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'error': '服务器内部错误'}, status_code=500)
 
         @app.get('/api/daily-profit')
         async def get_daily_profit(group_by: str = 'day', start_date: str = None, end_date: str = None):
@@ -7630,7 +7650,8 @@ if __name__ == '__main__':
             except Exception as e:
                 error_detail = str(e) + '\n' + traceback.format_exc()
                 print(f'get_daily_profit错误: {error_detail}')
-                return jsonify({'error': str(e), 'detail': error_detail}, status_code=500)
+                logger.error(f'get_daily_profit异常: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'error': '服务器内部错误，请查看日志'}, status_code=500)
 
         def get_all_products():
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
@@ -7718,7 +7739,8 @@ if __name__ == '__main__':
                     'system': Environment.SYSTEM
                 })
             except Exception as e:
-                return jsonify({'error': str(e)}, status_code=500)
+                logger.error(f'商品数据接口异常: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'error': '服务器内部错误'}, status_code=500)
 
         @app.get('/api/product')
         async def get_product(sku: str = ''):
@@ -7762,7 +7784,8 @@ if __name__ == '__main__':
                         return jsonify({'found': True, 'product': p})
                 return jsonify({'found': False, 'error': '未找到该商品'})
             except Exception as e:
-                return jsonify({'found': False, 'error': str(e)})
+                logger.error(f'商品详情接口异常: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'found': False, 'error': '服务器内部错误'})
         
         @app.get('/api/product/search')
         async def search_product(sku: str = ''):
@@ -9143,7 +9166,8 @@ if __name__ == '__main__':
                     print(f"[Tunnel] 🚀 hostc已启动，URL将由心跳机制获取和验证")
                     return {'success': True, 'url': None, 'message': 'hostc已启动，URL由心跳机制获取'}
             except Exception as e:
-                return {'success': False, 'error': str(e)}
+                logger.error(f'隧道启动异常: {type(e).__name__}: {e}', exc_info=True)
+                return {'success': False, 'error': f'隧道启动失败: {type(e).__name__}'}
         
         def restart_tunnel():
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay, cf_url
@@ -9589,7 +9613,8 @@ ingress:
                 return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 等待 URL 超时 ({timeout}秒)"}
 
             except Exception as e:
-                return {"success": False, "error": f"Plan B 也失败了: {str(e)}"}
+                logger.error(f'Cloudflare Plan B 异常: {type(e).__name__}: {e}', exc_info=True)
+                return {"success": False, "error": f"Plan B 失败: {type(e).__name__}"}
 
         def cf_heartbeat_loop():
             """Cloudflare Tunnel 独立心跳验证 - 验证通过后发邮件通知"""
@@ -9806,9 +9831,10 @@ ingress:
                     'timestamp': datetime.now().isoformat()
                 })
             except Exception as e:
+                logger.error(f'隧道状态接口异常: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({
                     'success': False,
-                    'error': str(e)[:200]
+                    'error': '服务器内部错误'
                 }), 500
         
         @app.post('/api/url-source/configure')
@@ -10089,10 +10115,11 @@ ingress:
             return FileResponse(path=os.path.join(PROJECT_DIR, 'dist', 'favicon', 'favicon.ico'))
 
 
+        web_host = os.environ.get('WEB_HOST', '0.0.0.0')
         print(f"\n🚀 FastAPI 服务启动中...")
-        print(f"   地址: http://0.0.0.0:{args.port}")
-        print(f"   文档: http://0.0.0.0:{args.port}/docs")
-        uvicorn.run(app, host='0.0.0.0', port=args.port, log_level="info")
+        print(f"   地址: http://{web_host}:{args.port}")
+        print(f"   文档: http://{web_host}:{args.port}/docs")
+        uvicorn.run(app, host=web_host, port=args.port, log_level="info")
     else:
         main()
 

@@ -55,3 +55,8 @@ version.txt
 
 # Playwright browsers (large files, should be downloaded on first run)
 playwright-browsers/
+
+# Build tools (pandoc for skill.docx generation, not project code)
+tools/
+*.msi
+*.zip

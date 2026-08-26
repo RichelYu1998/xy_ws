@@ -374,6 +374,60 @@ pandoc skill.md -o skill.docx
 
 ## 🔄 最新更新
 
+### v3.8.90.14 (2026-08-26) - 🔒 攻防纵深加固 + 隐藏Bug清零第三轮 — CSRF同源校验+日志注入防护+信息泄露清零+硬编码消除
+
+#### 更新内容: 全面审计攻防体系，修复CSRF白名单阻断隧道回归Bug+8处API响应信息泄露(含完整traceback泄露)，新增CSRF同源校验(支持动态隧道)+日志注入防护，消除swagger版本硬编码与uvicorn host硬编码
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
+
+---
+
+- **CSRF同源校验修复回归Bug (安全-P0/Bug修复)** — v3.8.90.14新增的CSRF白名单校验仅含localhost，阻断Cloudflare/hostc隧道写操作(回归v3.8.90.01已修复的403问题)
+  - 根因: `LOCAL_TRUSTED_ORIGINS`白名单无法枚举动态隧道域名，隧道Origin不在白名单→403
+  - 修复: 改为同源校验(比较Origin的host与请求Host头)，既防跨站请求又支持任意动态隧道域名
+  - 参考位置: [main.py#L6431-L6441](main.py#L6431-L6441)
+
+- **日志注入防护 (安全-P1)** — 请求日志直接拼接`path`与`client_ip`，攻击者可注入`\n`伪造日志
+  - 修复: `safe_path`/`safe_ip`过滤换行符(`\n`→`\\n`、`\r`→`\\r`)防止日志伪造
+  - 参考位置: [main.py#L6444-L6447](main.py#L6444-L6447)
+
+- **swagger版本硬编码消除 (Bug修复-P2)** — `/api/swagger.json`硬编码`'version': '3.8.73'`，与实际版本不符
+  - 修复: 改为 `'version': VERSION`（从README.md自动解析，与`/health`一致）
+  - 参考位置: [main.py#L6608](main.py#L6608)
+
+- **uvicorn host硬编码消除 (Bug修复-P2)** — `uvicorn.run(host='0.0.0.0')`硬编码，无法绑定指定网卡
+  - 修复: 改为 `web_host = os.environ.get('WEB_HOST', '0.0.0.0')`，通过环境变量配置
+  - 参考位置: [main.py#L10101-L10104](main.py#L10101-L10104)
+
+- **完整traceback泄露修复 (安全-P0)** — `/api/daily-profit`异常时返回`str(e)+traceback.format_exc()`完整堆栈
+  - 风险: 泄露文件路径、代码结构、内部调用链，辅助攻击者侦察
+  - 修复: 客户端返回通用消息`'服务器内部错误，请查看日志'`，完整堆栈仅`logger.error`记录
+  - 参考位置: [main.py#L7648-L7652](main.py#L7648-L7652)
+
+- **API响应信息泄露批量清零 (安全-P0)** — 8处API端点异常返回`str(e)`泄露内部异常消息
+  - 涉及端点: 指标采集`/metrics`、商品删除、商品列表、商品数据、商品详情、隧道启动、Cloudflare Plan B、隧道状态
+  - 修复: 统一改为`logger.error`记录+客户端返回`'服务器内部错误'`/`{type(e).__name__}`脱敏
+  - 参考位置: [main.py#L6580](main.py#L6580)、[main.py#L7360](main.py#L7360)、[main.py#L7463](main.py#L7463)、[main.py#L7738](main.py#L7738)、[main.py#L7782](main.py#L7782)、[main.py#L9163](main.py#L9163)、[main.py#L9613](main.py#L9613)、[main.py#L9831](main.py#L9831)
+
+- **健康检查信息脱敏 (安全-P1)** — `/health`端点`system_check_error`返回`str(e)`泄露系统异常细节
+  - 修复: 改为`'system_check_unavailable'`通用值，真实异常仅`logger.debug`记录
+  - 参考位置: [main.py#L6538-L6540](main.py#L6538-L6540)
+
+- **代码规范遵循 skill.md** - 质量保证
+  - ✅ PY-CORE-000: 所有import在文件顶部(L1-L117)，无内联导入，无重复导入
+  - ✅ 无硬编码: swagger版本/uvicorn host均改为环境变量与VERSION变量
+  - ✅ 异常脱敏: API响应不返回str(e)/traceback，仅记录日志
+
+- **验证结果** - 测试通过情况
+  - [x] 语法检查 `py_compile` 通过 → 结果 ✅
+  - [x] CSRF同源校验支持隧道(localhost/隧道域名同源放行，跨站阻断) → 结果 ✅
+  - [x] 无API响应str(e)泄露(grep无匹配) → 结果 ✅
+  - [x] 无traceback泄露 → 结果 ✅
+  - [x] 无swagger/uvicorn硬编码 → 结果 ✅
+  - [x] 所有import在文件顶部且唯一 → 结果 ✅
+
+---
+
 ### v3.8.90.13 (2026-08-26) - 🔒 全面安全审计 + 隐藏Bug清零第二轮 — 信息泄露+限流缺口+缓存控制+裸except+Windows磁盘兼容
 
 #### 更新内容: 全面审计main.py所有代码，修复5个隐藏Bug（健康检查版本硬编码/disk_usage Windows不兼容/RateLimiter内存泄漏/4处裸except/异常处理器信息泄露），新增6项安全防护（敏感端点限流/Cache-Control no-store/邮件测试输入验证/系统路径泄露防护/异常信息脱敏/RateLimiter内存清理）

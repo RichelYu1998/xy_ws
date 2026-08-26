@@ -21,9 +21,10 @@
 
 ---
 
-> **📌 当前版本**: v3.8.90.13 (2026-08-26) - 🔒 全面安全审计 + 隐藏Bug清零第二轮 — 信息泄露+限流缺口+缓存控制+裸except+Windows磁盘兼容
+> **📌 当前版本**: v3.8.90.14 (2026-08-26) - 🔒 攻防纵深加固 + 隐藏Bug清零第三轮 — CSRF同源校验+日志注入防护+信息泄露清零+硬编码消除
 >
 > **⚠️ 重要更新**:
+> - **v3.8.90.14**: 🔒 **攻防纵深加固+隐藏Bug清零第三轮** — 修复CSRF白名单阻断隧道回归Bug(LOCAL_TRUSTED_ORIGINS仅含localhost→隧道Origin不在白名单403，改为同源校验比较Origin的host与请求Host头，支持动态隧道域名)，新增日志注入防护(safe_path/safe_ip过滤换行符防止日志伪造)，消除swagger版本硬编码3.8.73改为VERSION，消除uvicorn host硬编码0.0.0.0改为WEB_HOST环境变量，修复8处API响应信息泄露(含/api/daily-profit完整traceback泄露+指标采集/商品删除/列表/数据/详情/隧道启动/Cloudflare Plan B/隧道状态str(e)泄露，统一改为logger.error记录+客户端返回通用消息)，健康检查system_check_error脱敏，确认所有import在文件顶部(L1-L117)无内联导入无重复
 > - **v3.8.90.13**: 🔒 **全面安全审计+隐藏Bug清零第二轮** — 修复5个隐藏Bug(健康检查版本硬编码3.8.73改为VERSION/disk_usage('/')Windows不兼容改为os.path.abspath(os.sep)/RateLimiter内存泄漏requests字典无限增长/4处裸except改为具体异常类型/异常处理器返回str(error)信息泄露改为通用消息)，新增6项安全防护(sensitive_rate_limiter敏感端点限流20次/分覆盖9个端点/_no_store_headers() Cache-Control no-store防缓存/邮件测试输入验证与config一致/系统路径泄露防护改bool/异常信息脱敏/RateLimiter内存清理del空IP条目)，验证无ReDoS/eval/exec/shell=True/pickle/marshal/不安全SSL/random.choice/可变默认参数
 > - **v3.8.90.12**: 🐛 **隐藏Bug清零+浏览器启动修复** — 修复PROJECT_DIR字符串类型与Path `/`运算符不兼容导致SecureConfig加密崩溃(11处路径拼接TypeError)，修复uvicorn=None错误放置在starlette.middleware.gzip的except块(导致GZipMiddleware缺失时uvicorn被误杀)，修复Playwright驱动与缓存Chromium版本不匹配(1208 vs 1169)导致Connection closed，新增Environment.launch_browser()集中式启动器(Connection closed自动重试3次+Executable不存在自动安装+系统Chrome回退)，get_chrome_path()检测到Playwright缓存有Chromium时返回None让Playwright自选匹配版本，替换3处重复try-except启动代码，确认所有import在文件顶部(L1-L117)无内联导入无重复
 > - **v3.8.90.11**: 🎯 **双向滚动联动底部同步修复** — 修复findFirstVisibleRow增强底部检测(isAtBottom判断scrollTop+clientHeight≥scrollHeight-5)，syncScroll优化滚动位置计算(使用offsetTop替代getBoundingClientRect消除滚动状态影响)，新增底部特殊处理逻辑(源表格在底部时目标行滚动到目标表格底部区域)，添加详细调试日志([联动初始化]/[联动事件]/[findFirstVisibleRow]/[联动]四级日志体系)
@@ -54,7 +55,7 @@
 > - v3.8.89.28: 修复邮件From头+Subject头两处构造Bug，`Header.encode()` 抛AttributeError导致所有隧道通知邮件发送失败；From头改用 `formataddr()` 标准库函数，Subject头改用字符串赋值（Python3.14新policy下Header对象在as_string()时崩溃）
 > - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
 > - 无任何额外的.py文件，避免导入依赖问题
-> - 当前commit: 待推送（v3.8.90.12 隐藏Bug清零+浏览器启动修复）
+> - 当前commit: 待推送（v3.8.90.14 攻防纵深加固+隐藏Bug清零第三轮）
 
 作者: 小旭二手机（西园路）
 
@@ -3431,6 +3432,9 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
+| v3.8.90.14 | 2026-08-26 | 小旭二手机（西园路） | 🔒 攻防纵深加固+隐藏Bug清零第三轮(CSRF同源校验支持动态隧道/日志注入防护safe_path+safe_ip/swagger版本硬编码改VERSION/uvicorn host改WEB_HOST环境变量/8处API响应str(e)信息泄露清零含完整traceback泄露/健康检查脱敏) |
+| v3.8.90.13 | 2026-08-26 | 小旭二手机（西园路） | 🔒 全面安全审计+隐藏Bug清零第二轮(健康检查版本硬编码改VERSION/disk_usage Windows兼容/RateLimiter内存泄漏修复/4处裸except改具体异常/异常处理器信息脱敏/敏感端点限流20次每分/Cache-Control no-store/邮件测试输入验证/系统路径泄露改bool) |
+| v3.8.90.12 | 2026-08-26 | 小旭二手机（西园路） | 🐛 隐藏Bug清零+浏览器启动修复(PROJECT_DIR改Path对象修复11处TypeError/uvicorn导入位置修复/Playwright驱动版本不匹配修复/Environment.launch_browser集中式启动器+3次重试+系统Chrome回退) |
 | v3.8.90.11 | 2026-08-24 | 小旭二手机（西园路） | 🎯 双向滚动联动底部同步修复(findFirstVisibleRow底部检测+syncScroll位置计算优化+offsetTop替代getBoundingClientRect+四级调试日志体系) |
 | v3.8.90.10 | 2026-08-24 | 小旭二手机（西园路） | 📱 移动端双表联动修复(programmaticScroll标志位+双重rAF消除抖动/SKU行对齐同步findFirstVisibleRow/toggleLinkedHighlight点击行联动高亮/搜索清除联动状态) |
 | v3.8.90.09 | 2026-08-22 | 小旭二手机（西园路） | 🔧 WEB_PORT环境变量消除硬编码端口+Playwright安装优化+浏览器状态API(_get_allowed_origins动态CORS/本地已有浏览器跳过安装/CDN测速HEAD请求/playwright锁定1.52.0/api/bootstrap浏览器状态字段/run.sh修复shebang) |
