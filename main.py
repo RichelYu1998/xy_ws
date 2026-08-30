@@ -9456,8 +9456,9 @@ if __name__ == '__main__':
                 env = os.environ.copy()
                 env['HOSTC_DEBUG'] = '1'
                 
-                tunnel_process = subprocess.Popen(
                 tunnel_host = os.environ.get('HOST', 'localhost')  # [CONFIGURED]
+
+                tunnel_process = subprocess.Popen(
                     [hostc_bin, str(port), '--local-host', tunnel_host] if hostc_bin != 'npx hostc' else ['npx', 'hostc', str(port), '--local-host', tunnel_host],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
