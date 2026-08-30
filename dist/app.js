@@ -1074,84 +1074,78 @@
             fetch('/api/changelog')
                 .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
-                    if (!data.success || !data.changelog || !data.changelog.length) return;
-                    var latest = data.changelog[0];
-                    var titleEl = document.getElementById('changelog-title');
-                    if (titleEl) titleEl.textContent = '最新更新 (v' + latest.version + ')';
-                    var container = document.getElementById('changelog-container');
-                    if (!container) return;
-                    container.innerHTML = '';
-                    var verCard = document.createElement('div');
-                    verCard.style.cssText = 'margin-bottom: 15px; border-left: 3px solid #67c23a; padding-left: 12px;';
-                    if (latest.items && latest.items.length) {
-                        latest.items.forEach(function(item) {
-                            var itemDiv = document.createElement('div');
-                            itemDiv.style.cssText = 'margin-bottom: 12px;';
-                            if (item.type === 'section') {
-                                var sectionTitle = document.createElement('div');
-                                sectionTitle.style.cssText = 'font-weight: 700; color: #303133; font-size: 15px; margin-bottom: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px;';
-                                sectionTitle.innerHTML = '<i class="fa fa-bookmark" style="color: #409EFF; margin-right: 6px;"></i>' + escapeHtml(  /* [ESCAPED] */item.title);
-                                itemDiv.appendChild(sectionTitle);
-                                if (item.content && item.content.trim()) {
-                                    var rawContent = item.content.trim();
-                                    var contentDiv = document.createElement('div');
-                                    contentDiv.style.cssText = 'padding: 10px 16px; color: #606266; font-size: 13px; line-height: 1.9; background: #fafafa; border-radius: 4px; word-break: break-word;';
-                                    var codeBlockRegex = /```[\s\S]*?```/g;
-                                    var parts = rawContent.split(codeBlockRegex);
-                                    var codeBlocks = rawContent.match(codeBlockRegex) || [];
-                                    var html = '';
-                                    for (var pi = 0; pi < parts.length; pi++) {
-                                        var textPart = parts[pi].trim();
-                                        if (textPart) {
-                                            textPart = escapeHtml(  /* [ESCAPED] */textPart)
-                                                .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#303133;">$1</strong>')
-                                                .replace(/^(\*\*.+?\*\*)$/gm, '$1')
-                                                .replace(/\n{2,}/g, '</p><p style="margin-bottom:8px;">')
-                                                .replace(/\n/g, '<br>');
-                                            html += '<p style="margin-bottom:8px;">' + textPart + '</p>';
+                    console.log('[Changelog] API返回数据:', data);
+                    try {
+                        if (!data.success || !data.changelog || !data.changelog.length) {
+                            console.warn('[Changelog] 无有效数据');
+                            return;
+                        }
+                        var latest = data.changelog[0];
+                        console.log('[Changelog] 最新版本:', latest.version);
+
+                        var titleEl = document.getElementById('changelog-title');
+                        if (titleEl) titleEl.textContent = '最新更新 (v' + latest.version + ')';
+
+                        var container = document.getElementById('changelog-container');
+                        if (!container) return;
+
+                        container.innerHTML = '';
+                        var verCard = document.createElement('div');
+                        verCard.style.cssText = 'margin-bottom: 15px; border-left: 3px solid #67c23a; padding-left: 12px;';
+
+                        if (latest.items && latest.items.length) {
+                            latest.items.forEach(function(item, idx) {
+                                try {
+                                    var itemDiv = document.createElement('div');
+                                    itemDiv.style.cssText = 'margin-bottom: 12px;';
+
+                                    if (item.type === 'section') {
+                                        var sectionTitle = document.createElement('div');
+                                        sectionTitle.style.cssText = 'font-weight: 700; color: #303133; font-size: 15px; margin-bottom: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px;';
+                                        sectionTitle.innerHTML = '<i class="fa fa-bookmark" style="color: #409EFF; margin-right: 6px;"></i>' + (item.title || '');
+                                        itemDiv.appendChild(sectionTitle);
+                                        
+                                        if (item.content && item.content.trim()) {
+                                            var contentDiv = document.createElement('div');
+                                            contentDiv.style.cssText = 'padding: 10px 16px; color: #606266; font-size: 13px; line-height: 1.9; background: #fafafa; border-radius: 4px;';
+                                            contentDiv.innerText = item.content;
+                                            itemDiv.appendChild(contentDiv);
                                         }
-                                        if (pi < codeBlocks.length) {
-                                            var codeContent = codeBlocks[pi].replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
-                                            html += '<pre style="background:#282c34;color:#abb2bf;padding:14px 18px;border-radius:6px;font-size:12px;line-height:1.7;overflow-x:auto;margin:10px 0;white-space:pre-wrap;word-break:break-all;border:1px solid #3e4451;">' + codeContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
-                                        }
+                                    } else {
+                                        var itemTitle = document.createElement('div');
+                                        itemTitle.style.cssText = 'font-weight: 600; color: #303133; font-size: 14px;';
+                                        itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' + 
+                                            (item.title || '') + 
+                                            (item.desc ? ' <span style="color:#606266;font-size:13px;"> - ' + item.desc + '</span>' : '');
+                                        itemDiv.appendChild(itemTitle);
                                     }
-                                    contentDiv.innerHTML = html;
-                                    itemDiv.appendChild(contentDiv);
+
+                                    if (item.sub_items && item.sub_items.length) {
+                                        var subList = document.createElement('ul');
+                                        subList.style.cssText = 'list-style:none;padding:8px 16px;margin:4px 0 0 0';
+                                        item.sub_items.forEach(function(sub) {
+                                            var subLi = document.createElement('li');
+                                            subLi.style.cssText = 'font-size:13px;color:#606266;line-height:1.8;padding-left:16px;margin-bottom:4px;position:relative';
+                                            subLi.innerHTML = '<span style="position:absolute;left:0;color:#409EF">•</span><span>' + (sub || '') + '</span>';
+                                            subList.appendChild(subLi);
+                                        });
+                                        itemDiv.appendChild(subList);
+                                    }
+
+                                    verCard.appendChild(itemDiv);
+                                } catch(err) {
+                                    console.error('[Changelog] Item error:', err, idx);
                                 }
-                                if (item.sub_items && item.sub_items.length) {
-                                    var subList = document.createElement('ul');
-                                    subList.style.cssText = 'list-style: none; padding: 8px 16px; margin: 0;';
-                                    item.sub_items.forEach(function(sub) {
-                                        var subLi = document.createElement('li');
-                                        subLi.style.cssText = 'font-size: 13px; color: #606266; line-height: 1.8; position: relative; padding-left: 16px; margin-bottom: 4px;';
-                                        subLi.innerHTML = '<span style="position: absolute; left: 0; color: #409EFF;">•</span>' + escapeHtml(  /* [ESCAPED] */sub);
-                                        subList.appendChild(subLi);
-                                    });
-                                    itemDiv.appendChild(subList);
-                                }
-                            } else {
-                                var itemTitle = document.createElement('div');
-                                itemTitle.style.cssText = 'font-weight: 600; color: #303133; font-size: 14px;';
-                                itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' + escapeHtml(  /* [ESCAPED] */item.title) + (item.desc ? ' <span style="font-weight: 400; color: #606266;">- ' + escapeHtml(  /* [ESCAPED] */item.desc) + '</span>' : '');
-                                itemDiv.appendChild(itemTitle);
-                                if (item.sub_items && item.sub_items.length) {
-                                    var subList = document.createElement('ul');
-                                    subList.style.cssText = 'list-style: none; padding-left: 24px; margin: 4px 0 0 0;';
-                                    item.sub_items.forEach(function(sub) {
-                                        var subLi = document.createElement('li');
-                                        subLi.style.cssText = 'font-size: 13px; color: #606266; line-height: 1.6; position: relative; padding-left: 12px;';
-                                        subLi.innerHTML = '<span style="position: absolute; left: 0; color: #c0c4cc;">·</span>' + escapeHtml(  /* [ESCAPED] */sub);
-                                        subList.appendChild(subLi);
-                                    });
-                                    itemDiv.appendChild(subList);
-                                }
-                            }
-                            verCard.appendChild(itemDiv);
-                        });
+                            });
+                        }
+
+                        container.appendChild(verCard);
+                    } catch(mainErr) {
+                        console.error('[Changelog] Main error:', mainErr);
+                        var container = document.getElementById('changelog-container');
+                        if (container) container.innerHTML = '<div style="padding:20px;background:#fef0e6;color:#e6a23c;border-radius:8px;text-align:center">⚠️ 加载失败，请刷新重试</div>';
                     }
-                    container.appendChild(verCard);
-                })
-                .catch(function(e) {
+                })                .catch(function(e) {
                     console.error('Failed to load changelog:', e);
                     if (typeof showToast === 'function') {
                         showToast('更新日志加载失败', 'warning');
