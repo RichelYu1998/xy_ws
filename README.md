@@ -138,6 +138,45 @@ bandit -r . -f json -o bandit_report.json
   - skill.md: 升级至v4.1，新增BOM防范措施章节和排查指南
   - README.md: 记录本次BOM修复完整过程和预防措施
   - 删除文件: check_bom.js, check_special_chars.js, check_js_syntax.py, fix2.js, _fix.js, fix_duplicate.py, fix.js.py, simple_test.html, test_changelog.html, code_block.txt, test/, .trae/ (共13项)
+  - **main.py**: 新增3个BOM检测函数（check_file_bom/scan_project_bom/validate_critical_files_bom），集成到启动流程
+  - **命令行参数**: 新增 `--fix-bom`（自动修复）和 `--check-bom`（仅扫描）参数
+  - **run.bat / run.sh**: 启动前自动执行BOM检测，发现问题立即修复
+  - **fix_bom.py**: 独立BOM清理工具（供手动使用）
+  - **.gitattributes**: 强制UTF-8 without BOM编码规范
+
+#### 🎯 BOM 检测功能使用方法:
+
+```bash
+# 方法1: 使用 main.py 内置功能（推荐）
+python main.py --check-bom        # 仅扫描项目中的 BOM 文件
+python main.py --fix-bom          # 扫描并自动修复所有 BOM 文件
+
+# 方法2: 使用独立工具
+py fix_bom.py                    # 扫描整个项目
+py fix_bom.py --fix              # 自动修复所有 BOM 文件
+py fix_bom.py dist/app.js --fix  # 检查并修复指定文件
+
+# 方法3: 启动脚本自动检测（已集成）
+run.bat     # Windows: 启动前自动检测并修复 BOM
+run.sh      # Linux/macOS: 启动前自动检测并修复 BOM
+```
+
+#### 🔍 BOM 检测范围:
+
+**关键文件（启动时必检）:**
+- `dist/app.js`: 前端主应用（BOM会导致浏览器 SyntaxError）
+- `index.html`: 入口 HTML 页面
+- `main.py`: Python 主程序
+
+**全项目扫描（可选）:**
+- Python: `*.py`
+- JavaScript: `*.js`
+- Web前端: `*.html`, `*.css`
+- 配置/数据: `*.json`, `*.xml`, `*.yaml`, `*.yml`
+- 文档: `*.md`, `*.txt`
+- 脚本: `*.sh`, `*.bat`
+
+**排除目录:** `.git/`, `__pycache__/`, `node_modules/`, `.venv/`, `.idea/`, `dist/assets/`
 
 ---
 ### v4.0 (2026-08-30) - 🛡️ 全面攻防压测系统+所有问题清零+代码规范化+Git推送

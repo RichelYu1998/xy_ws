@@ -119,6 +119,88 @@ PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _module_logger = logging.getLogger('main')
 logger = logging.getLogger('FileCleaner')
 
+
+def check_file_bom(file_path, auto_fix=False):
+    try:
+        path = Path(file_path) if not isinstance(file_path, Path) else file_path
+        if not path.exists():
+            return {"has_bom": False, "file_path": str(path), "fixed": False, "error": f"File not found: {path}"}
+        with open(path, "rb") as f:
+            header = f.read(3)
+        has_bom = header == b'\xef\xbb\xbf'
+        fixed = False
+        error = None
+        if has_bom and auto_fix:
+            try:
+                with open(path, "rb") as f:
+                    content = f.read()
+                with open(path, "wb") as f:
+                    f.write(content[3:])
+                _module_logger.info(f"✅ BOM removed: {path}")
+                fixed = True
+            except Exception as e:
+                error = f"BOM removal failed: {e}"
+                _module_logger.error(error)
+        elif has_bom and not auto_fix:
+            _module_logger.warning(f"⚠️ BOM found: {path} (use --fix-bom to auto-fix)")
+        return {"has_bom": has_bom, "file_path": str(path), "fixed": fixed, "error": error}
+    except Exception as e:
+        error_msg = f"BOM check error: {e}"
+        _module_logger.error(error_msg)
+        return {"has_bom": False, "file_path": str(file_path), "fixed": False, "error": error_msg}
+
+def scan_project_bom(auto_fix=False, extensions=None):
+    if extensions is None:
+        extensions = ["*.py", "*.js", "*.html", "*.css", "*.md", "*.json", "*.xml", "*.yaml", "*.yml", "*.txt", "*.sh", "*.bat"]
+    bom_files = []
+    total_files = 0
+    fixed_count = 0
+    errors = []
+    exclude_dirs = {".git", "__pycache__", "node_modules", ".venv", "venv", ".idea"}
+    for ext in extensions:
+        pattern = str(PROJECT_DIR / "**" / ext)
+        for filepath in glob.glob(pattern, recursive=True):
+            path_obj = Path(filepath)
+            if any(skip in path_obj.parts for skip in exclude_dirs):
+                continue
+            if "dist" in path_obj.parts and "assets" in path_obj.parts:
+                continue
+            total_files += 1
+            try:
+                result = check_file_bom(filepath, auto_fix=auto_fix)
+                if result["has_bom"]:
+                    bom_files.append(result["file_path"])
+                    if result.get("fixed"):
+                        fixed_count += 1
+                    if result.get("error"):
+                        errors.append(result["error"])
+            except Exception as e:
+                errors.append(f"Scan error {filepath}: {e}")
+    return {"total_files": total_files, "bom_files": bom_files, "fixed_count": fixed_count, "errors": errors}
+
+def validate_critical_files_bom():
+    critical_files = [PROJECT_DIR / "dist" / "app.js", PROJECT_DIR / "index.html", PROJECT_DIR / "main.py"]
+    all_ok = True
+    for file_path in critical_files:
+        result = check_file_bom(file_path, auto_fix=False)
+        if result["error"]:
+            if "not exist" not in result.get("error", ""):
+                _module_logger.error(result["error"])
+                all_ok = False
+            else:
+                continue
+        if result["has_bom"]:
+            filename = Path(result["file_path"]).name
+            if filename.endswith(".js"):
+                _module_logger.error(f"🚨 FATAL: {filename} contains BOM! This causes SyntaxError in browser. Run: python main.py --fix-bom")
+                all_ok = False
+            else:
+                _module_logger.warning(f"⚠️ WARNING: {filename} contains BOM. Run: python main.py --fix-bom")
+    if all_ok:
+        _module_logger.info("✅ Critical files BOM check passed")
+    return all_ok
+
+
 def get_version_info():
     """获取详细的 Python 版本信息"""
     return {
@@ -6685,7 +6767,51 @@ if __name__ == '__main__':
     parser.add_argument('--install-playwright', action='store_true', help='Playwright CDN智能测速+安装浏览器')
     parser.add_argument('--check-deps', action='store_true', help='检查requirements.txt依赖是否已满足')
     parser.add_argument('--select-pip-mirror', action='store_true', help='pip镜像智能测速并写入配置')
+    parser.add_argument('--fix-bom', action='store_true', help='检测并移除项目中所有文件的UTF-8 BOM字符 (ZWNBSP U+FEFF)')
+    parser.add_argument('--check-bom', action='store_true', help='仅扫描项目中的BOM文件，不进行修复')
     args = parser.parse_args()
+
+    # BOM 字符检测与修复（v4.1 新增功能）
+    if args.fix_bom:
+        print("=" * 60)
+        print("🔧 BOM 字符自动清理工具")
+        print("   版本: v4.1 | 日期: 2026-08-30")
+        print("=" * 60)
+        result = scan_project_bom(auto_fix=True)
+        print("\n📊 扫描结果:")
+        print(f"   总计文件数: {result['total_files']}")
+        print(f"   发现 BOM 文件: {len(result['bom_files'])}")
+        print(f"   成功修复: {result['fixed_count']}")
+        if result['errors']:
+            print("\n⚠️ 错误:")
+            for err in result['errors']:
+                print(f"   - {err}")
+        if len(result['bom_files']) == 0:
+            print("\n✅ 项目中未发现 BOM 文件，所有文件编码规范！")
+        else:
+            print("\n✅ 已成功修复 {result['fixed_count']}/{len(result['bom_files'])} 个文件")
+        sys.exit(0)
+
+    if args.check_bom:
+        print("=" * 60)
+        print("🔍 BOM 字符扫描工具")
+        print("   版本: v4.1 | 日期: 2026-08-30")
+        print("=" * 60)
+        result = scan_project_bom(auto_fix=False)
+        print("\n📊 扫描结果:")
+        print(f"   总计文件数: {result['total_files']}")
+        print(f"   发现 BOM 文件: {len(result['bom_files'])}")
+        if result['bom_files']:
+            print("\n⚠️ 以下文件包含 BOM 字符:")
+            for i, f in enumerate(result['bom_files'], 1):
+                print(f"   {i}. {f}")
+            print("\n💡 运行 python main.py --fix-bom 自动修复")
+        else:
+            print("\n✅ 项目中未发现 BOM 文件，所有文件编码规范！")
+        sys.exit(0)
+
+    # 启动前验证关键文件（防止 JS SyntaxError）
+    validate_critical_files_bom()
 
     if args.select_pip_mirror:
         venv_path = os.environ.get('VIRTUAL_ENV') or os.path.join(PROJECT_DIR, '.venv')

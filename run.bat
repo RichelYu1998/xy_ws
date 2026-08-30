@@ -770,6 +770,14 @@ call :log ========================================
 call "!VENV_PATH!\Scripts\activate.bat"
 
 call :log_blank
+
+call :log [*] 检测文件编码 (BOM)...
+"%VENV_PATH%\Scripts\python.exe" main.py --check-bom
+if errorlevel 1 (
+    call :log [WARNING] 发现 BOM 字符，正在自动修复...
+    "%VENV_PATH%\Scripts\python.exe" main.py --fix-bom
+)
+call :log [OK] 文件编码检查完成
 call :log 正在启动 Web 服务...
 call :log_blank
 

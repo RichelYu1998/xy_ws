@@ -5531,6 +5531,65 @@ if Environment.IS_WINDOWS:
 
 核心原则
 
+0. **BOM 字符检测与防范规范（v4.1 新增）** ⚠️ 重要
+
+> **问题背景**: UTF-8 BOM (Byte Order Mark, U+FEFF/EF BB BF) 字符会导致 JavaScript 语法错误 (`SyntaxError: Illegal character`)，影响前端页面加载。Python 虽然能容忍 BOM，但不符合 PEP 8 规范。
+
+**强制要求:**
+- ✅ 所有源代码文件必须使用 **UTF-8 without BOM** 编码
+- ✅ 项目启动时自动检测关键文件的 BOM 状态
+- ✅ 发现 BOM 必须立即修复，不得带 BOM 提交到 Git
+- ✅ 使用 `.gitattributes` 文件强制团队编码规范
+
+**检测方法:**
+
+```python
+# 方法1: main.py 内置功能（推荐）
+python main.py --check-bom    # 仅扫描
+python main.py --fix-bom      # 扫描并修复
+
+# 方法2: 使用独立工具
+py fix_bom.py                # 扫描项目
+py fix_bom.py --fix          # 自动修复
+
+# 方法3: 启动脚本（已集成）
+run.bat / run.sh             # 启动前自动检测
+```
+
+**代码示例:**
+
+```python
+# 检查单个文件
+from main import check_file_bom
+result = check_file_bom('dist/app.js')
+if result['has_bom']:
+    print(f"发现BOM: {result['file_path']}")
+
+# 自动修复
+result = check_file_bom('dist/app.js', auto_fix=True)
+print(f"已修复: {result['fixed']}")
+
+# 扫描整个项目
+from main import scan_project_bom
+result = scan_project_bom(auto_fix=True)
+print(f"修复了 {result['fixed_count']} 个文件")
+
+# 启动前验证（已集成到 main.py）
+from main import validate_critical_files_bom
+if not validate_critical_files_bom():
+    sys.exit(1)  # 关键文件有BOM，拒绝启动
+```
+
+**预防措施:**
+- 编辑器设置: PyCharm/VS Code → File Encodings → UTF-8 (取消勾选 "with BOM")
+- Git 配置: 项目根目录包含 `.gitattributes` 文件
+- IDE 配置: `Editor → File Encodings → Create UTF-8 files with BOM` ☐ 不勾选
+- 团队规范: Code Review 时检查文件编码，CI/CD 流水线集成 BOM 检测
+
+**排除目录:** `.git/`, `__pycache__/`, `node_modules/`, `.venv/`, `.idea/`, `dist/assets/`
+
+---
+
 1. 文件读写编码规范
 # ✅ 正确：始终显式指定 UTF-8
 with open(file_path, 'r', encoding='utf-8') as f:

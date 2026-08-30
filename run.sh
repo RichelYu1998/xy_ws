@@ -641,7 +641,15 @@ run_web() {
     source "$VENV_PATH/bin/activate"
 
     log_blank
-    log "正在启动 Web 服务..."
+    
+    log "[*] 检测文件编码 (BOM)..."
+    "/bin/python" main.py --check-bom
+    if [ \True -ne 0 ]; then
+        log "[WARNING] 发现 BOM 字符，正在自动修复..."
+        "/bin/python" main.py --fix-bom
+    fi
+    log "[OK] 文件编码检查完成"
+log "正在启动 Web 服务..."
     log_blank
 
     WEB_PORT="${WEB_PORT:-8888}"
