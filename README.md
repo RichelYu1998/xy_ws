@@ -22,19 +22,19 @@
 - **操作系统**: Windows 10/11, Linux (Ubuntu 20.04+), macOS 10.15+
 
 ### Python依赖
-\\ash
+```bash
 # 安装所有依赖（自动升级pip并优先选择wheel包）
 pip install -r requirements.txt
 
 # 或手动安装核心依赖
 pip install fastapi uvicorn pydantic openpyxl pandas pymysql playwright psutil prometheus-client
-\
+```
 ### Node.js环境（前端构建）
 - **Node.js**: 16+ (用于Playwright浏览器自动化)
 - **npm**: 8+
 
 ### 快速启动
-\\ash
+```bash
 # 1. 安装Python依赖
 pip install -r requirements.txt
 
@@ -49,9 +49,9 @@ run.bat
 
 # 或使用启动脚本（Linux/macOS）
 chmod +x run.sh && ./run.sh
-\
+```
 ### 端口配置
-- 默认端口: **8888** (可通过 \WEB_PORT\ 环境变量修改)
+- 默认端口: **8888** (可通过 `WEB_PORT` 环境变量修改)
 - 访问地址: http://localhost:8888
 
 ---
@@ -439,7 +439,7 @@ jobs:
 **检查命令**:
 ```bash
 # 检查是否存在内联 import
-grep -n "^\s*import \|\s*from .*import" main.py | grep -v "^1-\|^2-\|^3-" | head -20
+grep -n "^```s*import ```|```s*from .*import" main.py | grep -v "^1-```|^2-```|^3-" | head -20
 # 如果无输出，说明规范检查通过 ✅
 ```
 
@@ -576,11 +576,11 @@ pandoc skill.md -o skill.docx
 所有4个CRITICAL问题均为**安全审计脚本自身的正则表达式模式定义**，不是实际的安全漏洞：
 
 1. **os.system命令注入风险** (main.py#L10584)
-   - 实际：这是安全检查规则 `r'os\.system\s*\('` 的定义
+   - 实际：这是安全检查规则 `r'os```.system```s*```('` 的定义
    - 结论：✅ 误报，实际代码中不存在os.system()恶意调用
 
 2. **eval()代码执行风险** (main.py#L10597, #10605, #10612)
-   - 实际：这是安全检查规则 `r'eval\s*\('` 的定义
+   - 实际：这是安全检查规则 `r'eval```s*```('` 的定义
    - 结论：✅ 误报，实际代码中不存在eval()恶意使用
 
 ### HIGH级别问题分析 (65个)
@@ -653,8 +653,8 @@ pandoc skill.md -o skill.docx
   - 修复: 改为同源校验(比较Origin的host与请求Host头)，既防跨站请求又支持任意动态隧道域名
   - 参考位置: [main.py#L6431-L6441](main.py#L6431-L6441)
 
-- **日志注入防护 (安全-P1)** — 请求日志直接拼接`path`与`client_ip`，攻击者可注入`\n`伪造日志
-  - 修复: `safe_path`/`safe_ip`过滤换行符(`\n`→`\\n`、`\r`→`\\r`)防止日志伪造
+- **日志注入防护 (安全-P1)** — 请求日志直接拼接`path`与`client_ip`，攻击者可注入````n`伪造日志
+  - 修复: `safe_path`/`safe_ip`过滤换行符(````n`→````n`、````r`→````r`)防止日志伪造
   - 参考位置: [main.py#L6444-L6447](main.py#L6444-L6447)
 
 - **swagger版本硬编码消除 (Bug修复-P2)** — `/api/swagger.json`硬编码`'version': '3.8.73'`，与实际版本不符
@@ -708,7 +708,7 @@ pandoc skill.md -o skill.docx
 
 - **disk_usage Windows兼容修复 (Bug修复-P1)** — `psutil.disk_usage('/')`在Windows上抛FileNotFoundError
   - 根因: Windows没有`/`根路径，需使用系统盘符
-  - 修复: `psutil.disk_usage(os.path.abspath(os.sep))` 跨平台兼容（Windows→C:\，Linux→/）
+  - 修复: `psutil.disk_usage(os.path.abspath(os.sep))` 跨平台兼容（Windows→C:```，Linux→/）
   - 参考位置: [main.py#L6495](main.py#L6495)
 
 - **RateLimiter内存泄漏修复 (Bug修复-P1)** — `self.requests`字典无限增长，过期IP条目不清理
@@ -741,7 +741,7 @@ pandoc skill.md -o skill.docx
   - 参考位置: [main.py#L8354-L8380](main.py#L8354-L8380)
 
 - **系统路径泄露防护 (安全-P1)** — `/api/server/info`暴露完整Chromium/Chrome路径
-  - 风险: 泄露系统用户名和目录结构（如`C:\Users\Administrator\AppData\...`）
+  - 风险: 泄露系统用户名和目录结构（如`C:```Users```Administrator```AppData```...`）
   - 修复: `playwright_chromium`和`system_chrome`字段改为`bool()`布尔值，仅暴露存在状态
   - 参考位置: [main.py#L8418-L8420](main.py#L8418-L8420)
 
@@ -2466,7 +2466,7 @@ subprocess.run(f'taskkill /F /IM {process_name}', shell=True)
 
 # ✅ 修复后：列表参数 + 输入验证
 import re
-if not re.match(r'^[a-zA-Z0-9._\-]+$', str(process_name)):
+if not re.match(r'^[a-zA-Z0-9._```-]+$', str(process_name)):
     logger.warning(f'无效的进程名称: {process_name}')
     return False
 
@@ -2777,15 +2777,15 @@ def get_product_detail(item):
 ##### 修复2: 前端正则增强 (dist/app.js:1527-1540)
 ```javascript
 // ❌ 修复前：只匹配单一字段名
-const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/);
-const priceMatch = line.match(/"售价":\s*"([^"]+)"/);
+const nameMatch = line.match(/"商品描述":```s*"([^"]+)"/);
+const priceMatch = line.match(/"售价":```s*"([^"]+)"/);
 
 // ✅ 修复后：多字段名兼容匹配
-const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/) 
-               || line.match(/"商品名称":\s*"([^"]+)"/) 
-               || line.match(/"name":\s*"([^"]+)"/);
-const priceMatch = line.match(/"售价":\s*"([^"]+)"/) 
-                 || line.match(/"price":\s*"([^"]+)"/);
+const nameMatch = line.match(/"商品描述":```s*"([^"]+)"/) 
+               || line.match(/"商品名称":```s*"([^"]+)"/) 
+               || line.match(/"name":```s*"([^"]+)"/);
+const priceMatch = line.match(/"售价":```s*"([^"]+)"/) 
+                 || line.match(/"price":```s*"([^"]+)"/);
 ```
 
 ##### 修复3: PC端自动定位 (dist/app.js:1984-1997)
@@ -2979,18 +2979,18 @@ async def index():
 **根本原因**: 
 - 前端正则表达式无法正确匹配Python输出的格式
 - Python输出格式：`售价 >= 599 的商品: 78 个`（有空格）
-- 前端正则：`/售价[》>=]+\s*599[^:：]*[:：]\s*(\d+)\s*[个件]/`（无法匹配空格）
+- 前端正则：`/售价[》>=]+```s*599[^:：]*[:：]```s*(```d+)```s*[个件]/`（无法匹配空格）
 
 **修复方案**:
 ```javascript
 // ✅ 简化正则表达式，直接匹配Python输出格式
 if (line.includes('售价') && line.includes('599') && line.includes('商品')) {
     // 主要匹配："售价 >= 599 的商品: 78 个"
-    let match = line.match(/售价\s*>=\s*599\s*的商品\s*[:：]\s*(\d+)\s*个/);
+    let match = line.match(/售价```s*>=```s*599```s*的商品```s*[:：]```s*(```d+)```s*个/);
     // 备选方案：匹配任意"商品: 数字 个"格式
-    if (!match) match = line.match(/商品\s*[:：]\s*(\d+)\s*个/);
+    if (!match) match = line.match(/商品```s*[:：]```s*(```d+)```s*个/);
     // 最后备选：匹配行末的数字
-    if (!match) match = line.match(/(\d+)\s*个\s*$/);
+    if (!match) match = line.match(/(```d+)```s*个```s*$/);
     
     if (match && parseInt(match[1]) > 0) {
         skuData.highPriceCount = match[1];
@@ -3134,8 +3134,8 @@ window.resetButtons = resetButtons;
 # Ctrl+C 或关闭终端窗口
 
 # 重新启动服务器
-cd D:\ws\xy_ws
-D:\ws\xy_ws\.venv\Scripts\python.exe main.py
+cd D:```ws```xy_ws
+D:```ws```xy_ws```.venv```Scripts```python.exe main.py
 ```
 
 **如果使用 Node.js 启动前端**:
@@ -3144,7 +3144,7 @@ D:\ws\xy_ws\.venv\Scripts\python.exe main.py
 taskkill /F /IM node.exe
 
 # 重新启动
-cd D:\ws\xy_ws\dist
+cd D:```ws```xy_ws```dist
 npm start
 # 或
 node server.js
@@ -3180,7 +3180,7 @@ node server.js
 ```javascript
 // 在爬虫运行完成后，在控制台执行
 console.log('删除商品列表:', skuData.deletedProducts);
-console.log('原始行示例:', document.querySelector('#spider-output-content')?.innerText?.match(/删除商品[\s\S]*?\[/)?.[0]);
+console.log('原始行示例:', document.querySelector('#spider-output-content')?.innerText?.match(/删除商品[```s```S]*?```[/)?.[0]);
 ```
 
 #### 步骤3：手动测试正则表达式
@@ -3188,14 +3188,14 @@ console.log('原始行示例:', document.querySelector('#spider-output-content')
 在 Console 中执行：
 
 ```javascript
-const testLine = '    "商品描述": "iPhone 16 Pro Max",\n    "售价": "¥6,699",\n    "货号": "08055",';
+const testLine = '    "商品描述": "iPhone 16 Pro Max",```n    "售价": "¥6,699",```n    "货号": "08055",';
 
-const nameMatch = testLine.match(/"商品描述":\s*"([^"]+)"/)
-               || testLine.match(/"商品名称":\s*"([^"]+)"/)
-               || testLine.match(/"name":\s*"([^"]+)"/);
+const nameMatch = testLine.match(/"商品描述":```s*"([^"]+)"/)
+               || testLine.match(/"商品名称":```s*"([^"]+)"/)
+               || testLine.match(/"name":```s*"([^"]+)"/);
 
-const priceMatch = testLine.match(/"售价":\s*"([^"]+)"/)
-                 || testLine.match(/"price":\s*"([^"]+)"/);
+const priceMatch = testLine.match(/"售价":```s*"([^"]+)"/)
+                 || testLine.match(/"price":```s*"([^"]+)"/);
 
 console.log('名称匹配:', nameMatch?.[1]);   // 预期输出: iPhone 16 Pro Max ✅
 console.log('价格匹配:', priceMatch?.[1]);   // 预期输出: ¥6,699 ✅
@@ -6037,7 +6037,7 @@ import platform
 def start_cf_tunnel():
     system = platform.system()
     if system == 'Windows':
-        cf_path = 'C:\\Program Files\\cloudflared\\cloudflared.exe'
+        cf_path = 'C:```Program Files```cloudflared```cloudflared.exe'
     elif system == 'Darwin':
         cf_path = '/usr/local/bin/cloudflared'
     else:
@@ -7121,7 +7121,7 @@ def get_status():
 - **格式**: vX.Y.Z
 - **示例**: v3.8.12
 - **位置**: README.md第一行
-- **解析**: 使用正则表达式 `v\d+\.\d+\.\d+`
+- **解析**: 使用正则表达式 `v```d+```.```d+```.```d+`
 ```
 
 **修复效果**:
@@ -8189,7 +8189,7 @@ const formatCurrency = (value) => {
 taskkill /F /IM python.exe
 
 # ✅ 修复后：只清理临时文件，不误杀进程
-del /Q temp\*
+del /Q temp```*
 # 不再强制杀进程
 ```
 
@@ -8253,7 +8253,7 @@ import platform
 def get_config_path():
     system = platform.system()
     if system == 'Windows':
-        return 'C:\\config'
+        return 'C:```config'
     elif system == 'Darwin':
         return '/usr/local/config'
     else:
@@ -8679,8 +8679,8 @@ def write_tunnel_url(url):
 def write_tunnel_url(url):
     with open('tunnel_url.txt', 'w') as f:
         # 统一格式：时间戳 + URL
-        f.write(f"{datetime.now().isoformat()}\n")
-        f.write(f"{url}\n")
+        f.write(f"{datetime.now().isoformat()}```n")
+        f.write(f"{url}```n")
 ```
 
 **修复效果**:
@@ -10821,7 +10821,7 @@ class CookieValidator:
 ```python
 # ❌ 修复前：硬编码路径
 cookie_file = "config/cookies.json"  # Windows路径格式
-excel_file = "data\\excel.xlsx"      # 不兼容macOS/Linux
+excel_file = "data```excel.xlsx"      # 不兼容macOS/Linux
 
 # ✅ 修复后：PathManager统一管理
 class PathManager:
@@ -10900,7 +10900,7 @@ class PathManager:
 # ❌ 修复前：分散的系统检测
 import platform
 if platform.system() == 'Windows':
-    browser_path = 'C:\\Program Files\\...'
+    browser_path = 'C:```Program Files```...'
 
 # ✅ 修复后：统一的系统检测
 class SystemDetector:
@@ -10909,7 +10909,7 @@ class SystemDetector:
         """获取浏览器路径（跨平台）"""
         system = platform.system()
         if system == 'Windows':
-            return 'C:\\Program Files\\...'
+            return 'C:```Program Files```...'
         elif system == 'Darwin':
             return '/Applications/...'
 ```
@@ -11446,7 +11446,7 @@ def extract_remark_flexible(description):
 **修复方案**:
 ```python
 # ❌ 修复前：无法处理千分制价格
-price = re.search(r'(\d+)元', text)
+price = re.search(r'(```d+)元', text)
 if price:
     return int(price.group(1))  # "1,299元" → 提取失败
 
@@ -11455,7 +11455,7 @@ def parse_price(text):
     """解析价格（支持千分制）"""
     # 移除千分位分隔符
     text = text.replace(',', '')
-    price = re.search(r'(\d+)元', text)
+    price = re.search(r'(```d+)元', text)
     if price:
         return int(price.group(1))  # "1,299元" → 1299
     return None
@@ -11569,17 +11569,17 @@ def calculate_average_device_price(products):
 ```python
 # ❌ 修复前：简单的拿货价提取
 def extract_cost_price(html):
-    match = re.search(r'成本价[：:]\s*(\d+)', html)
+    match = re.search(r'成本价[：:]```s*(```d+)', html)
     return match.group(1) if match else None
 
 # ✅ 修复后：增强的HTML搜索和提取
 def extract_cost_price_enhanced(html):
     """增强的拿货价提取逻辑"""
     patterns = [
-        r'成本价[：:]\s*(\d+)',
-        r'拿货价[：:]\s*(\d+)',
-        r'进价[：:]\s*(\d+)',
-        r'成本[：:]\s*(\d+)'
+        r'成本价[：:]```s*(```d+)',
+        r'拿货价[：:]```s*(```d+)',
+        r'进价[：:]```s*(```d+)',
+        r'成本[：:]```s*(```d+)'
     ]
     for pattern in patterns:
         match = re.search(pattern, html)
@@ -12349,7 +12349,7 @@ def compare_json_files_cached(file1, file2):
 # ❌ 修复前：跨平台兼容性差
 def launch_browser():
     # Windows特定路径
-    browser_path = "C:\\Program Files\\Google\\Chrome\\chrome.exe"
+    browser_path = "C:```Program Files```Google```Chrome```chrome.exe"
     return launch(browser_path)
 
 # ✅ 修复后：跨平台兼容
@@ -12360,7 +12360,7 @@ def launch_browser_cross_platform():
     system = platform.system()
     
     if system == "Windows":
-        browser_path = "C:\\Program Files\\Google\\Chrome\\chrome.exe"
+        browser_path = "C:```Program Files```Google```Chrome```chrome.exe"
     elif system == "Darwin":  # macOS
         browser_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     else:  # Linux
@@ -12494,7 +12494,7 @@ def compare_today_json():
 # ❌ 修复前：跨平台兼容性差
 def launch_browser():
     # Windows特定路径
-    browser_path = "C:\\Program Files\\Google\\Chrome\\chrome.exe"
+    browser_path = "C:```Program Files```Google```Chrome```chrome.exe"
     return launch(browser_path)
 
 # ✅ 修复后：跨平台兼容
@@ -12505,7 +12505,7 @@ def launch_browser_cross_platform():
     system = platform.system()
     
     if system == "Windows":
-        browser_path = "C:\\Program Files\\Google\\Chrome\\chrome.exe"
+        browser_path = "C:```Program Files```Google```Chrome```chrome.exe"
     elif system == "Darwin":  # macOS
         browser_path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     else:  # Linux
@@ -13772,7 +13772,7 @@ class Spider:
 ## 📂 项目结构
 
 ```
-D:\ws\xy_ws\
+D:```ws```xy_ws```
 ├── dist/
 │   ├── app.js              # 主应用文件 (已修复)
 │   ├── assets/             # 静态资源
@@ -13968,7 +13968,7 @@ run.bat
 ## 📂 项目结构
 
 ```
-D:\ws\xy_ws\
+D:```ws```xy_ws```
 ├── dist/
 │   ├── app.js              # 主应用文件 (已修复)
 │   ├── assets/             # 静态资源
@@ -14164,7 +14164,7 @@ run.bat
 ## 📂 项目结构
 
 ```
-D:\ws\xy_ws\
+D:```ws```xy_ws```
 ├── dist/
 │   ├── app.js              # 主应用文件 (已修复)
 │   ├── assets/             # 静态资源
@@ -14360,7 +14360,7 @@ run.bat
 ## 📂 项目结构
 
 ```
-D:\ws\xy_ws\
+D:```ws```xy_ws```
 ├── dist/
 │   ├── app.js              # 主应用文件 (已修复)
 │   ├── assets/             # 静态资源
@@ -14557,3 +14557,8 @@ run.bat
 
 **最后更新**: 2026-08-11 (v3.8.89.18)  
 **维护者**: 小旭二手机（西园路）
+
+
+
+
+
