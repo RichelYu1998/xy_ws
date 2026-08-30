@@ -1,4 +1,4 @@
-﻿/*
+/*
  * ══════════════════════════════════════════════
  * [FINAL_SECURITY_AUDIT_PASSED]
  * Version: v3.8.90.15-FINAL
