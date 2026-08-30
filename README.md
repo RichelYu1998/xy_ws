@@ -133,6 +133,10 @@ bandit -r . -f json -o bandit_report.json
 #### 更新内容: 完善安全攻防压测代码至14项测试框架(含7类44个攻击模拟)，实现所有审计问题降为0，清理30+修复脚本，修复main.py语法错误10+处，更新3份文档(README.md/skill.md/skill.docx)并推送到Git
 
 **影响文件**: [main.py](main.py), [test/security_audit_v3.8.90.15.py](test/security_audit_v3.8.90.15.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), [dist/app.js](dist/app.js)
+  - main.py: 修复tunnel_host NameError + 10+处语法错误
+  - security_audit_v3.8.90.15.py: 新增7类44个攻击模拟测试方法
+  - README.md/skill.md/skill.docx: 文档同步更新至v4.0版本
+  - dist/app.js: 前端changelog渲染容错处理
 
 ---
 
