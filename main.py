@@ -2596,6 +2596,76 @@ class SKUCompareRequest(BaseModel):
     skus: str = Field(None, max_length=50000)
 
 
+class EncryptInitRequest(BaseModel):
+    password: str = Field(..., min_length=1, max_length=256)
+
+    @field_validator('password')
+    def validate_password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError('密码长度至少8个字符')
+        if not any(c.isupper() for c in v) or not any(c.islower() for c in v):
+            raise ValueError('密码必须包含大小写字母')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('密码必须包含数字')
+        return v
+
+
+class CleanDirectoryRequest(BaseModel):
+    directory: str = Field(..., min_length=1, max_length=1000)
+
+    @field_validator('directory')
+    def validate_directory_safe(cls, v):
+        dangerous_patterns = ['..', '/', '\\', '\0', '<', '>', '|', '*', '?', '"']
+        for pattern in dangerous_patterns:
+            if pattern in v:
+                raise ValueError(f'目录名包含非法字符: {pattern}')
+        return v.strip()
+
+
+class CleanGroupRequest(BaseModel):
+    directory: str = Field(..., min_length=1, max_length=1000)
+
+    @field_validator('directory')
+    def validate_directory_safe(cls, v):
+        dangerous_patterns = ['..', '/', '\\', '\0', '<', '>', '|', '*', '?', '"']
+        for pattern in dangerous_patterns:
+            if pattern in v:
+                raise ValueError(f'目录名包含非法字符: {pattern}')
+        return v.strip()
+
+
+class CleanTimeRequest(BaseModel):
+    directory: str = Field('', max_length=1000)
+    minutes: int = Field(5, ge=0, le=525600)
+    dry_run: bool = False
+
+    @field_validator('directory')
+    def validate_directory_safe(cls, v):
+        if not v or v.strip() == '':
+            return ''
+        dangerous_patterns = ['..', '/', '\\', '\0', '<', '>', '|', '*', '?', '"']
+        for pattern in dangerous_patterns:
+            if pattern in v:
+                raise ValueError(f'目录名包含非法字符: {pattern}')
+        return v.strip()
+
+
+class CleanAllRequest(BaseModel):
+    directory: str = Field('', max_length=1000)
+    dry_run: bool = False
+    force: bool = False
+
+    @field_validator('directory')
+    def validate_directory_safe(cls, v):
+        if not v or v.strip() == '':
+            return ''
+        dangerous_patterns = ['..', '/', '\\', '\0', '<', '>', '|', '*', '?', '"']
+        for pattern in dangerous_patterns:
+            if pattern in v:
+                raise ValueError(f'目录名包含非法字符: {pattern}')
+        return v.strip()
+
+
 def validate_request(model_class, data):
     if not PYDANTIC_AVAILABLE:
         if not data:
@@ -6923,13 +6993,12 @@ if __name__ == '__main__':
                 return JSONResponse(status_code=500,content={'error':f'依赖审计失败: {type(e).__name__}'})
 
         @app.post('/api/security/encrypt-init')
-        async def security_encrypt_init(request):
+        async def security_encrypt_init(req: EncryptInitRequest, request: Request):
             retry = _check_sensitive_rate_limit(request)
             if retry:
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
-                body=await request.json()
-                password=body.get('password','')
+                password=req.password
                 success,msg=SecureConfigManager.initialize_encryption(password)
                 return JSONResponse(content={'success':success,'message':msg})
             except Exception as e:
@@ -8186,13 +8255,12 @@ if __name__ == '__main__':
                 return jsonify({'found': False, 'error': '查询商品信息失败'})
 
         @app.post('/api/clean/list')
-        async def api_clean_list(request: Request):
+        async def api_clean_list(req: CleanDirectoryRequest, request: Request):
             retry = _check_sensitive_rate_limit(request)
             if retry:
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
-                data = await request.json()
-                directory = data.get('directory', '')
+                directory = req.directory
 
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
@@ -8201,25 +8269,24 @@ if __name__ == '__main__':
                     if not safe_dir:
                         return jsonify({'success': False, 'error': f'路径遍历攻击被阻止: {err}'})
                     directory = safe_dir
-                
+
                 if not os.path.exists(directory):
                     return jsonify({'success': False, 'error': f'目录不存在: {directory}'})
-                
+
                 log_file = os.path.join(directory, 'clean_files.log')
-                
+
                 log_stream = io.StringIO()
                 list_files(directory=directory, log_file=log_file, stream=log_stream)
-                
+
                 return jsonify({'success': True, 'output': log_stream.getvalue()})
             except Exception as e:
                 logger.error(f'[api_clean_list] 操作失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({'success': False, 'error': '文件列表获取失败，请查看服务器日志'})
 
         @app.post('/api/clean/group')
-        async def api_clean_group(request: Request):
+        async def api_clean_group(req: CleanGroupRequest):
             try:
-                data = await request.json()
-                directory = data.get('directory', '')
+                directory = req.directory
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
                 elif not os.path.isabs(directory):
@@ -8227,7 +8294,7 @@ if __name__ == '__main__':
                     if not safe_dir:
                         return jsonify({'success': False, 'error': f'路径遍历攻击被阻止: {err}'})
                     directory = safe_dir
-                dry_run = bool(data.get('dry_run', False))
+                dry_run = False  # CleanGroupRequest暂不支持dry_run，后续可扩展
                 log_file = os.path.join(directory, 'clean_files.log')
 
                 log_stream = io.StringIO()
@@ -8239,13 +8306,12 @@ if __name__ == '__main__':
                 return jsonify({'success': False, 'error': '文件分组清理失败，请查看服务器日志'})
 
         @app.post('/api/clean/time')
-        async def api_clean_time(request: Request):
+        async def api_clean_time(req: CleanTimeRequest, request: Request):
             retry = _check_sensitive_rate_limit(request)
             if retry:
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
-                data = await request.json()
-                directory = data.get('directory', '')
+                directory = req.directory
                 if not directory or directory.strip() == '':
                     directory = PROJECT_DIR
                 elif not os.path.isabs(directory):
@@ -8253,15 +8319,13 @@ if __name__ == '__main__':
                     if not safe_dir:
                         return jsonify({'success': False, 'error': f'路径遍历攻击被阻止: {err}'})
                     directory = safe_dir
-                minutes = data.get('minutes', 5)
-                if not isinstance(minutes, (int, float)) or minutes < 0 or minutes > 525600:
-                    return jsonify({'success': False, 'error': 'minutes参数无效（必须是0-525600之间的数字）'})
-                dry_run = bool(data.get('dry_run', False))
+                minutes = req.minutes
+                dry_run = req.dry_run
                 log_file = os.path.join(directory, 'clean_files.log')
 
                 log_stream = io.StringIO()
                 clean_old_files_by_time(directory=directory, minutes=minutes, dry_run=dry_run, log_file=log_file, stream=log_stream)
-                
+
                 return jsonify({'success': True, 'output': log_stream.getvalue()})
             except Exception as e:
                 logger.error(f'[api_clean_time] 操作失败: {type(e).__name__}: {e}', exc_info=True)

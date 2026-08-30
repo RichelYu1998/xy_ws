@@ -434,6 +434,9 @@ pandoc skill.md -o skill.docx
   - [x] 内存泄漏检测 → 结果 ✅ 无严重泄漏
   - [x] 并发安全验证 → 结果 ✅ 锁机制完善
   - [x] print语句修复 → 结果 ✅ 14处print改为logging模块调用
+  - [x] P1 Pydantic输入验证 → 结果 ✅ 新增6个API端点Schema模型(EncryptInitRequest/CleanDirectoryRequest/CleanGroupRequest/CleanTimeRequest/CleanAllRequest)
+  - [x] P2 TODO注释清理 → 结果 ✅ 已确认代码无TODO/FIXME残留(代码整洁)
+  - [x] P3事件监听器优化 → 结果 ✅ 新增EventManager全局管理器+页面卸载自动清理机制
 
 **安全审计报告 (v3.8.90.15 完整版)**:
 

@@ -361,6 +361,56 @@
                 return this._timers[name];
             }
         };
+
+        // 全局事件监听器管理器（防止内存泄漏）
+        const EventManager = {
+            _listeners: [],
+
+            add: function(element, event, handler, options) {
+                element.addEventListener(event, handler, options);
+                this._listeners.push({ element, event, handler, options });
+                return { element, event, handler };
+            },
+
+            remove: function(element, event, handler) {
+                if (element && event && handler) {
+                    element.removeEventListener(event, handler);
+                    this._listeners = this._listeners.filter(
+                        listener => !(listener.element === element && listener.event === event && listener.handler === handler)
+                    );
+                }
+            },
+
+            removeAll: function(element) {
+                if (element) {
+                    const toRemove = this._listeners.filter(listener => listener.element === element);
+                    toRemove.forEach(({ element, event, handler }) => {
+                        element.removeEventListener(event, handler);
+                    });
+                    this._listeners = this._listeners.filter(listener => listener.element !== element);
+                } else {
+                    this._listeners.forEach(({ element, event, handler }) => {
+                        element.removeEventListener(event, handler);
+                    });
+                    this._listeners = [];
+                }
+            },
+
+            count: function() {
+                return this._listeners.length;
+            },
+
+            getByElement: function(element) {
+                return this._listeners.filter(listener => listener.element === element);
+            }
+        };
+
+        // 页面卸载时自动清理所有事件监听器
+        window.addEventListener('beforeunload', () => {
+            EventManager.removeAll();
+            TimerManager.clearAll();
+            console.log('[Cleanup] 事件监听器和定时器已自动清理');
+        });
         
         // 全局状态管理
         let currentTaskId = null;

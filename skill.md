@@ -24,7 +24,7 @@
 > **📌 当前版本**: v3.8.90.15 (2026-08-30) - 🎯 表格滚动联动增强 + 数据显示完整性修复 — 移动端表头固定+API数据量扩展+顶部同步检测
 >
 > **⚠️ 重要更新**:
-> - **v3.8.90.15**: 🎯 **表格滚动联动增强+数据显示完整性修复+安全攻防全面审计+代码规范优化** — 修复移动端表格表头消失问题(index.html CSS position static改sticky+top:0+z-index:10)，扩展API商品数据量限制(main.py products[:100]改[:500]两处统一500条)，增强多表格滚动联动功能(dist/app.js新增scrollTop<5顶部检测强制所有表格同步到scrollTop:0+双重requestAnimationFrame性能优化)，执行7项安全审计(隐藏Bug排查/OWASP Top 10扫描/注入攻击检测/敏感数据审计/性能压测/内存泄漏检测/并发安全验证)结果A-评级(981项扫描/4CRITICAL误报/65HIGH已修复14处print→logging/性能优异文件读取3.88ms)，消除生产环境print调试残留14处(main.py版本检查/错误输出/清理日志全部改为logging模块调用)，整理测试脚本至test文件夹(test/security_audit_v3.8.90.15.py压测脚本/test/generate_skill_docx.py文档生成脚本)
+> - **v3.8.90.15**: 🎯 **表格滚动联动增强+数据显示完整性修复+安全攻防全面审计+代码规范优化+P1-P3优化实施** — 修复移动端表格表头消失问题(index.html CSS position static改sticky+top:0+z-index:10)，扩展API商品数据量限制(main.py products[:100]改[:500]两处统一500条)，增强多表格滚动联动功能(dist/app.js新增scrollTop<5顶部检测强制所有表格同步到scrollTop:0+双重requestAnimationFrame性能优化)，执行7项安全审计(隐藏Bug排查/OWASP Top 10扫描/注入攻击检测/敏感数据审计/性能压测/内存泄漏检测/并发安全验证)结果A-评级(981项扫描/4CRITICAL误报/65HIGH已修复14处print→logging/性能优异文件读取3.88ms)，消除生产环境print调试残留14处(main.py版本检查/错误输出/清理日志全部改为logging模块调用)，整理测试脚本至test文件夹(test/security_audit_v3.8.90.15.py压测脚本/test/generate_skill_docx.py文档生成脚本/test/test_version.py单元测试)，合并tests文件夹至test文件夹(统一测试目录)，**P1 Pydantic输入验证**(新增6个API Schema模型EncryptInitRequest密码强度验证/CleanDirectoryRequest目录安全验证/CleanGroupRequest/CleanTimeRequest参数范围验证/CleanAllRequest+修改4个API端点使用Pydantic模型替代手动json解析)，**P2 TODO注释清理**(已确认main.py和dist/app.js无TODO/FIXME/HACK/XXX残留代码整洁)，**P3事件监听器优化**(新增EventManager全局事件管理器支持add/remove/removeAll/count/getByElement方法+页面卸载beforeunload自动清理所有事件监听器和TimerManager定时器防止内存泄漏)，规范化文档管理范式写入skill.md(第三个MD文件出现时整合到README.md/skill.md的标准化流程含识别类型/整合步骤/格式要求/特殊情况处理/强制执行规则)
 > - **v3.8.90.14**: 🔒 **攻防纵深加固+隐藏Bug清零第三轮** — 修复CSRF白名单阻断隧道回归Bug(LOCAL_TRUSTED_ORIGINS仅含localhost→隧道Origin不在白名单403，改为同源校验比较Origin的host与请求Host头，支持动态隧道域名)，新增日志注入防护(safe_path/safe_ip过滤换行符防止日志伪造)，消除swagger版本硬编码3.8.73改为VERSION，消除uvicorn host硬编码0.0.0.0改为WEB_HOST环境变量，修复8处API响应信息泄露(含/api/daily-profit完整traceback泄露+指标采集/商品删除/列表/数据/详情/隧道启动/Cloudflare Plan B/隧道状态str(e)泄露，统一改为logger.error记录+客户端返回通用消息)，健康检查system_check_error脱敏，确认所有import在文件顶部(L1-L117)无内联导入无重复
 > - **v3.8.90.13**: 🔒 **全面安全审计+隐藏Bug清零第二轮** — 修复5个隐藏Bug(健康检查版本硬编码3.8.73改为VERSION/disk_usage('/')Windows不兼容改为os.path.abspath(os.sep)/RateLimiter内存泄漏requests字典无限增长/4处裸except改为具体异常类型/异常处理器返回str(error)信息泄露改为通用消息)，新增6项安全防护(sensitive_rate_limiter敏感端点限流20次/分覆盖9个端点/_no_store_headers() Cache-Control no-store防缓存/邮件测试输入验证与config一致/系统路径泄露防护改bool/异常信息脱敏/RateLimiter内存清理del空IP条目)，验证无ReDoS/eval/exec/shell=True/pickle/marshal/不安全SSL/random.choice/可变默认参数
 > - **v3.8.90.12**: 🐛 **隐藏Bug清零+浏览器启动修复** — 修复PROJECT_DIR字符串类型与Path `/`运算符不兼容导致SecureConfig加密崩溃(11处路径拼接TypeError)，修复uvicorn=None错误放置在starlette.middleware.gzip的except块(导致GZipMiddleware缺失时uvicorn被误杀)，修复Playwright驱动与缓存Chromium版本不匹配(1208 vs 1169)导致Connection closed，新增Environment.launch_browser()集中式启动器(Connection closed自动重试3次+Executable不存在自动安装+系统Chrome回退)，get_chrome_path()检测到Playwright缓存有Chromium时返回None让Playwright自选匹配版本，替换3处重复try-except启动代码，确认所有import在文件顶部(L1-L117)无内联导入无重复
@@ -267,6 +267,87 @@ API_DOCS.md              ❌ 禁止！应该合并后删除
 
 **记住这句话作为铁律**:
 > **"md文件只有readme。md以及skill。md 多余的md文件直接合到这里面"**
+
+#### 📋 文档管理范式 (v3.8.90.15 新增)
+
+**核心原则**: 项目根目录仅保留2个Markdown文档，所有其他报告/说明类内容必须整合到这两个文件中。
+
+**标准文档结构**:
+```
+项目根目录/
+├── README.md          # 项目主文档（面向用户+开发者）
+│   ├── 功能介绍
+│   ├── 安装部署
+│   ├── 使用指南
+│   ├── Changelog（版本更新记录）
+│   └── 安全审计报告（完整版嵌入）
+└── skill.md           # 开发技能文档（面向AI助手+开发者）
+    ├── 编码规范
+    ├── 架构设计
+    ├── 最佳实践
+    ├── 版本追踪
+    └── 技术细节
+```
+
+**第三个MD文件出现时的处理流程 (标准化操作)**:
+
+1. **识别文件类型**:
+   - 📊 **审计/测试报告** → 嵌入 `README.md` 的安全审计章节
+   - 📝 **功能说明文档** → 嵌入 `README.md` 对应功能章节
+   - 🔧 **技术实现文档** → 嵌入 `skill.md` 技术规范章节
+   - 📋 **临时性文档** → 内容提取后删除原文件
+
+2. **整合步骤**:
+   ```bash
+   # 步骤1: 读取原MD内容
+   cat third_party_report.md
+
+   # 步骤2: 根据类型选择目标位置
+   # 审计报告 → README.md 的 "## 📊 安全审计报告" 章节
+   # 技术文档 → skill.md 的对应技术章节
+
+   # 步骤3: 将内容嵌入目标文件的合适位置
+   # 使用 --- 分隔符保持层次清晰
+
+   # 步骤4: 删除原文件
+   rm third_party_report.md
+
+   # 步骤5: 更新Git并提交
+   git add README.md skill.md
+   git commit -m "整合文档: 将xxx报告嵌入README.md/skill.md"
+   ```
+
+3. **内容格式要求**:
+   - ✅ 保留完整的表格、代码块、链接
+   - ✅ 添加来源标注（原始文件名 + 生成时间）
+   - ✅ 使用二级(##)或三级(###)标题区分章节
+   - ✅ 保持原有的数据统计和结论
+
+4. **特殊情况处理**:
+   - **大型JSON报告** (>100KB): 仅在MD中保留摘要，JSON文件加入`.gitignore`
+   - **生成脚本**: 移至 `test/` 文件夹作为备用工具
+   - **临时分析文件**: 直接删除（信息已整合到主文档）
+
+**示例 (v3.8.90.15 实际案例)**:
+```
+原始状态:
+├── file/security_fix_report_v3.8.90.15.md  ❌ 第三个MD文件
+├── file/security_report_20260830_155905.json  ❌ JSON报告
+├── README.md  ✅ 主文档
+└── skill.md   ✅ 技能文档
+
+处理后:
+├── test/generate_skill_docx.py  ✅ 脚本移至test/
+├── test/security_audit_v3.8.90.15.py  ✅ 脚本移至test/
+├── README.md  ✅ 已嵌入完整安全审计报告(L437-L554)
+└── skill.md   ✅ 已更新版本摘要和审计要点
+```
+
+**强制执行规则**:
+- ⛔ 禁止在根目录创建新的 `.md` 文件（除README.md和skill.md外）
+- ⛔ 禁止将报告类MD文件提交到Git仓库
+- ✅ 所有文档整合操作必须在commit前完成
+- ✅ 整合后需验证两个MD文件的完整性和可读性
 
 ---
 
@@ -3709,7 +3790,7 @@ if __name__ == '__main__':
 
 | 版本 | 日期 | 作者 | 变更内容 |
 |------|------|------|---------|
-| v3.8.90.15 | 2026-08-30 | 小旭二手机（西园路） | 🎯 表格滚动联动增强+数据显示完整性修复+安全审计+代码规范优化(表头sticky固定/API数据量500条/滚动联动顶部同步/7项安全审计A-评级/14处print改logging/测试脚本整理至test/) |
+| v3.8.90.15 | 2026-08-30 | 小旭二手机（西园路） | 🎯 表格滚动联动增强+安全审计+P1-P3优化+文档规范(表头固定/数据量500/审计A-/print改logging/P1 Pydantic验证6模型/P2无TODO残留/P3 EventManager管理器/文档范式标准化/tests合并test/) |
 | v3.8.90.14 | 2026-08-26 | 小旭二手机（西园路） | 🔒 攻防纵深加固+隐藏Bug清零第三轮(CSRF同源校验支持动态隧道/日志注入防护safe_path+safe_ip/swagger版本硬编码改VERSION/uvicorn host改WEB_HOST环境变量/8处API响应str(e)信息泄露清零含完整traceback泄露/健康检查脱敏) |
 | v3.8.90.13 | 2026-08-26 | 小旭二手机（西园路） | 🔒 全面安全审计+隐藏Bug清零第二轮(健康检查版本硬编码改VERSION/disk_usage Windows兼容/RateLimiter内存泄漏修复/4处裸except改具体异常/异常处理器信息脱敏/敏感端点限流20次每分/Cache-Control no-store/邮件测试输入验证/系统路径泄露改bool) |
 | v3.8.90.12 | 2026-08-26 | 小旭二手机（西园路） | 🐛 隐藏Bug清零+浏览器启动修复(PROJECT_DIR改Path对象修复11处TypeError/uvicorn导入位置修复/Playwright驱动版本不匹配修复/Environment.launch_browser集中式启动器+3次重试+系统Chrome回退) |
