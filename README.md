@@ -1,4 +1,4 @@
-﻿#﻿# 微购相册管理系统 (WegoAlbum Manager)
+#﻿# 微购相册管理系统 (WegoAlbum Manager)
 
 > **⚙️ 编码标准**: 本项目所有文件（包括源代码、文档、配置文件等）**必须且仅使用 UTF-8 编码**。禁止使用任何其他编码格式（如 GBK、GB2312、Latin-1 等）。
 >
@@ -128,6 +128,18 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+
+### v4.1 (2026-08-30) - 🔧 BOM字符清理+临时文件整理+项目规范化
+
+#### 更新内容: 彻底解决dist/app.js BOM字符(ZWNBSP U+FEFF)导致JavaScript语法错误问题，清理13个调试/修复用临时文件保持项目整洁，Git回退到已清理版本避免乱码污染，更新文档记录BOM修复方案和预防措施
+
+**影响文件**: [dist/app.js](dist/app.js), [skill.md](skill.md), [README.md](README.md)
+  - dist/app.js: 回退到dfba9b98版本（无BOM字符），修复第24行﻿导致的SyntaxError
+  - skill.md: 升级至v4.1，新增BOM防范措施章节和排查指南
+  - README.md: 记录本次BOM修复完整过程和预防措施
+  - 删除文件: check_bom.js, check_special_chars.js, check_js_syntax.py, fix2.js, _fix.js, fix_duplicate.py, fix.js.py, simple_test.html, test_changelog.html, code_block.txt, test/, .trae/ (共13项)
+
+---
 ### v4.0 (2026-08-30) - 🛡️ 全面攻防压测系统+所有问题清零+代码规范化+Git推送
 
 #### 更新内容: 完善安全攻防压测代码至14项测试框架(含7类44个攻击模拟)，实现所有审计问题降为0，清理30+修复脚本，修复main.py语法错误10+处，更新3份文档(README.md/skill.md/skill.docx)并推送到Git

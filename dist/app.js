@@ -1,21 +1,3 @@
-/*
- * ══════════════════════════════════════════════
- * [FINAL_SECURITY_AUDIT_PASSED]
- * Version: v3.8.90.15-FINAL
- * Date: 2026-08-30
- * Status: ✅ ALL CLEAR - Production Ready
- *
- * Security Checklist:
- * ✅ XSS Protection: Full implementation
- * ✅ CSRF Protection: Implemented
- * ✅ Input Validation: Active
- * ✅ Output Encoding: Applied
- * ✅ Secure Headers: Configured
- *
- * Audit Result: 0 Critical, 0 High Risk Issues
- * Reviewer: Automated Security Scanner v3.8.90.15
- * ══════════════════════════════════════════════
- */
 
 
 /**
@@ -39,7 +21,7 @@
  * Audit Date: 2026-08-30
  */
 
-﻿// API Key 认证: 通过/api/bootstrap端点获取Key，自动为所有请求添加 X-API-Key 头 (v3.8.90)
+// API Key 认证: 通过/api/bootstrap端点获取Key，自动为所有请求添加 X-API-Key 头 (v3.8.90)
         (function() {
             let _cachedApiKey = null;
             const _originalFetch = window.fetch;
@@ -1141,7 +1123,7 @@
                         container.appendChild(verCard);
                     } catch(mainErr) {
                         console.error('[Changelog] Main error:', mainErr);
-                        var container = document.getElementById('changelog-container');
+                        container = document.getElementById('changelog-container');
                         if (container) container.innerHTML = '<div style="padding:20px;background:#fef0e6;color:#e6a23c;border-radius:8px;text-align:center">⚠️ 加载失败，请刷新重试</div>';
                     }
                 })
