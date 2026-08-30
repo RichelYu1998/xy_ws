@@ -129,6 +129,37 @@ bandit -r . -f json -o bandit_report.json
 ## 🔄 最新更新
 
 
+### v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化
+
+#### 更新内容: 修复web_output.log日志文件缺少局域网地址显示问题，在心跳循环和hostc URL获取两处关键位置增加局域网IP自动检测与记录功能，确保日志同时显示局域网地址和公网URL，提升运维便利性
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+  - **main.py:9386** (heartbeat_loop): 新增局域网IP获取逻辑，写入web_output.log时同时记录局域网地址(http://{lan_ip}:{port})和公网URL
+  - **main.py:9643** (read_output hostc URL): 同样新增局域网IP检测，确保从hostc输出获取URL时也同步记录局域网地址
+  - **代码规范**: 严格遵守项目编码标准(UTF-8 without BOM + 简体中文注释)，使用PathManager.get_lan_ip()复用现有方法
+  - **向后兼容**: lan_ip为空时不写入局域网行，保持日志格式干净
+  - **立即生效**: 手动更新当前web_output.log添加局域网地址(192.168.77.84:8888)
+
+#### 🔍 技术实现细节:
+
+```python
+# 局域网IP获取（复用PathManager现有方法）
+lan_ip = PathManager.get_lan_ip()
+port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
+
+# 条件写入，保持日志整洁
+if lan_ip:
+    wf.write(f"局域网地址: http://{lan_ip}:{port}\n")
+wf.write(f"Public URL: {web_url}\n")
+```
+
+#### ✅ 验证结果:
+- ✅ 日志文件正确显示三层访问地址（本地/局域网/公网）
+- ✅ 服务重启后自动记录，无需手动维护
+- ✅ 符合项目编码规范（UTF-8 + 简体中文）
+- ✅ Git提交信息符合规范要求
+
+---
 ### v4.1 (2026-08-30) - 🔧 BOM字符清理+临时文件整理+项目规范化
 
 #### 更新内容: 彻底解决dist/app.js BOM字符(ZWNBSP U+FEFF)导致JavaScript语法错误问题，清理13个调试/修复用临时文件保持项目整洁，Git回退到已清理版本避免乱码污染，更新文档记录BOM修复方案和预防措施
@@ -14332,8 +14363,3 @@ run.bat
 
 **最后更新**: 2026-08-11 (v3.8.89.18)  
 **维护者**: 小旭二手机（西园路）
-
-
-
-
-

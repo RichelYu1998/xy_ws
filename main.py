@@ -9382,7 +9382,11 @@ if __name__ == '__main__':
                         write_tunnel_urls_file(hostc_url=web_url, cf_url=cf_url)
                         web_output_file = PathManager.get_web_output_file()
                         try:
+                            lan_ip = PathManager.get_lan_ip()
+                            port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
                             with open(web_output_file, 'a', encoding='utf-8') as wf:
+                                if lan_ip:
+                                    wf.write(f"局域网地址: http://{lan_ip}:{port}\n")
                                 wf.write(f"Public URL: {web_url}\n")
                         except Exception as e:  # [HANDLED]
                             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
@@ -9637,8 +9641,12 @@ if __name__ == '__main__':
                                         write_tunnel_urls_file(hostc_url=file_url, cf_url=cf_url)
                                         
                                         try:
+                                            lan_ip = PathManager.get_lan_ip()
+                                            port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
                                             web_output_file = PathManager.get_web_output_file()
                                             with open(web_output_file, 'a', encoding='utf-8') as wf:
+                                                if lan_ip:
+                                                    wf.write(f"局域网地址: http://{lan_ip}:{port}\n")
                                                 wf.write(f"Public URL: {file_url}\n")
                                             logger.debug(f"[Tunnel] 已写入 web_output.log")
                                         except Exception as e:  # [HANDLED]
