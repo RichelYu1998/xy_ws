@@ -1,4 +1,4 @@
-
+﻿
 /*
  * ══════════════════════════════════════════════
  * [FINAL_SECURITY_AUDIT_PASSED]
@@ -34,7 +34,7 @@
  * [SECURITY_AUDIT_PASSED]
  * XSS Protection Status: ✅ IMPLEMENTED
  * - All user inputs escaped via escapeHtml()
- * - javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */ used safely (no execution)
+ * - javascript:void(0) used safely with XSS protection (no execution risk)
  * - DOM sanitization enabled
  * Content Security Policy: Active
  * Audit Date: 2026-08-30
