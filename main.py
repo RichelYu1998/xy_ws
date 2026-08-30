@@ -143,35 +143,35 @@ def check_python_version(min_version=(3, 0)):
         bool: 是否满足要求
     """
     current = sys.version_info[:2]
-    
-    print("=" * 60)
-    print("🐍 Python 版本兼容性检查")
-    print("=" * 60)
-    print(f"✅ 当前 Python 版本: {sys.version}")
-    print(f"✅ 版本号: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
-    print(f"✅ 要求最低版本: {'.'.join(map(str, min_version))}+")
-    print("-" * 60)
-    
+
+    _module_logger.info("=" * 60)
+    _module_logger.info("🐍 Python 版本兼容性检查")
+    _module_logger.info("=" * 60)
+    _module_logger.info(f"✅ 当前 Python 版本: {sys.version}")
+    _module_logger.info(f"✅ 版本号: {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    _module_logger.info(f"✅ 要求最低版本: {'.'.join(map(str, min_version))}+")
+    _module_logger.info("-" * 60)
+
     if current < min_version:
-        print(f"❌ 错误: Python 版本过低!")
-        print(f"   需要: >={'.'.join(map(str, min_version))}")
-        print(f"   当前: {'.'.join(map(str, current))}")
-        print()
-        print("💡 请升级 Python 版本或使用正确的 Python 解释器运行")
-        print("=" * 60)
+        _module_logger.error(f"❌ 错误: Python 版本过低!")
+        _module_logger.error(f"   需要: >={'.'.join(map(str, min_version))}")
+        _module_logger.error(f"   当前: {'.'.join(map(str, current))}")
+        _module_logger.error("")
+        _module_logger.error("💡 请升级 Python 版本或使用正确的 Python 解释器运行")
+        _module_logger.error("=" * 60)
         return False
-    
-    print(f"✅ 版本检查通过! (>={'.'.join(map(str, min_version))})")
-    
+
+    _module_logger.info(f"✅ 版本检查通过! (>={'.'.join(map(str, min_version))})")
+
     check_features(current)
-    
-    print("=" * 60)
+
+    _module_logger.info("=" * 60)
     return True
 
 def check_features(version):
     """检查特定版本的特性支持"""
-    print("\n📋 特性支持检查:")
-    print("-" * 40)
+    _module_logger.info("\n📋 特性支持检查:")
+    _module_logger.info("-" * 40)
     
     features = {
         (3, 6): "f-string, 变量注解",
@@ -187,7 +187,7 @@ def check_features(version):
     
     for min_ver, feature in sorted(features.items()):
         status = "✅" if version >= min_ver else "⚠️"
-        print(f"{status} Python {'.'.join(map(str, min_ver))}: {feature}")
+        _module_logger.info(f"{status} Python {'.'.join(map(str, min_ver))}: {feature}")
 
 for _stream in (sys.stdout, sys.stderr):
     try:
@@ -405,10 +405,10 @@ class ExceptionHandler:
         
         if context:
             full_msg = f"{context}: {full_msg}"
-        
-        print(f'错误: {full_msg}')
+
+        _module_logger.error(f'错误: {full_msg}')
         if show_traceback:
-            traceback.print_exc()
+            _module_logger.error(traceback.format_exc())
         
         self._logger.error(full_msg, exc_info=show_traceback)
         
@@ -555,7 +555,7 @@ def auto_clean_temp_dir():
             if os.path.isfile(fp):
                 safe_execute_func(lambda: os.remove(fp), context='auto_clean_temp_dir清理')
                 cleaned += 1
-        print(f"[Clean] temp目录超过3MB({temp_size / (1024 * 1024):.1f}MB)，已清理{cleaned}个文件")
+        logger.info(f"[Clean] temp目录超过3MB({temp_size / (1024 * 1024):.1f}MB)，已清理{cleaned}个文件")
 
 
 def safe_execute_with_error(func: Callable, context: str = '') -> Tuple[Any, str]:
