@@ -6811,8 +6811,19 @@ if __name__ == '__main__':
             print("\n✅ 项目中未发现 BOM 文件，所有文件编码规范！")
             sys.exit(0)
 
-    # 启动前验证关键文件（防止 JS SyntaxError）
-    validate_critical_files_bom()
+    # 启动前自动检测并移除 BOM 字符（v4.3 增强：全自动修复）
+    if not args.check_bom and not args.fix_bom:
+        _module_logger.info("[*] 自动检测并移除项目中的 BOM 字符...")
+        bom_result = scan_project_bom(auto_fix=True)
+        if bom_result['bom_files']:
+            _module_logger.info(f"[✅] 已自动移除 {bom_result['fixed_count']}/{len(bom_result['bom_files'])} 个文件的 BOM 字符")
+        else:
+            _module_logger.info("[✅] 项目中未发现 BOM 文件，编码规范")
+        # 验证关键文件（防止 JS SyntaxError）
+        validate_critical_files_bom()
+    else:
+        # 手动模式下的验证
+        validate_critical_files_bom()
 
     if args.select_pip_mirror:
         venv_path = os.environ.get('VIRTUAL_ENV') or os.path.join(PROJECT_DIR, '.venv')
