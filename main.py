@@ -6806,9 +6806,10 @@ if __name__ == '__main__':
             for i, f in enumerate(result['bom_files'], 1):
                 print(f"   {i}. {f}")
             print("\n💡 运行 python main.py --fix-bom 自动修复")
+            sys.exit(1)
         else:
             print("\n✅ 项目中未发现 BOM 文件，所有文件编码规范！")
-        sys.exit(0)
+            sys.exit(0)
 
     # 启动前验证关键文件（防止 JS SyntaxError）
     validate_critical_files_bom()
