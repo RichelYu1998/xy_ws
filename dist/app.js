@@ -2567,9 +2567,29 @@
                         window._programmaticScroll = true;
 
                         const scrollLeft = sourceContainer.scrollLeft;
+                        const scrollTop = sourceContainer.scrollTop;
+
+                        console.log('[联动] 源表格索引:', sourceIndex, ', scrollTop:', scrollTop, ', 是否在顶部:', scrollTop < 5);
+
+                        if (scrollTop < 5) {
+                            console.log('[联动] 🎯 检测到源表格在顶部，所有表格同步到顶部');
+                            tableContainers.forEach((otherContainer, otherIndex) => {
+                                if (otherIndex !== sourceIndex) {
+                                    otherContainer.scrollTop = 0;
+                                    otherContainer.scrollLeft = scrollLeft;
+                                }
+                            });
+
+                            requestAnimationFrame(() => {
+                                requestAnimationFrame(() => {
+                                    window._programmaticScroll = false;
+                                });
+                            });
+                            return;
+                        }
 
                         const visibleRow = findFirstVisibleRow(sourceContainer);
-                        console.log('[联动] 源表格索引:', sourceIndex, ', 可见行SKU:', visibleRow ? visibleRow.getAttribute('data-sku') : '无');
+                        console.log('[联动] 可见行SKU:', visibleRow ? visibleRow.getAttribute('data-sku') : '无');
 
                         if (visibleRow) {
                             const sku = visibleRow.getAttribute('data-sku');
@@ -2578,7 +2598,6 @@
                                 if (otherIndex !== sourceIndex) {
                                     if (sku) {
                                         const targetRow = otherContainer.querySelector(`tr[data-sku="${sku}"]`);
-                                        console.log('[联动] 目标表格索引:', otherIndex, ', 查找SKU:', sku, ', 找到行:', !!targetRow);
 
                                         if (targetRow) {
                                             const sourceRowRect = visibleRow.getBoundingClientRect();
@@ -2589,7 +2608,6 @@
 
                                             let targetScrollTop;
                                             if (sourceContainer.scrollTop + sourceContainer.clientHeight >= sourceContainer.scrollHeight - 5) {
-                                                console.log('[联动] 🎯 源表格在底部, 将目标行滚动到目标表格底部');
                                                 const targetRowHeight = targetRow.offsetHeight || 40;
                                                 const tableBody = otherContainer.querySelector('tbody');
                                                 const tbodyOffsetTop = tableBody ? tableBody.offsetTop : 0;
@@ -2602,12 +2620,8 @@
 
                                             targetScrollTop = Math.max(0, Math.min(targetScrollTop, otherContainer.scrollHeight - containerHeight));
 
-                                            console.log('[联动] 📍 滚动计算 - 源行偏移:', offsetFromTop.toFixed(2), ', 容器高度:', containerHeight, ', 新滚动值:', targetScrollTop);
-
                                             otherContainer.scrollTop = targetScrollTop;
-                                            console.log('[联动] ✅ 成功同步到目标表格, SKU:', sku, ', 实际scrollTop:', otherContainer.scrollTop);
                                         } else {
-                                            console.log('[联动] ⚠️ 目标表格中未找到SKU:', sku, ', 使用比例滚动');
                                             const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
                                             const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
                                             const scrollRatioY = maxScrollTop > 0 ? sourceContainer.scrollTop / maxScrollTop : 0;
@@ -2623,8 +2637,6 @@
                                 }
                             });
                         } else {
-                            console.log('[联动] ⚠️ 未找到可见行, 使用比例滚动');
-                            const scrollTop = sourceContainer.scrollTop;
                             const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
                             const scrollRatioY = maxScrollTop > 0 ? scrollTop / maxScrollTop : 0;
                             tableContainers.forEach((otherContainer, otherIndex) => {

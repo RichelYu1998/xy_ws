@@ -7757,10 +7757,10 @@ if __name__ == '__main__':
                     created_time = min(created_times)
                 
                 return jsonify({
-                    'filename': os.path.basename(latest_file), 
-                    'total': len(products), 
-                    'products': products[:100], 
-                    'highPriceProducts': high_price_products[:500], 
+                    'filename': os.path.basename(latest_file),
+                    'total': len(products),
+                    'products': products[:500],
+                    'highPriceProducts': high_price_products[:500],
                     'highPriceCount': high_price_count,
                     'totalPrice': f'¥{total_price:,.2f}',
                     'avgPrice': f'¥{avg_price:,.2f}',
@@ -8024,10 +8024,10 @@ if __name__ == '__main__':
                 avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
                 
                 return jsonify({
-                    'filename': os.path.basename(latest_file), 
-                    'total': len(products), 
-                    'products': products[:100], 
-                    'highPriceProducts': high_price_products[:500], 
+                    'filename': os.path.basename(latest_file),
+                    'total': len(products),
+                    'products': products[:500],
+                    'highPriceProducts': high_price_products[:500],
                     'highPriceCount': high_price_count,
                     'totalPrice': f'¥{total_price:,.2f}',
                     'avgPrice': f'¥{avg_price:,.2f}',
