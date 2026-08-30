@@ -694,14 +694,54 @@ log "正在启动 Web 服务..."
         log_console_only "[WARNING] 隧道服务启动失败，本地访问仍可用"
     fi
 
+    sleep 3
+
+    WEB_OUTPUT_LOG="file/web_output.log"
+    TUNNEL_URL_FILE="file/tunnel_url.txt"
+
+    LAN_ADDR=""
+    PUBLIC_URL=""
+
+    if [ -f "$WEB_OUTPUT_LOG" ]; then
+        LAN_ADDR=$(grep -oP '局域网地址: \Khttp://[0-9.]+' "$WEB_OUTPUT_LOG" | tail -1)
+        PUBLIC_URL_FROM_LOG=$(grep -oP 'Public URL: \Khttps?://\S+' "$WEB_OUTPUT_LOG" | tail -1)
+        if [ -n "$PUBLIC_URL_FROM_LOG" ]; then
+            PUBLIC_URL="$PUBLIC_URL_FROM_LOG"
+        fi
+    fi
+
+    if [ -z "$PUBLIC_URL" ] && [ -f "$TUNNEL_URL_FILE" ]; then
+        PUBLIC_URL_FROM_TUNNEL=$(grep -oP '(?:hostc:|cloudflare:)\s*\Khttps?://\S+' "$TUNNEL_URL_FILE" | head -1)
+        if [ -z "$PUBLIC_URL_FROM_TUNNEL" ]; then
+            PUBLIC_URL_FROM_TUNNEL=$(grep -oP 'https://[a-zA-Z0-9.-]+\.hostc\.dev' "$TUNNEL_URL_FILE" | head -1)
+        fi
+        if [ -n "$PUBLIC_URL_FROM_TUNNEL" ]; then
+            PUBLIC_URL="$PUBLIC_URL_FROM_TUNNEL"
+        fi
+    fi
+
+    if [ -z "$LAN_ADDR" ]; then
+        LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')
+        if [ -n "$LAN_IP" ]; then
+            LAN_ADDR="http://${LAN_IP}:${WEB_PORT}"
+        fi
+    fi
+
     log_blank_console_only
     log_console_only "========================================"
     log_console_only "启动完成！"
     log_console_only "========================================"
     log_blank_console_only
     log_console_only "本地访问: http://localhost:$WEB_PORT"
-    log_console_only "公网访问: 查看 file/tunnel_url.txt"
-    log_console_only "Web日志: 查看 file/web_output.log"
+    if [ -n "$LAN_ADDR" ]; then
+        log_console_only "局域网地址: $LAN_ADDR"
+    fi
+    if [ -n "$PUBLIC_URL" ]; then
+        log_console_only "公网访问: $PUBLIC_URL"
+    else
+        log_console_only "公网访问: 正在获取隧道URL..."
+    fi
+    log_console_only "详细日志: $WEB_OUTPUT_LOG"
     log_blank_console_only
     log_console_only "关闭此窗口可停止服务，或使用 Ctrl+C"
     log_blank_console_only

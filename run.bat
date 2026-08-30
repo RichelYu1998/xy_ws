@@ -815,14 +815,55 @@ set "LOG_FILE="
 call :log_console_only Web 服务已就绪，正在启动隧道...
 REM hostc已在脚本启动时启动
 
+ping -n 4 127.0.0.1 >nul 2>&1
+
+set "WEB_OUTPUT_LOG=file\web_output.log"
+set "TUNNEL_URL_FILE=file\tunnel_url.txt"
+
+set "LAN_ADDR="
+set "PUBLIC_URL="
+
+if exist "!WEB_OUTPUT_LOG!" (
+    for /f "delims=" %%l in ('findstr /C:"局域网地址:" "!WEB_OUTPUT_LOG!" 2^>nul') do (
+        for /f "tokens=2 delims=: " %%a in ("%%l") do set "LAN_ADDR=%%a"
+    )
+    for /f "delims=" %%p in ('findstr /C:"Public URL:" "!WEB_OUTPUT_LOG!" 2^>nul') do (
+        for /f "tokens=2 delims=: " %%b in ("%%p") do set "PUBLIC_URL=%%b"
+    )
+)
+
+if not defined PUBLIC_URL (
+    if exist "!TUNNEL_URL_FILE!" (
+        for /f "usebackq delims=" %%t in ("!TUNNEL_URL_FILE!") do (
+            echo %%t | findstr /i "hostc:" >nul && for /f "tokens=2 delims=: " %%h in ("%%t") do set "PUBLIC_URL=%%h"
+            if not defined PUBLIC_URL (
+                echo %%t | findstr /i ".hostc.dev" >nul && for /f "tokens=1" %%u in ("%%t") do set "PUBLIC_URL=%%u"
+            )
+        )
+    )
+)
+
+if not defined LAN_ADDR (
+    for /f "delims=" %%i in ('powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Ethernet*','Wi-Fi*','本地连接*'| Where-Object { $_.IPAddress -notmatch '^169\.254\.' }| Select-Object -First 1 -ExpandProperty IPAddress)" 2^>nul') do (
+        set "LAN_ADDR=http://%%i:!WEB_PORT!"
+    )
+)
+
 call :log_blank_console_only
 call :log_console_only ========================================
 call :log_console_only 启动完成！
 call :log_console_only ========================================
 call :log_blank_console_only
 call :log_console_only 本地访问: http://localhost:!WEB_PORT!
-call :log_console_only 公网访问: 查看 file\tunnel_url.txt
-call :log_console_only Web日志: 查看 file\web_output.log
+if defined LAN_ADDR (
+    call :log_console_only 局域网地址: !LAN_ADDR!
+)
+if defined PUBLIC_URL (
+    call :log_console_only 公网访问: !PUBLIC_URL!
+) else (
+    call :log_console_only 公网访问: 正在获取隧道URL...
+)
+call :log_console_only 详细日志: !WEB_OUTPUT_LOG!
 call :log_blank_console_only
 call :log_console_only 按 Ctrl+C 停止服务，或关闭此窗口
 call :log_blank_console_only
