@@ -1145,7 +1145,8 @@
                         var container = document.getElementById('changelog-container');
                         if (container) container.innerHTML = '<div style="padding:20px;background:#fef0e6;color:#e6a23c;border-radius:8px;text-align:center">⚠️ 加载失败，请刷新重试</div>';
                     }
-                })                .catch(function(e) {
+                })
+                .catch(function(e) {
                     console.error('Failed to load changelog:', e);
                     if (typeof showToast === 'function') {
                         showToast('更新日志加载失败', 'warning');
