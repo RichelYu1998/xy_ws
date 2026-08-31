@@ -8887,6 +8887,78 @@ if __name__ == '__main__':
                     if current_change:
                         current_entry['changes'].append(current_change)
                     changelog.append(current_entry)
+                readme_version_map = {entry['version']: entry for entry in changelog}
+                readme_versions_used = set()
+                merged_changelog = []
+                try:
+                    git_log_output = subprocess.check_output(
+                        ['git', 'log', '--pretty=format:%H|%ad|%s', '--date=short'],
+                        cwd=PROJECT_DIR, text=True, encoding='utf-8', stderr=subprocess.DEVNULL
+                    ).strip()
+                    if git_log_output:
+                        for log_line in git_log_output.split('\n'):
+                            parts = log_line.split('|', 2)
+                            if len(parts) != 3:
+                                continue
+                            commit_hash, commit_date, commit_msg = parts
+                            short_hash = commit_hash[:8]
+                            ver_in_msg = re.search(r'v([\d.]+)', commit_msg)
+                            version_key = ver_in_msg.group(1) if ver_in_msg else short_hash
+                            if version_key in readme_version_map and version_key not in readme_versions_used:
+                                readme_versions_used.add(version_key)
+                                readme_entry = readme_version_map[version_key]
+                                if not readme_entry['meta'].get('commit') or readme_entry['meta']['commit'] == '待补充':
+                                    readme_entry['meta']['commit'] = short_hash
+                                if not readme_entry['meta'].get('fix_date') or readme_entry['meta']['fix_date'] == '待补充':
+                                    readme_entry['meta']['fix_date'] = commit_date
+                                if not readme_entry['meta'].get('author') or readme_entry['meta']['author'] == '待补充':
+                                    readme_entry['meta']['author'] = '小旭二手机（西园路）'
+                                merged_changelog.append(readme_entry)
+                            else:
+                                clean_msg = re.sub(r'^(feat|fix|docs|refactor|convention|security|chore|style|test|perf|build|ci)\s*\(?\)?:\s*', '', commit_msg, flags=re.IGNORECASE)
+                                clean_msg = re.sub(r'^v[\d.]+\s*[:：]?\s*', '', clean_msg)
+                                clean_msg = re.sub(r'\s*\(20\d{2}-\d{2}-\d{2}\)\s*$', '', clean_msg)
+                                tag_match = re.match(r'^(🐛|🔒|🏗️|✨|📝|⚙️|🗑️|🔧|🚀|🌐|🛡️|📊|📧|💻)', clean_msg)
+                                tag = ''
+                                title = clean_msg
+                                if tag_match:
+                                    emoji = tag_match.group(1)
+                                    tag = {'🐛': '🐛Bug修复', '🔒': '🔒安全', '🏗️': '🏗️架构优化', '✨': '✨功能增强', '📝': '📝文档更新', '⚙️': '⚙️配置优化', '🗑️': '🗑️清理', '🔧': '🔧Bug修复', '🚀': '🚀性能优化', '🌐': '🌐网络优化', '🛡️': '🛡️安全加固', '📊': '📊数据分析', '📧': '📧邮件通知', '💻': '💻跨平台'}.get(emoji, emoji)
+                                    title = clean_msg[len(emoji):].strip()
+                                merged_changelog.append({
+                                    'version': version_key,
+                                    'date': commit_date,
+                                    'title': title[:200] if title else commit_msg[:200],
+                                    'meta': {
+                                        'fix_date': commit_date,
+                                        'fix_type': tag or '📝代码提交',
+                                        'affected_files': '待补充',
+                                        'commit': short_hash,
+                                        'change_stats': '待补充',
+                                        'author': '小旭二手机（西园路）'
+                                    },
+                                    'changes': [{
+                                        'id': '1',
+                                        'title': title[:200] if title else commit_msg[:200],
+                                        'tag': tag or '📝代码提交',
+                                        'problem': {
+                                            'phenomenon': commit_msg[:300],
+                                            'root_cause': '详见Git提交记录',
+                                            'scope': '待补充'
+                                        },
+                                        'solution': {
+                                            'implementation': commit_msg[:300],
+                                            'reference': f'commit {short_hash}'
+                                        },
+                                        'verification': [f'✅ 提交 {short_hash} 已合并至master分支']
+                                    }]
+                                })
+                    for entry in changelog:
+                        if entry['version'] not in readme_versions_used:
+                            merged_changelog.append(entry)
+                    changelog = merged_changelog
+                except Exception as git_err:  # [HANDLED]
+                    logger.debug(f'[api_changelog] Git历史合并跳过: {git_err}', file=sys.stderr)
                 result = {'success': True, 'changelog': changelog}
                 _debug_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 logger.debug(f'[{_debug_time}] [DEBUG] changelog API 返回: {len(changelog)} 个版本', file=sys.stderr)
