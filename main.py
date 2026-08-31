@@ -290,6 +290,16 @@ TIMEOUT_CONFIG = {
     'file_operation': int(os.environ.get('TIMEOUT_FILE_OPERATION', '10')),
 }
 
+TUNNEL_CONFIG = {
+    'cf_max_retries': int(os.environ.get('CF_MAX_RETRIES', '3')),
+    'cf_retry_delay': int(os.environ.get('CF_RETRY_DELAY', '60')),
+    'cf_quick_tunnel_timeout': int(os.environ.get('CF_QUICK_TUNNEL_TIMEOUT', '120')),
+    'cf_heartbeat_interval': int(os.environ.get('CF_HEARTBEAT_INTERVAL', '30')),
+    'hostc_heartbeat_interval': int(os.environ.get('HOSTC_HEARTBEAT_INTERVAL', '30')),
+    'url_verify_timeout': int(os.environ.get('URL_VERIFY_TIMEOUT', '10')),
+    'url_verify_max_retries': int(os.environ.get('URL_VERIFY_MAX_RETRIES', '3')),
+}
+
 if not hasattr(subprocess, 'CREATE_NO_WINDOW'):
     subprocess.CREATE_NO_WINDOW = 0x08000000 if platform.system() == 'Windows' else 0
 
@@ -9307,7 +9317,11 @@ if __name__ == '__main__':
             pass
             # [IMPLEMENTATION] 待实现的功能逻辑
         
-        def verify_url(url, timeout=10, verbose=False, max_retries=3):
+        def verify_url(url, timeout=None, verbose=False, max_retries=None):
+            if timeout is None:
+                timeout = TUNNEL_CONFIG['url_verify_timeout']
+            if max_retries is None:
+                max_retries = TUNNEL_CONFIG['url_verify_max_retries']
             for attempt in range(max_retries):
                 try:
                     # 创建SSL上下文，保持默认的安全验证
@@ -9372,7 +9386,7 @@ if __name__ == '__main__':
             max_consecutive_failures = 5
             url_verify_failures = 0
             max_url_verify_failures = 2
-            heartbeat_interval = 30
+            heartbeat_interval = TUNNEL_CONFIG['hostc_heartbeat_interval']
             last_log_time = 0
             grace_end_time = time.time() + 60
             last_url_sync_time = 0
@@ -9529,6 +9543,8 @@ if __name__ == '__main__':
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url, cf_url
 
             cf_binary = find_cloudflared_binary()
+            log_print(f"[Tunnel] 🔍 检测 cloudflared: {'✅ 已找到' if cf_binary else '❌ 未找到'} - {cf_binary or 'N/A'}")
+            
             if cf_binary and not force_restart:
                 existing_urls = read_tunnel_urls_file()
                 existing_cf = existing_urls.get('cloudflare')
@@ -9536,14 +9552,14 @@ if __name__ == '__main__':
                     try:
                         is_cf_valid = verify_url(existing_cf, timeout=5, verbose=False)
                         if is_cf_valid:
-                            logger.debug(f"[Tunnel] ✅ 发现可用CF地址，直接复用: {existing_cf}")
+                            log_print(f"[Tunnel] ✅ 发现可用CF地址，直接复用: {existing_cf}")
                             cf_url = existing_cf
                             start_cf_heartbeat()
                         else:
-                            logger.debug(f"[Tunnel] ⚠️ 已有CF地址不可用: {existing_cf}，将启动新CF隧道")
+                            log_print(f"[Tunnel] ⚠️ 已有CF地址不可用: {existing_cf}，将启动新CF隧道")
                             existing_cf = None
                     except Exception as e:  # [HANDLED]
-                        logger.debug(f"[Tunnel] ⚠️ 验证已有CF地址失败: {e}，将启动新CF隧道")
+                        log_print(f"[Tunnel] ⚠️ 验证已有CF地址失败: {e}，将启动新CF隧道")
                         existing_cf = None
                 
                 if existing_cf:
@@ -9551,26 +9567,26 @@ if __name__ == '__main__':
                     # [IMPLEMENTATION] 待实现的功能逻辑
                 else:
                     port = args.port if "args" in globals() and hasattr(args, "port") else int(os.environ.get('WEB_PORT', '8888'))
-                    logger.debug(f"[Tunnel] 🚀 启动新的 Cloudflare Tunnel...")
+                    log_print(f"[Tunnel] 🚀 启动新的 Cloudflare Tunnel (端口: {port})...")
                     cf_result = start_cloudflare_tunnel(port=port)
                     if cf_result and cf_result.get('success'):
-                        logger.debug(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
+                        log_print(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
                         start_cf_heartbeat()
                     else:
                         cf_err = cf_result.get('error', '未知') if cf_result else '未知'
-                        logger.debug(f"[Tunnel] ⚠️ Cloudflare Tunnel 启动失败: {cf_err}")
+                        log_print(f"[Tunnel] ❌ Cloudflare Tunnel 启动失败: {cf_err}")
             elif cf_binary:
                 port = args.port if "args" in globals() and hasattr(args, "port") else int(os.environ.get('WEB_PORT', '8888'))
-                logger.debug(f"[Tunnel] 🚀 强制重启 Cloudflare Tunnel...")
+                log_print(f"[Tunnel] 🚀 强制重启 Cloudflare Tunnel (端口: {port})...")
                 cf_result = start_cloudflare_tunnel(port=port)
                 if cf_result and cf_result.get('success'):
-                    logger.debug(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
+                    log_print(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
                     start_cf_heartbeat()
                 else:
                     cf_err = cf_result.get('error', '未知') if cf_result else '未知'
-                    logger.debug(f"[Tunnel] ⚠️ Cloudflare Tunnel 启动失败: {cf_err}")
+                    log_print(f"[Tunnel] ❌ Cloudflare Tunnel 启动失败: {cf_err}")
             else:
-                logger.debug(f"[Tunnel] ⏭️ 未找到 cloudflared，跳过 Cloudflare Tunnel")
+                log_print(f"[Tunnel] ⏭️ 未找到 cloudflared，跳过 Cloudflare Tunnel（需要安装以启用双隧道）")
 
             if force_restart:
                 logger.debug(f"[Tunnel] 🔄 强制重启模式，将清理旧进程并重新启动")
@@ -10171,7 +10187,9 @@ ingress:
 
             return tunnel_id, config_yml_path
 
-        def start_cloudflare_tunnel(port=None, timeout=120):
+        def start_cloudflare_tunnel(port=None, timeout=None):
+            if timeout is None:
+                timeout = TUNNEL_CONFIG['cf_quick_tunnel_timeout']
             """启动 Cloudflare Tunnel（Plan A: Named Tunnel → Plan B: Quick Tunnel，保底至少成功一个）
             启动成功后由 cf_heartbeat_loop 独立验证并发邮件"""
             global cf_process, cf_url, cf_mode
@@ -10186,9 +10204,9 @@ ingress:
             named_config = _detect_named_tunnel_config()
 
             if named_config['available']:
-                logger.debug(f"[Cloudflare] 🏠 Plan A: Named Tunnel (自定义域名: {named_config['custom_domain']})...")
+                log_print(f"[Cloudflare] 🏠 Plan A: Named Tunnel (自定义域名: {named_config['custom_domain']})...")
                 try:
-                    logger.debug(f"[Cloudflare] 启动 Named Tunnel: {named_config['tunnel_name']}...")
+                    log_print(f"[Cloudflare] 启动 Named Tunnel: {named_config['tunnel_name']}...")
                     cmd = [cf_binary, "tunnel", "run", named_config['tunnel_name'], "--config", named_config['config_yml_path'], "--no-autoupdate"]
 
                     cf_process = subprocess.Popen(
@@ -10209,66 +10227,98 @@ ingress:
                     if cf_process.poll() is None:
                         cf_url = named_url
                         cf_mode = 'named'
-                        logger.debug(f"[Cloudflare] ✅ Plan A 成功: Named Tunnel {cf_url}，等待心跳验证后发邮件")
+                        log_print(f"[Cloudflare] ✅ Plan A 成功: Named Tunnel {cf_url}，等待心跳验证后发邮件")
 
                         existing = read_tunnel_urls_file()
                         write_tunnel_urls_file(hostc_url=existing.get('hostc'), cf_url=cf_url)
 
                         return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "named"}
                     else:
-                        logger.debug(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 进程退出 (code: {cf_process.returncode})，回退到 Plan B...")
+                        log_print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 进程退出 (code: {cf_process.returncode})，回退到 Plan B...")
                         cf_process = None
                 except Exception as e:  # [HANDLED]
-                    logger.debug(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 启动异常: {e}，回退到 Plan B...")
+                    log_print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 启动异常: {e}，回退到 Plan B...")
                     cf_process = None
             else:
-                logger.debug(f"[Cloudflare] ⏭️ Plan A 跳过: 未检测到 Named Tunnel 配置，直接 Plan B...")
+                log_print(f"[Cloudflare] ⏭️ Plan A 跳过: 未检测到 Named Tunnel 配置，直接 Plan B...")
 
-            logger.debug(f"[Cloudflare] 🚀 Plan B: Quick Tunnel (临时域名, 端口 {port})...")
-            try:
-                cmd = [cf_binary, "tunnel", "--url", f"http://os.environ.get('HOST', 'localhost')  # [CONFIGURED]:{port}", "--no-autoupdate"]
+            log_print(f"[Cloudflare] 🚀 Plan B: Quick Tunnel (临时域名, 端口 {port})...")
+            
+            max_retries = TUNNEL_CONFIG['cf_max_retries']
+            retry_delay = TUNNEL_CONFIG['cf_retry_delay']
+            
+            for attempt in range(max_retries):
+                try:
+                    host = os.environ.get('HOST', 'localhost')
+                    cmd = [cf_binary, "tunnel", "--url", f"http://{host}:{port}", "--no-autoupdate"]
 
-                cf_process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1
-                )
+                    cf_process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1
+                    )
 
-                url_pattern = r"https://[a-z0-9\-]+\.trycloudflare\.com"
-                rate_limit_pattern = r"(429|error code: 1015|Too Many Requests)"
-                start_time = time.time()
+                    url_pattern = r"https://[a-z0-9\-]+\.trycloudflare\.com"
+                    rate_limit_pattern = r"(429|error code: 1015|Too Many Requests)"
+                    start_time = time.time()
 
-                while time.time() - start_time < timeout:
-                    if cf_process.poll() is not None:
-                        return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 进程退出 (code: {cf_process.returncode})"}
+                    while time.time() - start_time < timeout:
+                        if cf_process.poll() is not None:
+                            output = cf_process.stdout.read()
+                            
+                            if re.search(rate_limit_pattern, str(output), re.IGNORECASE):
+                                if attempt < max_retries - 1:
+                                    log_print(f"[Cloudflare] ⚠️ 第{attempt + 1}次尝试被限流 (429)，等待 {retry_delay} 秒后重试...")
+                                    time.sleep(retry_delay)
+                                    break
+                                else:
+                                    log_print(f"[Cloudflare] ❌ 已达最大重试次数 ({max_retries}次)，Quick Tunnel 持续限流")
+                                    log_print(f"[Cloudflare] 💡 建议: 等待 10 分钟后重试，或配置 Named Tunnel")
+                                    return {"success": False, "error": f"Quick Tunnel 持续限流 (已尝试{max_retries}次)"}
+                            
+                            log_print(f"[Cloudflare] ❌ Plan B 失败: Quick Tunnel 进程退出 (code: {cf_process.returncode})")
+                            log_print(f"[Cloudflare] 📋 进程输出 (前500字符): {str(output)[:500]}")
+                            return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 进程退出 (code: {cf_process.returncode})"}
 
-                    line = cf_process.stdout.readline()
-                    if line:
-                        if re.search(rate_limit_pattern, line, re.IGNORECASE):
-                            logger.debug(f"[Cloudflare] ⚠️ Quick Tunnel 请求被限流 (429 Too Many Requests)")
-                            logger.debug(f"[Cloudflare] 💡 建议: 等待 5-10 分钟后重试，或配置 Named Tunnel")
-                            return {"success": False, "error": "Quick Tunnel 限流，请稍后重试"}
+                        line = cf_process.stdout.readline()
+                        if line:
+                            if re.search(rate_limit_pattern, line, re.IGNORECASE):
+                                if attempt < max_retries - 1:
+                                    log_print(f"[Cloudflare] ⚠️ 第{attempt + 1}次尝试被限流 (429)，等待 {retry_delay} 秒后重试...")
+                                    cf_process.terminate()
+                                    time.sleep(retry_delay)
+                                    break
+                                else:
+                                    log_print(f"[Cloudflare] ❌ 已达最大重试次数 ({max_retries}次)，Quick Tunnel 持续限流")
+                                    log_print(f"[Cloudflare] 💡 建议: 等待 10 分钟后重试，或配置 Named Tunnel")
+                                    return {"success": False, "error": f"Quick Tunnel 持续限流 (已尝试{max_retries}次)"}
                         
                         match = re.search(url_pattern, line)
                         if match:
                             cf_url = match.group(0)
                             cf_mode = 'quick'
-                            logger.debug(f"[Cloudflare] ✅ Plan B 成功: Quick Tunnel {cf_url}，等待心跳验证后发邮件")
+                            log_print(f"[Cloudflare] ✅ Plan B 成功 (第{attempt + 1}次尝试): Quick Tunnel {cf_url}，等待心跳验证后发邮件")
 
                             existing = read_tunnel_urls_file()
                             write_tunnel_urls_file(hostc_url=existing.get('hostc'), cf_url=cf_url)
 
                             return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "quick"}
 
-                    time.sleep(0.5)
+                        time.sleep(0.5)
 
-                return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 等待 URL 超时 ({timeout}秒)"}
-
-            except Exception as e:  # [HANDLED]
-                logger.error(f'Cloudflare Plan B 异常: {type(e).__name__}: {e}', exc_info=True)
-                return {"success": False, "error": f"Plan B 失败: {type(e).__name__}"}
+                    return {"success": False, "error": f"Plan B 第{attempt + 1}次尝试超时 ({timeout}秒)"}
+                    
+                except Exception as e:  # [HANDLED]
+                    log_print(f'[Cloudflare] ❌ Plan B 第{attempt + 1}次尝试异常: {type(e).__name__}: {e}')
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        return {"success": False, "error": f"Plan B 失败: {type(e).__name__}"}
+            
+            return {"success": False, "error": f"Plan B 达到最大重试次数 ({max_retries}次)"}
 
         def cf_heartbeat_loop():
             """Cloudflare Tunnel 独立心跳验证 - 验证通过后发邮件通知"""
@@ -10276,7 +10326,7 @@ ingress:
             global cf_stable_url, cf_stable_confirm_count, cf_url_first_seen_time, cf_last_stable_notification_time, cf_last_email_sent_url
             global stable_url
 
-            interval = 30
+            interval = TUNNEL_CONFIG['cf_heartbeat_interval']
             last_log_time = 0
 
             while True:
@@ -10284,7 +10334,7 @@ ingress:
 
                 if cf_process is None or cf_process.poll() is not None:
                     if cf_url:
-                        logger.debug(f"[CF-Heartbeat] ⚠️ CF 隧道进程已退出")
+                        log_print(f"[CF-Heartbeat] ⚠️ CF 隧道进程已退出")
                         cf_url = None
                         cf_mode = None
                         cf_stable_url = None
@@ -10298,7 +10348,7 @@ ingress:
                 try:
                     url_verified = verify_url(cf_url, timeout=10, verbose=True)
                 except Exception as e:  # [HANDLED]
-                    logger.debug(f"[CF-Heartbeat] ❌ CF URL 验证异常: {str(e)[:100]}")
+                    log_print(f"[CF-Heartbeat] ❌ CF URL 验证异常: {str(e)[:100]}")
                     url_verified = False
 
                 if url_verified:
@@ -10306,32 +10356,32 @@ ingress:
                         cf_stable_url = cf_url
                         cf_stable_confirm_count = 1
                         cf_url_first_seen_time = time.time()
-                        logger.debug(f"[CF-Heartbeat] [搜索] CF 新URL，开始稳定性验证 (1/{cf_stable_min_confirms}): {cf_url}")
-                        logger.debug(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时0秒")
+                        log_print(f"[CF-Heartbeat] [搜索] CF 新URL，开始稳定性验证 (1/{cf_stable_min_confirms}): {cf_url}")
+                        log_print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时0秒")
                         write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
                         if cf_url != cf_last_email_sent_url:
-                            logger.debug(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
+                            log_print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
                             send_tunnel_notification(cf_url, 'stable_available', tunnel_type='cloudflare')
                             cf_last_stable_notification_time = time.time()
                             cf_last_email_sent_url = cf_url
                         else:
-                            logger.debug(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
+                            log_print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
                     elif cf_stable_confirm_count < cf_stable_min_confirms:
                         cf_stable_confirm_count += 1
-                        logger.debug(f"[CF-Heartbeat] ✅ CF 稳定性验证 ({cf_stable_confirm_count}/{cf_stable_min_confirms}): {cf_url}")
+                        log_print(f"[CF-Heartbeat] ✅ CF 稳定性验证 ({cf_stable_confirm_count}/{cf_stable_min_confirms}): {cf_url}")
                         elapsed = int(time.time() - cf_url_first_seen_time)
-                        logger.debug(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
+                        log_print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
                         write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
                         if cf_url != cf_last_email_sent_url:
-                            logger.debug(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
+                            log_print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
                             send_tunnel_notification(cf_url, 'stable_available', tunnel_type='cloudflare')
                             cf_last_stable_notification_time = time.time()
                             cf_last_email_sent_url = cf_url
                         else:
-                            logger.debug(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
+                            log_print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
                 else:
                     if cf_stable_confirm_count > 0:
-                        logger.debug(f"[CF-Heartbeat] ⚠️ CF URL 不可用，重置稳定性计数 ({cf_stable_confirm_count} -> 0)")
+                        log_print(f"[CF-Heartbeat] ⚠️ CF URL 不可用，重置稳定性计数 ({cf_stable_confirm_count} -> 0)")
                         cf_stable_confirm_count = 0
                         cf_stable_url = None
                         if stable_url and stable_url_confirm_count >= stable_url_min_confirms:

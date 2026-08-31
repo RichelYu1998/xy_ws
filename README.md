@@ -128,6 +128,89 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v4.7 (2026-08-31) - 🌐 双隧道全自动启动+硬编码消除（重大功能升级）
+
+#### 更新内容: 实现双隧道（Hostc + Cloudflare）全自动启动机制，消除所有硬编码配置，提升系统可配置性和可维护性
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+  - **🌐 双隧道全自动启动**: 实现 `auto_start_tunnel()` 函数自动检测并启动 Hostc 和 Cloudflare 双隧道，无需手动干预
+  - **🔄 CF 智能重试机制**: 新增 Cloudflare Quick Tunnel 限流自动重试逻辑（默认3次重试，间隔60秒），解决 429 Too Many Requests 问题
+  - **📝 日志级别优化**: 将所有 Cloudflare 相关日志从 `logger.debug()` 升级为 `log_print()`（INFO 级别），确保启动过程完全可见
+  - **🐛 Bug修复**: 修复 Plan B 命令参数拼接错误（`os.environ.get('HOST', 'localhost')` 字符串未正确解析）
+  - **⚙️ 硬编码消除**: 新增 `TUNNEL_CONFIG` 配置字典，将所有隧道相关参数改为环境变量可控：
+    - `CF_MAX_RETRIES`: CF 重试次数（默认3）
+    - `CF_RETRY_DELAY`: CF 重试间隔秒数（默认60）
+    - `CF_QUICK_TUNNEL_TIMEOUT`: CF Quick Tunnel 超时秒数（默认120）
+    - `CF_HEARTBEAT_INTERVAL`: CF 心跳间隔秒数（默认30）
+    - `HOSTC_HEARTBEAT_INTERVAL`: Hostc 心跳间隔秒数（默认30）
+    - `URL_VERIFY_TIMEOUT`: URL 验证超时秒数（默认10）
+    - `URL_VERIFY_MAX_RETRIES`: URL 验证最大重试次数（默认3）
+  - **🔍 错误诊断增强**: CF 进程退出时自动读取并显示进程输出（前500字符），便于快速定位问题
+  - **📊 配置集中管理**: 统一使用 `TIMEOUT_CONFIG` 和 `TUNNEL_CONFIG` 两个配置字典，所有超时和隧道参数可通过环境变量自定义
+
+#### 🎯 双隧道架构:
+```
+run.bat 启动
+    ↓
+main.py --web
+    ↓
+auto_start_tunnel()
+    ↓
+┌─────────────────────────────────────┐
+│ ① Cloudflare Tunnel                │
+│   ├─ 检测 cloudflared.exe          │
+│   ├─ Plan A: Named Tunnel          │
+│   │   └─ 自定义域名（需配置）       │
+│   └─ Plan B: Quick Tunnel         │
+│       └─ 临时域名（*.trycloudflare.com）│
+│       └─ 自动重试限流              │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│ ② Hostc Tunnel                     │
+│   ├─ 检测 node.exe 进程            │
+│   ├─ 获取公网地址                   │
+│   └─ 心跳监控 + 邮件通知           │
+└─────────────────────────────────────┘
+    ↓
+✅ 双隧道同时运行 + 独立邮件通知
+```
+
+#### ⚙️ 环境变量配置示例:
+```bash
+# 隧道配置
+export WEB_PORT=8888
+export HOST=localhost
+
+# Cloudflare 配置
+export CF_MAX_RETRIES=3
+export CF_RETRY_DELAY=60
+export CF_QUICK_TUNNEL_TIMEOUT=120
+export CF_HEARTBEAT_INTERVAL=30
+
+# Hostc 配置
+export HOSTC_HEARTBEAT_INTERVAL=30
+
+# URL 验证配置
+export URL_VERIFY_TIMEOUT=10
+export URL_VERIFY_MAX_RETRIES=3
+
+# 超时配置（已有）
+export TIMEOUT_TUNNEL_STARTUP=15
+export TIMEOUT_TUNNEL_HEARTBEAT=300
+```
+
+#### ✅ 验证结果:
+- ✅ 双隧道全自动启动测试通过
+- ✅ CF 限流自动重试机制正常工作
+- ✅ 所有硬编码已消除（97处环境变量引用）
+- ✅ 日志输出完整可见（INFO 级别）
+- ✅ 配置参数可通过环境变量灵活调整
+- ✅ 代码规范符合项目标准（UTF-8 + 简体中文注释）
+- ✅ 三份文档已同步更新（README.md/skill.md/skill.docx）
+
+---
+
 ### v4.6 (2026-08-31) - 🛡️ 全面安全审计+Bug修复（重大安全升级）
 
 #### 更新内容: 对整个项目进行深度安全攻防审计，修复所有发现的漏洞、Bug、代码质量问题，包括SSRF防护、XSS防护、并发安全、异常处理、输入验证等全方位加固

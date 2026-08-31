@@ -29,14 +29,14 @@ def create_skill_docx():
 
     # 版本信息
     version_para = doc.add_paragraph()
-    version_run = version_para.add_run('📌 当前版本: v4.6 (2026-08-31)')
+    version_run = version_para.add_run('📌 当前版本: v4.7 (2026-08-31)')
     version_run.bold = True
     version_run.font.size = Pt(14)
     version_run.font.color.rgb = RGBColor(0, 112, 192)
 
     # 版本标题
     subtitle = doc.add_paragraph()
-    subtitle_run = subtitle.add_run('🛡️ 全面安全审计 + Bug修复（重大安全升级）— 深度攻防审计全方位加固')
+    subtitle_run = subtitle.add_run('🌐 双隧道全自动启动 + 硬编码消除（重大功能升级）— 双隧道机制+配置集中管理')
     subtitle_run.font.size = Pt(12)
     subtitle_run.italic = True
 
@@ -45,6 +45,16 @@ def create_skill_docx():
 
     # 版本更新列表
     updates = [
+        ('v4.7', '🌐', '双隧道全自动启动+硬编码消除（重大功能升级）',
+         '实现auto_start_tunnel()函数自动检测并启动Hostc和Cloudflare双隧道无需手动干预'
+         '+新增TUNNEL_CONFIG配置字典消除硬编码(CF_MAX_RETRIES/CF_RETRY_DELAY/CF_QUICK_TUNNEL_TIMEOUT/CF_HEARTBEAT_INTERVAL'
+         '/HOSTC_HEARTBEAT_INTERVAL/URL_VERIFY_TIMEOUT/URL_VERIFY_MAX_RETRIES共7个环境变量可控参数)'
+         '+CF智能重试机制解决429 Too Many Requests问题(默认3次重试间隔60秒自动等待后重试)'
+         '+日志级别优化(所有CF相关日志从logger.debug()升级为log_print() INFO级别确保启动过程完全可见)'
+         '+Bug修复(Plan B命令参数拼接os.environ.get(\'HOST\',\'localhost\')字符串未正确解析改为host变量正确拼接)'
+         '+错误诊断增强(CF进程退出时自动读取并显示进程输出前500字符便于快速定位问题)'
+         '+配置集中管理(统一使用TIMEOUT_CONFIG和TUNNEL_CONFIG两个配置字典所有超时和隧道参数可通过环境变量自定义)',
+        ),
         ('v4.6', '🛡️', '全面安全审计+Bug修复（重大安全升级）',
          '对整个项目进行深度安全攻防审计修复所有发现的漏洞和Bug'
          '(SSRF防护系统_is_safe_url()禁止私有IP/云元数据/内网地址访问+并发安全_tunnel_state_lock线程锁保护全局变量'
