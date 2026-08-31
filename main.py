@@ -8892,18 +8892,66 @@ if __name__ == '__main__':
                 merged_changelog = []
                 try:
                     git_log_output = subprocess.check_output(
-                        ['git', 'log', '--pretty=format:%H|%ad|%s', '--date=short'],
+                        ['git', 'log', '--numstat', '--pretty=format:COMMITSEP|%H|%ad|%s', '--date=short'],
                         cwd=PROJECT_DIR, text=True, encoding='utf-8', stderr=subprocess.DEVNULL
                     ).strip()
                     if git_log_output:
+                        git_commits = []
+                        cur_hash = cur_date = cur_msg = None
+                        cur_files = []
+                        cur_add = cur_del = 0
                         for log_line in git_log_output.split('\n'):
-                            parts = log_line.split('|', 2)
-                            if len(parts) != 3:
-                                continue
-                            commit_hash, commit_date, commit_msg = parts
+                            if log_line.startswith('COMMITSEP|'):
+                                if cur_hash is not None:
+                                    git_commits.append((cur_hash, cur_date, cur_msg, cur_files, cur_add, cur_del))
+                                parts = log_line.split('|', 3)
+                                cur_hash = parts[1]
+                                cur_date = parts[2]
+                                cur_msg = parts[3] if len(parts) > 3 else ''
+                                cur_files = []
+                                cur_add = cur_del = 0
+                            else:
+                                numstat_match = re.match(r'^(\d+|-)\s+(\d+|-)\s+(.+)$', log_line)
+                                if numstat_match and cur_hash is not None:
+                                    add_val = numstat_match.group(1)
+                                    del_val = numstat_match.group(2)
+                                    file_name = numstat_match.group(3).strip()
+                                    cur_files.append(file_name)
+                                    if add_val != '-':
+                                        cur_add += int(add_val)
+                                    if del_val != '-':
+                                        cur_del += int(del_val)
+                        if cur_hash is not None:
+                            git_commits.append((cur_hash, cur_date, cur_msg, cur_files, cur_add, cur_del))
+                        emoji_tag_map = {
+                            '🐛': '🐛Bug修复', '🔒': '🔒安全', '🏗️': '🏗️架构优化',
+                            '✨': '✨功能增强', '📝': '📝文档更新', '⚙️': '⚙️配置优化',
+                            '🗑️': '🗑️清理', '🔧': '🔧Bug修复', '🚀': '🚀性能优化',
+                            '🌐': '🌐网络优化', '🛡️': '🛡️安全加固', '📊': '📊数据分析',
+                            '📧': '📧邮件通知', '💻': '💻跨平台', '⚡': '⚡性能优化',
+                            '🔧': '🔧Bug修复', '📄': '📄文档生成'
+                        }
+                        for commit_hash, commit_date, commit_msg, commit_files, total_add, total_del in git_commits:
                             short_hash = commit_hash[:8]
                             ver_in_msg = re.search(r'v([\d.]+)', commit_msg)
                             version_key = ver_in_msg.group(1) if ver_in_msg else short_hash
+                            clean_msg = re.sub(r'^(feat|fix|docs|refactor|convention|security|chore|style|test|perf|build|ci)\s*\(?\)?:\s*', '', commit_msg, flags=re.IGNORECASE)
+                            clean_msg = re.sub(r'^v[\d.]+\s*[:：]?\s*', '', clean_msg)
+                            clean_msg = re.sub(r'\s*\(20\d{2}-\d{2}-\d{2}\)\s*$', '', clean_msg)
+                            tag_match = re.match(r'^(🐛|🔒|🏗️|✨|📝|⚙️|🗑️|🔧|🚀|🌐|🛡️|📊|📧|💻|⚡|📄)', clean_msg)
+                            tag = '📝代码提交'
+                            title = clean_msg
+                            if tag_match:
+                                emoji = tag_match.group(1)
+                                tag = emoji_tag_map.get(emoji, emoji)
+                                title = clean_msg[len(emoji):].strip()
+                            display_title = title[:200] if title else commit_msg[:200]
+                            file_list_str = ', '.join(f'[{f}]({f})' for f in commit_files[:10])
+                            if len(commit_files) > 10:
+                                file_list_str += f' 等{len(commit_files)}个文件'
+                            if not file_list_str:
+                                file_list_str = '无文件变更'
+                            stats_str = f'+{total_add}行 -{total_del}行' if (total_add or total_del) else '二进制文件变更'
                             if version_key in readme_version_map and version_key not in readme_versions_used:
                                 readme_versions_used.add(version_key)
                                 readme_entry = readme_version_map[version_key]
@@ -8913,44 +8961,38 @@ if __name__ == '__main__':
                                     readme_entry['meta']['fix_date'] = commit_date
                                 if not readme_entry['meta'].get('author') or readme_entry['meta']['author'] == '待补充':
                                     readme_entry['meta']['author'] = '小旭二手机（西园路）'
+                                if not readme_entry['meta'].get('affected_files') or readme_entry['meta']['affected_files'] == '待补充':
+                                    readme_entry['meta']['affected_files'] = file_list_str
+                                if not readme_entry['meta'].get('change_stats') or readme_entry['meta']['change_stats'] == '待补充':
+                                    readme_entry['meta']['change_stats'] = stats_str
                                 merged_changelog.append(readme_entry)
                             else:
-                                clean_msg = re.sub(r'^(feat|fix|docs|refactor|convention|security|chore|style|test|perf|build|ci)\s*\(?\)?:\s*', '', commit_msg, flags=re.IGNORECASE)
-                                clean_msg = re.sub(r'^v[\d.]+\s*[:：]?\s*', '', clean_msg)
-                                clean_msg = re.sub(r'\s*\(20\d{2}-\d{2}-\d{2}\)\s*$', '', clean_msg)
-                                tag_match = re.match(r'^(🐛|🔒|🏗️|✨|📝|⚙️|🗑️|🔧|🚀|🌐|🛡️|📊|📧|💻)', clean_msg)
-                                tag = ''
-                                title = clean_msg
-                                if tag_match:
-                                    emoji = tag_match.group(1)
-                                    tag = {'🐛': '🐛Bug修复', '🔒': '🔒安全', '🏗️': '🏗️架构优化', '✨': '✨功能增强', '📝': '📝文档更新', '⚙️': '⚙️配置优化', '🗑️': '🗑️清理', '🔧': '🔧Bug修复', '🚀': '🚀性能优化', '🌐': '🌐网络优化', '🛡️': '🛡️安全加固', '📊': '📊数据分析', '📧': '📧邮件通知', '💻': '💻跨平台'}.get(emoji, emoji)
-                                    title = clean_msg[len(emoji):].strip()
                                 merged_changelog.append({
                                     'version': version_key,
                                     'date': commit_date,
-                                    'title': title[:200] if title else commit_msg[:200],
+                                    'title': display_title,
                                     'meta': {
                                         'fix_date': commit_date,
-                                        'fix_type': tag or '📝代码提交',
-                                        'affected_files': '待补充',
+                                        'fix_type': tag,
+                                        'affected_files': file_list_str,
                                         'commit': short_hash,
-                                        'change_stats': '待补充',
+                                        'change_stats': stats_str,
                                         'author': '小旭二手机（西园路）'
                                     },
                                     'changes': [{
                                         'id': '1',
-                                        'title': title[:200] if title else commit_msg[:200],
-                                        'tag': tag or '📝代码提交',
+                                        'title': display_title,
+                                        'tag': tag,
                                         'problem': {
                                             'phenomenon': commit_msg[:300],
-                                            'root_cause': '详见Git提交记录',
-                                            'scope': '待补充'
+                                            'root_cause': '详见Git提交记录及commit message',
+                                            'scope': file_list_str
                                         },
                                         'solution': {
                                             'implementation': commit_msg[:300],
-                                            'reference': f'commit {short_hash}'
+                                            'reference': f'commit {short_hash}, {file_list_str}'
                                         },
-                                        'verification': [f'✅ 提交 {short_hash} 已合并至master分支']
+                                        'verification': [f'✅ 提交 {short_hash} 已合并至master分支', f'✅ 变更统计: {stats_str}']
                                     }]
                                 })
                     for entry in changelog:
