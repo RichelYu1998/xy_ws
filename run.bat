@@ -773,6 +773,13 @@ call :log_blank
 
 call :log [*] Checking BOM...
 "%VENV_PATH%\Scripts\python.exe" main.py --check-bom >NUL 2>&1
+if not errorlevel 1 (
+    call :log [OK] No BOM found
+) else (
+    call :log [WARNING] BOM detected, auto-fixing...
+    "%VENV_PATH%\Scripts\python.exe" main.py --fix-bom
+)
+call :log [OK] BOM check completed
 call :log Starting Web service...
 call :log_blank
 

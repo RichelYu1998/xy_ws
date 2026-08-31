@@ -2535,12 +2535,13 @@ def sec_sp(base_dir, user_path):
 def _get_allowed_origins():
     """动态生成允许的CORS源，基于当前WEB_PORT"""
     port = int(os.environ.get('WEB_PORT', '8888'))
+    host = os.environ.get('HOST', 'localhost')
     origins = [
-        "http://os.environ.get('HOST', 'localhost')  # [CONFIGURED]",
+        f"http://{host}",
         "http://127.0.0.1",
     ]
     for p in sorted(set([port, 8888, 5000, 8080])):
-        origins.append(f"http://os.environ.get('HOST', 'localhost')  # [CONFIGURED]:{p}")
+        origins.append(f"http://{host}:{p}")
         origins.append(f"http://127.0.0.1:{p}")
     return origins
 
@@ -3462,17 +3463,17 @@ class PathManager:
             parsed = urllib.parse.urlparse(url)
             hostname = parsed.hostname
             port = parsed.port or (443 if parsed.scheme == 'https' else 80)
-            
+
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(timeout)
-            
+
             result = sock.connect_ex((hostname, port))
-            
+
             if result == 0:
                 return (True, None)
             else:
                 return (False, f"TCP连接失败 (错误码: {result})")
-                
+
         except socket.gaierror:
             return (False, "DNS解析失败")
         except socket.timeout:
@@ -3480,11 +3481,11 @@ class PathManager:
         except Exception as e:  # [HANDLED]
             return (False, str(e)[:80])
         finally:
-            if sock:
+            if sock is not None:
                 try:
                     sock.close()
-                except Exception as e:  # [HANDLED]
-                    _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+                except Exception:
+                    pass
     
     @staticmethod
     def _sync_url_to_tunnel_file(url):
@@ -3509,7 +3510,8 @@ class PathManager:
                 
                 f.write(f"Success  Tunnel ready\n")
                 f.write(f"  Public URL: {url}\n")
-                f.write(f"  Local:      http://os.environ.get('HOST', 'localhost')  # [CONFIGURED]:{port}/\n")
+                host = os.environ.get('HOST', 'localhost')
+                f.write(f"  Local:      http://{host}:{port}/\n")
                 f.write(f"  Tunnel:     {tunnel_name}\n")
                 f.write(f"  Channels:   2\n")
                 f.write(f"\n# Auto-synced at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -3691,12 +3693,11 @@ class PathManager:
             logger.debug(f"⚠️ 获取局域网IP失败: {e}")
             return ''
         finally:
-            if s:
+            if s is not None:
                 try:
                     s.close()
-                except Exception as e:  # [HANDLED]
-                    _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                    # [IMPLEMENTATION] 待实现的功能逻辑
+                except Exception:
+                    pass
 
     @staticmethod
     def sync_web_output_from_tunnel_url():
@@ -3735,11 +3736,12 @@ class PathManager:
                     
                     try:
                         port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
+                        host = os.environ.get('HOST', 'localhost')
                         lan_ip = PathManager.get_lan_ip()
                         header = f"""==================================================
 Szwego商品爬虫 - Web服务
 ==================================================
-访问地址: http://os.environ.get('HOST', 'localhost')  # [CONFIGURED]:{port}
+访问地址: http://{host}:{port}
 """
                         if lan_ip:
                             header += f"局域网地址: http://{lan_ip}:{port}\n"
@@ -6492,7 +6494,7 @@ def main():
         
         def start_web():
             logger.debug('\n正在启动Web服务...')
-            host = os.environ.get('HOST', 'localhost')  # [CONFIGURED]
+            host = os.environ.get('HOST', 'localhost')
             port = args.port if "args" in dir() and hasattr(args, "port") else int(os.environ.get("WEB_PORT", "8888"))
             logger.debug(f'访问地址: http://{host}:{port}')
             logger.debug('按 Ctrl+C 停止服务\n')
@@ -7565,6 +7567,13 @@ if __name__ == '__main__':
             # 命令长度限制
             if len(command) > 10000:
                 raise HTTPException(status_code=400, detail='命令长度超过限制（最大10000字符）')
+
+            # 安全检查：禁止危险字符
+            dangerous_patterns = [';', '|', '&', '$(', '`', '>', '<', '\n', '\r']
+            for pattern in dangerous_patterns:
+                if pattern in command:
+                    _module_logger.warning(f'[SECURITY] 命令注入尝试被阻止: IP={client_ip}, Pattern={repr(pattern)}')
+                    raise HTTPException(status_code=403, detail=f'命令包含不允许的字符: {repr(pattern)}')
 
             try:
                 cmd_list = shlex.split(command)
@@ -9076,7 +9085,7 @@ if __name__ == '__main__':
             pw_chromium = Environment._find_playwright_chromium()
             sys_chrome = Environment._find_system_chrome()
 
-            host = os.environ.get('HOST', 'localhost')  # [CONFIGURED]
+            host = os.environ.get('HOST', 'localhost')
             return jsonify({
                 'success': True,
                 'local_url': f'http://{host}:{port}',
@@ -9721,7 +9730,7 @@ if __name__ == '__main__':
                 env = os.environ.copy()
                 env['HOSTC_DEBUG'] = '1'
                 
-                tunnel_host = os.environ.get('HOST', 'localhost')  # [CONFIGURED]
+                tunnel_host = os.environ.get('HOST', 'localhost')
 
                 tunnel_process = subprocess.Popen(
                     [hostc_bin, str(port), '--local-host', tunnel_host] if hostc_bin != 'npx hostc' else ['npx', 'hostc', str(port), '--local-host', tunnel_host],
@@ -10170,12 +10179,13 @@ if __name__ == '__main__':
 
             logger.debug(f"[Cloudflare] 步骤3/3: 生成 config.yml...")
             try:
+                host = os.environ.get('HOST', 'localhost')
                 config_content = f"""tunnel: {tunnel_name}
 credentials-file: {credentials_path}
 
 ingress:
   - hostname: {custom_domain}
-    service: http://os.environ.get('HOST', 'localhost')  # [CONFIGURED]:{port}
+    service: http://{host}:{port}
   - service: http_status:404
 """
                 with open(config_yml_path, 'w', encoding='utf-8') as f:
@@ -10776,18 +10786,17 @@ ingress:
             lan_ip_startup = s.getsockname()[0]
         except Exception as e:  # [HANDLED]
             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-            # [IMPLEMENTATION] 待实现的功能逻辑
         finally:
-            if s:
+            if s is not None:
                 try:
                     s.close()
-                except Exception as e:  # [HANDLED]
-                    _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+                except Exception:
+                    pass
         
         logger.debug("=" * 50)
         logger.debug("Szwego商品爬虫 - Web服务")
         logger.debug("=" * 50)
-        logger.debug(f"访问地址: http://os.environ.get('HOST', 'localhost')  # [CONFIGURED]:{args.port}")
+        logger.debug(f"访问地址: http://{os.environ.get('HOST', 'localhost')}:{args.port}")
         logger.debug(f"局域网地址: http://{lan_ip_startup}:{args.port}" if lan_ip_startup else "")
         logger.debug("[Tunnel] 正在自动启动隧道...")
         
@@ -10848,7 +10857,7 @@ class SSRFProtection:
     PRIVATE_IP_RANGES=[('10.0.0.0',8),('172.16.0.0',12),('192.168.0.0',16),('127.0.0.0',8),('169.254.0.0',16),('100.64.0.0',10),('198.18.0.0',15),('0.0.0.0',8)]
     CLOUD_METADATA_ENDPOINTS={'metadata.google.internal','169.254.169.254','metadata.azure.com'}
     SENSITIVE_PORTS={22,23,25,53,135,139,445,1433,1521,3306,3389,5432,5900,6379,8080,9200,27017}
-    _HOST = os.environ.get('HOST', 'localhost')  # [CONFIGURED]
+    _HOST = os.environ.get('HOST', 'localhost')
     BLOCKED_HOSTNAMES={_HOST, f'{_HOST}.localdomain', 'ip6-_HOST', 'ip6-loopback', 'metadata'}
 
     def __init__(self,enabled=True,max_redirects=3,max_response_size=5*1024*1024,connect_timeout=5,read_timeout=10,dns_cache_ttl=300,block_private_ips=True,allow_localhost=False):
