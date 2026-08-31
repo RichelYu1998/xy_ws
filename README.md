@@ -3735,7 +3735,10 @@ Files: 6 files changed, 747 insertions(+), 13 deletions(-)
 - 删除商品的完整 JSON 数据
 - 浏览器类型和版本信息
 
+
 ---
+
+
 
 ## 📋 完整Git提交历史详细记录 (按DOC-CORE-002范式)
 
@@ -18713,7 +18716,73 @@ Files: 6 files changed, 747 insertions(+), 13 deletions(-)
 
 
 
+
+
 ---
+
+
+
+
+### v5.0.5 (2026-08-31) - 📝文档更新 添加完整Git提交历史详细记录(715个提交/321个版本)+DOC-CORE-002范式规范+修复requirements.txt编码
+
+#### 更新内容: 按DOC-CORE-002范式将全部715个Git提交写入README.md和skill.md，新增DOC-CORE-002详细技术文档格式范式，修复requirements.txt GBK编码混入
+
+**修复日期**: 2026-08-31
+**修复类型**: 文档更新
+**影响文件**: [README.md](README.md), [skill.md](skill.md), [requirements.txt](requirements.txt), [skill.docx](skill.docx)
+**Commit**: 14377317
+**变更统计**: 3个文件修改, +15541行新增, -6行删除
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. README.md添加完整Git提交历史详细记录 (📝文档更新)
+
+**问题描述**:
+- **现象**: README.md中版本记录仅含简略一句话摘要，缺少问题描述/修复方案/测试验证等完整技术细节
+- **根因**: 历史版本记录未遵循DOC-CORE-002范式规范，仅用一行描述版本更新
+- **影响范围**: 所有版本更新记录的可追溯性和技术完整性
+
+**修复方案**:
+- **技术实现**: 从Git历史提取715个提交的hash/日期/作者/变更统计/影响文件，按321个版本分组，生成完整DOC-CORE-002格式记录
+- **参考位置**: Commit 14377317 (2026-08-31)
+
+**测试验证**:
+- ✅ 715个提交全部按范式写入，包含问题描述/修复方案/测试验证三段式结构
+
+---
+
+##### 2. skill.md新增DOC-CORE-002范式规范+完整Git提交历史摘要 (📝文档更新)
+
+**问题描述**:
+- **现象**: skill.md缺少详细技术文档格式范式定义，版本记录格式不统一
+- **根因**: 无标准化范式约束，导致文档格式随意、信息缺失
+- **影响范围**: 所有后续Markdown文档生成的格式一致性
+
+**修复方案**:
+- **技术实现**: 在skill.md中定义DOC-CORE-002标准模板(含字段说明/分类标签/修复类型/完整示例/违规后果/强制执行规则)，同时添加715个提交的精简格式摘要
+- **参考位置**: Commit 14377317 (2026-08-31)
+
+**测试验证**:
+- ✅ DOC-CORE-002范式定义完整，包含标准模板+核心原则+分类标签+修复类型枚举+违规后果
+
+---
+
+##### 3. 修复requirements.txt GBK编码混入导致pip UnicodeDecodeError (🐛Bug修复)
+
+**问题描述**:
+- **现象**: pip install -r requirements.txt 报错 UnicodeDecodeError: 'utf-8' codec can't decode byte 0xce in position 1106
+- **根因**: requirements.txt位置1106处混入GBK编码的中文字符，与UTF-8解码冲突
+- **影响范围**: 所有依赖安装流程，阻塞项目环境搭建
+
+**修复方案**:
+- **技术实现**: 将requirements.txt重写为纯UTF-8编码，替换损坏的GBK中文字符为正确的UTF-8中文注释
+- **关键代码**: 修复前❌ GBK乱码 → 修复后✅ UTF-8中文
+- **参考位置**: [requirements.txt](requirements.txt)
+
+**测试验证**:
+- ✅ pip install --dry-run -r requirements.txt 验证通过，所有依赖可正常读取
+
 
 ## 📐 版本更新记录范式规范
 

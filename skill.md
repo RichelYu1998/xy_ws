@@ -4022,12 +4022,16 @@ if __name__ == '__main__':
 - [ ] 中文字符无乱码
 - [ ] 文档版本号为 v3.8.68
 
+
 ---
+
+
 
 ## 📋 完整Git提交历史摘要 (按DOC-CORE-002范式精简格式)
 
 > **生成日期**: 2026-08-31 | **总提交数**: 715 | **版本分组数**: 321
 
+- **v5.0.5** (2026-08-31) 📝文档更新 — 添加完整Git提交历史详细记录(715个提交/321个版本)+DOC-CORE-002范式规范+修复requirements.txt编码（影响文件: README.md, skill.md, requirements.txt, skill.docx; 提交: 1个; Commit: 14377317）
 - **v0.x** (2026-04-03) ✨功能增强 — 添加了一个excel读取功能，使得东西更加的自动化（影响文件: README.md, config/config.json, config/cookies.json, config/input_stock_numbers.txt, file/output.json 等8个; 提交: 4个; Commit: 9098f55c, 712dab7c, 51b42f7e, 3d81a65f）
 - **v1.0.0** (2026-07-31) 📝文档更新 — docs: 将skill.md补充完整，包含从v1.0.0到v3.8.89.11的所有版本记录（影响文件: skill.md; 提交: 3个; Commit: 44ea2996, 95c784df, 05887975）
 - **v1.0.00.01** (2026-08-11) 🐛Bug修复 — v1.0.00.01 (2026-08-11) - 🔧 UTF-8编码标准化与文档修复（影响文件: README.md, skill.docx, skill.md; 提交: 2个; Commit: 1b285645, b1f81abe）
@@ -4350,7 +4354,11 @@ if __name__ == '__main__':
 - **v5.0.3** (2026-08-31) 📝文档更新 — v5.0.3: 补充README.md缺失的v4.7版本记录并重新生成skill.docx（影响文件: README.md; 提交: 1个; Commit: 5783d25a）
 - **v5.0.4** (2026-08-31) 🔒安全 — v5.0.4: 从Git恢复README.md并安全添加v4.7版本记录+重新生成skill.docx（影响文件: README.md; 提交: 1个; Commit: c51c987d）
 
+
+
 ---
+
+
 
 ## 🔄 版本历史
 
