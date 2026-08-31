@@ -8892,7 +8892,7 @@ if __name__ == '__main__':
                 merged_changelog = []
                 try:
                     git_log_output = subprocess.check_output(
-                        ['git', 'log', '--numstat', '--pretty=format:COMMITSEP|%H|%ad|%s', '--date=short'],
+                        ['git', '-c', 'core.quotepath=false', 'log', '--numstat', '--pretty=format:COMMITSEP|%H|%ad|%s', '--date=short'],
                         cwd=PROJECT_DIR, text=True, encoding='utf-8', stderr=subprocess.DEVNULL
                     ).strip()
                     if git_log_output:
