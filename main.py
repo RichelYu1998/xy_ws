@@ -2203,19 +2203,31 @@ def print_separator(char='=', length=60):
     logger.debug(char * length)
 
 def get_version_from_readme():
-    """从 README.md 自动解析最新版本号"""
+    """从 README.md 自动解析最新版本号（智能取最大值，不依赖手动维护顺序）"""
     readme_path = os.path.join(PROJECT_DIR, 'README.md')
     try:
         with open(readme_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        match = re.search(r'###\s+v(\d+\.\d+\.\d+)', content)
-        if not match:
-            match = re.search(r'##\s+v(\d+\.\d+\.\d+)', content)
-        if match:
-            return match.group(1)
+        all_versions = [v for v in re.findall(r'#{1,3}\s+v([\d.]+)', content) if v.replace('.', '').isdigit() and len(v) >= 3]
+        if not all_versions:
+            return "0.0.0"
+        if packaging_version is not None:
+            try:
+                return str(max(all_versions, key=lambda v: packaging_version.parse(v)))
+            except Exception:
+                pass
+        best = all_versions[0]
+        for v in all_versions[1:]:
+            parts_a = [int(x) for x in best.split('.')]
+            parts_b = [int(x) for x in v.split('.')]
+            max_len = max(len(parts_a), len(parts_b))
+            pa = parts_a + [0] * (max_len - len(parts_a))
+            pb = parts_b + [0] * (max_len - len(parts_b))
+            if pb > pa:
+                best = v
+        return best
     except Exception as e:  # [HANDLED]
         _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-        # [IMPLEMENTATION] 待实现的功能逻辑
     return "0.0.0"
 
 def jsonify(*args, **kwargs):
