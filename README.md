@@ -3268,12 +3268,11 @@ Files: 6 files changed, 747 insertions(+), 13 deletions(-)
 
 ---
 
-## 📚 历史版本记录
+## 📚 早期版本历史记录 (v1.4.2 - v2.1.7)
 
-### v3.8.89.32 (2026-08-21) - 🔧 hostc WebSocket安全关闭补丁重新应用 + patch-package补丁未生效修复
-
-#### 问题: patch-package补丁文件存在但未应用到node_modules，导致hostc WebSocket连接超时进程崩溃
-**现象**: 启动时报错 `Error: WebSocket was closed before the connection was established` + `Unhandled 'error' event`，Node.js进程崩溃退出
+### v2.1.7 (历史版本) - 🛡️ 多重超时保护和重试机制
+**作者**: 小旭二手机（西园路）
+**更新内容**: 添加多重超时保护和重试机制，防止爬虫卡死
 
 **根本原因**:
 1. **补丁未生效**: `npm install` 或其他操作覆盖了node_modules，patch-package postinstall钩子未执行，导致hostc/dist/index.js恢复为原始缺陷代码

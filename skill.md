@@ -52,14 +52,14 @@
 > - FastAPI: 禁用/docs、/redoc、/openapi.json端点
 > - kill_process_by_name: 添加进程名格式验证，改用列表参数
 > - 信息泄露: detail=str(e)替换为通用错误消息
-> - 版本号同步更新至v3.8.89.32（所有文档已同步）
+> - 版本号同步更新至v4.4（所有文档已同步，2026-08-31）
 > - v3.8.89.31: 安全检查系统整合进main.py单文件架构，删除quick_security_check.py/security_audit.py/config_secure_template.py，新增SecurityChecker+DependencyAuditor+SecureConfigManager三个类，新增Playwright+移动端8项安全检查（浏览器上下文隔离/动态内容操作安全/文件下载上传安全/浏览器指纹反检测/移动端环境安全/网络流量安全/截图快照安全/Playwright进程安全），新增API端点/api/security/check+/api/security/audit+/api/security/encrypt-init，requirements.txt补充安全审计+代码质量+测试+移动端增强依赖，SECURITY_CHECKLIST.md合并进README.md+skill.md后删除
 > - v3.8.89.30: 启动脚本残留进程自动清理，run.bat/run.sh启动时分层清理node/python/hostc进程：①精准清理命令行含playwright的node进程（wmic+findstr/taskkill PID）②兜底清理所有node进程（taskkill /IM / pkill）③run.sh补齐playwright+node清理，与run.bat逻辑对齐，从源头消除Playwright "Connection closed while reading from the driver" 错误
 > - v3.8.89.29: 安全加固第四轮，完善3个薄弱点：①命令白名单+shell=False（shlex.split解析+仅允许python+main.py）②CSRF防护（写操作验证Origin/Referer）③API Key认证（secrets.token_urlsafe生成+secrets.compare_digest验证+前端monkey-patch fetch自动注入）
 > - v3.8.89.28: 修复邮件From头+Subject头两处构造Bug，`Header.encode()` 抛AttributeError导致所有隧道通知邮件发送失败；From头改用 `formataddr()` 标准库函数，Subject头改用字符串赋值（Python3.14新policy下Header对象在as_string()时崩溃）
 > - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
 > - 无任何额外的.py文件，避免导入依赖问题
-> - 当前commit: 待推送（v3.8.90.15 表格滚动联动增强+安全审计+代码规范优化）
+> - 当前commit: 已推送（v4.4 临时修复脚本清理+项目规范化，2026-08-31）
 
 作者: 小旭二手机（西园路）
 
@@ -91,9 +91,11 @@ D:/ws/xy_ws/
 ├── README.md            # 项目文档和Changelog
 ├── skill.md             # 开发规范文档（本文件）
 ├── skill.docx           # Word格式规范文档
-├── tests/               # 单元测试目录
+├── test/                # 单元测试目录（已推送至Git）
 │   ├── __init__.py      # 测试包初始化
-│   └── test_version.py  # Python版本兼容性测试套件
+│   ├── test_version.py  # Python版本兼容性测试套件
+│   ├── generate_skill_docx.py  # skill.docx生成脚本
+│   └── security_audit_v3.8.90.15.py  # 安全审计压测脚本
 ├── tox.ini              # Tox多版本测试配置（支持3.9-3.14）
 ├── config/              # 配置目录
 │   ├── config.json      # 主配置文件
