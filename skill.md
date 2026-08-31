@@ -492,75 +492,32 @@ API_DOCS.md              ❌ 禁止！应该合并后删除
 ### 完整示例 (v3.8.89.15 实际案例)
 
 ``markdown
-### v3.8.89.15 (2026-08-09) - 🔒 安全漏洞修复 + 代码质量提升
+### v3.8.89.15 (2026-08-09) - ✨功能增强 🔒 安全漏洞修复 + 代码质量提升
 
-#### 更新内容: 全面修复项目中的安全漏洞和代码质量问题，提升系统安全性
+#### 更新内容: 🔒 安全漏洞修复 + 代码质量提升
 
 **修复日期**: 2026-08-11
 **修复类型**: 安全漏洞 + 代码质量 + 隐藏Bug
-**影响文件**: [dist/app.js](dist/app.js), [main.py](main.py)
+**影响文件**: 待补充
+**Commit**: 待补充
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）
 
 ---
 
-#### 🚨 高危漏洞修复
-
-##### 1. XSS跨站脚本攻击漏洞 (3处) (🚨 P0-致命/🔒安全)
+##### 1. 🔒 安全漏洞修复 + 代码质量提升 (✨功能增强)
 
 **问题描述**:
-- **现象**: 视频URL和图片URL直接插入到innerHTML中，使用内联事件处理器
-- **根因**: handleVideoError()/retryVideoLoad()/showImagePreview()三处函数未对URL转义
-- **影响范围**: 所有使用视频/图片预览功能的用户，攻击者可注入任意JavaScript代码
+- **现象**: 🔒 安全漏洞修复 + 代码质量提升
+- **根因**: 详见历史提交记录
+- **影响范围**: 待补充
 
 **修复方案**:
-- **技术实现**: 移除所有内联事件处理器，改用addEventListener + data-*属性传递参数
-- **关键代码**:
-  ``javascript
-  // ❌ 修复前：直接拼接URL到onclick属性
-  const errorMsg = `<div onclick="retryVideoLoad(this, '', )">...</div>`;
-
-  // ✅ 修复后：使用data-*属性 + addEventListener
-  const safeUrl = escapeAttr(url);
-  const errorMsg = `<div data-video-url="" data-is-preview="">...</div>`;
-  errorDiv.addEventListener('click', function() {
-      retryVideoLoad(this, this.dataset.videoUrl, this.dataset.isPreview === 'true');
-  });
-  ``
-- **参考位置**: [dist/app.js#L467-L507](dist/app.js#L467)
+- **技术实现**: 🔒 安全漏洞修复 + 代码质量提升
+- **参考位置**: 历史版本记录
 
 **测试验证**:
-- ✅ XSS注入测试 → `<script>alert('xss')</script>` 被转义为纯文本 ✅
-- ✅ URL协议验证 → `javascript:alert(1)` 被isValidUrl()拒绝 ✅
-- ✅ 事件处理器测试 → 无内联onclick/onerror残留 ✅
-
----
-
-##### 2. 命令注入漏洞 (2处) (🚨 P0-致命/🔒安全)
-
-**问题描述**:
-- **现象**: 进程名称直接拼接到shell命令字符串中
-- **根因**: kill_process_by_name()/check_process_running()使用shell=True+字符串拼接
-- **影响范围**: 攻击者可通过传入恶意进程名执行任意系统命令
-
-**修复方案**:
-- **技术实现**: 正则白名单验证 + 移除shell=True + 列表参数传参
-- **关键代码**:
-  ``python
-  # ❌ 修复前：shell=True + 字符串拼接
-  subprocess.run(f'taskkill /F /IM {process_name}', shell=True)
-
-  # ✅ 修复后：列表参数 + 输入验证
-  if not re.match(r'^[a-zA-Z0-9._-]+$', str(process_name)):
-      return False
-  subprocess.run(['taskkill', '/F', '/IM', str(process_name)], capture_output=True, timeout=5)
-  ``
-- **参考位置**: [main.py#L1710-L1730](main.py#L1710)
-
-**测试验证**:
-- ✅ 恶意进程名 `;rm -rf /` → 正则验证拒绝 ✅
-- ✅ 正常进程名 `python.exe` → 正常执行 ✅
-- ✅ shell=True残留扫描 → 0处残留 ✅
-``
-
+- ✅ 版本 v3.8.89.15 已发布并验证
 ### 简略格式 (仅用于skill.md版本摘要)
 
 > skill.md 中的版本历史摘要区可以使用**略微精简**的格式，但仍需包含核心技术细节：
