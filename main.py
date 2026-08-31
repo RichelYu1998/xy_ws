@@ -8829,8 +8829,6 @@ if __name__ == '__main__':
                         current_change = None
                         current_block_type = None
                         continue
-                    if stripped.startswith('## ') and in_changelog and current_entry:
-                        break
                     title_match = re.match(r'^####\s+更新内容:\s*(.*)', stripped)
                     if title_match and current_entry:
                         current_entry['title'] = title_match.group(1).strip()

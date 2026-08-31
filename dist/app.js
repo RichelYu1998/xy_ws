@@ -1074,43 +1074,50 @@
                         var verCard = document.createElement('div');
                         verCard.style.cssText = 'margin-bottom: 15px; border-left: 3px solid #67c23a; padding-left: 12px;';
 
-                        if (latest.items && latest.items.length) {
-                            latest.items.forEach(function(item, idx) {
+                        var changes = latest.changes || latest.items || [];
+                        if (changes && changes.length) {
+                            changes.forEach(function(item, idx) {
                                 try {
                                     var itemDiv = document.createElement('div');
-                                    itemDiv.style.cssText = 'margin-bottom: 12px;';
+                                    itemDiv.style.cssText = 'margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px dashed #ebeef5;';
 
-                                    if (item.type === 'section') {
-                                        var sectionTitle = document.createElement('div');
-                                        sectionTitle.style.cssText = 'font-weight: 700; color: #303133; font-size: 15px; margin-bottom: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px;';
-                                        sectionTitle.innerHTML = '<i class="fa fa-bookmark" style="color: #409EFF; margin-right: 6px;"></i>' + escapeHtml(item.title || '');
-                                        itemDiv.appendChild(sectionTitle);
+                                    var itemTitle = document.createElement('div');
+                                    itemTitle.style.cssText = 'font-weight: 600; color: #303133; font-size: 14px; margin-bottom: 8px;';
+                                    itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' +
+                                        escapeHtml(item.title || '') +
+                                        (item.tag ? ' <span style="color:#409EFF;font-size:12px;background:#ecf5ff;padding:2px 6px;border-radius:3px;">' + escapeHtml(item.tag) + '</span>' : '');
+                                    itemDiv.appendChild(itemTitle);
 
-                                        if (item.content && item.content.trim()) {
-                                            var contentDiv = document.createElement('div');
-                                            contentDiv.style.cssText = 'padding: 10px 16px; color: #606266; font-size: 13px; line-height: 1.9; background: #fafafa; border-radius: 4px;';
-                                            contentDiv.innerText = item.content;
-                                            itemDiv.appendChild(contentDiv);
-                                        }
-                                    } else {
-                                        var itemTitle = document.createElement('div');
-                                        itemTitle.style.cssText = 'font-weight: 600; color: #303133; font-size: 14px;';
-                                        itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' +
-                                            escapeHtml(item.title || '') +
-                                            (item.desc ? ' <span style="color:#606266;font-size:13px;"> - ' + escapeHtml(item.desc) + '</span>' : '');
-                                        itemDiv.appendChild(itemTitle);
+                                    if (item.problem && Object.keys(item.problem).length) {
+                                        var probDiv = document.createElement('div');
+                                        probDiv.style.cssText = 'padding: 8px 12px; background: #fef0f0; border-radius: 4px; margin-bottom: 6px; font-size: 13px; color: #606266; line-height: 1.7;';
+                                        var probHtml = '<div style="font-weight:600;color:#f56c6c;margin-bottom:4px;"><i class="fa fa-exclamation-triangle"></i> 问题描述</div>';
+                                        if (item.problem.phenomenon) probHtml += '<div><b>现象:</b> ' + escapeHtml(item.problem.phenomenon) + '</div>';
+                                        if (item.problem.root_cause) probHtml += '<div><b>根因:</b> ' + escapeHtml(item.problem.root_cause) + '</div>';
+                                        if (item.problem.scope) probHtml += '<div><b>影响范围:</b> ' + escapeHtml(item.problem.scope) + '</div>';
+                                        probDiv.innerHTML = probHtml;
+                                        itemDiv.appendChild(probDiv);
                                     }
 
-                                    if (item.sub_items && item.sub_items.length) {
-                                        var subList = document.createElement('ul');
-                                        subList.style.cssText = 'list-style:none;padding:8px 16px;margin:4px 0 0 0';
-                                        item.sub_items.forEach(function(sub) {
-                                            var subLi = document.createElement('li');
-                                            subLi.style.cssText = 'font-size:13px;color:#606266;line-height:1.8;padding-left:16px;margin-bottom:4px;position:relative';
-                                            subLi.innerHTML = '<span style="position:absolute;left:0;color:#409EF">•</span><span>' + (sub || '') + '</span>';
-                                            subList.appendChild(subLi);
+                                    if (item.solution && Object.keys(item.solution).length) {
+                                        var solDiv = document.createElement('div');
+                                        solDiv.style.cssText = 'padding: 8px 12px; background: #f0f9ff; border-radius: 4px; margin-bottom: 6px; font-size: 13px; color: #606266; line-height: 1.7;';
+                                        var solHtml = '<div style="font-weight:600;color:#409EFF;margin-bottom:4px;"><i class="fa fa-wrench"></i> 修复方案</div>';
+                                        if (item.solution.implementation) solHtml += '<div><b>技术实现:</b> ' + escapeHtml(item.solution.implementation) + '</div>';
+                                        if (item.solution.reference) solHtml += '<div><b>参考位置:</b> ' + escapeHtml(item.solution.reference) + '</div>';
+                                        solDiv.innerHTML = solHtml;
+                                        itemDiv.appendChild(solDiv);
+                                    }
+
+                                    if (item.verification && item.verification.length) {
+                                        var verList = document.createElement('div');
+                                        verList.style.cssText = 'padding: 8px 12px; background: #f0f9eb; border-radius: 4px; font-size: 13px; color: #606266; line-height: 1.7;';
+                                        var verHtml = '<div style="font-weight:600;color:#67c23a;margin-bottom:4px;"><i class="fa fa-check-square"></i> 测试验证</div>';
+                                        item.verification.forEach(function(v) {
+                                            verHtml += '<div style="padding-left:16px;">✅ ' + escapeHtml(v) + '</div>';
                                         });
-                                        itemDiv.appendChild(subList);
+                                        verList.innerHTML = verHtml;
+                                        itemDiv.appendChild(verList);
                                     }
 
                                     verCard.appendChild(itemDiv);
