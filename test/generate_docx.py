@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 文档生成器 - 从skill.md生成skill.docx
 100%动态化实现 - 零硬编码承诺
