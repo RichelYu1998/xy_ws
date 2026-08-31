@@ -8893,9 +8893,9 @@ if __name__ == '__main__':
                 _debug_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 logger.debug(f'[{_debug_time}] [DEBUG] changelog API 返回: {len(changelog)} 个版本', file=sys.stderr)
                 if changelog:
-                    logger.debug(f'[{_debug_time}] [DEBUG] 最新版本: {changelog[0]["version"]}, 包含 {len(changelog[0]["items"])} 个项目', file=sys.stderr)
-                    for idx, item in enumerate(changelog[0]['items']):
-                        logger.debug(f'[{_debug_time}] [DEBUG]   项目{idx}: type={item.get("type")}, title={str(item.get("title", ""))[:50]}', file=sys.stderr)
+                    logger.debug(f'[{_debug_time}] [DEBUG] 最新版本: {changelog[0]["version"]}, 包含 {len(changelog[0]["changes"])} 个项目', file=sys.stderr)
+                    for idx, item in enumerate(changelog[0]['changes']):
+                        logger.debug(f'[{_debug_time}] [DEBUG]   项目{idx}: tag={item.get("tag")}, title={str(item.get("title", ""))[:50]}', file=sys.stderr)
                 return jsonify(result)
             except Exception as e:  # [HANDLED]
                 _error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
