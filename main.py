@@ -8997,6 +8997,23 @@ if __name__ == '__main__':
                                 })
                     for entry in changelog:
                         if entry['version'] not in readme_versions_used:
+                            if not entry['meta'].get('commit') or entry['meta']['commit'] == '待补充':
+                                entry['meta']['commit'] = '历史版本-无Git记录'
+                            if not entry['meta'].get('affected_files') or entry['meta']['affected_files'] == '待补充':
+                                entry['meta']['affected_files'] = '历史版本-详见README.md'
+                            if not entry['meta'].get('change_stats') or entry['meta']['change_stats'] == '待补充':
+                                entry['meta']['change_stats'] = '历史版本-无统计记录'
+                            if not entry['meta'].get('author') or entry['meta']['author'] == '待补充':
+                                entry['meta']['author'] = '小旭二手机（西园路）'
+                            for ch in entry['changes']:
+                                if ch.get('problem'):
+                                    if not ch['problem'].get('scope') or ch['problem']['scope'] == '待补充':
+                                        ch['problem']['scope'] = '历史版本-详见README.md'
+                                    if not ch['problem'].get('root_cause') or ch['problem']['root_cause'] == '详见历史提交记录':
+                                        ch['problem']['root_cause'] = '历史版本-早期手动记录，无Git提交关联'
+                                if ch.get('solution'):
+                                    if not ch['solution'].get('reference') or ch['solution']['reference'] == '历史版本记录':
+                                        ch['solution']['reference'] = '历史版本-详见README.md对应章节'
                             merged_changelog.append(entry)
                     changelog = merged_changelog
                 except Exception as git_err:  # [HANDLED]
