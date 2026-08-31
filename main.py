@@ -279,15 +279,23 @@ for _stream in (sys.stdout, sys.stderr):
 TIMEOUT_CONFIG = {
     'socket_connect': int(os.environ.get('TIMEOUT_SOCKET_CONNECT', '5')),
     'socket_read': int(os.environ.get('TIMEOUT_SOCKET_READ', '10')),
-    'http_request': int(os.environ.get('TIMEOUT_HTTP_REQUEST', '30')),
+    'http_request': int(os.environ.get('TIMEOUT_HTTP_REQUEST', '10')),
+    'http_request_long': int(os.environ.get('TIMEOUT_HTTP_REQUEST_LONG', '30')),
     'subprocess_kill': int(os.environ.get('TIMEOUT_SUBPROCESS_KILL', '3')),
     'subprocess_wait': int(os.environ.get('TIMEOUT_SUBPROCESS_WAIT', '10')),
-    'browser_page_load': int(os.environ.get('TIMEOUT_BROWSER_PAGE_LOAD', '60')),
-    'browser_element': int(os.environ.get('TIMEOUT_BROWSER_ELEMENT', '30')),
+    'subprocess_run': int(os.environ.get('TIMEOUT_SUBPROCESS_RUN', '30')),
+    'browser_page_load': int(os.environ.get('TIMEOUT_BROWSER_PAGE_LOAD', '30')),
+    'browser_page_load_long': int(os.environ.get('TIMEOUT_BROWSER_PAGE_LOAD_LONG', '60')),
+    'browser_element_click': int(os.environ.get('TIMEOUT_BROWSER_ELEMENT_CLICK', '1')),
+    'browser_element_wait': int(os.environ.get('TIMEOUT_BROWSER_ELEMENT_WAIT', '2')),
+    'browser_network_idle': int(os.environ.get('TIMEOUT_BROWSER_NETWORK_IDLE', '10')),
     'tunnel_startup': int(os.environ.get('TIMEOUT_TUNNEL_STARTUP', '15')),
     'tunnel_heartbeat': int(os.environ.get('TIMEOUT_TUNNEL_HEARTBEAT', '300')),
+    'tunnel_process_wait': int(os.environ.get('TIMEOUT_TUNNEL_PROCESS_WAIT', '2')),
     'email_send': int(os.environ.get('TIMEOUT_EMAIL_SEND', '30')),
     'file_operation': int(os.environ.get('TIMEOUT_FILE_OPERATION', '10')),
+    'thread_join': int(os.environ.get('TIMEOUT_THREAD_JOIN', '10')),
+    'log_init_retry': int(os.environ.get('TIMEOUT_LOG_INIT_RETRY', '3')),
 }
 
 TUNNEL_CONFIG = {
@@ -298,6 +306,49 @@ TUNNEL_CONFIG = {
     'hostc_heartbeat_interval': int(os.environ.get('HOSTC_HEARTBEAT_INTERVAL', '30')),
     'url_verify_timeout': int(os.environ.get('URL_VERIFY_TIMEOUT', '10')),
     'url_verify_max_retries': int(os.environ.get('URL_VERIFY_MAX_RETRIES', '3')),
+}
+
+RETRY_CONFIG = {
+    'default_max_retries': int(os.environ.get('RETRY_DEFAULT_MAX_RETRIES', '3')),
+    'excel_max_retries': int(os.environ.get('RETRY_EXCEL_MAX_RETRIES', '3')),
+    'excel_retry_delay': float(os.environ.get('RETRY_EXCEL_RETRY_DELAY', '0.5')),
+    'url_validation_max_retries': int(os.environ.get('RETRY_URL_VALIDATION_MAX_RETRIES', '2')),
+    'browser_navigation_max_retries': int(os.environ.get('RETRY_BROWSER_NAVIGATION_MAX_RETRIES', '3')),
+}
+
+SLEEP_CONFIG = {
+    'short': float(os.environ.get('SLEEP_SHORT', '1')),
+    'medium': float(os.environ.get('SLEEP_MEDIUM', '2')),
+    'long': float(os.environ.get('SLEEP_LONG', '3')),
+    'very_long': float(os.environ.get('SLEEP_VERY_LONG', '5')),
+    'tunnel_cf_retry': float(os.environ.get('SLEEP_TUNNEL_CF_RETRY', '60')),
+    'tunnel_startup': float(os.environ.get('SLEEP_TUNNEL_STARTUP', '2')),
+}
+
+NETWORK_CONFIG = {
+    'default_host': os.environ.get('HOST', 'localhost'),
+    'lan_ip_detect_host': os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'),
+    'lan_ip_detect_port': int(os.environ.get('LAN_IP_DETECT_PORT', '80')),
+    'dns_server_primary': os.environ.get('DNS_SERVER_PRIMARY', '8.8.8.8'),
+    'dns_server_secondary': os.environ.get('DNS_SERVER_SECONDARY', '1.1.1.1'),
+    'allowed_ports': list(map(int, os.environ.get('ALLOWED_PORTS', '8888,5000,8080').split(','))),
+    'default_port': int(os.environ.get('WEB_PORT', '8888')),
+}
+
+BROWSER_CONFIG = {
+    'default_timeout': int(os.environ.get('BROWSER_DEFAULT_TIMEOUT', '5')),
+    'element_timeout': int(os.environ.get('BROWSER_ELEMENT_TIMEOUT', '3')),
+    'screenshot_timeout': int(os.environ.get('BROWSER_SCREENSHOT_TIMEOUT', '2')),
+}
+
+SECURITY_CONFIG = {
+    'max_redirects': int(os.environ.get('SECURITY_MAX_REDIRECTS', '3')),
+    'max_response_size': int(os.environ.get('SECURITY_MAX_RESPONSE_SIZE', str(5*1024*1024))),
+    'connect_timeout': int(os.environ.get('SECURITY_CONNECT_TIMEOUT', '5')),
+    'read_timeout': int(os.environ.get('SECURITY_READ_TIMEOUT', '10')),
+    'dns_cache_ttl': int(os.environ.get('SECURITY_DNS_CACHE_TTL', '300')),
+    'error_message_max_length': int(os.environ.get('SECURITY_ERROR_MSG_MAX_LENGTH', '80')),
+    'error_message_long_length': int(os.environ.get('SECURITY_ERROR_MSG_LONG_LENGTH', '200')),
 }
 
 if not hasattr(subprocess, 'CREATE_NO_WINDOW'):
@@ -954,17 +1005,20 @@ def decode_base64_images(images):
     return decoded_images
 
 
-def safe_urlopen(url_or_req, timeout=10, context=None):
+def safe_urlopen(url_or_req, timeout=None, context=None):
     """安全的URL打开函数 - 确保资源正确释放 + SSRF防护
 
     Args:
         url_or_req: urllib.request.Request对象或URL字符串
-        timeout: 超时时间（秒）
+        timeout: 超时时间（秒），默认使用TIMEOUT_CONFIG['http_request']
         context: SSL上下文
 
     Returns:
         tuple: (response对象或None, 错误信息或None)
     """
+    if timeout is None:
+        timeout = TIMEOUT_CONFIG['http_request']
+
     response = None
     try:
 
@@ -979,7 +1033,7 @@ def safe_urlopen(url_or_req, timeout=10, context=None):
             response = urllib.request.urlopen(url_or_req, timeout=timeout)
         return response, None
     except Exception as e:  # [HANDLED]
-        error_msg = f'URL请求失败: {type(e).__name__}: {str(e)[:200]}'
+        error_msg = f'URL请求失败: {type(e).__name__}: {str(e)[:SECURITY_CONFIG["error_message_long_length"]]}'
         if response:
             try:
                 response.close()
@@ -1205,7 +1259,7 @@ class TeeOutput:
             self._init_log_file(log_file_path)
     
     def _init_log_file(self, log_file_path, retry_count=0):
-        max_retries = 3
+        max_retries = TIMEOUT_CONFIG['log_init_retry']
         try:
             log_dir = os.path.dirname(log_file_path)
             if log_dir and not os.path.exists(log_dir):
@@ -2422,7 +2476,7 @@ class Environment:
                 return {'width': min(width, 1920), 'height': min(height - 100, 1080)}
             elif Environment.IS_MAC or Environment.IS_LINUX:
                 try:
-                    result = subprocess.run(['xdpyinfo'], capture_output=True, text=True, timeout=2)
+                    result = subprocess.run(['xdpyinfo'], capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])
                     match = re.search(r'dimensions:\s*(\d+)\s*x\s*(\d+)', result.stdout)
                     if match:
                         return {'width': min(int(match.group(1)), 1920), 'height': min(int(match.group(2)) - 100, 1080)}
@@ -3331,7 +3385,9 @@ class PathManager:
     _cache_expiry_seconds = 60
     
     @staticmethod
-    def _validate_url_accessibility(url, timeout=None, max_retries=2):
+    def _validate_url_accessibility(url, timeout=None, max_retries=None):
+        if max_retries is None:
+            max_retries = RETRY_CONFIG['url_validation_max_retries']
         """验证URL是否可访问（增强版）
         
         改进点：
@@ -3384,7 +3440,7 @@ class PathManager:
                         last_error = f"{method_name}: {error_msg}"
                         
                 except Exception as e:  # [HANDLED]
-                    last_error = f"{method_name} 异常: {str(e)[:80]}"
+                    last_error = f"{method_name} 异常: {str(e)[:SECURITY_CONFIG['error_message_max_length']]}"
             
             # 重试前等待一小段时间
             if attempt < max_retries:
@@ -3430,7 +3486,7 @@ class PathManager:
         except socket.timeout:
             return (False, "连接超时")
         except Exception as e:  # [HANDLED]
-            return (False, str(e)[:80])
+            return (False, str(e)[:SECURITY_CONFIG['error_message_max_length']])
     
     @staticmethod
     def _validate_with_head(url, timeout):
@@ -3453,7 +3509,7 @@ class PathManager:
                 return (True, f"HTTP {e.code}")
             return (False, f"HTTP错误: {e.code}")
         except Exception as e:  # [HANDLED]
-            return (False, str(e)[:80])
+            return (False, str(e)[:SECURITY_CONFIG['error_message_max_length']])
     
     @staticmethod
     def _validate_with_tcp(url, timeout):
@@ -3479,7 +3535,7 @@ class PathManager:
         except socket.timeout:
             return (False, "TCP连接超时")
         except Exception as e:  # [HANDLED]
-            return (False, str(e)[:80])
+            return (False, str(e)[:SECURITY_CONFIG['error_message_max_length']])
         finally:
             if sock is not None:
                 try:
@@ -4431,7 +4487,11 @@ class FileManager:
             return files
 
     @staticmethod
-    def safe_read_excel(excel_file, max_retries=3, retry_delay=0.5):
+    def safe_read_excel(excel_file, max_retries=None, retry_delay=None):
+        if max_retries is None:
+            max_retries = RETRY_CONFIG['excel_max_retries']
+        if retry_delay is None:
+            retry_delay = RETRY_CONFIG['excel_retry_delay']
         """
         安全读取Excel文件，处理Windows共享违规问题
         通过复制到临时文件再读取，确保原文件不被锁定
@@ -4537,9 +4597,9 @@ class WegoScraper:
             )
     
     async def _close_popup_impl(self, page, selector, wait_time):
-        close_button = await page.query_selector(selector, timeout=1000)
+        close_button = await page.query_selector(selector, timeout=TIMEOUT_CONFIG['browser_element_click']*1000)
         if close_button:
-            await close_button.click(timeout=1000)
+            await close_button.click(timeout=TIMEOUT_CONFIG['browser_element_click']*1000)
             logger.debug(f'关闭了弹窗: {selector}')
             await asyncio.sleep(wait_time)
 
@@ -4742,8 +4802,8 @@ class WegoScraper:
         elements_data = []
         for i, element in enumerate(elements):
             try:
-                element_text = await asyncio.wait_for(element.text_content(), timeout=2.0)
-                html_content = await asyncio.wait_for(element.inner_html(), timeout=2.0)
+                element_text = await asyncio.wait_for(element.text_content(), timeout=BROWSER_CONFIG['element_timeout'])
+                html_content = await asyncio.wait_for(element.inner_html(), timeout=BROWSER_CONFIG['element_timeout'])
                 
                 # 尝试获取商品ID - 尝试多种属性
                 element_id = None
@@ -4796,7 +4856,7 @@ class WegoScraper:
 
             for i, future in enumerate(futures):
                 try:
-                    result = future.result(timeout=2)
+                    result = future.result(timeout=BROWSER_CONFIG['element_timeout'])
                     if result:
                         product_key = result['货号'] or result['商品名称']
                         if product_key not in seen_products:
@@ -5092,14 +5152,14 @@ class WegoScraper:
             logger.debug(f'当前系统: {self.get_system_info()}')
             
             # 页面导航重试机制
-            max_retries = 3
+            max_retries = RETRY_CONFIG['browser_navigation_max_retries']
             page_loaded = False
             
             for retry in range(max_retries):
                 goto_start = time.time()
                 try:
                     logger.debug(f'尝试加载页面 (第{retry + 1}/{max_retries}次)...')
-                    await page.goto(target_url, timeout=30000, wait_until='domcontentloaded')
+                    await page.goto(target_url, timeout=TIMEOUT_CONFIG['browser_page_load']*1000, wait_until='domcontentloaded')
                     logger.debug('页面DOM已加载')
                     page_loaded = True
                     break
@@ -5110,7 +5170,7 @@ class WegoScraper:
                         await asyncio.sleep(3)
                     else:
                         logger.debug('所有重试都失败，尝试继续执行...')
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(SLEEP_CONFIG['medium'])
                 logger.debug(f'页面导航耗时: {time.time() - goto_start:.2f}秒')
             
             if not page_loaded:
@@ -6590,7 +6650,7 @@ def update_cookie():
             logger.debug('请稍候，系统会自动处理...')
             
             try:
-                await page.wait_for_load_state('networkidle', timeout=10000)
+                await page.wait_for_load_state('networkidle', timeout=TIMEOUT_CONFIG['browser_network_idle']*1000)
                 logger.debug('页面加载完成')
             except Exception as e:  # [HANDLED]
                 logger.debug(f'页面加载超时，继续获取Cookie: {e}')
@@ -6621,7 +6681,7 @@ def update_cookie():
                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
                     # [IMPLEMENTATION] 待实现的功能逻辑
                 
-                await asyncio.sleep(5)
+                await asyncio.sleep(SLEEP_CONFIG['very_long'])
                 elapsed = int(time.time() - start_time)
                 logger.debug(f'等待登录中... ({elapsed}秒)')
             
@@ -6690,7 +6750,7 @@ def select_pip_mirror(venv_path: str):
     def test_mirror(name, url):
         try:
             start = time.time()
-            urllib.request.urlopen(url, timeout=3)
+            urllib.request.urlopen(url, timeout=TIMEOUT_CONFIG['socket_connect'])
             return round(time.time() - start, 3)
         except Exception as e:  # [HANDLED]
             logger.warning(f'Mirror test failed for {name}: {e}')
@@ -6798,7 +6858,7 @@ def install_playwright_cdn():
         try:
             start = time.time()
             req = urllib.request.Request(test_url, method='HEAD')
-            urllib.request.urlopen(req, timeout=5)
+            urllib.request.urlopen(req, timeout=TIMEOUT_CONFIG['http_request'])
             return round(time.time() - start, 3)
         except urllib.error.HTTPError:
             return round(time.time() - start, 3)
@@ -9377,7 +9437,7 @@ if __name__ == '__main__':
 
                 req = urllib.request.Request(web_url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-heartbeat/1.0')
-                urllib.request.urlopen(req, timeout=3)
+                urllib.request.urlopen(req, timeout=TIMEOUT_CONFIG['socket_connect'])
                 with _tunnel_state_lock:
                     tunnel_last_heartbeat = time.time()
                     tunnel_heartbeat_failed = False
@@ -9434,7 +9494,7 @@ if __name__ == '__main__':
                             logger.debug(f"[Tunnel] ⏳ 宽限期中（{remaining}秒），跳过URL验证")
                     else:
                         try:
-                            url_verified = verify_url(web_url, timeout=10)
+                            url_verified = verify_url(web_url, timeout=TUNNEL_CONFIG['url_verify_timeout'])
                             if url_verified:
                                 is_tunnel_running = True
                                 url_verify_failures = 0
@@ -9805,7 +9865,7 @@ if __name__ == '__main__':
                                         
                                         url_verified = False
                                         try:
-                                            url_verified = verify_url(file_url, timeout=10, verbose=True)
+                                            url_verified = verify_url(file_url, timeout=TUNNEL_CONFIG['url_verify_timeout'], verbose=True)
                                         except Exception as e:  # [HANDLED]
                                             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
                                             # [IMPLEMENTATION] 待实现的功能逻辑
@@ -9834,7 +9894,7 @@ if __name__ == '__main__':
                 read_thread.start()
                 
                 if force_restart:
-                    read_thread.join(timeout=10)
+                    read_thread.join(timeout=TIMEOUT_CONFIG['thread_join'])
                     if tunnel_url:
                         logger.debug(f"[Tunnel] 隧道启动成功: {tunnel_url}")
                         return {'success': True, 'url': tunnel_url, 'message': f'隧道已启动，URL: {tunnel_url}'}
@@ -9880,7 +9940,7 @@ if __name__ == '__main__':
                 if tunnel_process:
                     try:
                         tunnel_process.terminate()
-                        tunnel_process.wait(timeout=2)
+                        tunnel_process.wait(timeout=TIMEOUT_CONFIG['tunnel_process_wait'])
                     except Exception as e:  # [HANDLED]
                         logger.debug(f"Nested exception: {e}")
                         try:
@@ -9939,7 +9999,7 @@ if __name__ == '__main__':
                         verify_fail_count = 0
                         restart_wait_start = None
                         tunnel_need_restart = False
-                        time.sleep(1)
+                        time.sleep(SLEEP_CONFIG['short'])
                         continue
                     
                     verify_fail_count += 1
@@ -10120,7 +10180,7 @@ if __name__ == '__main__':
             try:
                 result = subprocess.run(
                     [cf_binary, "tunnel", "create", tunnel_name],
-                    capture_output=True, text=True, timeout=30
+                    capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_run']
                 )
                 if result.returncode != 0:
                     err_msg = result.stderr.strip() or result.stdout.strip()
@@ -10129,7 +10189,7 @@ if __name__ == '__main__':
                         logger.debug(f"[Cloudflare] ⚠️ Tunnel 已存在，尝试列出获取 ID...")
                         list_result = subprocess.run(
                             [cf_binary, "tunnel", "list"],
-                            capture_output=True, text=True, timeout=30
+                            capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_run']
                         )
                         tunnel_id = None
                         for line in list_result.stdout.split('\n'):
@@ -10163,7 +10223,7 @@ if __name__ == '__main__':
             try:
                 result = subprocess.run(
                     [cf_binary, "tunnel", "route", "dns", tunnel_name, custom_domain],
-                    capture_output=True, text=True, timeout=30
+                    capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_run']
                 )
                 if result.returncode != 0:
                     err_msg = result.stderr.strip() or result.stdout.strip()
@@ -10232,7 +10292,7 @@ ingress:
                     while time.time() - start_time < 15:
                         if cf_process.poll() is not None:
                             break
-                        time.sleep(1)
+                        time.sleep(SLEEP_CONFIG['short'])
 
                     if cf_process.poll() is None:
                         cf_url = named_url
@@ -10356,7 +10416,7 @@ ingress:
                     continue
 
                 try:
-                    url_verified = verify_url(cf_url, timeout=10, verbose=True)
+                    url_verified = verify_url(cf_url, timeout=TUNNEL_CONFIG['url_verify_timeout'], verbose=True)
                 except Exception as e:  # [HANDLED]
                     log_print(f"[CF-Heartbeat] ❌ CF URL 验证异常: {str(e)[:100]}")
                     url_verified = False
@@ -10766,7 +10826,7 @@ ingress:
         # 后台定期清理 temp 目录（每1分钟检查一次，超过3MB立即清理）
         def temp_cleanup_loop():
             while True:
-                time.sleep(60)
+                time.sleep(SLEEP_CONFIG['tunnel_cf_retry'])
                 try:
                     auto_clean_temp_dir()
                     cleanup_rate_limit_store()
@@ -10860,7 +10920,18 @@ class SSRFProtection:
     _HOST = os.environ.get('HOST', 'localhost')
     BLOCKED_HOSTNAMES={_HOST, f'{_HOST}.localdomain', 'ip6-_HOST', 'ip6-loopback', 'metadata'}
 
-    def __init__(self,enabled=True,max_redirects=3,max_response_size=5*1024*1024,connect_timeout=5,read_timeout=10,dns_cache_ttl=300,block_private_ips=True,allow_localhost=False):
+    def __init__(self,enabled=True,max_redirects=None,max_response_size=None,connect_timeout=None,read_timeout=None,dns_cache_ttl=None,block_private_ips=True,allow_localhost=False):
+        if max_redirects is None:
+            max_redirects = SECURITY_CONFIG['max_redirects']
+        if max_response_size is None:
+            max_response_size = SECURITY_CONFIG['max_response_size']
+        if connect_timeout is None:
+            connect_timeout = SECURITY_CONFIG['connect_timeout']
+        if read_timeout is None:
+            read_timeout = SECURITY_CONFIG['read_timeout']
+        if dns_cache_ttl is None:
+            dns_cache_ttl = SECURITY_CONFIG['dns_cache_ttl']
+
         self.enabled=enabled;self.max_redirects=max_redirects;self.max_response_size=max_response_size
         self.connect_timeout=connect_timeout;self.read_timeout=read_timeout;self.dns_cache_ttl=dns_cache_ttl
         self.block_private_ips=block_private_ips;self.allow_localhost=allow_localhost
@@ -11267,7 +11338,7 @@ class DependencyAuditor:
 
     def get_installed_packages(self):
         try:
-            result=subprocess.run([sys.executable,'-m','pip','list','--format=json'],capture_output=True,text=True,timeout=30)
+            result=subprocess.run([sys.executable,'-m','pip','list','--format=json'],capture_output=True,text=True,timeout=TIMEOUT_CONFIG['subprocess_run'])
             packages=json.loads(result.stdout)
             return {pkg['name'].lower():pkg['version'] for pkg in packages}
         except Exception:return {}
