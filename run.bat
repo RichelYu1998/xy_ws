@@ -771,14 +771,9 @@ call "!VENV_PATH!\Scripts\activate.bat"
 
 call :log_blank
 
-call :log [*] 检测文件编码 (BOM)...
-"%VENV_PATH%\Scripts\python.exe" main.py --check-bom
-if errorlevel 1 (
-    call :log [WARNING] 发现 BOM 字符，正在自动修复...
-    "%VENV_PATH%\Scripts\python.exe" main.py --fix-bom
-)
-call :log [OK] 文件编码检查完成
-call :log 正在启动 Web 服务...
+call :log [*] Checking BOM...
+"%VENV_PATH%\Scripts\python.exe" main.py --check-bom >NUL 2>&1
+call :log Starting Web service...
 call :log_blank
 
 if not defined WEB_PORT set "WEB_PORT=8888"
@@ -844,10 +839,30 @@ if not defined PUBLIC_URL (
 )
 
 if not defined LAN_ADDR (
-    for /f "delims=" %%i in ('powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Ethernet*','Wi-Fi*','本地连接*'| Where-Object { $_.IPAddress -notmatch '^169\.254\.' }| Select-Object -First 1 -ExpandProperty IPAddress)" 2^>nul') do (
+    for /f "delims=" %%i in ('powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Ethernet*','Wi-Fi*','本地连接*','WLAN*'| Where-Object { $_.IPAddress -notmatch '^169\.254\.' -and $_.IPAddress -notmatch '^127\.' }| Select-Object -First 1 -ExpandProperty IPAddress)" 2^>nul') do (
         set "LAN_ADDR=http://%%i:!WEB_PORT!"
     )
 )
+
+if not defined LAN_ADDR (
+    for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /i "IPv4"') do (
+        if not "%%a"=="127.0.0.1" if not "%%a"=="169.254.*" (
+            set "LAN_ADDR=http://%%a:!WEB_PORT!"
+            goto :got_lan
+        )
+    )
+)
+:got_lan
+
+if not defined LAN_ADDR (
+    for /f "tokens=14 delims= " %%i in ('ipconfig ^| findstr /i "IPv4" 2^>nul') do (
+        if not "%%i"=="127.0.0.1" (
+            set "LAN_ADDR=http://%%i:!WEB_PORT!"
+            goto :lan_done
+        )
+    )
+)
+:lan_done
 
 call :log_blank_console_only
 call :log_console_only ========================================
@@ -857,6 +872,8 @@ call :log_blank_console_only
 call :log_console_only 本地访问: http://localhost:!WEB_PORT!
 if defined LAN_ADDR (
     call :log_console_only 局域网地址: !LAN_ADDR!
+) else (
+    call :log_console_only 局域网地址: 检测中...
 )
 if defined PUBLIC_URL (
     call :log_console_only 公网访问: !PUBLIC_URL!
@@ -867,6 +884,22 @@ call :log_console_only 详细日志: !WEB_OUTPUT_LOG!
 call :log_blank_console_only
 call :log_console_only 按 Ctrl+C 停止服务，或关闭此窗口
 call :log_blank_console_only
+
+call :log ========================================
+call :log 启动完成！
+call :log ========================================
+call :log 本地访问: http://localhost:!WEB_PORT!
+if defined LAN_ADDR (
+    call :log 局域网地址: !LAN_ADDR!
+) else (
+    call :log 局域网地址: 检测中...
+)
+if defined PUBLIC_URL (
+    call :log 公网访问: !PUBLIC_URL!
+) else (
+    call :log 公网访问: 正在获取隧道URL...
+)
+call :log 详细日志: !WEB_OUTPUT_LOG!
 
 :wait_loop_entry
 set "CHECK_INTERVAL=60"

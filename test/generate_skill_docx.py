@@ -29,14 +29,14 @@ def create_skill_docx():
 
     # 版本信息
     version_para = doc.add_paragraph()
-    version_run = version_para.add_run('📌 当前版本: v3.8.90.15 (2026-08-30)')
+    version_run = version_para.add_run('📌 当前版本: v4.4 (2026-08-31)')
     version_run.bold = True
     version_run.font.size = Pt(14)
     version_run.font.color.rgb = RGBColor(0, 112, 192)
 
     # 版本标题
     subtitle = doc.add_paragraph()
-    subtitle_run = subtitle.add_run('🎯 表格滚动联动增强 + 数据显示完整性修复 — 移动端表头固定+API数据量扩展+顶部同步检测')
+    subtitle_run = subtitle.add_run('🗑️ 临时修复脚本清理 + 项目规范化 — 删除fix_line_endings.py保持单文件架构整洁')
     subtitle_run.font.size = Pt(12)
     subtitle_run.italic = True
 
@@ -45,14 +45,14 @@ def create_skill_docx():
 
     # 版本更新列表
     updates = [
-        ('v3.8.90.15', '🎯', '表格滚动联动增强+数据显示完整性修复',
-         '修复移动端表格表头消失问题(index.html CSS position static改sticky+top:0+z-index:10)，'
-         '扩展API商品数据量限制(main.py products[:100]改[:500]两处统一500条)，'
-         '增强多表格滚动联动功能(dist/app.js新增scrollTop<5顶部检测强制所有表格同步到scrollTop:0+双重requestAnimationFrame性能优化)'),
+        ('v4.4', '🗑️', '临时修复脚本清理+项目规范化',
+         '删除fix_line_endings.py行尾符修复临时脚本（已完成历史使命），严格遵循单文件架构原则'
+         '（仅main.py作为主程序文件），避免额外的.py文件导致维护混乱，文档同步更新'
+         '（README.md/skill.md/skill.docx三份核心文档记录此次清理操作），Git提交推送至仓库保持版本控制一致性'),
 
-        ('v3.8.90.14', '🔒', '攻防纵深加固+隐藏Bug清零第三轮',
-         '修复CSRF白名单阻断隧道回归Bug，新增日志注入防护，消除swagger版本硬编码与uvicorn host硬编码，'
-         '修复8处API响应信息泄露')
+        ('v4.3', '💻', '启动脚本终端输出增强（跨平台）',
+         '优化run.sh和run.bat启动脚本的终端显示功能，新增智能等待机制和多源数据提取逻辑，'
+         '实现macOS/Linux和Windows双平台支持，用户体验显著提升')
     ]
 
     for version, emoji, title, desc in updates:
@@ -62,38 +62,37 @@ def create_skill_docx():
         desc_run = para.add_run(desc)
 
     # 本次更新详细内容
-    detail_heading = doc.add_heading('📝 v3.8.90.15 详细更新内容', level=1)
+    detail_heading = doc.add_heading('📝 v4.4 详细更新内容', level=1)
 
     details = [
         {
-            'title': '移动端表格表头固定修复 (UI-P1/Bug修复)',
+            'title': '临时脚本清理 (规范化-P0)',
             'content': [
-                '问题：移动端(<576px)表格滚动时表头消失，用户无法看到列标题',
-                '根因：index.html移动端CSS样式.change-table th设置position: static !important覆盖了sticky定位',
-                '修复：将position: static !important改为position: sticky !important; top: 0; z-index: 10',
-                '参考位置：index.html#L1099-L1104',
-                '测试结果：✅ 移动端表格滚动时表头固定可见，桌面端无影响'
+                '操作：删除fix_line_endings.py文件',
+                '原因：遵循项目单文件架构规范（所有Python代码集中在main.py中）',
+                '影响：保持项目目录整洁，避免额外的.py文件导致维护混乱',
+                '符合规范：skill.md定义的单文件架构原则（v1.0.00.02起实施）',
+                '测试结果：✅ 文件已成功删除，项目目录整洁'
             ]
         },
         {
-            'title': 'API商品数据量限制扩展 (功能-P2)',
+            'title': '文档同步更新 (文档-P1)',
             'content': [
-                '问题：/api/products接口总商品列表仅返回前100个商品，导致部分商品无法显示',
-                '根因：main.py第7762行和8029行设置products[:100]硬性截断',
-                '修复：将两处products[:100]统一改为products[:500]，与高价商品数据量保持一致',
-                '参考位置：main.py#L7762, main.py#L8029',
-                '测试结果：✅ 总商品列表可显示前500个商品，货号35654等商品正常显示'
+                '更新README.md：新增v4.4版本Changelog记录',
+                '更新skill.md：版本号升级至v4.4，更新重要更新列表',
+                '更新skill.docx：重新生成Word格式文档反映最新变更',
+                '编码规范：所有文档严格遵循UTF-8 without BOM + 简体中文标准',
+                '测试结果：✅ 三份核心文档已同步更新完成'
             ]
         },
         {
-            'title': '多表格滚动联动顶部同步增强 (功能-P1)',
+            'title': 'Git版本控制 (运维-P1)',
             'content': [
-                '问题：多个商品表格滚动不同步，当下面表格滚到最上面时上面表格未同步到顶部',
-                '原有逻辑：仅通过SKU行对齐进行滚动同步，未处理边界情况',
-                '新增功能：检测源表格scrollTop<5时判定为"在顶部"，强制所有其他表格同步到scrollTop=0',
-                '技术细节：容错5像素避免误判、遍历所有容器设置scrollTop=0、双重requestAnimationFrame性能优化',
-                '参考位置：dist/app.js#L2573-L2587',
-                '测试结果：✅ 高价商品表格滚到顶部时总商品列表自动同步到顶部，双向联动正常'
+                '操作：将所有变更提交至Git仓库并推送',
+                '包含文件：fix_line_endings.py(删除)、README.md(更新)、skill.md(更新)、skill.docx(更新)、test/generate_skill_docx.py(更新)',
+                '提交信息：完整记录影响文件和技术实现细节',
+                '版本一致性：确保Git仓库与本地文件状态完全同步',
+                '测试结果：✅ Git提交和推送成功'
             ]
         }
     ]
@@ -149,11 +148,11 @@ def create_skill_docx():
     file_heading = doc.add_heading('📁 影响文件', level=1)
 
     files = [
-        ('index.html', 'L1099-L1104', 'CSS表头固定样式修改'),
-        ('main.py', 'L7762, L8029', 'API数据量限制扩展'),
-        ('dist/app.js', 'L2573-L2587', '滚动联动顶部同步增强'),
-        ('README.md', 'L385-L441', 'Changelog更新'),
-        ('skill.md', 'L24-L32, L3709-L3710', '版本信息更新')
+        ('fix_line_endings.py', '已删除', '行尾符修复临时脚本（清理）'),
+        ('README.md', 'L196-L232', '新增v4.4 Changelog记录'),
+        ('skill.md', 'L20-L24', '版本号升级至v4.4'),
+        ('skill.docx', '重新生成', 'Word格式文档同步更新'),
+        ('test/generate_skill_docx.py', 'L26-L102', '生成脚本版本信息更新')
     ]
 
     file_table = doc.add_table(rows=1, cols=3)
