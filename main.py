@@ -8792,15 +8792,10 @@ if __name__ == '__main__':
                     content = f.read()
                 lines = content.split('\n')
                 changelog = []
-                current_version = None
-                current_date = None
-                current_items = []
-                current_item = None
-                current_section = None
-                current_sub_section = None
-                current_block = None
+                current_entry = None
+                current_change = None
+                current_block_type = None
                 in_changelog = False
-                in_code_block = False
                 for line in lines:
                     if '最新更新' in line.strip() and line.strip().startswith('##'):
                         in_changelog = True
@@ -8820,167 +8815,80 @@ if __name__ == '__main__':
                         if m_no_date:
                             version_match = type('VM', (), {'group': lambda self, n: m_no_date.group(n) if n <= m_no_date.lastindex else ''})()
                     if version_match:
-                        if current_version:
-                            if current_block:
-                                if current_sub_section:
-                                    current_sub_section['blocks'].append(current_block)
-                                    current_sub_section = None
-                                current_section['sub_sections'].append(current_sub_section) if current_sub_section else None
-                                current_items.append(current_section)
-                            elif current_sub_section:
-                                current_items.append(current_sub_section)
-                            elif current_section:
-                                current_items.append(current_section)
-                            elif current_item:
-                                current_items.append(current_item)
-                            changelog.append({
-                                'version': current_version,
-                                'date': current_date,
-                                'items': current_items
-                            })
-                        current_version = version_match.group(1)
-                        current_date = version_match.group(2)
-                        current_items = []
-                        current_item = None
-                        current_section = None
-                        current_sub_section = None
-                        current_block = None
-                        in_code_block = False
-                        continue
-                    if stripped.startswith('## ') and in_changelog and current_version:
-                        break
-                    if stripped.startswith('```'):
-                        in_code_block = not in_code_block
-                        if current_block:
-                            current_block['content'] += line + '\n'
-                        elif current_section:
-                            current_section['content'] += line + '\n'
-                        continue
-                    sub_section_match = re.match(r'^#####\s+(.+?)\s*\((.+?)\)$', stripped)
-                    if sub_section_match and current_version:
-                        if current_block:
-                            if current_sub_section:
-                                current_sub_section['blocks'].append(current_block)
-                            else:
-                                if current_section:
-                                    current_section['sub_sections'] = current_section.get('sub_sections', [])
-                                    current_sub_section = {'type': 'sub_section', 'title': sub_section_match.group(1).strip(), 'tag': sub_section_match.group(2).strip(), 'blocks': []}
-                                    current_section['sub_sections'].append(current_sub_section)
-                                else:
-                                    current_sub_section = {'type': 'sub_section', 'title': sub_section_match.group(1).strip(), 'tag': sub_section_match.group(2).strip(), 'blocks': []}
-                                    current_items.append(current_sub_section)
-                            current_block = None
-                        elif current_sub_section:
-                            current_items.append(current_sub_section)
-                            current_sub_section = {'type': 'sub_section', 'title': sub_section_match.group(1).strip(), 'tag': sub_section_match.group(2).strip(), 'blocks': []}
-                            if current_section:
-                                current_section['sub_sections'] = current_section.get('sub_sections', [])
-                                current_section['sub_sections'].append(current_sub_section)
-                            else:
-                                current_items.append(current_sub_section)
-                        else:
-                            current_sub_section = {'type': 'sub_section', 'title': sub_section_match.group(1).strip(), 'tag': sub_section_match.group(2).strip(), 'blocks': []}
-                            if current_section:
-                                current_section['sub_sections'] = current_section.get('sub_sections', [])
-                                current_section['sub_sections'].append(current_sub_section)
-                            else:
-                                current_items.append(current_sub_section)
-                        current_block = None
-                        continue
-                    block_header_match = re.match(r'^\*\*(.+?)\*\*:\s*$', stripped)
-                    if block_header_match and (current_sub_section or current_section):
-                        block_title = block_header_match.group(1)
-                        if block_title in ['问题描述', '修复方案', '测试验证']:
-                            if current_block:
-                                if current_sub_section:
-                                    current_sub_section['blocks'].append(current_block)
-                                elif current_section:
-                                    current_section['blocks'] = current_section.get('blocks', [])
-                                    current_section['blocks'].append(current_block)
-                            current_block = {'type': 'block', 'title': block_title, 'items': [], 'content': ''}
-                        continue
-                    section_match = re.match(r'^####\s+(.+)$', stripped)
-                    if section_match and current_version:
-                        if current_block:
-                            if current_sub_section:
-                                current_sub_section['blocks'].append(current_block)
-                                current_sub_section = None
-                            current_items.append(current_section) if current_section else None
-                            current_section = None
-                        elif current_sub_section:
-                            current_items.append(current_sub_section)
-                            current_sub_section = None
-                        elif current_section:
-                            current_items.append(current_section)
-                        elif current_item:
-                            current_items.append(current_item)
-                            current_item = None
-                        current_section = {
-                            'type': 'section',
-                            'title': section_match.group(1).strip(),
-                            'content': '',
-                            'sub_items': [],
-                            'sub_sections': [],
-                            'blocks': []
+                        if current_entry:
+                            if current_change:
+                                current_entry['changes'].append(current_change)
+                            changelog.append(current_entry)
+                        current_entry = {
+                            'version': version_match.group(1),
+                            'date': version_match.group(2),
+                            'title': '',
+                            'meta': {},
+                            'changes': []
                         }
-                        current_block = None
+                        current_change = None
+                        current_block_type = None
+                        continue
+                    if stripped.startswith('## ') and in_changelog and current_entry:
+                        break
+                    title_match = re.match(r'^####\s+更新内容:\s*(.*)', stripped)
+                    if title_match and current_entry:
+                        current_entry['title'] = title_match.group(1).strip()
+                        continue
+                    meta_match = re.match(r'^\*\*(.+?)\*\*:\s*(.*)', stripped)
+                    if meta_match and current_entry and not current_change:
+                        meta_key = meta_match.group(1).strip()
+                        meta_value = meta_match.group(2).strip()
+                        key_map = {
+                            '修复日期': 'fix_date',
+                            '修复类型': 'fix_type',
+                            '影响文件': 'affected_files',
+                            'Commit': 'commit',
+                            '变更统计': 'change_stats',
+                            '作者': 'author'
+                        }
+                        if meta_key in key_map:
+                            current_entry['meta'][key_map[meta_key]] = meta_value
+                        continue
+                    change_match = re.match(r'^#####\s+(\d+)\.\s*(.+?)\s*\((.+?)\)$', stripped)
+                    if change_match and current_entry:
+                        if current_change:
+                            current_entry['changes'].append(current_change)
+                        current_change = {
+                            'id': change_match.group(1),
+                            'title': change_match.group(2).strip(),
+                            'tag': change_match.group(3).strip(),
+                            'problem': {},
+                            'solution': {},
+                            'verification': []
+                        }
+                        current_block_type = None
+                        continue
+                    block_header_match = re.match(r'^\*\*(问题描述|修复方案|测试验证)\*\*:\s*$', stripped)
+                    if block_header_match and current_change:
+                        current_block_type = block_header_match.group(1)
                         continue
                     item_match = re.match(r'^-\s+\*\*(.+?)\*\*\s*[-–:]?\s*(.*)', stripped)
-                    if item_match and current_version:
-                        if current_block:
-                            current_block['items'].append({'type': 'item', 'title': item_match.group(1), 'desc': item_match.group(2).strip(), 'sub_items': []})
-                            continue
-                        if current_sub_section:
-                            current_sub_section.setdefault('items', []).append({'type': 'item', 'title': item_match.group(1), 'desc': item_match.group(2).strip(), 'sub_items': []})
-                            continue
-                        if current_section:
-                            current_items.append(current_section)
-                            current_section = None
-                        elif current_item:
-                            current_items.append(current_item)
-                        current_item = {
-                            'type': 'item',
-                            'title': item_match.group(1),
-                            'desc': item_match.group(2).strip(),
-                            'sub_items': []
-                        }
+                    if item_match and current_change and current_block_type:
+                        item_title = item_match.group(1).strip()
+                        item_desc = item_match.group(2).strip()
+                        if current_block_type == '问题描述':
+                            key_map = {'现象': 'phenomenon', '根因': 'root_cause', '影响范围': 'scope'}
+                            if item_title in key_map:
+                                current_change['problem'][key_map[item_title]] = item_desc
+                        elif current_block_type == '修复方案':
+                            key_map = {'技术实现': 'implementation', '参考位置': 'reference'}
+                            if item_title in key_map:
+                                current_change['solution'][key_map[item_title]] = item_desc
                         continue
-                    sub_match = re.match(r'^-\s+(.*)', stripped)
-                    if sub_match and (current_item or current_section or current_block):
-                        is_indented = line.startswith('  ') or line.startswith('\t')
-                        if current_block:
-                            current_block['items'][-1]['sub_items'].append(sub_match.group(1).strip()) if current_block['items'] else None
-                        elif current_item and is_indented:
-                            current_item['sub_items'].append(sub_match.group(1).strip())
-                        elif current_section:
-                            current_section['sub_items'].append(sub_match.group(1).strip())
+                    verification_match = re.match(r'^-\s*(✅|❌|⚠️)?\s*(.*)', stripped)
+                    if verification_match and current_change and current_block_type == '测试验证':
+                        current_change['verification'].append(verification_match.group(2).strip())
                         continue
-                    if current_block:
-                        if in_code_block or stripped:
-                            current_block['content'] += line + '\n'
-                    elif current_section:
-                        if in_code_block:
-                            current_section['content'] += line + '\n'
-                        elif stripped and not stripped.startswith('---'):
-                            current_section['content'] += line + '\n'
-                if current_block:
-                    if current_sub_section:
-                        current_sub_section['blocks'].append(current_block)
-                    elif current_section:
-                        current_section['blocks'] = current_section.get('blocks', [])
-                        current_section['blocks'].append(current_block)
-                if current_sub_section:
-                    current_items.append(current_sub_section)
-                elif current_section:
-                    current_items.append(current_section)
-                elif current_item:
-                    current_items.append(current_item)
-                if current_version:
-                    changelog.append({
-                        'version': current_version,
-                        'date': current_date,
-                        'items': current_items
-                    })
+                if current_entry:
+                    if current_change:
+                        current_entry['changes'].append(current_change)
+                    changelog.append(current_entry)
                 result = {'success': True, 'changelog': changelog}
                 _debug_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 logger.debug(f'[{_debug_time}] [DEBUG] changelog API 返回: {len(changelog)} 个版本', file=sys.stderr)
