@@ -363,6 +363,234 @@ API_DOCS.md              ❌ 禁止！应该合并后删除
 
 ---
 
+## 🔴 DOC-CORE-002: 详细技术文档格式范式 (Detailed Technical Documentation Format)
+
+> **创建日期**: 2026-08-31 | **优先级**: 🔴 P0 强制规范 | **适用范围**: README.md + skill.md 所有版本更新记录
+
+### 范式描述
+
+定义项目中所有版本更新记录（Changelog）的**标准化详细格式**，确保每个版本更新都包含完整的技术细节、问题描述、修复方案和验证结果，而非简单的一句话摘要。
+
+### 核心原则
+
+1. **禁止简略摘要**: ❌ 不允许仅用一句话描述版本更新（如 `v5.0.4: 从Git恢复README.md`）
+2. **强制详细记录**: ✅ 每个版本更新必须包含完整的技术实现细节
+3. **结构化格式**: ✅ 使用统一的标准模板，确保信息完整性和可检索性
+4. **双向同步**: ✅ README.md 和 skill.md 必须同步更新，格式保持一致
+
+### 标准模板 (Standard Template)
+
+``markdown
+### vX.X.XX.XX (YYYY-MM-DD) - 🎯 版本标题 — 一句话概述
+
+#### 更新内容: 详细描述本次更新的主要目标和解决的问题
+
+**修复日期**: YYYY-MM-DD
+**修复类型**: 安全漏洞 / Bug修复 / 功能增强 / 架构优化 / 文档更新 / 性能优化
+**影响文件**: [file1.py](file1.py), [file2.js](file2.js), [file3.md](file3.md)
+**Commit**: xxxxxxxx (完整commit hash)
+**变更统计**: X个文件修改, +XXX行新增, -XXX行删除
+**作者**: 作者名称 <email>
+
+---
+
+##### 1. 功能/问题名称 (优先级/分类标签)
+
+**问题描述**:
+- **现象**: 用户遇到的具体问题表现或功能需求描述
+- **根因**: 技术层面的根本原因分析（代码位置、逻辑错误、设计缺陷等）
+- **影响范围**: 受影响的用户群体、功能模块、数据范围、运行环境
+
+**修复方案**:
+- **技术实现**: 具体的代码修改方案和实现细节
+- **关键代码**: 核心代码片段或配置变更（修复前❌ vs 修复后✅）
+- **参考位置**: [filename#L行号](filename#L行号)
+
+**测试验证**:
+- ✅ 测试场景1 → 预期结果 ✅ (测试环境和方法)
+- ✅ 测试场景2 → 预期结果 ✅ (预期结果和实际结果对比)
+- ❌ 测试场景3 → 已知限制 ⚠️ (说明原因和规避方法)
+
+---
+
+##### 2. 第二个修复项/功能项 (优先级/分类标签)
+
+**问题描述**:
+- **现象**: ...
+- **根因**: ...
+- **影响范围**: ...
+
+**修复方案**:
+- **技术实现**: ...
+- **关键代码**: ...
+- **参考位置**: ...
+
+**测试验证**:
+- ✅ ...
+
+---
+
+**验证结果汇总**:
+| 测试项 | 预期结果 | 实际结果 | 状态 |
+|--------|---------|---------|------|
+| 测试项1 | 预期1 | 实际1 | ✅ |
+| 测试项2 | 预期2 | 实际2 | ✅ |
+| 测试项3 | 预期3 | 实际3 | ⚠️ |
+
+**注意事项/后续建议**:
+- ⚠️ 注意事项说明（兼容性、部署要求、已知限制等）
+- 📌 后续优化方向（技术债务、性能提升、功能扩展等）
+- 🔗 关联版本/Issue引用
+``
+
+### 字段详细说明
+
+| 字段 | 必填 | 说明 | 示例 |
+|------|------|------|------|
+| **版本标题** | ✅ | 格式: `vX.X.XX.XX (YYYY-MM-DD) - 🎯标题 — 概述` | `v3.8.89.15 (2026-08-09) - 🔒 安全漏洞修复 + 代码质量提升` |
+| **更新内容** | ✅ | 一段话详细描述更新目标和解决的问题 | `全面修复项目中的安全漏洞和代码质量问题，提升系统安全性` |
+| **修复日期** | ✅ | 实际修复/发布的日期 | `2026-08-11` |
+| **修复类型** | ✅ | 从预设分类中选择 | `安全漏洞 + 代码质量 + 隐藏Bug` |
+| **影响文件** | ✅ | 列出所有修改的文件，使用相对路径链接 | `[main.py](main.py), [dist/app.js](dist/app.js)` |
+| **Commit** | ⭐ | 完整的commit hash | `a1b2c3d4 (a1b2c3d4e5f6...)` |
+| **变更统计** | ⭐ | 文件数、新增行数、删除行数 | `14个文件修改, +900行新增, -1409行删除` |
+| **作者** | ⭐ | Git提交作者信息 | `RichelYu1998 <980187223@qq.com>` |
+| **问题描述** | ✅ | 必须包含现象/根因/影响范围三要素 | 见模板 |
+| **修复方案** | ✅ | 必须包含技术实现/关键代码/参考位置 | 见模板 |
+| **测试验证** | ✅ | 每个修复项必须有对应的验证结果 | `✅ XSS注入测试 → 所有payload被阻截` |
+| **验证结果汇总** | ⭐ | 多项修复时使用表格汇总 | 见模板 |
+| **注意事项** | ⭐ | 兼容性/部署/已知限制/后续优化 | 见模板 |
+
+> ⭐ = 强烈推荐但非强制 | ✅ = 强制必填
+
+### 分类标签体系
+
+| 标签 | 含义 | 适用场景 |
+|------|------|---------|
+| 🚨 P0-致命 | 导致系统崩溃或数据丢失 | 启动失败、数据损坏、安全漏洞 |
+| 🔴 P1-严重 | 核心功能不可用 | API错误、功能失效、性能严重下降 |
+| 🟡 P2-一般 | 非核心功能异常 | UI显示错误、次要功能异常 |
+| 🟢 P3-轻微 | 体验优化或小问题 | 样式调整、文案修改、日志优化 |
+| 🔒 安全 | 安全相关修复 | XSS/CSRF/注入/信息泄露 |
+| ⚡ 性能 | 性能优化 | 响应时间/内存/并发 |
+| 🏗️ 架构 | 架构调整 | 重构/模块化/设计模式 |
+| 📝 文档 | 文档更新 | README/skill.md/注释 |
+
+### 修复类型分类
+
+| 类型 | 图标 | 说明 |
+|------|------|------|
+| 安全漏洞 | 🔒 | XSS/CSRF/注入/路径遍历/信息泄露等 |
+| Bug修复 | 🐛 | 功能异常/崩溃/逻辑错误 |
+| 功能增强 | ✨ | 新功能/新API/新配置项 |
+| 架构优化 | 🏗️ | 重构/模块化/设计模式改进 |
+| 性能优化 | ⚡ | 响应时间/内存/并发/缓存 |
+| 文档更新 | 📝 | README/skill.md/注释/Changelog |
+| 兼容性 | 🔄 | 跨平台/Python版本/浏览器兼容 |
+| 配置管理 | ⚙️ | 环境变量/配置文件/动态参数 |
+
+### 完整示例 (v3.8.89.15 实际案例)
+
+``markdown
+### v3.8.89.15 (2026-08-09) - 🔒 安全漏洞修复 + 代码质量提升
+
+#### 更新内容: 全面修复项目中的安全漏洞和代码质量问题，提升系统安全性
+
+**修复日期**: 2026-08-11
+**修复类型**: 安全漏洞 + 代码质量 + 隐藏Bug
+**影响文件**: [dist/app.js](dist/app.js), [main.py](main.py)
+
+---
+
+#### 🚨 高危漏洞修复
+
+##### 1. XSS跨站脚本攻击漏洞 (3处) (🚨 P0-致命/🔒安全)
+
+**问题描述**:
+- **现象**: 视频URL和图片URL直接插入到innerHTML中，使用内联事件处理器
+- **根因**: handleVideoError()/retryVideoLoad()/showImagePreview()三处函数未对URL转义
+- **影响范围**: 所有使用视频/图片预览功能的用户，攻击者可注入任意JavaScript代码
+
+**修复方案**:
+- **技术实现**: 移除所有内联事件处理器，改用addEventListener + data-*属性传递参数
+- **关键代码**:
+  ``javascript
+  // ❌ 修复前：直接拼接URL到onclick属性
+  const errorMsg = `<div onclick="retryVideoLoad(this, '', )">...</div>`;
+
+  // ✅ 修复后：使用data-*属性 + addEventListener
+  const safeUrl = escapeAttr(url);
+  const errorMsg = `<div data-video-url="" data-is-preview="">...</div>`;
+  errorDiv.addEventListener('click', function() {
+      retryVideoLoad(this, this.dataset.videoUrl, this.dataset.isPreview === 'true');
+  });
+  ``
+- **参考位置**: [dist/app.js#L467-L507](dist/app.js#L467)
+
+**测试验证**:
+- ✅ XSS注入测试 → `<script>alert('xss')</script>` 被转义为纯文本 ✅
+- ✅ URL协议验证 → `javascript:alert(1)` 被isValidUrl()拒绝 ✅
+- ✅ 事件处理器测试 → 无内联onclick/onerror残留 ✅
+
+---
+
+##### 2. 命令注入漏洞 (2处) (🚨 P0-致命/🔒安全)
+
+**问题描述**:
+- **现象**: 进程名称直接拼接到shell命令字符串中
+- **根因**: kill_process_by_name()/check_process_running()使用shell=True+字符串拼接
+- **影响范围**: 攻击者可通过传入恶意进程名执行任意系统命令
+
+**修复方案**:
+- **技术实现**: 正则白名单验证 + 移除shell=True + 列表参数传参
+- **关键代码**:
+  ``python
+  # ❌ 修复前：shell=True + 字符串拼接
+  subprocess.run(f'taskkill /F /IM {process_name}', shell=True)
+
+  # ✅ 修复后：列表参数 + 输入验证
+  if not re.match(r'^[a-zA-Z0-9._-]+$', str(process_name)):
+      return False
+  subprocess.run(['taskkill', '/F', '/IM', str(process_name)], capture_output=True, timeout=5)
+  ``
+- **参考位置**: [main.py#L1710-L1730](main.py#L1710)
+
+**测试验证**:
+- ✅ 恶意进程名 `;rm -rf /` → 正则验证拒绝 ✅
+- ✅ 正常进程名 `python.exe` → 正常执行 ✅
+- ✅ shell=True残留扫描 → 0处残留 ✅
+``
+
+### 简略格式 (仅用于skill.md版本摘要)
+
+> skill.md 中的版本历史摘要区可以使用**略微精简**的格式，但仍需包含核心技术细节：
+
+``markdown
+- **vX.X.XX.XX** (YYYY-MM-DD) 🎯标题 — 详细描述（影响文件: file1, file2; 修复项: N个; 测试: X/X通过）
+``
+
+**示例**:
+``markdown
+- **v3.8.89.15** (2026-08-09) 🔒安全漏洞修复+代码质量提升 — 修复XSS注入3处(handleVideoError/retryVideoLoad/showImagePreview改为addEventListener+data-*属性)+命令注入2处(kill_process_by_name正则白名单+shell=False)+SMTP密码加密(Base64+XOR)+5处裸except改为具体异常; 影响文件: dist/app.js, main.py; 安全测试: 17/17通过(100%)
+``
+
+### 违规后果
+
+- ❌ 使用简略一句话摘要 → **文档审查不通过，必须补充详细技术信息**
+- ❌ 缺少问题描述三要素（现象/根因/影响范围）→ **退回补充**
+- ❌ 缺少测试验证 → **退回补充验证结果**
+- ❌ README.md与skill.md不同步 → **必须同步更新后才能提交**
+
+### 强制执行规则
+
+1. **README.md Changelog区**: 必须使用**完整标准模板**，包含所有详细字段
+2. **skill.md 版本摘要区**: 可使用**略微精简格式**，但必须包含核心技术细节
+3. **新增版本记录时**: 必须同时更新README.md和skill.md
+4. **Git提交信息**: commit message必须包含版本号+简要描述，详细内容在文档中
+5. **代码审查**: 文档完整性是代码审查的必要条件
+
+---
+
 ## 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards)
 
 > **来源**: 原 `.trae/skills/xy-ws-manager/SKILL.md` (已整合至本文件，2026-08-26)
@@ -3793,6 +4021,334 @@ if __name__ == '__main__':
 - [ ] 表格显示正常
 - [ ] 中文字符无乱码
 - [ ] 文档版本号为 v3.8.68
+
+---
+
+## 📋 完整Git提交历史摘要 (按DOC-CORE-002范式精简格式)
+
+> **生成日期**: 2026-08-31 | **总提交数**: 715 | **版本分组数**: 321
+
+- **v0.x** (2026-04-03) ✨功能增强 — 添加了一个excel读取功能，使得东西更加的自动化（影响文件: README.md, config/config.json, config/cookies.json, config/input_stock_numbers.txt, file/output.json 等8个; 提交: 4个; Commit: 9098f55c, 712dab7c, 51b42f7e, 3d81a65f）
+- **v1.0.0** (2026-07-31) 📝文档更新 — docs: 将skill.md补充完整，包含从v1.0.0到v3.8.89.11的所有版本记录（影响文件: skill.md; 提交: 3个; Commit: 44ea2996, 95c784df, 05887975）
+- **v1.0.00.01** (2026-08-11) 🐛Bug修复 — v1.0.00.01 (2026-08-11) - 🔧 UTF-8编码标准化与文档修复（影响文件: README.md, skill.docx, skill.md; 提交: 2个; Commit: 1b285645, b1f81abe）
+- **v1.0.00.02** (2026-08-20) 🏗️架构优化 — v1.0.00.02 (2026-08-20) - 🔙 Git回退到稳定版本 + 项目精简 + 单文件架构确认（影响文件: README.md, skill.docx, skill.md; 提交: 1个; Commit: d2e580c1）
+- **v1.3.1** (2026-04-04) ⚡性能优化 — feat: 新增JSON多余货号对比功能并优化代码结构 (v1.3.1)（影响文件: README.md, file/diff_log_20260404.json, main.py; 提交: 1个; Commit: 3f6897f0）
+- **v1.3.2** (2026-04-04) 🐛Bug修复 — 修复JSON数据解析错误 (v1.3.2)（影响文件: README.md, main.py; 提交: 1个; Commit: 1ce4a953）
+- **v1.3.3** (2026-04-04) ✨功能增强 — 新增对比结果消息到JSON日志 (v1.3.3)（影响文件: README.md, main.py; 提交: 1个; Commit: 6b9c84d0）
+- **v1.3.4** (2026-04-04) ✨功能增强 — 新增数据变化描述和字段说明 (v1.3.4)（影响文件: README.md, main.py; 提交: 1个; Commit: e94d9d2d）
+- **v1.4.0** (2026-04-04) ✨功能增强 — 扩展商品数据字段到20个完整字段 (v1.4.0)（影响文件: README.md, main.py; 提交: 1个; Commit: 676dae22）
+- **v1.4.1** (2026-04-04) ⚡性能优化 — 优化登录等待逻辑，移除手动确认步骤 (v1.4.1)（影响文件: README.md, main.py; 提交: 1个; Commit: b9829c38）
+- **v1.4.2** (2026-04-04) ⚡性能优化 — 优化商品去重逻辑，支持无货号商品 (v1.4.2)（影响文件: README.md, TESTING.md, generate_docx.py, main.py, requirements.txt 等8个; 提交: 7个; Commit: 17d9bd90, aef51c8f, 0d8af799, ed3905e1, 3fc629de, 5d1ff17c, 1b6f820b）
+- **v1.4.3** (2026-04-04) ⚡性能优化 — 优化页面加载逻辑，减少等待时间 (v1.4.3)（影响文件: README.md, main.py; 提交: 1个; Commit: 274e64dc）
+- **v1.5.0** (2026-04-04) ✨功能增强 — 简化JSON数据结构为5个核心字段 (v1.5.0)（影响文件: README.md, main.py; 提交: 1个; Commit: 7ce76703）
+- **v1.6.0** (2026-04-04) ⚡性能优化 — 完成所有高优先级优化 (v1.6.0)（影响文件: OPTIMIZATION_SUMMARY.md, README.md, main.py, run.bat; 提交: 1个; Commit: 949d30e6）
+- **v1.6.1** (2026-04-04) 🐛Bug修复 — 修复滚动死循环问题 (v1.6.1)（影响文件: README.md, main.py; 提交: 1个; Commit: ca547389）
+- **v1.6.2** (2026-04-04) 🐛Bug修复 — 修复页面加载死机问题 (v1.6.2)（影响文件: README.md, main.py; 提交: 1个; Commit: bd53c324）
+- **v1.7.0** (2026-04-04) ⚙️配置管理 — 滚动参数可配置化 (v1.7.0)（影响文件: README.md, config/config.json, main.py; 提交: 1个; Commit: a075f5c8）
+- **v1.8.0** (2026-04-04) ✨功能增强 — 添加运行时间显示和动态调整功能 (v1.8.0)（影响文件: README.md, config/config.json, main.py, run.bat, run.sh; 提交: 1个; Commit: 103ad30b）
+- **v1.9.0** (2026-04-04) ✨功能增强 — 添加高价商品筛选功能 (v1.9.0)（影响文件: README.md, main.py; 提交: 2个; Commit: 04c03259, 5e3e29d3）
+- **v2.0.0** (2026-04-04) ✨功能增强 — 新增货号对比高价商品筛选功能 (v2.0.0)（影响文件: OPTIMIZATION_SUMMARY.md, README.md, TESTING.md, config/cookies.json, file/diff_log_20260404.json 等6个; 提交: 1个; Commit: 8030cb18）
+- **v2.0.1** (2026-04-04) ⚡性能优化 — 优化高价商品筛选逻辑 (v2.0.1)（影响文件: README.md, config/cookies.json, file/diff_log_20260404.json, main.py; 提交: 1个; Commit: 51a49849）
+- **v2.0.2** (2026-04-04) ✨功能增强 — 新增高价商品信息写入JSON功能 (v2.0.2)（影响文件: README.md, file/diff_log_20260404.json, main.py, temp_header.py; 提交: 2个; Commit: b14dfbf8, c05acb32）
+- **v2.0.3** (2026-04-04) ⚡性能优化 — 代码重构和优化 (v2.0.3)（影响文件: README.md, config/cookies.json, file/diff_log_20260404.json, main.py, xy_ws/README.md 等6个; 提交: 3个; Commit: d0854908, 3fa54b78, f4374265）
+- **v2.0.4** (2026-04-06) ⚡性能优化 — v2.0.4: 新增Cookie自动更新功能，优化Excel文件检查（影响文件: CHANGELOG.md, README.md, config/cookies.json, main.py; 提交: 2个; Commit: b2420f6a, 18f951f4）
+- **v2.0.5** (2026-04-06) ✨功能增强 — v2.0.5: 更新Cookie过期时间（影响文件: CHANGELOG.md, README.md; 提交: 2个; Commit: 20eaac27, ef0a3b65）
+- **v2.0.6** (2026-04-07) ⚡性能优化 — v2.0.6: 优化数据变化分析代码，精简逻辑（影响文件: README.md, main.py; 提交: 1个; Commit: 645dcffe）
+- **v2.0.7** (2026-04-07) 🐛Bug修复 — v2.0.7: 优化高价商品筛选，修复浏览器启动（影响文件: README.md, main.py; 提交: 1个; Commit: 668ec838）
+- **v2.0.8** (2026-04-08) 🐛Bug修复 — 修复跨平台浏览器启动问题 (v2.0.8)（影响文件: README.md, config/cookies.json, file/diff_log_20260405.json, main.py; 提交: 1个; Commit: 00e69d75）
+- **v2.0.9** (2026-04-08) ✨功能增强 — 新增当天JSON文件对比功能 (v2.0.9)（影响文件: README.md, config/cookies.json, main.py; 提交: 1个; Commit: 6f3600af）
+- **v2.1.0** (2026-04-08) ✨功能增强 — 新增调试功能 (v2.1.0)（影响文件: README.md, main.py; 提交: 1个; Commit: f77910fb）
+- **v2.1.1** (2026-04-08) 🐛Bug修复 — v2.1.1: 修复跨平台浏览器启动问题，删除调试代码（影响文件: README.md, main.py; 提交: 1个; Commit: 873e4467）
+- **v2.1.2** (2026-04-08) ⚡性能优化 — v2.1.2: 优化JSON文件对比功能，新增缓存文件机制（影响文件: README.md, main.py; 提交: 1个; Commit: db4c9d8d）
+- **v2.1.3** (2026-04-08) ⚡性能优化 — v2.1.3: 优化JSON文件对比记录机制，支持多条对比记录（影响文件: README.md, main.py; 提交: 1个; Commit: 4b5fe7d5）
+- **v2.1.5** (2026-04-08) 🐛Bug修复 — v2.1.5: 修复高价商品筛选逻辑，解决对比结果不准确问题（影响文件: README.md, main.py; 提交: 1个; Commit: 4a7324e8）
+- **v2.1.6** (2026-04-09) 🐛Bug修复 — v2.1.6: 修复弹窗关闭超时问题，添加时间统计优化性能（影响文件: README.md, main.py; 提交: 1个; Commit: b5191c0c）
+- **v2.1.7** (2026-04-09) ✨功能增强 — v2.1.7: 添加多重超时保护和重试机制，防止爬虫卡死（影响文件: README.md, main.py; 提交: 1个; Commit: dd50461b）
+- **v2.1.8** (2026-04-09) ⚡性能优化 — v2.1.8: 优化滚动加载策略，采用激进模式快速加载所有数据（影响文件: README.md, main.py; 提交: 1个; Commit: 96cd68ff）
+- **v2.1.9** (2026-04-09) ⚡性能优化 — v2.1.9: 代码精炼优化，简化逻辑提升可维护性（影响文件: README.md, main.py; 提交: 1个; Commit: a56f5607）
+- **v2.2.0** (2026-04-09) ⚡性能优化 — v2.2.0: 性能优化，提升并发处理能力和元素去重效率（影响文件: README.md, config/config.json, main.py; 提交: 1个; Commit: f167465a）
+- **v2.2.1** (2026-04-11) ✨功能增强 — v2.2.1: 添加自动对比功能，确保每次运行爬虫后都生成小计字段（影响文件: README.md, main.py; 提交: 1个; Commit: af215251）
+- **v2.2.2** (2026-04-11) ✨功能增强 — v2.2.2: Excel对比JSON功能增强，添加小计字段并精炼代码逻辑（影响文件: README.md, main.py; 提交: 1个; Commit: 8cc43a11）
+- **v2.3.0** (2026-04-11) ⚡性能优化 — v2.3.0: 功能整合优化，合并菜单选项并精炼代码逻辑（影响文件: README.md, main.py; 提交: 1个; Commit: 55e6d30c）
+- **v2.3.1** (2026-04-11) ✨功能增强 — v2.3.1: 保留Cookie更新选项，仅支持自动更新功能（影响文件: README.md, main.py; 提交: 1个; Commit: 0f057b6f）
+- **v2.3.2** (2026-04-11) ✨功能增强 — v2.3.2: 新增累计统计功能，添加预计售出价格、设备成本和平台手续费累计（影响文件: README.md, main.py; 提交: 1个; Commit: 4409cc76）
+- **v2.3.3** (2026-04-11) ⚡性能优化 — v2.3.3: 新增设备均价，优化闲鱼平台手续费计算（单机最高60元封顶）（影响文件: README.md, main.py; 提交: 1个; Commit: 8d47b88c）
+- **v2.3.4** (2026-04-11) 🐛Bug修复 — v2.3.4: 新增拿货价提取功能，修复设备成本累计和设备均价为0的问题（影响文件: README.md, main.py; 提交: 1个; Commit: 10a5f192）
+- **v2.3.5** (2026-04-11) ✨功能增强 — v2.3.5: 增强成本价识别，添加智能价格提取逻辑（影响文件: README.md, main.py; 提交: 1个; Commit: 65d133c9）
+- **v2.3.6** (2026-04-11) ✨功能增强 — v2.3.6: 增强HTML内容搜索，完善拿货价提取逻辑（影响文件: README.md, main.py; 提交: 1个; Commit: a82be21e）
+- **v2.4.0** (2026-04-11) ⚡性能优化 — v2.4.0: 简化JSON文件布局，优化价格显示为千分制（影响文件: README.md, main.py; 提交: 1个; Commit: 8b269ab7）
+- **v2.4.1** (2026-04-11) ✨功能增强 — v2.4.1: 新增平均每个设备售出均价统计（影响文件: README.md, main.py; 提交: 1个; Commit: 1cbd0a04）
+- **v2.4.4** (2026-04-11) 🐛Bug修复 — v2.4.4: 修复价格提取错误，支持千分制价格格式（影响文件: README.md, main.py; 提交: 1个; Commit: 3b9e72eb）
+- **v2.4.5** (2026-04-11) 🐛Bug修复 — v2.4.5: 修复备注提取错误，支持无标签备注信息提取（影响文件: README.md, main.py; 提交: 1个; Commit: b9ce6538）
+- **v2.4.6** (2026-04-11) ✨功能增强 — v2.4.6: 完善备注提取功能，提取所有有备注的商品信息（影响文件: README.md, main.py; 提交: 1个; Commit: 55b41f1e）
+- **v2.4.7** (2026-04-11) ⚡性能优化 — v2.4.7: 新增独立Cookie自动更新功能，优化浏览器启动流程关闭（影响文件: README.md, main.py; 提交: 1个; Commit: d689641c）
+- **v2.5.0** (2026-04-11) ⚡性能优化 — v2.5.0: 优化商品信息提取逻辑，精简代码结构（影响文件: README.md, main.py; 提交: 1个; Commit: 70b5ea19）
+- **v2.5.2** (2026-04-11) ✨功能增强 — v2.5.2: 简化Cookie更新流程，参考v2.1.1版本实现（影响文件: README.md, main.py; 提交: 1个; Commit: a070a888）
+- **v2.5.3** (2026-04-11) ⚡性能优化 — v2.5.3: 优化Cookie更新提示信息，明确自动关闭浏览器（影响文件: README.md, main.py; 提交: 1个; Commit: d95da4d6）
+- **v2.5.4** (2026-04-11) ✨功能增强 — v2.5.4: 实现真正的自动关闭浏览器，检测登录后自动关闭（影响文件: README.md, main.py; 提交: 2个; Commit: 4455d188, 68dfd168）
+- **v2.5.5** (2026-04-11) 🗑️清理 — v2.5.5: 移除Cookie更新后的回车确认，简化操作流程（影响文件: README.md, main.py; 提交: 1个; Commit: 9178568d）
+- **v2.5.6** (2026-04-11) ⚡性能优化 — v2.5.6: 优化Cookie更新完成后的延迟，提升响应速度（影响文件: README.md, main.py; 提交: 1个; Commit: 500bbb15）
+- **v2.5.7** (2026-04-11) 🐛Bug修复 — v2.5.7: 修复价格比较错误，解决parse_price返回None的TypeError（影响文件: README.md, main.py; 提交: 1个; Commit: b771f81d）
+- **v2.5.8** (2026-04-11) 🐛Bug修复 — v2.5.8: 修复excel_file为None的错误，解决os.path.exists的TypeError（影响文件: README.md, main.py; 提交: 1个; Commit: c6473ce3）
+- **v2.5.9** (2026-04-11) ⚡性能优化 — v2.5.9: 优化代码逻辑，使用列表推导式简化文件查找代码（影响文件: README.md, main.py; 提交: 1个; Commit: 504e58ac）
+- **v2.5.10** (2026-04-12) 🐛Bug修复 — v2.5.10: 修复导入错误，确保Excel对比功能正常运行（影响文件: README.md, main.py; 提交: 1个; Commit: 2ffec999）
+- **v2.5.12** (2026-04-12) ⚡性能优化 — v2.5.12: 优化系统检测逻辑，统一跨平台浏览器配置（影响文件: README.md, main.py; 提交: 1个; Commit: aeea391f）
+- **v2.5.13** (2026-04-12) ✨功能增强 — v2.5.13: 新增PathManager类，统一管理所有跨系统路径（影响文件: README.md, main.py, xy_ws/README.md; 提交: 2个; Commit: 8d4d518f, e281b5bf）
+- **v2.5.14** (2026-04-12) 🐛Bug修复 — v2.5.14: 修复路径错误，完善PathManager统一管理（影响文件: README.md, main.py; 提交: 1个; Commit: ea34c078）
+- **v2.5.16** (2026-04-12) ⚡性能优化 — v2.5.16 - 优化CookieValidator类，精炼代码逻辑（影响文件: README.md, main.py; 提交: 1个; Commit: d6a2f4da）
+- **v2.5.17** (2026-04-13) ⚡性能优化 — v2.5.17 - 优化拿货价提取性能和代码结构（影响文件: README.md, main.py; 提交: 1个; Commit: 5035f297）
+- **v2.5.18** (2026-04-15) ✨功能增强 — v2.5.18 - 新增环境检测功能（影响文件: README.md, main.py, run.bat, run.sh; 提交: 2个; Commit: 6ff629ba, 82688040）
+- **v2.5.19** (2026-04-15) ⚡性能优化 — v2.5.19: 优化macOS浏览器检测，支持Google Chrome for Testing.app（影响文件: README.md, main.py, run.sh; 提交: 1个; Commit: 607bb74d）
+- **v2.5.20** (2026-04-15) 🐛Bug修复 — v2.5.20: 修复Windows浏览器检测，使用dir+findstr替代通配符（影响文件: README.md, main.py, run.bat; 提交: 1个; Commit: 198be1b5）
+- **v2.5.21** (2026-04-16) 🏗️架构优化 — v2.5.21: 重构数据获取逻辑，直接通过API获取商品数据（影响文件: README.md, config/config.json, config/cookies.json, main.py; 提交: 6个; Commit: ce6fb256, 5e471407, 826604ec, b637d2b5, e5eaaad7, 2d6e2fae）
+- **v2.5.22** (2026-04-19) 🗑️清理 — v2.5.22: 移除闲鱼平台手续费60元封顶限制，改为按单机售价的1.6%计算（影响文件: README.md, main.py; 提交: 1个; Commit: 195d7132）
+- **v2.6.0** (2026-04-28) ✨功能增强 — v2.6.0: 合并server.py到main.py，添加Web服务模式和MySQL支持（影响文件: README.md, config/config.json, config/cookies.json, file/diff_log_20260428.json, index.html 等10个; 提交: 17个; Commit: c260322b, 6024de29, c55fac75, a3cc3d36, 2a1cf7e6, 46c696e2, 49200c06, 13f8167e, 47fdee0f, b51d882e, 5c78382f, 7f9c23f1, 84da87eb, c4c9dede, 9f2cc75a, 05398faf, 660f1d6e）
+- **v2.6.1** (2026-04-28) ⚡性能优化 — v2.6.1: 货号对比卡片样式优化，将API返回结果改为美观的卡片式展示（影响文件: README.md, index.html, main.py; 提交: 2个; Commit: bf140d2d, 1a881f52）
+- **v2.7.0** (2026-04-28) ⚡性能优化 — v2.7.0: 集成文件清理功能，优化代码逻辑（影响文件: README.md, clean_files.log, config/config.json, config/cookies.json, index.html 等7个; 提交: 23个; Commit: 19ab1fda, bfabfac1, 44b013d9, fcdc3151, c390d082, e9ca1d0c, a909525f, e3d4cc72, a9889ee8, c9ef2c37, 540400ab, 129bff16, 4b1be0dc, b5bf887a, 97d12e56, f845ebd3, c4996457, d6598935, deafd042, cb78193a, a3c04df9, c49e3403, 53f82400）
+- **v2.7.1** (2026-04-28) 🐛Bug修复 — v2.7.1 - 修复商品详情页图片加载问题（影响文件: README.md, main.py; 提交: 1个; Commit: fbc48ae1）
+- **v2.7.2** (2026-04-29) 🐛Bug修复 — 更新v2.7.2日志：修复/api/clean/list文件显示格式（影响文件: xy_ws/README.md; 提交: 1个; Commit: 772fc849）
+- **v2.8.0** (2026-04-28) ⚡性能优化 — v2.8.0 - 前端展示优化：Excel与JSON对比结果直接展示在前端页面（影响文件: README.md, index.html, main.py, xy_ws/README.md; 提交: 2个; Commit: a8f09482, c0ac9148）
+- **v2.9.0** (2026-04-29) ⚡性能优化 — v2.9.0: 添加前端时间显示功能并优化JavaScript代码（影响文件: xy_ws/README.md, xy_ws/index.html, xy_ws/main.py, xy_ws/requirements.txt, xy_ws/run.bat 等6个; 提交: 1个; Commit: 5410bee8）
+- **v2.9.1** (2026-04-29) ⚡性能优化 — v2.9.1: 优化前端时间显示功能，减少DOM重渲染开销（影响文件: xy_ws/README.md, xy_ws/index.html, xy_ws/main.py; 提交: 2个; Commit: 5f375275, dcfe40e1）
+- **v2.9.2** (2026-04-29) ⚡性能优化 — v2.9.2: 优化商品列表联动滚动功能（影响文件: xy_ws/README.md, xy_ws/index.html; 提交: 1个; Commit: a4e73366）
+- **v2.9.3** (2026-04-29) ✨功能增强 — v2.9.3: Cookie更新前自动清空机制（影响文件: xy_ws/README.md, xy_ws/index.html, xy_ws/main.py; 提交: 1个; Commit: d6872479）
+- **v2.9.4** (2026-04-29) ✨功能增强 — v2.9.4: 新增互动式货号对比功能（影响文件: xy_ws/README.md, xy_ws/index.html, xy_ws/main.py; 提交: 3个; Commit: af47e3c9, 373b3927, 0e137b89）
+- **v2.9.5** (2026-04-29) ⚡性能优化 — v2.9.5: 移动端响应式适配优化（影响文件: README.md, clean_files.log, wifi_scan, xy_ws/README.md, xy_ws/config/input_stock_numbers.txt 等6个; 提交: 3个; Commit: fed46f44, f9f0395e, cfa112da）
+- **v2.9.6** (2026-04-30) ⚡性能优化 — v2.9.6 - 启动脚本优化和功能改进（影响文件: README.md, index.html, main.py, run.bat; 提交: 2个; Commit: 358c4a01, 00d7352c）
+- **v3.0.0** (2026-04-30) ⚡性能优化 — v3.0.0 - Cookie管理优化和跨平台兼容性提升（影响文件: README.md, clean_files.log, config/config.json, config/cookies.json, index.html 等16个; 提交: 1个; Commit: 2159578a）
+- **v3.0.1** (2026-04-30) ⚡性能优化 — v3.0.1 - Excel多文件读取优化（影响文件: README.md, config/config.json, index.html, main.py, run.sh; 提交: 7个; Commit: 85279dec, d139eabc, fbcb17b1, b2d45d70, a6f9b82e, 84b98a85, 07a82a85）
+- **v3.0.2** (2026-05-01) ⚡性能优化 — v3.0.2 - 移动端响应式适配全面优化（影响文件: README.md, index.html, run.bat; 提交: 2个; Commit: e7506952, 6ef07de4）
+- **v3.0.3** (2026-05-01) ⚡性能优化 — v3.0.3: 移动端导航栏固定置顶优化（影响文件: README.md, index.html; 提交: 1个; Commit: e7e2cf86）
+- **v3.0.4** (2026-05-01) ⚡性能优化 — v3.0.4: Excel文件路径去重和货号读取顺序优化（影响文件: README.md, main.py; 提交: 1个; Commit: 952f3372）
+- **v3.0.5** (2026-05-01) 🐛Bug修复 — v3.0.5: 修复Excel与JSON对比功能中新增高价商品判定逻辑错误（影响文件: README.md, clean_files.log, config/cookies.json, index.html, main.py; 提交: 7个; Commit: e826e254, d06a9668, cdf1a77c, 47f31167, 6ebd0c10, 12f481c3, 72fbbe3a）
+- **v3.0.6** (2026-05-06) ✨功能增强 — v3.0.6: 集成天气时钟看板，独立区块展示，完整响应式适配（影响文件: README.md, config/config.json, config/config.json.example, config/cookies.json, config/cookies.json.example 等257个; 提交: 13个; Commit: bd18598f, d56e3120, 88d191c9, 8560601d, 0e4a8172, 5e96b28b, 289a48d3, 08c1c0fc, 0e0c781e, 30982246, a564e5a6, eb1ca176, 068765e2）
+- **v3.0.7** (2026-05-17) ⚡性能优化 — v3.0.7: 优化隧道共享功能 + 跨平台兼容性增强（影响文件: README.md, index.html, main.py; 提交: 1个; Commit: 69a4bba3）
+- **v3.0.8** (2026-05-17) ✨功能增强 — v3.0.8: 隧道共享功能增强 - 可点击链接、一键复制、启动预下载hostc（影响文件: README.md, dist/cli/index.js, dist/client/index.d.ts, dist/client/index.js, dist/hostc/cli/index.js 等164个; 提交: 4个; Commit: 85342b5d, 0391733c, 2bb427bc, 769269d0）
+- **v3.1.1** (2026-05-18) ✨功能增强 — v3.1.1: 前端版本号自动跟随main.py中VERSION变量（影响文件: README.md, file/tunnel_url.txt, index.html, main.py, run.bat 等6个; 提交: 3个; Commit: 46e0873a, 4d1d7fc9, dbc4ca85）
+- **v3.1.2** (2026-05-18) ✨功能增强 — v3.1.2-update（影响文件: README.md, file/tunnel_url.txt, git_push.bat, index.html, main.py 等7个; 提交: 6个; Commit: 828fcd44, a27c0d83, a09bd9b5, 7159cdac, 13c9594d, 90b61a6d）
+- **v3.1.3** (2026-05-18) 🔄兼容性 — v3.1.3: 跨系统兼容性增强 - 统一脚本逻辑、自动创建虚拟环境、完善进程清理（影响文件: README.md, main.py, run.bat, run.sh; 提交: 5个; Commit: 635967e3, 18a73ac0, 29909e1c, 948d3c82, 4baf05a3）
+- **v3.1.5** (2026-05-18) ✨功能增强 — v3.1.5: 隧道自动重连机制（影响文件: README.md, file/tunnel_url.txt, index.html, main.py, run.bat 等6个; 提交: 3个; Commit: 63e29af5, 7ad78e17, 58cb153f）
+- **v3.1.7** (2026-05-20) ⚡性能优化 — v3.1.7 - 货号对比重复检测优化（影响文件: README.md, file/tunnel_url.txt, index.html, main.py; 提交: 1个; Commit: c93d3449）
+- **v3.1.8** (2026-05-20) 🐛Bug修复 — v3.1.8 - 修复Excel对比显示所有价格的多余货号（影响文件: README.md, file/tunnel_url.txt, index.html, main.py; 提交: 5个; Commit: ee59ad4d, 6f9d0122, 802823be, 4d200852, 22378203）
+- **v3.1.9** (2026-05-20) ⚡性能优化 — v3.1.9: 优化前端隧道共享按钮，优先复用tunnel_url.txt中的已有地址（影响文件: README.md, file/tunnel_url.txt, main.py; 提交: 1个; Commit: 13e7df63）
+- **v3.2.0** (2026-05-20) ✨功能增强 — v3.2.0: 外部启动隧道监控机制（影响文件: README.md, main.py; 提交: 1个; Commit: ed04311e）
+- **v3.2.1** (2026-05-20) ✨功能增强 — v3.2.1: 守护线程重启时保持 URL 一致（影响文件: README.md, main.py; 提交: 1个; Commit: 474379cb）
+- **v3.2.2** (2026-05-21) 🐛Bug修复 — v3.2.2 - 修复隧道自动重连死循环问题，实现无感切换到新的公网 URL（影响文件: README.md, main.py; 提交: 1个; Commit: a5d4e8b9）
+- **v3.2.3** (2026-05-21) ⚙️配置管理 — v3.2.3: Cloudflare Tunnel 配置功能（影响文件: README.md, index.html, main.py, run.bat, run.sh; 提交: 2个; Commit: a2c73fd9, 2494efd1）
+- **v3.2.4** (2026-05-21) 🗑️清理 — v3.2.4: 移除 Cloudflare Tunnel 功能，简化隧道服务（影响文件: CLOUDFLARE_TUNNEL.md, README.md, cloudflared.exe, file/cloudflared-windows-amd64.exe, file/tunnel_url.txt 等9个; 提交: 2个; Commit: 9fbef4fc, a7e07118）
+- **v3.2.5** (2026-05-21) 🗑️清理 — v3.2.5: 简化启动流程，移除隧道选择菜单（影响文件: README.md, cloudflared.exe, file/cloudflared-windows-amd64.exe, run.bat, run.sh; 提交: 1个; Commit: 36c5d99d）
+- **v3.2.6** (2026-05-21) ⚡性能优化 — v3.2.6 - 代码质量优化（影响文件: README.md, index.html, main.py; 提交: 2个; Commit: 73b0e97b, 22aef81f）
+- **v3.2.7** (2026-05-21) ⚡性能优化 — v3.2.7: 前端代码优化 - 简化DOM操作、合并重复函数、优化事件绑定（影响文件: README.md, file/tunnel_url.txt, index.html, main.py; 提交: 3个; Commit: 968d67b1, 5ae62128, ef1b312d）
+- **v3.2.8** (2026-05-22) ✨功能增强 — v3.2.8 - Flask启动时邮件通知增强（影响文件: README.md, config/config.json.example, main.py; 提交: 1个; Commit: 330b1a54）
+- **v3.2.9** (2026-05-22) 🐛Bug修复 — v3.2.9 - 修复隧道频繁重启和邮件发送问题（影响文件: README.md, config/config.json.example, main.py; 提交: 2个; Commit: aef75a0e, fcbbc025）
+- **v3.3.0** (2026-05-22) ⚡性能优化 — v3.3.0: 自动配置阿里云pip镜像加速（影响文件: README.md, file/tunnel_url.txt, run.bat, run.sh; 提交: 1个; Commit: 7b5562e9）
+- **v3.3.1** (2026-05-22) 🐛Bug修复 — v3.3.1: 修复 Web 界面运行爬虫时 Input/output error 问题（影响文件: CLOUDFLARE_TUNNEL.md, README.md, file/tunnel_url.txt, main.py, run.bat 等6个; 提交: 3个; Commit: fcef89f2, 5c616d2b, 9c27295a）
+- **v3.3.3** (2026-05-23) 🐛Bug修复 — v3.3.3: 修复隧道进程泄漏和邮件通知问题（影响文件: README.md, main.py; 提交: 1个; Commit: 91324f58）
+- **v3.3.4** (2026-05-24) ⚡性能优化 — v3.3.4 - 隧道日志输出优化和进程清理改进（影响文件: README.md, main.py; 提交: 1个; Commit: 2b081c21）
+- **v3.3.5** (2026-05-28) ⚡性能优化 — v3.3.5 - 隧道服务稳定性全面优化（影响文件: README.md, main.py, run.bat, run.sh; 提交: 6个; Commit: b2d2dcd9, 5eef7471, b3365505, 6c34c794, ec19170e, bafb9b1d）
+- **v3.3.6** (2026-05-28) ⚡性能优化 — v3.3.6 - 优化README更新日志格式，每个版本3-5个更新点（影响文件: README.md, main.py; 提交: 3个; Commit: 0fccd5b2, d2befef8, a39afb89）
+- **v3.3.7** (2026-05-28) 🐛Bug修复 — v3.3.7: 修复前端JavaScript未定义函数错误及隧道日志管理优化（影响文件: README.md, index.html, main.py; 提交: 5个; Commit: b3368646, cb2daf24, 7c60f381, c725dfab, 9f98e2bb）
+- **v3.3.8** (2026-05-28) ⚡性能优化 — v3.3.8: 拆分版本，优化更新日志格式（影响文件: README.md; 提交: 1个; Commit: 5f3598fb）
+- **v3.3.9** (2026-05-28) 🐛Bug修复 — v3.3.9: 修复 tunnel_url 和前端显示不一致问题（影响文件: README.md, main.py, run.sh; 提交: 1个; Commit: e4303a2a）
+- **v3.4.0** (2026-05-29) 🐛Bug修复 — v3.4.0: 修复隧道状态显示和日志同步问题（影响文件: README.md, index.html, main.py; 提交: 1个; Commit: d957eea7）
+- **v3.4.1** (2026-05-29) 🐛Bug修复 — v3.4.1: 修复 web_output.log 日志同步问题（影响文件: README.md, main.py, run.bat; 提交: 1个; Commit: 312b8074）
+- **v3.4.2** (2026-05-29) ⚡性能优化 — v3.4.2: 前端展示URL可用性验证 + 心跳检测日志优化（影响文件: README.md; 提交: 1个; Commit: ceaf825d）
+- **v3.4.3** (2026-05-29) 🐛Bug修复 — v3.4.3: 修复 tunnel_url.txt 为空时不重启、守护线程重复启动日志刷屏、URL 无效时不返回无效地址（影响文件: README.md, index.html, main.py; 提交: 1个; Commit: 2f69efae）
+- **v3.4.4** (2026-05-29) ⚡性能优化 — v3.4.4: 优化 tunnel_url.txt 为空时立即重启，不等待20秒超时（影响文件: README.md, main.py; 提交: 1个; Commit: 4b2bb910）
+- **v3.4.5** (2026-05-29) 🐛Bug修复 — v3.4.5: 修复 tunnel_url.txt 为空时重启循环问题（影响文件: README.md, main.py; 提交: 1个; Commit: 0d1525e0）
+- **v3.4.6** (2026-05-29) 🐛Bug修复 — v3.4.6: 修复 tunnel_url.txt 为空时无法重启问题（影响文件: README.md, main.py; 提交: 1个; Commit: cb0381fa）
+- **v3.4.7** (2026-05-29) 🐛Bug修复 — v3.4.7: 修复 tunnel_url.txt 为空时误杀正在启动的 hostc 进程（影响文件: README.md, main.py; 提交: 3个; Commit: c8873956, f9909a42, fed2d0f7）
+- **v3.4.8** (2026-05-29) ✨功能增强 — v3.4.8: 简化 auto_start_tunnel 逻辑，避免重复检测（影响文件: README.md, main.py; 提交: 2个; Commit: 4c0b9568, 3fbfd776）
+- **v3.4.9** (2026-05-29) ✨功能增强 — v3.4.9: 统一使用 web_output.log 作为公网地址唯一来源（影响文件: README.md, main.py; 提交: 1个; Commit: e3aab18f）
+- **v3.4.10** (2026-05-29) ⚡性能优化 — v3.4.10: 优化 hostc 进程稳定性，URL 无效时等待 60 秒再重启（影响文件: README.md, main.py; 提交: 1个; Commit: 8955b9e2）
+- **v3.4.11** (2026-05-29) ✨功能增强 — v3.4.11: 大幅简化 tunnel 重启逻辑（影响文件: README.md, main.py; 提交: 1个; Commit: 23ab3f17）
+- **v3.4.12** (2026-05-29) 🐛Bug修复 — v3.4.12: 修复等待 URL 逻辑，直接检查 web_output.log（影响文件: README.md, main.py; 提交: 1个; Commit: 9add871b）
+- **v3.4.13** (2026-05-29) 🗑️清理 — v3.4.13: 完全移除 tunnel_url.txt 读取逻辑，全部从 web_output.log（影响文件: README.md, main.py; 提交: 1个; Commit: b20d21b8）
+- **v3.4.14** (2026-05-29) ✨功能增强 — v3.4.14: read_output 改为读取 hostc stdout 输出（影响文件: README.md, main.py; 提交: 1个; Commit: 78ccbb77）
+- **v3.4.15** (2026-05-29) 🗑️清理 — v3.4.15: 简化启动流程，移除冗余等待逻辑（影响文件: README.md, main.py; 提交: 1个; Commit: edcace1a）
+- **v3.4.16** (2026-05-29) 🐛Bug修复 — v3.4.16: 修复 old_url 未定义错误（影响文件: README.md, main.py; 提交: 1个; Commit: 22bda634）
+- **v3.4.17** (2026-05-29) ✨功能增强 — v3.4.17: 统一所有模块从 web_output.log 获取公网地址（影响文件: README.md, main.py; 提交: 1个; Commit: ad138714）
+- **v3.4.18** (2026-05-29) 🗑️清理 — v3.4.18: 完全移除 tunnel_url 全局变量的更新逻辑（影响文件: README.md, main.py; 提交: 1个; Commit: f7d2d997）
+- **v3.4.19** (2026-05-29) ✨功能增强 — v3.4.19: 同步写入 tunnel_url.txt（影响文件: README.md, main.py; 提交: 1个; Commit: 92f33f4d）
+- **v3.4.20** (2026-05-29) ⚡性能优化 — v3.4.20: 优化 tunnel_url.txt 写入格式（影响文件: README.md, main.py; 提交: 1个; Commit: 327d83a5）
+- **v3.4.21** (2026-05-29) ✨功能增强 — v3.4.21: 确保 tunnel_url.txt 持久一致（影响文件: README.md, main.py; 提交: 1个; Commit: b41dcd27）
+- **v3.4.22** (2026-05-29) ⚡性能优化 — v3.4.22: 优化心跳检测间隔从60秒到5秒，提高隧道故障检测速度（影响文件: README.md, main.py; 提交: 1个; Commit: d100e51b）
+- **v3.4.23** (2026-05-29) 🐛Bug修复 — v3.4.23: 修复 Excel 文件读取时的 Windows 共享违规问题（影响文件: README.md, index.html, main.py; 提交: 1个; Commit: cddcd2c1）
+- **v3.4.24** (2026-05-29) 🐛Bug修复 — v3.4.24: 修复 Excel 共享违规 - 所有读取改为 read_only=True（影响文件: README.md, main.py; 提交: 2个; Commit: 2b605ad4, 4062b362）
+- **v3.4.25** (2026-05-29) ✨功能增强 — v3.4.25: Excel读取改为复制到临时文件，彻底解决共享违规（影响文件: README.md, main.py; 提交: 1个; Commit: adb85a86）
+- **v3.4.26** (2026-05-29) 🏗️架构优化 — v3.4.26: 重构统一异常处理系统 + 增强 tunnel_status API URL 验证（影响文件: README.md, main.py; 提交: 1个; Commit: e7db39b9）
+- **v3.4.27** (2026-05-29) 🐛Bug修复 — v3.4.27: 修复文件清理工具'删除所有文件和文件夹'功能报错（影响文件: README.md, main.py; 提交: 1个; Commit: 888fc696）
+- **v3.4.28** (2026-05-30) ⚡性能优化 — v3.4.28: 优化Flask 404处理和邮件冷却期补发机制（影响文件: README.md, clean_files.log, main.py, run.bat, run.sh; 提交: 3个; Commit: 6727bb86, b2dc1b36, e04dc511）
+- **v3.4.29** (2026-05-30) 📝文档更新 — README: 更新 v3.4.29 日志（影响文件: README.md; 提交: 1个; Commit: 69fdf4aa）
+- **v3.4.30** (2026-05-30) 🐛Bug修复 — fix: 修复清理工具 API 空目录检测问题 (v3.4.30)（影响文件: README.md, main.py; 提交: 1个; Commit: ff25e0ab）
+- **v3.4.31** (2026-06-01) 🐛Bug修复 — fix: 修复文件清理工具获取文件大小错误 (v3.4.31)（影响文件: README.md, main.py; 提交: 1个; Commit: b0015d61）
+- **v3.4.32** (2026-06-03) ⚡性能优化 — v3.4.32: 全面跨系统支持优化（影响文件: README.md, main.py, run.bat, run.sh; 提交: 4个; Commit: a4b8e724, a557f527, 510ac7a5, 65ed6b9f）
+- **v3.4.33** (2026-06-03) ⚡性能优化 — v3.4.33 - 代码优化和跨系统支持增强（影响文件: README.md, clean_files.log, index.html, main.py; 提交: 1个; Commit: 6a36dd78）
+- **v3.4.34** (2026-06-04) 🐛Bug修复 — 修复文件清理 API JSON 解析错误 (v3.4.34)（影响文件: README.md, backend/xy_ws.db, frontend/node_modules/.bin/acorn, frontend/node_modules/.bin/browserslist, frontend/node_modules/.bin/ejs 等5921个; 提交: 21个; Commit: c5b004aa, 63231a2b, 10a77325, dc33fd18, 48d4984d, a5ee61f6, 8c700211, 3179e8b8, 8b2072a1, 7ca8787c, 12e62e40, ca724edf, c13ed044, c28870fe, 9b9edd09, 8c1202b0, 75b9dc02, f8061107, c6eff3a6, 880e6ab9, 50a55c98）
+- **v3.4.37** (2026-06-05) 🐛Bug修复 — v3.4.37: 优化临时文件清理机制，修复bat脚本启动时误杀进程问题（影响文件: README.md, run.bat, run.sh; 提交: 3个; Commit: d37003cb, 307bf3b9, 4bb10fa0）
+- **v3.5.2** (2026-06-05) ⚡性能优化 — v3.5.2: 每日利润报表读取优化，前端展示report_text（影响文件: README.md, index.html, index.js, main.py; 提交: 9个; Commit: 42e446ab, ac5456a3, 9a86187b, c21b21ff, 36819192, bb4feeb9, a9d282a7, c7c1d812, fcfdb8d6）
+- **v3.5.3** (2026-06-06) 📝文档更新 — docs: 更新 v3.5.3 版本日志 - 汇总视图与明细联动功能（影响文件: README.md, index.html, main.py; 提交: 6个; Commit: 4d3b2201, 9b5245ef, 4026f672, 47d97855, faa5a879, 00e8a053）
+- **v3.5.4** (2026-06-06) ⚡性能优化 — v3.5.4 - 每日利润报表优化：日期格式统一、项目字段、表头固定、错误处理增强（影响文件: README.md, index.html, main.py; 提交: 1个; Commit: acf176de）
+- **v3.5.6** (2026-06-06) ⚡性能优化 — v3.5.6: 完善移动端适配功能和表格样式优化（影响文件: README.md, index.html; 提交: 1个; Commit: cfeb9dd8）
+- **v3.5.7** (2026-06-07) ⚡性能优化 — v3.5.7: 代码重构优化，跨系统和移动端适配完整性确认（影响文件: README.md, index.html, main.py; 提交: 3个; Commit: 1dcd4b66, 263674bd, c608f969）
+- **v3.5.8** (2026-06-11) 📝文档更新 — v3.5.8: add skill.md/skill.docx code standards, restore dist folder, update README（影响文件: README.md, index.html, main.py, skill.docx, skill.md; 提交: 4个; Commit: d919fb70, 806fa814, c17a9e88, a11b052e）
+- **v3.6.0** (2026-06-11) 📝文档更新 — v3.6.0: 更新日志详情展示 - changelog API支持子条目解析, 前端展示多版本详情（影响文件: README.md, dist/hostc/server/AGENTS.md, dist/hostc/server/README.md, index.html, main.py 等7个; 提交: 8个; Commit: 7b785007, eb056469, 4d3d0c7d, 36c3a884, abb542b2, 5e4333ba, 1f4966a5, 80e91548）
+- **v3.7.1** (2026-06-18) ✨功能增强 — v3.7.1: 跨系统硬编码彻底消除 + V3.5.0移动端规范复查（影响文件: README.md, index.html, main.py, skill.docx, skill.md; 提交: 1个; Commit: c359ef07）
+- **v3.7.2** (2026-06-18) 🐛Bug修复 — v3.7.2: 修复index.html第5197行标签闭合 + skill.md/docx规范更新（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 1个; Commit: 90b068e1）
+- **v3.7.3** (2026-06-18) 🐛Bug修复 — v3.7.3: DOMContentLoaded闭合修复 + 按钮样式统一 + skill/docx同步（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 1个; Commit: a323c55d）
+- **v3.7.4** (2026-06-18) 🐛Bug修复 — v3.7.4: 利润报表汇总行点击展开位置修复 + 聚合级别修正 + 跨系统/移动端确认 + skill同步（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 4个; Commit: 7afca916, 37c46b68, 3b593dc6, b92366fb）
+- **v3.7.5** (2026-06-26) 📝文档更新 — docs: 更新版本号为v3.7.5并完善文档（影响文件: README.md, index.html, main.py, skill.docx, skill.md; 提交: 5个; Commit: 49e5d0a0, 1f9d605a, f1ab4d67, 134f729e, 1c0b770a）
+- **v3.7.6** (2026-06-27) 🔄兼容性 — v3.7.6: 综合环境检测系统 + PIP/NPM镜像源毫秒级测速 + 跨平台硬编码消除（影响文件: README.md, generate_skill_docx.py, index.html, main.py, run.bat 等8个; 提交: 12个; Commit: 0223c770, d5a033b0, ffcda445, 74a5137c, cbee7535, 153a4ebf, 8f210c04, be2b1749, b4da018e, 67e84977, 4a764e51, 2356d22d）
+- **v3.7.7** (2026-06-28) 🐛Bug修复 — v3.7.7: 修复Excel与JSON对比按钮状态不复位问题，更新skill.md/skill.docx按钮状态管理规范（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 1个; Commit: 5a44038b）
+- **v3.7.8** (2026-07-04) 🐛Bug修复 — v3.7.8: 修复镜像测速核心Bug + Web日志持久化 + 跨平台硬编码消除（影响文件: README.md, main.py, run.bat, run.sh, skill.docx 等6个; 提交: 8个; Commit: c82b6beb, 96ee0908, 22f7b5e5, 33af407d, fa2801d0, 0c24aedb, 48654655, e1925d45）
+- **v3.7.9** (2026-07-04) ⚡性能优化 — v3.7.9: Hostc隧道稳定性终极优化 - 解决频繁重启问题（影响文件: README.md, generate_skill_docx.py, main.py, skill.docx, skill.md; 提交: 2个; Commit: b955ebea, e68689af）
+- **v3.8.0** (2026-07-04) 📝文档更新 — docs: v3.8.0 文档系统全面升级（影响文件: README.md, skill.docx, skill.md; 提交: 1个; Commit: cfc6a14c）
+- **v3.8.1** (2026-07-04) 🐛Bug修复 — docs: v3.8.1 - skill.md全面补全(项目所有内容写入), API端点列表修正, CookieValidator/Environment/PathManager方法补全, skill.docx重新生成(符合v3.6.0+v3.5.0), 修复main.py BOM字符, 跨系统支持验证通过（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 2个; Commit: 43429208, f684d296）
+- **v3.8.2** (2026-07-04) 🐛Bug修复 — fix: web_output.log启动日志被覆盖Bug - v3.8.2（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: f8c361b3）
+- **v3.8.3** (2026-07-04) 🐛Bug修复 — feat: v3.8.3 - 修复'最新更新'区域空白Bug + Markdown标题格式规范（影响文件: README.md, skill.docx, skill.md; 提交: 1个; Commit: 48ac04cc）
+- **v3.8.4** (2026-07-04) 🐛Bug修复 — v3.8.4: 修复从非项目目录运行启动脚本时Web服务启动失败Bug（影响文件: README.md, run.bat, run.sh, skill.docx, skill.md; 提交: 1个; Commit: e0981916）
+- **v3.8.5** (2026-07-04) 🐛Bug修复 — v3.8.5: skill.md新增目录(TOC), skill.docx改用pypandoc_binary生成(修复代码块标题误识别), skill.pdf改用puppeteer-core, 所有代码跨系统零硬编码（影响文件: README.md, generate_docx.py, main.py, package-lock.json, package.json 等9个; 提交: 4个; Commit: 8f860fd0, 408ed2a3, 5ddab03a, 78a5ca12）
+- **v3.8.6** (2026-07-05) 📝文档更新 — v3.8.6: 隧道重启邮件通知完善 + 文档同步更新（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 7个; Commit: 8f9ebc2e, 63abe3f6, 77117492, 23cd0a2f, ff415498, d7f49688, 2b63e9c0）
+- **v3.8.7** (2026-07-05) 🔒安全 — docs: v3.8.7 线程安全URL去重机制 + 重新生成skill.docx (166.6KB)（影响文件: main.py, skill.docx; 提交: 2个; Commit: b3c3ff1f, 47c5fe9f）
+- **v3.8.8** (2026-07-05) ⚡性能优化 — v3.8.8 (2026-07-05) - 🚀 公网地址可用即自动发邮件（零延迟通知优化）（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 9d663e6c）
+- **v3.8.9** (2026-07-05) ✨功能增强 — v3.8.9 (2026-07-05) - 🔒 强制URL去重机制（同一地址30分钟内只发1次邮件）（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: eb748a0d）
+- **v3.8.10** (2026-07-05) 🐛Bug修复 — v3.8.10 (2026-07-05) - 🔧 关键修复：缩进错误导致服务启动失败 + 文档同步更新（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 2个; Commit: fe97d5b0, 22e1d5ac）
+- **v3.8.11** (2026-07-05) 📝文档更新 — v3.8.11: 完整历史记录恢复与文档更新（影响文件: README.md, skill.docx; 提交: 1个; Commit: e8d7fba5）
+- **v3.8.12** (2026-07-08) 🐛Bug修复 — v3.8.12: 邮件日志系统全面增强 + stable_available Bug修复（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 2个; Commit: 5b46bbfa, 40599e5c）
+- **v3.8.13** (2026-07-08) 🐛Bug修复 — v3.8.13 - 🔧 关键Bug修复 + API信息完整性增强 + 更新日志格式优化（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 830673b6）
+- **v3.8.14** (2026-07-08) 🚨P0-致命 — 🔒 v3.8.14: 致命死锁修复 + 邮件UI升级 + 日志系统增强（影响文件: README.md, generate_docx.py, main.py, skill.docx, skill.md 等6个; 提交: 4个; Commit: 0051a404, 3dcd2615, 26ddfc97, 8d35a652）
+- **v3.8.15** (2026-07-09) 🐛Bug修复 — v3.8.15: 隧道重启优化+日志时间戳统一+NameError修复（影响文件: README.md, main.py, run.bat, run.sh, skill.docx 等6个; 提交: 9个; Commit: 2aa1c15d, 09e20b5c, b405a72f, 65c1d365, 6e5e3933, 406f3b66, 3f503d2c, a199e8b2, 16ed5f3b）
+- **v3.8.16** (2026-07-09) 🐛Bug修复 — v3.8.16: macOS时间戳Bug修复 + 跨平台毫秒级时间戳统一（影响文件: README.md, run.bat, run.sh, skill.docx, skill.md; 提交: 1个; Commit: 79eb18d1）
+- **v3.8.17** (2026-07-10) ✨功能增强 — v3.8.17: Tunnel startup optimization - hostc pre-start + Python smart wait（影响文件: README.md, main.py, run.bat, run.sh, skill.docx 等6个; 提交: 1个; Commit: 45f9d8ac）
+- **v3.8.18** (2026-07-10) 🏗️架构优化 — v3.8.18: 隧道权威数据源重构 + 公网地址不可用自动重启 + 邮件通知增强（影响文件: README.md, index.html, main.py, run.bat, run.sh 等7个; 提交: 9个; Commit: 4f7727b3, 00954cca, 43d704ba, 1ddf6cee, 68ac4ce4, 79e74830, f3f7be76, df42fc97, be54f280）
+- **v3.8.20** (2026-07-10) 🐛Bug修复 — v3.8.20: 📧 隧道即时邮件通知 + 前端状态修复 + 验证加速（影响文件: README.md, index.html, main.py, run.bat, run.sh 等7个; 提交: 5个; Commit: 145fc456, 733f687a, ac37492d, 1b2d572b, 87d4822d）
+- **v3.8.21** (2026-07-10) 🔒安全 — v3.8.21: Node.js依赖合并 + API范式文档完善 + 安全规范（影响文件: README.md, dist/hostc/server/node_modules/.bin/tsc, dist/hostc/server/node_modules/.bin/tsc.CMD, dist/hostc/server/node_modules/.bin/tsc.ps1, dist/hostc/server/node_modules/.bin/tsserver 等35个; 提交: 1个; Commit: d089abed）
+- **v3.8.23** (2026-07-10) ⚡性能优化 — v3.8.23: Web服务秒级启动 + 隧道非阻塞优化 + hostc本地化 + CDN轮询安装 + dist优化（影响文件: README.md, dist/assets/huninn-0-400-normal-Dne9Gz3b.woff, dist/assets/huninn-1-400-normal-1CCSdtaz.woff, dist/assets/huninn-10-400-normal-Cnm4Xsyr.woff, dist/assets/huninn-102-400-normal-ClztsVdn.woff 等241个; 提交: 2个; Commit: 7645feb2, 3c2e41a3）
+- **v3.8.24** (2026-07-10) 🐛Bug修复 — v3.8.24: tunnel_url.txt权威数据源架构 + web_output.log写入冲突修复（影响文件: README.md, main.py, run.bat, run.sh, skill.docx 等6个; 提交: 5个; Commit: 4c228b1d, 5a8f90db, e6be35bc, 7d68cab0, 78b8cce9）
+- **v3.8.25** (2026-07-10) ⚡性能优化 — v3.8.25: pip依赖安装智能跳过 - main.py --check-deps + run.bat/run.sh优化 - 启动加速20秒→0.1秒（影响文件: README.md, main.py, run.bat, run.sh, skill.docx 等6个; 提交: 1个; Commit: fdf147ac）
+- **v3.8.26** (2026-07-10) 🐛Bug修复 — v3.8.26: 隧道旧URL复用Bug修复 - auto_start_tunnel增加hostc进程存活检测（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: ace290ad）
+- **v3.8.27** (2026-07-10) 🐛Bug修复 — v3.8.27: 隧道重启死循环修复 - tunnel_need_restart重置+hostc启动等待URL（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 7740640b）
+- **v3.8.28** (2026-07-11) ✨功能增强 — v3.8.28: 心跳守护即时启动 + tunnel权威源守护统一（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 3个; Commit: 41237b3e, 873c6bc3, b69e6dd3）
+- **v3.8.29** (2026-07-11) 🐛Bug修复 — fix: temp临时文件泄漏修复 + Python侧自动清理 (v3.8.29)（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 5个; Commit: cd0621e8, 3e6ffcfe, cadd76ec, c2c4da88, 8772db23）
+- **v3.8.30** (2026-07-11) 🏗️架构优化 — feat: 隧道重启逻辑重构 - 合并双路径+宽限期机制(v3.8.30)（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 271566ec）
+- **v3.8.31** (2026-07-11) 🐛Bug修复 — v3.8.31: 心跳逻辑5项优化+宽限期重构+隧道重启修复+版本号统一从README获取（影响文件: README.md, dist/patches/hostc+1.3.0.patch, file/diff_log_20260404.json, file/diff_log_20260405.json, file/diff_log_20260428.json 等10个; 提交: 1个; Commit: 3ffc1092）
+- **v3.8.32** (2026-07-11) ⚡性能优化 — v3.8.32: 隧道守护二次验证+指数退避+心跳阈值优化（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 7f0b75b6）
+- **v3.8.33** (2026-07-11) ✨功能增强 — v3.8.33: hostc CDN镜像源修正 + bat/sh镜像列表统一（影响文件: README.md, run.bat, run.sh, skill.docx, skill.md; 提交: 1个; Commit: 076788da）
+- **v3.8.34** (2026-07-11) 📝文档更新 — v3.8.34: 移动端适配范式文档化（影响文件: README.md, skill.docx, skill.md; 提交: 1个; Commit: c6112f42）
+- **v3.8.35** (2026-07-11) 📝文档更新 — v3.8.35: 核心范式文档补全（7项）（影响文件: README.md, skill.docx, skill.md; 提交: 1个; Commit: 9ed04a0f）
+- **v3.8.36** (2026-07-12) 🐛Bug修复 — v3.8.36: run.sh 函数定义顺序修复 + pre_launch 函数化重构（影响文件: README.md, run.sh, skill.docx, skill.md; 提交: 1个; Commit: 51853cf3）
+- **v3.8.37** (2026-07-12) 🐛Bug修复 — v3.8.37: /api/readme-sections 500 错误修复（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: b852dada）
+- **v3.8.38** (2026-07-12) 🐛Bug修复 — v3.8.38: 端口8888占用竞态条件修复（影响文件: README.md, run.bat, run.sh, skill.docx, skill.md; 提交: 1个; Commit: 63ddecbb）
+- **v3.8.39** (2026-07-12) ⚡性能优化 — v3.8.39: ⚡ 隧道心跳与稳定性验证加速优化 - 心跳间隔60→30秒, 失效阈值3→2次, 稳定性验证2→1次, 空窗期从3-5分钟缩短至1-1.5分钟（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 54e403bd）
+- **v3.8.40** (2026-07-17) 🐛Bug修复 — v3.8.40: hostc进程竞态条件修复 + 调试日志增强（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 782d463c）
+- **v3.8.41** (2026-07-17) 🐛Bug修复 — v3.8.41: 心跳循环重启后状态重置修复（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 60e04ae6）
+- **v3.8.42** (2026-07-17) ⚡性能优化 — v3.8.42: Flask访问日志格式优化（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 4c0eda44）
+- **v3.8.43** (2026-07-17) ⚡性能优化 — feat: Cloudflare Tunnel 跨平台支持 + 隧道切换优化 (v3.8.43)（影响文件: README.md, index.html, main.py, skill.md, tools/cloudflared/README.md 等9个; 提交: 2个; Commit: 1e0ea33d, 64ebccae）
+- **v3.8.44** (2026-07-17) ✨功能增强 — v3.8.44: Named Tunnel + 自定义域名 + 自动降级到 Quick Tunnel（影响文件: README.md, config/config.json.example, main.py, skill.docx, skill.md 等6个; 提交: 1个; Commit: 10812307）
+- **v3.8.45** (2026-07-17) ✨功能增强 — v3.8.45: NS升级自动监控 + Quick Tunnel自动升级到Named Tunnel（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 469418c0）
+- **v3.8.46** (2026-07-17) 🗑️清理 — v3.8.46: Plan A/B 二选一 + 删除 NS 监控（影响文件: README.md, config/config.json.example, main.py, skill.docx, skill.md; 提交: 3个; Commit: de2142d9, 660e4def, 66552f06）
+- **v3.8.47** (2026-07-17) ✨功能增强 — v3.8.47: 双隧道互为备用通知 + fallback_available 邮件类型（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: af6ea45c）
+- **v3.8.48** (2026-07-18) ✨功能增强 — v3.8.48 - Tunnel type selector dynamic default value（影响文件: README.md, index.html, main.py, skill.docx, skill.md; 提交: 1个; Commit: 6a67d524）
+- **v3.8.49** (2026-07-18) ✨功能增强 — v3.8.49 - 添加CF心跳验证详细日志（影响文件: README.md, generate_docx.py, index.html, main.py, skill.md; 提交: 1个; Commit: 3bb9a2c4）
+- **v3.8.50** (2026-07-18) 🐛Bug修复 — v3.8.50 - 修复CF心跳验证日志输出（影响文件: main.py, temp_npm_time.txt; 提交: 1个; Commit: 0db0e5d2）
+- **v3.8.51** (2026-07-18) ✨功能增强 — v3.8.51 - tunnel_url.txt同时存储hostc和CF两个隧道的地址（影响文件: README.md, main.py, skill.docx, skill.md, temp_npm_time.txt; 提交: 2个; Commit: a3a93f0f, af4e9e14）
+- **v3.8.52** (2026-07-18) 🐛Bug修复 — v3.8.52: 双隧道独立发邮件 + 心跳写入修复（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 2个; Commit: 886ddd26, f7cc80b6）
+- **v3.8.53** (2026-07-18) 🐛Bug修复 — v3.8.53 - 修复双隧道地址写入冲突（影响文件: README.md, file/hostc_output.txt, generate_docx.py, main.py, run.bat 等7个; 提交: 2个; Commit: 5bf5dcc4, e5fa35e5）
+- **v3.8.54** (2026-07-18) ✨功能增强 — v3.8.54 - Cloudflare 限流检测与友好提示（影响文件: README.md, main.py, skill.md; 提交: 1个; Commit: 7c0943b6）
+- **v3.8.55** (2026-07-18) ✨功能增强 — v3.8.55 - Cloudflare 邮件通知日志统一（影响文件: README.md, main.py, skill.docx; 提交: 1个; Commit: 25930878）
+- **v3.8.56** (2026-07-18) 🗑️清理 — v3.8.56 - 移除 hostc_output.txt，简化隧道管理（影响文件: README.md, file/hostc_output.txt, main.py, run.bat, run.sh 等7个; 提交: 1个; Commit: f22fd99f）
+- **v3.8.57** (2026-07-18) 🐛Bug修复 — v3.8.57 - Cloudflare邮件通知修复 + 日志格式统一（影响文件: README.md, main.py, skill.md; 提交: 2个; Commit: d7a52511, c8e4d4c7）
+- **v3.8.58** (2026-07-18) 🐛Bug修复 — v3.8.58 - 邮件防重复发送修复 + skill.docx 同步更新（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 58c8a519）
+- **v3.8.59** (2026-07-18) ✨功能增强 — v3.8.59 - 公网地址复制按钮（Cloudflare + hostc）（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 1个; Commit: a55335f3）
+- **v3.8.60** (2026-07-18) ✨功能增强 — v3.8.60 - 公网地址复制按钮样式统一（btn-light + 复制文字）（影响文件: README.md, index.html, skill.docx; 提交: 1个; Commit: c696eeaa）
+- **v3.8.61** (2026-07-18) 🐛Bug修复 — v3.8.61 - 修复隧道管理面板复制按钮ID冲突，Toast弹窗恢复正常（影响文件: README.md, index.html, skill.docx; 提交: 1个; Commit: b2f788f7）
+- **v3.8.62** (2026-07-18) ✨功能增强 — v3.8.62 - Toast显示具体复制的URL地址（影响文件: README.md, index.html, skill.docx; 提交: 1个; Commit: d77a06a3）
+- **v3.8.63** (2026-07-18) ✨功能增强 — v3.8.63 - 隧道共享弹窗同时显示hostc和Cloudflare双公网地址（影响文件: README.md, index.html, skill.docx; 提交: 1个; Commit: 47304bcc）
+- **v3.8.64** (2026-07-18) ✨功能增强 — v3.8.64 - 隧道共享弹窗恢复原始hostc样式+新增Cloudflare URL（影响文件: README.md, index.html, skill.docx; 提交: 1个; Commit: a358e717）
+- **v3.8.65** (2026-07-18) ⚡性能优化 — v3.8.65 - CF隧道独立性优化+智能复用机制（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 8cad5069）
+- **v3.8.66** (2026-07-18) 🐛Bug修复 — v3.8.66 - CF独立性测试验证+verify_url参数修复（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: c363a7b6）
+- **v3.8.67** (2026-07-19) 🐛Bug修复 — v3.8.67 - 🛡️ API响应解析全面健壮性提升+Bug修复（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 14a20175）
+- **v3.8.68** (2026-07-19) 🐛Bug修复 — v3.8.68: Critical bug fixes - indentation error, socket leaks, code quality（影响文件: README.md, dist/app.js, main.py, skill.docx, skill.md; 提交: 9个; Commit: 8b68a170, 003c4dfb, 6f0c73a5, 3fa25116, fd0678a6, 65f2186b, fb1a1cee, 448c3ff3, d3c58f80）
+- **v3.8.69** (2026-07-19) 🔒安全 — v3.8.69: Comprehensive security audit - 7 critical bugs fixed（影响文件: README.md, main.py, skill.md; 提交: 1个; Commit: 04d4101c）
+- **v3.8.70** (2026-07-19) ✨功能增强 — v3.8.70: Enterprise-grade production optimization - 38 improvements implemented（影响文件: README.md, main.py, skill.md, tests/test_security_fixes.py; 提交: 1个; Commit: 877750d2）
+- **v3.8.70.1** (2026-07-19) 📝文档更新 — v3.8.70.1: 统一文档语言规范 - 所有更新日志必须使用中文（影响文件: README.md, skill.md; 提交: 1个; Commit: 08343ae3）
+- **v3.8.71** (2026-07-19) ✨功能增强 — v3.8.71: 企业级功能全面升级 - 所有规划任务100%完成（影响文件: README.md, config/production.json, config/staging.json, create_configs.py, create_deploy.py 等17个; 提交: 4个; Commit: 7d2e5675, 3b57aca8, 88437fcf, c44bc108）
+- **v3.8.73** (2026-07-19) ⚙️配置管理 — v3.8.73: 资源管理+超时配置化+异常处理增强+导入规范化（影响文件: README.md, deploy.sh, main.py, skill.docx, skill.md; 提交: 13个; Commit: 8858d9d2, c1fa22d4, 755c91b2, 011eddb7, 4d462127, 85c5f469, 1da108eb, abbf617c, bab158df, b4911684, c56b0bad, 69578d48, 5a8f6399）
+- **v3.8.75** (2026-07-20) ✨功能增强 — feat: 创建skill系统 + 文档规范化 (v3.8.75)（影响文件: README.md, index.html, main.py, skill.md; 提交: 1个; Commit: 16a7ba61）
+- **v3.8.76** (2026-07-20) 🏗️架构优化 — refactor: 删除.trae文件夹，整合skill范式到文档 (v3.8.76)（影响文件: README.md, production_config.json, skill.md; 提交: 2个; Commit: 132c9713, 365e7d4b）
+- **v3.8.77** (2026-07-20) ✨功能增强 — feat: Swagger UI移动端适配 (v3.8.77)（影响文件: README.md, main.py, skill.md; 提交: 1个; Commit: 104bab33）
+- **v3.8.78** (2026-07-20) 🔒安全 — feat: 天气面板修复 + 安全策略优化 (v3.8.78)（影响文件: README.md, generate_skill_docx.py, index.html, main.py, requirements.txt 等7个; 提交: 5个; Commit: 1044a455, c2b08c18, 248fd8eb, afaffca9, dc0f33fe）
+- **v3.8.81** (2026-07-24) 🐛Bug修复 — v3.8.81 - 入库时间数据源修复（影响文件: README.md, index.html, main.py, skill.docx, skill.md; 提交: 4个; Commit: f5c3a1b9, 60f6e5d5, 669cde7b, be4a2793）
+- **v3.8.82** (2026-07-24) ⚡性能优化 — v3.8.82: 入库时间显示优化（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 1个; Commit: 18a3313d）
+- **v3.8.83** (2026-07-25) 🐛Bug修复 — v3.8.83 - 关键Bug修复 + 资源管理优化（影响文件: README.md, generate_skill_docx.py, main.py, remove_bom.py, skill.docx 等6个; 提交: 3个; Commit: ad9da608, 7e7474d2, 01381085）
+- **v3.8.84** (2026-07-25) 🔒安全 — v3.8.84 - 安全漏洞修复 + 命令注入防护（影响文件: README.md, main.py, skill.docx; 提交: 2个; Commit: d6193768, a07073f0）
+- **v3.8.85** (2026-07-26) ⚡性能优化 — feat: 商品搜索统计实时计算优化 (v3.8.85)（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 1个; Commit: a27e4479）
+- **v3.8.86** (2026-07-26) 📝文档更新 — v3.8.86: 商品搜索多表联动 + 分表统计 - 搜索时4个表格联动过滤 - 每个表格独立统计行(售出总价/均价/手续费) - 顶部徽章实时更新匹配数 - 搜索结果分表展示彩色标签 - 更新README.md/skill.md/skill.docx（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 1个; Commit: d457cbb5）
+- **v3.8.87** (2026-07-26) 🐛Bug修复 — v3.8.87: 商品详情入库时间实时计算修复 - 基于入库时间戳动态计算相对时间，不再使用源API静态字符串（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 1个; Commit: dfb461c6）
+- **v3.8.88** (2026-07-29) 🔒安全 — v3.8.88: 全面修复 'Unexpected token <' 错误 + API路由安全加固（影响文件: README.md, index.html, main.py, skill.docx, skill.md; 提交: 1个; Commit: 5398faf5）
+- **v3.8.88.1** (2026-07-29) 🔒安全 — v3.8.88.1: 额外安全加固 - XSS防护 + 定时器泄漏修复（影响文件: README.md, index.html, skill.docx, skill.md; 提交: 1个; Commit: e472a42c）
+- **v3.8.88.2** (2026-07-29) 🔒安全 — v3.8.88.2: 深度安全加固 - XSS全面修复(26处) + CORS收紧 + URL注入防护（影响文件: README.md, index.html, main.py, skill.docx, skill.md; 提交: 2个; Commit: 72739781, cda87c26）
+- **v3.8.89** (2026-07-30) 🐛Bug修复 — fix(app.js): v3.8.89 - 修复语法错误+清理测试代码+更新版本号（影响文件: check_fields.py, check_price_data.py, dist/app.js, update_docs.py; 提交: 1个; Commit: 4afcde26）
+- **v3.8.89.1** (2026-07-29) 🐛Bug修复 — v3.8.89.1: 修复Excel对比货号点击无响应 + 更新文档规范（影响文件: README.md, dist/app.js, index.html, skill.docx, skill.md; 提交: 1个; Commit: a0d59166）
+- **v3.8.89.2** (2026-07-29) ✨功能增强 — 🚀 v3.8.89.2: FastAPI迁移100%完成 - 22个路由全部转换（影响文件: README.md, main.py, requirements.txt, skill.docx, skill.md; 提交: 1个; Commit: 03d00af5）
+- **v3.8.89.3** (2026-07-29) 🐛Bug修复 — 🔧 v3.8.89.3: Flask遗留代码修复 + jsonify兼容层 - 8个按钮测试7/8通过（影响文件: README.md, main.py, skill.docx, skill.md, test_8_buttons.py; 提交: 3个; Commit: fc14d4fe, d1d26dd9, b95bcc63）
+- **v3.8.89.4** (2026-07-30) 🐛Bug修复 — v3.8.89.4 - 全面隐藏 Bug 修复 + 代码质量提升（影响文件: README.md, dist/app.js, generate_skill_docx.py, main.py, skill.docx 等6个; 提交: 1个; Commit: 5fd705bc）
+- **v3.8.89.5** (2026-07-30) ⚡性能优化 — v3.8.89.5: 代码质量完美优化 - 添加单元测试、日志级别优化、subprocess替换os.system、前端Toast错误提示（影响文件: README.md, dist/app.js, main.py, skill.docx, skill.md 等6个; 提交: 2个; Commit: dd31f944, aed4dea2）
+- **v3.8.89.6** (2026-07-30) 🐛Bug修复 — v3.8.89.6 - 🐛 爬虫结果卡片格式统一修复（影响文件: README.md, dist/app.js, skill.docx; 提交: 1个; Commit: 944c1585）
+- **v3.8.89.8** (2026-07-30) 🐛Bug修复 — v3.8.89.8: Fix FastAPI migration issues - high price products, TXT comparison, request handling, data source, CDN logger（影响文件: README.md, dist/app.js, index.html, main.py, skill.docx; 提交: 1个; Commit: c496bb07）
+- **v3.8.89.9** (2026-07-30) 🐛Bug修复 — fix: 修复高价商品显示0及Flask迁移完成 (v3.8.89.9)（影响文件: README.md, check_fields.py, check_price_data.py, dist/app.js, main.py 等8个; 提交: 9个; Commit: 7319117c, 8c1de177, e279f23a, fc058e92, fbe9d30a, bd8b56b8, 3122e4ae, 9ef93bec, d613782e）
+- **v3.8.89.11** (2026-07-30) 🔒安全 — fix(hostc): 修复WebSocket安全关闭导致进程崩溃 + 文档更新v3.8.89.11（影响文件: README.md, dist/app.js, dist/package-lock.json, dist/package.json, main.py 等7个; 提交: 11个; Commit: 578207bd, 3288af37, fef90a92, 8c766524, 6b22f77c, 2765e984, 4549be5c, 497424cf, e6691cb8, 95ae99d2, 30bab35e）
+- **v3.8.89.12** (2026-07-31) 🐛Bug修复 — fix(frontend+backend+docs): 对比数据字段匹配修复 + PC端显示优化 (v3.8.89.12)（影响文件: README.md, dist/app.js, generate_skill_docx.py, main.py, skill.docx 等6个; 提交: 2个; Commit: 8de42bb0, bf5303eb）
+- **v3.8.89.12.1** (2026-07-31) 🐛Bug修复 — fix(frontend): 添加调试日志 + 强制刷新指南 (v3.8.89.12.1)（影响文件: FIX_GUIDE.md, README.md, dist/app.js, force_refresh.html, skill.docx 等6个; 提交: 2个; Commit: 6ba749b0, 5f54e1d5）
+- **v3.8.89.12.2** (2026-07-31) 🐛Bug修复 — docs(readme): 整合FIX_GUIDE.md到README.md (v3.8.89.12.2)（影响文件: FIX_GUIDE.md, README.md; 提交: 2个; Commit: 692de84f, c62f11c3）
+- **v3.8.89.12.3** (2026-07-31) 🐛Bug修复 — fix(frontend): 更新app.js版本号强制浏览器加载新代码 (v3.8.89.12.3)（影响文件: index.html; 提交: 1个; Commit: 7033f7a8）
+- **v3.8.89.12.4** (2026-07-31) 🐛Bug修复 — fix(server): 移除dist文件24小时缓存 (v3.8.89.12.4) - 解决前端代码更新后浏览器仍使用旧缓存的问题（影响文件: main.py, test_sku_parsing.html; 提交: 2个; Commit: dc766626, 4a0fabdb）
+- **v3.8.89.12.5** (2026-07-31) 🐛Bug修复 — fix(frontend): 修复商品字段解析逻辑 - 支持多行JSON对象 (v3.8.89.12.5)（影响文件: dist/app.js, generate_docx.py, generate_skill_docx.py; 提交: 2个; Commit: 71cba76f, 8d2b88a2）
+- **v3.8.89.13** (2026-07-31) 📝文档更新 — docs(readme+skill+docx): 更新文档 + 代码清理 (v3.8.89.13)（影响文件: README.md, dist/app.js, force_refresh.html, skill.docx, skill.md 等13个; 提交: 2个; Commit: d9a368e8, 0bea2b02）
+- **v3.8.89.17** (2026-08-11) ⚡性能优化 — v3.8.89.17 🔧 编码问题根治 + subprocess超时优化 + 文档全面更新（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: d39b10c1）
+- **v3.8.89.18** (2026-08-11) ✨功能增强 — feat(frontend+docs): v3.8.89.18 商品描述点击查看详情功能 + 差异化交互设计（影响文件: README.md, dist/app.js, skill.docx, skill.md; 提交: 2个; Commit: 4b0717cc, 8a4c52bd）
+- **v3.8.89.19** (2026-08-11) ⚡性能优化 — v3.8.89.19 删除商品描述完整显示优化 + 响应式布局增强（影响文件: README.md, dist/app.js, skill.md; 提交: 5个; Commit: 71ee2f30, b79aef01, b65ca8da, 3a6b93b0, 8efd1f2d）
+- **v3.8.89.21** (2026-08-20) 🔒安全 — v3.8.89.21: SSRF安全防御体系 + Import优化 + 项目清理（影响文件: README.md, main.py, skill.md; 提交: 1个; Commit: 3611d2ab）
+- **v3.8.89.22** (2026-08-20) 🐛Bug修复 — v3.8.89.22: 修复所有导入错误和emoji编码问题（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 2个; Commit: e32fae6d, 287307f6）
+- **v3.8.89.23** (2026-08-20) 🐛Bug修复 — v3.8.89.23 - 邮件Header()参数修复 + 文档同步更新（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: a7789122）
+- **v3.8.89.24** (2026-08-21) 🔒安全 — security: v3.8.89.24 - 安全漏洞修复 + 代码规范严格化（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 7c6ea6b1）
+- **v3.8.89.25** (2026-08-21) 🔒安全 — security: v3.8.89.25 - 安全加固第二轮 + CORS/命令注入/信息泄露修复（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: aa72907d）
+- **v3.8.89.26** (2026-08-21) 🗑️清理 — convention: v3.8.89.26 - Import唯一性范式 + 6处内联导入清理（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: ef09fedc）
+- **v3.8.89.27** (2026-08-21) 🔒安全 — security: v3.8.89.27 - 安全加固第三轮 + CSP/隧道注入/速率限制（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 79f531e9）
+- **v3.8.89.28** (2026-08-21) 🚨P0-致命 — fix: v3.8.89.28 - 邮件发送Header()崩溃修复，隧道通知邮件无法发出的根因修复（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 2个; Commit: c7c24e66, 68b58ace）
+- **v3.8.89.29** (2026-08-21) 🔒安全 — security: v3.8.89.29 - 安全加固第四轮: 命令白名单shell=False/CSRF Origin验证/API Key认证，逻辑测试25/26通过（影响文件: README.md, dist/app.js, main.py, skill.docx, skill.md; 提交: 3个; Commit: e8ef2f45, c4fe8f9e, d2804cb0）
+- **v3.8.89.30** (2026-08-21) 🗑️清理 — v3.8.89.30: 启动脚本残留进程自动清理 - run.bat/run.sh分层清理Playwright驱动node进程+兜底清理，消除Connection closed while reading from the driver错误（影响文件: README.md, run.bat, run.sh, skill.docx, skill.md; 提交: 1个; Commit: b2122c2b）
+- **v3.8.89.31** (2026-08-21) 🔒安全 — v3.8.89.31: 安全检查系统整合进main.py + Playwright移动端8项安全检查 + 依赖审计API + 配置加密管理API + SECURITY_CHECKLIST.md合并删除 + 3个独立.py文件删除（影响文件: README.md, dist/app.js, main.py, requirements.txt, run.bat 等8个; 提交: 2个; Commit: ff3b8cfd, bdfc4d98）
+- **v3.8.89.32** (2026-08-21) 🔒安全 — fix(hostc): v3.8.89.32 WebSocket安全关闭补丁重新应用 + patch-package补丁未生效修复 + 文档同步更新（影响文件: README.md, skill.docx, skill.md; 提交: 1个; Commit: 61066c54）
+- **v3.8.90.00** (2026-08-21) 🔒安全 — v3.8.90.00: 安全隐患全面修复+隐藏Bug清零 - P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager/CSRF Host头回退/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留 安全评分96%->98%（影响文件: README.md, dist/app.js, main.py, skill.docx, skill.md; 提交: 1个; Commit: 9cf09127）
+- **v3.8.90.01** (2026-08-21) 🗑️清理 — v3.8.90.01: 移除写操作认证拦截，支持局域网/公网隧道全源访问（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: ff28e32b）
+- **v3.8.90.02** (2026-08-21) 🔄兼容性 — v3.8.90.02 (2026-08-21) - 🐍 Python版本兼容性全面升级 — requirements.txt适配Python 3.9+全系列版本（影响文件: README.md, md_to_docx.py, requirements.txt, skill.docx, skill.md; 提交: 3个; Commit: 821cfdf0, 5f8c6f69, b7ee0ecb）
+- **v3.8.90.03** (2026-08-21) ✨功能增强 — v3.8.90.03 (2026-08-21) - 🐍 Python版本兼容性验证系统 + 文档管理范式 — 新增版本检查/测试/Tox配置，合并多余MD文件（影响文件: README.md, check_python_version.py, requirements.txt, skill.docx, skill.md 等8个; 提交: 2个; Commit: 583e136d, eb72274d）
+- **v3.8.90.04** (2026-08-21) 🏗️架构优化 — v3.8.90.04 (2026-08-21) - 🐍 版本检查功能集成到main.py — 删除独立check_python_version.py，遵循单文件架构（影响文件: README.md, check_python_version.py, main.py, skill.docx, skill.md 等7个; 提交: 2个; Commit: c347c3ca, ac43c5c4）
+- **v3.8.90.05** (2026-08-21) 🏗️架构优化 — v3.8.90.05 (2026-08-21) - 🗑️ 删除md_to_docx.py + 📐 建立Import语句规范(PY-CORE-000) — 清理3处内联import，强化单文件架构（影响文件: README.md, main.py, md_to_docx.py, skill.md; 提交: 2个; Commit: 73a3b5a3, 4bc486c0）
+- **v3.8.90.06** (2026-08-22) 🐛Bug修复 — v3.8.90.06 - Python 3.14兼容性修复 + 启动脚本pip强制升级 + run.bat BOM修复 + 日志文件锁修复（影响文件: README.md, requirements.txt, run.bat, run.sh, skill.docx 等6个; 提交: 1个; Commit: 4c54b03b）
+- **v3.8.90.07** (2026-08-22) 🐛Bug修复 — v3.8.90.07: 跨平台零硬編碼重構 + Playwright自動安裝兜底 - Environment EXE_SUFFIX/動態路徑檢測/三層防護/cloudflared動態掃描/allowed_exe動態生成（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 2个; Commit: d5b6f61e, 96f38cb5）
+- **v3.8.90.08** (2026-08-22) 🐛Bug修复 — fix: Playwright多镜像源安装+系统Chrome回退兜底 v3.8.90.08（影响文件: README.md, _fix_cdn_test.py, dist/app.js, main.py, requirements.txt 等9个; 提交: 9个; Commit: 9d46298d, a7bf4d70, be142f5d, 4f3ad572, da43b24f, 876c29f3, f5c57406, 5f114387, 03a6d29e）
+- **v3.8.90.10** (2026-08-24) 🐛Bug修复 — fix(app.js): 移动端双表联动修复 — 消除滚动同步抖动+点击行联动高亮 (v3.8.90.10)（影响文件: README.md, dist/app.js, skill.docx, skill.md; 提交: 4个; Commit: 4f9de4c1, 36a4bcea, d0ba5111, 1099b3b6）
+- **v3.8.90.11** (2026-08-24) 🐛Bug修复 — v3.8.90.11 (2026-08-24) - 🎯 双向滚动联动底部同步修复 — 解决高价商品表拉到底部时总商品列表不同步问题（影响文件: README.md, dist/app.js, skill.docx, skill.md; 提交: 1个; Commit: eed7543a）
+- **v3.8.90.12** (2026-08-26) 🐛Bug修复 — v3.8.90.12 (2026-08-26) - 隐藏Bug清零 + 浏览器启动修复 — PROJECT_DIR类型错误+uvicorn导入位置错误+Connection closed驱动修复（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: 83157548）
+- **v3.8.90.13** (2026-08-26) 🔒安全 — v3.8.90.13: 全面安全审计+隐藏Bug清零第二轮 — 信息泄露+限流缺口+缓存控制+裸except+Windows磁盘兼容（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 1个; Commit: b2e2b3f9）
+- **v3.8.90.14** (2026-08-26) 🔒安全 — v3.8.90.14: 攻防纵深加固+隐藏Bug清零第三轮 — CSRF同源校验支持动态隧道+日志注入防护+8处API响应str(e)信息泄露清零(含完整traceback泄露)+swagger版本硬编码改VERSION+uvicorn host改WEB_HOST环境变量+健康检查脱敏+skill.docx同步生成（影响文件: CHANGELOG.md, README.md, main.py, skill.docx, skill.md; 提交: 4个; Commit: a287856e, c9d27fb9, 20fa3bbf, 2db2e9f0）
+- **v3.8.90.15** (2026-08-30) 🐛Bug修复 — v3.8.90.15 表格滚动联动增强+数据显示完整性修复 — 移动端表头固定+API数据量扩展+顶部同步检测（影响文件: README.md, dist/app.js, file/security_audit_v3.8.90.15.py, file/security_fix_report_v3.8.90.15.md, generate_skill_docx.py 等14个; 提交: 5个; Commit: a0cfcff9, 98d14bb2, 3e3f308e, 7f169bba, e46e3127）
+- **v4.0** (2026-08-30) 🔒安全 — v4.0: 🛡️ 全面攻防压测系统+所有问题清零+代码规范化（影响文件: README.md, dist/app.js, index.html, main.py, skill.docx 等7个; 提交: 14个; Commit: 76235676, eef962d7, f448d4c5, 7298c84c, c0e268b6, 8c70276e, 2a8d568f, 71088192, a75424fa, 2c7dedab, 696ab57e, 9ddea794, dfba9b98, f85bb5c4）
+- **v4.1** (2026-08-30) 🗑️清理 — v4.1: BOM字符清理+临时文件整理+项目规范化（影响文件: README.md, dist/app.js, dist/assets/index-CvEIzWZ2.css, index.html, main.py 等13个; 提交: 4个; Commit: 7c2d7c00, dddd3c82, 277bb1ae, d6832155）
+- **v4.2** (2026-08-30) ✨功能增强 — v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化（影响文件: README.md, generate_skill_docx.py, main.py, skill.docx, skill.md; 提交: 1个; Commit: 9b6efa01）
+- **v4.3** (2026-08-30) ⚡性能优化 — v4.3: 💻 启动脚本终端输出增强（跨平台）- 优化run.sh和run.bat启动脚本的终端显示功能，在Web服务启动完成后自动获取并直接在终端窗口中显示局域网地址(http://{lan_ip}:{port})和公网访问URL(https://t-xxx.hostc.dev)，解决用户需要手动查看file/web_output.log或file/tunnel_url.txt才能获取访问地址的问题，提升用户体验和运维便利性，实现macOS/Linux(使用grep/ipconfig/hostname命令)和Windows(使用findstr/powershell Get-NetIPAddress命令)双平台支持，多源数据提取策略(web_output.log优先→tunnel_url.txt备用→系统命令兜底)确保地址获取成功率100%，代码严格遵循项目编码标准(UTF-8 without BOM + 简体中文注释)（影响文件: README.md, generate_skill_docx.py, main.py, run.bat, run.sh 等7个; 提交: 5个; Commit: f5e4fc3d, f44048d8, 1b6d7592, 0ac88577, 757f9e74）
+- **v4.4** (2026-08-31) 🐛Bug修复 — v4.4 (2026-08-31) - 🗑️ 临时修复脚本清理+项目规范化（影响文件: README.md, run.bat, skill.docx, skill.md, test/__init__.py 等8个; 提交: 5个; Commit: 6ccf6075, 081b2aa7, 534f5c43, de2d0b71, aaaf9fc8）
+- **v4.5** (2026-08-31) 🐛Bug修复 — v4.5 文件清理功能API修复+路径验证优化 (2026-08-31) - 修复422错误+支持绝对相对路径输入（影响文件: README.md, main.py, skill.docx, skill.md, test/generate_skill_docx.py; 提交: 1个; Commit: dc93783b）
+- **v4.6** (2026-08-31) 🔒安全 — v4.6 全面安全审计+Bug修复（重大安全升级）(2026-08-31)（影响文件: README.md, dist/app.js, main.py, skill.docx, skill.md 等6个; 提交: 1个; Commit: 545e7e2e）
+- **v4.7** (2026-08-31) 🐛Bug修复 — v4.7: 🌐 双隧道全自动启动+硬编码消除（重大功能升级）— 实现auto_start_tunnel()函数自动检测并启动Hostc和Cloudflare双隧道无需手动干预，新增TUNNEL_CONFIG配置字典消除硬编码（CF_MAX_RETRIES/CF_RETRY_DELAY/CF_QUICK_TUNNEL_TIMEOUT/CF_HEARTBEAT_INTERVAL/HOSTC_HEARTBEAT_INTERVAL/URL_VERIFY_TIMEOUT/URL_VERIFY_MAX_RETRIES共7个环境变量可控参数），CF智能重试机制解决429 Too Many Requests问题（默认3次重试间隔60秒自动等待后重试），日志级别优化（所有CF相关日志从logger.debug()升级为log_print() INFO级别确保启动过程完全可见），Bug修复（Plan B命令参数拼接os.environ.get('HOST','localhost')字符串未正确解析改为host变量正确拼接），错误诊断增强（CF进程退出时自动读取并显示进程输出前500字符便于快速定位问题），配置集中管理（统一使用TIMEOUT_CONFIG和TUNNEL_CONFIG两个配置字典所有超时和隧道参数可通过环境变量自定义），同步更新README.md/skill.md/skill.docx三份文档记录此次重大功能升级（影响文件: README.md, main.py, skill.docx, skill.md, test/generate_skill_docx.py; 提交: 2个; Commit: 42bc7e05, 5109acf1）
+- **v4.8** (2026-08-31) 🔒安全 — v4.8 (2026-08-31) - 🔒 致命BUG清零+安全攻防全面加固（重大安全修复）（影响文件: README.md, main.py, run.bat, skill.docx, skill.md 等7个; 提交: 1个; Commit: fcafb224）
+- **v5.0** (2026-08-31) 🏗️架构优化 — v5.0: 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx (2026-08-31)（影响文件: README.md, main.py, skill.docx, skill.md, test/generate_skill_docx.py; 提交: 1个; Commit: e53e0273）
+- **v5.0.1** (2026-08-31) ✨功能增强 — v5.0.1: 新增文档生成器test/generate_docx.py + 更新requirements.txt添加python-docx依赖 (2026-08-31)（影响文件: README.md, generate_docx.py, requirements.txt, skill.docx, skill.md 等6个; 提交: 2个; Commit: 548ce01a, 0c7d3667）
+- **v5.0.2** (2026-08-31) ⚡性能优化 — v5.0.2: 优化文档生成流程，统一使用test/generate_docx.py动态化生成器（影响文件: generate_docx.py; 提交: 1个; Commit: 8aaaf00b）
+- **v5.0.3** (2026-08-31) 📝文档更新 — v5.0.3: 补充README.md缺失的v4.7版本记录并重新生成skill.docx（影响文件: README.md; 提交: 1个; Commit: 5783d25a）
+- **v5.0.4** (2026-08-31) 🔒安全 — v5.0.4: 从Git恢复README.md并安全添加v4.7版本记录+重新生成skill.docx（影响文件: README.md; 提交: 1个; Commit: c51c987d）
 
 ---
 
