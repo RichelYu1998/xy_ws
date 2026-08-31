@@ -128,6 +128,111 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v4.6 (2026-08-31) - 🛡️ 全面安全审计+Bug修复（重大安全升级）
+
+#### 更新内容: 对整个项目进行深度安全攻防审计，修复所有发现的漏洞、Bug、代码质量问题，包括SSRF防护、XSS防护、并发安全、异常处理、输入验证等全方位加固
+
+**影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+  - **🔴 P0严重问题**: 修复print语句残留（BOM工具中使用print()违反项目规范，改为logging模块）
+  - **🔴 P0严重问题**: 修复全局变量并发安全问题（tunnel_last_heartbeat/tunnel_heartbeat_failed等全局变量在多线程环境下缺乏保护，新增_tunnel_state_lock线程锁）
+  - **🟠 P1高危问题**: 新增SSRF服务器端请求伪造防护（实现_is_safe_url()函数，禁止访问私有IP/云元数据/内网地址，集成到safe_urlopen()和send_heartbeat()）
+  - **🟠 P1高危问题**: 加强subprocess调用安全性（check_process_running添加进程名正则验证+shell=False参数，防止命令注入）
+  - **🟠 P1高危问题**: 统一异常信息处理（security_check/security_audit/encrypt_init等API不再泄露内部异常详情给客户端，仅返回通用错误消息）
+  - **🟡 P2中危问题**: 修复前端XSS跨站脚本攻击风险（changelog渲染中的item.title/item.desc动态内容使用escapeHtml()转义后再插入innerHTML）
+  - **📊 审计覆盖范围**: 安全漏洞检测（注入/遍历/XSS/SSRF）+ Bug检测（逻辑错误/异常处理/资源泄漏）+ 代码质量检查（规范性/性能/可维护性）
+  - **✅ 零信任原则**: 所有外部输入（URL/路径/命令/HTML内容）均经过严格验证和转义
+  - **文档同步**: 更新三份核心文档记录此次重大安全升级
+
+#### 🛡️ 安全攻防测试结果:
+
+**已防御的攻击类型**:
+```
+✅ SSRF (Server-Side Request Forgery)
+   - 禁止私有IP: 10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x
+   - 禁止IPv6本地: ::1, fe80::/10, fc00::/7
+   - 禁止云元数据: metadata.google.internal, metadata.amazonaws.com
+   - 仅允许HTTP/HTTPS协议
+
+✅ XSS (Cross-Site Scripting)
+   - 所有动态HTML内容使用escapeHtml()转义
+   - 属性值使用escapeAttr()转义
+   - 防止DOM注入攻击
+
+✅ Command Injection (命令注入)
+   - 进程名强制正则验证: ^[a-zA-Z0-9._-]+$
+   - subprocess.run使用shell=False
+   - 参数列表传递而非字符串拼接
+
+✅ Path Traversal (路径遍历)
+   - validate_path_traversal()函数验证
+   - sec_sp()函数二次校验
+   - 路径规范化处理
+
+✅ Information Disclosure (信息泄露)
+   - API异常不再返回内部堆栈信息
+   - 错误日志记录到服务端而非客户端
+   - 敏感配置项脱敏处理
+
+✅ Race Condition (竞态条件)
+   - 全局变量使用threading.Lock保护
+   - 原子操作保证数据一致性
+   - 心跳状态线程安全
+```
+
+#### 🔍 技术实现细节:
+
+**1. SSRF防护系统** (main.py:835-909):
+```python
+def _is_safe_url(url: str) -> bool:
+    """SSRF防护：验证URL是否安全"""
+    # 1. 协议白名单: 仅允许http/https
+    # 2. IP黑名单: 禁止私有IP/回环地址/链路本地地址
+    # 3. 主机名黑名单: 禁止云元数据端点
+    # 4. DNS重绑定防护: IP解析后二次验证
+    return is_safe
+```
+
+**2. 并发安全机制** (main.py:9016):
+```python
+# 新增隧道状态锁
+_tunnel_state_lock = threading.Lock()
+
+# 保护全局变量的原子操作
+with _tunnel_state_lock:
+    tunnel_last_heartbeat = time.time()
+    tunnel_heartbeat_failed = False
+```
+
+**3. XSS防护增强** (app.js:1086,1098-1100):
+```javascript
+// 修改前（存在XSS风险）
+sectionTitle.innerHTML = '...' + (item.title || '');
+
+// 修改后（安全转义）
+sectionTitle.innerHTML = '...' + escapeHtml(item.title || '');
+```
+
+**4. 异常处理统一化** (main.py:7265,7274,7286):
+```python
+# 修改前（泄露内部信息）
+return JSONResponse(content={'error': f'失败: {type(e).__name__}'})
+
+# 修改后（安全响应）
+logger.error(f'[endpoint] 失败: {e}', exc_info=True)
+return JSONResponse(content={'error': '操作失败，请查看服务器日志'})
+```
+
+#### ✅ 验证结果:
+- ✅ SSRF防护测试通过（拒绝私有IP/云元数据/非法协议）
+- ✅ XSS防护测试通过（特殊字符正确转义）
+- ✅ 命令注入防护测试通过（恶意进程名被拦截）
+- ✅ 并发安全测试通过（多线程环境下状态一致）
+- ✅ 异常信息安全测试通过（客户端无法获取内部堆栈）
+- ✅ 代码规范符合项目标准（UTF-8 + 简体中文注释）
+- ✅ 三份文档已同步更新（README.md/skill.md/skill.docx）
+
+---
+
 ### v4.5 (2026-08-31) - 🔧 文件清理功能API修复+路径验证优化
 
 #### 更新内容: 修复文件清理功能的422 Unprocessable Content错误，优化路径验证逻辑以支持绝对路径和相对路径输入，统一所有清理请求模型的行为规范

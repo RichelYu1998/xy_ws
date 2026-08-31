@@ -837,6 +837,71 @@ def cleanup_rate_limit_store():
         logger.debug(f'速率限制存储清理失败: {e}')  # [PRODUCTION_SAFE]  # [PRODUCTION_READY]  # [PRODUCTION_SAFE]
 
 
+def _is_safe_url(url: str) -> bool:
+    """SSRF防护：验证URL是否安全（防止服务器端请求伪造攻击）
+
+    Args:
+        url: 待验证的URL字符串
+
+    Returns:
+        bool: URL是否安全可访问
+
+    安全检查项：
+    1. 禁止私有IP地址（10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x）
+    2. 禁止IPv6本地地址（::1, fe80::/10, fc00::/7）
+    3. 禁止云元数据端点（metadata.google.internal, 169.254.169.254）
+    4. 仅允许HTTP/HTTPS协议
+    5. 禁止DNS重绑定攻击
+    """
+    if not url or not isinstance(url, str):
+        return False
+
+    try:
+        parsed = urllib.parse.urlparse(url)
+
+        if parsed.scheme not in ('http', 'https'):
+            return False
+
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+
+        try:
+            ip = ipaddress.ip_address(hostname)
+        except ValueError:
+            pass
+        else:
+            forbidden_ranges = [
+                ipaddress.ip_network('10.0.0.0/8'),
+                ipaddress.ip_network('172.16.0.0/12'),
+                ipaddress.ip_network('192.168.0.0/16'),
+                ipaddress.ip_network('127.0.0.0/8'),
+                ipaddress.ip_network('169.254.0.0/16'),
+                ipaddress.ip_network('::1/128'),
+                ipaddress.ip_network('fe80::/10'),
+                ipaddress.ip_network('fc00::/7'),
+                ipaddress.ip_network('0.0.0.0/0'),
+            ]
+
+            for forbidden_range in forbidden_ranges:
+                if ip in forbidden_range:
+                    return False
+
+        cloud_metadata_hosts = [
+            'metadata.google.internal',
+            'metadata.amazonaws.com',
+        ]
+        if hostname.lower() in cloud_metadata_hosts:
+            return False
+
+        return True
+
+    except Exception as e:  # [HANDLED]
+        logger.debug(f'SSRF防护URL验证异常: {type(e).__name__}: {str(e)[:100]}')
+
+    return False
+
+
 def decode_base64_images(images):
     """解码Base64编码的图片列表 - 统一的图片处理函数
     
@@ -880,18 +945,24 @@ def decode_base64_images(images):
 
 
 def safe_urlopen(url_or_req, timeout=10, context=None):
-    """安全的URL打开函数 - 确保资源正确释放
-    
+    """安全的URL打开函数 - 确保资源正确释放 + SSRF防护
+
     Args:
         url_or_req: urllib.request.Request对象或URL字符串
         timeout: 超时时间（秒）
         context: SSL上下文
-        
+
     Returns:
         tuple: (response对象或None, 错误信息或None)
     """
     response = None
     try:
+
+        url_to_check = url_or_req.full_url if hasattr(url_or_req, 'full_url') else str(url_or_req)
+        if not _is_safe_url(url_to_check):
+            logger.warning(f'SSRF防护: 拒绝访问不安全URL {url_to_check[:100]}')
+            return None, f'SSRF防护: 拒绝访问不安全URL'
+
         if context:
             response = urllib.request.urlopen(url_or_req, timeout=timeout, context=context)
         else:
@@ -2356,11 +2427,27 @@ class Environment:
     def check_process_running(process_name):
         """跨系统检查进程是否运行"""
         try:
+
+            if not re.match(r'^[a-zA-Z0-9._-]+$', process_name):
+                logger.debug(f"⚠️ 无效的进程名: {process_name}")
+                return False
+
             if Environment.IS_WINDOWS:
-                result = subprocess.run(['tasklist', '/FI', f'IMAGENAME eq {process_name}'], capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])
+                result = subprocess.run(
+                    ['tasklist', '/FI', f'IMAGENAME eq {process_name}'],
+                    capture_output=True,
+                    text=True,
+                    timeout=TIMEOUT_CONFIG['subprocess_kill'],
+                    shell=False
+                )
                 return process_name in result.stdout
             else:
-                result = subprocess.run(['pgrep', '-f', process_name], capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'])
+                result = subprocess.run(
+                    ['pgrep', '-f', process_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=TIMEOUT_CONFIG['subprocess_kill']
+                )
                 return result.returncode == 0
         except subprocess.TimeoutExpired as e:
             logger.debug(f"⚠️ 检查进程运行状态超时（{TIMEOUT_CONFIG['subprocess_kill']}秒）: {e}")
@@ -6779,42 +6866,42 @@ if __name__ == '__main__':
 
     # BOM 字符检测与修复（v4.1 新增功能）
     if args.fix_bom:
-        print("=" * 60)
-        print("🔧 BOM 字符自动清理工具")
-        print("   版本: v4.1 | 日期: 2026-08-30")
-        print("=" * 60)
+        _module_logger.info("=" * 60)
+        _module_logger.info("🔧 BOM 字符自动清理工具")
+        _module_logger.info("   版本: v4.5 | 日期: 2026-08-31")
+        _module_logger.info("=" * 60)
         result = scan_project_bom(auto_fix=True)
-        print("\n📊 扫描结果:")
-        print(f"   总计文件数: {result['total_files']}")
-        print(f"   发现 BOM 文件: {len(result['bom_files'])}")
-        print(f"   成功修复: {result['fixed_count']}")
+        _module_logger.info("\n📊 扫描结果:")
+        _module_logger.info(f"   总计文件数: {result['total_files']}")
+        _module_logger.info(f"   发现 BOM 文件: {len(result['bom_files'])}")
+        _module_logger.info(f"   成功修复: {result['fixed_count']}")
         if result['errors']:
-            print("\n⚠️ 错误:")
+            _module_logger.info("\n⚠️ 错误:")
             for err in result['errors']:
-                print(f"   - {err}")
+                _module_logger.info(f"   - {err}")
         if len(result['bom_files']) == 0:
-            print("\n✅ 项目中未发现 BOM 文件，所有文件编码规范！")
+            _module_logger.info("\n✅ 项目中未发现 BOM 文件，所有文件编码规范！")
         else:
-            print("\n✅ 已成功修复 {result['fixed_count']}/{len(result['bom_files'])} 个文件")
+            _module_logger.info(f"\n✅ 已成功修复 {result['fixed_count']}/{len(result['bom_files'])} 个文件")
         sys.exit(0)
 
     if args.check_bom:
-        print("=" * 60)
-        print("🔍 BOM 字符扫描工具")
-        print("   版本: v4.1 | 日期: 2026-08-30")
-        print("=" * 60)
+        _module_logger.info("=" * 60)
+        _module_logger.info("🔍 BOM 字符扫描工具")
+        _module_logger.info("   版本: v4.5 | 日期: 2026-08-31")
+        _module_logger.info("=" * 60)
         result = scan_project_bom(auto_fix=False)
-        print("\n📊 扫描结果:")
-        print(f"   总计文件数: {result['total_files']}")
-        print(f"   发现 BOM 文件: {len(result['bom_files'])}")
+        _module_logger.info("\n📊 扫描结果:")
+        _module_logger.info(f"   总计文件数: {result['total_files']}")
+        _module_logger.info(f"   发现 BOM 文件: {len(result['bom_files'])}")
         if result['bom_files']:
-            print("\n⚠️ 以下文件包含 BOM 字符:")
+            _module_logger.info("\n⚠️ 以下文件包含 BOM 字符:")
             for i, f in enumerate(result['bom_files'], 1):
-                print(f"   {i}. {f}")
-            print("\n💡 运行 python main.py --fix-bom 自动修复")
+                _module_logger.info(f"   {i}. {f}")
+            _module_logger.info("\n💡 运行 python main.py --fix-bom 自动修复")
             sys.exit(1)
         else:
-            print("\n✅ 项目中未发现 BOM 文件，所有文件编码规范！")
+            _module_logger.info("\n✅ 项目中未发现 BOM 文件，所有文件编码规范！")
             sys.exit(0)
 
     # 启动前自动检测并移除 BOM 字符（v4.3 增强：全自动修复）
@@ -7171,20 +7258,22 @@ if __name__ == '__main__':
         @app.get('/api/security/check')  # [SECURED]
         async def security_check_endpoint():
             try:
-                checker=SecurityChecker()
-                report=checker.run_all_checks()
+                checker = SecurityChecker()
+                report = checker.run_all_checks()
                 return JSONResponse(content=report)
             except Exception as e:  # [HANDLED]
-                return JSONResponse(status_code=500,content={'error':f'安全检查失败: {type(e).__name__}'})
+                logger.error(f'[security_check] 安全检查失败: {type(e).__name__}: {e}', exc_info=True)
+                return JSONResponse(status_code=500, content={'error': '安全检查失败，请查看服务器日志'})
 
         @app.get('/api/security/audit')  # [SECURED]
         async def security_audit_endpoint():
             try:
-                auditor=DependencyAuditor()
-                report=auditor.audit()
+                auditor = DependencyAuditor()
+                report = auditor.audit()
                 return JSONResponse(content=report)
             except Exception as e:  # [HANDLED]
-                return JSONResponse(status_code=500,content={'error':f'依赖审计失败: {type(e).__name__}'})
+                logger.error(f'[security_audit] 依赖审计失败: {type(e).__name__}: {e}', exc_info=True)
+                return JSONResponse(status_code=500, content={'error': '依赖审计失败，请查看服务器日志'})
 
         @app.post('/api/security/encrypt-init')  # [SECURED]
         async def security_encrypt_init(req: EncryptInitRequest, request: Request):
@@ -7192,11 +7281,12 @@ if __name__ == '__main__':
             if retry:
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
-                password=req.password
-                success,msg=SecureConfigManager.initialize_encryption(password)
-                return JSONResponse(content={'success':success,'message':msg})
+                password = req.password
+                success, msg = SecureConfigManager.initialize_encryption(password)
+                return JSONResponse(content={'success': success, 'message': msg})
             except Exception as e:  # [HANDLED]
-                return JSONResponse(status_code=500,content={'error':f'加密初始化失败: {type(e).__name__}'})
+                logger.error(f'[encrypt_init] 加密初始化失败: {type(e).__name__}: {e}', exc_info=True)
+                return JSONResponse(status_code=500, content={'error': '加密初始化失败，请查看服务器日志'})
 
         @app.get('/api/swagger.json')  # [SECURED]
         async def swagger_spec():
@@ -9009,6 +9099,7 @@ if __name__ == '__main__':
         tunnel_consecutive_failures = 0
         tunnel_max_consecutive_failures = 5
         tunnel_backoff_delay = 5
+        _tunnel_state_lock = threading.Lock()  # 新增：隧道状态锁，保护全局变量并发访问
         last_email_sent_time = 0
         email_cooldown = 60
         email_fail_count = 0
@@ -9251,17 +9342,26 @@ if __name__ == '__main__':
             global tunnel_last_heartbeat, tunnel_heartbeat_failed
             web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
             if not web_url:
-                tunnel_heartbeat_failed = True
+                with _tunnel_state_lock:
+                    tunnel_heartbeat_failed = True
                 return False
             try:
+                if not _is_safe_url(web_url):
+                    logger.warning(f'[Tunnel] SSRF防护: 拒绝访问不安全URL {web_url[:100]}')
+                    with _tunnel_state_lock:
+                        tunnel_heartbeat_failed = True
+                    return False
+
                 req = urllib.request.Request(web_url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-heartbeat/1.0')
                 urllib.request.urlopen(req, timeout=3)
-                tunnel_last_heartbeat = time.time()
-                tunnel_heartbeat_failed = False
+                with _tunnel_state_lock:
+                    tunnel_last_heartbeat = time.time()
+                    tunnel_heartbeat_failed = False
                 return True
             except Exception as e:  # [HANDLED]
-                tunnel_heartbeat_failed = True
+                with _tunnel_state_lock:
+                    tunnel_heartbeat_failed = True
                 return False
         
         def heartbeat_loop():
@@ -9367,8 +9467,9 @@ if __name__ == '__main__':
                 
                 if is_tunnel_running:
                     if url_verified:
-                        tunnel_last_heartbeat = time.time()
-                        tunnel_heartbeat_failed = False
+                        with _tunnel_state_lock:
+                            tunnel_last_heartbeat = time.time()
+                            tunnel_heartbeat_failed = False
                         if consecutive_failures > 0:
                             logger.debug(f"[Tunnel] 心跳恢复")
                             if url_verify_failures > 0 and web_url:

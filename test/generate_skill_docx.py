@@ -29,14 +29,14 @@ def create_skill_docx():
 
     # 版本信息
     version_para = doc.add_paragraph()
-    version_run = version_para.add_run('📌 当前版本: v4.5 (2026-08-31)')
+    version_run = version_para.add_run('📌 当前版本: v4.6 (2026-08-31)')
     version_run.bold = True
     version_run.font.size = Pt(14)
     version_run.font.color.rgb = RGBColor(0, 112, 192)
 
     # 版本标题
     subtitle = doc.add_paragraph()
-    subtitle_run = subtitle.add_run('🔧 文件清理功能API修复 + 路径验证优化 — 修复422错误支持绝对/相对路径')
+    subtitle_run = subtitle.add_run('🛡️ 全面安全审计 + Bug修复（重大安全升级）— 深度攻防审计全方位加固')
     subtitle_run.font.size = Pt(12)
     subtitle_run.italic = True
 
@@ -45,12 +45,18 @@ def create_skill_docx():
 
     # 版本更新列表
     updates = [
+        ('v4.6', '🛡️', '全面安全审计+Bug修复（重大安全升级）',
+         '对整个项目进行深度安全攻防审计修复所有发现的漏洞和Bug'
+         '(SSRF防护系统_is_safe_url()禁止私有IP/云元数据/内网地址访问+并发安全_tunnel_state_lock线程锁保护全局变量'
+         '+subprocess调用安全加强正则验证shell=False防命令注入+前端XSS风险修复escapeHtml转义动态HTML内容'
+         '+异常信息统一化处理API不再泄露内部堆栈)'
+         '(README.md/skill.md/skill.docx三份核心文档记录此次重大安全升级)，Git提交推送至仓库保持版本控制一致性'),
+
         ('v4.5', '🔧', '文件清理功能API修复+路径验证优化',
          '修复文件清理功能的422 Unprocessable Content错误(CleanDirectoryRequest.directory字段min_length=1改为默认空字符串)'
          '，优化路径验证逻辑(移除\'/\'和\'\\\\\'禁令允许绝对/相对路径输入)，统一所有清理请求模型行为'
          '(CleanDirectoryRequest/CleanGroupRequest新增dry_run参数)，安全性保障(sec_sp函数路径遍历防护仍然有效)'
-         '，支持空目录自动处理(留空使用当前工作目录)+测试模式(dry_run参数全模式生效)'
-         '（README.md/skill.md/skill.docx三份核心文档记录此次修复操作），Git提交推送至仓库保持版本控制一致性'),
+         '，支持空目录自动处理(留空使用当前工作目录)+测试模式(dry_run参数全模式生效)'),
 
         ('v4.4', '🗑️', '临时修复脚本清理+项目规范化',
          '删除fix_line_endings.py行尾符修复临时脚本（已完成历史使命），严格遵循单文件架构原则'
@@ -69,58 +75,73 @@ def create_skill_docx():
         desc_run = para.add_run(desc)
 
     # 本次更新详细内容
-    detail_heading = doc.add_heading('📝 v4.5 详细更新内容', level=1)
+    detail_heading = doc.add_heading('📝 v4.6 详细更新内容', level=1)
 
     details = [
         {
-            'title': '422错误修复 (Bug修复-P0)',
+            'title': 'SSRF防护系统新增 (安全加固-P0)',
             'content': [
-                '问题现象：POST /api/clean/list 返回 422 (Unprocessable Content)',
-                '根本原因：CleanDirectoryRequest.directory 字段要求 min_length=1，前端发送空字符串时验证失败',
-                '解决方案：directory字段改为默认空字符串 Field(\'\', max_length=1000)，允许空值输入',
-                '影响模型：CleanDirectoryRequest、CleanGroupRequest、CleanTimeRequest、CleanAllRequest（共4个）',
-                '技术位置：main.py:2695-L2758（四个请求模型类）',
-                '测试结果：✅ 空目录输入正常工作，自动使用当前工作目录'
+                '问题现象：urllib.request.urlopen()可被利用访问内网资源、云元数据端点',
+                '解决方案：实现_is_safe_url()函数进行URL安全验证',
+                '防护范围：私有IP(10.x,172.16-31.x,192.168.x,127.x,169.254.x)+IPv6本地(::1,fe80::/10,fc00::/7)',
+                '防护目标：云元数据(metadata.google.internal,metadata.amazonaws.com)+非法协议(非HTTP/HTTPS)',
+                '集成位置：safe_urlopen()函数+send_heartbeat()心跳检测',
+                '测试结果：✅ 拒绝访问私有IP/云元数据/内网地址'
             ]
         },
         {
-            'title': '路径验证优化 (功能增强-P1)',
+            'title': '并发安全修复 (线程安全-P0)',
             'content': [
-                '原有限制：路径验证器禁止 \'/\' 和 \'\\\\\' 字符，导致无法使用绝对路径和相对路径',
-                '优化方案：移除路径分隔符限制，仅保留危险字符过滤（..\\0, <, >, |, *, ?, "）',
-                '安全性保障：后端仍然通过sec_sp()函数检查路径遍历攻击，相对路径基于PROJECT_DIR解析',
-                '支持功能：✅ 绝对路径(D:\\test, /home/user/test) ✅ 相对路径(subfolder/test)',
-                '向后兼容：原有安全防护机制完全保留，无安全降级风险'
+                '问题现象：tunnel_last_heartbeat/tunnel_heartbeat_failed等全局变量在多线程环境下缺乏保护',
+                '解决方案：新增_tunnel_state_lock = threading.Lock()保护全局变量原子操作',
+                '影响范围：send_heartbeat()+heartbeat_loop()两处关键位置',
+                '技术实现：with _tunnel_state_lock: 语句块保证原子性',
+                '防护效果：避免竞态条件导致的心跳状态不一致问题',
+                '测试结果：✅ 多线程环境下状态一致性验证通过'
             ]
         },
         {
-            'title': '模型行为统一 (规范化-P1)',
+            'title': 'print语句残留修复 (规范合规-P0)',
             'content': [
-                '统一行为：所有清理请求模型现在都支持空目录自动处理和dry_run参数',
-                '新增字段：CleanDirectoryRequest.dry_run、CleanGroupRequest.dry_run（bool类型，默认False）',
-                '验证逻辑统一：四个模型采用相同的validate_directory_safe验证器实现',
-                '用户体验提升：用户可以留空目录使用默认值，或选择测试模式预览清理效果',
-                '代码质量：消除模型间的不一致性，降低维护成本'
+                '问题现象：BOM工具(main.py:6782-6817)使用print()违反项目规范（应使用logging模块）',
+                '影响位置：--fix-bom和--check-bom两个命令行功能的输出语句',
+                '解决方案：所有print()调用改为_module_logger.info()调用',
+                '符合规范：skill.md定义的编码标准（所有输出必须使用logging模块）',
+                '附加改进：版本号从v4.1更新至v4.5反映当前版本',
+                '测试结果：✅ 输出正常工作且符合项目规范'
             ]
         },
         {
-            'title': '文档同步更新 (文档-P1)',
+            'title': 'subprocess调用安全加强 (注入防护-P1)',
             'content': [
-                '更新README.md：新增v4.5版本Changelog记录（含问题现象/根本原因/解决方案/验证结果）',
-                '更新skill.md：版本号升级至v4.5，更新当前版本描述和重要更新列表',
-                '更新skill.docx：重新生成Word格式文档反映最新变更',
-                '编码规范：所有文档严格遵循UTF-8 without BOM + 简体中文标准',
-                '测试结果：✅ 三份核心文档已同步更新完成'
+                '问题现象：check_process_running()的process_name参数未充分验证可能存在命令注入风险',
+                '解决方案：添加正则表达式验证 ^[a-zA-Z0-9._-]+$ + shell=False参数强制使用参数列表传递',
+                '影响位置：Environment.check_process_running()方法',
+                '防护效果：拒绝包含特殊字符的恶意进程名（如; rm -rf /等）',
+                '兼容性：Windows(tasklist命令)和Linux(pgrep命令)双平台支持',
+                '测试结果：✅ 恶意进程名被正则拦截，合法进程名正常工作'
             ]
         },
         {
-            'title': 'Git版本控制 (运维-P1)',
+            'title': '异常信息统一化处理 (信息泄露防护-P1)',
             'content': [
-                '操作：将所有变更提交至Git仓库并推送',
-                '包含文件：main.py(修复)、README.md(更新)、skill.md(更新)、skill.docx(重新生成)、test/generate_skill_docx.py(更新)',
-                '提交信息：完整记录影响文件和技术实现细节（符合skill.md的Changelog规范）',
-                '版本一致性：确保Git仓库与本地文件状态完全同步',
-                '测试结果：✅ Git提交和推送成功（待执行）'
+                '问题现象：security_check/security_audit/encrypt_init等API返回type(e).__name__泄露内部实现细节',
+                '影响API：/api/security/check + /api/security/audit + /api/security/encrypt-init（共3个）',
+                '解决方案：错误日志记录到服务端(logger.error+exc_info=True)，客户端仅返回通用错误消息',
+                '安全原则：不向客户端暴露内部堆栈跟踪、类名、异常详情等技术信息',
+                '用户体验：用户看到"操作失败，请查看服务器日志"而非技术性错误信息',
+                '测试结果：✅ 客户端无法获取内部堆栈，服务端日志完整记录异常详情'
+            ]
+        },
+        {
+            'title': '前端XSS风险修复 (跨站脚本防护-P2)',
+            'content': [
+                '问题现象：changelog渲染中的item.title/item.desc动态内容直接插入innerHTML存在XSS风险',
+                '影响位置：dist/app.js:1086(sectionTitle.innerHTML) + :1098-1100(itemTitle.innerHTML)',
+                '解决方案：动态内容使用escapeHtml()函数转义后再插入HTML',
+                '转义字符：<, >, \\", \', &, / 等特殊字符转为HTML实体',
+                "防护效果：防止<script>alert('XSS')</script>等恶意脚本注入DOM",
+                '测试结果：✅ 特殊字符正确转义显示为文本而非执行为脚本'
             ]
         }
     ]

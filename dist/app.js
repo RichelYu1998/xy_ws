@@ -1083,9 +1083,9 @@
                                     if (item.type === 'section') {
                                         var sectionTitle = document.createElement('div');
                                         sectionTitle.style.cssText = 'font-weight: 700; color: #303133; font-size: 15px; margin-bottom: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px;';
-                                        sectionTitle.innerHTML = '<i class="fa fa-bookmark" style="color: #409EFF; margin-right: 6px;"></i>' + (item.title || '');
+                                        sectionTitle.innerHTML = '<i class="fa fa-bookmark" style="color: #409EFF; margin-right: 6px;"></i>' + escapeHtml(item.title || '');
                                         itemDiv.appendChild(sectionTitle);
-                                        
+
                                         if (item.content && item.content.trim()) {
                                             var contentDiv = document.createElement('div');
                                             contentDiv.style.cssText = 'padding: 10px 16px; color: #606266; font-size: 13px; line-height: 1.9; background: #fafafa; border-radius: 4px;';
@@ -1095,9 +1095,9 @@
                                     } else {
                                         var itemTitle = document.createElement('div');
                                         itemTitle.style.cssText = 'font-weight: 600; color: #303133; font-size: 14px;';
-                                        itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' + 
-                                            (item.title || '') + 
-                                            (item.desc ? ' <span style="color:#606266;font-size:13px;"> - ' + item.desc + '</span>' : '');
+                                        itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' +
+                                            escapeHtml(item.title || '') +
+                                            (item.desc ? ' <span style="color:#606266;font-size:13px;"> - ' + escapeHtml(item.desc) + '</span>' : '');
                                         itemDiv.appendChild(itemTitle);
                                     }
 

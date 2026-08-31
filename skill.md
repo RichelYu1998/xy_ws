@@ -21,9 +21,10 @@
 
 ---
 
-> **📌 当前版本**: **v4.5** (2026-08-31) - 🔧 **文件清理功能API修复+路径验证优化** — 修复文件清理功能的422 Unprocessable Content错误，优化路径验证逻辑以支持绝对路径和相对路径输入，统一所有清理请求模型的行为规范(CleanDirectoryRequest/CleanGroupRequest/CleanTimeRequest/CleanAllRequest)，放宽路径分隔符限制(移除'/'和'\\'禁令)同时保留路径遍历防护(sec_sp函数)，新增dry_run参数支持测试模式，符合skill.md定义的编码标准（UTF-8 without BOM + 简体中文），同步更新README.md/skill.md/skill.docx三份文档并推送至Git仓库
+> **📌 当前版本**: **v4.6** (2026-08-31) - 🛡️ **全面安全审计+Bug修复（重大安全升级）** — 对整个项目进行深度安全攻防审计，修复所有发现的漏洞、Bug、代码质量问题（包括SSRF防护/XSS防护/并发安全/异常处理/输入验证等全方位加固），新增_is_safe_url()SSRF防护系统(禁止私有IP/云元数据/内网地址访问)、_tunnel_state_lock线程锁保护全局变量并发安全、subprocess调用安全性加强(正则验证+shell=False防止命令注入)、前端XSS风险修复(escapeHtml转义动态HTML内容)、异常信息统一化处理(API不再泄露内部堆栈给客户端)，符合skill.md定义的编码标准（UTF-8 without BOM + 简体中文），同步更新README.md/skill.md/skill.docx三份文档并推送至Git仓库
 
 > **⚠️ 重要更新**:
+> - **v4.6**: 🛡️ **全面安全审计+Bug修复（重大安全升级）** — 对整个项目进行深度安全攻防审计修复所有发现的漏洞和Bug（SSRF防护系统_is_safe_url()禁止私有IP/云元数据/内网地址访问、并发安全_tunnel_state_lock线程锁保护全局变量、subprocess调用安全加强正则验证+shell=False防命令注入、前端XSS风险修复escapeHtml转义动态HTML内容、异常信息统一化处理API不再泄露内部堆栈），审计覆盖范围（安全漏洞检测注入遍历XSS SSRF + Bug检测逻辑错误异常处理资源泄漏 + 代码质量检查规范性性能可维护性），零信任原则所有外部输入严格验证转义，影响文件main.py/dist/app.js/README.md/skill.md/skill.docx
 > - **v4.5**: 🔧 **文件清理功能API修复+路径验证优化** — 修复文件清理功能的422 Unprocessable Content错误(CleanDirectoryRequest.directory字段min_length=1改为默认空字符串)，优化路径验证逻辑(移除'/'和'\\'禁令允许绝对/相对路径输入)，统一所有清理请求模型行为(CleanDirectoryRequest/CleanGroupRequest新增dry_run参数+CleanTimeRequest/CleanAllRequest验证逻辑优化)，安全性保障(sec_sp函数路径遍历防护仍然有效+相对路径基于PROJECT_DIR解析)，支持空目录自动处理(留空使用当前工作目录)+测试模式(dry_run参数全模式生效)，技术实现(main.py:2695-L2758四个模型类修改)
 > - **v4.4**: 🗑️ **临时修复脚本清理+项目规范化** — 删除fix_line_endings.py行尾符修复临时脚本（已完成历史使命），严格遵循单文件架构原则（仅main.py作为主程序文件），清理原因（避免额外.py文件导致维护混乱），文档同步更新（README.md/skill.md/skill.docx三份核心文档记录此次清理操作），Git提交推送至仓库保持版本控制一致性，代码规范符合项目标准（UTF-8 without BOM + 简体中文注释）
 > - **v4.3**: 💻 **启动脚本终端输出增强（跨平台）** — 优化run.sh(L696-L749)和run.bat(L812-L873)启动脚本的终端显示功能，新增智能等待机制(等待3-4秒让服务完全启动)、多源数据提取逻辑(从web_output.log提取局域网地址和Public URL、从tunnel_url.txt提取隧道URL、从系统命令获取本机IP)、友好显示格式(启动完成！标题下分三行显示本地访问/局域网地址/公网访问)，macOS/Linux平台使用grep -oP正则提取+ipconfig getifaddr en0/hostname -I获取本机IP，Windows平台使用findstr搜索+powershell Get-NetIPAddress获取IPv4地址(排除169.254.x.x链路本地地址)，向后兼容(URL为空时显示"正在获取隧道URL..."提示)，用户体验显著提升(无需再手动查看日志文件即可直接看到所有访问地址)
