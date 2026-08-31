@@ -116,7 +116,7 @@ D:/ws/xy_ws/
 - **版本检查集成**: `check_python_version()` 函数已内置在 main.py L122-L191
 - **Import规范**: 所有import语句必须在文件开头（L1-L117），禁止函数内部内联import
 - **无独立脚本**: 已删除 `check_python_version.py` 和 `md_to_docx.py`，遵循单文件架构原则
-- **测试文件例外**: `tests/` 目录下的测试文件不违反单文件架构（属于质量保证体系）
+- **测试文件例外**: `test/` 目录下的测试文件不违反单文件架构（属于质量保证体系）
 - **Python 3.14兼容**: pydantic>=2.7.0,<2.13.0（2.12.0+支持Python 3.14 wheel）
 - **pip强制升级**: 启动脚本安装依赖前先升级pip，优先选择wheel预编译包
 - **BOM修复**: run.bat必须保存为UTF-8无BOM，否则@echo off失效
@@ -556,7 +556,7 @@ Security: CVE-2024-XXXXX
 #### 提交前检查清单
 
 - [ ] 代码通过语法检查 (`python3 -m py_compile main.py`)
-- [ ] 单元测试全部通过 (`pytest tests/ -v`)
+- [ ] 单元测试全部通过 (`pytest test/ -v`)
 - [ ] 安全扫描无高危问题 (`bandit -r main.py`)
 - [ ] 符合PY-SEC-*所有规范
 - [ ] 更新CHANGELOG (如涉及功能变更)
@@ -2267,7 +2267,7 @@ D:/ws/xy_ws/
 ├── skill.docx              # Word格式文档
 ├── run.bat                 # Windows启动脚本
 ├── run.sh                  # Linux/Mac启动脚本
-├── tests/                  # 测试目录
+├── test/                  # 测试目录
 │   ├── test_main.py        # 主测试文件
 │   ├── test_edge_cases.py  # 边界测试
 │   ├── stress_test.py      # 压力测试
@@ -3552,7 +3552,7 @@ logger.info(f"Cookie已加载: {mask_sensitive(cookie)}")  # 安全
 ## 🧪 测试规范
 
 ### 6.1 单元测试要求
-tests/test_syntax_check.py
+test/test_syntax_check.py
 import unittest
 import re
 
@@ -3682,7 +3682,7 @@ npm test
 刷新浏览器 → 运行任务 → 检查控制台输出和UI显示
 
 4. 回归测试
-python tests/test_regression.py
+python test/test_regression.py
 
 ---
 
@@ -4325,7 +4325,7 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest tests/ -v --cov=. --cov-report=xml
+        pytest test/ -v --cov=. --cov-report=xml
 
     - name: Upload coverage
       uses: codecov/codecov-action@v3
@@ -4957,9 +4957,9 @@ class TestExceptionHandling:
 | PY-CORE-018 | PWA离线缓存 | dist/sw.js + registerSW.js | 🟡 重要 |
 | PY-CORE-019 | Python依赖管理 | requirements.txt | 🟡 重要 |
 | PY-CORE-020 | Node.js依赖管理与补丁持久化 | dist/package.json | 🟡 重要 |
-| PY-CORE-021 | API压力测试 | tests/stress_test.py | 🟡 重要 |
-| PY-CORE-022 | 边界条件测试 | tests/test_edge_cases.py | 🟡 重要 |
-| PY-CORE-023 | 安全修复验证测试 | tests/test_security_fixes.py | 🟡 重要 |
+| PY-CORE-021 | API压力测试 | test/stress_test.py | 🟡 重要 |
+| PY-CORE-022 | 边界条件测试 | test/test_edge_cases.py | 🟡 重要 |
+| PY-CORE-023 | 安全修复验证测试 | test/test_security_fixes.py | 🟡 重要 |
 | PY-CORE-024 | 安全漏洞防护范式 | main.py | 🔴 核心 |
 
 **总计: 24个核心范式，覆盖项目中所有关键文件！**
@@ -5192,7 +5192,7 @@ JavaScript语法检查
 node --check dist/app.js
 
 单元测试
-python -m pytest tests/ -v
+python -m pytest test/ -v
 
 代码格式化（可选）
 black main.py

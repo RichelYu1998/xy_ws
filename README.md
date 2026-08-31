@@ -1012,7 +1012,7 @@ run.sh      # Linux/macOS: 启动前自动检测并修复 BOM
   - 规范编号: PY-CORE-000 (Import语句标准)
 
 - **代码质量验证 (测试通过)** — 多维度检查确认无回归问题
-  - [x] pytest tests/test_version.py -v → 10 passed in 0.04s ✅
+  - [x] pytest test/test_version.py -v → 10 passed in 0.04s ✅
   - [x] 内联import检查 → L117之后无任何import语句 ✅
   - [x] MD文件数量检查 → 只有 README.md + skill.md (2个) ✅
   - [x] Python文件数量检查 → 只有main.py（业务文件）✅
@@ -1035,7 +1035,7 @@ run.sh      # Linux/macOS: 启动前自动检测并修复 BOM
 
 #### 更新内容: 将check_python_version.py的版本检查函数整合到main.py中，删除独立脚本，更新相关文档和测试
 
-**影响文件**: [main.py](main.py) (L122-L191, L6088), [README.md](README.md), [skill.md](skill.md), [tests/test_version.py](tests/test_version.py), [tox.ini](tox.ini)
+**影响文件**: [main.py](main.py) (L122-L191, L6088), [README.md](README.md), [skill.md](skill.md), [test/test_version.py](test/test_version.py), [tox.ini](tox.ini)
 
 ---
 
@@ -1064,7 +1064,7 @@ run.sh      # Linux/macOS: 启动前自动检测并修复 BOM
 
 - **skill.md文档完善 (规范文档)** — 更新项目结构和模块说明
   - ✅ 项目文件结构新增:
-    * `tests/` 目录（单元测试）
+    * `test/` 目录（单元测试）
     * `tox.ini` 文件（多版本测试配置）
     * `md_to_docx.py` 工具脚本
   - ✅ 新增'重要说明(v3.8.90.03)'章节:
@@ -1095,7 +1095,7 @@ run.sh      # Linux/macOS: 启动前自动检测并修复 BOM
   - ✅ UTF-8编码强制要求已遵守
 
 - **验证结果** — 多维度测试和检查全部通过
-  - [x] pytest tests/test_version.py -v → 10 passed in 0.04s ✅
+  - [x] pytest test/test_version.py -v → 10 passed in 0.04s ✅
   [x] MD文件数量检查 → 只有 README.md + skill.md (2个) ✅
   [x] Git状态检查 → 所有变更已暂存 ✅
   [x] main.py语法检查 → 无语法错误 ✅
@@ -1117,13 +1117,13 @@ run.sh      # Linux/macOS: 启动前自动检测并修复 BOM
 
 #### 更新内容: 创建完整的Python版本兼容性验证方案，建立DOC-CORE-001文档管理铁律
 
-**影响文件**: [README.md](README.md), [skill.md](skill.md), [requirements.txt](requirements.txt), [check_python_version.py](check_python_version.py), [tests/](tests/), [tox.ini](tox.ini)
+**影响文件**: [README.md](README.md), [skill.md](skill.md), [requirements.txt](requirements.txt), [check_python_version.py](check_python_version.py), [test/](test/), [tox.ini](tox.ini)
 
 ---
 
 - **Python版本验证系统 (新增功能)** — 完整的多版本兼容性检查方案
   - ✅ 版本检查脚本 (check_python_version.py) — 检测Python >=3.0，显示特性支持
-  - ✅ 单元测试套件 (tests/test_version.py) — 10项测试全部通过
+  - ✅ 单元测试套件 (test/test_version.py) — 10项测试全部通过
   - ✅ Tox多版本测试配置 (tox.ini) — 支持3.9/3.10/3.11/3.12/3.13/3.14
   - ✅ README.md新增'🐍 Python版本兼容性验证'完整章节
   - 规范遵循: PY-CORE-002 (环境自适应范式)
@@ -1154,7 +1154,7 @@ run.sh      # Linux/macOS: 启动前自动检测并修复 BOM
 
 - **验证结果** — 多维度测试和检查全部通过
   - [x] python3 check_python_version.py → PASSED (Python 3.9.6) ✅
-  - [x] pytest tests/test_version.py -v → 10 passed in 0.04s ✅
+  - [x] pytest test/test_version.py -v → 10 passed in 0.04s ✅
   [x] MD文件数量检查 → 只有 README.md + skill.md (2个) ✅
   [x] requirements.txt语法检查 → PASSED ✅
   [x] Git状态检查 → 所有变更已暂存 ✅
