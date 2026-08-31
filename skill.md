@@ -8684,3 +8684,159 @@ class RunCommandRequest(BaseModel):
 - [x] 语法验证：py_compile + ast.parse 双重验证通过
 
 ---
+
+## 🔴 PY-CORE-025: Changelog API数据结构与Git历史集成范式 (Changelog API & Git History Integration)
+
+> **创建日期**: 2026-08-31 | **最后更新**: 2026-08-31 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 + 前端更新日志展示 | **参考基准**: v5.0.9
+
+### 范式描述
+`/api/changelog` 端点必须集成 **README.md 结构化解析** 与 **Git提交历史**，确保所有Git提交（无论多少次）都展示在API中。前后端必须使用统一的数据结构字段名，避免字段名不匹配导致Web展示空白。
+
+### 核心原则
+
+#### 1. 后端数据结构标准 (唯一合法格式)
+```python
+# ✅ 正确：changelog API返回的数据结构
+{
+    "success": True,
+    "changelog": [
+        {
+            "version": "5.0.9",           # 版本号或commit short hash
+            "date": "2026-08-31",        # 日期 YYYY-MM-DD
+            "title": "更新标题",          # 简短描述
+            "meta": {
+                "fix_date": "2026-08-31",
+                "fix_type": "🐛Bug修复",  # Emoji标签类型
+                "affected_files": "[main.py](main.py)",  # 带文件链接
+                "commit": "d9f7a9af",     # commit short hash
+                "change_stats": "+72行",
+                "author": "小旭二手机（西园路）"
+            },
+            "changes": [                  # ⚠️ 字段名必须是 changes（不是 items）
+                {
+                    "id": "1",
+                    "title": "变更标题",
+                    "tag": "🐛Bug修复",   # ⚠️ 字段名必须是 tag（不是 type）
+                    "problem": {
+                        "phenomenon": "现象描述",
+                        "root_cause": "根因分析",
+                        "scope": "影响范围"
+                    },
+                    "solution": {
+                        "implementation": "技术实现",
+                        "reference": "参考位置"
+                    },
+                    "verification": ["✅ 验证项1", "✅ 验证项2"]
+                }
+            ]
+        }
+    ]
+}
+```
+
+#### 2. 前端字段名兼容性 (必须实现)
+```javascript
+// ✅ 正确：兼容新旧数据结构
+var changes = latest.changes || latest.items || [];  // 优先 changes，降级 items
+
+// ❌ 错误：只访问单一字段名（导致Web展示空白）
+if (latest.items && latest.items.length) { ... }  // latest.items 为 undefined
+```
+
+**字段名映射表**:
+| 新字段 (v5.0.8+) | 旧字段 (v4.3及之前) | 说明 |
+|------------------|---------------------|------|
+| `changes` | `items` | 变更列表 |
+| `tag` | `type` | 变更类型标签 |
+| `problem` | - | 问题描述块 |
+| `solution` | - | 修复方案块 |
+| `verification` | - | 测试验证列表 |
+
+#### 3. Git提交历史集成逻辑
+```python
+# 合并策略：每个git提交都创建一个changelog条目（不去重）
+readme_version_map = {entry['version']: entry for entry in changelog}
+readme_versions_used = set()
+merged_changelog = []
+
+git_log_output = subprocess.check_output(
+    ['git', 'log', '--pretty=format:%H|%ad|%s', '--date=short'],
+    cwd=PROJECT_DIR, text=True, encoding='utf-8', stderr=subprocess.DEVNULL
+).strip()
+
+for log_line in git_log_output.split('\n'):
+    commit_hash, commit_date, commit_msg = parts
+    short_hash = commit_hash[:8]
+    version_key = re.search(r'v([\d.]+)', commit_msg)  # 从message提取版本号
+
+    if version_key in readme_version_map and version_key not in readme_versions_used:
+        # 首次匹配到README版本：使用完整结构化数据
+        readme_versions_used.add(version_key)
+        merged_changelog.append(readme_version_map[version_key])
+    else:
+        # 其余提交：从commit message生成基本条目
+        merged_changelog.append({
+            'version': version_key,
+            'date': commit_date,
+            'changes': [{'tag': '📝代码提交', 'problem': {...}, 'solution': {...}}]
+        })
+
+# README独有版本追加到末尾
+for entry in changelog:
+    if entry['version'] not in readme_versions_used:
+        merged_changelog.append(entry)
+```
+
+#### 4. 前端渲染规范
+```javascript
+// ✅ 正确：渲染问题描述/修复方案/测试验证三个块
+if (item.problem && Object.keys(item.problem).length) {
+    // 渲染：现象/根因/影响范围
+}
+if (item.solution && Object.keys(item.solution).length) {
+    // 渲染：技术实现/参考位置
+}
+if (item.verification && item.verification.length) {
+    // 渲染：✅ 验证项列表
+}
+```
+
+### 应用场景
+
+| 场景 | 文件位置 | 说明 |
+|------|----------|------|
+| **后端API端点** | `main.py` `/api/changelog` | 解析README.md + 集成git log |
+| **前端展示** | `dist/app.js:1070+` | 渲染changelog到Web界面 |
+| **版本检测** | `main.py` `get_version_from_readme()` | 从README提取最大版本号 |
+
+### 最佳实践清单
+
+- [ ] **后端字段名**：变更列表必须用 `changes`，类型标签必须用 `tag`
+- [ ] **前端兼容性**：使用 `latest.changes || latest.items || []` 兼容新旧结构
+- [ ] **Git历史集成**：每个git提交都创建独立条目，不去重
+- [ ] **版本号提取**：从commit message用 `re.search(r'v([\d.]+)')` 提取
+- [ ] **Emoji标签识别**：从commit message开头识别emoji自动分类
+- [ ] **字段补全**：自动补全commit hash、修复日期、作者字段
+- [ ] **异常处理**：git log失败时降级为仅返回README解析结果
+
+### 反面案例（避免）
+
+❌ 错误示例1：前端只访问旧字段名
+```javascript
+if (latest.items && latest.items.length) { ... }  // latest.items = undefined → 空白
+```
+
+❌ 错误示例2：按版本号去重git提交
+```python
+if version_key in seen_versions: continue  # 丢失同版本的多次提交
+```
+
+❌ 错误示例3：解析器遇到##就break
+```python
+if stripped.startswith('## ') and in_changelog:
+    break  # 只返回最新更新区，丢失历史版本
+```
+
+---
+
+---
