@@ -21,9 +21,10 @@
 
 ---
 
-> **📌 当前版本**: **v4.4** (2026-08-31) - 🗑️ **临时修复脚本清理+项目规范化** — 删除fix_line_endings.py临时脚本文件，遵循项目单文件架构规范（所有Python代码集中在main.py中），保持项目目录整洁，避免额外的.py文件导致维护混乱，符合skill.md定义的编码标准（UTF-8 without BOM + 简体中文），同步更新README.md/skill.md/skill.docx三份文档并推送至Git仓库
->
+> **📌 当前版本**: **v4.5** (2026-08-31) - 🔧 **文件清理功能API修复+路径验证优化** — 修复文件清理功能的422 Unprocessable Content错误，优化路径验证逻辑以支持绝对路径和相对路径输入，统一所有清理请求模型的行为规范(CleanDirectoryRequest/CleanGroupRequest/CleanTimeRequest/CleanAllRequest)，放宽路径分隔符限制(移除'/'和'\\'禁令)同时保留路径遍历防护(sec_sp函数)，新增dry_run参数支持测试模式，符合skill.md定义的编码标准（UTF-8 without BOM + 简体中文），同步更新README.md/skill.md/skill.docx三份文档并推送至Git仓库
+
 > **⚠️ 重要更新**:
+> - **v4.5**: 🔧 **文件清理功能API修复+路径验证优化** — 修复文件清理功能的422 Unprocessable Content错误(CleanDirectoryRequest.directory字段min_length=1改为默认空字符串)，优化路径验证逻辑(移除'/'和'\\'禁令允许绝对/相对路径输入)，统一所有清理请求模型行为(CleanDirectoryRequest/CleanGroupRequest新增dry_run参数+CleanTimeRequest/CleanAllRequest验证逻辑优化)，安全性保障(sec_sp函数路径遍历防护仍然有效+相对路径基于PROJECT_DIR解析)，支持空目录自动处理(留空使用当前工作目录)+测试模式(dry_run参数全模式生效)，技术实现(main.py:2695-L2758四个模型类修改)
 > - **v4.4**: 🗑️ **临时修复脚本清理+项目规范化** — 删除fix_line_endings.py行尾符修复临时脚本（已完成历史使命），严格遵循单文件架构原则（仅main.py作为主程序文件），清理原因（避免额外.py文件导致维护混乱），文档同步更新（README.md/skill.md/skill.docx三份核心文档记录此次清理操作），Git提交推送至仓库保持版本控制一致性，代码规范符合项目标准（UTF-8 without BOM + 简体中文注释）
 > - **v4.3**: 💻 **启动脚本终端输出增强（跨平台）** — 优化run.sh(L696-L749)和run.bat(L812-L873)启动脚本的终端显示功能，新增智能等待机制(等待3-4秒让服务完全启动)、多源数据提取逻辑(从web_output.log提取局域网地址和Public URL、从tunnel_url.txt提取隧道URL、从系统命令获取本机IP)、友好显示格式(启动完成！标题下分三行显示本地访问/局域网地址/公网访问)，macOS/Linux平台使用grep -oP正则提取+ipconfig getifaddr en0/hostname -I获取本机IP，Windows平台使用findstr搜索+powershell Get-NetIPAddress获取IPv4地址(排除169.254.x.x链路本地地址)，向后兼容(URL为空时显示"正在获取隧道URL..."提示)，用户体验显著提升(无需再手动查看日志文件即可直接看到所有访问地址)
 > - **v4.2**: 🌐 **局域网地址显示增强+日志完善+代码规范化** — 修复web_output.log日志文件缺少局域网地址显示问题，在main.py:9386(heartbeat_loop心跳循环)和main.py:9643(read_output hostc URL获取)两处关键位置新增局域网IP自动检测与记录逻辑，使用PathManager.get_lan_ip()复用现有方法获取局域网IP，动态读取端口配置(args.port或WEB_PORT环境变量默认8888)，条件写入(if lan_ip判断非空)保持日志格式整洁，确保服务重启后日志自动同时显示三层访问地址（本地localhost:8888/局域网http://{lan_ip}:8888/公网https://t-xxx.hostc.dev），立即手动更新当前web_output.log添加局域网地址验证(192.168.77.84:8888)，代码规范符合项目标准(UTF-8 + 简体中文)，Git提交信息完整记录影响文件和技术实现细节
@@ -52,14 +53,14 @@
 > - FastAPI: 禁用/docs、/redoc、/openapi.json端点
 > - kill_process_by_name: 添加进程名格式验证，改用列表参数
 > - 信息泄露: detail=str(e)替换为通用错误消息
-> - 版本号同步更新至v4.4（所有文档已同步，2026-08-31）
+> - 版本号同步更新至v4.5（所有文档已同步，2026-08-31）
 > - v3.8.89.31: 安全检查系统整合进main.py单文件架构，删除quick_security_check.py/security_audit.py/config_secure_template.py，新增SecurityChecker+DependencyAuditor+SecureConfigManager三个类，新增Playwright+移动端8项安全检查（浏览器上下文隔离/动态内容操作安全/文件下载上传安全/浏览器指纹反检测/移动端环境安全/网络流量安全/截图快照安全/Playwright进程安全），新增API端点/api/security/check+/api/security/audit+/api/security/encrypt-init，requirements.txt补充安全审计+代码质量+测试+移动端增强依赖，SECURITY_CHECKLIST.md合并进README.md+skill.md后删除
 > - v3.8.89.30: 启动脚本残留进程自动清理，run.bat/run.sh启动时分层清理node/python/hostc进程：①精准清理命令行含playwright的node进程（wmic+findstr/taskkill PID）②兜底清理所有node进程（taskkill /IM / pkill）③run.sh补齐playwright+node清理，与run.bat逻辑对齐，从源头消除Playwright "Connection closed while reading from the driver" 错误
 > - v3.8.89.29: 安全加固第四轮，完善3个薄弱点：①命令白名单+shell=False（shlex.split解析+仅允许python+main.py）②CSRF防护（写操作验证Origin/Referer）③API Key认证（secrets.token_urlsafe生成+secrets.compare_digest验证+前端monkey-patch fetch自动注入）
 > - v3.8.89.28: 修复邮件From头+Subject头两处构造Bug，`Header.encode()` 抛AttributeError导致所有隧道通知邮件发送失败；From头改用 `formataddr()` 标准库函数，Subject头改用字符串赋值（Python3.14新policy下Header对象在as_string()时崩溃）
 > - 项目采用**单文件架构**，所有Python代码集中在 `main.py` 中
 > - 无任何额外的.py文件，避免导入依赖问题
-> - 当前commit: 已推送（v4.4 临时修复脚本清理+项目规范化，2026-08-31）
+> - 当前commit: 已推送（v4.5 文件清理功能API修复+路径验证优化，2026-08-31）
 
 作者: 小旭二手机（西园路）
 

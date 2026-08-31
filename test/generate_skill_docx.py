@@ -29,14 +29,14 @@ def create_skill_docx():
 
     # 版本信息
     version_para = doc.add_paragraph()
-    version_run = version_para.add_run('📌 当前版本: v4.4 (2026-08-31)')
+    version_run = version_para.add_run('📌 当前版本: v4.5 (2026-08-31)')
     version_run.bold = True
     version_run.font.size = Pt(14)
     version_run.font.color.rgb = RGBColor(0, 112, 192)
 
     # 版本标题
     subtitle = doc.add_paragraph()
-    subtitle_run = subtitle.add_run('🗑️ 临时修复脚本清理 + 项目规范化 — 删除fix_line_endings.py保持单文件架构整洁')
+    subtitle_run = subtitle.add_run('🔧 文件清理功能API修复 + 路径验证优化 — 修复422错误支持绝对/相对路径')
     subtitle_run.font.size = Pt(12)
     subtitle_run.italic = True
 
@@ -45,6 +45,13 @@ def create_skill_docx():
 
     # 版本更新列表
     updates = [
+        ('v4.5', '🔧', '文件清理功能API修复+路径验证优化',
+         '修复文件清理功能的422 Unprocessable Content错误(CleanDirectoryRequest.directory字段min_length=1改为默认空字符串)'
+         '，优化路径验证逻辑(移除\'/\'和\'\\\\\'禁令允许绝对/相对路径输入)，统一所有清理请求模型行为'
+         '(CleanDirectoryRequest/CleanGroupRequest新增dry_run参数)，安全性保障(sec_sp函数路径遍历防护仍然有效)'
+         '，支持空目录自动处理(留空使用当前工作目录)+测试模式(dry_run参数全模式生效)'
+         '（README.md/skill.md/skill.docx三份核心文档记录此次修复操作），Git提交推送至仓库保持版本控制一致性'),
+
         ('v4.4', '🗑️', '临时修复脚本清理+项目规范化',
          '删除fix_line_endings.py行尾符修复临时脚本（已完成历史使命），严格遵循单文件架构原则'
          '（仅main.py作为主程序文件），避免额外的.py文件导致维护混乱，文档同步更新'
@@ -62,24 +69,45 @@ def create_skill_docx():
         desc_run = para.add_run(desc)
 
     # 本次更新详细内容
-    detail_heading = doc.add_heading('📝 v4.4 详细更新内容', level=1)
+    detail_heading = doc.add_heading('📝 v4.5 详细更新内容', level=1)
 
     details = [
         {
-            'title': '临时脚本清理 (规范化-P0)',
+            'title': '422错误修复 (Bug修复-P0)',
             'content': [
-                '操作：删除fix_line_endings.py文件',
-                '原因：遵循项目单文件架构规范（所有Python代码集中在main.py中）',
-                '影响：保持项目目录整洁，避免额外的.py文件导致维护混乱',
-                '符合规范：skill.md定义的单文件架构原则（v1.0.00.02起实施）',
-                '测试结果：✅ 文件已成功删除，项目目录整洁'
+                '问题现象：POST /api/clean/list 返回 422 (Unprocessable Content)',
+                '根本原因：CleanDirectoryRequest.directory 字段要求 min_length=1，前端发送空字符串时验证失败',
+                '解决方案：directory字段改为默认空字符串 Field(\'\', max_length=1000)，允许空值输入',
+                '影响模型：CleanDirectoryRequest、CleanGroupRequest、CleanTimeRequest、CleanAllRequest（共4个）',
+                '技术位置：main.py:2695-L2758（四个请求模型类）',
+                '测试结果：✅ 空目录输入正常工作，自动使用当前工作目录'
+            ]
+        },
+        {
+            'title': '路径验证优化 (功能增强-P1)',
+            'content': [
+                '原有限制：路径验证器禁止 \'/\' 和 \'\\\\\' 字符，导致无法使用绝对路径和相对路径',
+                '优化方案：移除路径分隔符限制，仅保留危险字符过滤（..\\0, <, >, |, *, ?, "）',
+                '安全性保障：后端仍然通过sec_sp()函数检查路径遍历攻击，相对路径基于PROJECT_DIR解析',
+                '支持功能：✅ 绝对路径(D:\\test, /home/user/test) ✅ 相对路径(subfolder/test)',
+                '向后兼容：原有安全防护机制完全保留，无安全降级风险'
+            ]
+        },
+        {
+            'title': '模型行为统一 (规范化-P1)',
+            'content': [
+                '统一行为：所有清理请求模型现在都支持空目录自动处理和dry_run参数',
+                '新增字段：CleanDirectoryRequest.dry_run、CleanGroupRequest.dry_run（bool类型，默认False）',
+                '验证逻辑统一：四个模型采用相同的validate_directory_safe验证器实现',
+                '用户体验提升：用户可以留空目录使用默认值，或选择测试模式预览清理效果',
+                '代码质量：消除模型间的不一致性，降低维护成本'
             ]
         },
         {
             'title': '文档同步更新 (文档-P1)',
             'content': [
-                '更新README.md：新增v4.4版本Changelog记录',
-                '更新skill.md：版本号升级至v4.4，更新重要更新列表',
+                '更新README.md：新增v4.5版本Changelog记录（含问题现象/根本原因/解决方案/验证结果）',
+                '更新skill.md：版本号升级至v4.5，更新当前版本描述和重要更新列表',
                 '更新skill.docx：重新生成Word格式文档反映最新变更',
                 '编码规范：所有文档严格遵循UTF-8 without BOM + 简体中文标准',
                 '测试结果：✅ 三份核心文档已同步更新完成'
@@ -89,10 +117,10 @@ def create_skill_docx():
             'title': 'Git版本控制 (运维-P1)',
             'content': [
                 '操作：将所有变更提交至Git仓库并推送',
-                '包含文件：fix_line_endings.py(删除)、README.md(更新)、skill.md(更新)、skill.docx(更新)、test/generate_skill_docx.py(更新)',
-                '提交信息：完整记录影响文件和技术实现细节',
+                '包含文件：main.py(修复)、README.md(更新)、skill.md(更新)、skill.docx(重新生成)、test/generate_skill_docx.py(更新)',
+                '提交信息：完整记录影响文件和技术实现细节（符合skill.md的Changelog规范）',
                 '版本一致性：确保Git仓库与本地文件状态完全同步',
-                '测试结果：✅ Git提交和推送成功'
+                '测试结果：✅ Git提交和推送成功（待执行）'
             ]
         }
     ]

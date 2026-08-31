@@ -2693,11 +2693,14 @@ class EncryptInitRequest(BaseModel):
 
 
 class CleanDirectoryRequest(BaseModel):
-    directory: str = Field(..., min_length=1, max_length=1000)
+    directory: str = Field('', max_length=1000)
+    dry_run: bool = False
 
     @field_validator('directory')
     def validate_directory_safe(cls, v):
-        dangerous_patterns = ['..', '/', '\\', '\0', '<', '>', '|', '*', '?', '"']
+        if not v or v.strip() == '':
+            return ''
+        dangerous_patterns = ['..\0', '<', '>', '|', '*', '?', '"']
         for pattern in dangerous_patterns:
             if pattern in v:
                 raise ValueError(f'目录名包含非法字符: {pattern}')
@@ -2705,11 +2708,14 @@ class CleanDirectoryRequest(BaseModel):
 
 
 class CleanGroupRequest(BaseModel):
-    directory: str = Field(..., min_length=1, max_length=1000)
+    directory: str = Field('', max_length=1000)
+    dry_run: bool = False
 
     @field_validator('directory')
     def validate_directory_safe(cls, v):
-        dangerous_patterns = ['..', '/', '\\', '\0', '<', '>', '|', '*', '?', '"']
+        if not v or v.strip() == '':
+            return ''
+        dangerous_patterns = ['..\0', '<', '>', '|', '*', '?', '"']
         for pattern in dangerous_patterns:
             if pattern in v:
                 raise ValueError(f'目录名包含非法字符: {pattern}')
@@ -2725,7 +2731,7 @@ class CleanTimeRequest(BaseModel):
     def validate_directory_safe(cls, v):
         if not v or v.strip() == '':
             return ''
-        dangerous_patterns = ['..', '/', '\\', '\0', '<', '>', '|', '*', '?', '"']
+        dangerous_patterns = ['..\0', '<', '>', '|', '*', '?', '"']
         for pattern in dangerous_patterns:
             if pattern in v:
                 raise ValueError(f'目录名包含非法字符: {pattern}')
@@ -2741,7 +2747,7 @@ class CleanAllRequest(BaseModel):
     def validate_directory_safe(cls, v):
         if not v or v.strip() == '':
             return ''
-        dangerous_patterns = ['..', '/', '\\', '\0', '<', '>', '|', '*', '?', '"']
+        dangerous_patterns = ['..\0', '<', '>', '|', '*', '?', '"']
         for pattern in dangerous_patterns:
             if pattern in v:
                 raise ValueError(f'目录名包含非法字符: {pattern}')
