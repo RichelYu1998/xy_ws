@@ -8797,6 +8797,8 @@ if __name__ == '__main__':
                 current_items = []
                 current_item = None
                 current_section = None
+                current_sub_section = None
+                current_block = None
                 in_changelog = False
                 in_code_block = False
                 for line in lines:
@@ -8819,12 +8821,18 @@ if __name__ == '__main__':
                             version_match = type('VM', (), {'group': lambda self, n: m_no_date.group(n) if n <= m_no_date.lastindex else ''})()
                     if version_match:
                         if current_version:
-                            if current_section:
+                            if current_block:
+                                if current_sub_section:
+                                    current_sub_section['blocks'].append(current_block)
+                                    current_sub_section = None
+                                current_section['sub_sections'].append(current_sub_section) if current_sub_section else None
                                 current_items.append(current_section)
-                                current_section = None
+                            elif current_sub_section:
+                                current_items.append(current_sub_section)
+                            elif current_section:
+                                current_items.append(current_section)
                             elif current_item:
                                 current_items.append(current_item)
-                                current_item = None
                             changelog.append({
                                 'version': current_version,
                                 'date': current_date,
@@ -8835,18 +8843,74 @@ if __name__ == '__main__':
                         current_items = []
                         current_item = None
                         current_section = None
+                        current_sub_section = None
+                        current_block = None
                         in_code_block = False
                         continue
                     if stripped.startswith('## ') and in_changelog and current_version:
                         break
                     if stripped.startswith('```'):
                         in_code_block = not in_code_block
-                        if current_section:
+                        if current_block:
+                            current_block['content'] += line + '\n'
+                        elif current_section:
                             current_section['content'] += line + '\n'
+                        continue
+                    sub_section_match = re.match(r'^#####\s+(.+?)\s*\((.+?)\)$', stripped)
+                    if sub_section_match and current_version:
+                        if current_block:
+                            if current_sub_section:
+                                current_sub_section['blocks'].append(current_block)
+                            else:
+                                if current_section:
+                                    current_section['sub_sections'] = current_section.get('sub_sections', [])
+                                    current_sub_section = {'type': 'sub_section', 'title': sub_section_match.group(1).strip(), 'tag': sub_section_match.group(2).strip(), 'blocks': []}
+                                    current_section['sub_sections'].append(current_sub_section)
+                                else:
+                                    current_sub_section = {'type': 'sub_section', 'title': sub_section_match.group(1).strip(), 'tag': sub_section_match.group(2).strip(), 'blocks': []}
+                                    current_items.append(current_sub_section)
+                            current_block = None
+                        elif current_sub_section:
+                            current_items.append(current_sub_section)
+                            current_sub_section = {'type': 'sub_section', 'title': sub_section_match.group(1).strip(), 'tag': sub_section_match.group(2).strip(), 'blocks': []}
+                            if current_section:
+                                current_section['sub_sections'] = current_section.get('sub_sections', [])
+                                current_section['sub_sections'].append(current_sub_section)
+                            else:
+                                current_items.append(current_sub_section)
+                        else:
+                            current_sub_section = {'type': 'sub_section', 'title': sub_section_match.group(1).strip(), 'tag': sub_section_match.group(2).strip(), 'blocks': []}
+                            if current_section:
+                                current_section['sub_sections'] = current_section.get('sub_sections', [])
+                                current_section['sub_sections'].append(current_sub_section)
+                            else:
+                                current_items.append(current_sub_section)
+                        current_block = None
+                        continue
+                    block_header_match = re.match(r'^\*\*(.+?)\*\*:\s*$', stripped)
+                    if block_header_match and (current_sub_section or current_section):
+                        block_title = block_header_match.group(1)
+                        if block_title in ['问题描述', '修复方案', '测试验证']:
+                            if current_block:
+                                if current_sub_section:
+                                    current_sub_section['blocks'].append(current_block)
+                                elif current_section:
+                                    current_section['blocks'] = current_section.get('blocks', [])
+                                    current_section['blocks'].append(current_block)
+                            current_block = {'type': 'block', 'title': block_title, 'items': [], 'content': ''}
                         continue
                     section_match = re.match(r'^####\s+(.+)$', stripped)
                     if section_match and current_version:
-                        if current_section:
+                        if current_block:
+                            if current_sub_section:
+                                current_sub_section['blocks'].append(current_block)
+                                current_sub_section = None
+                            current_items.append(current_section) if current_section else None
+                            current_section = None
+                        elif current_sub_section:
+                            current_items.append(current_sub_section)
+                            current_sub_section = None
+                        elif current_section:
                             current_items.append(current_section)
                         elif current_item:
                             current_items.append(current_item)
@@ -8855,11 +8919,20 @@ if __name__ == '__main__':
                             'type': 'section',
                             'title': section_match.group(1).strip(),
                             'content': '',
-                            'sub_items': []
+                            'sub_items': [],
+                            'sub_sections': [],
+                            'blocks': []
                         }
+                        current_block = None
                         continue
-                    item_match = re.match(r'^-\s+\*\*(.+?)\*\*\s*[-–]?\s*(.*)', stripped)
+                    item_match = re.match(r'^-\s+\*\*(.+?)\*\*\s*[-–:]?\s*(.*)', stripped)
                     if item_match and current_version:
+                        if current_block:
+                            current_block['items'].append({'type': 'item', 'title': item_match.group(1), 'desc': item_match.group(2).strip(), 'sub_items': []})
+                            continue
+                        if current_sub_section:
+                            current_sub_section.setdefault('items', []).append({'type': 'item', 'title': item_match.group(1), 'desc': item_match.group(2).strip(), 'sub_items': []})
+                            continue
                         if current_section:
                             current_items.append(current_section)
                             current_section = None
@@ -8873,19 +8946,32 @@ if __name__ == '__main__':
                         }
                         continue
                     sub_match = re.match(r'^-\s+(.*)', stripped)
-                    if sub_match and (current_item or current_section):
+                    if sub_match and (current_item or current_section or current_block):
                         is_indented = line.startswith('  ') or line.startswith('\t')
-                        if current_item and is_indented:
+                        if current_block:
+                            current_block['items'][-1]['sub_items'].append(sub_match.group(1).strip()) if current_block['items'] else None
+                        elif current_item and is_indented:
                             current_item['sub_items'].append(sub_match.group(1).strip())
                         elif current_section:
                             current_section['sub_items'].append(sub_match.group(1).strip())
                         continue
-                    if current_section:
+                    if current_block:
+                        if in_code_block or stripped:
+                            current_block['content'] += line + '\n'
+                    elif current_section:
                         if in_code_block:
                             current_section['content'] += line + '\n'
-                        elif stripped:
+                        elif stripped and not stripped.startswith('---'):
                             current_section['content'] += line + '\n'
-                if current_section:
+                if current_block:
+                    if current_sub_section:
+                        current_sub_section['blocks'].append(current_block)
+                    elif current_section:
+                        current_section['blocks'] = current_section.get('blocks', [])
+                        current_section['blocks'].append(current_block)
+                if current_sub_section:
+                    current_items.append(current_sub_section)
+                elif current_section:
                     current_items.append(current_section)
                 elif current_item:
                     current_items.append(current_item)
