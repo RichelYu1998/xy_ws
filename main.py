@@ -8968,7 +8968,29 @@ if __name__ == '__main__':
                         for commit_hash, commit_date, commit_msg, commit_files, total_add, total_del in git_commits:
                             short_hash = commit_hash[:8]
                             ver_in_msg = re.search(r'v([\d.]+)', commit_msg)
-                            version_key = ver_in_msg.group(1) if ver_in_msg else short_hash
+                            if ver_in_msg:
+                                version_key = ver_in_msg.group(1)
+                            else:
+                                def find_nearest_version(commit_dt, versions_map):
+                                    from datetime import datetime
+                                    try:
+                                        commit_datetime = datetime.strptime(commit_dt, '%Y-%m-%d')
+                                        min_diff = float('inf')
+                                        nearest_ver = short_hash
+                                        for ver, info in versions_map.items():
+                                            if 'date' in info and info['date'] != '待补充':
+                                                try:
+                                                    ver_datetime = datetime.strptime(info['date'], '%Y-%m-%d')
+                                                    diff = abs((commit_datetime - ver_datetime).days)
+                                                    if diff < min_diff:
+                                                        min_diff = diff
+                                                        nearest_ver = ver
+                                                except:
+                                                    continue
+                                        return nearest_ver if min_diff <= 30 else short_hash
+                                    except:
+                                        return short_hash
+                                version_key = find_nearest_version(commit_date, readme_version_map)
                             clean_msg = re.sub(r'^(feat|fix|docs|refactor|convention|security|chore|style|test|perf|build|ci)\s*\(?\)?:\s*', '', commit_msg, flags=re.IGNORECASE)
                             clean_msg = re.sub(r'^v[\d.]+\s*[:：]?\s*', '', clean_msg)
                             clean_msg = re.sub(r'\s*\(20\d{2}-\d{2}-\d{2}\)\s*$', '', clean_msg)
