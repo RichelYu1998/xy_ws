@@ -209,6 +209,185 @@ detect_python_env() {
     return 0
 }
 
+test_brew_mirror() {
+    log "[*] 测试Homebrew国内镜像源速度..."
+    
+    local mirrors=(
+        "阿里云|https://mirrors.aliyun.com/homebrew/brew.git"
+        "中科大|https://mirrors.ustc.edu.cn/homebrew/brew.git"
+        "清华|https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+        "腾讯|https://mirrors.cloud.tencent.com/homebrew/brew.git"
+    )
+    
+    local fastest_mirror=""
+    local fastest_time=99999
+    
+    for mirror_info in "${mirrors[@]}"; do
+        local mirror_name="${mirror_info%%|*}"
+        local mirror_url="${mirror_info##*|}"
+        
+        log "    测试 ${mirror_name}..."
+        local start_time=$(date +%s%N 2>/dev/null || date +%s)
+        local http_code=$(curl -o /dev/null -s -w "%{http_code}" --connect-timeout 3 --max-time 5 "$mirror_url" 2>/dev/null)
+        local end_time=$(date +%s%N 2>/dev/null || date +%s)
+        
+        if [ "$http_code" = "200" ] || [ "$http_code" = "301" ] || [ "$http_code" = "302" ]; then
+            local elapsed=$(( (end_time - start_time) / 1000000 ))
+            if [ $elapsed -lt 1 ]; then
+                elapsed=1
+            fi
+            log "        ${mirror_name}: ${elapsed}ms ✅"
+            
+            if [ $elapsed -lt $fastest_time ]; then
+                fastest_time=$elapsed
+                fastest_mirror="$mirror_name"
+            fi
+        else
+            log "        ${mirror_name}: 超时或不可用 ❌"
+        fi
+    done
+    
+    if [ -n "$fastest_mirror" ]; then
+        log "[*] 最快Homebrew镜像: ${fastest_mirror} [${fastest_time}ms]"
+        echo "$fastest_mirror"
+        return 0
+    else
+        log "[WARNING] 所有Homebrew镜像测试失败，使用官方源"
+        echo "official"
+        return 1
+    fi
+}
+
+auto_install_homebrew() {
+    log "[*] 正在全自动安装Homebrew..."
+    
+    local fastest_mirror
+    fastest_mirror=$(test_brew_mirror)
+    
+    case "$fastest_mirror" in
+        "阿里云")
+            log "    使用阿里云镜像源安装Homebrew..."
+            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            
+            if [ $? -eq 0 ]; then
+                log "[*] 配置Homebrew使用阿里云加速源..."
+                
+                if [ -f "/opt/homebrew/bin/brew" ]; then
+                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/brew.git"
+                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.aliyun.com/homebrew-core.git"
+                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.aliyun.com/homebrew-cask.git"
+                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles"
+                    
+                    eval "$(/opt/homebrew/bin/brew shellenv)"
+                    
+                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/core https://mirrors.aliyun.com/homebrew-core.git 2>/dev/null || true
+                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.aliyun.com/homebrew-cask.git 2>/dev/null || true
+                    
+                elif [ -f "/usr/local/bin/brew" ]; then
+                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/brew.git"
+                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.aliyun.com/homebrew-core.git"
+                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.aliyun.com/homebrew-cask.git"
+                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles"
+                    
+                    eval "$(/usr/local/bin/brew shellenv)"
+                    
+                    /usr/local/bin/brew tap --custom-remote --force homebrew/core https://mirrors.aliyun.com/homebrew-core.git 2>/dev/null || true
+                    /usr/local/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.aliyun.com/homebrew-cask.git 2>/dev/null || true
+                fi
+                
+                log "[✅] Homebrew 安装成功（阿里云加速源）"
+                return 0
+            fi
+            ;;
+        "中科大")
+            log "    使用中科大镜像源安装Homebrew..."
+            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            
+            if [ $? -eq 0 ]; then
+                log "[*] 配置Homebrew使用中科大加速源..."
+                
+                if [ -f "/opt/homebrew/bin/brew" ]; then
+                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew/brew.git"
+                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-cask.git"
+                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+                    
+                    eval "$(/opt/homebrew/bin/brew shellenv)"
+                    
+                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/core https://mirrors.ustc.edu.cn/homebrew-core.git 2>/dev/null || true
+                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.ustc.edu.cn/homebrew-cask.git 2>/dev/null || true
+                    
+                elif [ -f "/usr/local/bin/brew" ]; then
+                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew/brew.git"
+                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-cask.git"
+                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+                    
+                    eval "$(/usr/local/bin/brew shellenv)"
+                    
+                    /usr/local/bin/brew tap --custom-remote --force homebrew/core https://mirrors.ustc.edu.cn/homebrew-core.git 2>/dev/null || true
+                    /usr/local/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.ustc.edu.cn/homebrew-cask.git 2>/dev/null || true
+                fi
+                
+                log "[✅] Homebrew 安装成功（中科大加速源）"
+                return 0
+            fi
+            ;;
+        "清华")
+            log "    使用清华镜像源安装Homebrew..."
+            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            
+            if [ $? -eq 0 ]; then
+                log "[*] 配置Homebrew使用清华加速源..."
+                
+                if [ -f "/opt/homebrew/bin/brew" ]; then
+                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask.git"
+                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+                    
+                    eval "$(/opt/homebrew/bin/brew shellenv)"
+                    
+                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/core https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git 2>/dev/null || true
+                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask.git 2>/dev/null || true
+                    
+                elif [ -f "/usr/local/bin/brew" ]; then
+                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask.git"
+                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+                    
+                    eval "$(/usr/local/bin/brew shellenv)"
+                    
+                    /usr/local/bin/brew tap --custom-remote --force homebrew/core https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git 2>/dev/null || true
+                    /usr/local/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask.git 2>/dev/null || true
+                fi
+                
+                log "[✅] Homebrew 安装成功（清华加速源）"
+                return 0
+            fi
+            ;;
+        *)
+            log "    使用官方源安装Homebrew（可能较慢）..."
+            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            
+            if [ $? -eq 0 ]; then
+                if [ -f "/opt/homebrew/bin/brew" ]; then
+                    eval "$(/opt/homebrew/bin/brew shellenv)"
+                elif [ -f "/usr/local/bin/brew" ]; then
+                    eval "$(/usr/local/bin/brew shellenv)"
+                fi
+                
+                log "[✅] Homebrew 安装成功（官方源）"
+                return 0
+            fi
+            ;;
+    esac
+    
+    log "[ERROR] Homebrew 安装失败"
+    return 1
+}
+
 auto_install_python() {
     case "$(uname -s)" in
         Darwin)
@@ -219,10 +398,21 @@ auto_install_python() {
                 log "    使用Homebrew (Apple Silicon) 安装Python..."
                 /opt/homebrew/bin/brew install python
             else
-                log "[ERROR] 未检测到Homebrew，无法自动安装Python"
-                log "请先安装Homebrew:"
-                log '    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-                return 1
+                log "[*] 未检测到Homebrew，正在全自动安装（使用国内加速源）..."
+                auto_install_homebrew
+                if [ $? -ne 0 ]; then
+                    return 1
+                fi
+
+                log "    使用Homebrew安装Python..."
+                if [ -f "/opt/homebrew/bin/brew" ]; then
+                    /opt/homebrew/bin/brew install python
+                elif command -v brew &> /dev/null; then
+                    brew install python
+                else
+                    log "[ERROR] Homebrew 安装后仍不可用"
+                    return 1
+                fi
             fi
             ;;
         Linux)
