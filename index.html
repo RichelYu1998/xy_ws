@@ -734,9 +734,14 @@
         }
         
         /* 响应式设计 - 移动端适配 */
-        
+
         /* 超小屏幕手机 (< 576px) */
         @media (max-width: 575.98px) {
+            html, body {
+                overflow-x: hidden;
+                max-width: 100%;
+            }
+
             .product-thumb,
             .product-thumb-placeholder {
                 width: 5rem;
@@ -1850,5 +1855,3 @@ SzwegoSpider/
     <script src="./dist/app.js?v=20260830180533"></script>
 </body>
 </html>
-
-
