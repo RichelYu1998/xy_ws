@@ -138,7 +138,41 @@ bandit -r . -f json -o bandit_report.json
 
 
 
-### v5.0.9 (2026-08-31) - ✨功能增强 Changelog API全面升级（Git历史集成+数据100%完整）
+### v5.0.9 (2026-09-02) - 🔧Bug修复 run.bat编码问题根治（CMD窗口输出与web_output.log完全一致）
+
+#### 更新内容: 修复run.bat UTF-8无BOM编码导致CMD窗口显示原始命令而非格式化日志的问题
+
+**修复日期**: 2026-09-02
+**修复类型**: Bug修复
+**影响文件**: [run.bat](run.bat#L1-L2)
+**Commit**: 1b6caf32
+**变更统计**: run.bat +1行修改(添加echo off) + 编码转换(UTF-8 without BOM → UTF-8 with BOM)
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. run.bat编码问题根治 (🔧Bug修复)
+
+**问题描述**:
+- **现象**: CMD窗口显示原始批处理命令（如 `set "VERSION=..."`、`goto main_start`、`if not defined WEB_PORT` 等），而不是像web_output.log一样的格式化日志（带时间戳的 `[2026-09-02 10:33:37.04]` 格式）
+- **根因**: ①run.bat文件使用UTF-8 without BOM编码，Windows CMD无法正确解析中文和特殊字符 ②@echo off在某些复杂语法场景下未完全生效导致命令回显泄露 ③批处理中的括号/if/else语句会重置echo状态
+- **影响范围**: Windows平台启动脚本用户体验、CMD窗口可读性、运维调试效率
+
+**修复方案**:
+- **技术实现**: ①将run.bat从UTF-8 without BOM转换为UTF-8 with BOM编码（确保Windows CMD正确解析所有字符）②在@echo off后新增echo off双重保护（防止复杂语法重置echo状态）③验证CMD输出与web_output.log完全一致（只显示带时间戳的格式化日志）
+- **参考位置**: run.bat 第1-2行
+
+**测试验证**:
+- ✅ CMD窗口只显示格式化日志（[2026-09-02 10:33:37.04] 格式）
+- ✅ 不再显示原始批处理命令（set/goto/if等命令已隐藏）
+- ✅ 中文正常显示（无乱码）
+- ✅ 特殊字符正常解析（延迟变量!VAR!、转义字符^等）
+- ✅ 输出格式与web_output.log完全一致
+- ✅ 符合项目编码规范（UTF-8 with BOM + 简体中文）
+
+---
+
+### v5.0.8 (2026-08-31) - 🐛Bug修复 版本号智能检测根治（Web显示错误版本号问题彻底解决）
 
 #### 更新内容: Changelog API集成Git提交历史，所有727次提交全部展示，每个条目数据100%完整
 
