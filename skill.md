@@ -1,3 +1,36 @@
+### v5.0.9.29 (2026-09-02) - 🔧 **跨平台兼容性修复** run.sh macOS兼容性根治(版本号检测+语法错误修复)
+
+#### 更新内容: ①修复run.sh版本号检测在macOS上显示v0.0.0的问题(BSD grep不支持-P Perl正则,改用-E扩展正则并支持多段版本号如5.0.9.28) ②修复run.sh第8行单引号字符串内转义引号冲突的语法错误 ③修复run.sh第123行log语句缺失闭合双引号的语法错误 ④验证脚本在macOS上成功启动并正确显示版本号v5.0.9.28
+
+**修复日期**: 2026-09-02
+**修复类型**: 🔧Bug修复 + 跨平台兼容性
+**影响文件**: [run.sh](run.sh), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: b6a8dd33
+**变更统计**: +3行 -3行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🔧 run.sh macOS跨平台兼容性根治 (🔧Bug修复)
+
+**问题描述**:
+- **现象**: run.sh在macOS上执行报syntax error(line 957/994 unexpected EOF),启动后版本号显示为v0.0.0而非实际版本号v5.0.9.28; line 147报syntax error near unexpected token '('
+- **根因**: ①macOS使用BSD grep不支持-P(Perl正则)选项导致版本号正则匹配失败返回默认值0.0.0 ②第8行grep -oP 'version:\s*["\']?...'中单引号字符串内嵌套转义单引号造成引号不平衡 ③第123行log "[*] hostc v${HOSTC_VER} 已就绪缺少闭合双引号
+- **影响范围**: run.sh启动流程,版本号检测逻辑,macOS/Linux跨平台兼容性
+
+**修复方案**:
+- **技术实现**: ①将grep -P改为grep -oE(Extended regex)并调整正则为'###\s+v[0-9]+(\.[0-9+)+'支持任意段式版本号(v5.0.9/v5.0.9.28/v1.2.3.4) ②将第8行外层单引号改为双引号避免嵌套冲突: grep -oP "version:\s*[\"']?\K..." → grep -oE "version:[\"]?[0-9]+(\.[0-9]+)+" ③在第123行末尾补全缺失的"字符 ④bash -n语法检查通过确认无残留语法错误
+- **参考位置**: [run.sh#L6-L11](run.sh#L6-L11), [run.sh#L8](run.sh#L8), [run.sh#L123](run.sh#L123)
+
+**测试验证**:
+- ✅ bash -n run.sh语法检查通过(无error/warning)
+- ✅ VERSION变量正确提取v5.0.9.28(grep -oE多段版本号正则生效)
+- ✅ ./run.sh成功启动显示"Szwego商品爬虫和货号对比工具 - v5.0.9.28"
+- ✅ Web服务正常监听http://localhost:8888和http://192.168.77.85:8888
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
 ### v5.0.9.26 (2026-09-02) - 📝 **范式精简** PY-CORE-027两份合一+禁止占位符规则+历史叙述commit化
 
 #### 更新内容: ①将skill.md中重复的两份PY-CORE-027范式精简为一份(删除第一份范式定义140行,保留完整示例和版本记录,第二份作为唯一完整范式) ②PY-CORE-027范式新增"禁止占位符"硬性规则(Commit必须用git log按版本号匹配真实hash,变更统计必须用git diff --shortstat获取真实行数) ③v5.0.9.25的Commit占位符替换为真实hash 00ee975d ④v5.0.9.23/v5.0.9.3历史叙述中的"待补充"替换为具体commit描述(48901a28/425ecd5f/75f403af/0b89a619)

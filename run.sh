@@ -3,9 +3,9 @@ cd "$(dirname "$0")"
 
 VERSION="0.0.0"
 if [ -f "README.md" ]; then
-    VERSION=$(grep -m 1 -oP '###\s+v\K[\d]+\.[\d]+\.[\d]+' README.md 2>/dev/null || echo "0.0.0")
+    VERSION=$(grep -m 1 -oE '###\s+v[0-9]+(\.[0-9]+)+' README.md 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || echo "0.0.0")
     if [ "$VERSION" = "0.0.0" ]; then
-        VERSION=$(grep -m 1 -oP 'version:\s*["\']?\K[\d]+\.[\d]+\.[\d]+' README.md 2>/dev/null || echo "0.0.0")
+        VERSION=$(grep -m 1 -oE "version:[\"]?[0-9]+(\.[0-9]+)+" README.md 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || echo "0.0.0")
     fi
 fi
 
@@ -116,7 +116,7 @@ pre_launch() {
     fi
     if [ -f "$HOSTC_BIN" ]; then
         HOSTC_VER=$("$HOSTC_BIN" --version 2>/dev/null || echo "unknown")
-        log "[*] hostc v${HOSTC_VER} 已就绪
+        log "[*] hostc v${HOSTC_VER} 已就绪"
     else
         log "[WARNING] hostc 安装失败，隧道将不可用"
     fi
