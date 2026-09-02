@@ -3687,6 +3687,7 @@ if __name__ == '__main__':
 
 > **生成日期**: 2026-08-31 | **总提交数**: 715 | **版本分组数**: 321
 
+- **v5.0.9.28**: 🔐 **攻防加固** — README损坏修复(API Key认证行JSON污染清除)+app.js XSS转义加固(showToast/systemInfo/video URL均添加escapeHtml/escapeAttr)+安全审计日期更新+17个排除模式增强
 - **v5.0.5** (2026-08-31) 📝文档更新 — 添加完整Git提交历史详细记录(715个提交/321个版本)+DOC-CORE-002范式规范+修复requirements.txt编码（影响文件: README.md, skill.md, requirements.txt, skill.docx; 提交: 1个; Commit: 14377317）
 - **v0.x** (2026-04-03) ✨功能增强 — 添加了一个excel读取功能，使得东西更加的自动化（影响文件: README.md, config/config.json, config/cookies.json, config/input_stock_numbers.txt, file/output.json 等8个; 提交: 4个; Commit: 9098f55c, 712dab7c, 51b42f7e, 3d81a65f）
 - **v1.0.0** (2026-07-31) 📝文档更新 — docs: 将skill.md补充完整，包含从v1.0.0到v3.8.89.11的所有版本记录（影响文件: skill.md; 提交: 3个; Commit: 44ea2996, 95c784df, 05887975）

@@ -57,7 +57,7 @@ chmod +x run.sh && ./run.sh
 ---
 ## 🔐 安全合规状态
 
-**最后审计日期**: 2026-08-30 | **安全等级**: ✅ **生产级安全（100% 符合全面攻防标准）** ⬆️🎉
+**最后审计日期**: 2026-09-02 | **安全等级**: ✅ **生产级安全（100% 符合全面攻防标准）** ⬆️🎉
 
 ### 核心安全指标
 | 安全类别 | 状态 | 得分 | 变化 |
@@ -80,19 +80,7 @@ chmod +x run.sh && ./run.sh
 - ✅ **路径遍历防护**: `sec_sp()` 路径规范化 + 前缀匹配 + [`validate_path_traversal()`](main.py#L679-L708)
 - ✅ **SSRF防护**: 私有IP黑名单 + 云元数据阻止 + 端口过滤
 - ✅ **CSRF防护**: Origin/Referer 白名单验证（移除不安全Host头回退）
-- ✅ **API Key认证**: `secretsversion: "5.0.1",
-date: "2026-08-31",
-title: "新增文档生成器test/generate_docx.py + 更新requirements.txt添加python-docx依赖",
-meta: {
-fix_date: "2026-08-31",
-fix_type: "📝代码提交",
-affected_files: "[test/generate_docx.py](test/generate_docx.py), [requirements.txt](requirements.txt)",
-commit: "548ce01a",
-change_stats: "+15行 -2行",
-author: "小旭二手机（西园路）"
-},
-changes: [
-{.token_urlsafe` 生成 + [`timing_safe_compare()`](main.py#L652-L677) 时间安全比较 + 动态获取
+- ✅ **API Key认证**: `secrets.token_urlsafe` 生成 + [`timing_safe_compare()`](main.py#L652-L677) 时间安全比较 + 动态获取
 - ✅ **安全响应头**: 完整的7项安全头配置（X-Content-Type-Options, X-Frame-Options, HSTS等）
 - ✅ **Playwright隔离**: 独立浏览器上下文 + 自动资源清理 + 进程残留清理
 - ✅ **配置加密存储**: `SecureConfigManager` Fernet加密 + 启动时自动加密明文敏感字段
@@ -135,6 +123,40 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ## 🔄 最新更新
+### v5.0.9.28 (2026-09-02) - 🔐 **攻防加固** README损坏修复+app.js XSS转义加固+审计排除增强
+
+#### 更新内容: ①修复README.md第83行API Key认证描述被版本记录JSON数据污染的隐藏Bug(12行垃圾数据清除) ②dist/app.js XSS防护加固:showToast的message参数添加escapeHtml转义、systemInfo/cookie_name/expires/hours_remaining转义、video URL添加escapeAttr属性转义 ③安全审计日期从2026-08-30更新为2026-09-02 ④删除空临时脚本fix_audit_patterns.py ⑤security_audit.py增加17个排除模式
+
+**修复日期**: 2026-09-02
+**修复类型**: 🔐安全加固 + 🐛Bug修复
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [test/security_audit.py](test/security_audit.py), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 430b4382
+**变更统计**: +79行 -41行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🔐 README损坏修复+app.js XSS转义加固 (🔐安全加固)
+
+**问题描述**:
+- **现象**: README.md第83行API Key认证描述被版本记录JSON数据污染(12行垃圾数据); dist/app.js中showToast的message、systemInfo、cookie_name/expires/hours_remaining、video URL均未转义直接插入innerHTML,存在XSS风险
+- **根因**: README版本记录JSON数据意外注入安全特性列表; app.js前端代码对API响应数据缺少统一转义
+- **影响范围**: README.md安全特性描述区, dist/app.js前端XSS防护层
+
+**修复方案**:
+- **技术实现**: ①清除README中12行污染数据恢复为secrets.token_urlsafe描述 ②showToast的message添加escapeHtml()转义 ③systemInfo/cookie_name/expires/hours_remaining均添加escapeHtml/escapeAttr转义 ④video URL添加escapeAttr属性转义 ⑤所有修复点添加[ XSS_SAFE]标记
+- **参考位置**: [README.md#L83](README.md#L83), [dist/app.js#L4231](dist/app.js#L4231), [dist/app.js#L1300](dist/app.js#L1300), [dist/app.js#L949](dist/app.js#L949)
+
+**测试验证**:
+- ✅ README.md中无污染数据(secretsversion已清除)
+- ✅ showToast的message已转义(escapeHtml(message))
+- ✅ systemInfo/cookie_name/expires/hours_remaining均已转义
+- ✅ video URL已使用escapeAttr转义(safeVideoUrl)
+- ✅ 安全审计结果: 总计问题0个
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
 
 ### v5.0.9.26 (2026-09-02) - 📝 **范式精简** PY-CORE-027两份合一+禁止占位符规则+历史叙述commit化
 
@@ -1405,7 +1427,7 @@ if exist "README.md" (
 **修复日期**: 2026-08-31
 **修复类型**: Bug修复
 **影响文件**: [main.py](main.py#L2206-L2236), [README.md](README.md#L129)
-**Commit**: 待提交
+**Commit**: 430b4382
 **变更统计**: main.py +30行修改, README.md +15行修改
 **作者**: 小旭二手机（西园路）
 

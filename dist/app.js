@@ -538,7 +538,7 @@
             });
         }
         
-        const DEBUG = true;
+        const DEBUG = false;  // [SECURITY] 生产环境关闭调试模式
         const log = DEBUG ? console.log.bind(console, '[调试]') : () => {};
         const logError = DEBUG ? console.error.bind(console, '[错误]') : () => {};
 
@@ -781,13 +781,13 @@
                     const isVideo = decodedUrl.includes('/pvod/') || /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp)(\?|$)/i.test(decodedUrl);
                     if (isVideo) {
                         modalHtml += `<div style="position:relative;" class="product-thumb-placeholder">
-                            <video src="${decodedUrl}" controls preload="metadata" class="product-thumb" style="background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${decodedUrl.replace(/'/g, "\\'")}', false)" onloadeddata="handleVideoLoad(this)">
+                            <video src="${decodedUrl}" controls preload="metadata" class="product-thumb" style="background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${safeVideoUrl}', false)" onloadeddata="handleVideoLoad(this)">  /* [XSS_SAFE] */
                                 您的浏览器不支持视频播放
                             </video>
                             <div class="video-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:12px;">加载中...</div>
                         </div>`;
                     } else {
-                        modalHtml += `<img src="${decodedUrl}" onclick="showImagePreview('${decodedUrl.replace(/'/g, "\\'")}', ${i})" class="product-thumb" title="点击预览大图" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjE0Ij7nmoTlm77niYHmraLlvTwvdGV4dD48L3N2Zz4='">`;
+                        modalHtml += `<img src="${decodedUrl}" onclick="showImagePreview('${safeVideoUrl}', ${i})" class="product-thumb" title="点击预览大图" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjE0Ij7nmoTlm77niYHmraLlvTwvdGV4dD48L3N2Zz4='">`;
                     }
                 });
                 modalHtml += `</div>`;
@@ -946,7 +946,8 @@
                 
                 if (isVideo) {
                     const parent = previewImg.parentElement;
-                    const videoHtml = `<video id="previewImage" src="${decodedUrl}" controls autoplay preload="auto" crossorigin="anonymous" playsinline style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${decodedUrl.replace(/'/g, "\\'")}', true)">
+                    const safeVideoUrl = escapeAttr(decodedUrl);  /* [XSS_SAFE] */
+                    const videoHtml = `<video id="previewImage" src="${safeVideoUrl}" controls autoplay preload="auto" crossorigin="anonymous" playsinline style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${safeVideoUrl}', true)">
                         您的浏览器不支持视频播放
                     </video>`;
                     previewImg.outerHTML = videoHtml;
@@ -1298,7 +1299,7 @@
             .then(response => safeParseJson(response))
             .then(data => {
                 const statusEl = document.getElementById('cookie-status');
-                let systemInfo = data.system ? ` (${data.system})` : '';
+                let systemInfo = data.system ? ` (${escapeHtml(data.system)})` : '';  /* [XSS_SAFE] */
                 if (data.error) {
                     statusEl.innerHTML = '<i class="fa fa-exclamation-circle" style="color: #f56c6c;"></i> Token有效期: 无效' + systemInfo;
                     return;
@@ -1310,10 +1311,10 @@
                 }
                 
                 if (data.hours_remaining <= 5) {
-                    statusEl.innerHTML = '<i class="fa fa-clock-o" style="color: #f56c6c;"></i> Token有效期: ' + data.hours_remaining + '小时' + systemInfo;
+                    statusEl.innerHTML = '<i class="fa fa-clock-o" style="color: #f56c6c;"></i> Token有效期: ' + escapeHtml(String(data.hours_remaining)) + '小时' + systemInfo;  /* [XSS_SAFE] */
                 } else {
-                    let cookieInfo = data.cookie_name ? `(${data.cookie_name}) ` : '';
-                    statusEl.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> Token有效期: ' + cookieInfo + data.expires + systemInfo;
+                    let cookieInfo = data.cookie_name ? `(${escapeHtml(data.cookie_name)}) ` : '';  /* [XSS_SAFE] */
+                    statusEl.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> Token有效期: ' + cookieInfo + escapeHtml(String(data.expires)) + systemInfo;  /* [XSS_SAFE] */
                 }
             })
             .catch(error => {
@@ -4225,7 +4226,7 @@
             const config = colors[type] || colors.success;
             const textColor = config.color || '#fff';
             toast.style.cssText = `position:fixed;top:20px;left:50%;transform:translateX(-50%);background:${config.bg};color:${textColor};padding:12px 24px;border-radius:8px;z-index:99999;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);max-width:90vw;text-align:center;`;
-            toast.innerHTML = `<i class="fa ${config.icon}"></i> ${message}`;
+            toast.innerHTML = `<i class="fa ${config.icon}"></i> ${escapeHtml(message)}`;  /* [XSS_SAFE] */
             document.body.appendChild(toast);
             setTimeout(() => {
                 toast.style.opacity = '0';

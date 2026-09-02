@@ -8985,10 +8985,10 @@ if __name__ == '__main__':
                                                     if diff < min_diff:
                                                         min_diff = diff
                                                         nearest_ver = ver
-                                                except:
+                                                except Exception:
                                                     continue
                                         return nearest_ver if min_diff <= 30 else short_hash
-                                    except:
+                                    except Exception:
                                         return short_hash
                                 version_key = find_nearest_version(commit_date, readme_version_map)
                             clean_msg = re.sub(r'^(feat|fix|docs|refactor|convention|security|chore|style|test|perf|build|ci)\s*\(?\)?:\s*', '', commit_msg, flags=re.IGNORECASE)
@@ -9079,7 +9079,7 @@ if __name__ == '__main__':
                     try:
                         parts = [int(p) if p.isdigit() else p for p in version_str.split('.')]
                         return [p if isinstance(p, int) else 0 for p in parts] + [len(parts)]
-                    except:
+                    except Exception:
                         return [0]
                 
                 changelog.sort(key=lambda x: version_sort_key(x.get('version', '0.0.0')), reverse=True)
