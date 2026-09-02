@@ -1,3 +1,37 @@
+### v5.0.9.30 (2026-09-02) - 🐛 **Bug修复** 隧道按钮点击无反应+toggleTunnel逻辑完善(启动/停止双向切换)
+
+#### 更新内容: ①修复dist/app.js中toggleTunnel()函数只有启动逻辑缺少停止逻辑的严重Bug导致隧道运行时按钮点击无反应 ②修复updateTunnelUI()中运行状态按钮被disabled=true禁用导致用户无法交互的问题 ③新增完整的停止隧道功能(fetch /api/tunnel/stop + POST) ④优化按钮状态显示(启动中/停止中/连接中/运行中四种状态+对应图标和颜色) ⑤增加操作反馈Toast提示(启动成功/停止成功/失败提示)
+
+**修复日期**: 2026-09-02
+**修复类型**: 🐛Bug修复 + UX体验优化
+**影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: a91fb3ec
+**变更统计**: +65行 -25行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🐛 隧道按钮toggleTunnel逻辑完善 (🐛Bug修复)
+
+**问题描述**:
+- **现象**: 用户点击"启动隧道"按钮后无任何反应,控制台显示fetch /api/tunnel/status返回200但UI无变化;原来点击后会展示隧道面板并显示状态现在纯点击无反馈;隧道处于运行状态时按钮变灰且无法再次点击
+- **根因**: ①toggleTunnel()函数只实现了if(!data.running)启动分支缺少else停止分支导致运行状态点击被忽略 ②updateTunnelUI()在running&&url状态下设置btn.disabled=true违反交互设计原则 ③缺少停止隧道的API调用逻辑(/api/tunnel/stop)
+- **影响范围**: 隧道管理面板的启停控制,用户体验,系统可用性
+
+**修复方案**:
+- **技术实现**: ①在toggleTunnel()的if(!data.running)后补充else分支调用fetch('/api/tunnel/stop', {method: 'POST'})实现停止功能 ②修改updateTunnelUI()按钮状态机: 未连接→绿色"启动隧道"、连接中→黄色spinner"连接中..."、已连接→红色"停止隧道"(三种状态均设置disabled=false保证可交互) ③增加btn.innerHTML动态切换显示当前操作状态("启动中..."/"停止中...") ④每个关键操作点添加showToast()反馈(🚀启动成功/🛑已停止/❌失败) ⑤轮询逻辑增加try-catch防止异常中断
+- **参考位置**: [dist/app.js#L5227-L5287](dist/app.js#L5227-L5287) (toggleTunnel函数), [dist/app.js#L5145-L5156](dist/app.js#L5145-L5156) (updateTunnelUI按钮状态)
+
+**测试验证**:
+- ✅ 点击"启动隧道"按钮触发start API并显示"启动中..."loading状态
+- ✅ 启动成功后按钮变为红色"停止隧道"且可点击
+- ✅ 点击"停止隧道"按钮触发stop API并显示"停止中..."loading状态
+- ✅ 停止成功后按钮恢复为绿色"启动隧道"
+- ✅ 所有状态转换均有Toast提示且控制台有详细日志
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
 ### v5.0.9.29 (2026-09-02) - 🔧 **跨平台兼容性修复** run.sh macOS兼容性根治(版本号检测+语法错误修复)
 
 #### 更新内容: ①修复run.sh版本号检测在macOS上显示v0.0.0的问题(BSD grep不支持-P Perl正则,改用-E扩展正则并支持多段版本号如5.0.9.28) ②修复run.sh第8行单引号字符串内转义引号冲突的语法错误 ③修复run.sh第123行log语句缺失闭合双引号的语法错误 ④验证脚本在macOS上成功启动并正确显示版本号v5.0.9.28

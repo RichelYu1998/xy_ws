@@ -5144,9 +5144,13 @@
             
             if (btn) {
                 if (running && url) {
-                    btn.className = 'btn btn-secondary';
-                    btn.innerHTML = '<i class="fa fa-check"></i> 隧道运行中';
-                    btn.disabled = true;
+                    btn.className = 'btn btn-danger';
+                    btn.innerHTML = '<i class="fa fa-stop"></i> 停止隧道';
+                    btn.disabled = false;
+                } else if (running) {
+                    btn.className = 'btn btn-warning';
+                    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 连接中...';
+                    btn.disabled = false;
                 } else {
                     btn.className = 'btn btn-success';
                     btn.innerHTML = '<i class="fa fa-play"></i> 启动隧道';
@@ -5227,40 +5231,71 @@
         window.toggleTunnel = async function() {
             const btn = document.getElementById('btn-toggle-tunnel');
             const status = document.getElementById('tunnel-status');
-            if (btn) btn.disabled = true;
+            if (!btn) return;
+            
+            btn.disabled = true;
             if (status) status.innerHTML = '<span class="badge badge-warning"><i class="fa fa-spinner fa-spin"></i> 处理中...</span>';
             
             try {
                 const response = await fetch('/api/tunnel/status');
                 const data = await safeParseJson(response);
+                
                 if (!data.running) {
+                    console.log('[隧道] 正在启动...');
+                    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 启动中...';
+                    
                     const startRes = await fetch('/api/tunnel/start', { method: 'POST' });
                     const startData = await safeParseJson(startRes);
+                    
                     if (startData.success) {
-                        // 如果返回了 URL，直接显示
+                        showToast('🚀 隧道启动成功', 'success');
+                        
                         if (startData.url) {
                             checkTunnelStatus();
                         } else {
-                            // 持续轮询直到获取到 URL
                             const pollInterval = setInterval(async () => {
-                                const statusRes = await fetch('/api/tunnel/status');
-                                const statusData = await statusRes.json();
-                                if (statusData.url) {
-                                    clearInterval(pollInterval);
-                                    checkTunnelStatus();
+                                try {
+                                    const statusRes = await fetch('/api/tunnel/status');
+                                    const statusData = await statusRes.json();
+                                    if (statusData.url) {
+                                        clearInterval(pollInterval);
+                                        checkTunnelStatus();
+                                        showToast('✅ 隧道已就绪', 'success');
+                                    }
+                                } catch (pollErr) {
+                                    console.error('[隧道] 轮询失败:', pollErr);
                                 }
                             }, 1000);
-                            // 最多轮询 30 秒
-                            setTimeout(() => clearInterval(pollInterval), 30000);
+                            
+                            setTimeout(() => {
+                                clearInterval(pollInterval);
+                                checkTunnelStatus();
+                            }, 30000);
+                            
                             checkTunnelStatus();
                         }
                     } else {
-                        showToast('启动失败: ' + (startData.error || '未知错误'), 'error');
+                        showToast('❌ 启动失败: ' + (startData.error || '未知错误'), 'error');
+                        checkTunnelStatus();
+                    }
+                } else {
+                    console.log('[隧道] 正在停止...');
+                    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 停止中...';
+                    
+                    const stopRes = await fetch('/api/tunnel/stop', { method: 'POST' });
+                    const stopData = await safeParseJson(stopRes);
+                    
+                    if (stopData.success) {
+                        showToast('🛑 隧道已停止', 'info');
+                        checkTunnelStatus();
+                    } else {
+                        showToast('❌ 停止失败: ' + (stopData.error || '未知错误'), 'error');
                         checkTunnelStatus();
                     }
                 }
             } catch (e) {
-                showToast('操作失败: ' + e.message, 'error');
+                console.error('[隧道] 操作异常:', e);
+                showToast('⚠️ 操作失败: ' + e.message, 'error');
                 checkTunnelStatus();
             }
         }
