@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-v3.8.90.15 安全攻防全面审计脚本
+安全攻防全面审计脚本（版本号动态从README.md获取）
 遵循 UTF-8 编码 + 简体中文规范
 功能：
 1. 隐藏Bug排查（代码静态分析）
@@ -34,15 +34,16 @@ class SecurityIssue:
     code_snippet: str  # 代码片段
 
 class SecurityAuditor:
-    """v3.8.90.15 安全审计器"""
+    """安全审计器（版本号动态获取）"""
 
     def __init__(self, project_root: str = "D:/ws/xy_ws"):
         self.project_root = Path(project_root)
         self.issues: List[SecurityIssue] = []
         self.scan_time = datetime.now()
+        self.version = self._get_version()
         self.results = {
             'scan_metadata': {
-                'version': 'v3.8.90.15',
+                'version': self.version,
                 'timestamp': self.scan_time.isoformat(),
                 'scanner': 'SecurityAuditor v1.0'
             },
@@ -59,9 +60,28 @@ class SecurityAuditor:
             'performance_metrics': {}
         }
 
+    def _get_version(self) -> str:
+        """从README.md动态获取最新版本号（与main.py get_version_from_readme一致）"""
+        readme = self.project_root / 'README.md'
+        if not readme.exists():
+            return 'vunknown'
+        try:
+            content = readme.read_text(encoding='utf-8')
+            versions = re.findall(r'#{1,3}\s+v(\d+\.\d+\.\d+(?:\.\d+)?)', content)
+            if not versions:
+                return 'vunknown'
+
+            def vkey(v):
+                return tuple(int(p) for p in v.split('.'))
+
+            latest = max(versions, key=vkey)
+            return f'v{latest}'
+        except Exception:
+            return 'vunknown'
+
     def scan_all(self) -> Dict:
         """执行全量扫描"""
-        print("🔍 开始 v3.8.90.15 全面安全审计...")
+        print(f"🔍 开始 {self.version} 全面安全审计...")
         start_time = time.time()
 
         try:
@@ -739,7 +759,7 @@ class SecurityAuditor:
             json.dump(report, f, ensure_ascii=False, indent=2)
 
         print(f"\n{'='*60}")
-        print(f"📊 v3.8.90.15 安全审计报告已生成:")
+        print(f"📊 {self.version} 安全审计报告已生成:")
         print(f"   文件: {report_path}")
         print(f"{'='*60}")
         print(f"\n📈 审计统计:")
