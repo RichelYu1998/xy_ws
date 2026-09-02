@@ -9052,6 +9052,16 @@ if __name__ == '__main__':
                     changelog = merged_changelog
                 except Exception as git_err:  # [HANDLED]
                     logger.debug(f'[api_changelog] Git历史合并跳过: {git_err}', file=sys.stderr)
+                
+                def version_sort_key(version_str):
+                    try:
+                        parts = [int(p) if p.isdigit() else p for p in version_str.split('.')]
+                        return [p if isinstance(p, int) else 0 for p in parts] + [len(parts)]
+                    except:
+                        return [0]
+                
+                changelog.sort(key=lambda x: version_sort_key(x.get('version', '0.0.0')), reverse=True)
+                
                 result = {'success': True, 'changelog': changelog}
                 _debug_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 logger.debug(f'[{_debug_time}] [DEBUG] changelog API 返回: {len(changelog)} 个版本', file=sys.stderr)
