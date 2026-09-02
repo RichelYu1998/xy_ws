@@ -33,10 +33,58 @@ log_console_only() {
 
 check_prerequisites() {
     log "[*] 检查前置条件..."
-    
+
     if ! command -v curl &> /dev/null; then
-        log "[ERROR] 未找到 curl，请先安装: brew install curl (macOS) 或 apt install curl (Linux)"
-        return 1
+        log "[*] 未检测到curl，正在自动安装..."
+        case "$(uname -s)" in
+            Darwin)
+                if command -v brew &> /dev/null || [ -f "/opt/homebrew/bin/brew" ] || [ -f "/usr/local/bin/brew" ]; then
+                    log "    使用Homebrew安装curl..."
+                    if [ -f "/opt/homebrew/bin/brew" ]; then
+                        /opt/homebrew/bin/brew install curl
+                    elif [ -f "/usr/local/bin/brew" ]; then
+                        /usr/local/bin/brew install curl
+                    else
+                        brew install curl
+                    fi
+                else
+                    log "    使用系统自带工具安装curl..."
+                    if [ -f "/usr/bin/ruby" ]; then
+                        /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" > /dev/null 2>&1 || true
+                        if [ -f "/opt/homebrew/bin/brew" ]; then
+                            /opt/homebrew/bin/brew install curl
+                        fi
+                    else
+                        log "[ERROR] 无法自动安装curl，请手动运行: xcode-select --install"
+                        return 1
+                    fi
+                fi
+                ;;
+            Linux)
+                if command -v apt-get &> /dev/null; then
+                    sudo apt-get update && sudo apt-get install -y curl
+                elif command -v yum &> /dev/null; then
+                    sudo yum install -y curl
+                elif command -v dnf &> /dev/null; then
+                    sudo dnf install -y curl
+                elif command -v pacman &> /dev/null; then
+                    sudo pacman -Syu --noconfirm curl
+                else
+                    log "[ERROR] 无法识别包管理器，请手动安装: apt/yum/dnf/pacman install curl"
+                    return 1
+                fi
+                ;;
+            *)
+                log "[ERROR] 不支持的操作系统，无法自动安装curl"
+                return 1
+                ;;
+        esac
+
+        if ! command -v curl &> /dev/null; then
+            log "[ERROR] curl 安装失败"
+            return 1
+        fi
+        log "[✅] curl 安装成功"
     fi
     
     log "[*] 前置条件检查通过"
@@ -418,19 +466,38 @@ auto_install_python() {
         Linux)
             if command -v apt-get &> /dev/null; then
                 log "    使用apt安装Python..."
-                sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip
+                sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip nodejs npm curl
             elif command -v yum &> /dev/null; then
                 log "    使用yum安装Python..."
-                sudo yum install -y python3 python3-pip
+                sudo yum install -y python3 python3-pip nodejs npm curl
             elif command -v dnf &> /dev/null; then
                 log "    使用dnf安装Python..."
-                sudo dnf install -y python3 python3-pip
+                sudo dnf install -y python3 python3-pip nodejs npm curl
             elif command -v pacman &> /dev/null; then
                 log "    使用pacman安装Python..."
-                sudo pacman -Syu --noconfirm python python-pip
+                sudo pacman -Syu --noconfirm python python-pip nodejs npm curl
+            elif command -v apk &> /dev/null; then
+                log "    使用apk安装Python..."
+                sudo apk add python3 py3-pip nodejs npm curl
+            elif command -v zypper &> /dev/null; then
+                log "    使用zypper安装Python..."
+                sudo zypper install -y python3 python3-pip nodejs npm curl
             else
-                log "[ERROR] 无法识别包管理器，请手动安装Python"
-                return 1
+                log "[WARNING] 无法识别Linux包管理器，尝试下载独立Python..."
+                if [ "$(uname -m)" = "x86_64" ]; then
+                    log "    下载Python standalone版本..."
+                    curl -fsSL https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.tar.xz -o /tmp/python.tar.xz || {
+                        log "[ERROR] Python下载失败，请手动安装: https://www.python.org/downloads/"
+                        return 1
+                    }
+                    cd /tmp && tar xf python.tar.xz
+                    export PATH="/tmp/python-3.11.9/bin:$PATH"
+                    export PYTHON_CMD="/tmp/python-3.11.9/bin/python3"
+                    cd -
+                else
+                    log "[ERROR] 不支持的架构或操作系统，请手动安装Python"
+                    return 1
+                fi
             fi
             ;;
         *)
