@@ -518,22 +518,33 @@
         
         function searchProductBySku(sku) {
             if (!sku) return;
+            console.log('[SKU搜索] 开始搜索:', sku);
             const url = '/api/product/search?sku=' + encodeURIComponent(sku);
             fetch(url)
             .then(response => safeParseJson(response))
             .then(data => {
+                console.log('[SKU搜索] API返回:', data);
                 if (data.error) {
+                    console.error('[SKU搜索] 搜索失败:', data.error);
                     showToast('搜索失败: ' + data.error, 'error');
                     return;
                 }
                 if (data.product) {
-                    showProductModal(data.product);
+                    console.log('[SKU搜索] 找到商品, 显示模态框');
+                    try {
+                        showProductModal(data.product);
+                        console.log('[SKU搜索] ✅ 模态框已显示');
+                    } catch (modalError) {
+                        console.error('[SKU搜索] ❌ 显示模态框失败:', modalError);
+                        showToast('显示商品详情失败: ' + modalError.message, 'error');
+                    }
                 } else {
+                    console.warn('[SKU搜索] 未找到商品');
                     showToast('未找到该商品', 'warning');
                 }
             })
             .catch(error => {
-                console.error('搜索商品出错:', error);
+                console.error('[SKU搜索] 查询异常:', error);
                 showToast('搜索商品出错: ' + error.message, 'error');
             });
         }
@@ -709,18 +720,27 @@
         }
         
         function showProductModal(p) {
-            const images = p.图片;
-            const imageList = images ? (Array.isArray(images) ? images : [images]) : [];
-            const validImages = imageList.filter(img => img);
-            const decodedImages = validImages.map(img => decodeBase64Url(img));
+            console.log('[showProductModal] 开始渲染模态框, 商品:', p.货号 || p.商品描述 || '未知');
             
-            if (DEBUG && decodedImages.length > 0) {
-                log('商品图片数量:', decodedImages.length);
-                log('首个URL:', decodedImages[0].substring(0, 50) + '...');
-            }
-            
-            window.currentProductImages = decodedImages;
-            window.currentImageIndex = 0;
+            try {
+                const existingModal = document.getElementById('productModal');
+                if (existingModal) {
+                    console.log('[showProductModal] 移除已存在的模态框');
+                    existingModal.remove();
+                }
+
+                const images = p.图片;
+                const imageList = images ? (Array.isArray(images) ? images : [images]) : [];
+                const validImages = imageList.filter(img => img);
+                const decodedImages = validImages.map(img => decodeBase64Url(img));
+                
+                if (DEBUG && decodedImages.length > 0) {
+                    log('商品图片数量:', decodedImages.length);
+                    log('首个URL:', decodedImages[0].substring(0, 50) + '...');
+                }
+                
+                window.currentProductImages = decodedImages;
+                window.currentImageIndex = 0;
             
             let productTimeHtml = '';
             if (p.入库时间戳) {
@@ -796,6 +816,22 @@
             modalHtml += `</div></div>`;
             
             document.body.insertAdjacentHTML('beforeend', modalHtml);
+            
+            const newModal = document.getElementById('productModal');
+            if (newModal) {
+                console.log('[showProductModal] ✅ 模态框成功插入DOM, ID:', newModal.id);
+                console.log('[showProductModal] 模态框显示状态:', newModal.style.display);
+                console.log('[showProductModal] 模态框z-index:', getComputedStyle(newModal).zIndex);
+            } else {
+                console.error('[showProductModal] ❌ 模态框插入失败!');
+                throw new Error('模态框元素未找到');
+            }
+            
+            } catch (error) {
+                console.error('[showProductModal] ❌ 渲染模态框时发生错误:', error);
+                showToast('显示商品详情失败: ' + error.message, 'error');
+                throw error;
+            }
         }
         
         function showImagePreview(imageUrl, index) {
@@ -968,35 +1004,55 @@
         }
         
         window.showProductDetail = function(sku) {
+            console.log('[商品详情] 开始查询SKU:', sku);
             fetch(`/api/product?sku=${encodeURIComponent(sku)}`)
                 .then(response => safeParseJson(response))
                 .then(data => {
+                    console.log('[商品详情] API返回:', data);
                     if (data.found) {
                         const p = data.product;
-                        showProductModal(p);
+                        console.log('[商品详情] 商品数据:', p);
+                        try {
+                            showProductModal(p);
+                            console.log('[商品详情] ✅ 模态框已显示');
+                        } catch (modalError) {
+                            console.error('[商品详情] ❌ 显示模态框失败:', modalError);
+                            showToast('显示商品详情失败: ' + modalError.message, 'error');
+                        }
                     } else {
+                        console.warn('[商品详情] 未找到商品:', data.error);
                         showToast(data.error || '未找到该商品', 'error');
                     }
                 })
                 .catch(error => {
-                    console.error('查询失败:', error);
+                    console.error('[商品详情] 查询异常:', error);
                     showToast('查询失败: ' + error.message, 'error');
                 });
         }
         
         window.showProductByDescription = function(description) {
+            console.log('[商品描述] 开始查询描述:', description);
             fetch(`/api/product/by-description?description=${encodeURIComponent(description)}`)
                 .then(response => safeParseJson(response))
                 .then(data => {
+                    console.log('[商品描述] API返回:', data);
                     if (data.found) {
                         const p = data.product;
-                        showProductModal(p);
+                        console.log('[商品描述] 商品数据:', p);
+                        try {
+                            showProductModal(p);
+                            console.log('[商品描述] ✅ 模态框已显示');
+                        } catch (modalError) {
+                            console.error('[商品描述] ❌ 显示模态框失败:', modalError);
+                            showToast('显示商品详情失败: ' + modalError.message, 'error');
+                        }
                     } else {
+                        console.warn('[商品描述] 未找到商品:', data.error);
                         showToast(data.error || '未找到该商品', 'error');
                     }
                 })
                 .catch(error => {
-                    console.error('查询失败:', error);
+                    console.error('[商品描述] 查询异常:', error);
                     showToast('查询失败: ' + error.message, 'error');
                 });
         }

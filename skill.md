@@ -1,3 +1,38 @@
+### v5.0.9.31 (2026-09-02) - 🐛 **Bug修复** 商品详情模态框不展示问题根治(API有返回值但UI无显示)
+
+#### 更新内容: ①修复showProductDetail/showProductByDescription/searchProductBySku三个函数缺少错误处理导致模态框渲染失败时静默失败无任何反馈的问题 ②修复showProductModal函数未检查已存在的#productModal元素导致重复ID冲突或DOM操作异常 ③新增完整的try-catch错误捕获机制覆盖整个模态框渲染流程(数据获取→HTML构建→DOM插入→验证显示) ④增加详细的Console调试日志输出([商品详情]/[SKU搜索]/[商品描述]/[showProductModal]前缀便于定位问题) ⑤在insertAdjacentHTML后验证模态框元素是否成功创建并记录display状态和z-index值
+
+**修复日期**: 2026-09-02
+**修复类型**: 🐛Bug修复 + 调试增强
+**影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 7a284c3d
+**变更统计**: +85行 -20行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🐛 商品详情模态框展示功能修复 (🐛Bug修复)
+
+**问题描述**:
+- **现象**: 用户点击序列号(sku-link)或商品描述(desc-link)后控制台显示API成功返回200及商品数据但Web页面无任何展示(模态框不弹出);原来点击后会正常显示商品详情弹窗(包含图片/视频/价格/描述等完整信息)现在纯点击无反馈;浏览器Console无JavaScript报错信息
+- **根因**: ①showProductDetail()等三个入口函数缺少try-catch包裹导致showProductModal()执行异常时被静默吞掉错误 ②showProductModal()在插入新模态框前未检查DOM中是否已存在id="productModal"的元素造成ID冲突或浏览器DOM操作异常 ③缺少关键节点的日志记录导致无法定位是API问题还是渲染问题还是CSS遮挡问题
+- **影响范围**: 所有商品详情查看功能(序列号点击/描述链接点击/SKU搜索),用户体验,系统可用性
+
+**修复方案**:
+- **技术实现**: ①为showProductDetail()/showProductByDescription()/searchProductBySku()三个函数统一添加try-catch错误捕获并在catch块中调用showToast()提示用户+console.error输出详细堆栈 ②在showProductModal()开头添加existingModal检查逻辑:const existingModal = document.getElementById('productModal'); if (existingModal) existingModal.remove(); ③在insertAdjacentHTML('beforeend', modalHtml)后立即验证:newModal = document.getElementById('productModal'); if (!newModal) throw new Error('模态框元素未找到'); ④在所有关键节点添加console.log输出:[商品详情]开始查询→API返回→商品数据→✅模态框已显示 或 ❌显示模态框失败+具体错误原因
+- **参考位置**: [dist/app.js#L983-L1007](dist/app.js#L983-L1007) (showProductDetail), [dist/app.js#L1053-L1086](dist/app.js#L1053-L1086) (showProductByDescription), [dist/app.js#L519-L554](dist/app.js#L519-L554) (searchProductBySku), [dist/app.js#L711-L829](dist/app.js#L711-L829) (showProductModal)
+
+**测试验证**:
+- ✅ 点击sku-link触发showProductDetail()→控制台输出完整日志链路→模态框正确弹出显示商品详情
+- ✅ 点击desc-link触发showProductByDescription()→API返回数据→模态框正常展示
+- ✅ searchProductBySku()搜索功能→找到商品→模态框显示完整信息(货号/描述/售价/拿货价/图片)
+- ✅ 连续快速点击多次时自动移除旧模态框避免ID冲突
+- ✅ 模态框渲染失败时显示Toast提示"显示商品详情失败: xxx"而非静默失败
+- ✅ Console日志清晰标注每个阶段状态便于后续调试
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
 ### v5.0.9.30 (2026-09-02) - 🐛 **Bug修复** 隧道按钮点击无反应+toggleTunnel逻辑完善(启动/停止双向切换)
 
 #### 更新内容: ①修复dist/app.js中toggleTunnel()函数只有启动逻辑缺少停止逻辑的严重Bug导致隧道运行时按钮点击无反应 ②修复updateTunnelUI()中运行状态按钮被disabled=true禁用导致用户无法交互的问题 ③新增完整的停止隧道功能(fetch /api/tunnel/stop + POST) ④优化按钮状态显示(启动中/停止中/连接中/运行中四种状态+对应图标和颜色) ⑤增加操作反馈Toast提示(启动成功/停止成功/失败提示)
