@@ -6960,6 +6960,358 @@ D:/ws/xy_ws/
 
 ## 🔄 最新更新 (v3.8.90.11)
 
+### v3.5.0 (2026-09-02) - 📝文档更新 docs: 新增完整编码规范文档（v3.6.0 + v3.5.0 + README格式规范）
+
+#### 更新内容: docs: 新增完整编码规范文档（v3.6.0 + v3.5.0 + README格式规范）
+
+**修复日期**: 2026-09-02
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**Commit**: 5e4333ba
+**变更统计**: +399行 -0行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. docs: 新增完整编码规范文档（v3.6.0 + v3.5.0 + README格式规范） (📝文档更新)
+
+**问题描述**:
+- **现象**: 版本v3.5.0的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit 5e4333ba
+
+**测试验证**:
+- ✅ 版本v3.5.0已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v4.1 (2026-09-02) - 📝文档更新 feat: BOM检测功能集成到核心流程 (v4.1增强)
+
+#### 更新内容: feat: BOM检测功能集成到核心流程 (v4.1增强)
+
+**修复日期**: 2026-09-02
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md), [main.py](main.py), [requirements.txt](requirements.txt), [run.bat](run.bat), [run.sh](run.sh)
+**Commit**: d6832155
+**变更统计**: +242行 -2行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. feat: BOM检测功能集成到核心流程 (v4.1增强) (📝文档更新)
+
+**问题描述**:
+- **现象**: 版本v4.1的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), [main.py](main.py), [requirements.txt](requirements.txt), [run.bat](run.bat), [run.sh](run.sh), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit d6832155
+
+**测试验证**:
+- ✅ 版本v4.1已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v4.2 (2026-09-02) - 📝文档更新 v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化
+
+#### 更新内容: v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化
+
+**修复日期**: 2026-09-02
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md), [generate_skill_docx.py](generate_skill_docx.py), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**Commit**: 9b6efa01
+**变更统计**: +239行 -8行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化 (📝文档更新)
+
+**问题描述**:
+- **现象**: 版本v4.2的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), [generate_skill_docx.py](generate_skill_docx.py), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit 9b6efa01
+
+**测试验证**:
+- ✅ 版本v4.2已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v4.3 (2026-09-02) - 🚀功能升级 🚀 v4.3: 增强main.py启动流程 - 直接运行python main.py时自动检测并移除所有BOM字符(scan_project_bom...
+
+#### 更新内容: 🚀 v4.3: 增强main.py启动流程 - 直接运行python main.py时自动检测并移除所有BOM字符(scan_project_bom auto_fix=True)，无需手动运行--fix-bom或依赖run.sh/run.bat，实现真正的全自动BOM清理机制
+
+**修复日期**: 2026-09-02
+**修复类型**: 🚀功能升级
+**影响文件**: [main.py](main.py)
+**Commit**: 757f9e74
+**变更统计**: +13行 -2行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🚀 v4.3: 增强main.py启动流程 - 直接运行python main.py时自动检测并移除所有BOM字符(scan_project_bom auto_fix=True)，无需手动运行--fi (🚀功能升级)
+
+**问题描述**:
+- **现象**: 版本v4.3的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [main.py](main.py), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit 757f9e74
+
+**测试验证**:
+- ✅ 版本v4.3已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v4.5 (2026-09-02) - 📝文档更新 v4.5 文件清理功能API修复+路径验证优化 (2026-08-31) - 修复422错误+支持绝对相对路径输入
+
+#### 更新内容: v4.5 文件清理功能API修复+路径验证优化 (2026-08-31) - 修复422错误+支持绝对相对路径输入
+
+**修复日期**: 2026-09-02
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py)
+**Commit**: dc93783b
+**变更统计**: +124行 -24行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. v4.5 文件清理功能API修复+路径验证优化 (2026-08-31) - 修复422错误+支持绝对相对路径输入 (📝文档更新)
+
+**问题描述**:
+- **现象**: 版本v4.5的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit dc93783b
+
+**测试验证**:
+- ✅ 版本v4.5已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v4.8 (2026-09-02) - 🔒安全修复 v4.8 (2026-08-31) - 🔒 致命BUG清零+安全攻防全面加固（重大安全修复）
+
+#### 更新内容: v4.8 (2026-08-31) - 🔒 致命BUG清零+安全攻防全面加固（重大安全修复）
+
+**修复日期**: 2026-09-02
+**修复类型**: 🔒安全修复
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [skill.docx](skill.docx), [skill.md](skill.md)
+**Commit**: fcafb224
+**变更统计**: +353行 -31行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. v4.8 (2026-08-31) - 🔒 致命BUG清零+安全攻防全面加固（重大安全修复） (🔒安全修复)
+
+**问题描述**:
+- **现象**: 版本v4.8的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [skill.docx](skill.docx), [skill.md](skill.md), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit fcafb224
+
+**测试验证**:
+- ✅ 版本v4.8已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v5.0 (2026-09-02) - 📝文档更新 v5.0: 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx...
+
+#### 更新内容: v5.0: 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx (2026-08-31)
+
+**修复日期**: 2026-09-02
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py)
+**Commit**: e53e0273
+**变更统计**: +292行 -315行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. v5.0: 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx (2026-08-31) (📝文档更新)
+
+**问题描述**:
+- **现象**: 版本v5.0的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit e53e0273
+
+**测试验证**:
+- ✅ 版本v5.0已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v5.0.6 (2026-09-02) - 📝文档更新 docs: v5.0.6 - 所有版本记录统一转为DOC-CORE-002范式(README.md 270条+skill.md 67条)
+
+#### 更新内容: docs: v5.0.6 - 所有版本记录统一转为DOC-CORE-002范式(README.md 270条+skill.md 67条)
+
+**修复日期**: 2026-09-02
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md), [skill.md](skill.md)
+**Commit**: d316be98
+**变更统计**: +6408行 -7882行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. docs: v5.0.6 - 所有版本记录统一转为DOC-CORE-002范式(README.md 270条+skill.md 67条) (📝文档更新)
+
+**问题描述**:
+- **现象**: 版本v5.0.6的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), [skill.md](skill.md), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit d316be98
+
+**测试验证**:
+- ✅ 版本v5.0.6已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v5.0.7 (2026-09-02) - 📝文档更新 docs: v5.0.7 - README.md(47条)+skill.md(1条)剩余非合规记录全部转为DOC-CORE-002范式
+
+#### 更新内容: docs: v5.0.7 - README.md(47条)+skill.md(1条)剩余非合规记录全部转为DOC-CORE-002范式
+
+**修复日期**: 2026-09-02
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md), [skill.md](skill.md)
+**Commit**: b7a6b768
+**变更统计**: +869行 -2692行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. docs: v5.0.7 - README.md(47条)+skill.md(1条)剩余非合规记录全部转为DOC-CORE-002范式 (📝文档更新)
+
+**问题描述**:
+- **现象**: 版本v5.0.7的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), [skill.md](skill.md), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit b7a6b768
+
+**测试验证**:
+- ✅ 版本v5.0.7已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v5.0.9 (2026-09-02) - 📝文档更新 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1)...
+
+#### 更新内容: 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1) ②所有变更统计更新为真实Git数据(不再显示'待补充') ③删除临时脚本
+
+**修复日期**: 2026-09-02
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md)
+**Commit**: 0b89a619
+**变更统计**: +115行 -187行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1) ②所有变更统计更新为真实Git数据(不再显示'待补充') ③删除临时脚本 (📝文档更新)
+
+**问题描述**:
+- **现象**: 版本v5.0.9的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit 0b89a619
+
+**测试验证**:
+- ✅ 版本v5.0.9已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
+### v5.0.9.3 (2026-09-02) - 📝文档更新 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1)...
+
+#### 更新内容: 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1) ②所有变更统计更新为真实Git数据(不再显示'待补充') ③删除临时脚本
+
+**修复日期**: 2026-09-02
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md)
+**Commit**: 0b89a619
+**变更统计**: +115行 -187行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1) ②所有变更统计更新为真实Git数据(不再显示'待补充') ③删除临时脚本 (📝文档更新)
+
+**问题描述**:
+- **现象**: 版本v5.0.9.3的变更需完整记录
+- **根因**: Git提交中包含此版本但README.md/skill.md未记录
+- **影响范围**: [README.md](README.md), /api/changelog端点
+
+**修复方案**:
+- **技术实现**: 从Git提交历史提取版本信息，按PY-CORE-027范式生成完整的变更详情块
+- **参考位置**: commit 0b89a619
+
+**测试验证**:
+- ✅ 版本v5.0.9.3已添加到README.md和skill.md
+- ✅ 包含完整的问题描述、修复方案、测试验证三要素
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+
 ### v3.8.89.14 (2026-08-08) - ✨功能增强 ✨ 商品描述字段增强 — 对比表格完整显示商品信息
 
 #### 更新内容: ✨ 商品描述字段增强 — 对比表格完整显示商品信息
