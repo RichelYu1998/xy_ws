@@ -1,3 +1,35 @@
+### v5.0.9.25 (2026-09-02) - 🔧 **Bug修复** generate_docx.py路径修复+skill.docx重新生成
+
+#### 更新内容: 修复test/generate_docx.py读取skill.md的相对路径错误(Path('skill.md')→Path('../skill.md'))，使脚本在test目录运行时能正确读取根目录的skill.md并输出skill.docx到根目录，重新生成最新v5.0.9.24版skill.docx
+
+**修复日期**: 2026-09-02
+**修复类型**: 🔧Bug修复 + 📝文档更新
+**影响文件**: [test/generate_docx.py](test/generate_docx.py#L15), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
+**Commit**: 0d18135
+**变更统计**: +66行 -2行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🔧 generate_docx.py路径修复+skill.docx重新生成 (🔧Bug修复)
+
+**问题描述**:
+- **现象**: 运行test/generate_docx.py报"找不到 skill.md"，skill.docx停留在今早9:55的旧版本，与README.md(17:13)/skill.md(17:14)不一致
+- **根因**: parse_skill_md()中md_path=Path('skill.md')仅在当前目录(test/)查找，而skill.md位于项目根目录；输出路径../skill.docx指向根目录，读写路径基准不一致
+- **影响范围**: test/generate_docx.py, skill.docx生成流程, 三方版本一致性
+
+**修复方案**:
+- **技术实现**: ①将md_path改为Path('../skill.md')使其与输出路径../skill.docx基准一致 ②补全文件末尾换行符符合代码规范 ③重新运行生成器解析最新skill.md(v5.0.9.24)生成skill.docx
+- **参考位置**: test/generate_docx.py#L15, skill.md
+
+**测试验证**:
+- ✅ test目录运行generate_docx.py成功读取skill.md并生成../skill.docx
+- ✅ skill.docx更新时间17:28:51，版本号v5.0.9.24(2026-09-02)与README/skill.md一致
+- ✅ 文件末尾换行符符合UTF-8代码规范
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
 ### v5.0.9.24 (2026-09-02) - 🔧 **三方版本对齐** Git/README/skill.md 366个版本100%一致
 
 #### 更新内容: 补入11个Git提交版本(v3.5.0/v4.1~v4.8/v5.0/v5.0.6/v5.0.7/v5.0.9/v5.0.9.3)，确保Git提到的每个版本在README.md和skill.md中都有对应记录

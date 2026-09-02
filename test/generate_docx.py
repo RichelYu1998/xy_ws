@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 def parse_skill_md():
-    md_path = Path('skill.md')
+    md_path = Path('../skill.md')
     if not md_path.exists():
         print(f'找不到 skill.md')
         return None
