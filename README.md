@@ -141,34 +141,154 @@ bandit -r . -f json -o bandit_report.json
 
 
 
-### v5.0.9.4 (2026-09-02) - 🚀 **版本升级** 全自动Homebrew安装(国内加速源智能测速) + macOS成功率95-98%
+### v5.0.9.15 (2026-08-31) - 📝 **文档更新** skill.md新增PY-CORE-025 Changelog API数据结构与Git历史集成范式
 
-#### 更新内容: 实现macOS/Linux环境下Homebrew全自动安装，智能选择最快国内镜像源
+#### 更新内容: 在skill.md中新增Changelog API的开发范式文档
 
-**修复日期**: 2026-09-02
-**修复类型**: ✨功能增强
-**影响文件**: [run.sh](run.sh), [README.md](README.md)
-**Commit**: 8a83add9
+**修复日期**: 2026-08-31
+**修复类型**: 📝文档更新
+**影响文件**: [skill.md](skill.md)
+**Commit**: ea8f79f0
 **变更统计**: 待补充
 **作者**: 小旭二手机（西园路）**
 
 ---
 
-##### 1. 🚀 Homebrew全自动升级 (✨功能增强)
 
-**问题描述**:
-- **现象**: macOS用户需要手动安装Homebrew，成功率低
-- **根因**: 缺少Homebrew自动安装逻辑
-- **影响范围**: [run.sh](run.sh)
+### v5.0.9.14 (2026-08-31) - ✨ **功能增强** changelog API每个条目补充真实影响文件和变更统计
 
-**修复方案**:
-- **技术实现**: 智能测试4个国内镜像源速度（阿里云/中科大/清华/腾讯），自动选择最快镜像
-- **参考位置**: commit 8a83add9, [run.sh](run.sh#L208-L392)
+#### 更新内容: 为changelog API的每个版本条目添加真实的影响文件列表和代码变更统计
 
-**测试验证**:
-- ✅ macOS Monterey/Ventura/Sonoma 测试通过率：98-99%
+**修复日期**: 2026-08-31
+**修复类型**: ✨功能增强
+**影响文件**: [main.py](main.py)
+**Commit**: 869430d0
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）**
 
 ---
+
+
+
+### v5.0.9.13 (2026-08-31) - ✨ **功能增强** changelog API历史版本数据补全-100%完整
+
+#### 更新内容: 补全changelog API中的历史版本数据，达到100%完整性
+
+**修复日期**: 2026-08-31
+**修复类型**: ✨功能增强
+**影响文件**: [main.py](main.py)
+**Commit**: 11f9cadf
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）**
+
+---
+
+
+
+### v5.0.9.12 (2026-08-31) - 📝 **文档更新** README最新更新区域添加v5.0.9版本记录
+
+#### 更新内容: 在README.md中添加v5.0.9版本的初始记录
+
+**修复日期**: 2026-08-31
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md)
+**Commit**: 5431ea7a
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）**
+
+---
+
+
+
+### v5.0.9.11 (2026-08-31) - 📝 **文档更新** README版本记录格式全面规范为v4.3.0标准 + skill.md范式升级
+
+#### 更新内容: 统一文档格式标准，提升可读性和维护性
+
+**修复日期**: 2026-08-31
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md), [skill.md](skill.md)
+**Commit**: b29dadd4
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）**
+
+---
+
+
+
+### v5.0.9.10 (2026-08-31) - 🐛 **Bug修复** 修复/api/changelog解析失败 + README格式规范(仅标题)
+
+#### 更新内容: 修复changelog API解析异常，规范化README格式
+
+**修复日期**: 2026-08-31
+**修复类型**: 🐛Bug修复
+**影响文件**: [main.py](main.py), [README.md](README.md)
+**Commit**: f9e6f00b
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）**
+
+---
+
+
+
+### v5.0.9.9 (2026-08-31) - 📝 **文档更新** README最新更新区域版本记录内容补全(10个版本)
+
+#### 更新内容: 补全README.md中缺失的版本记录信息
+
+**修复日期**: 2026-08-31
+**修复类型**: 📝文档更新
+**影响文件**: [README.md](README.md)
+**Commit**: 112f15c0
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）**
+
+---
+
+
+
+### v5.0.9.8 (2026-08-31) - 🐛 **Bug修复** 修复Changelog Web展示空白+API返回所有版本
+
+#### 更新内容: 修复前端展示空白问题，API现在返回所有历史版本
+
+**修复日期**: 2026-08-31
+**修复类型**: 🐛Bug修复
+**影响文件**: [main.py](main.py), 前端代码
+**Commit**: 6740cc17
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）**
+
+---
+
+
+
+### v5.0.9.7 (2026-08-31) - ✨ **功能增强** changelog API集成Git提交历史 - 所有124次提交全部展示
+
+#### 更新内容: 将Git提交历史完整集成到changelog API，展示完整的开发历程
+
+**修复日期**: 2026-08-31
+**修复类型**: ✨功能增强
+**影响文件**: [main.py](main.py)
+**Commit**: d9f7a9af
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）**
+
+---
+
+
+
+### v5.0.9.6 (2026-09-02) - 🔧 **Bug修复** run.bat编码问题根治-CMD窗口输出与web_output.log完全一致
+
+#### 更新内容: 解决CMD窗口输出和日志文件不一致的问题
+
+**修复日期**: 2026-09-02
+**修复类型**: 🐛Bug修复
+**影响文件**: [run.bat](run.bat)
+**Commit**: 7118dcad
+**变更统计**: 待补充
+**作者**: 小旭二手机（西园路）**
+
+---
+
+
 
 ### v5.0.9.5 (2026-09-02) - 🔧 **重大功能升级** run.bat/run.sh全新电脑兼容性根治 + 版本号智能检测 + Python/Node.js自动安装
 
@@ -200,135 +320,39 @@ bandit -r . -f json -o bandit_report.json
 
 ---
 
-### v5.0.9.6 (2026-09-02) - 🔧 **Bug修复** run.bat编码问题根治-CMD窗口输出与web_output.log完全一致
 
-#### 更新内容: 解决CMD窗口输出和日志文件不一致的问题
+
+### v5.0.9.4 (2026-09-02) - 🚀 **版本升级** 全自动Homebrew安装(国内加速源智能测速) + macOS成功率95-98%
+
+#### 更新内容: 实现macOS/Linux环境下Homebrew全自动安装，智能选择最快国内镜像源
 
 **修复日期**: 2026-09-02
-**修复类型**: 🐛Bug修复
-**影响文件**: [run.bat](run.bat)
-**Commit**: 7118dcad
-**变更统计**: 待补充
-**作者**: 小旭二手机（西园路）**
-
----
-
-### v5.0.9.7 (2026-08-31) - ✨ **功能增强** changelog API集成Git提交历史 - 所有124次提交全部展示
-
-#### 更新内容: 将Git提交历史完整集成到changelog API，展示完整的开发历程
-
-**修复日期**: 2026-08-31
 **修复类型**: ✨功能增强
-**影响文件**: [main.py](main.py)
-**Commit**: d9f7a9af
+**影响文件**: [run.sh](run.sh), [README.md](README.md)
+**Commit**: 8a83add9
 **变更统计**: 待补充
 **作者**: 小旭二手机（西园路）**
 
 ---
 
-### v5.0.9.8 (2026-08-31) - 🐛 **Bug修复** 修复Changelog Web展示空白+API返回所有版本
+##### 1. 🚀 Homebrew全自动升级 (✨功能增强)
 
-#### 更新内容: 修复前端展示空白问题，API现在返回所有历史版本
+**问题描述**:
+- **现象**: macOS用户需要手动安装Homebrew，成功率低
+- **根因**: 缺少Homebrew自动安装逻辑
+- **影响范围**: [run.sh](run.sh)
 
-**修复日期**: 2026-08-31
-**修复类型**: 🐛Bug修复
-**影响文件**: [main.py](main.py), 前端代码
-**Commit**: 6740cc17
-**变更统计**: 待补充
-**作者**: 小旭二手机（西园路）**
+**修复方案**:
+- **技术实现**: 智能测试4个国内镜像源速度（阿里云/中科大/清华/腾讯），自动选择最快镜像
+- **参考位置**: commit 8a83add9, [run.sh](run.sh#L208-L392)
 
----
-
-### v5.0.9.9 (2026-08-31) - 📝 **文档更新** README最新更新区域版本记录内容补全(10个版本)
-
-#### 更新内容: 补全README.md中缺失的版本记录信息
-
-**修复日期**: 2026-08-31
-**修复类型**: 📝文档更新
-**影响文件**: [README.md](README.md)
-**Commit**: 112f15c0
-**变更统计**: 待补充
-**作者**: 小旭二手机（西园路）**
+**测试验证**:
+- ✅ macOS Monterey/Ventura/Sonoma 测试通过率：98-99%
 
 ---
 
-### v5.0.9.10 (2026-08-31) - 🐛 **Bug修复** 修复/api/changelog解析失败 + README格式规范(仅标题)
 
-#### 更新内容: 修复changelog API解析异常，规范化README格式
 
-**修复日期**: 2026-08-31
-**修复类型**: 🐛Bug修复
-**影响文件**: [main.py](main.py), [README.md](README.md)
-**Commit**: f9e6f00b
-**变更统计**: 待补充
-**作者**: 小旭二手机（西园路）**
-
----
-
-### v5.0.9.11 (2026-08-31) - 📝 **文档更新** README版本记录格式全面规范为v4.3.0标准 + skill.md范式升级
-
-#### 更新内容: 统一文档格式标准，提升可读性和维护性
-
-**修复日期**: 2026-08-31
-**修复类型**: 📝文档更新
-**影响文件**: [README.md](README.md), [skill.md](skill.md)
-**Commit**: b29dadd4
-**变更统计**: 待补充
-**作者**: 小旭二手机（西园路）**
-
----
-
-### v5.0.9.12 (2026-08-31) - 📝 **文档更新** README最新更新区域添加v5.0.9版本记录
-
-#### 更新内容: 在README.md中添加v5.0.9版本的初始记录
-
-**修复日期**: 2026-08-31
-**修复类型**: 📝文档更新
-**影响文件**: [README.md](README.md)
-**Commit**: 5431ea7a
-**变更统计**: 待补充
-**作者**: 小旭二手机（西园路）**
-
----
-
-### v5.0.9.13 (2026-08-31) - ✨ **功能增强** changelog API历史版本数据补全-100%完整
-
-#### 更新内容: 补全changelog API中的历史版本数据，达到100%完整性
-
-**修复日期**: 2026-08-31
-**修复类型**: ✨功能增强
-**影响文件**: [main.py](main.py)
-**Commit**: 11f9cadf
-**变更统计**: 待补充
-**作者**: 小旭二手机（西园路）**
-
----
-
-### v5.0.9.14 (2026-08-31) - ✨ **功能增强** changelog API每个条目补充真实影响文件和变更统计
-
-#### 更新内容: 为changelog API的每个版本条目添加真实的影响文件列表和代码变更统计
-
-**修复日期**: 2026-08-31
-**修复类型**: ✨功能增强
-**影响文件**: [main.py](main.py)
-**Commit**: 869430d0
-**变更统计**: 待补充
-**作者**: 小旭二手机（西园路）**
-
----
-
-### v5.0.9.15 (2026-08-31) - 📝 **文档更新** skill.md新增PY-CORE-025 Changelog API数据结构与Git历史集成范式
-
-#### 更新内容: 在skill.md中新增Changelog API的开发范式文档
-
-**修复日期**: 2026-08-31
-**修复类型**: 📝文档更新
-**影响文件**: [skill.md](skill.md)
-**Commit**: ea8f79f0
-**变更统计**: 待补充
-**作者**: 小旭二手机（西园路）**
-
----
 ### v5.0.9.2 (2026-09-02) - 🎯 **100%全自动升级** curl自动安装 + 6大Linux包管理器覆盖 + standalone Python降级 + 成功率98-99%
 
 #### 更新内容: 实现curl自动安装、Linux全发行版包管理器覆盖、standalone Python降级方案，使项目在任何环境下都能100%全自动运行
@@ -358,6 +382,8 @@ bandit -r . -f json -o bandit_report.json
 - ✅ 变更统计: +104行 -26行
 
 ---
+
+
 
 ### v5.0.9.1 (2026-09-02) - 🔧 **关键修复** run.bat编码问题根治 - UTF-8 with BOM + CRLF换行符 + .gitattributes配置优化（解决无限递归崩溃问题）
 
@@ -389,107 +415,9 @@ bandit -r . -f json -o bandit_report.json
 
 ---
 
-### v5.0.9 (2026-09-02) - 🔧 **重大功能升级** run.bat/run.sh全新电脑兼容性根治 + 全自动Homebrew安装（国内加速源）+ 版本号智能检测 + 安全审计全通过
 
-#### 更新内容: 全面升级启动脚本支持在全新电脑上零配置一键运行，macOS/Linux实现全自动Homebrew安装并智能选择最快国内镜像源，修复所有历史遗留问题，实现生产级质量标准
 
-**修复日期**: 2026-09-02
-**修复类型**: 功能增强 + Bug修复 + 安全加固 + 100%全自动升级
-**影响文件**: [run.bat](run.bat#L21-L41), [run.sh](run.sh#L30-L506), [main.py](main.py#L1893-L1943), [README.md], [skill.md]
-**Commit**: 待提交
-**变更统计**: run.bat +50行改进, run.sh +280行改进(含Homebrew全自动+curl自动安装+Linux全包管理器覆盖+standalone Python降级), main.py +50行权限处理, 文档全面更新
-**作者**: 小旭二手机（西园路）
-
----
-
-##### 1. 🚀 全新电脑一键运行支持 (✨功能增强)
-
-**问题描述**:
-- **现象**: 原版run.bat/run.sh在全新电脑上运行成功率仅5-10%（Windows）/ 0%（macOS），需要手动安装Python/Node.js/Homebrew等依赖
-- **根因**: ①缺少前置条件检查（管理员权限/curl/PowerShell/Homebrew/Xcode CLI）②缺少依赖自动安装逻辑 ③错误处理脆弱易崩溃 ④进程清理误杀所有Python/Node进程
-- **影响范围**: 新用户首次使用体验、部署效率、运维自动化程度
-
-**修复方案**:
-
-###### Windows 11 (run.bat):
-- **前置条件检查**:
-  - 管理员权限检测：启动前检查 `net session`，无权限提示"右键以管理员身份运行"
-  - curl.exe 检查：确认 Windows 10 1803+ 或 Windows 11 环境
-  - PowerShell 检查：确保目录大小计算等功能可用
-- **Python 自动安装**（三重备选方案）:
-  1. Winget 安装：`winget install Python.Python.3.11`
-  2. Chocolatey 安装：`choco install python`
-  3. 官网下载安装：下载 python-3.11.9-amd64.exe 并静默安装到本地 `_python` 目录
-- **Node.js 自动安装**（四重备选方案）:
-  1. NVM for Windows 安装 LTS 版本
-  2. Winget 安装 Node.js LTS
-  3. Chocolatey 安装 nodejs
-  4. 官网 MSI 静默安装
-- **安全的进程清理**:
-  - 使用 `wmic process where "commandline like '%%xy_ws%%'" get ProcessId` 精准匹配
-  - 只杀本项目相关进程（含 `main.py` / `hostc` 关键字）
-  - 避免误杀系统或其他应用的 Python/Node 进程
-
-###### macOS/Linux (run.sh):
-- **curl 全自动安装**（新增 🎉🎉）:
-  - macOS: 使用 Homebrew 安装 curl（如果 Homebrew 不存在则先全自动安装）
-  - Linux: 根据包管理器自动安装（apt/yum/dnf/pacman/apk/zypper）
-  - 确保**所有前置依赖100%全自动**
-- **Homebrew 全自动安装**（新增 🎉）:
-  - 智能测试4个国内镜像源速度（阿里云/中科大/清华/腾讯）
-  - 自动选择**最快**的镜像源（基于实际网络延迟）
-  - 全自动安装 Homebrew（`NONINTERACTIVE=1` 无需交互）
-  - 自动配置加速源（`HOMEBREW_BOTTLE_DOMAIN` / `HOMEBREW_CORE_GIT_REMOTE` 等）
-  - 支持 Apple Silicon (`/opt/homebrew`) 和 Intel Mac (`/usr/local`)
-- **Xcode Command Line Tools 检测**:
-  - `xcode-select -p` 检查是否已安装
-  - 未安装时执行 `xcode-select --install`
-- **Linux 包管理器全覆盖**（增强 🚀）:
-  - Debian/Ubuntu: `apt install python3 python3-pip nodejs npm curl`
-  - RHEL/CentOS/Fedora: `dnf/yum install python3 python3-pip nodejs npm curl`
-  - Arch Linux: `pacman -S python python-pip nodejs npm curl`
-  - Alpine Linux: `apk add python3 py3-pip nodejs npm curl`
-  - OpenSUSE: `zypper install python3 python3-pip nodejs npm curl`
-  - **未知发行版降级**: 自动下载 Python standalone 版本到 /tmp
-- **NVM 自动配置**:
-  - 检测 `.nvm/nvm.sh` 是否存在
-  - 自动加载 NVM 并安装 Node.js LTS 版本
-  - 配置 PATH 环境变量
-
-**Homebrew 国内加速源详情**（[run.sh:208-392](run.sh#L208-L392)）:
-
-| 镜像源 | 地址 | 特点 | 适用场景 |
-|--------|------|------|---------|
-| **阿里云** ⚡ | `mirrors.aliyun.com` | CDN加速，峰值8-10 MB/s | 大部分地区最快 |
-| **中科大** | `mirrors.ustc.edu.cn` | 每2小时同步，10Gbps带宽 | 教育网/华东地区 |
-| **清华** | `mirrors.tuna.tsinghua.edu.cn` | 每4小时同步，8Gbps带宽 | 教育网首选 |
-| **腾讯** | `mirrors.cloud.tencent.com` | 备用源 | 华南地区 |
-
-**智能选择逻辑**（[test_brew_mirror()](run.sh#L208-L258)）:
-```bash
-1. 并发测试4个镜像源的HTTP响应时间
-2. 记录每个源的延迟（毫秒级精度）
-3. 选择延迟最低的源作为"最快镜像"
-4. 使用该源安装Homebrew并配置加速
-5. 如果所有源都超时，降级使用官方源
-```
-
-**测试验证**:
-- ✅ Windows 11 全新虚拟机测试通过率：**95-98%** 🚀🚀（原5-10%）
-- ✅ macOS Monterey/Ventura/Sonoma (M1/M2/M3) 测试通过率：**98-99%** 🚀🚀🚀（原0%，现已全自动含Homebrew+curl）
-- ✅ Ubuntu 22.04/24.04 测试通过率：**95-97%** 🚀（原80-90%，现已覆盖apt+curl自动安装）
-- ✅ CentOS Stream 9 / RHEL 9 测试通过率：**92-95%** 🚀
-- ✅ Arch Linux / Manjaro 测试通过率：**90-93%** 🚀
-- ✅ Alpine Linux / OpenSUSE 测试通过率：**85-90%** 🚀（新增支持）
-- ✅ **100% 全自动，无需手动安装任何依赖，真正的一键运行**
-
----
-
-##### 2. 🔧 版本号智能检测根治 (🐛Bug修复)
-
-**问题描述**:
-- **现象**: 启动时标题栏显示版本号为 v0.0.0 / v2.1.8 / "v基础环境"，而不是实际的 v5.0.9
-- **根因**: ①README.md 包含100个历史版本号记录，`findstr` 匹配到所有以 `### v` 开头的行 ②`for` 循环取最后一个匹配值导致选中旧版本 ③还误匹配了 `### 基础环境` 等非版本号文本
+### v` 开头的行 ②`for` 循环取最后一个匹配值导致选中旧版本 ③还误匹配了 `### 基础环境` 等非版本号文本
 - **影响范围**: 用户无法识别当前运行的版本、文档与实际不一致
 
 **修复方案**:
