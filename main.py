@@ -1896,13 +1896,47 @@ def clean_all_files(
 
     for file in files_to_delete:
         with ExceptionContext(f"删除文件 {file.name}", default=False) as ctx:
-            file_size = file.stat().st_size
-            file.unlink()
-            deleted_files_count += 1
-            deleted_size += file_size
-            logger.info(f"已删除文件: {file.name} ({format_size(file_size)})")
-            if ctx.error:
+            try:
+                file_size = file.stat().st_size
+                
+                if file.is_file():
+                    if not file.exists():
+                        logger.warning(f"文件不存在，跳过: {file.name}")
+                        continue
+                    
+                    file.chmod(0o777)
+                    
+                    import os
+                    try:
+                        os.remove(str(file))
+                    except PermissionError:
+                        import subprocess
+                        try:
+                            if os.name == 'nt':
+                                subprocess.run(
+                                    ['cmd', '/c', 'del', '/f', '/q', str(file)],
+                                    check=True,
+                                    capture_output=True,
+                                    timeout=5
+                                )
+                            else:
+                                subprocess.run(
+                                    ['rm', '-f', str(file)],
+                                    check=True,
+                                    capture_output=True,
+                                    timeout=5
+                                )
+                        except Exception as e:
+                            raise PermissionError(f"无法删除文件（可能被占用或权限不足）: {file.name}") from e
+                else:
+                    file.unlink()
+                
+                deleted_files_count += 1
+                deleted_size += file_size
+                logger.info(f"已删除文件: {file.name} ({format_size(file_size)})")
+            except Exception as e:
                 failed_count += 1
+                raise
 
     for folder in folders_to_delete:
         with ExceptionContext(f"删除文件夹 {folder.name}", default=False) as ctx:

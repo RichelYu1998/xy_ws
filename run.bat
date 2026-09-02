@@ -1,30 +1,81 @@
 @echo off
-echo off
 setlocal enabledelayedexpansion
 chcp 65001 > nul 2>&1
 cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 title Szwego Crawler Tool
 
+call :check_admin_rights
+if errorlevel 1 (
+    echo [ERROR] 请右键"以管理员身份运行"此脚本
+    pause
+    exit /b 1
+)
+
+call :check_prerequisites
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
+
 set "VERSION=0.0.0"
-for /f "delims=" %%i in ('py -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2^>nul') do set "VERSION=%%i"
+if exist "README.md" (
+    for /f "delims=" %%L in ('type README.md ^| findstr /c:"### v5." ^| findstr /c:"(2026-"') do (
+        for /f "tokens=2 delims=v " %%v in ("%%L") do (
+            if "!VERSION!"=="0.0.0" set "VERSION=%%v"
+        )
+    )
+    if "!VERSION!"=="0.0.0" (
+        for /f "delims=" %%L in ('type README.md ^| findstr /c:"### v4." ^| findstr /c:"(2026-"') do (
+            for /f "tokens=2 delims=v " %%v in ("%%L") do (
+                if "!VERSION!"=="0.0.0" set "VERSION=%%v"
+            )
+        )
+    )
+    if "!VERSION!"=="0.0.0" (
+        for /f "tokens=3 delims=: " %%v in ('findstr /i "version:" README.md 2^>nul ^| findstr /r "[0-9]\.[0-9]\.[0-9]"') do (
+            if "!VERSION!"=="0.0.0" set "VERSION=%%v"
+        )
+    )
+)
 
 if not defined WEB_PORT set "WEB_PORT=8888"
 
 if not exist file mkdir file
 set "LOG_FILE=%CD%\file\web_output.log"
 
-set "_TS_PYTHON="
-where py >nul 2>&1 && set "_TS_PYTHON=py"
-if not defined _TS_PYTHON where python >nul 2>&1 && set "_TS_PYTHON=python"
-
 goto main_start
+
+:check_admin_rights
+net session >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] 需要管理员权限
+    exit /b 1
+)
+exit /b 0
+
+:check_prerequisites
+echo [*] 检查前置条件...
+
+where curl >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] 未找到 curl.exe，需要 Windows 10 1803+ 或 Windows 11
+    exit /b 1
+)
+
+where powershell >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] 未找到 PowerShell
+    exit /b 1
+)
+
+echo [*] 前置条件检查通过
+exit /b 0
 
 :ms_timestamp
 set "TIMESTAMP="
-if defined _TS_PYTHON (
-    for /f "delims=" %%t in ('"!_TS_PYTHON!" -c "from datetime import datetime; d=datetime.now(); print(d.strftime(\"%%Y-%%m-%%d %%H:%%M:%%S.\")+f\"{d.microsecond//1000:03d}\")" 2^>nul') do set "TIMESTAMP=%%t"
-)
+for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set "datetime=%%I"
+if defined datetime set "TIMESTAMP=%datetime:~0,4%-%datetime:~4,2%-%datetime:~6,2% %datetime:~8,2%:%datetime:~10,2%:%datetime:~12,2%.%datetime:~15,3%"
 if not defined TIMESTAMP set "TIMESTAMP=%date% %time: =0%"
 exit /b
 
@@ -57,10 +108,6 @@ echo.
 exit /b
 
 :main_start
-taskkill /F /IM hostc.exe >nul 2>&1
-taskkill /F /IM python.exe >nul 2>&1
-taskkill /F /IM node.exe >nul 2>&1
-ping -n 2 127.0.0.1 >nul 2>&1
 echo. > "%CD%\file\web_output.log" 2>nul
 
 call :log ========================================
@@ -69,26 +116,11 @@ call :log ========================================
 
 call :log_blank
 call :log [*] 清理残留进程...
-for /f "tokens=3 delims=," %%p in ('wmic process where "name='node.exe'" get processid^,commandline /format:csv 2^>nul ^| findstr /i "playwright"') do (
-    taskkill /F /PID %%p >nul 2>&1
-)
-
-set PORT_WAIT_COUNT=0
-set PORT_MAX_WAIT=10
-:port_wait_loop
-if %PORT_WAIT_COUNT% geq %PORT_MAX_WAIT% goto port_wait_done
-netstat -ano | findstr ":!WEB_PORT!.*LISTENING" >nul 2>&1
-if errorlevel 1 goto port_wait_done
-set /a PORT_WAIT_COUNT+=1
-call :log [*] 端口!WEB_PORT!仍被占用，等待释放... (%PORT_WAIT_COUNT%/%PORT_MAX_WAIT%)
+call :kill_process_safe python.exe main.py
+call :kill_process_safe hostc.exe
 ping -n 2 127.0.0.1 >nul 2>&1
-goto port_wait_loop
-:port_wait_done
-if %PORT_WAIT_COUNT% geq %PORT_MAX_WAIT% (
-    call :log [WARNING] 端口!WEB_PORT!等待超时，强制清理占用进程...
-    for /f "tokens=6" %%p in ('netstat -ano ^| findstr ":!WEB_PORT!.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
-    ping -n 2 127.0.0.1 >nul 2>&1
-)
+
+call :wait_for_port !WEB_PORT! 10
 call :log [*] 残留进程清理完成
 
 call :log_blank
@@ -97,65 +129,82 @@ set "HOSTC_BIN=%CD%\dist\node_modules\.bin\hostc.cmd"
 if not exist "!HOSTC_BIN!" (
     call :log [*] 本地未找到 hostc，开始安装...
     call :install_hostc
-    if not exist "!HOSTC_BIN!" (
-        call :log [ERROR] hostc 安装失败，隧道将不可用
-        goto skip_tunnel
-    )
 )
-for /f "delims=" %%v in ('"!HOSTC_BIN!" --version 2^>nul') do set "HOSTC_VER=%%v"
-call :log [*] hostc v!HOSTC_VER! 已就绪
+if exist "!HOSTC_BIN!" (
+    for /f "delims=" %%v in ('"!HOSTC_BIN!" --version 2^>nul') do set "HOSTC_VER=%%v"
+    call :log [*] hostc v!HOSTC_VER! 已就绪
+) else (
+    call :log [WARNING] hostc 安装失败，隧道将不可用
+)
 
 call :log_blank
-call :log [*] 启动 hostc 隧道（后台运行，不阻塞）...
-start /b cmd /c ""!HOSTC_BIN!" !WEB_PORT! --local-host localhost" < nul
-call :log [*] hostc 已在后台启动，将在后续步骤中获取URL
-:skip_tunnel
+call :log [*] 启动 hostc 隧道（后台运行）...
+if exist "!HOSTC_BIN!" (
+    start /b cmd /c ""!HOSTC_BIN!" !WEB_PORT! --local-host localhost" < nul
+    call :log [*] hostc 已在后台启动
+)
 
 call :log_blank
 call :log [*] 清理临时文件...
-if exist temp (
-    call :get_dir_size temp
-    set "LIMIT_SIZE=3145728"
-    if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
-        del /f /s /q temp\*.* >nul 2>&1
-        call :log [*] temp目录超过3MB，已清理所有文件
-    ) else (
-        call :log [*] temp目录未超过3MB，跳过清理
-    )
-) else (
-    call :log [*] temp目录不存在，跳过清理
-)
-
-call :log [*] 清理浏览器临时文件...
-if exist playwright-browsers (
-    call :log [*] 删除playwright-browsers目录中的临时zip文件...
-    del /f /q playwright-browsers\*.zip >nul 2>&1
-    call :log [*] 浏览器临时文件清理完成
-) else (
-    call :log [*] playwright-browsers目录不存在，跳过清理
-)
+call :cleanup_temp_dir temp 3145728
+call :cleanup_temp_dir playwright-browsers 0
 
 goto detect_environments
 
+:kill_process_safe
+set "PROC_NAME=%~1"
+wmic process where "name='%PROC_NAME%'" get processid,commandline 2>nul | findstr /i "xy_ws" >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'%PROC_NAME%\' and commandlike \'%%xy_ws%%\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+        taskkill /F /PID %%p >nul 2>&1
+        call :log     已终止进程 %%p (%PROC_NAME%)
+    )
+)
+exit /b
+
+:wait_for_port
+set "WAIT_PORT=%~1"
+set "MAX_WAIT=%~2"
+set "WAIT_COUNT=0"
+
+:port_wait_loop
+if %WAIT_COUNT% geq %MAX_WAIT goto port_wait_done
+netstat -ano | findstr ":%WAIT_PORT%.*LISTENING" >nul 2>&1
+if errorlevel 1 goto port_wait_done
+set /a WAIT_COUNT+=1
+call :log [*] 端口%WAIT_PORT%仍被占用，等待释放... (%WAIT_COUNT%/%MAX_WAIT%)
+ping -n 2 127.0.0.1 >nul 2>&1
+goto port_wait_loop
+
+:port_wait_done
+if %WAIT_COUNT% geq %MAX_WAIT% (
+    call :log [WARNING] 端口%WAIT_PORT%等待超时，强制清理...
+    for /f "tokens=6" %%p in ('netstat -ano ^| findstr ":%WAIT_PORT%.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
+    ping -n 2 127.0.0.1 >nul 2>&1
+)
+exit /b
+
+:cleanup_temp_dir
+set "DIR_NAME=%~1"
+set "MAX_SIZE=%~2"
+if exist "%DIR_NAME%" (
+    for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path \'%DIR_NAME%\' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum" 2^>nul') do set "DIR_SIZE=%%a"
+    if defined DIR_SIZE if !DIR_SIZE! gtr %MAX_SIZE% (
+        del /f /s /q "%DIR_NAME%\*.*" >nul 2>&1
+        call :log [*] %DIR_NAME%目录超过限制，已清理
+    ) else (
+        call :log [*] %DIR_NAME%目录未超过限制，跳过清理
+    )
+) else (
+    call :log [*] %DIR_NAME%目录不存在，跳过
+)
+exit /b
+
 :get_dir_size
 set "TOTAL_SIZE=0"
-for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path '%~1' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum" 2^>nul') do set "TOTAL_SIZE=%%a"
+for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path \'%~1\' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum" 2^>nul') do set "TOTAL_SIZE=%%a"
 if not defined TOTAL_SIZE set "TOTAL_SIZE=0"
 if "!TOTAL_SIZE!"=="" set "TOTAL_SIZE=0"
-goto :eof
-
-:cleanup_exit
-call :log_blank
-call :log 正在清理进程...
-taskkill /f /im python.exe >nul 2>&1
-taskkill /f /im node.exe >nul 2>&1
-if exist temp_pip_time.txt del temp_pip_time.txt 2>nul
-if exist temp_pip_int.txt del temp_pip_int.txt 2>nul
-if exist temp_npm_time.txt del temp_npm_time.txt 2>nul
-if exist temp_npm_int.txt del temp_npm_int.txt 2>nul
-if exist temp_h_time.txt del temp_h_time.txt 2>nul
-if exist temp_h_int.txt del temp_h_int.txt 2>nul
-call :log 清理完成
 goto :eof
 
 :detect_environments
@@ -165,7 +214,6 @@ call :log 综合环境检测与配置
 call :log ========================================
 
 set "VENV_PATH=.venv"
-set "NODE_ENV_PATH=.node_env"
 set "FASTEST_PIP_MIRROR="
 set "FASTEST_NPM_MIRROR="
 
@@ -185,105 +233,45 @@ goto detect_venv
 :detect_python_env
 call :log [1/6] 检测Python环境...
 
-where py >nul 2>&1
-if errorlevel 1 (
-    where python >nul 2>&1
-    if errorlevel 1 (
-        call :log Python未在PATH中，正在尝试查找系统中的Python...
-        
-        set "PYTHON_PATH="
-        for /d %%p in ("C:\Python3*") do if exist "%%p\python.exe" set "PYTHON_PATH=%%p\python.exe"
-        if not defined PYTHON_PATH for /d %%p in ("C:\Program Files\Python3*") do if exist "%%p\python.exe" set "PYTHON_PATH=%%p\python.exe"
-        if not defined PYTHON_PATH for /d %%p in ("C:\Users\%USERNAME%\AppData\Local\Programs\Python\Python3*") do if exist "%%p\python.exe" set "PYTHON_PATH=%%p\python.exe"
-        
-        if defined PYTHON_PATH (
-            call :log [*] 找到Python: !PYTHON_PATH!
-            for %%P in ("!PYTHON_PATH!") do set "PYTHON_DIR=%%~dpP"
-            set "PATH=!PATH!;!PYTHON_DIR!"
-            set "PYTHON_CMD=!PYTHON_PATH!"
-        ) else (
-            call :log [WARNING] 系统中未找到Python，正在自动安装...
-            
-            where winget >nul 2>&1
-            if not errorlevel 1 (
-                call :log     使用 Winget 安装 Python...
-                winget install Python.Python.3 --accept-package-agreements --accept-source-agreements --silent
-                if not errorlevel 1 (
-                    goto :python_verify_install
-                )
-                call :log [ERROR] Winget 安装失败
-            )
-            
-            where choco >nul 2>&1
-            if not errorlevel 1 (
-                call :log     使用 Chocolatey 安装 Python...
-                choco install python -y
-                if not errorlevel 1 (
-                    goto :python_verify_install
-                )
-                call :log [ERROR] Chocolatey 安装失败
-            )
-            
-            where scoop >nul 2>&1
-            if not errorlevel 1 (
-                call :log     使用 Scoop 安装 Python...
-                scoop install python
-                if not errorlevel 1 (
-                    goto :python_verify_install
-                )
-                call :log [ERROR] Scoop 安装失败
-            )
-            
-            call :log     正在查询最新 Python 版本...
-            set "PYTHON_LATEST_VERSION=3.11.9"
-            for /f "delims=" %%v in ('curl.exe -s https://www.python.org/ftp/python/ 2^>nul ^| findstr /r "^3\.[0-9]*\.[0-9]*/$" ^| sort /r ^| findstr /n "^" ^| findstr "^[1]:"') do (
-                for /f "tokens=1 delims=/" %%a in ("%%v") do set "PYTHON_LATEST_VERSION=%%a"
-            )
-            call :log     检测到最新Python版本: !PYTHON_LATEST_VERSION!
+set "PYTHON_CMD="
+where py >nul 2>&1 && set "PYTHON_CMD=py"
+if not defined PYTHON_CMD where python >nul 2>&1 && set "PYTHON_CMD=python"
 
-            call :log     直接下载 Python !PYTHON_LATEST_VERSION! 安装程序...
-            if not exist "%TEMP%\python_installer.exe" (
-                curl.exe -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/!PYTHON_LATEST_VERSION!/python-!PYTHON_LATEST_VERSION!-amd64.exe
-            )
-            
-            if exist "%TEMP%\python_installer.exe" (
-                call :log     正在静默安装 Python 到 %CD%\_python...
-                "%TEMP%\python_installer.exe" /quiet InstallAllUsers=0 PrependPath=0 Include_pip=1 TargetDir="%CD%\_python"
-                if exist "%CD%\_python\python.exe" (
-                    set "PYTHON_CMD=%CD%\_python\python.exe"
-                    set "PATH=%CD%\_python;!PATH!"
-                    call :log [*] Python 已安装到临时目录: %CD%\_python
-                    del "%TEMP%\python_installer.exe" 2>nul
-                ) else (
-                    call :log [ERROR] Python 安装失败
-                    exit /b 1
-                )
-            ) else (
-                call :log [ERROR] Python 下载失败
-                exit /b 1
-            )
-        )
+if not defined PYTHON_CMD (
+    call :log Python未在PATH中，正在尝试查找或自动安装...
+    
+    set "PYTHON_PATH="
+    for /d %%p in ("C:\Python3*") do if exist "%%p\python.exe" set "PYTHON_PATH=%%p\python.exe"
+    for /d %%p in ("C:\Program Files\Python3*") do if exist "%%p\python.exe" set "PYTHON_PATH=%%p\python.exe"
+    for /d %%p in ("%LOCALAPPDATA%\Programs\Python\Python3*") do if exist "%%p\python.exe" set "PYTHON_PATH=%%p\python.exe"
+    
+    if defined PYTHON_PATH (
+        call :log [*] 找到Python: !PYTHON_PATH!
+        for %%P in ("!PYTHON_PATH!") do set "PATH=!PATH!;%%~dpP"
+        set "PYTHON_CMD=!PYTHON_PATH!"
     ) else (
-        set "PYTHON_CMD=python"
+        call :log [*] 正在自动安装Python...
+        call :auto_install_python
+        if errorlevel 1 exit /b 1
     )
-) else (
-    set "PYTHON_CMD=py"
-)
-
-:python_verify_install
-if not defined PYTHON_CMD (
-    where py >nul 2>&1 && set "PYTHON_CMD=py"
-    if not defined PYTHON_CMD where python >nul 2>&1 && set "PYTHON_CMD=python"
-)
-
-if not defined PYTHON_CMD (
-    call :log [ERROR] 无法找到或安装Python
-    exit /b 1
 )
 
 call :log_blank
 call :log Python版本：
-"!PYTHON_CMD!" --version 2>nul || call :log [WARNING] 无法获取Python版本信息
+if defined PYTHON_CMD (
+    if exist "!PYTHON_CMD!" (
+        for /f "delims=" %%v in ('"!PYTHON_CMD!" --version 2^>nul') do call :log     %%v
+    ) else (
+        where !PYTHON_CMD! >nul 2>&1
+        if not errorlevel 1 (
+            for /f "delims=" %%v in ('!PYTHON_CMD! --version 2^>nul') do call :log     %%v
+        ) else (
+            call :log [WARNING] Python路径不存在: !PYTHON_CMD!
+        )
+    )
+) else (
+    call :log [ERROR] 未找到Python解释器
+)
 
 call :log [*] 检测虚拟环境状态...
 if defined VIRTUAL_ENV (
@@ -295,6 +283,53 @@ if defined VIRTUAL_ENV (
 )
 exit /b 0
 
+:auto_install_python
+call :log     尝试使用 Winget 安装...
+where winget >nul 2>&1
+if not errorlevel 1 (
+    winget install Python.Python.3 --accept-package-agreements --accept-source-agreements --silent
+    if not errorlevel 1 (
+        where py >nul 2>&1 && set "PYTHON_CMD=py"
+        where python >nul 2>&1 && set "PYTHON_CMD=python"
+        if defined PYTHON_CMD (
+            call :log [*] Python 安装成功
+            exit /b 0
+        )
+    )
+)
+
+call :log     尝试使用 Chocolatey 安装...
+where choco >nul 2>&1
+if not errorlevel 1 (
+    choco install python -y
+    if not errorlevel 1 (
+        set "PYTHON_CMD=python"
+        call :log [*] Python 安装成功
+        exit /b 0
+    )
+)
+
+call :log     直接下载并安装Python...
+set "PYTHON_VERSION=3.11.9"
+if not exist "%TEMP%\python_installer.exe" (
+    curl.exe -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe
+)
+
+if exist "%TEMP%\python_installer.exe" (
+    if not exist "%CD%\_python" mkdir "%CD%\_python"
+    "%TEMP%\python_installer.exe" /quiet InstallAllUsers=0 PrependPath=0 Include_pip=1 TargetDir="%CD%\_python"
+    if exist "%CD%\_python\python.exe" (
+        set "PYTHON_CMD=%CD%\_python\python.exe"
+        set "PATH=%CD%\_python;!PATH!"
+        call :log [*] Python 已安装到本地目录: %CD%\_python
+        del "%TEMP%\python_installer.exe" 2>nul
+        exit /b 0
+    )
+)
+
+call :log [ERROR] Python 自动安装失败
+exit /b 1
+
 :detect_node_env
 call :log [2/6] 检测Node.js环境...
 
@@ -305,80 +340,13 @@ if errorlevel 1 (
     where nvm >nul 2>&1
     if not errorlevel 1 (
         call :log     使用NVM管理Node.js...
-        nvm list
-        nvm use latest >nul 2>&1 || nvm use lts >nul 2>&1
-        if errorlevel 1 (
-            call :log     NVM中未安装Node.js，正在安装LTS版本...
-            nvm install lts
-            nvm use lts
-        )
+        nvm use lts >nul 2>&1 || nvm install lts
+        nvm use lts
         goto :node_verify_install
     )
     
-    if exist "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" (
-        call :log     发现NVM（注册表路径），正在使用NVM管理Node.js...
-        call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use latest
-        if errorlevel 1 (
-            call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" install lts
-            call "%USERPROFILE%\AppData\Roaming\nvm\nvm.exe" use lts
-        )
-        goto :node_verify_install
-    )
-    
-    call :log [WARNING] 未发现Node.js和NVM，正在全自动安装...
-    
-    where winget >nul 2>&1
-    if not errorlevel 1 (
-        call :log     使用 Winget 安装 Node.js...
-        winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --silent
-        if not errorlevel 1 (
-            goto :node_verify_install
-        )
-    )
-    
-    where choco >nul 2>&1
-    if not errorlevel 1 (
-        call :log     使用 Chocolatey 安装 Node.js...
-        choco install nodejs -y
-        if not errorlevel 1 (
-            goto :node_verify_install
-        )
-    )
-    
-    where scoop >nul 2>&1
-    if not errorlevel 1 (
-        call :log     使用 Scoop 安装 Node.js...
-        scoop install nodejs-lts
-        if not errorlevel 1 (
-            goto :node_verify_install
-        )
-    )
-    
-    call :log     正在查询最新 Node.js LTS 版本...
-    set "NODE_LTS_VERSION=v20.11.1"
-    for /f "delims=" %%v in ('curl.exe -s https://nodejs.org/dist/index.tab 2^>nul ^| findstr /i "LTS" ^| findstr /v "headers" ^| findstr /v "src" ^| findstr /r "^[v]?[0-9]" ^| sort /r ^| findstr /n "^" ^| findstr "^[1]:"') do (
-        for /f "tokens=1 delims= " %%a in ("%%v") do set "NODE_LTS_VERSION=%%a"
-    )
-    call :log     检测到最新Node.js LTS版本: !NODE_LTS_VERSION!
-
-    call :log     直接下载 Node.js !NODE_LTS_VERSION! 安装程序到 %NODE_ENV_PATH%...
-    if not exist "%NODE_ENV_PATH%" mkdir "%NODE_ENV_PATH%"
-
-    curl.exe -L -o "%NODE_ENV_PATH%\node-installer.msi" https://nodejs.org/dist/!NODE_LTS_VERSION!/node-!NODE_LTS_VERSION!-x64.msi
-    
-    if exist "%NODE_ENV_PATH%\node-installer.msi" (
-        call :log     正在静默安装 Node.js 到 %CD%\%NODE_ENV_PATH%...
-        msiexec /i "%NODE_ENV_PATH%\node-installer.msi" INSTALLDIR="%CD%\%NODE_ENV_PATH%" /quiet /norestart
-        set "PATH=%CD%\%NODE_ENV_PATH%;!PATH!"
-        del "%NODE_ENV_PATH%\node-installer.msi" 2>nul
-        call :log [*] Node.js 已安装到临时目录: %CD%\%NODE_ENV_PATH%
-    ) else (
-        call :log [ERROR] Node.js 下载失败
-    )
-) else (
-    call :log Node.js版本:
-    node --version
-    npm --version
+    call :log [*] 正在自动安装Node.js...
+    call :auto_install_node
 )
 
 :node_verify_install
@@ -386,10 +354,35 @@ where node >nul 2>&1
 if not errorlevel 1 (
     call :log_blank
     call :log Node.js版本:
-    node --version
-    npm --version
+    for /f "delims=" %%v in ('node --version 2^>nul') do call :log     Node %%v
+    for /f "delims=" %%v in ('npm --version 2^>nul') do call :log     NPM %%v
 ) else (
     call :log [WARNING] Node.js 安装失败，部分功能可能不可用
+)
+exit /b 0
+
+:auto_install_node
+where winget >nul 2>&1
+if not errorlevel 1 (
+    winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --silent
+    if not errorlevel 1 goto :node_verify_install
+)
+
+where choco >nul 2>&1
+if not errorlevel 1 (
+    choco install nodejs -y
+    if not errorlevel 1 goto :node_verify_install
+)
+
+set "NODE_VERSION=v20.11.1"
+if not exist "%TEMP%\node-installer.msi" (
+    curl.exe -L -o "%TEMP%\node-installer.msi" https://nodejs.org/dist/%NODE_VERSION%/node-%NODE_VERSION%-x64.msi
+)
+
+if exist "%TEMP%\node-installer.msi" (
+    msiexec /i "%TEMP%\node-installer.msi" /quiet /norestart
+    del "%TEMP%\node-installer.msi" 2>nul
+    call :log [*] Node.js 已安装
 )
 exit /b 0
 
@@ -397,7 +390,6 @@ exit /b 0
 call :log [3/6] 测试PIP加速镜像源...
 
 if not defined PYTHON_CMD (
-    call :log [WARNING] Python未安装，跳过PIP镜像测试
     set "FASTEST_PIP_MIRROR=https://pypi.org/simple/"
     exit /b 0
 )
@@ -417,43 +409,22 @@ for /L %%i in (0,1,3) do (
         set "MIRROR_NAME=%%b"
         call :log     测试 !MIRROR_NAME!...
         
-        set "TEST_TIME=9999"
-        curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 1.5 --max-time 2 "!MIRROR_URL!" > temp_pip_time.txt 2>nul
-        if exist temp_pip_time.txt (
-            set /p TEST_TIME=<temp_pip_time.txt
-            del temp_pip_time.txt 2>nul
-            for /f "delims=0123456789." %%c in ("!TEST_TIME!") do set "TEST_TIME=9999"
-        )
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 1.5 --max-time 2 "!MIRROR_URL!" 2^>nul') do set "TEST_TIME=%%t"
         
-        if not defined TEST_TIME set "TEST_TIME=9999"
-        
-        set "PIP_INT_TIME=9999"
-        if not "!TEST_TIME!"=="0" if not "!TEST_TIME!"=="0.000000" (
-            "!PYTHON_CMD!" -c "print(int(float('!TEST_TIME!')*1000))" > temp_pip_int.txt 2>nul
-            if exist temp_pip_int.txt (
-                set /p PIP_INT_TIME=<temp_pip_int.txt
-                del temp_pip_int.txt 2>nul
-                for /f "delims=0123456789" %%c in ("!PIP_INT_TIME!") do set "PIP_INT_TIME=9999"
-            )
-        )
-        if "!PIP_INT_TIME!"=="" set "PIP_INT_TIME=9999"
-        if "!PIP_INT_TIME!"=="0" set "PIP_INT_TIME=9999"
-        
-        if !PIP_INT_TIME! equ 9999 (
-            call :log         !MIRROR_NAME!: 超时/失败
-        ) else (
-            call :log         !MIRROR_NAME!: !TEST_TIME!秒 [!PIP_INT_TIME!ms]
-            if !PIP_INT_TIME! LSS !MIN_TIME! (
+        if defined TEST_TIME if not "!TEST_TIME!"=="0" if not "!TEST_TIME!"=="0.000000" (
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!TEST_TIME!\'*1000)" 2^>nul') do set "PIP_INT_TIME=%%m"
+            
+            if defined PIP_INT_TIME if !PIP_INT_TIME! LSS !MIN_TIME! (
                 set "MIN_TIME=!PIP_INT_TIME!"
                 set "BEST_MIRROR=!MIRROR_URL!"
                 set "BEST_NAME=!MIRROR_NAME!"
+                call :log         !MIRROR_NAME!: !TEST_TIME!秒 [!PIP_INT_TIME!ms]
             )
+        ) else (
+            call :log         !MIRROR_NAME!: 超时/失败
         )
     )
 )
-
-if exist temp_pip_time.txt del temp_pip_time.txt 2>nul
-if exist temp_pip_int.txt del temp_pip_int.txt 2>nul
 
 if "!BEST_MIRROR!"=="" (
     call :log [WARNING] 所有镜像测试失败，使用默认PyPI源
@@ -472,59 +443,27 @@ set "HOSTC_MIRRORS[0]=https://registry.npmmirror.com|npmmirror淘宝"
 set "HOSTC_MIRRORS[1]=https://repo.huaweicloud.com/repository/npm/|华为云"
 set "HOSTC_MIRRORS[2]=https://registry.npmjs.org|官方源"
 
-set "HOSTC_BEST_MIRROR="
-set "HOSTC_BEST_NAME="
-set "HOSTC_MIN_TIME=9999"
+set "HOSTC_BEST_MIRROR=https://registry.npmmirror.com"
 
 for /L %%i in (0,1,2) do (
     for /f "tokens=1,2 delims=|" %%a in ("!HOSTC_MIRRORS[%%i]!") do (
         set "H_URL=%%a"
         set "H_NAME=%%b"
-        call :log     测试 !H_NAME!...
         
-        set "H_TIME=9999"
-        curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 3 "!H_URL!" > temp_h_time.txt 2>nul
-        if exist temp_h_time.txt (
-            set /p H_TIME=<temp_h_time.txt
-            del temp_h_time.txt 2>nul
-            for /f "delims=0123456789." %%c in ("!H_TIME!") do set "H_TIME=9999"
-        )
-
-        set "H_INT=9999"
-        if not "!H_TIME!"=="0" if not "!H_TIME!"=="0.000000" (
-            "!PYTHON_CMD!" -c "print(int(float('!H_TIME!')*1000))" > temp_h_int.txt 2>nul
-            if exist temp_h_int.txt (
-                set /p H_INT=<temp_h_int.txt
-                del temp_h_int.txt 2>nul
-                for /f "delims=0123456789" %%c in ("!H_INT!") do set "H_INT=9999"
-            )
-        )
-        if "!H_INT!"=="" set "H_INT=9999"
-        if "!H_INT!"=="0" set "H_INT=9999"
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 3 "!H_URL!" 2^>nul') do set "H_TIME=%%t"
         
-        if !H_INT! equ 9999 (
-            call :log         !H_NAME!: 超时/失败
-        ) else (
-            call :log         !H_NAME!: !H_TIME!秒 [!H_INT!ms]
-            if !H_INT! LSS !HOSTC_MIN_TIME! (
-                set "HOSTC_MIN_TIME=!H_INT!"
+        if defined H_TIME if not "!H_TIME!"=="0" if not "!H_TIME!"=="0.000000" (
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!H_TIME!\'*1000)" 2^>nul') do set "H_INT=%%m"
+            
+            if defined H_INT if !H_INT! LSS 9999 (
                 set "HOSTC_BEST_MIRROR=!H_URL!"
-                set "HOSTC_BEST_NAME=!H_NAME!"
+                call :log     测试 !H_NAME!: !H_TIME!秒 [!H_INT!ms]
             )
         )
     )
 )
 
-if exist temp_h_time.txt del temp_h_time.txt 2>nul
-if exist temp_h_int.txt del temp_h_int.txt 2>nul
-
-if "!HOSTC_BEST_MIRROR!"=="" (
-    call :log [WARNING] 所有CDN均不可用，尝试默认源安装...
-    set "HOSTC_BEST_MIRROR=https://registry.npmmirror.com"
-    set "HOSTC_BEST_NAME=npmmirror淘宝(fallback)"
-)
-
-call :log [*] 使用 !HOSTC_BEST_NAME! 安装 hostc...
+call :log [*] 使用最佳镜像安装 hostc...
 npm install hostc@latest --registry "!HOSTC_BEST_MIRROR!" --prefix dist 2>nul
 if errorlevel 1 (
     call :log [ERROR] hostc 安装失败
@@ -555,43 +494,22 @@ for /L %%i in (0,1,1) do (
         set "NPM_NAME=%%b"
         call :log     测试 !NPM_NAME!...
         
-        set "NPM_TEST_TIME=9999"
-        curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 3 "!NPM_URL!" > temp_npm_time.txt 2>nul
-        if exist temp_npm_time.txt (
-            set /p NPM_TEST_TIME=<temp_npm_time.txt
-            del temp_npm_time.txt 2>nul
-            for /f "delims=0123456789." %%c in ("!NPM_TEST_TIME!") do set "NPM_TEST_TIME=9999"
-        )
-
-        if not defined NPM_TEST_TIME set "NPM_TEST_TIME=9999"
-
-        set "NPM_INT_TIME=9999"
-        if not "!NPM_TEST_TIME!"=="0" if not "!NPM_TEST_TIME!"=="0.000000" (
-            "!PYTHON_CMD!" -c "print(int(float('!NPM_TEST_TIME!')*1000))" > temp_npm_int.txt 2>nul
-            if exist temp_npm_int.txt (
-                set /p NPM_INT_TIME=<temp_npm_int.txt
-                del temp_npm_int.txt 2>nul
-                for /f "delims=0123456789" %%c in ("!NPM_INT_TIME!") do set "NPM_INT_TIME=9999"
-            )
-        )
-        if "!NPM_INT_TIME!"=="" set "NPM_INT_TIME=9999"
-        if "!NPM_INT_TIME!"=="0" set "NPM_INT_TIME=9999"
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 3 "!NPM_URL!" 2^>nul') do set "NPM_TEST_TIME=%%t"
         
-        if !NPM_INT_TIME! equ 9999 (
-            call :log         !NPM_NAME!: 超时/失败
-        ) else (
-            call :log         !NPM_NAME!: !NPM_TEST_TIME!秒 [!NPM_INT_TIME!ms]
-            if !NPM_INT_TIME! LSS !NPM_MIN_TIME! (
+        if defined NPM_TEST_TIME if not "!NPM_TEST_TIME!"=="0" if not "!NPM_TEST_TIME!"=="0.000000" (
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!NPM_TEST_TIME!\'*1000)" 2^>nul') do set "NPM_INT_TIME=%%m"
+            
+            if defined NPM_INT_TIME if !NPM_INT_TIME! LSS !NPM_MIN_TIME! (
                 set "NPM_MIN_TIME=!NPM_INT_TIME!"
                 set "NPM_BEST_MIRROR=!NPM_URL!"
                 set "NPM_BEST_NAME=!NPM_NAME!"
+                call :log         !NPM_NAME!: !NPM_TEST_TIME!秒 [!NPM_INT_TIME!ms]
             )
+        ) else (
+            call :log         !NPM_NAME!: 超时/失败
         )
     )
 )
-
-if exist temp_npm_time.txt del temp_npm_time.txt 2>nul
-if exist temp_npm_int.txt del temp_npm_int.txt 2>nul
 
 if "!NPM_BEST_MIRROR!"=="" (
     call :log [WARNING] NPM镜像测试失败
@@ -600,25 +518,17 @@ if "!NPM_BEST_MIRROR!"=="" (
     call :log_blank
     call :log [*] 最快NPM镜像: !NPM_BEST_NAME! [!NPM_MIN_TIME!毫秒]
     
-    where npm >nul 2>&1
-    if not errorlevel 1 (
-        npm config set registry "!NPM_BEST_MIRROR!"
-        call :log [*] NPM镜像已设置为: !NPM_BEST_MIRROR!
-    )
+    npm config set registry "!NPM_BEST_MIRROR!"
+    call :log [*] NPM镜像已设置为: !NPM_BEST_MIRROR!
 )
 exit /b 0
 
 :detect_venv
 call :log [5/6] 检测Python虚拟环境...
 
-if exist venv\Scripts\activate.bat (
-    call :log 检测到虚拟环境：venv
-    set "VENV_EXISTS=1"
-    set "VENV_PATH=venv"
-) else if exist .venv\Scripts\activate.bat (
+if exist .venv\Scripts\activate.bat (
     call :log 检测到虚拟环境：.venv
     set "VENV_EXISTS=1"
-    set "VENV_PATH=.venv"
 ) else (
     call :log 未检测到虚拟环境
     set "VENV_EXISTS=0"
@@ -637,12 +547,6 @@ if "!VENV_EXISTS!"=="0" (
         exit /b 1
     )
     set "VENV_EXISTS=1"
-)
-
-if not exist "!VENV_PATH!\Scripts\activate.bat" (
-    call :log ERROR: 虚拟环境路径不存在：!VENV_PATH!
-    pause
-    exit /b 1
 )
 
 call "!VENV_PATH!\Scripts\activate.bat"
@@ -673,35 +577,25 @@ if exist requirements.txt (
     if not errorlevel 1 (
         call :log [*] 所有Python依赖已满足，跳过安装
         set "NEED_PIP_INSTALL=0"
-    ) else (
-        call :log [*] 检测到缺失或版本不满足的依赖，开始安装...
-        set "NEED_PIP_INSTALL=1"
     )
 
     if "!NEED_PIP_INSTALL!"=="1" (
-        set "PIP_INSTALL_OK=0"
         call :log [*] 强制升级pip到最新版本...
         if defined FASTEST_PIP_MIRROR (
             "!VENV_PATH!\Scripts\python.exe" -m pip install --upgrade pip -i "!FASTEST_PIP_MIRROR!"
         ) else (
             "!VENV_PATH!\Scripts\python.exe" -m pip install --upgrade pip
         )
+        
+        call :log [*] 安装依赖...
         if defined FASTEST_PIP_MIRROR (
             "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt -i "!FASTEST_PIP_MIRROR!"
             if errorlevel 1 (
                 call :log WARNING: 使用镜像源安装失败，尝试默认源...
                 "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt
-                if errorlevel 1 set "PIP_INSTALL_OK=1"
             )
         ) else (
             "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt
-            if errorlevel 1 set "PIP_INSTALL_OK=1"
-        )
-
-        if "!PIP_INSTALL_OK!"=="1" (
-            call :log ERROR: 依赖安装完全失败
-            pause
-            exit /b 1
         )
     )
 
@@ -728,9 +622,6 @@ if exist config\config.json (
 :auto_setup
 call :log [*] 自动配置...
 
-call :log_blank
-call :log 正在复制配置文件模板...
-
 if exist config\config.json.example (
     copy /Y config\config.json.example config\config.json >nul
     call :log [OK] config.json 已创建
@@ -744,23 +635,9 @@ if exist config\cookies.json.example (
 )
 
 call :log_blank
-call :log ========================================
-call :log 首次配置完成！
-call :log ========================================
-call :log_blank
-call :log 请编辑 config\config.json，填写以下信息：
-call :log   - login.username: 用户名
-call :log   - login.password: 密码
-call :log   - target_url: 目标URL
-call :log   - headers.cookie: Cookie值
-call :log   - cookies中的token和sensorsdata值
-call :log_blank
-set "CHOICE="
-set /p CHOICE="按回车键继续，或输入 Q 退出: "
-
-if not defined CHOICE set "CHOICE="
-for /f "delims=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" %%c in ("!CHOICE!") do set "CHOICE="
-if /i "!CHOICE!"=="Q" goto cleanup_exit
+call :log 请编辑 config\config.json 后按回车继续
+pause
+goto run_web
 
 :run_web
 call :log_blank
@@ -771,12 +648,9 @@ call :log ========================================
 call "!VENV_PATH!\Scripts\activate.bat"
 
 call :log_blank
-
 call :log [*] Checking BOM...
 "%VENV_PATH%\Scripts\python.exe" main.py --check-bom >NUL 2>&1
-if not errorlevel 1 (
-    call :log [OK] No BOM found
-) else (
+if errorlevel 1 (
     call :log [WARNING] BOM detected, auto-fixing...
     "%VENV_PATH%\Scripts\python.exe" main.py --fix-bom
 )
@@ -788,6 +662,7 @@ if not defined WEB_PORT set "WEB_PORT=8888"
 for /f "delims=0123456789" %%c in ("!WEB_PORT!") do set "WEB_PORT=8888"
 if !WEB_PORT! lss 1 set "WEB_PORT=8888"
 if !WEB_PORT! gtr 65535 set "WEB_PORT=8888"
+
 call :ms_timestamp
 call :log [!TIMESTAMP!] === Web服务启动 ===
 start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT!" < nul
@@ -801,76 +676,41 @@ set "FLASK_MAX_WAIT=60"
 :wait_flask
 set /a FLASK_WAIT_COUNT+=1
 if !FLASK_WAIT_COUNT! gtr !FLASK_MAX_WAIT! (
-    call :log [ERROR] Web服务启动超时（等待了!FLASK_MAX_WAIT!次），请检查日志: !LOG_FILE!
+    call :log [ERROR] Web服务启动超时
     goto :wait_loop_entry
 )
 set "HTTP_CODE="
 for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" http://localhost:!WEB_PORT! 2^>nul') do set "HTTP_CODE=%%i"
 if not defined HTTP_CODE set "HTTP_CODE=000"
-if not "!HTTP_CODE!"=="200" (
-    if not "!HTTP_CODE!"=="302" (
-        ping -n 1 127.0.0.1 >nul 2>&1
-        goto wait_flask
-    )
+if not "!HTTP_CODE!"=="200" if not "!HTTP_CODE!"=="302" (
+    ping -n 1 127.0.0.1 >nul 2>&1
+    goto wait_flask
 )
 
-set "LOG_FILE="
-call :log_console_only Web 服务已就绪，正在启动隧道...
-REM hostc已在脚本启动时启动
+call :log_console_only Web 服务已就绪
 
 ping -n 4 127.0.0.1 >nul 2>&1
-
-set "WEB_OUTPUT_LOG=file\web_output.log"
-set "TUNNEL_URL_FILE=file\tunnel_url.txt"
 
 set "LAN_ADDR="
 set "PUBLIC_URL="
 
-if exist "!WEB_OUTPUT_LOG!" (
-    for /f "delims=" %%l in ('findstr /C:"局域网地址:" "!WEB_OUTPUT_LOG!" 2^>nul') do (
-        for /f "tokens=2 delims=: " %%a in ("%%l") do set "LAN_ADDR=%%a"
-    )
-    for /f "delims=" %%p in ('findstr /C:"Public URL:" "!WEB_OUTPUT_LOG!" 2^>nul') do (
-        for /f "tokens=2 delims=: " %%b in ("%%p") do set "PUBLIC_URL=%%b"
-    )
-)
-
-if not defined PUBLIC_URL (
-    if exist "!TUNNEL_URL_FILE!" (
-        for /f "usebackq delims=" %%t in ("!TUNNEL_URL_FILE!") do (
-            echo %%t | findstr /i "hostc:" >nul && for /f "tokens=2 delims=: " %%h in ("%%t") do set "PUBLIC_URL=%%h"
-            if not defined PUBLIC_URL (
-                echo %%t | findstr /i ".hostc.dev" >nul && for /f "tokens=1" %%u in ("%%t") do set "PUBLIC_URL=%%u"
-            )
-        )
-    )
+for /f "delims=" %%l in ('findstr /C:"局域网地址:" "!LOG_FILE!" 2^>nul') do (
+    for /f "tokens=2 delims=: " %%a in ("%%l") do set "LAN_ADDR=%%a"
 )
 
 if not defined LAN_ADDR (
-    for /f "delims=" %%i in ('powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Ethernet*','Wi-Fi*','本地连接*','WLAN*'| Where-Object { $_.IPAddress -notmatch '^169\.254\.' -and $_.IPAddress -notmatch '^127\.' }| Select-Object -First 1 -ExpandProperty IPAddress)" 2^>nul') do (
+    for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch \'^(169\.254|127\.)\' } | Select-Object -First 1 -ExpandProperty IPAddress" 2^>nul') do (
         set "LAN_ADDR=http://%%i:!WEB_PORT!"
     )
 )
 
 if not defined LAN_ADDR (
-    for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /i "IPv4"') do (
-        if not "%%a"=="127.0.0.1" if not "%%a"=="169.254.*" (
-            set "LAN_ADDR=http://%%a:!WEB_PORT!"
-            goto :got_lan
-        )
-    )
-)
-:got_lan
-
-if not defined LAN_ADDR (
     for /f "tokens=14 delims= " %%i in ('ipconfig ^| findstr /i "IPv4" 2^>nul') do (
         if not "%%i"=="127.0.0.1" (
             set "LAN_ADDR=http://%%i:!WEB_PORT!"
-            goto :lan_done
         )
     )
 )
-:lan_done
 
 call :log_blank_console_only
 call :log_console_only ========================================
@@ -883,31 +723,10 @@ if defined LAN_ADDR (
 ) else (
     call :log_console_only 局域网地址: 检测中...
 )
-if defined PUBLIC_URL (
-    call :log_console_only 公网访问: !PUBLIC_URL!
-) else (
-    call :log_console_only 公网访问: 正在获取隧道URL...
-)
-call :log_console_only 详细日志: !WEB_OUTPUT_LOG!
+call :log_console_only 详细日志: !LOG_FILE!
 call :log_blank_console_only
-call :log_console_only 按 Ctrl+C 停止服务，或关闭此窗口
+call :log_console_only 按 Ctrl+C 停止服务
 call :log_blank_console_only
-
-call :log ========================================
-call :log 启动完成！
-call :log ========================================
-call :log 本地访问: http://localhost:!WEB_PORT!
-if defined LAN_ADDR (
-    call :log 局域网地址: !LAN_ADDR!
-) else (
-    call :log 局域网地址: 检测中...
-)
-if defined PUBLIC_URL (
-    call :log 公网访问: !PUBLIC_URL!
-) else (
-    call :log 公网访问: 正在获取隧道URL...
-)
-call :log 详细日志: !WEB_OUTPUT_LOG!
 
 :wait_loop_entry
 set "CHECK_INTERVAL=60"
@@ -923,12 +742,18 @@ if !CHECK_COUNTER! geq !CHECK_INTERVAL! (
 goto wait_loop
 
 :check_temp_size
-if exist temp (
-    call :get_dir_size temp
-    set "LIMIT_SIZE=3145728"
-    if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
-        del /f /s /q temp\*.* >nul 2>&1
-        call :log_console_only [AUTO] temp目录超过3MB，已自动清理
-    )
+call :get_dir_size temp
+set "LIMIT_SIZE=3145728"
+if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
+    del /f /s /q temp\*.* >nul 2>&1
+    call :log_console_only [AUTO] temp目录超过3MB，已自动清理
 )
+goto :eof
+
+:cleanup_exit
+call :log_blank
+call :log 正在清理进程...
+call :kill_process_safe python.exe main.py
+call :kill_process_safe hostc.exe
+call :log 清理完成
 goto :eof

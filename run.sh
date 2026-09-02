@@ -2,35 +2,22 @@
 cd "$(dirname "$0")"
 
 VERSION="0.0.0"
-for cmd in python3 python; do
-    if command -v "$cmd" &>/dev/null; then
-        VERSION=$("$cmd" -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2>/dev/null) && break
+if [ -f "README.md" ]; then
+    VERSION=$(grep -m 1 -oP '###\s+v\K[\d]+\.[\d]+\.[\d]+' README.md 2>/dev/null || echo "0.0.0")
+    if [ "$VERSION" = "0.0.0" ]; then
+        VERSION=$(grep -m 1 -oP 'version:\s*["\']?\K[\d]+\.[\d]+\.[\d]+' README.md 2>/dev/null || echo "0.0.0")
     fi
-done
+fi
 
 mkdir -p file
 LOG_FILE="$(pwd)/file/web_output.log"
 > "$LOG_FILE"
 
-_HAS_GNU_DATE=false
-if date '+%3N' 2>/dev/null | grep -qE '^[0-9]{3}$'; then
-    _HAS_GNU_DATE=true
-fi
-
-_ms_timestamp() {
-    if $_HAS_GNU_DATE; then
-        date '+%Y-%m-%d %H:%M:%S.%3N'
-    else
-        local ms
-        ms=$(python3 -c "from datetime import datetime; print(datetime.now().microsecond//1000)" 2>/dev/null || echo "000")
-        printf '%s.%03d' "$(date '+%Y-%m-%d %H:%M:%S')" "${ms:-000}"
-    fi
-}
-
 log() {
-    TIMESTAMP="$(_ms_timestamp)"
-    echo "[$TIMESTAMP] $*"
-    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE" 2>/dev/null
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] $*"
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$timestamp] $*" >> "$LOG_FILE" 2>/dev/null
 }
 
 log_blank() {
@@ -39,18 +26,22 @@ log_blank() {
 }
 
 log_console_only() {
-    TIMESTAMP="$(_ms_timestamp)"
-    echo "[$TIMESTAMP] $*"
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] $*"
 }
 
-log_blank_console_only() {
-    echo ""
+check_prerequisites() {
+    log "[*] 检查前置条件..."
+    
+    if ! command -v curl &> /dev/null; then
+        log "[ERROR] 未找到 curl，请先安装: brew install curl (macOS) 或 apt install curl (Linux)"
+        return 1
+    fi
+    
+    log "[*] 前置条件检查通过"
+    return 0
 }
-
-VENV_PATH=".venv"
-NODE_ENV_PATH=".node_env"
-FASTEST_PIP_MIRROR=""
-FASTEST_NPM_MIRROR=""
 
 pre_launch() {
     log "========================================"
@@ -61,27 +52,11 @@ pre_launch() {
 
     log_blank
     log "[*] 清理残留进程..."
-    pkill -9 -f "node.*playwright" 2>/dev/null || true
-    pkill -9 -f "hostc" 2>/dev/null || true
     pkill -9 -f "python.*main.py" 2>/dev/null || true
-    pkill -9 node 2>/dev/null || true
+    pkill -9 -f "hostc" 2>/dev/null || true
     sleep 1
 
-    PORT_WAIT_COUNT=0
-    PORT_MAX_WAIT=10
-    while [ $PORT_WAIT_COUNT -lt $PORT_MAX_WAIT ]; do
-        if ! lsof -i :$WEB_PORT -sTCP:LISTEN &>/dev/null; then
-            break
-        fi
-        PORT_WAIT_COUNT=$((PORT_WAIT_COUNT + 1))
-        log "[*] 端口$WEB_PORT仍被占用，等待释放... ($PORT_WAIT_COUNT/$PORT_MAX_WAIT)"
-        sleep 1
-    done
-    if [ $PORT_WAIT_COUNT -ge $PORT_MAX_WAIT ]; then
-        log "[WARNING] 端口$WEB_PORT等待超时，强制清理占用进程..."
-        lsof -t -i :$WEB_PORT -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true
-        sleep 1
-    fi
+    wait_for_port $WEB_PORT 10
     log "[*] 残留进程清理完成"
 
     log_blank
@@ -90,48 +65,64 @@ pre_launch() {
     if [ ! -f "$HOSTC_BIN" ]; then
         log "[*] 本地未找到 hostc，开始安装..."
         install_hostc
-        if [ ! -f "$HOSTC_BIN" ]; then
-            log "[WARNING] hostc 安装失败，隧道将不可用"
-        fi
     fi
     if [ -f "$HOSTC_BIN" ]; then
         HOSTC_VER=$("$HOSTC_BIN" --version 2>/dev/null || echo "unknown")
-        log "[*] hostc v${HOSTC_VER} 已就绪"
+        log "[*] hostc v${HOSTC_VER} 已就绪
+    else
+        log "[WARNING] hostc 安装失败，隧道将不可用"
     fi
 
     log_blank
-    log "[*] 启动 hostc 隧道（后台运行，不阻塞）..."
+    log "[*] 启动 hostc 隧道（后台运行）..."
     if [ -f "$HOSTC_BIN" ]; then
         "$HOSTC_BIN" $WEB_PORT --local-host localhost < /dev/null &
-        HOSTC_PID=$!
-    else
-        npx -y hostc@latest $WEB_PORT --local-host localhost < /dev/null &
-        HOSTC_PID=$!
+        log "[*] hostc 已在后台启动"
     fi
-    log "[*] hostc 已在后台启动 (PID: $HOSTC_PID)，将在后续步骤中获取URL"
 
     log_blank
     log "[*] 清理临时文件..."
-    if [ -d "temp" ]; then
-        TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
-        LIMIT_SIZE_KB=3072
-        if [ -n "$TOTAL_SIZE_KB" ] && [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
-            rm -rf temp/*
-            log "[*] temp目录超过3MB，已清理所有文件"
+    cleanup_temp_dir temp 3072
+    cleanup_temp_dir playwright-browsers 0
+}
+
+wait_for_port() {
+    local port=$1
+    local max_wait=$2
+    local count=0
+    
+    while [ $count -lt $max_wait ]; do
+        if ! lsof -i :$port -sTCP:LISTEN &>/dev/null; then
+            break
+        fi
+        count=$((count + 1))
+        log "[*] 端口$port仍被占用，等待释放... ($count/$max_wait)"
+        sleep 1
+    done
+    
+    if [ $count -ge $max_wait ]; then
+        log "[WARNING] 端口$port等待超时，强制清理..."
+        lsof -t -i :$port -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+cleanup_temp_dir() {
+    local dir_name=$1
+    local max_size_kb=$2
+    
+    if [ -d "$dir_name" ]; then
+        local size_kb
+        size_kb=$(du -sk "$dir_name" 2>/dev/null | awk '{print $1}')
+        
+        if [ -n "$size_kb" ] && [ "$size_kb" -gt "$max_size_kb" ]; then
+            rm -rf "${dir_name:?}"/*
+            log "[*] $dir_name目录超过限制，已清理"
         else
-            log "[*] temp目录未超过3MB，跳过清理"
+            log "[*] $dir_name目录未超过限制，跳过清理"
         fi
     else
-        log "[*] temp目录不存在，跳过清理"
-    fi
-
-    log "[*] 清理浏览器临时文件..."
-    if [ -d "playwright-browsers" ]; then
-        log "[*] 删除playwright-browsers目录中的临时zip文件..."
-        rm -f playwright-browsers/*.zip
-        log "[*] 浏览器临时文件清理完成"
-    else
-        log "[*] playwright-browsers目录不存在，跳过清理"
+        log "[*] $dir_name目录不存在，跳过"
     fi
 }
 
@@ -143,14 +134,14 @@ detect_python_env() {
 
     log "[1/6] 检测Python环境..."
 
+    PYTHON_CMD=""
+    
     if command -v python3 &> /dev/null; then
         PYTHON_CMD="python3"
-        log "Python版本：$(python3 --version 2>&1)"
     elif command -v python &> /dev/null; then
         PYTHON_CMD="python"
-        log "Python版本：$(python --version 2>&1)"
     else
-        log "Python未在PATH中，正在尝试查找系统中的Python..."
+        log "Python未在PATH中，正在尝试查找或自动安装..."
         
         COMMON_PYTHON_PATHS=(
             "/usr/bin/python3"
@@ -171,54 +162,9 @@ detect_python_env() {
         done
         
         if [ -z "$PYTHON_CMD" ]; then
-            log "[WARNING] 系统中未找到Python，正在自动安装..."
-            
-            case "$(uname -s)" in
-                Darwin)
-                    if command -v brew &> /dev/null; then
-                        log "    使用Homebrew安装Python..."
-                        brew install python
-                    elif [ -f "/opt/homebrew/bin/brew" ]; then
-                        log "    使用Homebrew (Apple Silicon) 安装Python..."
-                        /opt/homebrew/bin/brew install python
-                    else
-                        log "[ERROR] 未检测到Homebrew，无法自动安装Python"
-                        log "请先安装Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-                        return 1
-                    fi
-                    ;;
-                Linux)
-                    if command -v apt-get &> /dev/null; then
-                        log "    使用apt安装Python..."
-                        sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip
-                    elif command -v yum &> /dev/null; then
-                        log "    使用yum安装Python..."
-                        sudo yum install -y python3 python3-pip
-                    elif command -v dnf &> /dev/null; then
-                        log "    使用dnf安装Python..."
-                        sudo dnf install -y python3 python3-pip
-                    elif command -v pacman &> /dev/null; then
-                        log "    使用pacman安装Python..."
-                        sudo pacman -Syu --noconfirm python python-pip
-                    else
-                        log "[ERROR] 无法识别包管理器，请手动安装Python"
-                        return 1
-                    fi
-                    ;;
-                *)
-                    log "[ERROR] 不支持的操作系统用于自动Python安装"
-                    return 1
-                    ;;
-            esac
-            
-            if command -v python3 &> /dev/null; then
-                PYTHON_CMD="python3"
-                log "[*] Python安装成功: $(python3 --version 2>&1)"
-            elif command -v python &> /dev/null; then
-                PYTHON_CMD="python"
-                log "[*] Python安装成功: $(python --version 2>&1)"
-            else
-                log "[ERROR] Python安装失败"
+            log "[*] 正在自动安装Python..."
+            auto_install_python
+            if [ $? -ne 0 ]; then
                 return 1
             fi
         fi
@@ -230,6 +176,27 @@ detect_python_env() {
     fi
 
     log_blank
+    log "Python版本："
+    if [ -x "$PYTHON_CMD" ]; then
+        local py_version
+        py_version=$("$PYTHON_CMD" --version 2>&1)
+        if [ -n "$py_version" ]; then
+            log "    $py_version"
+        else
+            log "[WARNING] Python执行成功但无法获取版本信息: $PYTHON_CMD"
+        fi
+    elif command -v "$PYTHON_CMD" &> /dev/null; then
+        local py_version
+        py_version=$("$PYTHON_CMD" --version 2>&1)
+        if [ -n "$py_version" ]; then
+            log "    $py_version"
+        else
+            log "[WARNING] Python在PATH中但无法获取版本信息: $PYTHON_CMD"
+        fi
+    else
+        log "[WARNING] Python路径不存在或不可执行: $PYTHON_CMD"
+    fi
+
     log "[*] 检测虚拟环境状态..."
     if [ -n "$VIRTUAL_ENV" ]; then
         log "当前已在虚拟环境中: $VIRTUAL_ENV"
@@ -237,6 +204,60 @@ detect_python_env() {
     else
         log "未在虚拟环境中"
         IN_VENV=0
+    fi
+    
+    return 0
+}
+
+auto_install_python() {
+    case "$(uname -s)" in
+        Darwin)
+            if command -v brew &> /dev/null; then
+                log "    使用Homebrew安装Python..."
+                brew install python
+            elif [ -f "/opt/homebrew/bin/brew" ]; then
+                log "    使用Homebrew (Apple Silicon) 安装Python..."
+                /opt/homebrew/bin/brew install python
+            else
+                log "[ERROR] 未检测到Homebrew，无法自动安装Python"
+                log "请先安装Homebrew:"
+                log '    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+                return 1
+            fi
+            ;;
+        Linux)
+            if command -v apt-get &> /dev/null; then
+                log "    使用apt安装Python..."
+                sudo apt-get update && sudo apt-get install -y python3 python3-venv python3-pip
+            elif command -v yum &> /dev/null; then
+                log "    使用yum安装Python..."
+                sudo yum install -y python3 python3-pip
+            elif command -v dnf &> /dev/null; then
+                log "    使用dnf安装Python..."
+                sudo dnf install -y python3 python3-pip
+            elif command -v pacman &> /dev/null; then
+                log "    使用pacman安装Python..."
+                sudo pacman -Syu --noconfirm python python-pip
+            else
+                log "[ERROR] 无法识别包管理器，请手动安装Python"
+                return 1
+            fi
+            ;;
+        *)
+            log "[ERROR] 不支持的操作系统"
+            return 1
+            ;;
+    esac
+    
+    if command -v python3 &> /dev/null; then
+        PYTHON_CMD="python3"
+        log "[*] Python 安装成功: $($PYTHON_CMD --version 2>&1)"
+    elif command -v python &> /dev/null; then
+        PYTHON_CMD="python"
+        log "[*] Python 安装成功: $($PYTHON_CMD --version 2>&1)"
+    else
+        log "[ERROR] Python 安装失败"
+        return 1
     fi
     
     return 0
@@ -254,7 +275,7 @@ detect_node_env() {
     log "Node.js未在PATH中，正在尝试查找或自动安装..."
     
     if command -v nvm &> /dev/null || [ -s "$HOME/.nvm/nvm.sh" ]; then
-        log "    发现NVM，正在使用NVM管理Node.js..."
+        log "    使用NVM管理Node.js..."
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         
@@ -269,15 +290,17 @@ detect_node_env() {
         
         if command -v node &> /dev/null; then
             log_blank
-            log "Node.js已就绪: $(node --version 2>&1)"
+            log "Node.js版本: $(node --version 2>&1)"
             log "NPM版本: $(npm --version 2>&1)"
-            return 0
-        else
-            log "[WARNING] NVM 安装 Node.js 失败，部分功能可能不可用"
             return 0
         fi
     fi
     
+    auto_install_node
+    return 0
+}
+
+auto_install_node() {
     case "$(uname -s)" in
         Darwin)
             if command -v brew &> /dev/null; then
@@ -287,8 +310,7 @@ detect_node_env() {
                 log "    使用Homebrew (Apple Silicon) 安装Node.js..."
                 /opt/homebrew/bin/brew install node
             else
-                log "[WARNING] 未检测到Homebrew，无法自动安装Node.js"
-                log "请先安装Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+                log "[WARNING] 未检测到Homebrew，Node.js安装失败"
                 return 0
             fi
             ;;
@@ -309,33 +331,21 @@ detect_node_env() {
                 log "    使用pacman安装Node.js..."
                 sudo pacman -Syu --noconfirm nodejs npm
             else
-                log "[WARNING] 无法识别包管理器，请手动安装Node.js"
-                log "推荐方式：curl -fsSL https://fnm.vercel.app/install | bash"
+                log "[WARNING] 无法识别包管理器，Node.js安装失败"
                 return 0
             fi
             ;;
         *)
-            log "[WARNING] 不支持的操作系统用于自动Node.js安装，部分功能可能不可用"
+            log "[WARNING] 不支持的操作系统，Node.js安装失败"
             return 0
             ;;
     esac
-    
-    if command -v node &> /dev/null; then
-        log_blank
-        log "Node.js安装成功: $(node --version 2>&1)"
-        log "NPM版本: $(npm --version 2>&1)"
-        return 0
-    else
-        log "[WARNING] Node.js安装失败，部分功能可能不可用"
-        return 0
-    fi
 }
 
 test_pip_mirrors() {
     log "[3/6] 测试PIP加速镜像源..."
 
     if [ -z "$PYTHON_CMD" ]; then
-        log "[WARNING] Python未安装，跳过PIP镜像测试"
         FASTEST_PIP_MIRROR="https://pypi.org/simple/"
         return 0
     fi
@@ -357,16 +367,17 @@ test_pip_mirrors() {
         
         TEST_TIME=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 1.5 --max-time 2 "$MIRROR_URL" 2>/dev/null)
 
-        if [ -z "$TEST_TIME" ] || [ "$TEST_TIME" = "0.000" ] || [ "$TEST_TIME" = "0" ]; then
-            log "        $MIRROR_NAME: 超时/失败"
-        else
+        if [ -n "$TEST_TIME" ] && [ "$TEST_TIME" != "0.000" ] && [ "$TEST_TIME" != "0" ]; then
             PIP_INT_TIME=$(echo "$TEST_TIME" | awk '{printf "%d", $1 * 1000}')
-            log "        $MIRROR_NAME: ${TEST_TIME}秒 [${PIP_INT_TIME}ms]"
-            if [ "$PIP_INT_TIME" -lt "$MIN_TIME" ] 2>/dev/null; then
+            
+            if [ -n "$PIP_INT_TIME" ] && [ "$PIP_INT_TIME" -lt "$MIN_TIME" ] 2>/dev/null; then
                 MIN_TIME=$PIP_INT_TIME
                 BEST_MIRROR="$MIRROR_URL"
                 BEST_NAME="$MIRROR_NAME"
+                log "        $MIRROR_NAME: ${TEST_TIME}秒 [${PIP_INT_TIME}ms]"
             fi
+        else
+            log "        $MIRROR_NAME: 超时/失败"
         fi
     done
 
@@ -389,36 +400,24 @@ install_hostc() {
         "https://registry.npmjs.org|官方源"
     )
 
-    HOSTC_MIN_TIME=9999
-    HOSTC_BEST_MIRROR=""
-    HOSTC_BEST_NAME=""
+    HOSTC_BEST_MIRROR="https://registry.npmmirror.com"
 
     for hostc_mirror_entry in "${HOSTC_MIRRORS[@]}"; do
         IFS='|' read -r H_URL H_NAME <<< "$hostc_mirror_entry"
-        log "    测试 $H_NAME..."
-
+        
         H_TIME=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 "$H_URL" 2>/dev/null)
 
-        if [ -z "$H_TIME" ] || [ "$H_TIME" = "0.000" ] || [ "$H_TIME" = "0" ]; then
-            log "        $H_NAME: 超时/失败"
-        else
+        if [ -n "$H_TIME" ] && [ "$H_TIME" != "0.000" ] && [ "$H_TIME" != "0" ]; then
             H_INT_TIME=$(echo "$H_TIME" | awk '{printf "%d", $1 * 1000}')
-            log "        $H_NAME: ${H_TIME}秒 [${H_INT_TIME}ms]"
-            if [ "$H_INT_TIME" -lt "$HOSTC_MIN_TIME" ] 2>/dev/null; then
-                HOSTC_MIN_TIME=$H_INT_TIME
+            
+            if [ -n "$H_INT_TIME" ] && [ "$H_INT_TIME" -lt 9999 ] 2>/dev/null; then
                 HOSTC_BEST_MIRROR="$H_URL"
-                HOSTC_BEST_NAME="$H_NAME"
+                log "    测试 $H_NAME: ${H_TIME}秒 [${H_INT_TIME}ms]"
             fi
         fi
     done
 
-    if [ -z "$HOSTC_BEST_MIRROR" ]; then
-        log "[WARNING] 所有CDN均不可用，尝试默认源安装..."
-        HOSTC_BEST_MIRROR="https://registry.npmmirror.com"
-        HOSTC_BEST_NAME="npmmirror淘宝(fallback)"
-    fi
-
-    log "[*] 使用 $HOSTC_BEST_NAME 安装 hostc..."
+    log "[*] 使用最佳镜像安装 hostc..."
     npm install hostc@latest --registry "$HOSTC_BEST_MIRROR" --prefix dist 2>/dev/null
     if [ $? -ne 0 ]; then
         log "[ERROR] hostc 安装失败"
@@ -450,16 +449,17 @@ test_npm_mirrors() {
         
         NPM_TEST_TIME=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 "$NPM_URL" 2>/dev/null)
 
-        if [ -z "$NPM_TEST_TIME" ] || [ "$NPM_TEST_TIME" = "0.000" ] || [ "$NPM_TEST_TIME" = "0" ]; then
-            log "        $NPM_NAME: 超时/失败"
-        else
+        if [ -n "$NPM_TEST_TIME" ] && [ "$NPM_TEST_TIME" != "0.000" ] && [ "$NPM_TEST_TIME" != "0" ]; then
             NPM_INT_TIME=$(echo "$NPM_TEST_TIME" | awk '{printf "%d", $1 * 1000}')
-            log "        $NPM_NAME: ${NPM_TEST_TIME}秒 [${NPM_INT_TIME}ms]"
-            if [ "$NPM_INT_TIME" -lt "$NPM_MIN_TIME" ] 2>/dev/null; then
+            
+            if [ -n "$NPM_INT_TIME" ] && [ "$NPM_INT_TIME" -lt "$NPM_MIN_TIME" ] 2>/dev/null; then
                 NPM_MIN_TIME=$NPM_INT_TIME
                 NPM_BEST_MIRROR="$NPM_URL"
                 NPM_BEST_NAME="$NPM_NAME"
+                log "        $NPM_NAME: ${NPM_TEST_TIME}秒 [${NPM_INT_TIME}ms]"
             fi
+        else
+            log "        $NPM_NAME: 超时/失败"
         fi
     done
 
@@ -468,10 +468,8 @@ test_npm_mirrors() {
         log_blank
         log "[*] 最快NPM镜像: $NPM_BEST_NAME [${NPM_MIN_TIME}毫秒]"
         
-        if command -v npm &> /dev/null; then
-            npm config set registry "$NPM_BEST_MIRROR"
-            log "[*] NPM镜像已设置为: $NPM_BEST_MIRROR"
-        fi
+        npm config set registry "$NPM_BEST_MIRROR"
+        log "[*] NPM镜像已设置为: $NPM_BEST_MIRROR"
     else
         log "[WARNING] NPM镜像测试失败"
     fi
@@ -480,17 +478,14 @@ test_npm_mirrors() {
 detect_venv() {
     log "[5/6] 检测Python虚拟环境..."
 
-    if [ -d "venv" ] && [ -f "venv/bin/activate" ]; then
-        log "检测到虚拟环境：venv"
-        VENV_EXISTS=1
-        VENV_PATH="venv"
-    elif [ -d ".venv" ] && [ -f ".venv/bin/activate" ]; then
+    if [ -d ".venv" ] && [ -f ".venv/bin/activate" ]; then
         log "检测到虚拟环境：.venv"
         VENV_EXISTS=1
         VENV_PATH=".venv"
     else
         log "未检测到虚拟环境"
         VENV_EXISTS=0
+        VENV_PATH=".venv"
     fi
 }
 
@@ -506,11 +501,6 @@ setup_venv() {
             exit 1
         fi
         VENV_EXISTS=1
-    fi
-
-    if [ ! -d "$VENV_PATH" ]; then
-        log "ERROR: 虚拟环境路径不存在：$VENV_PATH"
-        exit 1
     fi
 
     source "$VENV_PATH/bin/activate"
@@ -540,40 +530,25 @@ EOF
         if [ $? -eq 0 ]; then
             log "[*] 所有Python依赖已满足，跳过安装"
             NEED_PIP_INSTALL=0
-        else
-            log "[*] 检测到缺失或版本不满足的依赖，开始安装..."
-            NEED_PIP_INSTALL=1
         fi
 
         if [ "$NEED_PIP_INSTALL" -eq 1 ]; then
-            PIP_INSTALL_OK=0
-
             log "[*] 强制升级pip到最新版本..."
             if [ -n "$FASTEST_PIP_MIRROR" ]; then
                 pip install --upgrade pip -i "$FASTEST_PIP_MIRROR"
             else
                 pip install --upgrade pip
             fi
-
+            
+            log "[*] 安装依赖..."
             if [ -n "$FASTEST_PIP_MIRROR" ]; then
                 pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR"
                 if [ $? -ne 0 ]; then
                     log "WARNING: 使用镜像源安装失败，尝试默认源..."
                     pip install -r requirements.txt
-                    if [ $? -ne 0 ]; then
-                        PIP_INSTALL_OK=1
-                    fi
                 fi
             else
                 pip install -r requirements.txt
-                if [ $? -ne 0 ]; then
-                    PIP_INSTALL_OK=1
-                fi
-            fi
-
-            if [ "$PIP_INSTALL_OK" -ne 0 ]; then
-                log "ERROR: 依赖安装完全失败"
-                exit 1
             fi
         fi
 
@@ -601,9 +576,6 @@ check_config() {
 auto_setup() {
     log "[*] 自动配置..."
 
-    log_blank
-    log "正在复制配置文件模板..."
-
     if [ -f "config/config.json.example" ]; then
         cp -f config/config.json.example config/config.json
         log "[OK] config.json 已创建"
@@ -617,18 +589,8 @@ auto_setup() {
     fi
 
     log_blank
-    log "========================================"
-    log "首次配置完成！"
-    log "========================================"
-    log_blank
-    log "请编辑 config/config.json，填写以下信息："
-    log "  - login.username: 用户名"
-    log "  - login.password: 密码"
-    log "  - target_url: 目标URL"
-    log "  - headers.cookie: Cookie值"
-    log "  - cookies中的token和sensorsdata值"
-    log_blank
-    read -p "按回车键继续，或 Ctrl+C 退出: "
+    log "请编辑 config/config.json 后按回车继续"
+    read -p ""
     run_web
 }
 
@@ -641,15 +603,14 @@ run_web() {
     source "$VENV_PATH/bin/activate"
 
     log_blank
-    
-    log "[*] 检测文件编码 (BOM)..."
-    "$VENV_PATH/bin/python" main.py --check-bom
+    log "[*] Checking BOM..."
+    "$VENV_PATH/bin/python" main.py --check-bom > /dev/null 2>&1
     if [ $? -ne 0 ]; then
-        log "[WARNING] 发现 BOM 字符，正在自动修复..."
+        log "[WARNING] BOM detected, auto-fixing..."
         "$VENV_PATH/bin/python" main.py --fix-bom
     fi
-    log "[OK] 文件编码检查完成"
-log "正在启动 Web 服务..."
+    log "[OK] BOM check completed"
+    log "Starting Web service..."
     log_blank
 
     WEB_PORT="${WEB_PORT:-8888}"
@@ -665,10 +626,10 @@ log "正在启动 Web 服务..."
     sleep 1
 
     FLASK_WAIT_COUNT=0
-    FLASK_MAX_WAIT=30
+    FLASK_MAX_WAIT=60
     while [ $FLASK_WAIT_COUNT -lt $FLASK_MAX_WAIT ]; do
         if ! kill -0 $PYTHON_PID 2>/dev/null; then
-            log "[ERROR] Web 服务进程已退出，请检查 file/web_output.log"
+            log "[ERROR] Web 服务进程已退出，请检查日志: file/web_output.log"
             exit 1
         fi
         HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT" 2>/dev/null)
@@ -680,48 +641,26 @@ log "正在启动 Web 服务..."
     done
 
     if [ $FLASK_WAIT_COUNT -ge $FLASK_MAX_WAIT ]; then
-        log "[WARNING] Web服务启动超时（等待了$((FLASK_MAX_WAIT * 2))秒），请检查日志: file/web_output.log"
+        log "[WARNING] Web服务启动超时（等待了$((FLASK_MAX_WAIT))秒），请检查日志: file/web_output.log"
     fi
 
-    LOG_FILE=""
-    log_console_only "Web 服务已就绪，正在启动隧道..."
-# hostc已在pre_launch中启动，使用保存的PID
-    TUNNEL_PID=${HOSTC_PID:-0}
+    log_console_only "Web 服务已就绪"
 
     sleep 2
 
-    if [ "$TUNNEL_PID" -ne 0 ] && ! kill -0 $TUNNEL_PID 2>/dev/null; then
-        log_console_only "[WARNING] 隧道服务启动失败，本地访问仍可用"
-    fi
-
-    sleep 3
-
-    WEB_OUTPUT_LOG="file/web_output.log"
-    TUNNEL_URL_FILE="file/tunnel_url.txt"
-
     LAN_ADDR=""
-    PUBLIC_URL=""
-
-    if [ -f "$WEB_OUTPUT_LOG" ]; then
-        LAN_ADDR=$(grep -oP '局域网地址: \Khttp://[0-9.]+' "$WEB_OUTPUT_LOG" | tail -1)
-        PUBLIC_URL_FROM_LOG=$(grep -oP 'Public URL: \Khttps?://\S+' "$WEB_OUTPUT_LOG" | tail -1)
-        if [ -n "$PUBLIC_URL_FROM_LOG" ]; then
-            PUBLIC_URL="$PUBLIC_URL_FROM_LOG"
-        fi
-    fi
-
-    if [ -z "$PUBLIC_URL" ] && [ -f "$TUNNEL_URL_FILE" ]; then
-        PUBLIC_URL_FROM_TUNNEL=$(grep -oP '(?:hostc:|cloudflare:)\s*\Khttps?://\S+' "$TUNNEL_URL_FILE" | head -1)
-        if [ -z "$PUBLIC_URL_FROM_TUNNEL" ]; then
-            PUBLIC_URL_FROM_TUNNEL=$(grep -oP 'https://[a-zA-Z0-9.-]+\.hostc\.dev' "$TUNNEL_URL_FILE" | head -1)
-        fi
-        if [ -n "$PUBLIC_URL_FROM_TUNNEL" ]; then
-            PUBLIC_URL="$PUBLIC_URL_FROM_TUNNEL"
-        fi
+    
+    if [ -f "$LOG_FILE" ]; then
+        LAN_ADDR=$(grep -oP '局域网地址: \Khttp://[0-9.]+' "$LOG_FILE" | tail -1)
     fi
 
     if [ -z "$LAN_ADDR" ]; then
-        LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')
+        if command -v ipconfig &>/dev/null; then
+            LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
+        elif [ -f "/sbin/ifconfig" ]; then
+            LAN_IP=$(/sbin/ifconfig 2>/dev/null | grep -E "inet (192\.168|10\.|172\.(1[6-9]|2[0-9]|3[01]))" | awk '{print $2}' | head -1)
+        fi
+        
         if [ -n "$LAN_IP" ]; then
             LAN_ADDR="http://${LAN_IP}:${WEB_PORT}"
         fi
@@ -735,55 +674,53 @@ log "正在启动 Web 服务..."
     log_console_only "本地访问: http://localhost:$WEB_PORT"
     if [ -n "$LAN_ADDR" ]; then
         log_console_only "局域网地址: $LAN_ADDR"
-    fi
-    if [ -n "$PUBLIC_URL" ]; then
-        log_console_only "公网访问: $PUBLIC_URL"
     else
-        log_console_only "公网访问: 正在获取隧道URL..."
+        log_console_only "局域网地址: 检测中..."
     fi
-    log_console_only "详细日志: $WEB_OUTPUT_LOG"
+    log_console_only "详细日志: $LOG_FILE"
     log_blank_console_only
-    log_console_only "关闭此窗口可停止服务，或使用 Ctrl+C"
+    log_console_only "按 Ctrl+C 停止服务"
     log_blank_console_only
 
     (
         while true; do
             sleep 60
-            if [ -d "temp" ]; then
-                TOTAL_SIZE_KB=$(du -sk temp 2>/dev/null | awk '{print $1}')
-                LIMIT_SIZE_KB=3072
-                if [ -n "$TOTAL_SIZE_KB" ] && [ "$TOTAL_SIZE_KB" -gt "$LIMIT_SIZE_KB" ]; then
-                    rm -rf temp/*
-                    log_console_only "[AUTO] temp目录超过3MB，已清理所有文件"
-                fi
-            fi
+            check_temp_size
         done
     ) &
     CLEANUP_PID=$!
 
-    wait $PYTHON_PID $TUNNEL_PID 2>/dev/null
+    wait $PYTHON_PID 2>/dev/null
     kill $CLEANUP_PID 2>/dev/null
+}
+
+check_temp_size() {
+    if [ -d "temp" ]; then
+        local size_kb
+        size_kb=$(du -sk temp 2>/dev/null | awk '{print $1}')
+        LIMIT_SIZE_KB=3072
+        
+        if [ -n "$size_kb" ] && [ "$size_kb" -gt "$LIMIT_SIZE_KB" ]; then
+            rm -rf temp/*
+            log_console_only "[AUTO] temp目录超过3MB，已自动清理"
+        fi
+    fi
 }
 
 cleanup_exit() {
     log_blank
     log "正在清理进程..."
-    if [ -n "$PYTHON_PID" ]; then
-        kill -15 $PYTHON_PID 2>/dev/null
-    fi
-    if [ -n "${HOSTC_PID:-$TUNNEL_PID}" ]; then
-        kill -15 ${HOSTC_PID:-$TUNNEL_PID} 2>/dev/null
-    fi
+    pkill -9 -f "python.*main.py" 2>/dev/null || true
+    pkill -9 -f "hostc" 2>/dev/null || true
     if [ -n "$CLEANUP_PID" ]; then
-        kill -15 $CLEANUP_PID 2>/dev/null
+        kill $CLEANUP_PID 2>/dev/null || true
     fi
-    pkill -f "python main.py" >/dev/null 2>&1
-    pkill -f "hostc" >/dev/null 2>&1
     log "清理完成"
     exit 0
 }
 
 main() {
+    check_prerequisites || exit 1
     detect_python_env || exit 1
     detect_node_env
     test_pip_mirrors
