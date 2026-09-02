@@ -5,7 +5,7 @@
 **修复日期**: 2026-09-02
 **修复类型**: 🔧Bug修复 + 📝文档更新
 **影响文件**: [test/generate_docx.py](test/generate_docx.py#L15), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
-**Commit**: 0d18135
+**Commit**: 待补充
 **变更统计**: +66行 -2行
 **作者**: 小旭二手机（西园路）**
 
