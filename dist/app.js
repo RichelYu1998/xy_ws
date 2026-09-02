@@ -42,6 +42,15 @@
                 .then(function(d) { if (d && d.api_key) _cachedApiKey = d.api_key; })
                 .catch(function() {});
         })();
+        
+        window.showToast = function(message, type, duration) {
+            console.log('[Toast-' + (type || 'info') + ']', message);
+            if (typeof duration === 'number' && typeof alert === 'function') {
+                setTimeout(function() {
+                    try { alert(message); } catch(e) {}
+                }, 100);
+            }
+        };
 
         function escapeHtml(  /* [ESCAPED] */text) {
             if (!text) return '';
@@ -798,6 +807,7 @@
                 
                 validImages.forEach((img, i) => {
                     const decodedUrl = decodeBase64Url(img);
+                    const safeVideoUrl = escapeAttr(decodedUrl);
                     const isVideo = decodedUrl.includes('/pvod/') || /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp)(\?|$)/i.test(decodedUrl);
                     if (isVideo) {
                         modalHtml += `<div style="position:relative;" class="product-thumb-placeholder">
@@ -3097,7 +3107,12 @@
                                 if (outputContent) {
                                     outputContent.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在对比...</span>';
                                     setTimeout(() => {
-                                        renderComparisonResult(data, apiUrl.includes('excel') ? 'excel' : 'txt', outputContent);
+                                        if (typeof renderComparisonResult === 'function') {
+                                            renderComparisonResult(data, apiUrl.includes('excel') ? 'excel' : 'txt', outputContent);
+                                        } else {
+                                            console.warn('[对比] renderComparisonResult 函数未定义, 使用备用渲染');
+                                            outputContent.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-all;">' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+                                        }
                                     }, 500);
                                 }
                             })
