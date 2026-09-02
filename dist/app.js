@@ -1071,7 +1071,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             
             document.addEventListener('click', function(e) {
-                var skuLink = e.target.closest('.sku-link');
+                    var skuLink = e.target.closest('.sku-link');
                 if (skuLink) {
                     e.preventDefault();
                     var sku = skuLink.dataset.sku;
@@ -2661,13 +2661,12 @@
                         const scrollHeight = container.scrollHeight;
                         const clientHeight = container.clientHeight;
                         const isAtBottom = Math.abs(scrollTop + clientHeight - scrollHeight) < 5;
+                        const isAtTop = scrollTop < 5;
 
-                        console.log('[findFirstVisibleRow] 容器信息 - scrollTop:', scrollTop, ', scrollHeight:', scrollHeight, ', clientHeight:', clientHeight, ', 是否在底部:', isAtBottom);
+                        console.log('[findFirstVisibleRow] 容器信息 - scrollTop:', scrollTop, ', scrollHeight:', scrollHeight, ', clientHeight:', clientHeight, ', 是否在底部:', isAtBottom, ', 是否在顶部:', isAtTop);
                         console.log('[findFirstVisibleRow] 总行数:', rows.length);
 
-                        const viewMid = containerRect.top + containerRect.height / 2;
-                        let closestRow = null;
-                        let closestDist = Infinity;
+                        let firstVisibleRow = null;
                         let lastFullyVisibleRow = null;
                         let lastPartiallyVisibleRow = null;
 
@@ -2676,11 +2675,8 @@
                             const isInView = rowRect.bottom > containerRect.top && rowRect.top < containerRect.bottom;
 
                             if (isInView) {
-                                const rowMid = (rowRect.top + rowRect.bottom) / 2;
-                                const dist = Math.abs(rowMid - viewMid);
-                                if (dist < closestDist) {
-                                    closestDist = dist;
-                                    closestRow = row;
+                                if (!firstVisibleRow) {
+                                    firstVisibleRow = row;
                                 }
 
                                 if (rowRect.top >= containerRect.top && rowRect.bottom <= containerRect.bottom) {
@@ -2696,9 +2692,12 @@
                         if (isAtBottom && lastPartiallyVisibleRow) {
                             resultRow = lastPartiallyVisibleRow;
                             console.log('[findFirstVisibleRow] ✅ 检测到滚动到底部, 返回最后可见行:', resultRow.getAttribute('data-sku'));
+                        } else if (firstVisibleRow) {
+                            resultRow = firstVisibleRow;
+                            console.log('[findFirstVisibleRow] 📍 返回第一个可见行(顶部):', resultRow.getAttribute('data-sku'));
                         } else {
-                            resultRow = closestRow || lastFullyVisibleRow || lastPartiallyVisibleRow;
-                            console.log('[findFirstVisibleRow] 📍 返回中心行或最后可见行:', resultRow ? resultRow.getAttribute('data-sku') : '无');
+                            resultRow = lastFullyVisibleRow || lastPartiallyVisibleRow;
+                            console.log('[findFirstVisibleRow] 📍 返回备用行:', resultRow ? resultRow.getAttribute('data-sku') : '无');
                         }
 
                         return resultRow;
@@ -2713,23 +2712,7 @@
 
                         console.log('[联动] 源表格索引:', sourceIndex, ', scrollTop:', scrollTop, ', 是否在顶部:', scrollTop < 5);
 
-                        if (scrollTop < 5) {
-                            console.log('[联动] 🎯 检测到源表格在顶部，所有表格同步到顶部');
-                            tableContainers.forEach((otherContainer, otherIndex) => {
-                                if (otherIndex !== sourceIndex) {
-                                    otherContainer.scrollTop = 0;
-                                    otherContainer.scrollLeft = scrollLeft;
-                                }
-                            });
-
-                            requestAnimationFrame(() => {
-                                requestAnimationFrame(() => {
-                                    window._programmaticScroll = false;
-                                });
-                            });
-                            return;
-                        }
-
+                        // 顶部也使用SKU匹配（而不是强制同步到顶部）
                         const visibleRow = findFirstVisibleRow(sourceContainer);
                         console.log('[联动] 可见行SKU:', visibleRow ? visibleRow.getAttribute('data-sku') : '无');
 
@@ -2807,8 +2790,6 @@
                         }, { passive: true });
                     });
 
-                    console.log('[联动初始化] ✅ 所有表格容器的滚动事件已绑定完成');
-                    
                     const isMobile = window.innerWidth < 768;
                     if (!isMobile) {
                         productsContent.scrollTop = productsContent.scrollHeight;
