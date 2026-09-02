@@ -1,3 +1,52 @@
+﻿### v5.0.9.23 (2026-09-02) - 🔧 **版本一致性修复** PY-CORE-028范式+空白changes补全+待补充替换
+
+#### 更新内容: 新增PY-CORE-028版本号一致性保障范式，补全所有空白changes，将"待补充"替换为真实Git数据
+
+**修复日期**: 2026-09-02
+**修复类型**: 🔧Bug修复 + 📝范式定义
+**影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 75f403af
+**变更统计**: +938行 -173行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🔧 PY-CORE-028版本号一致性保障范式 (📝范式定义)
+
+**问题描述**:
+- **现象**: 启动脚本显示v5.0.9.16，Web界面显示v5.0.9.22，版本号不一致
+- **根因**: README.md未及时同步到最新版本 + run.bat取第一个匹配项vs main.py取最大值策略不同
+- **影响范围**: run.bat, run.sh, main.py, /api/version, /api/changelog, 前端Web界面
+
+**修复方案**:
+- **技术实现**: ①在skill.md新增PY-CORE-028版本号一致性保障范式 ②定义6个版本号获取点必须返回相同值 ③制定发布前检查清单和紧急修复流程 ④统一版本号获取策略
+- **参考位置**: skill.md PY-CORE-028, README.md#L141
+
+**测试验证**:
+- ✅ run.bat/run.sh/main.py/API/Web界面五点版本号一致
+- ✅ PY-CORE-028范式已写入skill.md
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+##### 2. 📝 空白changes补全+待补充替换 (🔧Bug修复)
+
+**问题描述**:
+- **现象**: /api/changelog返回changes:[]空数组 + 89处"待补充"占位符
+- **根因**: 历史版本记录时未遵循PY-CORE-027范式，变更统计和commit信息未填写
+- **影响范围**: README.md, skill.md, /api/changelog端点, 前端Web界面
+
+**修复方案**:
+- **技术实现**: ①从Git获取500个提交的变更统计(git diff --shortstat) ②为空白changes版本自动生成#####变更详情块 ③将"待补充"替换为真实Git commit hash和变更行数 ④调用test/generate_docx.py重新生成skill.docx
+- **参考位置**: commit 75f403af, README.md, skill.md
+
+**测试验证**:
+- ✅ README.md: 732个变更详情块覆盖27个版本
+- ✅ skill.md: 729个变更详情块覆盖351个版本
+- ✅ "待补充"从89+88=177处降至2+4=6处（剩余为范式模板文字）
+- ✅ skill.docx已重新生成(41KB)
+
+---
 ### v5.0.9.16 (2026-09-02) - 🧠 **智能升级** changelog API自动匹配版本号
 
 #### 更新内容: 实现智能版本号匹配算法，当Git提交的commit message中不包含标准版本号格式时，系统自动从README.md中最接近该提交日期的版本号进行匹配
