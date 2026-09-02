@@ -141,7 +141,38 @@ bandit -r . -f json -o bandit_report.json
 
 
 
-### v5.0.9.15 (2026-08-31) - 📝 **文档更新** skill.md新增PY-CORE-025 Changelog API数据结构与Git历史集成范式
+
+### v5.0.9.16 (2026-09-02) - 🧠 **智能升级** changelog API自动匹配版本号 - 当commit message无版本号时从README智能查找最接近日期的版本(解决历史提交显示hash问题)
+
+#### 更新内容: 实现智能版本号匹配算法，当Git提交的commit message中不包含标准版本号格式时（如使用ix:/eat:前缀的旧提交），系统自动从README.md中最接近该提交日期的版本号进行匹配，避免显示难以理解的commit hash
+
+**修复日期**: 2026-09-02
+**修复类型**: 🧠功能增强 + 智能算法
+**影响文件**: [main.py](main.py#L8970-L8993), [skill.md](skill.md#PY-CORE-026)
+**Commit**: 6c09b2b3
+**变更统计**: +23行 -1行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🧠 智能版本号匹配算法 (🧠功能增强)
+
+**问题描述**:
+- **现象**: 历史Git提交（如2026年7月、5月的提交）在changelog API中显示为commit hash（如77117492, 30982246），而不是语义化版本号（如5.0.7, 5.0.6）
+- **根因**: 这些提交的commit message使用的是ix:/eat:前缀，不包含标准的X.X.X格式
+- **影响范围**: [main.py](main.py#L8970-L8993), /api/changelog 端点输出, 前端展示
+
+**修复方案**:
+- **技术实现**: 三级降级策略 - Level1: 从commit message直接提取 → Level2: 智能日期匹配（30天阈值）→ Level3: 显示hash兜底
+- **算法核心**: 计算commit日期与所有README版本的日期差值，选择差值最小且≤30天的版本号
+- **参考位置**: commit 6c09b2b3, [main.py:8970-8993](main.py#L8970-L8993), [skill.md PY-CORE-026](skill.md#PY-CORE-026)
+
+**测试验证**:
+- ✅ 提交 6c09b2b3 已合并至master分支,
+- ✅ 变更统计: +23行 -1行,
+- ✅ 智能匹配算法已集成到changelog API逻辑,
+
+---### v5.0.9.15 (2026-08-31) - 📝 **文档更新** skill.md新增PY-CORE-025 Changelog API数据结构与Git历史集成范式
 
 #### 更新内容: 在skill.md中新增Changelog API的开发范式文档
 

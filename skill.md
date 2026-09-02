@@ -1,4 +1,4 @@
-# 微购相册开发技能文档 (Skill Documentation)
+﻿# 微购相册开发技能文档 (Skill Documentation)
 
 > **⚙️ 编码标准**: 本项目强制要求 **UTF-8 作为唯一字符串编码**（**禁止BOM字符！**），**简体中文作为唯一中文字体**。
 >
@@ -8839,5 +8839,123 @@ if stripped.startswith('## ') and in_changelog:
 ```
 
 ---
+
+---
+## 🔴 PY-CORE-026: 智能版本号匹配算法 (Smart Version Number Matching Algorithm)
+
+> **创建日期**: 2026-09-02 | **最后更新**: 2026-09-02 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 - commit message无版本号时的降级策略 | **参考基准**: v5.0.9.4
+
+### 范式描述
+当Git提交的commit message中**不包含标准版本号格式**（如5.0.9）时，系统必须**智能匹配**最接近该提交日期的README版本号，而不是直接显示commit hash（如77117492）。
+
+### 核心原则
+
+#### 1. 版本号提取优先级（三级降级策略）
+`python
+# ✅ 正确：三级降级策略
+for commit_hash, commit_date, commit_msg, ... in git_commits:
+    short_hash = commit_hash[:8]
+    
+    # Level 1: 从commit message直接提取（最高优先级）
+    ver_in_msg = re.search(r'v([\\d.]+)', commit_msg)
+    if ver_in_msg:
+        version_key = ver_in_msg.group(1)  # 例如: "5.0.9"
+    
+    # Level 2: 智能日期匹配（中等优先级）
+    else:
+        def find_nearest_version(commit_dt, versions_map):
+            from datetime import datetime
+            try:
+                commit_datetime = datetime.strptime(commit_dt, '%Y-%m-%d')
+                min_diff = float('inf')
+                nearest_ver = short_hash
+                
+                for ver, info in versions_map.items():
+                    if 'date' in info and info['date'] != '\\u5f85\\u8865\\u5145':
+                        try:
+                            ver_datetime = datetime.strptime(info['date'], '%Y-%m-%d')
+                            diff = abs((commit_datetime - ver_datetime).days)
+                            
+                            # ⚠️ 关键：只接受30天内的匹配（避免错误归因）
+                            if diff < min_diff:
+                                min_diff = diff
+                                nearest_ver = ver
+                        except:
+                            continue
+                
+                # 返回结果：30天内返回版本号，否则返回hash
+                return nearest_ver if min_diff <= 30 else short_hash
+            except:
+                return short_hash
+        
+        version_key = find_nearest_version(commit_date, readme_version_map)
+`
+
+#### 2. 匹配算法详解
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| **输入** | commit日期 + README所有版本的日期映射 | {"2026-07-05": "5.0.7", "2026-09-02": "5.0.9"} |
+| **计算** | 计算每个版本与commit日期的**绝对天数差** | bs(2026-07-05 - 2026-07-05) = 0天 |
+| **阈值** | **最大允许差值：30天** | 超过30天视为不匹配 |
+| **输出** | 差值最小的版本号或原始hash | "5.0.7" 或 "77117492" |
+
+#### 3. 实际案例演示
+`python
+# 案例1: commit message有版本号 → 直接提取
+commit_msg = "🔧v5.0.9.1 关键修复: run.bat编码问题"
+# 结果: version_key = "5.0.9.1"
+
+# 案例2: commit message无版本号但日期接近 → 智能匹配
+commit_date = "2026-07-05"
+readme_versions = {
+    "5.0.7": {"date": "2026-07-05"},   # ← 差值: 0天 ✅
+    "5.0.8": {"date": "2026-08-31"},   # ← 差值: 57天 ❌ 超过阈值
+}
+# 结果: version_key = "5.0.7" (因为0天 < 30天)
+
+# 案例3: 日期差距太大 → 显示hash
+commit_date = "2026-01-01"
+readme_versions = {
+    "5.0.7": {"date": "2026-07-05"},   # ← 差值: 185天 ❌
+}
+# 结果: version_key = "abc12345" (超过30天阈值)
+`
+
+### 应用场景
+
+| 场景 | 文件位置 | 说明 |
+|------|----------|------|
+| **历史提交兼容** | main.py:8970-8993 | 处理使用ix:/eat:前缀的旧提交 |
+| **README版本映射** | eadme_version_map 字典 | 提供版本→日期的查找表 |
+| **API响应优化** | /api/changelog JSON输出 | 确保所有条目都有语义化版本号 |
+
+### 最佳实践清单
+
+- [ ] **三级降级**：必须实现 message提取 → 日期匹配 → hash兜底 的完整链路
+- [ ] **30天阈值**：日期差值上限严格限制为30天（可配置但需文档说明）
+- [ ] **异常处理**：日期解析失败时必须降级为hash，不能抛异常导致API 500
+- [ ] **性能优化**：ind_nearest_version函数不应在循环内重复定义（考虑提取到外层）
+- [ ] **日志记录**：当触发智能匹配时建议记录debug日志便于排查
+
+### 反面案例（避免）
+
+❌ 错误示例1：无降级策略直接显示hash
+`python
+ver_in_msg = re.search(r'v([\\d.]+)', commit_msg)
+version_key = ver_in_msg.group(1) if ver_in_msg else short_hash  # 直接fallback
+# 问题：用户看到 "version": "77117492" 而不是 "5.0.7"
+`
+
+❌ 错误示例2：无阈值限制的暴力匹配
+`python
+nearest_ver = min(versions_map.keys(), key=lambda v: abs(date_diff(v, commit_date)))
+# 问题：2026年1月的commit可能被错误匹配到2026年12月的版本
+`
+
+❌ 错误示例3：修改Git历史（禁止）
+`ash
+git filter-branch --msg-filter 'sed "s/fix:/v5.0.7/"'
+# 问题：破坏Git历史完整性，导致 collaborators 需要force pull
+`
 
 ---
