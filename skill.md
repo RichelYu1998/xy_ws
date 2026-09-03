@@ -5,7 +5,7 @@
 **修复日期**: 2026-09-03
 **修复类型**: 🔄功能增强 + 📦依赖管理优化 + 🔧技术债务清理
 **影响文件**: [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
-**Commit**: (待提交)
+**Commit**: 0ae079df
 **变更统计**: +40行 -8行 (+32行净增)
 **作者**: 小旭二手机（西园路）**
 
