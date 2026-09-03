@@ -18427,7 +18427,7 @@ Files: 6 files changed, 747 insertions(+), 13 deletions(-)
 **修复类型**: Bug修复
 **影响文件**: [README.md](README.md), [main.py](main.py)
 **Commit**: 2.5.24
-**变更统计**: +N行 -M行(v2.5.24)
+**变更统计**: +9行 -9行(v2.5.24)
 **作者**: 小旭二手机（西园路）
 
 ---
@@ -18454,7 +18454,7 @@ Files: 6 files changed, 747 insertions(+), 13 deletions(-)
 **修复类型**: Bug修复
 **影响文件**: [README.md](README.md), [main.py](main.py)
 **Commit**: 2.5.23
-**变更统计**: +N行 -M行(v2.5.23)
+**变更统计**: +15行 -5行(v2.5.23)
 **作者**: 小旭二手机（西园路）
 
 ---
