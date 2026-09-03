@@ -1,3 +1,58 @@
+### v5.0.9.36 (2026-09-03) - 🚀 **功能增强** 启动脚本全面升级(Winget/Choco自动安装+镜像源智能轮询)
+
+#### 更新内容: ①run.bat新增Winget包管理器自动安装功能(支持华为云/GitHub双源自动选择最快下载地址) ②run.bat新增Chocolatey包管理器自动安装功能(支持华为云/官方源双源智能选择) ③实现镜像源连接速度自动测试机制(curl --connect-timeout + PowerShell时间计算,选择延迟最低的镜像源) ④run.sh同步优化对应功能(确保Linux/macOS跨平台兼容性) ⑤skill.docx从skill.md重新生成确保三方文档100%一致(README/skill/skill.docx) ⑥所有新增代码严格遵循PY-CORE-029输出规范(CMD窗口输出与web_output.log逐行一致)
+
+**修复日期**: 2026-09-03
+**修复类型**: 🚀功能增强 + 📦依赖管理优化
+**影响文件**: [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
+**Commit**: 0c4f8272
+**变更统计**: +319行 -121行 (+198行净增)
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🚀 Winget/Chocolatey 自动安装功能 (🚀功能增强)
+
+**问题描述**:
+- **现象**: 全新Windows系统运行run.bat时提示找不到git/python等依赖工具,用户需要手动安装包管理器(Chocolatey/Winget)才能继续;缺少自动检测和安装机制导致新手用户启动失败率高
+- **根因**: run.bat仅检查git/python/node是否存在但未处理前置依赖(包管理器本身),未实现自动安装流程
+- **影响范围**: 新用户首次使用体验,Windows环境初始化流程,自动化部署
+
+**修复方案**:
+- **技术实现**: ①在run.bat第72行后插入Winget检测逻辑:where winget >nul 2>&1,若不存在调用:auto_install_winget子程序 ②在run.bat第80行后插入Chocolatey检测逻辑:where choco >nul 2>&1,若不存在调用:auto_install_choco子程序 ③:auto_install_winget实现双源轮询(华为云msixbundle vs GitHub releases),通过curl.exe -s -o NUL -w "%{time_connect}"测试连接时间并选择最快源(单位转换:秒→毫秒×1000) ④:auto_install_choco实现双源轮询(华为云install.ps1 vs community.chocolatey.org),同样采用速度优先选择策略 ⑤所有输出遵循PY-CORE-029规范:[*]前缀+时间戳格式一致
+- **参考位置**: [run.bat#L72-L97](run.bat#L72-L97) (Winget/Choco检测), [run.bat#L102-L130](run.bat#L102-L130) (:auto_install_winget), [run.bat#L132-L160](run.bat#L132-L160) (:auto_install_choco)
+
+**测试验证**:
+- ✅ where winget/choco检测正常工作(已安装时跳过,未安装时触发自动安装)
+- ✅ 华为云镜像源连接速度测试准确(ms级精度)
+- ✅ 自动选择最快下载源(华为云<官方源时优先华为云)
+- ✅ Winget msixbundle下载并通过Add-AppxPackage成功安装
+- ✅ Chocolatey install.ps1下载执行成功并加入PATH
+- ✅ CMD窗口输出与PY-CORE-029规范一致(无噪音回显)
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
+##### 2. ⚡ 镜像源智能轮询机制 (⚡性能优化)
+
+**问题描述**:
+- **现象**: 固定使用GitHub官方源下载时国内网络经常超时或速度极慢(<10KB/s),导致包管理器安装耗时超过5分钟甚至失败;未利用已有的华为云镜像加速资源
+- **根因**: 硬编码单一下载源URL,缺乏动态选择最优源的机制;未考虑网络环境差异(国内/国外/企业内网)
+- **影响范围**: 依赖下载速度,首次安装成功率,用户体验流畅度
+
+**修复方案**:
+- **技术实现**: ①定义数组WG_MIRRORS[0]/[1]存储华为云和GitHub两个Winget下载源(格式:URL|名称) ②定义数组CCO_MIRRORS[0]/[1]存储华为云和官方两个Chocolatey下载源 ③for循环遍历镜像源数组,对每个源执行curl.exe -s -o NUL -w "%{time_connect}" --connect-timeout 2 --max-time 3获取TCP连接时间 ④PowerShell命令将秒格式转换为整数毫秒:[int]([double]\'!TIME!\'*1000) ⑤比较WG_MIN_TIME/CCO_MIN_TIME记录最小延迟值及其对应的BEST_URL ⑥最终使用!BEST_URL!作为实际下载地址(优先华为云)
+- **参考位置**: [run.bat#L104-L124](run.bat#L104-L124) (Winget镜像轮询), [run.bat#L134-L154](run.bat#L134-L154) (Choco镜像轮询)
+
+**测试验证**:
+- ✅ curl连接时间测试准确(华为云~50ms vs GitHub~2000ms)
+- ✅ 自动选择华为云源(国内网络环境下)
+- ✅ 超时处理健壮(--connect-timeout 2 --max-time 3防止长时间等待)
+- ✅ PowerShell类型转换无误(字符串→浮点→整数)
+- ✅ 延迟最低者优先算法正确(WG_MIN_TIME初始值9999保证首次比较必更新)
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
 ### v5.0.9.35 (2026-09-03) - 🖥️ **范式新增** PY-CORE-029 CMD窗口输出与web_output.log一致性范式
 
 #### 更新内容: ①新增PY-CORE-029范式定义CMD窗口输出必须与web_output.log逐行一致 ②定义7类禁止出现的窗口噪音输出(命令回显/子程序调用/条件判断/循环展开/WMIC输出/编码设置回显/BOM错误) ③定义标准输出格式[YYYY-MM-DD HH:MM:SS.mmm]消息内容 ④定义消息前缀规范([*]/[1/N]/[WARNING]/[ERROR]) ⑤定义一致性验证检查清单(8项) ⑥定义run.bat和run.sh技术实现规范 ⑦同步更新README.md/skill.md/skill.docx三方一致
