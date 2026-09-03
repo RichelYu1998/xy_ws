@@ -7,9 +7,9 @@ title Szwego Crawler Tool
 
 call :check_admin_rights
 if errorlevel 1 (
-    echo [ERROR] 请右键"以管理员身份运行"此脚本
-    pause
-    exit /b 1
+    echo [*] 正在请求管理员权限...
+    powershell -NoProfile -Command "Start-Process cmd -ArgumentList '/c \"%~f0\"' -Verb RunAs"
+    exit /b 0
 )
 
 call :check_prerequisites
@@ -157,8 +157,28 @@ for /L %%i in (0,1,1) do (
 )
 echo     使用最快镜像安装Chocolatey...
 powershell -NoProfile -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('!CCO_BEST_URL!'))" 2>nul
-set "PATH=%PATH%;C:\ProgramData\chocolatey\bin"
+
+:: 刷新当前会话的PATH（关键修复）
+call :refresh_path
 exit /b 0
+
+:refresh_path
+echo     刷新环境变量...
+set "PATH=%PATH%;C:\ProgramData\chocolatey\bin"
+
+:: 等待choco命令可用（最多等待10秒）
+for /L %%w in (1,1,10) do (
+    where choco >nul 2>&1 && goto :choco_ready
+    ping -n 1 127.0.0.1 >nul 2>&1
+)
+
+:choco_ready
+if exist "C:\ProgramData\chocolatey\bin\choco.exe" (
+    echo     Chocolatey 已就绪
+) else (
+    echo     [WARNING] Chocolatey 可能未完全安装，部分功能可能不可用
+)
+exit /b
 
 :get_latest_git_version
 for /f "delims=" %%v in ('curl.exe -s https://api.github.com/repos/git-for-windows/git/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input | ConvertFrom-Json | Select-Object -ExpandProperty tag_name"') do set "GIT_LATEST_VERSION=%%v"
@@ -429,8 +449,31 @@ if defined VIRTUAL_ENV (
 exit /b 0
 
 :get_latest_python_version
-for /f "delims=" %%v in ('curl.exe -s https://api.github.com/repos/python/cpython/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input | ConvertFrom-Json | Select-Object -ExpandProperty tag_name"') do set "PYTHON_LATEST_VERSION=%%v"
-if not defined PYTHON_LATEST_VERSION set "PYTHON_LATEST_VERSION=3.11.9"
+set "PYTHON_LATEST_VERSION="
+echo     正在获取Python最新版本（使用国内镜像）...
+
+:: 方法1: 使用短超时 + 多次重试（GitHub API）
+for /L %%r in (1,1,3) do (
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/python/cpython/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input ^| ConvertFrom-Json ^| Select-Object -ExpandProperty tag_name"') do set "PYTHON_LATEST_VERSION=%%v"
+    if defined PYTHON_LATEST_VERSION goto :python_version_done
+    if %%r lss 3 echo     重试获取... (%%r/3)
+)
+
+:: 方法2: 失败时使用国内镜像源获取版本信息
+if not defined PYTHON_LATEST_VERSION (
+    echo     [WARNING] GitHub API 获取失败，尝试国内镜像...
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://mirrors.huaweicloud.com/python/ 2^>nul ^| powershell -NoProfile -Command "$input ^| Select-String -Pattern ""python-[0-9]+\.[0-9]+\.[0-9]+"" ^| Select-Object -First 1"') do (
+        for /f "tokens=2 delims=-" %%p in ("%%v") do set "PYTHON_LATEST_VERSION=%%p"
+    )
+)
+
+:python_version_done
+if not defined PYTHON_LATEST_VERSION (
+    echo     [WARNING] 所有方式获取失败，使用安全默认值
+    set "PYTHON_LATEST_VERSION=3.12.6"
+)
+
+echo     检测到Python最新版本: %PYTHON_LATEST_VERSION%
 exit /b
 
 :auto_install_python
@@ -538,8 +581,29 @@ if not errorlevel 1 (
 exit /b 0
 
 :get_latest_node_version
-for /f "delims=" %%v in ('curl.exe -s https://api.github.com/repos/nodejs/release/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input | ConvertFrom-Json | Select-Object -ExpandProperty tag_name"') do set "NODE_LATEST_VERSION=%%v"
-if not defined NODE_LATEST_VERSION set "NODE_LATEST_VERSION=v20.11.1"
+set "NODE_LATEST_VERSION="
+echo     正在获取Node.js最新版本（使用国内镜像）...
+
+:: 方法1: 使用短超时 + 多次重试（GitHub API）
+for /L %%r in (1,1,3) do (
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/nodejs/release/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input ^| ConvertFrom-Json ^| Select-Object -ExpandProperty tag_name"') do set "NODE_LATEST_VERSION=%%v"
+    if defined NODE_LATEST_VERSION goto :node_version_done
+    if %%r lss 3 echo     重试获取... (%%r/3)
+)
+
+:: 方法2: 失败时使用国内镜像源获取版本信息
+if not defined NODE_LATEST_VERSION (
+    echo     [WARNING] GitHub API 获取失败，尝试国内镜像...
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://npmmirror.com/mirrors/node/ 2^>nul ^| powershell -NoProfile -Command "$input ^| Select-String -Pattern ""v[0-9]+\.[0-9]+\.[0-9]+"" ^| Select-Object -First 1"') do set "NODE_LATEST_VERSION=%%v"
+)
+
+:node_version_done
+if not defined NODE_LATEST_VERSION (
+    echo     [WARNING] 所有方式获取失败，使用安全默认值
+    set "NODE_LATEST_VERSION=v20.17.0"
+)
+
+echo     检测到Node.js最新版本: %NODE_LATEST_VERSION%
 exit /b
 
 :auto_install_node
@@ -588,6 +652,18 @@ if not exist "%TEMP%\node-installer.msi" (
 if exist "%TEMP%\node-installer.msi" (
     msiexec /i "%TEMP%\node-installer.msi" /quiet /norestart
     del "%TEMP%\node-installer.msi" 2>nul
+    
+    :: 等待 node 加入 PATH（关键修复）
+    call :log     等待 Node.js 安装完成...
+    for /L %%w in (1,1,10) do (
+        where node >nul 2>&1 && goto :node_installed_ok
+        ping -n 2 127.0.0.1 >nul 2>&1
+    )
+    
+    :: 如果还没找到，手动添加常见路径
+    :node_installed_ok
+    where node >nul 2>&1 || set "PATH=%PATH%;C:\Program Files\nodejs"
+    
     call :log [*] Node.js 已安装
 )
 exit /b 0
@@ -811,18 +887,38 @@ if exist requirements.txt (
         
         call :log [*] 安装依赖...
         if defined FASTEST_PIP_MIRROR (
-            "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt -i "!FASTEST_PIP_MIRROR!"
+            :: 首次尝试：使用镜像源 + 预编译包（关键优化）
+            "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt -i "!FASTEST_PIP_MIRROR!" --only-binary :all:
             if errorlevel 1 (
-                call :log WARNING: 使用镜像源安装失败，尝试默认源...
-                "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt
+                call :log WARNING: 预编译包安装失败，尝试使用源码编译...
+                "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt -i "!FASTEST_PIP_MIRROR!"
+                if errorlevel 1 (
+                    call :log WARNING: 使用镜像源安装失败，尝试默认源...
+                    "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt
+                    if errorlevel 1 (
+                        call :log [ERROR] 依赖安装失败，请查看日志或手动运行: .venv\Scripts\pip install -r requirements.txt
+                        pause
+                        exit /b 1
+                    )
+                )
             )
         ) else (
             "!VENV_PATH!\Scripts\python.exe" -m pip install -r requirements.txt
+            if errorlevel 1 (
+                call :log [ERROR] 依赖安装失败，请手动检查网络或依赖兼容性
+                pause
+                exit /b 1
+            )
         )
     )
 
     call :log [*] 安装Playwright浏览器...
     "!VENV_PATH!\Scripts\python.exe" main.py --install-playwright
+    if errorlevel 1 (
+        call :log [ERROR] Playwright浏览器安装失败，部分功能可能不可用
+    ) else (
+        call :log [*] Playwright 浏览器安装成功
+    )
 )
 
 call :log Python虚拟环境设置完成

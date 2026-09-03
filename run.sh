@@ -1,6 +1,13 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
+:: 自动检测并请求sudo权限（如果需要）
+if [ "$(id -u)" -ne 0 ]; then
+    if command -v sudo &> /dev/null; then
+        echo "[*] 检测到非root用户，部分操作可能需要sudo权限"
+    fi
+fi
+
 VERSION="0.0.0"
 if [ -f "README.md" ]; then
     VERSION=$(grep -m 1 -oE '###\s+v[0-9]+(\.[0-9]+)+' README.md 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || echo "0.0.0")
@@ -576,10 +583,30 @@ auto_install_python() {
                 log "    使用zypper安装Python..."
                 sudo zypper install -y python3 python3-pip nodejs npm curl
 get_latest_python_version() {
-    PYTHON_LATEST_VERSION=$(curl -s https://api.github.com/repos/python/cpython/releases/latest 2>/dev/null | grep -oE '"tag_name":\s*"v[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    PYTHON_LATEST_VERSION=""
+    echo "    正在获取Python最新版本（使用国内镜像）..."
+
+    :: 方法1: 使用短超时 + 多次重试（GitHub API）
+    for r in 1 2 3; do
+        PYTHON_LATEST_VERSION=$(curl -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/python/cpython/releases/latest 2>/dev/null | grep -oE '"tag_name":\s*"v[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        if [ -n "$PYTHON_LATEST_VERSION" ]; then
+            break
+        fi
+        echo "    重试获取... ($r/3)"
+    done
+
+    :: 方法2: 失败时使用国内镜像源获取版本信息
     if [ -z "$PYTHON_LATEST_VERSION" ]; then
-        PYTHON_LATEST_VERSION="3.11.9"
+        echo "    [WARNING] GitHub API 获取失败，尝试国内镜像..."
+        PYTHON_LATEST_VERSION=$(curl -s --connect-timeout 5 --max-time 10 https://mirrors.huaweicloud.com/python/ 2>/dev/null | grep -oE 'python-[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/python-//')
     fi
+
+    if [ -z "$PYTHON_LATEST_VERSION" ]; then
+        echo "    [WARNING] 所有方式获取失败，使用安全默认值"
+        PYTHON_LATEST_VERSION="3.12.6"
+    fi
+
+    echo "    检测到Python最新版本: $PYTHON_LATEST_VERSION"
 }
 
             else
@@ -777,6 +804,26 @@ auto_install_node() {
             return 0
             ;;
     esac
+
+    :: 等待 node 加入 PATH（关键修复）
+    log "    等待 Node.js 安装完成..."
+    for w in $(seq 1 10); do
+        if command -v node &> /dev/null; then
+            break
+        fi
+        sleep 1
+    done
+
+    :: 如果还没找到，手动添加常见路径
+    if ! command -v node &> /dev/null; then
+        export PATH="/usr/local/bin:/usr/bin:$PATH"
+    fi
+
+    if command -v node &> /dev/null; then
+        log "[*] Node.js 已安装: $(node --version 2>&1)"
+    else
+        log "[WARNING] Node.js 可能未完全安装，部分功能可能不可用"
+    fi
 }
 
 test_pip_mirrors() {
@@ -1031,18 +1078,36 @@ EOF2
             
             log "[*] 安装依赖..."
             if [ -n "$FASTEST_PIP_MIRROR" ]; then
-                pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR"
+                :: 首次尝试：使用镜像源 + 预编译包（关键优化）
+                pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --only-binary :all:
                 if [ $? -ne 0 ]; then
-                    log "WARNING: 使用镜像源安装失败，尝试默认源..."
-                    pip install -r requirements.txt
+                    log "WARNING: 预编译包安装失败，尝试使用源码编译..."
+                    pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR"
+                    if [ $? -ne 0 ]; then
+                        log "WARNING: 使用镜像源安装失败，尝试默认源..."
+                        pip install -r requirements.txt
+                        if [ $? -ne 0 ]; then
+                            log "[ERROR] 依赖安装失败，请查看日志或手动运行: .venv/bin/pip install -r requirements.txt"
+                            exit 1
+                        fi
+                    fi
                 fi
             else
                 pip install -r requirements.txt
+                if [ $? -ne 0 ]; then
+                    log "[ERROR] 依赖安装失败，请手动检查网络或依赖兼容性"
+                    exit 1
+                fi
             fi
         fi
 
         log "[*] 安装Playwright浏览器..."
         "$VENV_PATH/bin/python" main.py --install-playwright
+        if [ $? -ne 0 ]; then
+            log "[ERROR] Playwright浏览器安装失败，部分功能可能不可用"
+        else
+            log "[*] Playwright 浏览器安装成功"
+        fi
     fi
 
     log "Python虚拟环境设置完成"
