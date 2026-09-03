@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 def parse_skill_md():
-    md_path = Path('../skill.md')
+    md_path = Path('skill.md')
     if not md_path.exists():
         print(f'找不到 skill.md')
         return None
@@ -154,7 +154,7 @@ def create_docx(data):
     time_run.font.size = Pt(10)
     time_run.italic = True
 
-    output_path = '../skill.docx'
+    output_path = 'skill.docx'
     doc.save(output_path)
     print(f'✅ 成功生成 {output_path}')
 

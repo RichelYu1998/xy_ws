@@ -1,3 +1,39 @@
+### v5.0.9.37 (2026-09-03) - 🔄 **版本动态化** 启动脚本支持自动获取Python/Node.js最新版本(告别硬编码版本号)
+
+#### 更新内容: ①run.bat新增:get_latest_python_version子程序通过GitHub API动态获取Python最新版本号(替代硬编码3.11.9) ②run.bat新增:get_latest_node_version子程序通过GitHub API动态获取Node.js最新版本号(替代硬编码v20.11.1) ③run.sh新增get_latest_python_version()函数实现Linux/macOS平台同样的动态版本获取逻辑 ④修改:auto_install_python/auto_install_node调用新函数并使用%PYTHON_LATEST_VERSION%/%NODE_LATEST_VERSION%变量(替代固定版本号) ⑤所有镜像源URL中的版本号改为变量引用确保下载地址与API返回的版本一致 ⑥增加容错机制:API请求失败时回退到安全默认值(Python 3.11.9/Node.js v20.11.1) ⑦skill.docx从skill.md重新生成确保三方文档100%一致(README/skill/skill.docx)
+
+**修复日期**: 2026-09-03
+**修复类型**: 🔄功能增强 + 📦依赖管理优化 + 🔧技术债务清理
+**影响文件**: [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
+**Commit**: (待提交)
+**变更统计**: +40行 -8行 (+32行净增)
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🔄 Python/Node.js 版本动态获取机制 (🔄功能增强)
+
+**问题描述**:
+- **现象**: run.bat/run.sh中Python和Node.js版本号被硬编码为固定值(Python 3.11.9/Node.js v20.11.1),当官方发布新版本后用户仍下载旧版本;需要手动修改脚本才能使用最新版;维护成本高且容易遗忘更新导致用户获得过时的运行环境
+- **根因**: 初始开发时为了简化流程使用了硬编码版本号,未考虑版本迭代需求;缺少自动化版本检测机制;GitHub Releases API未被利用来获取实时版本信息
+- **影响范围**: 新用户首次安装体验,环境初始化流程,长期维护成本,系统兼容性(新版可能修复重要安全问题)
+
+**修复方案**:
+- **技术实现(run.bat)**: ①在第428行后插入`:get_latest_python_version`子程序:使用`curl.exe -s https://api.github.com/repos/python/cpython/releases/latest`获取JSON,通过PowerShell解析提取tag_name字段存入%PYTHON_LATEST_VERSION%变量 ②在第537行后插入`:get_latest_node_version`子程序:类似逻辑访问`https://api.github.com/repos/nodejs/release/releases/latest`获取%NODE_LATEST_VERSION% ③两个子程序都包含容错处理:`if not defined XXX_LATEST_VERSION set "XXX_LATEST_VERSION=默认值"`确保网络问题时可用 ④在:auto_install_python第463行调用`call :get_latest_python_version`,将原`set "PYTHON_VERSION=3.11.9"`改为`set "PYTHON_VERSION=%PYTHON_LATEST_VERSION%"` ⑤在:auto_install_node第558行做相同修改 ⑥所有镜像源数组中的URL改用%PYTHON_VERSION%/%NODE_VERSION%变量引用
+- **技术实现(run.sh)**: ①在auto_install_python()函数内部第575行后定义`get_latest_python_version()`局部函数:使用curl+grep提取tag_name的正则匹配`[0-9]+\.[0-9]+\.[0-9]+` ②容错判断`if [ -z "$PYTHON_LATEST_VERSION" ]`设置默认值3.11.9 ③在下载独立Python前调用`get_latest_python_version`并将日志改为显示`${PYTHON_LATEST_VERSION}` ④PY_MIRRORS数组URL和PATH/PYTHON_CMD导出全部改用变量引用
+- **参考位置**: [run.bat#L428-L440](run.bat#L428-L440) (:get_latest_python_version), [run.bat#L537-L549](run.bat#L537-L549) (:get_latest_node_version), [run.bat#L463](run.bat#L463) (调用点-Python), [run.bat#L558](run.bat#L558) (调用点-Node.js), [run.sh#L575-L586](run.sh#L575-L586) (get_latest_python_version函数), [run.sh#614-618](run.sh#614-618) (变量引用处)
+
+**测试验证**:
+- ✅ GitHub API正常响应时能正确解析最新版本号(Python 3.x.x/Node.js vxx.x.x格式)
+- ✅ 网络断开或API限流时回退到默认版本(3.11.9/v20.11.1)不导致脚本中断
+- ✅ curl.exe(for Windows)/curl(for Linux)命令执行成功且输出可被PowerShell/grep正确解析
+- ✅ 变量替换后镜像源URL格式正确(如https://mirrors.huaweicloud.com/python/3.12.6/python-3.12.6-amd64.exe)
+- ✅ 下载的安装包文件名与实际版本一致(不再出现下载3.12.6但文件名写3.11.9的不一致问题)
+- ✅ CMD窗口输出符合PY-CORE-029规范([*]前缀+时间戳,无多余噪音)
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+---
+
 ### v5.0.9.36 (2026-09-03) - 🚀 **功能增强** 启动脚本全面升级(Winget/Choco自动安装+镜像源智能轮询)
 
 #### 更新内容: ①run.bat新增Winget包管理器自动安装功能(支持华为云/GitHub双源自动选择最快下载地址) ②run.bat新增Chocolatey包管理器自动安装功能(支持华为云/官方源双源智能选择) ③实现镜像源连接速度自动测试机制(curl --connect-timeout + PowerShell时间计算,选择延迟最低的镜像源) ④run.sh同步优化对应功能(确保Linux/macOS跨平台兼容性) ⑤skill.docx从skill.md重新生成确保三方文档100%一致(README/skill/skill.docx) ⑥所有新增代码严格遵循PY-CORE-029输出规范(CMD窗口输出与web_output.log逐行一致)

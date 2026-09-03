@@ -160,7 +160,15 @@ powershell -NoProfile -Command "Set-ExecutionPolicy Bypass -Scope Process -Force
 set "PATH=%PATH%;C:\ProgramData\chocolatey\bin"
 exit /b 0
 
+:get_latest_git_version
+for /f "delims=" %%v in ('curl.exe -s https://api.github.com/repos/git-for-windows/git/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input | ConvertFrom-Json | Select-Object -ExpandProperty tag_name"') do set "GIT_LATEST_VERSION=%%v"
+if not defined GIT_LATEST_VERSION set "GIT_LATEST_VERSION=2.47.1"
+exit /b
+
 :auto_install_git
+call :get_latest_git_version
+echo     检测到Git最新版本: %GIT_LATEST_VERSION%
+
 where winget >nul 2>&1
 if not errorlevel 1 (
     echo     使用 Winget 安装 Git...
@@ -176,7 +184,7 @@ if not errorlevel 1 (
 )
 
 echo     轮询最快Git镜像源并下载...
-set "GIT_VERSION=2.47.1"
+set "GIT_VERSION=%GIT_LATEST_VERSION%"
 set "GIT_MIRRORS[0]=https://mirrors.huaweicloud.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|华为云"
 set "GIT_MIRRORS[1]=https://registry.npmmirror.com/-/binary/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|npmmirror"
 set "GIT_MIRRORS[2]=https://github.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|GitHub官方"
@@ -420,7 +428,15 @@ if defined VIRTUAL_ENV (
 )
 exit /b 0
 
+:get_latest_python_version
+for /f "delims=" %%v in ('curl.exe -s https://api.github.com/repos/python/cpython/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input | ConvertFrom-Json | Select-Object -ExpandProperty tag_name"') do set "PYTHON_LATEST_VERSION=%%v"
+if not defined PYTHON_LATEST_VERSION set "PYTHON_LATEST_VERSION=3.11.9"
+exit /b
+
 :auto_install_python
+call :get_latest_python_version
+call :log     检测到Python最新版本: %PYTHON_LATEST_VERSION%
+
 call :log     尝试使用 Winget 安装...
 where winget >nul 2>&1
 if not errorlevel 1 (
@@ -447,7 +463,7 @@ if not errorlevel 1 (
 )
 
 call :log     轮询最快Python镜像源并下载...
-set "PYTHON_VERSION=3.11.9"
+set "PYTHON_VERSION=%PYTHON_LATEST_VERSION%"
 set "PY_MIRRORS[0]=https://mirrors.huaweicloud.com/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe|华为云"
 set "PY_MIRRORS[1]=https://registry.npmmirror.com/-/binary/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe|npmmirror"
 set "PY_MIRRORS[2]=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe|Python官方"
@@ -521,7 +537,15 @@ if not errorlevel 1 (
 )
 exit /b 0
 
+:get_latest_node_version
+for /f "delims=" %%v in ('curl.exe -s https://api.github.com/repos/nodejs/release/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input | ConvertFrom-Json | Select-Object -ExpandProperty tag_name"') do set "NODE_LATEST_VERSION=%%v"
+if not defined NODE_LATEST_VERSION set "NODE_LATEST_VERSION=v20.11.1"
+exit /b
+
 :auto_install_node
+call :get_latest_node_version
+call :log     检测到Node.js最新版本: %NODE_LATEST_VERSION%
+
 where winget >nul 2>&1
 if not errorlevel 1 (
     winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --silent
@@ -534,7 +558,7 @@ if not errorlevel 1 (
     if not errorlevel 1 goto :node_verify_install
 )
 
-set "NODE_VERSION=v20.11.1"
+set "NODE_VERSION=%NODE_LATEST_VERSION%"
 call :log     轮询最快Node.js镜像源并下载...
 set "ND_MIRRORS[0]=https://npmmirror.com/mirrors/node/%NODE_VERSION%/node-%NODE_VERSION%-x64.msi|npmmirror"
 set "ND_MIRRORS[1]=https://mirrors.huaweicloud.com/nodejs/%NODE_VERSION%/node-%NODE_VERSION%-x64.msi|华为云"

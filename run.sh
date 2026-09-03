@@ -575,17 +575,25 @@ auto_install_python() {
             elif command -v zypper &> /dev/null; then
                 log "    使用zypper安装Python..."
                 sudo zypper install -y python3 python3-pip nodejs npm curl
+get_latest_python_version() {
+    PYTHON_LATEST_VERSION=$(curl -s https://api.github.com/repos/python/cpython/releases/latest 2>/dev/null | grep -oE '"tag_name":\s*"v[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    if [ -z "$PYTHON_LATEST_VERSION" ]; then
+        PYTHON_LATEST_VERSION="3.11.9"
+    fi
+}
+
             else
                 log "[WARNING] 无法识别Linux包管理器，尝试下载独立Python..."
                 if [ "$(uname -m)" = "x86_64" ]; then
-                    log "    下载Python standalone版本..."
+                    get_latest_python_version
+                    log "    下载Python ${PYTHON_LATEST_VERSION} standalone版本..."
                     log "    轮询最快Python镜像源..."
                     PY_MIRRORS=(
-                        "https://mirrors.huaweicloud.com/python/3.11.9/python-3.11.9-amd64.tar.xz|华为云"
-                        "https://registry.npmmirror.com/-/binary/python/3.11.9/python-3.11.9-amd64.tar.xz|npmmirror"
-                        "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.tar.xz|Python官方"
+                        "https://mirrors.huaweicloud.com/python/${PYTHON_LATEST_VERSION}/python-${PYTHON_LATEST_VERSION}-amd64.tar.xz|华为云"
+                        "https://registry.npmmirror.com/-/binary/python/${PYTHON_LATEST_VERSION}/python-${PYTHON_LATEST_VERSION}-amd64.tar.xz|npmmirror"
+                        "https://www.python.org/ftp/python/${PYTHON_LATEST_VERSION}/python-${PYTHON_LATEST_VERSION}-amd64.tar.xz|Python官方"
                     )
-                    PY_BEST_URL="https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.tar.xz"
+                    PY_BEST_URL="https://www.python.org/ftp/python/${PYTHON_LATEST_VERSION}/python-${PYTHON_LATEST_VERSION}-amd64.tar.xz"
                     PY_MIN_TIME=99999
                     for m in "${PY_MIRRORS[@]}"; do
                         m_name="${m##*|}"
@@ -606,8 +614,8 @@ auto_install_python() {
                         return 1
                     }
                     cd /tmp && tar xf python.tar.xz
-                    export PATH="/tmp/python-3.11.9/bin:$PATH"
-                    export PYTHON_CMD="/tmp/python-3.11.9/bin/python3"
+                    export PATH="/tmp/python-${PYTHON_LATEST_VERSION}/bin:$PATH"
+                    export PYTHON_CMD="/tmp/python-${PYTHON_LATEST_VERSION}/bin/python3"
                     cd -
                 else
                     log "[ERROR] 不支持的架构或操作系统，请手动安装Python"
