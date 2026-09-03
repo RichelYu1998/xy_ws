@@ -69,6 +69,22 @@ if errorlevel 1 (
     exit /b 1
 )
 
+where winget >nul 2>&1
+if errorlevel 1 (
+    echo [*] 未找到 Winget，正在自动安装...
+    call :auto_install_winget
+    where winget >nul 2>&1
+    if not errorlevel 1 echo [*] Winget 安装成功
+)
+
+where choco >nul 2>&1
+if errorlevel 1 (
+    echo [*] 未找到 Chocolatey，正在自动安装...
+    call :auto_install_choco
+    where choco >nul 2>&1
+    if not errorlevel 1 echo [*] Chocolatey 安装成功
+)
+
 where git >nul 2>&1
 if errorlevel 1 (
     echo [*] 未找到 Git，正在自动安装...
@@ -82,6 +98,66 @@ if errorlevel 1 (
 )
 
 echo [*] 前置条件检查通过
+exit /b 0
+
+:auto_install_winget
+echo     轮询最快Winget安装源...
+set "WG_MIRRORS[0]=https://mirrors.huaweicloud.com/microsoft/winget-cli/latest/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle|华为云"
+set "WG_MIRRORS[1]=https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle|GitHub官方"
+set "WG_BEST_URL="
+set "WG_MIN_TIME=9999"
+for /L %%i in (0,1,1) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!WG_MIRRORS[%%i]!") do (
+        set "WG_URL=%%a"
+        set "WG_NAME=%%b"
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!WG_URL!" 2^>nul') do set "WG_TIME=%%t"
+        if defined WG_TIME if not "!WG_TIME!"=="0" if not "!WG_TIME!"=="0.000000" (
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!WG_TIME!\'*1000)" 2^>nul') do set "WG_INT=%%m"
+            if defined WG_INT if !WG_INT! LSS !WG_MIN_TIME! (
+                set "WG_MIN_TIME=!WG_INT!"
+                set "WG_BEST_URL=!WG_URL!"
+                echo         !WG_NAME!: !WG_TIME!s [!WG_INT!ms]
+            )
+        )
+    )
+)
+if defined WG_BEST_URL (
+    echo     使用最快镜像下载Winget...
+    curl.exe -L -o "%TEMP%\winget-installer.msixbundle" "!WG_BEST_URL!" 2>nul
+    if exist "%TEMP%\winget-installer.msixbundle" (
+        powershell -NoProfile -Command "Add-AppxPackage -Path '%TEMP%\winget-installer.msixbundle'" 2>nul
+        del "%TEMP%\winget-installer.msixbundle" 2>nul
+    )
+) else (
+    echo     尝试通过Microsoft Store安装Winget...
+    powershell -NoProfile -Command "Start-Process 'ms-windows-store://pdp/?ProductId=9NBLGGH4NNS2'" 2>nul
+)
+exit /b 0
+
+:auto_install_choco
+echo     轮询最快Chocolatey安装源...
+set "CCO_MIRRORS[0]=https://mirrors.huaweicloud.com/chocolatey/install.ps1|华为云"
+set "CCO_MIRRORS[1]=https://community.chocolatey.org/install.ps1|Chocolatey官方"
+set "CCO_BEST_URL=https://community.chocolatey.org/install.ps1"
+set "CCO_MIN_TIME=9999"
+for /L %%i in (0,1,1) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!CCO_MIRRORS[%%i]!") do (
+        set "CCO_URL=%%a"
+        set "CCO_NAME=%%b"
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!CCO_URL!" 2^>nul') do set "CCO_TIME=%%t"
+        if defined CCO_TIME if not "!CCO_TIME!"=="0" if not "!CCO_TIME!"=="0.000000" (
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!CCO_TIME!\'*1000)" 2^>nul') do set "CCO_INT=%%m"
+            if defined CCO_INT if !CCO_INT! LSS !CCO_MIN_TIME! (
+                set "CCO_MIN_TIME=!CCO_INT!"
+                set "CCO_BEST_URL=!CCO_URL!"
+                echo         !CCO_NAME!: !CCO_TIME!s [!CCO_INT!ms]
+            )
+        )
+    )
+)
+echo     使用最快镜像安装Chocolatey...
+powershell -NoProfile -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('!CCO_BEST_URL!'))" 2>nul
+set "PATH=%PATH%;C:\ProgramData\chocolatey\bin"
 exit /b 0
 
 :auto_install_git
@@ -405,6 +481,8 @@ if exist "%TEMP%\python_installer.exe" (
         set "PATH=%CD%\_python;!PATH!"
         call :log [*] Python 已安装到本地目录: %CD%\_python
         del "%TEMP%\python_installer.exe" 2>nul
+        setx PYTHON_CMD "%CD%\_python\python.exe" >nul 2>&1
+        call :log     已持久化PYTHON_CMD到系统环境变量
         exit /b 0
     )
 )
@@ -624,6 +702,10 @@ if "!NPM_BEST_MIRROR!"=="" (
     
     npm config set registry "!NPM_BEST_MIRROR!"
     call :log [*] NPM镜像已设置为: !NPM_BEST_MIRROR!
+
+    call :log [*] 持久化NPM镜像到系统环境变量...
+    setx NPM_CONFIG_REGISTRY "!NPM_BEST_MIRROR!" >nul 2>&1
+    call :log     已写入系统环境变量: NPM_CONFIG_REGISTRY=!NPM_BEST_MIRROR!
 )
 exit /b 0
 
@@ -672,6 +754,18 @@ if defined FASTEST_PIP_MIRROR (
     echo:trusted-host=!TRUSTED_HOST!>> "!VENV_PATH!\pip_config\pip.ini"
     
     set "PIP_CONFIG_FILE=!VENV_PATH!\pip_config\pip.ini"
+
+    call :log [*] 持久化PIP镜像到系统环境变量...
+    setx PIP_INDEX_URL "!FASTEST_PIP_MIRROR!" >nul 2>&1
+    call :log     已写入系统环境变量: PIP_INDEX_URL=!FASTEST_PIP_MIRROR!
+
+    if not exist "%APPDATA%\pip" mkdir "%APPDATA%\pip"
+    echo:[global]> "%APPDATA%\pip\pip.ini"
+    echo:index-url=!FASTEST_PIP_MIRROR!>> "%APPDATA%\pip\pip.ini"
+    echo:trusted-host=!TRUSTED_HOST!>> "%APPDATA%\pip\pip.ini"
+    echo:[install]>> "%APPDATA%\pip\pip.ini"
+    echo:trusted-host=!TRUSTED_HOST!>> "%APPDATA%\pip\pip.ini"
+    call :log     已写入用户级全局: %APPDATA%\pip\pip.ini
 )
 
 if exist requirements.txt (

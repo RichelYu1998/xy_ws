@@ -48,14 +48,19 @@ check_prerequisites() {
                         brew install curl
                     fi
                 else
-                    log "    使用系统自带工具安装curl..."
-                    if [ -f "/usr/bin/ruby" ]; then
-                        /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" > /dev/null 2>&1 || true
+                    log "    未检测到Homebrew，先安装Homebrew（使用国内镜像）..."
+                    auto_install_homebrew
+                    if command -v brew &> /dev/null || [ -f "/opt/homebrew/bin/brew" ] || [ -f "/usr/local/bin/brew" ]; then
+                        log "    使用Homebrew安装curl..."
                         if [ -f "/opt/homebrew/bin/brew" ]; then
                             /opt/homebrew/bin/brew install curl
+                        elif [ -f "/usr/local/bin/brew" ]; then
+                            /usr/local/bin/brew install curl
+                        else
+                            brew install curl
                         fi
                     else
-                        log "[ERROR] 无法自动安装curl，请手动运行: xcode-select --install"
+                        log "[ERROR] Homebrew安装失败，无法安装curl"
                         return 1
                     fi
                 fi
@@ -98,7 +103,21 @@ check_prerequisites() {
                 elif [ -f "/usr/local/bin/brew" ]; then
                     /usr/local/bin/brew install git
                 else
-                    xcode-select --install 2>/dev/null || true
+                    log "    未检测到Homebrew，先安装Homebrew（使用国内镜像）..."
+                    auto_install_homebrew
+                    if command -v brew &> /dev/null || [ -f "/opt/homebrew/bin/brew" ] || [ -f "/usr/local/bin/brew" ]; then
+                        log "    使用Homebrew安装git..."
+                        if [ -f "/opt/homebrew/bin/brew" ]; then
+                            /opt/homebrew/bin/brew install git
+                        elif [ -f "/usr/local/bin/brew" ]; then
+                            /usr/local/bin/brew install git
+                        else
+                            brew install git
+                        fi
+                    else
+                        log "[ERROR] Homebrew安装失败，无法安装git"
+                        return 1
+                    fi
                 fi
                 ;;
             Linux)
@@ -349,133 +368,166 @@ test_brew_mirror() {
 
 auto_install_homebrew() {
     log "[*] 正在全自动安装Homebrew..."
-    
+
     local fastest_mirror
     fastest_mirror=$(test_brew_mirror)
-    
+
+    local brew_remote=""
+    local core_remote=""
+    local cask_remote=""
+    local bottle_domain=""
+
     case "$fastest_mirror" in
         "阿里云")
-            log "    使用阿里云镜像源安装Homebrew..."
-            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            
-            if [ $? -eq 0 ]; then
-                log "[*] 配置Homebrew使用阿里云加速源..."
-                
-                if [ -f "/opt/homebrew/bin/brew" ]; then
-                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/brew.git"
-                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.aliyun.com/homebrew-core.git"
-                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.aliyun.com/homebrew-cask.git"
-                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles"
-                    
-                    eval "$(/opt/homebrew/bin/brew shellenv)"
-                    
-                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/core https://mirrors.aliyun.com/homebrew-core.git 2>/dev/null || true
-                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.aliyun.com/homebrew-cask.git 2>/dev/null || true
-                    
-                elif [ -f "/usr/local/bin/brew" ]; then
-                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.aliyun.com/homebrew/brew.git"
-                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.aliyun.com/homebrew-core.git"
-                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.aliyun.com/homebrew-cask.git"
-                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.aliyun.com/homebrew-bottles"
-                    
-                    eval "$(/usr/local/bin/brew shellenv)"
-                    
-                    /usr/local/bin/brew tap --custom-remote --force homebrew/core https://mirrors.aliyun.com/homebrew-core.git 2>/dev/null || true
-                    /usr/local/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.aliyun.com/homebrew-cask.git 2>/dev/null || true
-                fi
-                
-                log "[✅] Homebrew 安装成功（阿里云加速源）"
-                return 0
-            fi
+            brew_remote="https://mirrors.aliyun.com/homebrew/brew.git"
+            core_remote="https://mirrors.aliyun.com/homebrew-core.git"
+            cask_remote="https://mirrors.aliyun.com/homebrew-cask.git"
+            bottle_domain="https://mirrors.aliyun.com/homebrew-bottles"
             ;;
         "中科大")
-            log "    使用中科大镜像源安装Homebrew..."
-            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            
-            if [ $? -eq 0 ]; then
-                log "[*] 配置Homebrew使用中科大加速源..."
-                
-                if [ -f "/opt/homebrew/bin/brew" ]; then
-                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew/brew.git"
-                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
-                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-cask.git"
-                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
-                    
-                    eval "$(/opt/homebrew/bin/brew shellenv)"
-                    
-                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/core https://mirrors.ustc.edu.cn/homebrew-core.git 2>/dev/null || true
-                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.ustc.edu.cn/homebrew-cask.git 2>/dev/null || true
-                    
-                elif [ -f "/usr/local/bin/brew" ]; then
-                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew/brew.git"
-                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
-                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-cask.git"
-                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
-                    
-                    eval "$(/usr/local/bin/brew shellenv)"
-                    
-                    /usr/local/bin/brew tap --custom-remote --force homebrew/core https://mirrors.ustc.edu.cn/homebrew-core.git 2>/dev/null || true
-                    /usr/local/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.ustc.edu.cn/homebrew-cask.git 2>/dev/null || true
-                fi
-                
-                log "[✅] Homebrew 安装成功（中科大加速源）"
-                return 0
-            fi
+            brew_remote="https://mirrors.ustc.edu.cn/homebrew/brew.git"
+            core_remote="https://mirrors.ustc.edu.cn/homebrew-core.git"
+            cask_remote="https://mirrors.ustc.edu.cn/homebrew-cask.git"
+            bottle_domain="https://mirrors.ustc.edu.cn/homebrew-bottles"
             ;;
         "清华")
-            log "    使用清华镜像源安装Homebrew..."
-            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            
-            if [ $? -eq 0 ]; then
-                log "[*] 配置Homebrew使用清华加速源..."
-                
-                if [ -f "/opt/homebrew/bin/brew" ]; then
-                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
-                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
-                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask.git"
-                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
-                    
-                    eval "$(/opt/homebrew/bin/brew shellenv)"
-                    
-                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/core https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git 2>/dev/null || true
-                    /opt/homebrew/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask.git 2>/dev/null || true
-                    
-                elif [ -f "/usr/local/bin/brew" ]; then
-                    export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
-                    export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
-                    export HOMEBREW_CASK_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask.git"
-                    export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
-                    
-                    eval "$(/usr/local/bin/brew shellenv)"
-                    
-                    /usr/local/bin/brew tap --custom-remote --force homebrew/core https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git 2>/dev/null || true
-                    /usr/local/bin/brew tap --custom-remote --force homebrew/cask https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask.git 2>/dev/null || true
-                fi
-                
-                log "[✅] Homebrew 安装成功（清华加速源）"
-                return 0
-            fi
+            brew_remote="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git"
+            core_remote="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-core.git"
+            cask_remote="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/homebrew-cask.git"
+            bottle_domain="https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles"
+            ;;
+        "腾讯")
+            brew_remote="https://mirrors.cloud.tencent.com/homebrew/brew.git"
+            core_remote="https://mirrors.cloud.tencent.com/homebrew/homebrew-core.git"
+            cask_remote="https://mirrors.cloud.tencent.com/homebrew/homebrew-cask.git"
+            bottle_domain="https://mirrors.cloud.tencent.com/homebrew-bottles"
             ;;
         *)
-            log "    使用官方源安装Homebrew（可能较慢）..."
-            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            
-            if [ $? -eq 0 ]; then
-                if [ -f "/opt/homebrew/bin/brew" ]; then
-                    eval "$(/opt/homebrew/bin/brew shellenv)"
-                elif [ -f "/usr/local/bin/brew" ]; then
-                    eval "$(/usr/local/bin/brew shellenv)"
-                fi
-                
-                log "[✅] Homebrew 安装成功（官方源）"
-                return 0
-            fi
+            brew_remote="https://github.com/Homebrew/brew.git"
+            core_remote="https://github.com/homebrew/homebrew-core.git"
+            cask_remote="https://github.com/homebrew/homebrew-cask.git"
+            bottle_domain=""
             ;;
     esac
-    
-    log "[ERROR] Homebrew 安装失败"
-    return 1
+
+    log "[*] 安装前设置Homebrew镜像环境变量（安装脚本会使用这些变量）..."
+    export HOMEBREW_BREW_GIT_REMOTE="$brew_remote"
+    export HOMEBREW_CORE_GIT_REMOTE="$core_remote"
+    if [ -n "$cask_remote" ]; then
+        export HOMEBREW_CASK_GIT_REMOTE="$cask_remote"
+    fi
+    if [ -n "$bottle_domain" ]; then
+        export HOMEBREW_BOTTLE_DOMAIN="$bottle_domain"
+    fi
+
+    log "[*] 下载Homebrew安装脚本（轮询国内镜像）..."
+    local install_script=""
+    local install_mirrors=(
+        "https://ghproxy.com/https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh|ghproxy"
+        "https://mirror.ghproxy.com/https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh|mirror.ghproxy"
+        "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh|GitHub官方"
+    )
+
+    for m in "${install_mirrors[@]}"; do
+        local m_name="${m##*|}"
+        local m_url="${m%|*}"
+        log "    尝试 ${m_name}..."
+        install_script=$(curl -fsSL --connect-timeout 5 --max-time 15 "$m_url" 2>/dev/null)
+        if [ -n "$install_script" ]; then
+            log "    ${m_name} 下载成功 ✅"
+            break
+        else
+            log "    ${m_name} 下载失败 ❌"
+        fi
+    done
+
+    if [ -z "$install_script" ]; then
+        log "[ERROR] 无法下载Homebrew安装脚本，请检查网络"
+        return 1
+    fi
+
+    log "[*] 执行Homebrew安装（镜像环境变量已设置）..."
+    NONINTERACTIVE=1 /bin/bash -c "$install_script"
+
+    if [ $? -ne 0 ]; then
+        log "[ERROR] Homebrew 安装失败"
+        return 1
+    fi
+
+    if [ -f "/opt/homebrew/bin/brew" ]; then
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [ -f "/usr/local/bin/brew" ]; then
+        eval "$(/usr/local/bin/brew shellenv)"
+    fi
+
+    if command -v brew &> /dev/null; then
+        if [ -n "$core_remote" ] && [ "$core_remote" != "https://github.com/homebrew/homebrew-core.git" ]; then
+            brew tap --custom-remote --force homebrew/core "$core_remote" 2>/dev/null || true
+        fi
+        if [ -n "$cask_remote" ] && [ "$cask_remote" != "https://github.com/homebrew/homebrew-cask.git" ]; then
+            brew tap --custom-remote --force homebrew/cask "$cask_remote" 2>/dev/null || true
+        fi
+    fi
+
+    persist_brew_mirror "$fastest_mirror" "$brew_remote" "$core_remote" "$cask_remote" "$bottle_domain"
+
+    log "[✅] Homebrew 安装成功（${fastest_mirror}加速源）"
+    return 0
 }
+
+persist_brew_mirror() {
+    local mirror_name="$1"
+    local brew_remote="$2"
+    local core_remote="$3"
+    local cask_remote="$4"
+    local bottle_domain="$5"
+
+    log "[*] 持久化Homebrew镜像配置到系统环境..."
+
+    local profile_files=("$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile")
+
+    for profile in "${profile_files[@]}"; do
+        if [ -f "$profile" ]; then
+            sed -i.bak '/^export HOMEBREW_BREW_GIT_REMOTE=/d; /^export HOMEBREW_CORE_GIT_REMOTE=/d; /^export HOMEBREW_CASK_GIT_REMOTE=/d; /^export HOMEBREW_BOTTLE_DOMAIN=/d' "$profile" 2>/dev/null || true
+            rm -f "${profile}.bak" 2>/dev/null || true
+        fi
+
+        {
+            echo ""
+            echo "# Homebrew镜像源配置 (由run.sh自动设置)"
+            echo "export HOMEBREW_BREW_GIT_REMOTE="${brew_remote}""
+            echo "export HOMEBREW_CORE_GIT_REMOTE="${core_remote}""
+            if [ -n "$cask_remote" ]; then
+                echo "export HOMEBREW_CASK_GIT_REMOTE="${cask_remote}""
+            fi
+            if [ -n "$bottle_domain" ]; then
+                echo "export HOMEBREW_BOTTLE_DOMAIN="${bottle_domain}""
+            fi
+        } >> "$profile"
+
+        log "    已冕入: $profile"
+    done
+
+    if [ "$(uname -s)" = "Linux" ]; then
+        if [ -w "/etc/environment" ] || command -v sudo &> /dev/null; then
+            sudo sed -i '/^HOMEBREW_BREW_GIT_REMOTE=/d; /^HOMEBREW_CORE_GIT_REMOTE=/d; /^HOMEBREW_CASK_GIT_REMOTE=/d; /^HOMEBREW_BOTTLE_DOMAIN=/d' /etc/environment 2>/dev/null || true
+            {
+                echo "HOMEBREW_BREW_GIT_REMOTE="${brew_remote}""
+                echo "HOMEBREW_CORE_GIT_REMOTE="${core_remote}""
+                if [ -n "$cask_remote" ]; then
+                    echo "HOMEBREW_CASK_GIT_REMOTE="${cask_remote}""
+                fi
+                if [ -n "$bottle_domain" ]; then
+                    echo "HOMEBREW_BOTTLE_DOMAIN="${bottle_domain}""
+                fi
+            } | sudo tee -a /etc/environment > /dev/null 2>&1 || true
+            log "    已冕入: /etc/environment (Linux系统级)"
+        fi
+    fi
+
+    log "[✅] Homebrew镜像配置已持久化"]
+}
+
 
 auto_install_python() {
     case "$(uname -s)" in
@@ -847,6 +899,28 @@ test_npm_mirrors() {
         
         npm config set registry "$NPM_BEST_MIRROR"
         log "[*] NPM镜像已设置为: $NPM_BEST_MIRROR"
+
+        log "[*] 持久化NPM镜像到系统环境..."
+
+        for profile in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
+            if [ -f "$profile" ]; then
+                sed -i.bak '/^export NPM_CONFIG_REGISTRY=/d' "$profile" 2>/dev/null || true
+                rm -f "${profile}.bak" 2>/dev/null || true
+                echo "" >> "$profile"
+                echo "# NPM镜像配置 (由run.sh自动设置)" >> "$profile"
+                echo "export NPM_CONFIG_REGISTRY="${NPM_BEST_MIRROR}"" >> "$profile"
+                log "    已写入NPM_REGISTRY到: $profile"
+                break
+            fi
+        done
+
+        if [ "$(uname -s)" = "Linux" ]; then
+            if [ -w "/etc/environment" ] || command -v sudo &> /dev/null; then
+                sudo sed -i '/^NPM_CONFIG_REGISTRY=/d' /etc/environment 2>/dev/null || true
+                echo "NPM_CONFIG_REGISTRY="${NPM_BEST_MIRROR}"" | sudo tee -a /etc/environment > /dev/null 2>&1 || true
+                log "    已写入: /etc/environment (Linux系统级)"
+            fi
+        fi
     else
         log "[WARNING] NPM镜像测试失败"
     fi
@@ -898,7 +972,37 @@ trusted-host = $TRUSTED_HOST
 EOF
         
         export PIP_CONFIG_FILE="$VENV_PATH/pip_config/pip.conf"
-    fi
+
+        log "[*] 持久化PIP镜像到系统环境..."
+        mkdir -p "$HOME/.pip" 2>/dev/null || true
+        cat > "$HOME/.pip/pip.conf" << EOF2
+[global]
+index-url = $FASTEST_PIP_MIRROR
+trusted-host = $TRUSTED_HOST
+[install]
+trusted-host = $TRUSTED_HOST
+EOF2
+        log "    已写入: $HOME/.pip/pip.conf (用户级全局)"
+
+        for profile in "$HOME/.zshrc" "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
+            if [ -f "$profile" ]; then
+                sed -i.bak '/^export PIP_INDEX_URL=/d' "$profile" 2>/dev/null || true
+                rm -f "${profile}.bak" 2>/dev/null || true
+                echo "" >> "$profile"
+                echo "# PIP镜像配置 (由run.sh自动设置)" >> "$profile"
+                echo "export PIP_INDEX_URL="${FASTEST_PIP_MIRROR}"" >> "$profile"
+                log "    已写入PIP_INDEX_URL到: $profile"
+                break
+            fi
+        done
+
+        if [ "$(uname -s)" = "Linux" ]; then
+            if [ -w "/etc/environment" ] || command -v sudo &> /dev/null; then
+                sudo sed -i '/^PIP_INDEX_URL=/d' /etc/environment 2>/dev/null || true
+                echo "PIP_INDEX_URL="${FASTEST_PIP_MIRROR}"" | sudo tee -a /etc/environment > /dev/null 2>&1 || true
+                log "    已写入: /etc/environment (Linux系统级)"
+            fi
+        fi    fi
 
     if [ -f "requirements.txt" ]; then
         log "[*] 检查Python依赖是否需要安装..."
