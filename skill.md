@@ -3933,6 +3933,8 @@ def test_high_price_count_display():
 ## 📦 Git工作流规范
 
 ### 7.1 Commit Message 格式
+
+> **⚠️ 强制规则**: commit message必须使用中文简体，禁止使用英文描述。如：“🐛修复: 括号不匹配导致高价商品数显示为0”而非“fix: bracket mismatch”
 <type>(<scope>): <subject>
 
 <body>
@@ -5724,6 +5726,8 @@ AppException (自定义基类)
 ### 🚀 Git提交规范
 
 #### Commit Message格式
+
+> **⚠️ 强制规则**: commit message必须使用中文简体，禁止英文。如：“🔒安全(后端): 修复日志注入漏洞”而非“sec(main): fix log injection”
 
 ```
 <type>(<scope>): <subject>
@@ -21601,6 +21605,8 @@ if (isMobile) {
 ### Git提交规范
 
 #### Commit Message 格式
+
+> **⚠️ 强制规则**: commit message必须使用中文简体，禁止英文。如：“🐛修复(前端): 对比数据字段名匹配问题”而非“fix(frontend): comparison field mismatch”
 <type>(<scope>): <subject>
 
 <body>
@@ -22240,6 +22246,8 @@ git merge hotfix/encoding-issue
 git tag -a v3.8.89.17 -m "修复编码问题"
 
 5. 提交信息格式规范
+
+> **⚠️ 强制规则**: commit message必须使用中文简体，禁止英文描述。如：“🐛修复(后端): 优化subprocess超时配置”而非“fix(main): optimize subprocess timeout”
 <type>(<scope>): <subject>
 
 <body>
@@ -22274,6 +22282,7 @@ Git 维护检查清单
 - ✅ Force push 前 always 使用 --force-with-lease
 - ✅ 重要版本打 tag（如 v3.8.89.17）
 - ✅ 敏感信息（密码、密钥）绝不提交到仓库
+- ✅ Git commit message必须使用中文简体，禁止英文描述（如“📝PY-CORE-027范式增强”而非“prohibit placeholder”）
 
 ──────────────────────────────────────────────────
         """
@@ -23922,6 +23931,7 @@ git filter-branch --msg-filter 'sed "s/fix:/v5.0.7/"'
 - [ ] **类型标签一致性**：同一变更的类型标签在头部和详情块保持一致
 - [ ] **禁止占位符**：所有字段必须填写真实数据，禁止使用“待补充”/“待提交”/“(待提交)”占位符（Commit必须用git log按版本号匹配获取真实8位hash，变更统计用git diff --shortstat获取）
 - [ ] **序号连续性**：多个changes块时序号从1开始连续递增
+- [ ] **Git commit message必须使用中文简体**：禁止使用英文描述，必须用中文简体写commit message（如“📝PY-CORE-027范式增强: 禁止占位符+补全真实Commit hash”而非“prohibit placeholder”）
 
 ---
 
