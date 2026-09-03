@@ -99,10 +99,31 @@ if not errorlevel 1 (
     if not errorlevel 1 exit /b 0
 )
 
-echo     直接下载并安装 Git...
+echo     轮询最快Git镜像源并下载...
 set "GIT_VERSION=2.47.1"
+set "GIT_MIRRORS[0]=https://mirrors.huaweicloud.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|华为云"
+set "GIT_MIRRORS[1]=https://registry.npmmirror.com/-/binary/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|npmmirror"
+set "GIT_MIRRORS[2]=https://github.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|GitHub官方"
+set "GIT_BEST_URL=https://github.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe"
+set "GIT_MIN_TIME=9999"
+for /L %%i in (0,1,2) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!GIT_MIRRORS[%%i]!") do (
+        set "GM_URL=%%a"
+        set "GM_NAME=%%b"
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!GM_URL!" 2^>nul') do set "GM_TIME=%%t"
+        if defined GM_TIME if not "!GM_TIME!"=="0" if not "!GM_TIME!"=="0.000000" (
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!GM_TIME!\'*1000)" 2^>nul') do set "GM_INT=%%m"
+            if defined GM_INT if !GM_INT! LSS !GIT_MIN_TIME! (
+                set "GIT_MIN_TIME=!GM_INT!"
+                set "GIT_BEST_URL=!GM_URL!"
+                echo         !GM_NAME!: !GM_TIME!s [!GM_INT!ms]
+            )
+        )
+    )
+)
+echo     使用最快镜像下载Git...
 if not exist "%TEMP%\git-installer.exe" (
-    curl.exe -L -o "%TEMP%\git-installer.exe" https://github.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe 2>nul
+    curl.exe -L -o "%TEMP%\git-installer.exe" "!GIT_BEST_URL!" 2>nul
 )
 if exist "%TEMP%\git-installer.exe" (
     "%TEMP%\git-installer.exe" /VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /COMPONENTS="assoc,assoc_sh" /PATHOPTION=NO >nul 2>&1
@@ -349,10 +370,31 @@ if not errorlevel 1 (
     )
 )
 
-call :log     直接下载并安装Python...
+call :log     轮询最快Python镜像源并下载...
 set "PYTHON_VERSION=3.11.9"
+set "PY_MIRRORS[0]=https://mirrors.huaweicloud.com/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe|华为云"
+set "PY_MIRRORS[1]=https://registry.npmmirror.com/-/binary/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe|npmmirror"
+set "PY_MIRRORS[2]=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe|Python官方"
+set "PY_BEST_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe"
+set "PY_MIN_TIME=9999"
+for /L %%i in (0,1,2) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!PY_MIRRORS[%%i]!") do (
+        set "PM_URL=%%a"
+        set "PM_NAME=%%b"
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!PM_URL!" 2^>nul') do set "PM_TIME=%%t"
+        if defined PM_TIME if not "!PM_TIME!"=="0" if not "!PM_TIME!"=="0.000000" (
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!PM_TIME!\'*1000)" 2^>nul') do set "PM_INT=%%m"
+            if defined PM_INT if !PM_INT! LSS !PY_MIN_TIME! (
+                set "PY_MIN_TIME=!PM_INT!"
+                set "PY_BEST_URL=!PM_URL!"
+                call :log         !PM_NAME!: !PM_TIME!s [!PM_INT!ms]
+            )
+        )
+    )
+)
+call :log     使用最快镜像下载Python...
 if not exist "%TEMP%\python_installer.exe" (
-    curl.exe -L -o "%TEMP%\python_installer.exe" https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-amd64.exe
+    curl.exe -L -o "%TEMP%\python_installer.exe" "!PY_BEST_URL!"
 )
 
 if exist "%TEMP%\python_installer.exe" (
@@ -415,8 +457,30 @@ if not errorlevel 1 (
 )
 
 set "NODE_VERSION=v20.11.1"
+call :log     轮询最快Node.js镜像源并下载...
+set "ND_MIRRORS[0]=https://npmmirror.com/mirrors/node/%NODE_VERSION%/node-%NODE_VERSION%-x64.msi|npmmirror"
+set "ND_MIRRORS[1]=https://mirrors.huaweicloud.com/nodejs/%NODE_VERSION%/node-%NODE_VERSION%-x64.msi|华为云"
+set "ND_MIRRORS[2]=https://nodejs.org/dist/%NODE_VERSION%/node-%NODE_VERSION%-x64.msi|Node官方"
+set "ND_BEST_URL=https://nodejs.org/dist/%NODE_VERSION%/node-%NODE_VERSION%-x64.msi"
+set "ND_MIN_TIME=9999"
+for /L %%i in (0,1,2) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!ND_MIRRORS[%%i]!") do (
+        set "NM_URL=%%a"
+        set "NM_NAME=%%b"
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!NM_URL!" 2^>nul') do set "NM_TIME=%%t"
+        if defined NM_TIME if not "!NM_TIME!"=="0" if not "!NM_TIME!"=="0.000000" (
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!NM_TIME!\'*1000)" 2^>nul') do set "NM_INT=%%m"
+            if defined NM_INT if !NM_INT! LSS !ND_MIN_TIME! (
+                set "ND_MIN_TIME=!NM_INT!"
+                set "ND_BEST_URL=!NM_URL!"
+                call :log         !NM_NAME!: !NM_TIME!s [!NM_INT!ms]
+            )
+        )
+    )
+)
+call :log     使用最快镜像下载Node.js...
 if not exist "%TEMP%\node-installer.msi" (
-    curl.exe -L -o "%TEMP%\node-installer.msi" https://nodejs.org/dist/%NODE_VERSION%/node-%NODE_VERSION%-x64.msi
+    curl.exe -L -o "%TEMP%\node-installer.msi" "!ND_BEST_URL!"
 )
 
 if exist "%TEMP%\node-installer.msi" (

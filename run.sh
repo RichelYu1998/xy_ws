@@ -527,7 +527,29 @@ auto_install_python() {
                 log "[WARNING] 无法识别Linux包管理器，尝试下载独立Python..."
                 if [ "$(uname -m)" = "x86_64" ]; then
                     log "    下载Python standalone版本..."
-                    curl -fsSL https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.tar.xz -o /tmp/python.tar.xz || {
+                    log "    轮询最快Python镜像源..."
+                    PY_MIRRORS=(
+                        "https://mirrors.huaweicloud.com/python/3.11.9/python-3.11.9-amd64.tar.xz|华为云"
+                        "https://registry.npmmirror.com/-/binary/python/3.11.9/python-3.11.9-amd64.tar.xz|npmmirror"
+                        "https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.tar.xz|Python官方"
+                    )
+                    PY_BEST_URL="https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.tar.xz"
+                    PY_MIN_TIME=99999
+                    for m in "${PY_MIRRORS[@]}"; do
+                        m_name="${m##*|}"
+                        m_url="${m%|*}"
+                        m_time=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 2 --max-time 3 "$m_url" 2>/dev/null)
+                        if [ -n "$m_time" ] && [ "$m_time" != "0" ]; then
+                            m_ms=$(echo "$m_time" | awk '{printf "%d", $1*1000}')
+                            log "        $m_name: ${m_ms}ms"
+                            if [ "$m_ms" -lt "$PY_MIN_TIME" ]; then
+                                PY_MIN_TIME=$m_ms
+                                PY_BEST_URL="$m_url"
+                            fi
+                        fi
+                    done
+                    log "    使用最快镜像下载Python..."
+                    curl -fsSL "$PY_BEST_URL" -o /tmp/python.tar.xz || {
                         log "[ERROR] Python下载失败，请手动安装: https://www.python.org/downloads/"
                         return 1
                     }
@@ -615,15 +637,72 @@ auto_install_node() {
         Linux)
             if command -v apt-get &> /dev/null; then
                 log "    使用apt+nodesource安装Node.js..."
-                curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+                log "    轮询最快NodeSource镜像..."
+                NS_MIRRORS=(
+                    "https://mirrors.tuna.tsinghua.edu.cn/nodesource/deb/setup_lts.x|清华"
+                    "https://deb.nodesource.com/setup_lts.x|NodeSource官方"
+                )
+                NS_BEST_URL="https://deb.nodesource.com/setup_lts.x"
+                NS_MIN_TIME=99999
+                for m in "${NS_MIRRORS[@]}"; do
+                    m_name="${m##*|}"
+                    m_url="${m%|*}"
+                    m_time=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 2 --max-time 3 "$m_url" 2>/dev/null)
+                    if [ -n "$m_time" ] && [ "$m_time" != "0" ]; then
+                        m_ms=$(echo "$m_time" | awk '{printf "%d", $1*1000}')
+                        if [ "$m_ms" -lt "$NS_MIN_TIME" ]; then
+                            NS_MIN_TIME=$m_ms
+                            NS_BEST_URL="$m_url"
+                        fi
+                    fi
+                done
+                curl -fsSL "$NS_BEST_URL" | sudo -E bash -
                 sudo apt-get install -y nodejs
             elif command -v yum &> /dev/null; then
                 log "    使用yum+nodesource安装Node.js..."
-                curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+                log "    轮询最快NodeSource RPM镜像..."
+                NSR_MIRRORS=(
+                    "https://mirrors.tuna.tsinghua.edu.cn/nodesource/rpm/setup_lts.x|清华"
+                    "https://rpm.nodesource.com/setup_lts.x|NodeSource官方"
+                )
+                NSR_BEST_URL="https://rpm.nodesource.com/setup_lts.x"
+                NSR_MIN_TIME=99999
+                for m in "${NSR_MIRRORS[@]}"; do
+                    m_name="${m##*|}"
+                    m_url="${m%|*}"
+                    m_time=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 2 --max-time 3 "$m_url" 2>/dev/null)
+                    if [ -n "$m_time" ] && [ "$m_time" != "0" ]; then
+                        m_ms=$(echo "$m_time" | awk '{printf "%d", $1*1000}')
+                        if [ "$m_ms" -lt "$NSR_MIN_TIME" ]; then
+                            NSR_MIN_TIME=$m_ms
+                            NSR_BEST_URL="$m_url"
+                        fi
+                    fi
+                done
+                curl -fsSL "$NSR_BEST_URL" | sudo bash -
                 sudo yum install -y nodejs
             elif command -v dnf &> /dev/null; then
                 log "    使用dnf+nodesource安装Node.js..."
-                curl -fsSL https://rpm.nodesource.com/setup_lts.x | sudo bash -
+                log "    轮询最快NodeSource RPM镜像..."
+                NSR_MIRRORS=(
+                    "https://mirrors.tuna.tsinghua.edu.cn/nodesource/rpm/setup_lts.x|清华"
+                    "https://rpm.nodesource.com/setup_lts.x|NodeSource官方"
+                )
+                NSR_BEST_URL="https://rpm.nodesource.com/setup_lts.x"
+                NSR_MIN_TIME=99999
+                for m in "${NSR_MIRRORS[@]}"; do
+                    m_name="${m##*|}"
+                    m_url="${m%|*}"
+                    m_time=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 2 --max-time 3 "$m_url" 2>/dev/null)
+                    if [ -n "$m_time" ] && [ "$m_time" != "0" ]; then
+                        m_ms=$(echo "$m_time" | awk '{printf "%d", $1*1000}')
+                        if [ "$m_ms" -lt "$NSR_MIN_TIME" ]; then
+                            NSR_MIN_TIME=$m_ms
+                            NSR_BEST_URL="$m_url"
+                        fi
+                    fi
+                done
+                curl -fsSL "$NSR_BEST_URL" | sudo bash -
                 sudo dnf install -y nodejs
             elif command -v pacman &> /dev/null; then
                 log "    使用pacman安装Node.js..."
