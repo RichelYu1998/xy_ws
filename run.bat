@@ -69,8 +69,48 @@ if errorlevel 1 (
     exit /b 1
 )
 
+where git >nul 2>&1
+if errorlevel 1 (
+    echo [*] 未找到 Git，正在自动安装...
+    call :auto_install_git
+    where git >nul 2>&1
+    if errorlevel 1 (
+        echo [ERROR] Git 安装失败，请手动安装: https://git-scm.com/download/win
+        exit /b 1
+    )
+    echo [*] Git 安装成功
+)
+
 echo [*] 前置条件检查通过
 exit /b 0
+
+:auto_install_git
+where winget >nul 2>&1
+if not errorlevel 1 (
+    echo     使用 Winget 安装 Git...
+    winget install Git.Git --accept-package-agreements --accept-source-agreements --silent >nul 2>&1
+    if not errorlevel 1 exit /b 0
+)
+
+where choco >nul 2>&1
+if not errorlevel 1 (
+    echo     使用 Chocolatey 安装 Git...
+    choco install git -y >nul 2>&1
+    if not errorlevel 1 exit /b 0
+)
+
+echo     直接下载并安装 Git...
+set "GIT_VERSION=2.47.1"
+if not exist "%TEMP%\git-installer.exe" (
+    curl.exe -L -o "%TEMP%\git-installer.exe" https://github.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe 2>nul
+)
+if exist "%TEMP%\git-installer.exe" (
+    "%TEMP%\git-installer.exe" /VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /COMPONENTS="assoc,assoc_sh" /PATHOPTION=NO >nul 2>&1
+    set "PATH=%PATH%;C:\Program Files\Git\cmd"
+    del "%TEMP%\git-installer.exe" 2>nul
+    exit /b 0
+)
+exit /b 1
 
 :ms_timestamp
 set "TIMESTAMP="

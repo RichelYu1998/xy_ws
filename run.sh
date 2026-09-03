@@ -86,6 +86,47 @@ check_prerequisites() {
         fi
         log "[✅] curl 安装成功"
     fi
+
+    if ! command -v git &> /dev/null; then
+        log "[*] 未检测到git，正在自动安装..."
+        case "$(uname -s)" in
+            Darwin)
+                if command -v brew &> /dev/null; then
+                    brew install git
+                elif [ -f "/opt/homebrew/bin/brew" ]; then
+                    /opt/homebrew/bin/brew install git
+                elif [ -f "/usr/local/bin/brew" ]; then
+                    /usr/local/bin/brew install git
+                else
+                    xcode-select --install 2>/dev/null || true
+                fi
+                ;;
+            Linux)
+                if command -v apt-get &> /dev/null; then
+                    sudo apt-get update && sudo apt-get install -y git
+                elif command -v yum &> /dev/null; then
+                    sudo yum install -y git
+                elif command -v dnf &> /dev/null; then
+                    sudo dnf install -y git
+                elif command -v pacman &> /dev/null; then
+                    sudo pacman -Syu --noconfirm git
+                else
+                    log "[ERROR] 无法自动安装git，请手动安装"
+                    return 1
+                fi
+                ;;
+            *)
+                log "[ERROR] 不支持的操作系统，无法自动安装git"
+                return 1
+                ;;
+        esac
+
+        if ! command -v git &> /dev/null; then
+            log "[ERROR] git 安装失败，请手动安装"
+            return 1
+        fi
+        log "[✅] git 安装成功"
+    fi
     
     log "[*] 前置条件检查通过"
     return 0
