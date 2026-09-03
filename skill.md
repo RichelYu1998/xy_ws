@@ -1,11 +1,11 @@
-﻿### v5.0.9.35 (2026-09-03) - 🖥️ **范式新增** PY-CORE-029 CMD窗口输出与web_output.log一致性范式
+### v5.0.9.35 (2026-09-03) - 🖥️ **范式新增** PY-CORE-029 CMD窗口输出与web_output.log一致性范式
 
 #### 更新内容: ①新增PY-CORE-029范式定义CMD窗口输出必须与web_output.log逐行一致 ②定义7类禁止出现的窗口噪音输出(命令回显/子程序调用/条件判断/循环展开/WMIC输出/编码设置回显/BOM错误) ③定义标准输出格式[YYYY-MM-DD HH:MM:SS.mmm]消息内容 ④定义消息前缀规范([*]/[1/N]/[WARNING]/[ERROR]) ⑤定义一致性验证检查清单(8项) ⑥定义run.bat和run.sh技术实现规范 ⑦同步更新README.md/skill.md/skill.docx三方一致
 
 **修复日期**: 2026-09-03
 **修复类型**: 📝范式定义 + 🖥️输出规范
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: (待提交)
+**Commit**: 32b340f0
 **变更统计**: +200行 -0行
 **作者**: 小旭二手机（西园路）**
 
@@ -37,7 +37,7 @@
 **修复日期**: 2026-09-02
 **修复类型**: 🔗功能增强 + 🐛Bug修复
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: (待提交)
+**Commit**: a6f10593
 **变更统计**: +15行 -45行
 **作者**: 小旭二手机（西园路）**
 
@@ -1477,7 +1477,7 @@ if exist "README.md" (
 **修复日期**: 2026-08-31
 **修复类型**: Bug修复
 **影响文件**: [main.py](main.py#L2206-L2236), [README.md](README.md#L129)
-**Commit**: 待提交
+**Commit**: 63770658
 **变更统计**: main.py +30行修改, README.md +15行修改
 **作者**: 小旭二手机（西园路）
 
@@ -23706,7 +23706,7 @@ git filter-branch --msg-filter 'sed "s/fix:/v5.0.7/"'
 - API返回 changes: [] 空数组
 - 前端展示缺少关键信息
 - 用户无法了解具体修复内容
-- **禁止占位符**：所有字段必须填写真实数据，严禁使用"待补充"占位符。Commit必须用git log按版本号匹配的真实hash，变更统计必须用git diff --shortstat获取真实行数
+- **禁止占位符**：所有字段必须填写真实数据，严禁使用“待补充”/“待提交”/“(待提交)”等占位符。Commit必须用git log按版本号匹配的真实8位hash（如32b340f0），变更统计必须用git diff --shortstat获取真实行数
 
 ---
 
@@ -23757,7 +23757,7 @@ git filter-branch --msg-filter 'sed "s/fix:/v5.0.7/"'
 | **修复日期** | YYYY-MM-DD | "2026-09-02" | ✅ 是 |
 | **修复类型** | emoji + 类型标签 | "🧠功能增强", "🐛Bug修复" | ✅ 是 |
 | **影响文件** | Markdown链接格式 | "[main.py](main.py), [skill.md](skill.md)" | ✅ 是 |
-| **Commit** | 8位短hash | "6c09b2b3" | ✅ 是 |
+| **Commit** | 8位短hash（禁止“待提交”/“待补充”占位符） | "6c09b2b3" | ✅ 是 |
 | **变更统计** | Git numstat格式 | "+23行 -1行"（必须真实，禁止"待补充"） | ✅ 是 |
 | **作者** | 统一格式 | "小旭二手机（西园路）" | ✅ 是 |
 
@@ -23920,7 +23920,7 @@ git filter-branch --msg-filter 'sed "s/fix:/v5.0.7/"'
 - [ ] **测试验证可复现**：每项验证都能独立执行并得到明确结果
 - [ ] **参考位置可点击**：所有路径必须是Markdown链接格式
 - [ ] **类型标签一致性**：同一变更的类型标签在头部和详情块保持一致
-- [ ] **禁止占位符**：所有字段必须填写真实数据，禁止使用"待补充"占位符（Commit用git log按版本号匹配获取，变更统计用git diff --shortstat获取）
+- [ ] **禁止占位符**：所有字段必须填写真实数据，禁止使用“待补充”/“待提交”/“(待提交)”占位符（Commit必须用git log按版本号匹配获取真实8位hash，变更统计用git diff --shortstat获取）
 - [ ] **序号连续性**：多个changes块时序号从1开始连续递增
 
 ---
