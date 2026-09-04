@@ -342,6 +342,25 @@ class SecurityAuditor:
             ]
         }
 
+        # 白名单：排除已知必要的print语句（业务输出，非调试残留）
+        print_whitelist = {
+            'main.py': [
+                5728,    # 数据保存提示: print(f'数据已保存到 ...')
+                5729,    # 总商品数统计: print(f'成功获取 ... 个商品')
+                5730,    # 高价商品统计: print(f'售价 >= 599 的商品 ...')
+                5731,    # 预计售价统计: print(f'预计售出价格累计 ...')
+                5732,    # 平均售价统计: print(f'平均每个设备售出均价 ...')
+                5733,    # 手续费统计: print(f'闲鱼平台手续费累计 ...')
+                5735,    # 变更摘要输出: print(f'{change_summary}')
+            ]
+        }
+
+        def is_whitelisted_print(filename, line_num, line_content):
+            """检查是否是白名单中的必要print语句"""
+            if filename not in print_whitelist:
+                return False
+            return line_num in print_whitelist[filename]
+
         files_to_scan = [
             'main.py', 'dist/app.js', 'index.html', 'dist/index.html'
         ]
@@ -359,6 +378,9 @@ class SecurityAuditor:
                 for severity, patterns in bug_patterns.items():
                     for pattern, desc in patterns:
                         if re.search(pattern, line, re.IGNORECASE):
+                            # 排除白名单中的必要print语句
+                            if desc == '生产环境print调试残留' and is_whitelisted_print(filename, line_num, line):
+                                continue
                             self._add_issue(SecurityIssue(
                                 severity=severity,
                                 category='HiddenBug',

@@ -54,7 +54,7 @@ python main.py --web
 
 ### v5.0.9.43 (2026-09-04) - 🐛 **Bug修复** - 爬虫统计卡片显示问题修复(logger.debug→logger.info确保关键统计数据正常输出)+安全审计新增日志级别最佳实践自动检测功能
 
-#### 更新内容: ①定位并修复爬虫执行结果统计卡片不显示的Bug(根本原因:logger.info()不走stdout导致subprocess无法捕获输出→tasks[task_id]['output']为空→前端hasSpiderStats=false→showComparisonCard未调用):main.py第5727-5736行将6个logger.info()/logger.debug()改为print()(确保输出到sys.stdout被子进程正确捕获) ②test/security_audit.py重构_scan_logging_best_practices()为输出方式最佳实践审计(检测logger/debug/info误用print场景-CRITICAL/HIGH/MEDIUM三级规则,类别从LoggingBestPractice改为OutputMethodBestPractice) ③更新scan_all()扫描流程从7项扩展到8项(新增第5项:输出方式最佳实践审计) ④验证修复效果:运行security_audit.py --quick确认0个CRITICAL/HIGH问题,爬虫统计卡片可正常显示总商品数/高价商品/预计售出总价/平均售价/平台手续费 ⑤修复skill.md文档头部缺失问题:添加完整的文档标题/项目概述/编码标准/文档导航/快速启动等章节(解决文件直接从版本记录开始导致用户无法了解项目全貌的问题) ⑥三方文档同步更新(README+skill+skill.docx)确保100%一致
+#### 更新内容: ①定位并修复爬虫执行结果统计卡片不显示的Bug(根本原因:logger.info()不走stdout导致subprocess无法捕获输出→tasks[task_id]['output']为空→前端hasSpiderStats=false→showComparisonCard未调用):main.py第5727-5736行将6个logger.info()/logger.debug()改为print()(确保输出到sys.stdout被子进程正确捕获) ②test/security_audit.py重构_scan_logging_best_practices()为输出方式最佳实践审计(检测logger/debug/info误用print场景-CRITICAL/HIGH/MEDIUM三级规则,类别从LoggingBestPractice改为OutputMethodBestPractice) ③修复HiddenBug扫描误报问题:_scan_hidden_bugs()将所有print()标记为"生产环境print调试残留"→添加print白名单机制排除main.py第5728-5735行的7个必要业务输出语句(数据保存/总商品数/高价商品/预计售价/平均售价/平台手续费/变更摘要) ④更新scan_all()扫描流程从7项扩展到8项(新增第5项:输出方式最佳实践审计) ⑤验证修复效果:运行security_audit.py --quick确认总计0个问题(所有级别均为0),爬虫统计卡片可正常显示总商品数/高价商品/预计售出总价/平均售价/平台手续费 ⑥修复skill.md文档头部缺失问题:添加完整的文档标题/项目概述/编码标准/文档导航/快速启动等章节(解决文件直接从版本记录开始导致用户无法了解项目全貌的问题) ⑦三方文档同步更新(README+skill+skill.docx)确保100%一致
 
 **修复日期**: 2026-09-04
 **修复类型**: 🐛Bug修复 + 🔒安全增强 + 📝文档规范化
