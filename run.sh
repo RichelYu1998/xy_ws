@@ -1,4 +1,6 @@
 #!/bin/bash
+export LANG="zh_CN.UTF-8"
+export LC_ALL="zh_CN.UTF-8"
 cd "$(dirname "$0")"
 
 :: 自动检测并请求sudo权限（如果需要）
@@ -22,7 +24,11 @@ LOG_FILE="$(pwd)/file/web_output.log"
 
 log() {
     local timestamp
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    else
+        timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
+    fi
     echo "[$timestamp] $*"
     [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$timestamp] $*" >> "$LOG_FILE" 2>/dev/null
 }
@@ -34,8 +40,16 @@ log_blank() {
 
 log_console_only() {
     local timestamp
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    else
+        timestamp=$(date '+%Y-%m-%d %H:%M:%S.%3N' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S')
+    fi
     echo "[$timestamp] $*"
+}
+
+log_blank_console_only() {
+    echo ""
 }
 
 check_prerequisites() {
@@ -211,12 +225,14 @@ wait_for_port() {
             break
         fi
         count=$((count + 1))
-        log "[*] 端口$port仍被占用，等待释放... ($count/$max_wait)"
+        printf -v msg "[*] 端口%s仍被占用，等待释放... (%d/%d)" "$port" "$count" "$max_wait"
+        log "$msg"
         sleep 1
     done
     
     if [ $count -ge $max_wait ]; then
-        log "[WARNING] 端口$port等待超时，强制清理..."
+        printf -v msg "[WARNING] 端口%s等待超时，强制清理..." "$port"
+        log "$msg"
         lsof -t -i :$port -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true
         sleep 1
     fi
@@ -232,12 +248,15 @@ cleanup_temp_dir() {
         
         if [ -n "$size_kb" ] && [ "$size_kb" -gt "$max_size_kb" ]; then
             rm -rf "${dir_name:?}"/*
-            log "[*] $dir_name目录超过限制，已清理"
+            printf -v msg "[*] %s目录超过限制，已清理" "$dir_name"
+            log "$msg"
         else
-            log "[*] $dir_name目录未超过限制，跳过清理"
+            printf -v msg "[*] %s目录未超过限制，跳过清理" "$dir_name"
+            log "$msg"
         fi
     else
-        log "[*] $dir_name目录不存在，跳过"
+        printf -v msg "[*] %s目录不存在，跳过" "$dir_name"
+        log "$msg"
     fi
 }
 
@@ -1182,7 +1201,8 @@ run_web() {
 
     WEB_PORT="${WEB_PORT:-8888}"
     if ! [[ "$WEB_PORT" =~ ^[0-9]+$ ]] || [ "$WEB_PORT" -lt 1 ] || [ "$WEB_PORT" -gt 65535 ]; then
-        log "[WARNING] 端口 $WEB_PORT 无效，使用默认端口 8888"
+        printf -v msg "[WARNING] 端口 %s 无效，使用默认端口 8888" "$WEB_PORT"
+        log "$msg"
         WEB_PORT=8888
     fi
     log "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ==="
@@ -1301,6 +1321,3 @@ trap cleanup_exit INT TERM EXIT
 
 pre_launch
 main
-
-
-

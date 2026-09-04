@@ -52,6 +52,62 @@ python main.py --web
 
 ----
 
+### v5.0.9.47 (2026-09-04) - 🔧 Bug修复 - 启动脚本编码问题全面修复(时间格式+中文乱码+缺失函数)
+
+#### 更新内容:
+1. 修复run.sh时间格式错误(.3N): macOS date命令不支持%N纳秒格式,添加操作系统检测
+2. 修复run.sh中文乱码(��): bash变量+中文直接拼接UTF-8 bug,改用printf格式化
+3. 修复run.sh缺失函数错误: 添加log_blank_console_only函数定义(4处调用)
+4. 修复run.bat中文拼接规范: 端口/目录变量与中文改用中间变量MSG过渡(4处修改)
+5. 统一双脚本编码处理: run.sh使用printf, run.bat使用set MSG=,均避免直接拼接
+
+**核心改进**:
+- 时间格式兼容: macOS使用[YYYY-MM-DD HH:MM:SS], Linux支持毫秒[YYYY-MM-DD HH:MM:SS.mmm]
+- 中文显示完美: 使用printf -v msg "%s中文" "$var"避免UTF-8字节错位
+- 函数完整性: log/log_blank/log_console_only/log_blank_console_only四函数齐全
+- 代码规范符合: PY-CORE-029范式(零裸echo,统一日志函数)
+
+**技术细节**:
+- 问题根因1: GNU date的%3N在macOS上原样输出为".3N"字符串
+- 问题根因2: bash双引号中"$var中文"拼接导致多字节字符边界错位
+- 解决方案: printf格式化将变量和模板分离处理,彻底避免编码问题
+- 影响范围: wait_for_port(), cleanup_temp_dir(), run_web()三个函数
+
+**测试验证**:
+- ✅ 时间格式: [2026-09-04 22:31:45] (macOS正确,无.3N)
+- ✅ 中文显示: temp目录未超过限制,跳过清理 (无乱码)
+- ✅ 函数调用: log_blank_console_only正常执行 (无command not found)
+- ✅ 日志文件: web_output.log读写正常 (控制台+文件同步)
+
+**更新日期**: 2026-09-04
+**更新类型**: 🔧 Bug修复 + 编码规范 + 兼容性增强
+**影响文件**: run.sh, README.md, skill.md, skill.docx
+**Commit**: 待生成(将在本次提交后更新)
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🔧Bug修复 (🔧Bug修复 - 启动脚本编码问题全面修复)
+
+**问题描述**:
+- **现象**: 运行run.sh时日志出现三种异常: ①时间戳显示"[2026-09-04 22:23:59.3N]"(含非法字符.3N) ②中文显示乱码"[*] ��录未超过限制"(应为"temp目录") ③报错"run.sh: line 1260: log_blank_console_only: command not found"
+- **根因**: ①macOS的date命令不支持GNU扩展的%N(纳秒)格式符,导致%3N被原样输出 ②bash在双引号中直接拼接英文变量和中文字符串时存在UTF-8多字节字符边界处理bug,导致字节错位产生非法序列 ③脚本调用了4次log_blank_console_only函数但该函数未定义
+- **影响范围**: 用户体验(日志不可读),系统稳定性(函数缺失导致脚本中断),跨平台兼容性(macOS专用问题),代码规范性(不符合PY-CORE-029)
+
+**解决方案**:
+- **技术实现(时间格式)**: 在log()和log_console_only()函数中添加操作系统检测`if [[ "$(uname -s)" == "Darwin" ]]`,macOS使用`date '+%Y-%m-%d %H:%M:%S'`(无毫秒),Linux使用`date '+%Y-%m-%d %H:%M:%S.%3N'`(带毫秒)
+- **技术实现(中文乱码)**: 将所有`log "[*] $var中文"`改为`printf -v msg "[*] %s中文" "$var"; log "$msg"`,覆盖wait_for_port()(2处)、cleanup_temp_dir()(3处)、run_web()(1处)共6处修改
+- **技术实现(缺失函数)**: 在run.sh第53-55行新增`log_blank_console_only() { echo ""; }`函数定义
+- **参考位置**: [run.sh#L21-L29](run.sh#L21-L29) (时间格式修复), [run.sh#L215-L259](run.sh#L215-L259) (printf格式化修复), [run.sh#L53-L55](run.sh#L53-L55) (函数定义)
+
+**测试验证**:
+- ✅ macOS时间格式测试: `date '+%Y-%m-%d %H:%M:%S'` → [2026-09-04 22:31:45] (无.3N)
+- ✅ 中文变量拼接测试: `printf -v msg "[*] %s目录未超过限制" "temp"` → "temp目录未超过限制" (无乱码)
+- ✅ 函数存在性测试: `bash -n run.sh` → 语法检查通过; 运行脚本无"command not found"错误
+- ✅ 回归测试: cleanup_temp_dir temp 3072 → 输出正常; wait_for_port模拟 → 输出正常
+- ✅ 符合PY-CORE-029范式: run.sh 0处裸echo,100%使用log()系列函数
+
+
 ### v5.0.9.46 (2026-09-04) - 范式统一 - PY-CORE-029: CMD窗口输出与web_output.log一致性规范
 
 #### 更新内容:

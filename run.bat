@@ -333,17 +333,19 @@ set "MAX_WAIT=%~2"
 set "WAIT_COUNT=0"
 
 :port_wait_loop
-if %WAIT_COUNT% geq %MAX_WAIT goto port_wait_done
+if %WAIT_COUNT% geq %MAX_WAIT% goto port_wait_done
 netstat -ano | findstr ":%WAIT_PORT%.*LISTENING" >nul 2>&1
 if errorlevel 1 goto port_wait_done
 set /a WAIT_COUNT+=1
-call :log [*] 端口%WAIT_PORT%仍被占用，等待释放... (%WAIT_COUNT%/%MAX_WAIT%)
+set "MSG=[*] 端口%WAIT_PORT%仍被占用，等待释放... (%WAIT_COUNT%/%MAX_WAIT%)"
+call :log %MSG%
 ping -n 2 127.0.0.1 >nul 2>&1
 goto port_wait_loop
 
 :port_wait_done
 if %WAIT_COUNT% geq %MAX_WAIT% (
-    call :log [WARNING] 端口%WAIT_PORT%等待超时，强制清理...
+    set "MSG=[WARNING] 端口%WAIT_PORT%等待超时，强制清理..."
+    call :log %MSG%
     for /f "tokens=6" %%p in ('netstat -ano ^| findstr ":%WAIT_PORT%.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
     ping -n 2 127.0.0.1 >nul 2>&1
 )
@@ -356,12 +358,15 @@ if exist "%DIR_NAME%" (
     for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path \'%DIR_NAME%\' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum" 2^>nul') do set "DIR_SIZE=%%a"
     if defined DIR_SIZE if !DIR_SIZE! gtr %MAX_SIZE% (
         del /f /s /q "%DIR_NAME%\*.*" >nul 2>&1
-        call :log [*] %DIR_NAME%目录超过限制，已清理
+        set "MSG=[*] %DIR_NAME%目录超过限制，已清理"
+        call :log %MSG%
     ) else (
-        call :log [*] %DIR_NAME%目录未超过限制，跳过清理
+        set "MSG=[*] %DIR_NAME%目录未超过限制，跳过清理"
+        call :log %MSG%
     )
 ) else (
-    call :log [*] %DIR_NAME%目录不存在，跳过
+    set "MSG=[*] %DIR_NAME%目录不存在，跳过"
+    call :log %MSG%
 )
 exit /b
 
@@ -1082,5 +1087,3 @@ call :kill_process_safe python.exe main.py
 call :kill_process_safe hostc.exe
 call :log 清理完成
 goto :eof
-
-
