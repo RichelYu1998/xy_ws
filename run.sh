@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 cd "$(dirname "$0")"
 
 :: 自动检测并请求sudo权限（如果需要）
