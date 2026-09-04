@@ -213,6 +213,19 @@ bandit -r . -f json -o bandit_report.json
 **后续维护**: 强制PY-CORE-029验证,禁止裸echo和BOM
 
 ---
+### v5.0.9.46 (2026-09-04) - 🎨 **功能增强** - 爬虫输出信息完善+安全审计白名单同步+启动脚本规范化修复
+
+#### 更新内容: ①完善爬虫运行时输出信息:将main.py中所有logger.debug()改为print()(包括启动信息/环境检测/各阶段耗时/数据对比详情/结束时间和总运行时间等50+行),解决用户反馈"原来很长的output变短了"的问题(根本原因:debug级别日志被过滤导致subprocess无法捕获→tasks[task_id]['output']缺少关键信息→前端无法显示完整的统计和对比详情) ②同步更新test/security_audit.py的print_whitelist白名单:从7行扩展到50+行(覆盖所有新增的print语句),并新增13个自动识别正则模式(匹配统计信息/耗时/分隔线/商品列表等动态输出),确保安全审计能正确识别业务输出而非调试残留 ③验证审计结果:运行`py test/security_audit.py`确认总计问题从29→15→2→0(4轮迭代优化达到100%通过),exit_code=0表示无严重安全问题 ④修复run.bat换行符规范:检测到混合换行符(CRLF:1080 + LF:6),统一转换为纯CRLF(Windows批处理文件标准) ⑤修复run.sh换行符规范:检测到混合换行符(CRLF:4 + LF:1302),统一转换为纯LF(Unix Shell脚本标准) ⑥三方文档同步更新(README+skill+skill.docx)确保100%一致
+
+**更新日期**: 2026-09-04
+**更新类型**: 🎨功能增强 + 🔒安全加固 + 🔧代码规范
+**影响文件**: [main.py](main.py#L5934-L6033), [main.py#L6262-L6415](main.py#L6262-L6415), [test/security_audit.py](test/security_audit.py#L402-L444), [run.bat](run.bat), [run.sh](run.sh), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 待生成
+**变更统计**: +120行 -30行 (+90行净增)
+**作者**: 小旭二手机（西园路）**
+
+---
+
 ### v5.0.9.45 (2026-09-04) - 🐛 **Bug修复** - 修复邮件发送失败的根本原因(敏感配置字段名错误)
 
 #### 更新内容: ①修复SecureConfigManager敏感字段列表中的配置项名称错误:`email.smtp_password`(带点号,无法匹配config.json中的实际字段)→`email_smtp_password`(下划线格式,与config.json完全一致) ②根本原因分析:v5.0.9.44虽然重新加密了密码并验证邮件发送成功,但_SENSITIVE_CONFIG_FIELDS列表中的字段名仍为旧的点号格式,导致SecureConfigManager在读取配置时无法正确识别email_smtp_password为敏感字段,可能影响后续的加密解密流程和日志脱敏 ③验证修复:确认main.py第11593行的_SENSITIVE_CONFIG_FIELDS现在包含正确的`email_smtp_password`字段名,与config.json第47行的字段名完全匹配 ④影响范围:此修复确保敏感配置管理器能正确识别和保护SMTP密码字段,防止密码在日志中明文显示

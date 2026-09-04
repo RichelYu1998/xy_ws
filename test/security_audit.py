@@ -231,6 +231,17 @@ class SecurityAuditor:
             r'\[INTENTIONAL_IMPLEMENTATION\]',
             r'BLOCKED_HOSTNAMES|SENSITIVE_PORTS|SSRF',
             r'allow_localhost|block_private',
+            # ===== 爬虫业务输出（print）自动识别 =====
+            r"print\(f?'(数据已保存到|成功获取|售价.*>=.*599|预计售出价格累计|平均每个设备售出均价|闲鱼平台手续费累计)",
+            r"print\(f?'(Szwego商品爬虫|当前系统:|Python版本:|开始时间:|结束时间:|总运行时间)",
+            r"print\('(开始运行|正在启动浏览器|检测到系统:|使用系统Chrome|使用Playwright内置Chromium)",
+            r"print\(f'.*耗时:.*秒'",
+            r"print\(f?'(当天JSON文件对比工具|从.*JSON文件中读取到|对比差异已追加到|当前共有.*条对比记录)",
+            r"print\('(对比结果|对比文件:|新增商品数:|删除商品数:|新增高价商品数:)",
+            r"print\('(\n?新增的商品:|\n?删除的商品:|\n?新增的售价>=599的商品:)",
+            r"print\(f'  \d+\. ",  # 商品列表项（带编号）
+            r"print\('='*\d+\+?'\)",  # 分隔线
+            r"print\(f?'(注意：缓存文件|提示：下次运行|Cookie已保存到|已加载.*个Cookie)",
         ]
         
         code_snippet = getattr(issue, 'code_snippet', '') or ''
@@ -345,13 +356,89 @@ class SecurityAuditor:
         # 白名单：排除已知必要的print语句（业务输出，非调试残留）
         print_whitelist = {
             'main.py': [
-                5728,    # 数据保存提示: print(f'数据已保存到 ...')
-                5729,    # 总商品数统计: print(f'成功获取 ... 个商品')
-                5730,    # 高价商品统计: print(f'售价 >= 599 的商品 ...')
-                5731,    # 预计售价统计: print(f'预计售出价格累计 ...')
-                5732,    # 平均售价统计: print(f'平均每个设备售出均价 ...')
-                5733,    # 手续费统计: print(f'闲鱼平台手续费累计 ...')
-                5735,    # 变更摘要输出: print(f'{change_summary}')
+                # ===== 爬虫核心统计信息 =====
+                5920,    # 数据保存提示: print(f'数据已保存到 {new_filename}')
+                5921,    # 总商品数统计: print(f'成功获取 {total_count} 个商品')
+                5922,    # 高价商品统计: print(f'售价 >= 599 的商品: {high_price_count} 个')
+                5923,    # 预计售价统计: print(f'预计售出价格累计: ¥{total_sell_price:,.2f}')
+                5924,    # 平均售价统计: print(f'平均每个设备售出均价: ¥{avg_sell_price:,.2f}')
+                5925,    # 手续费统计: print(f'闲鱼平台手续费累计: ¥{total_platform_fee:,.2f}')
+
+                # ===== 爬虫运行信息（启动） =====
+                5937,    # 版本信息: print(f'Szwego商品爬虫 - v{VERSION}')
+                5938,    # 系统信息: print(f'当前系统: {self.get_system_info()}')
+                5939,    # Python版本: print(f'Python版本: {platform.python_version()}')
+                5940,    # 开始时间: print(f'开始时间: {start_datetime.strftime(...)}')
+                5942,    # 运行状态: print('开始运行...')
+                5946,    # 浏览器启动: print('正在启动浏览器...')
+
+                # ===== 环境检测与耗时 =====
+                5952,    # 系统检测: print(f'检测到系统: {system}')
+                5954,    # Chrome路径: print(f'使用系统Chrome: {chrome_path}')
+                5956,    # Chromium备用: print(f'使用Playwright内置Chromium')
+                5961,    # 浏览器耗时: print(f'浏览器启动耗时: {...:.2f}秒')
+                5968,    # 上下文耗时: print(f'上下文创建耗时: {...:.2f}秒')
+                5975,    # Cookie加载: print(f'已加载 {len(cookies)} 个Cookie')
+                5977,    # Cookie耗时: print(f'Cookie加载耗时: {...:.2f}秒')
+                5981,    # 页面耗时: print(f'页面创建耗时: {...:.2f}秒')
+                5985,    # 数据获取耗时: print(f'数据获取耗时: {...:.2f}秒')
+                5990,    # 保存耗时: print(f'数据保存耗时: {...:.2f}秒')
+                5996,    # 对比耗时: print(f'对比耗时: {...:.2f}秒')
+
+                # ===== 运行结束信息 =====
+                6007,    # Cookie保存: print(f'Cookie已保存到 {cookie_file}')
+                6008,    # Cookie保存耗时: print(f'Cookie保存耗时: {...:.2f}秒')
+                6016,    # 关闭浏览器: print(f'浏览器关闭耗时: {...:.2f}秒')
+                6030,    # 结束时间: print(f'结束时间: {end_datetime.strftime(...)}')
+                6031,    # 总运行时间: print(f'总运行时间: {total_time:.2f} 秒 ({total_time/60:.2f} 分钟)')
+
+                # ===== 数据对比详情 =====
+                6262,    # 对比工具标题: print('当天JSON文件对比工具')
+                6304,    # 最新文件货号: print(f'从最新JSON文件中读取到 {len(latest_stock_numbers)} 个货号')
+                6305,    # 次新文件货号: print(f'从次新JSON文件中读取到 {len(second_stock_numbers)} 个货号\n')
+                6378,    # 对比记录数: print(f'当前共有 {len(latest_json_data["小计"])} 条对比记录')
+                6382,    # 对比结果标题: print('对比结果')
+                6384,    # 对比文件名: print(f'对比文件: {os.path.basename(second_latest_json_file)} -> ...')
+                6385,    # 新增数量: print(f'新增商品数: {len(added)}')
+                6386,    # 删除数量: print(f'删除商品数: {len(removed)}')
+                6387,    # 新增高价数量: print(f'新增高价商品数: {len(high_price_added)}')
+
+                # ===== 其他业务输出 =====
+                5927,    # 变更摘要: print(f'{change_summary}')
+                5936,    # 启动分隔线: print('='*50)
+                5941,    # 启动分隔线: print('='*50)
+                5993,    # 对比开始: print('\n开始自动对比当天JSON文件...')
+                6010,    # Cookie错误: print(f'⚠️  Cookie保存失败: {e}')
+                6011,    # 继续执行: print('继续执行，不影响数据获取...')
+                6018,    # 浏览器关闭错误: print(f'⚠️  浏览器关闭失败: {e}')
+                6029,    # 结束分隔线: print('='*50)
+                6032,    # 结束分隔线: print('='*50)
+
+                # ===== 数据对比工具的其他输出 =====
+                6261,    # 对比工具分隔线: print('='*50)
+                6263,    # 对比工具分隔线: print('='*50)
+                6268,    # 错误提示: print('无法获取最新的JSON文件')
+                6272,    # 提示信息: print('只找到一个JSON文件，无法进行对比')
+                6273,    # 当前文件: print(f'当前文件: {latest_json_file}')
+                6274,    # 提示信息: print('提示：运行爬虫后再次运行此功能即可进行对比')
+                6283,    # 错误提示: print('无法读取最新的JSON文件')
+                6289,    # 错误提示: print('无法读取次新的JSON文件')
+                6297,    # 错误提示: print('JSON文件中没有商品列表')
+
+                # ===== 对比结果详细输出 =====
+                6377,    # 对比差异提示: print(f'\n对比差异已追加到 {latest_json_file}')
+                6381,    # 对比结果分隔线: print('='*50)
+                6383,    # 对比结果标题: print('对比结果')
+                6388,    # 新增数量: print(f'新增商品数: {len(added)}')
+                6391,    # 删除数量: print(f'删除商品数: {len(removed)}')
+                6393,    # 新增高价数量: print(f'新增高价商品数: {len(high_price_added)}')
+                6396,    # 分隔线: print('='*60)
+                6398,    # 新增商品标题: print('\n新增的商品:')
+                6401,    # 删除商品标题: print('\n删除的商品:')
+                6403,    # 新增高价商品标题: print(f'\n新增的售价>=599的商品:')
+                6405,    # 结束分隔线: print('='*60 + '\n')
+
+                # ===== 商品列表项（循环内，通过正则自动识别） =====
             ]
         }
 

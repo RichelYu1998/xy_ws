@@ -5931,70 +5931,70 @@ class WegoScraper:
     async def run(self):
         start_time = time.time()
         start_datetime = datetime.now()
-        
+
         try:
-            logger.debug('='*50)
-            logger.debug(f'Szwego商品爬虫 - v{VERSION}')
-            logger.debug(f'当前系统: {self.get_system_info()}')
-            logger.debug(f'Python版本: {platform.python_version()}')
-            logger.debug(f'开始时间: {start_datetime.strftime("%Y-%m-%d %H:%M:%S")}')
-            logger.debug('='*50)
-            logger.debug('开始运行...')
-            
+            print('='*50)
+            print(f'Szwego商品爬虫 - v{VERSION}')
+            print(f'当前系统: {self.get_system_info()}')
+            print(f'Python版本: {platform.python_version()}')
+            print(f'开始时间: {start_datetime.strftime("%Y-%m-%d %H:%M:%S")}')
+            print('='*50)
+            print('开始运行...')
+
             browser_start = time.time()
             async with async_playwright() as p:
-                logger.debug('正在启动浏览器...')
+                print('正在启动浏览器...')
                 
                 system = self.get_system_info()
                 browser_args = self.get_browser_args()
                 chrome_path = self.get_chrome_path()
-                
-                logger.debug(f'检测到系统: {system}')
+
+                print(f'检测到系统: {system}')
                 if chrome_path:
-                    logger.debug(f'使用系统Chrome: {chrome_path}')
+                    print(f'使用系统Chrome: {chrome_path}')
                 else:
-                    logger.debug(f'使用Playwright内置Chromium')
-                
+                    print(f'使用Playwright内置Chromium')
+
                 browser = await Environment.launch_browser(
                     p, headless=False, args=browser_args, executable_path=chrome_path
                 )
-                logger.debug(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
-                
+                print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
+
                 context_start = time.time()
                 context = await browser.new_context(
                     viewport=Environment.get_default_viewport(),
                     user_agent=self.get_user_agent()
                 )
-                logger.debug(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
-                
+                print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
+
                 cookie_start = time.time()
                 cookie_file = self.config_manager.get_cookie_file()
                 if FileManager.file_exists(cookie_file):
                     cookies = FileManager.read_json(cookie_file)
                     if cookies:
-                        logger.debug(f'已加载 {len(cookies)} 个Cookie')
+                        print(f'已加载 {len(cookies)} 个Cookie')
                         await context.add_cookies(cookies)
-                logger.debug(f'Cookie加载耗时: {time.time() - cookie_start:.2f}秒')
-                
+                print(f'Cookie加载耗时: {time.time() - cookie_start:.2f}秒')
+
                 page_start = time.time()
                 page = await context.new_page()
-                logger.debug(f'页面创建耗时: {time.time() - page_start:.2f}秒')
-                
+                print(f'页面创建耗时: {time.time() - page_start:.2f}秒')
+
                 data_start = time.time()
                 products = await self.get_data_with_playwright(page)
-                logger.debug(f'数据获取耗时: {time.time() - data_start:.2f}秒')
+                print(f'数据获取耗时: {time.time() - data_start:.2f}秒')
                 
                 if products:
                     save_start = time.time()
                     self.save_data(products)
-                    logger.debug(f'数据保存耗时: {time.time() - save_start:.2f}秒')
-                    
+                    print(f'数据保存耗时: {time.time() - save_start:.2f}秒')
+
                     compare_start = time.time()
-                    logger.debug('\n开始自动对比当天JSON文件...')
+                    print('\n开始自动对比当天JSON文件...')
                     comparator = StockNumberComparator()
                     comparator.compare_json_files()
-                    logger.debug(f'对比耗时: {time.time() - compare_start:.2f}秒')
-                
+                    print(f'对比耗时: {time.time() - compare_start:.2f}秒')
+
                 save_cookie_start = time.time()
                 try:
                     cookies = await context.cookies()
@@ -6004,18 +6004,18 @@ class WegoScraper:
                         if cookie['domain'] == 'www.szwego.com':
                             cookie['domain'] = '.szwego.com'
                     FileManager.write_json(cookie_file, szwego_cookies)
-                    logger.debug(f'Cookie已保存到 {cookie_file}')
-                    logger.debug(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
+                    print(f'Cookie已保存到 {cookie_file}')
+                    print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
                 except Exception as e:  # [HANDLED]
-                    logger.debug(f'⚠️  Cookie保存失败: {e}')
-                    logger.debug('继续执行，不影响数据获取...')
-                
+                    print(f'⚠️  Cookie保存失败: {e}')
+                    print('继续执行，不影响数据获取...')
+
                 close_start = time.time()
                 try:
                     await browser.close()
-                    logger.debug(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
+                    print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
                 except Exception as e:  # [HANDLED]
-                    logger.debug(f'⚠️  浏览器关闭失败: {e}')
+                    print(f'⚠️  浏览器关闭失败: {e}')
                     logger.debug('浏览器可能已经关闭，继续执行...')
                 
         except Exception as e:  # [HANDLED]
@@ -6025,11 +6025,11 @@ class WegoScraper:
             end_time = time.time()
             end_datetime = datetime.now()
             total_time = end_time - start_time
-            
-            logger.debug('='*50)
-            logger.debug(f'结束时间: {end_datetime.strftime("%Y-%m-%d %H:%M:%S")}')
-            logger.debug(f'总运行时间: {total_time:.2f} 秒 ({total_time/60:.2f} 分钟)')
-            logger.debug('='*50)
+
+            print('='*50)
+            print(f'结束时间: {end_datetime.strftime("%Y-%m-%d %H:%M:%S")}')
+            print(f'总运行时间: {total_time:.2f} 秒 ({total_time/60:.2f} 分钟)')
+            print('='*50)
 
 
 class StockNumberComparator:
@@ -6258,51 +6258,51 @@ class StockNumberComparator:
         如果使用缓存文件，对比完成后会删除缓存文件
         """
         try:
-            print_separator()
-            logger.debug('当天JSON文件对比工具')
-            print_separator()
-            
+            print('='*50)
+            print('当天JSON文件对比工具')
+            print('='*50)
+
             # 获取用于对比的两个JSON文件
             latest_json_file, second_latest_json_file = FileManager.get_today_json_files()
             if not latest_json_file:
-                logger.debug('无法获取最新的JSON文件')
+                print('无法获取最新的JSON文件')
                 return False
-            
+
             if not second_latest_json_file:
-                logger.debug('只找到一个JSON文件，无法进行对比')
-                logger.debug(f'当前文件: {latest_json_file}')
-                logger.debug('提示：运行爬虫后再次运行此功能即可进行对比')
+                print('只找到一个JSON文件，无法进行对比')
+                print(f'当前文件: {latest_json_file}')
+                print('提示：运行爬虫后再次运行此功能即可进行对比')
                 return True
-            
+
             # 检查是否使用缓存文件
             is_cache_used = '_cache' in second_latest_json_file
-            
+
             # 读取最新的JSON文件
             latest_json_data = FileManager.read_json(latest_json_file)
             if not latest_json_data:
-                logger.debug('无法读取最新的JSON文件')
+                print('无法读取最新的JSON文件')
                 return False
-            
+
             # 读取次新的JSON文件
             second_json_data = FileManager.read_json(second_latest_json_file)
             if not second_json_data:
-                logger.debug('无法读取次新的JSON文件')
+                print('无法读取次新的JSON文件')
                 return False
-            
+
             # 提取商品列表
             latest_products = latest_json_data.get('商品列表', [])
             second_products = second_json_data.get('商品列表', [])
-            
+
             if not latest_products or not second_products:
-                logger.debug('JSON文件中没有商品列表')
+                print('JSON文件中没有商品列表')
                 return False
-            
+
             # 提取货号
             latest_stock_numbers = {item.get('货号', '') for item in latest_products if item.get('货号')}
             second_stock_numbers = {item.get('货号', '') for item in second_products if item.get('货号')}
-            
-            logger.debug(f'从最新JSON文件中读取到 {len(latest_stock_numbers)} 个货号')
-            logger.debug(f'从次新JSON文件中读取到 {len(second_stock_numbers)} 个货号\n')
+
+            print(f'从最新JSON文件中读取到 {len(latest_stock_numbers)} 个货号')
+            print(f'从次新JSON文件中读取到 {len(second_stock_numbers)} 个货号\n')
             
             # 计算差异
             added = latest_stock_numbers - second_stock_numbers
@@ -6374,41 +6374,41 @@ class StockNumberComparator:
             latest_json_data['小计'].sort(key=lambda x: x['timestamp'])
             
             FileManager.write_json(latest_json_file, latest_json_data)
-            logger.debug(f'\n对比差异已追加到 {latest_json_file}')
-            logger.debug(f'当前共有 {len(latest_json_data["小计"])} 条对比记录')
-            
+            print(f'\n对比差异已追加到 {latest_json_file}')
+            print(f'当前共有 {len(latest_json_data["小计"])} 条对比记录')
+
             # 打印对比结果
-            print_separator()
-            logger.debug('对比结果')
-            print_separator()
-            logger.debug(f'对比文件: {os.path.basename(second_latest_json_file)} -> {os.path.basename(latest_json_file)}')
-            logger.debug(f'新增商品数: {len(added)}')
-            logger.debug(f'删除商品数: {len(removed)}')
-            logger.debug(f'新增高价商品数: {len(high_price_added)}')
-            logger.debug('='*60)
-            
+            print('='*50)
+            print('对比结果')
+            print('='*50)
+            print(f'对比文件: {os.path.basename(second_latest_json_file)} -> {os.path.basename(latest_json_file)}')
+            print(f'新增商品数: {len(added)}')
+            print(f'删除商品数: {len(removed)}')
+            print(f'新增高价商品数: {len(high_price_added)}')
+            print('='*60)
+
             if added:
-                logger.debug('\n新增的商品:')
+                print('\n新增的商品:')
                 for i, num in enumerate(added, 1):
-                    logger.debug(f'  {i}. {num}')
-            
+                    print(f'  {i}. {num}')
+
             if removed:
-                logger.debug('\n删除的商品:')
+                print('\n删除的商品:')
                 for i, num in enumerate(removed, 1):
-                    logger.debug(f'  {i}. {num}')
-            
+                    print(f'  {i}. {num}')
+
             if high_price_added:
-                logger.debug(f'\n新增的售价>=599的商品:')
+                print(f'\n新增的售价>=599的商品:')
                 for i, num in enumerate(high_price_added, 1):
-                    logger.debug(f'  {i}. {num}')
-            
-            logger.debug('='*60 + '\n')
-            
+                    print(f'  {i}. {num}')
+
+            print('='*60 + '\n')
+
             # 不删除缓存文件，保留用于后续对比
             # 缓存文件会在下一次运行爬虫时被覆盖
             if is_cache_used:
-                logger.debug(f'注意：缓存文件 {second_latest_json_file} 已保留，用于后续对比')
-                logger.debug(f'提示：下次运行爬虫时会自动更新缓存文件')
+                print(f'注意：缓存文件 {second_latest_json_file} 已保留，用于后续对比')
+                print(f'提示：下次运行爬虫时会自动更新缓存文件')
             
             return True
         except Exception as e:  # [HANDLED]
