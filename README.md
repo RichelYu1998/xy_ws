@@ -1,4 +1,4 @@
-﻿#﻿# 微购相册管理系统 (WegoAlbum Manager)
+#﻿# 微购相册管理系统 (WegoAlbum Manager)
 
 > **⚙️ 编码标准**: 本项目所有文件（包括源代码、文档、配置文件等）**必须且仅使用 UTF-8 编码**。禁止使用任何其他编码格式（如 GBK、GB2312、Latin-1 等）。
 >
@@ -189,7 +189,28 @@ bandit -r . -f json -o bandit_report.json
 **更新类型**: 范式统一 + 文档完善 + 功能增强
 **影响文件**: run.bat, run.sh, README.md, skill.md, skill.docx
 **Commit**: 5a0be716
-**作者**: 小旭二手机（西园路）
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. PY-CORE-029范式实施 (范式统一 - Console-Log Consistency)
+
+**问题描述**:
+- **现象**: 运行run.bat时CMD窗口显示大量命令回显,与web_output.log的干净输出不一致
+- **根因**: ①run.bat文件带有UTF-8 BOM导致@echo off失效 ②97处裸echo ③run.sh有6处裸echo
+- **影响范围**: run.bat, run.sh, README.md, skill.md, skill.docx
+
+**修复方案**:
+- **技术实现(Batch)**: 移除BOM + 批量替换echo为call:log + 验证0处残留
+- **技术实现(Shell)**: 6处echo改为log() + grep验证通过
+
+**测试验证**:
+- ✅ run.bat首字节0x40(@),无BOM
+- ✅ findstr检查: 仅3处echo.(均在:log函数内)
+- ✅ grep检查: run.sh 0处裸echo
+- ✅ 输出与web_output.log一致
+
+**后续维护**: 强制PY-CORE-029验证,禁止裸echo和BOM
 
 ---
 ### v5.0.9.45 (2026-09-04) - 🐛 **Bug修复** - 修复邮件发送失败的根本原因(敏感配置字段名错误)
