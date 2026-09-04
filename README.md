@@ -127,13 +127,13 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.43 (2026-09-04) - 🐛 **Bug修复** - 爬虫统计卡片显示问题修复(logger.debug→logger.info确保关键统计数据正常输出)+安全审计新增日志级别最佳实践自动检测功能
 
-#### 更新内容: ①定位并修复爬虫执行结果统计卡片不显示的Bug(根本原因:logger.info()不走stdout导致subprocess无法捕获输出→tasks[task_id]['output']为空→前端hasSpiderStats=false→showComparisonCard未调用):main.py第5727-5736行将6个logger.info()/logger.debug()改为print()(确保输出到sys.stdout被子进程正确捕获) ②test/security_audit.py重构_scan_logging_best_practices()为输出方式最佳实践审计(检测logger/debug/info误用print场景-CRITICAL/HIGH/MEDIUM三级规则,类别从LoggingBestPractice改为OutputMethodBestPractice) ③修复HiddenBug扫描误报问题:_scan_hidden_bugs()将所有print()标记为"生产环境print调试残留"→添加print白名单机制排除main.py第5728-5735行的7个必要业务输出语句(数据保存/总商品数/高价商品/预计售价/平均售价/平台手续费/变更摘要) ④更新scan_all()扫描流程从7项扩展到8项(新增第5项:输出方式最佳实践审计) ⑤验证修复效果:运行security_audit.py --quick确认总计0个问题(所有级别均为0),爬虫统计卡片可正常显示总商品数/高价商品/预计售出总价/平均售价/平台手续费 ⑥修复skill.md文档头部缺失问题:添加完整的文档标题/项目概述/编码标准/文档导航/快速启动等章节(解决文件直接从版本记录开始导致用户无法了解项目全貌的问题) ⑦三方文档同步更新(README+skill+skill.docx)确保100%一致
+#### 更新内容: ①定位并修复爬虫执行结果统计卡片不显示的Bug(根本原因:logger.info()不走stdout导致subprocess无法捕获输出→tasks[task_id]['output']为空→前端hasSpiderStats=false→showComparisonCard未调用):main.py第5727-5736行将6个logger.info()/logger.debug()改为print()(确保输出到sys.stdout被子进程正确捕获) ②test/security_audit.py重构_scan_logging_best_practices()为输出方式最佳实践审计(检测logger/debug/info误用print场景-CRITICAL/HIGH/MEDIUM三级规则,类别从LoggingBestPractice改为OutputMethodBestPractice) ③修复HiddenBug扫描误报问题:_scan_hidden_bugs()将所有print()标记为"生产环境print调试残留"→添加print白名单机制排除main.py第5728-5735行的7个必要业务输出语句(数据保存/总商品数/高价商品/预计售价/平均售价/平台手续费/变更摘要) ④优化删除商品区域UI交互体验:dist/app.js第2193-2199行移除删除商品表格的所有事件监听器(onclick/onmouseover/onmouseout)和<a>标签链接,货号和商品描述改为纯文本显示(color:#666灰色),整行设置cursor:default实现只读效果(与新增商品区域的可交互设计形成对比,符合用户"只能看不能点"的需求) ⑤更新scan_all()扫描流程从7项扩展到8项(新增第5项:输出方式最佳实践审计) ⑥验证修复效果:运行security_audit.py --quick确认总计0个问题(所有级别均为0),爬虫统计卡片可正常显示总商品数/高价商品/预计售出总价/平均售价/平台手续费,删除商品区域只读展示无任何交互 ⑦修复skill.md文档头部缺失问题:添加完整的文档标题/项目概述/编码标准/文档导航/快速启动等章节(解决文件直接从版本记录开始导致用户无法了解项目全貌的问题) ⑧三方文档同步更新(README+skill+skill.docx)确保100%一致
 
 **修复日期**: 2026-09-04
-**修复类型**: 🐛Bug修复 + 🔒安全增强 + 📝文档规范化
-**影响文件**: [main.py](main.py#L5729-L5736), [test/security_audit.py](test/security_audit.py#L533-L593), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**修复类型**: 🐛Bug修复 + 🎨UI优化 + 🔒安全增强 + 📝文档规范化
+**影响文件**: [main.py](main.py#L5729-L5736), [dist/app.js](dist/app.js#L2193-L2199), [test/security_audit.py](test/security_audit.py#L341-L366), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 待生成
-**变更统计**: +120行 -6行 (+114行净增)
+**变更统计**: +124行 -8行 (+116行净增)
 **作者**: 小旭二手机（西园路）**
 
 ---

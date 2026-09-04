@@ -2190,10 +2190,10 @@
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.deletedProducts.map((p, idx) => `<tr data-sku="${escapeAttr(p.sku)}" onmouseover="highlightRow('${escapeAttr(p.sku)}')" onmouseout="unhighlightRow('${escapeAttr(p.sku)}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${escapeAttr(p.sku)}')">
+                                        ${skuData.deletedProducts.map((p, idx) => `<tr data-sku="${escapeAttr(p.sku)}" style="cursor: default;">
                                             <td>${idx + 1}</td>
-                                            <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(  /* [ESCAPED] */p.sku)}</a></td>
-                                            <td style="word-break: break-word; white-space: normal; min-width: 200px;" title="${escapeAttr(p.name || '')}">${escapeHtml(  /* [ESCAPED] */p.name || '-')}</td>
+                                            <td style="color: #666;">${escapeHtml(  /* [ESCAPED] */p.sku)}</td>
+                                            <td style="word-break: break-word; white-space: normal; min-width: 200px; color: #666;" title="${escapeAttr(p.name || '')}">${escapeHtml(  /* [ESCAPED] */p.name || '-')}</td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
