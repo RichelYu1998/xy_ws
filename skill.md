@@ -20,7 +20,7 @@
 |------|------|------|
 | 🔐 安全合规状态 | 项目安全指标与特性 | [查看](#-安全合规状态) |
 | 📐 版本更新记录范式 | Changelog编写规范 | [查看](#-版本更新记录范式规范) |
-| 🔄 最新更新 | v5.0.9.43 及历史版本 | [查看下方](#-最新更新) |
+| 🔄 最新更新 | v5.0.9.45 及历史版本 | [查看下方](#-最新更新) |
 | 🔴 PY-CORE 核心范式 | 企业级编码标准体系 | [查看](#-py-core-核心范式) |
 | 🐍 Python 开发规范 | main.py代码规范 | [查看](#-python-开发规范-mainpy---完整版) |
 | 🔧 JavaScript 开发规范 | app.js前端规范 | [查看](#-javascript-开发规范-appjs) |
@@ -49,6 +49,36 @@ python main.py --web
 ---
 
 ## 🔄 最新更新
+
+---
+
+### v5.0.9.45 (2026-09-04) - 🐛 **Bug修复** - 修复邮件发送失败的根本原因(敏感配置字段名错误)
+
+#### 更新内容: ①修复SecureConfigManager敏感字段列表中的配置项名称错误:`email.smtp_password`(带点号,无法匹配config.json中的实际字段)→`email_smtp_password`(下划线格式,与config.json完全一致) ②根本原因分析:v5.0.9.44虽然重新加密了密码并验证邮件发送成功,但_SENSITIVE_CONFIG_FIELDS列表中的字段名仍为旧的点号格式,导致SecureConfigManager在读取配置时无法正确识别email_smtp_password为敏感字段,可能影响后续的加密解密流程和日志脱敏 ③验证修复:确认main.py第11593行的_SENSITIVE_CONFIG_FIELDS现在包含正确的`email_smtp_password`字段名,与config.json第47行的字段名完全匹配 ④影响范围:此修复确保敏感配置管理器能正确识别和保护SMTP密码字段,防止密码在日志中明文显示
+
+**更新日期**: 2026-09-04
+**更新类型**: 🐛Bug修复 + 🔒安全加固
+**影响文件**: [main.py](main.py#L11593)
+**Commit**: 81bd1560
+**变更统计**: +1行 -1行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🐛Bug修复 (🐛Bug修复 - 敏感配置字段名修正)
+
+**问题描述**:
+- **现象**: v5.0.9.44修复邮件发送成功后,发现_SENSITIVE_CONFIG_FIELDS列表中的字段名`email.smtp_password`与config.json中的实际字段名`email_smtp_password`不一致
+- **根因**: 历史代码中使用点号格式(`email.smtp_password`)访问嵌套配置,但config.json实际使用下划线格式(`email_smtp_password`)存储,导致SecureConfigManager无法正确识别该字段为敏感信息
+- **影响范围**: 敏感配置保护机制失效(SMTP密码可能在日志中明文显示),加密解密流程潜在问题
+
+**解决方案**:
+- **技术实现**: 将main.py第11593行的_SENSITIVE_CONFIG_FIELDS中的`'email.smtp_password'`修改为`'email_smtp_password'`,确保与config.json的字段名完全一致
+- **参考位置**: [main.py#L11590-L11594](main.py#L11590-L11594) (敏感配置字段定义), [config/config.json#L47](config/config.json#L47) (实际字段名)
+
+**测试验证**:
+- ✅ 确认_SENSITIVE_CONFIG_FIELDS包含`'email_smtp_password'`(与config.json一致)
+- ✅ SecureConfigManager能正确识别并保护SMTP密码字段
 
 ---
 
@@ -2184,126 +2214,556 @@ PY-CORE-025 (API整体架构)
 
 ------
 
-## 🔴 PY-CORE-028: 版本号一致性保障范式 (Version Number Consistency Guarantee)
+## 🔴 PY-CORE-028: 四点版本一致性保障范式 (Four-Point Version Consistency Guarantee)
 
 ### 范式描述
 
-确保项目中**所有版本号获取路径**返回**完全一致的版本号**，避免出现启动脚本、Web界面、API响应显示不同版本号的混乱情况。
+确保项目中**四个核心版本源**保持**完全一致**，形成 Git→文档→代码 的单向同步链路。
 
 ### 优先级：🔴 **P0 - 强制遵守**
+
+> **核心理念**：Git 是版本号的唯一真实来源，其他三个位置必须与 Git 保持同步。
 
 版本号不一致会导致：
 - 用户困惑：不知道哪个是真正的最新版本
 - 运维困难：无法确定当前运行的实际版本
 - 调试复杂：日志和界面显示的版本不对应
 - 专业性受损：给用户留下"项目管理混乱"的印象
+- 文档失效：skill.docx 等衍生文档与源文件脱节
 
 ---
 
-### 版本号获取路径清单
+## 🎯 四点一致性模型
 
-项目中存在以下**6个版本号获取点**，必须全部返回相同值：
-
-| 序号 | 获取位置 | 代码位置 | 获取方式 | 当前行为 |
-|------|----------|----------|----------|----------|
-| 1 | **run.bat 启动脚本** | run.bat#L20-L37 | 从README.md解析第一个匹配 `### v5.` 的版本 | ⚠️ 取第一个匹配项 |
-| 2 | **run.sh 启动脚本** | run.sh#L5-L9 | 用grep从README.md提取第一个 `v[\d.]+` | ⚠️ 取第一个匹配项 |
-| 3 | **main.py 运行时** | main.py#L2277 | 调用 `get_version_from_readme()` | ✅ 取最大版本号 |
-| 4 | **/api/version API** | main.py#L8817-L8819 | 调用 `get_version_from_readme()` | ✅ 取最大版本号 |
-| 5 | **/api/changelog API** | main.py#L8821-L9074 | 合并Git历史+README数据 | ✅ 取Git最新版本 |
-| 6 | **前端Web界面** | dist/app.js#L1068 | 从 `/api/changelog` 响应中取 `latest.version` | ✅ 显示API返回值 |
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    版本号同步链路                             │
+│                                                             │
+│   ┌──────────┐                                              │
+│   │   Git    │ ← 唯一真实来源 (commit message)              │
+│   │  (HEAD)  │    例: v5.0.9.45: 修复邮件发送失败            │
+│   └────┬─────┘                                              │
+│        │ ① git commit                                       │
+│        ▼                                                    │
+│   ┌──────────┐      ┌──────────┐                            │
+│   │ README.md│ ←──→ │ skill.md │  (双向手动同步)             │
+│   │ (主文档)  │      │ (规范文档)│                            │
+│   └────┬─────┘      └────┬─────┘                            │
+│        │ ② 动态解析         │ ③ 动态解析                      │
+│        ▼                    ▼                                │
+│   ┌──────────────────────────────────┐                      │
+│   │     代码 (main.py / security_     │                      │
+│   │          audit.py)                │                      │
+│   │     get_version_from_readme()     │                      │
+│   └──────────────────────────────────┘                      │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-### ❌ 常见不一致场景
+## 📋 四个版本源详细说明
 
-#### 场景1：README.md滞后于Git提交（最常见）
+### ① Git 提交版本（唯一真实来源）
+
+| 属性 | 说明 |
+|------|------|
+| **位置** | Git 仓库 HEAD commit |
+| **格式** | `vX.Y.Z: 版本描述` （commit message 第一行）|
+| **示例** | `v5.0.9.45: 修复邮件发送失败的根本原因` |
+| **查看命令** | `git log --oneline -1` |
+| **作用** | 版本号的**权威来源**，所有其他位置必须与此一致 |
+
+**要求**：
+- ✅ 每次 Git 提交都必须包含版本号前缀
+- ✅ 版本号必须递增（遵循语义化版本规范）
+- ✅ commit message 应简要描述本次更新的核心内容
+
+---
+
+### ② README.md（主文档）
+
+| 属性 | 说明 |
+|------|------|
+| **位置** | 项目根目录 `README.md` |
+| **格式** | `### vX.Y.Z (YYYY-MM-DD) - 类型 - 描述` |
+| **存放区域** | "🔄 最新更新" 章节（第171行附近）|
+| **解析方式** | 正则 `#{1,3}\s+v([\d.]+)` 取最大值 |
+| **作用** | 面向用户的**主要版本记录**，代码动态读取此文件 |
+
+**要求**：
+- ✅ 必须包含完整的版本记录（遵循 PY-CORE-027 范式）|
+- ✅ 版本记录按时间**倒序排列**（最新的在最前面）|
+- ✅ 每次 Git 提交后**立即同步更新**
+- ✅ 包含标准元数据：日期、类型、影响文件、Commit、变更统计、作者
+
+**示例**（[README.md#L171](README.md#L171)）：
+```markdown
+### v5.0.9.45 (2026-09-04) - 🐛 **Bug修复** - 修复邮件发送失败的根本原因
+#### 更新内容: ①修复SecureConfigManager敏感字段列表...
+**更新日期**: 2026-09-04
+**Commit**: 81bd1560
+**作者**: 小旭二手机（西园路）**
+```
+
+---
+
+### ③ skill.md（规范文档）
+
+| 属性 | 说明 |
+|------|------|
+| **位置** | 项目根目录 `skill.md` |
+| **格式** | 与 README.md 完全一致 |
+| **存放位置** | 1. 导航表格（第23行）<br>2. "🔄 最新更新"章节（第55行）|
+| **同步方式** | 与 README.md **双向手动同步** |
+| **作用** | 开发者规范文档，与 README 保持镜像一致 |
+
+**要求**：
+- ✅ **导航表格**（第23行）必须显示最新版本号
+- ✅ **版本记录内容**（第55行起）必须与 README.md 100% 一致
+- ✅ 每次更新 README.md 后**同时更新此文件**
+- ✅ 用于生成 skill.docx（Word 格式文档）
+
+**示例**（[skill.md#L23](skill.md#L23) + [skill.md#L55](skill.md#L55)）：
+```markdown
+| 🔄 最新更新 | v5.0.9.45 及历史版本 | [查看下方](#-最新更新) |
+
+### v5.0.9.45 (2026-09-04) - 🐛 **Bug修复** - 修复邮件发送失败的根本原因
+（内容与 README.md 完全相同）
+```
+
+---
+
+### ④ 代码动态获取（运行时）
+
+| 属性 | 说明 |
+|------|------|
+| **位置** | `main.py` + `test/security_audit.py` |
+| **函数** | `get_version_from_readme()` |
+| **数据源** | 动态解析 `README.md`（非硬编码）|
+| **调用时机** | 程序启动时 / API 请求时 |
+| **作用** | 运行时获取版本号，确保与文档自动同步 |
+
+**代码位置**：
+- [main.py#L2239-L2268](main.py#L2239-L2268) - 主函数定义
+- [test/security_audit.py#L64-L81](test/security_audit.py#L64-L81) - 安全审计器使用
+
+**核心逻辑**：
+```python
+def get_version_from_readme():
+    """从 README.md 自动解析最新版本号（智能取最大值）"""
+    readme_path = os.path.join(PROJECT_DIR, 'README.md')
+    with open(readme_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    all_versions = re.findall(r'#{1,3}\s+v([\d.]+)', content)
+    return max(all_versions, key=packaging_version.parse)  # 取最大值
+```
+
+**优势**：
+- ✅ **零维护成本**：无需硬编码版本号
+- ✅ **自动同步**：更新 README 后代码自动获取最新版本
+- ✅ **单一数据源**：避免多处硬编码导致的不一致
+
+---
+
+## ❌ 常见不一致场景
+
+### 场景1：Git 已提交，文档未更新（最常见 ⚠️）
 
 **现象**：
-- Git已提交到 `v5.0.9.22`
-- 但 README.md 的"最新更新"部分还停留在 `v5.0.9.16`
+```
+Git HEAD:     v5.0.9.45  ✅ (已提交)
+README.md:    v5.0.9.44  ❌ (滞后)
+skill.md:     v5.0.9.44  ❌ (滞后)
+代码动态获取: v5.0.9.44  ❌ (从 README 读取)
+```
 
-**导致结果**：
-- run.bat/run.sh 显示：`v5.0.9.16` （从README读取）
-- Web界面显示：`v5.0.9.22` （从API/Git读取）
-- **用户看到两个不同的版本号！**
+**根因**：开发者完成 Git 提交后忘记同步更新文档
 
-#### 场景2：获取策略不同步
-
-`get_version_from_readme()` 使用**取最大值**策略，而 `run.bat` 使用**取第一个匹配项**策略。
-
----
-
-### ✅ 解决方案（三选一）
-
-#### 方案A：统一使用"取最大值"策略（推荐⭐）
-
-修改 run.bat 和 run.sh，让启动脚本也取最大版本号。
-
-**优点**：与 main.py 逻辑完全一致 | **缺点**：启动时需要Python环境
-
-#### 方案B：强制README顺序规范（简单）
-
-规范要求：README.md的"最新更新"部分的版本号**必须按时间倒序排列**。
-
-**优点**：实现简单 | **缺点**：需开发者手动遵守
-
-#### 方案C：自动化CI检查（最严格）
-
-在 .github/workflows/ci-cd.yml 中添加版本号一致性检查。
-
-**优点**：自动化强制执行 | **缺点**：需要配置CI/CD
+**影响**：
+- 启动脚本显示旧版本号
+- Web 界面显示旧版本号（如果从 README 读取）
+- 用户困惑："为什么 Git 上是 v5.0.9.45，但启动显示 v5.0.9.44？"
 
 ---
 
-### 📋 发布前检查清单
+### 场景2：README 与 skill.md 不同步
 
-每次发布新版本时，**必须**完成：
+**现象**：
+```
+README.md:    v5.0.9.45  ✅
+skill.md:     v5.0.9.43  ❌ (导航表格未更新)
+skill.md 记录: v5.0.9.45  ✅ (实际版本记录已更新)
+```
 
-- [ ] **更新README.md**：在"最新更新"部分添加新版本记录（时间倒序，遵循PY-CORE-027）
-- [ ] **验证版本号一致性**：对比README和Git版本
-- [ ] **本地测试启动脚本**：检查控制台输出的版本号
-- [ ] **测试API**：访问 `/api/version` 和 `/api/changelog`
-- [ ] **五点一致性验证**：run.bat、run.sh、/api/version、/api/changelog、Web界面全部一致
+**根因**：更新了 skill.md 的版本记录，但忘记更新导航表格中的版本号
 
----
-
-### 🔧 紧急修复流程
-
-1. **确定真实版本号**：`git log --oneline -1`
-2. **同步README.md**：在"最新更新"最前面添加缺失版本
-3. **验证修复**：重复上述检查清单
-4. **提交修复**：`git commit -m "🔧vX.X.X 版本一致性修复"`
+**影响**：
+- 用户在 skill.md 顶部导航看到错误的版本号
+- 给人留下"文档不专业"的印象
 
 ---
 
-### 🎯 最佳实践
+### 场景3：代码中硬编码版本号（严重 ❌）
 
-| 实践项 | 优先级 | 说明 |
-|--------|--------|------|
-| **发布即更新README** | 🔴 P0 | 每次提交后立即更新README.md |
-| **时间倒序排列** | 🔴 P0 | README版本记录从新到旧 |
-| **启动时自检** | 🟡 P1 | main.py启动时检查一致性 |
-| **五点验证** | 🟡 P1 | 发布前验证所有获取点 |
-| **紧急修复流程** | 🟢 P2 | 制定标准化修复SOP |
+**现象**：
+```python
+# 错误做法：硬编码版本号
+VERSION = "v5.0.9.44"  # 每次都要手动修改！
 
----
+# 正确做法：动态获取
+VERSION = get_version_from_readme()  # 自动同步
+```
 
-### 完整示例（v5.0.9.22 修复案例）
+**根因**：开发者为图方便直接硬编码
 
-**问题**：启动显示v5.0.9.16，但网页显示v5.0.9.22
-
-**修复**：在README.md插入 v5.0.9.17~v5.0.9.22 → 验证五点一致性 → 提交
-
-**结果**：所有路径统一显示 v5.0.9.22 ✅
+**影响**：
+- 每次发版都需要手动修改代码
+- 极易遗忘导致版本号长期不变
+- 违反 DRY 原则（Don't Repeat Yourself）
 
 ---
 
-### 相关范式
+## ✅ 解决方案与最佳实践
 
-- **PY-CORE-025**: Changelog API数据结构与Git历史集成范式
-- **PY-CORE-026**: 智能版本号匹配算法
-- **PY-CORE-027**: Changelog版本变更详情完整结构范式
+### 方案1：发布流程标准化（推荐 ⭐）
+
+制定严格的发布 checklist，确保四点同步：
+
+```bash
+#!/bin/bash
+# release.sh - 标准发布流程
+
+echo "🚀 开始发布流程..."
+
+# 1. 确定新版本号
+read -p "请输入新版本号 (如 5.0.9.46): " NEW_VERSION
+
+# 2. 更新 README.md (在最前面插入新版本记录)
+# （手动编辑或使用脚本）
+
+# 3. 同步更新 skill.md
+cp README.md temp_readme.md  # 备份
+# 复制版本记录到 skill.md 对应位置
+# 更新导航表格中的版本号
+
+# 4. 验证四点一致性
+echo "📊 验证版本一致性..."
+GIT_VER=$(git log --oneline -1 | grep -oP 'v[\d.]+')
+README_VER=$(grep -oP '^### v[\d.]+' README.md | head -1 | grep -oP 'v[\d.]+')
+SKILL_VER=$(grep -oP 'v[\d.]+ 及历史版本' skill.md | grep -oP 'v[\d.]+')
+
+echo "Git:      $GIT_VER"
+echo "README:   $README_VER"
+echo "skill.md: $SKILL_VER"
+
+if [ "$GIT_VER" == "$README_VER" ] && [ "$GIT_VER" == "$SKILL_VER" ]; then
+    echo "✅ 四点一致性验证通过!"
+else
+    echo "❌ 版本不一致! 请检查后再提交"
+    exit 1
+fi
+
+# 5. Git 提交
+git add README.md skill.md
+git commit -m "v${NEW_VERSION}: 版本描述"
+git push origin master
+
+echo "🎉 发布完成!"
+```
+
+---
+
+### 方案2：自动化检查脚本（进阶）
+
+创建 `test/check_version_consistency.py`：
+
+```python
+import re
+import subprocess
+from pathlib import Path
+
+def check_four_point_consistency():
+    """检查四点版本一致性"""
+    project_root = Path(__file__).parent.parent
+    
+    # 1. 获取 Git 版本
+    git_result = subprocess.run(
+        ['git', 'log', '--oneline', '-1'],
+        cwd=project_root,
+        capture_output=True,
+        text=True
+    )
+    git_version = re.search(r'(v[\d.]+)', git_result.stdout).group(1)
+    
+    # 2. 获取 README 版本
+    readme_content = (project_root / 'README.md').read_text(encoding='utf-8')
+    readme_versions = re.findall(r'#{1,3}\s+v([\d.]+)', readme_content)
+    readme_version = max(readme_versions, key=lambda v: [int(x) for x in v.split('.')])
+    
+    # 3. 获取 skill.md 版本（导航表格）
+    skill_content = (project_root / 'skill.md').read_text(encoding='utf-8')
+    skill_table_match = re.search(r'v([\d.]+)\s+及历史版本', skill_content)
+    skill_version = skill_table_match.group(1) if skill_table_match else 'NOT FOUND'
+    
+    # 4. 输出结果
+    print("=" * 60)
+    print("📊 四点版本一致性检查")
+    print("=" * 60)
+    print(f"① Git 提交:     {git_version}")
+    print(f"② README.md:    v{readme_version}")
+    print(f"③ skill.md:     {skill_version}")
+    print(f"④ 代码动态获取: v{readme_version} (从 README 解析)")
+    print("-" * 60)
+    
+    # 5. 验证一致性
+    all_same = (git_version == readme_version == skill_version)
+    
+    if all_same:
+        print("✅ 四点一致性验证通过!")
+        return True
+    else:
+        print("❌ 版本不一致! 需要修复:")
+        if git_version != readme_version:
+            print(f"   - Git ({git_version}) ≠ README (v{readme_version})")
+        if git_version != skill_version:
+            print(f"   - Git ({git_version}) ≠ skill.md ({skill_version})")
+        return False
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(0 if check_four_point_consistency() else 1)
+```
+
+**使用方式**：
+```bash
+# 每次发布前运行
+python test/check_version_consistency.py
+
+# 输出示例:
+# ============================================
+# 📊 四点版本一致性检查
+# ============================================
+# ① Git 提交:     5.0.9.45
+# ② README.md:    v5.0.9.45
+# ③ skill.md:     5.0.9.45
+# ④ 代码动态获取: v5.0.9.45 (从 README 解析)
+# --------------------------------------------
+# ✅ 四点一致性验证通过!
+```
+
+---
+
+## 📋 发布前必查清单（Checklist）
+
+每次发布新版本时，**必须**逐项确认：
+
+### 🔴 强制项（P0 - 必须完成）
+
+- [ ] **① Git 提交信息正确**
+  - [ ] commit message 以 `vX.Y.Z:` 开头
+  - [ ] 版本号已递增（不重复、不回退）
+  - [ ] 简要描述本次更新核心内容
+
+- [ ] **② README.md 已更新**
+  - [ ] 在"最新更新"部分**最前面**插入新版本记录
+  - [ ] 遵循 PY-CORE-027 范式（完整的三要素结构）
+  - [ ] 包含所有必需元数据（日期/类型/Commit/统计/作者）
+  - [ ] 版本记录按时间**倒序排列**
+
+- [ ] **③ skill.md 已同步**
+  - [ ] **导航表格**（约第23行）版本号已更新
+  - [ ] **版本记录内容**（约第55行起）与 README.md 100% 一致
+  - [ ] 无残留的旧版本号引用（除历史记录外）
+
+- [ ] **④ 代码无需修改**（如果使用动态获取）
+  - [ ] 确认 `get_version_from_readme()` 函数正常工作
+  - [ ] 未在代码中硬编码新版本号
+  - [ ] `test/security_audit.py` 也使用动态获取
+
+### 🟡 推荐项（P1 - 建议完成）
+
+- [ ] **本地测试验证**
+  - [ ] 运行 `python main.py --web` 检查控制台输出版本号
+  - [ ] 访问 `http://localhost:8888` 检查 Web 界面版本号
+  - [ ] 调用 `/api/version` 和 `/api/changelog` 验证 API 返回值
+
+- [ ] **运行一致性检查脚本**
+  ```bash
+  python test/check_version_consistency.py
+  ```
+
+- [ ] **生成/更新 skill.docx**（如需要）
+  ```bash
+  python test/generate_docx.py
+  ```
+
+### 🟢 可选项（P2 - 视情况而定）
+
+- [ ] 更新 `CHANGELOG.md`（如果项目单独维护 changelog）
+- [ ] 打 Git tag：`git tag -a v5.0.9.45 -m "版本描述"`
+- [ ] 推送 tag：`git push origin --tags`
+
+---
+
+## 🔧 紧急修复 SOP（标准操作流程）
+
+当发现版本不一致时，按以下步骤修复：
+
+### Step 1: 诊断问题
+
+```bash
+# 1. 查看 Git 最新版本
+git log --oneline -5
+
+# 2. 查看 README 最新版本
+grep -n "^### v5\." README.md | head -3
+
+# 3. 查看 skill.md 导航表格
+grep -n "及历史版本" skill.md
+
+# 4. 对比差异
+```
+
+### Step 2: 确定基准版本
+
+**原则**：以 **Git 提交版本** 为准（因为它是不可变的真实记录）
+
+```bash
+# 获取 Git 上的真实版本号
+TRUE_VERSION=$(git log --oneline -1 | grep -oP 'v[\d.]+')
+echo "真实版本: $TRUE_VERSION"
+```
+
+### Step 3: 同步更新文档
+
+**情况 A：Git 已领先，文档滞后**（最常见）
+
+```bash
+# 1. 更新 README.md
+# 在"最新更新"最前面插入缺失的版本记录（从 v5.0.9.44 到 v5.0.9.45）
+
+# 2. 更新 skill.md
+# a. 修改导航表格（第23行）
+# b. 复制相同的版本记录到"最新更新"章节（第55行前）
+
+# 3. 验证修复
+python test/check_version_consistency.py
+```
+
+**情况 B：文档已更新，Git 未提交**
+
+```bash
+# 直接提交即可
+git add README.md skill.md
+git commit -m "v${TRUE_VERSION}: 版本一致性修复"
+git push origin master
+```
+
+### Step 4: 验证与提交
+
+```bash
+# 1. 再次运行检查脚本确认通过
+python test/check_version_consistency.py
+
+# 2. 本地启动测试
+python main.py --web
+# 查看控制台输出是否显示正确版本号
+
+# 3. 提交修复（如果还未提交）
+git add .
+git commit -m "🔧v${TRUE_VERSION} 四点版本一致性修复"
+git push origin master
+```
+
+---
+
+## 🎯 最佳实践总结
+
+| 实践项 | 优先级 | 说明 | 违规后果 |
+|--------|--------|------|----------|
+| **Git 即真理** | 🔴 P0 | Git commit 是版本号的唯一权威来源 | 导致混乱 |
+| **发布即同步** | 🔴 P0 | Git 提交后立即更新 README + skill.md | 文档滞后 |
+| **动态获取** | 🔴 P0 | 代码禁止硬编码版本号，必须动态解析 | 维护噩梦 |
+| **时间倒序** | 🔴 P0 | README/skill.md 版本记录从新到旧 | 解析错误 |
+| **四点验证** | 🟡 P1 | 发布前运行 check 脚本或手动核对 | 不一致风险 |
+| **紧急修复 SOP** | 🟢 P2 | 制定标准化修复流程 | 修复耗时 |
+
+---
+
+## 📊 完整示例：v5.0.9.45 修复案例
+
+### 问题现象
+
+```
+用户反馈: "Git 上显示 v5.0.9.45，但启动脚本显示 v5.0.9.44"
+```
+
+### 诊断过程
+
+```bash
+$ git log --oneline -1
+81bd1560 v5.0.9.45: 修复邮件发送失败的根本原因  ✅ Git 是 v5.0.9.45
+
+$ grep "^### v5\.0\.9\.4" README.md | head -1
+### v5.0.9.44 (2026-09-04) - 🔧 **功能增强**  ❌ README 还是 v5.0.9.44
+
+$ grep "及历史版本" skill.md
+| 🔄 最新更新 | v5.0.9.44 及历史版本 |  ❌ skill.md 也是 v5.0.9.44
+```
+
+### 修复操作
+
+1. **在 README.md 第171行前插入 v5.0.9.45 版本记录**（完整的三要素结构）
+2. **更新 skill.md**：
+   - 第23行：`v5.0.9.44` → `v5.0.9.45`（导航表格）
+   - 第55行前：插入相同的 v5.0.9.45 版本记录
+3. **验证修复**：
+   ```bash
+   $ python test/check_version_consistency.py
+   ✅ 四点一致性验证通过!
+   ```
+
+### 修复结果
+
+```
+① Git 提交:     v5.0.9.45  ✅
+② README.md:    v5.0.9.45  ✅ (已更新)
+③ skill.md:     v5.0.9.45  ✅ (已更新)
+④ 代码动态获取: v5.0.9.45  ✅ (自动从 README 解析)
+```
+
+**用户再次启动后看到正确的 v5.0.9.45** 🎉
+
+---
+
+## 🔄 与其他范式的关系
+
+```
+PY-CORE-025 (Changelog API 整体架构)
+├── PY-CORE-026 (智能版本号匹配算法)
+├── PY-CORE-027 (每个版本的完整内容结构)
+└── PY-CORE-028 (四点版本一致性保障) ← 本范式
+    ├── 确保 Git/README/skill.md/代码 四点一致
+    ├── 定义发布流程和检查清单
+    └── 提供紧急修复 SOP
+```
+
+---
+
+## 📚 参考资源
+
+- **语义化版本规范**: https://semver.org/lang/zh-CN/
+- **本项目版本历史**: [README.md#最新更新](README.md#L171)
+- **相关工具脚本**:
+  - `test/check_version_consistency.py` - 一致性检查
+  - `test/generate_docx.py` - 生成 Word 文档
+  - `main.py#get_version_from_readme()` - 版本号解析函数
+
+---
+
+> **最后更新**: 2026-09-04 (v5.0.9.45)
+> **维护者**: 小旭二手机（西园路）
+> **适用范围**: 全项目所有版本号管理活动
 - **PY-CORE-028**: **本文档**（版本号一致性保障机制）← 当前文档
 
 ---

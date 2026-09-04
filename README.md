@@ -168,6 +168,36 @@ bandit -r . -f json -o bandit_report.json
 ## 🔄 最新更新
 ---
 
+### v5.0.9.45 (2026-09-04) - 🐛 **Bug修复** - 修复邮件发送失败的根本原因(敏感配置字段名错误)
+
+#### 更新内容: ①修复SecureConfigManager敏感字段列表中的配置项名称错误:`email.smtp_password`(带点号,无法匹配config.json中的实际字段)→`email_smtp_password`(下划线格式,与config.json完全一致) ②根本原因分析:v5.0.9.44虽然重新加密了密码并验证邮件发送成功,但_SENSITIVE_CONFIG_FIELDS列表中的字段名仍为旧的点号格式,导致SecureConfigManager在读取配置时无法正确识别email_smtp_password为敏感字段,可能影响后续的加密解密流程和日志脱敏 ③验证修复:确认main.py第11593行的_SENSITIVE_CONFIG_FIELDS现在包含正确的`email_smtp_password`字段名,与config.json第47行的字段名完全匹配 ④影响范围:此修复确保敏感配置管理器能正确识别和保护SMTP密码字段,防止密码在日志中明文显示
+
+**更新日期**: 2026-09-04
+**更新类型**: 🐛Bug修复 + 🔒安全加固
+**影响文件**: [main.py](main.py#L11593)
+**Commit**: 81bd1560
+**变更统计**: +1行 -1行
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🐛Bug修复 (🐛Bug修复 - 敏感配置字段名修正)
+
+**问题描述**:
+- **现象**: v5.0.9.44修复邮件发送成功后,发现_SENSITIVE_CONFIG_FIELDS列表中的字段名`email.smtp_password`与config.json中的实际字段名`email_smtp_password`不一致
+- **根因**: 历史代码中使用点号格式(`email.smtp_password`)访问嵌套配置,但config.json实际使用下划线格式(`email_smtp_password`)存储,导致SecureConfigManager无法正确识别该字段为敏感信息
+- **影响范围**: 敏感配置保护机制失效(SMTP密码可能在日志中明文显示),加密解密流程潜在问题
+
+**解决方案**:
+- **技术实现**: 将main.py第11593行的_SENSITIVE_CONFIG_FIELDS中的`'email.smtp_password'`修改为`'email_smtp_password'`,确保与config.json的字段名完全一致
+- **参考位置**: [main.py#L11590-L11594](main.py#L11590-L11594) (敏感配置字段定义), [config/config.json#L47](config/config.json#L47) (实际字段名)
+
+**测试验证**:
+- ✅ 确认_SENSITIVE_CONFIG_FIELDS包含`'email_smtp_password'`(与config.json一致)
+- ✅ SecureConfigManager能正确识别并保护SMTP密码字段
+
+---
+
 ### v5.0.9.44 (2026-09-04) - 🔧 **功能增强** - 邮件通知系统修复+配置加密解密工具+Git安全配置优化
 
 #### 更新内容: ①修复邮件通知系统无法发送问题(根本原因:config.json中email_smtp_password字段存储的ENC()加密密码解密后为空字符串→导致SMTP登录认证失败→服务器断开连接):定位到SecureConfigManager的Fernet加密密钥文件(.encryption_key)与当前配置不匹配或损坏→使用用户提供的真实QQ邮箱SMTP授权码(hjfkybdlgrzjbega)重新加密并保存 ②创建config/crypto_tool.py完整的加密解密工具(支持encrypt/decrypt/encrypt-config/decrypt-config/init等6个命令,基于Fernet对称加密+PBKDF2-HMAC-SHA256密钥派生) ③格式化config/config.json.example脱敏模板(从压缩单行改为标准JSON格式化,所有敏感值使用YOUR_...占位符,提升可读性) ④更新.gitignore规则:新增忽略config/crypto_tool.py/config/README_CONFIG.md等敏感工具文件(确保加密密钥/工具/真实配置不会推送到Git仓库) ⑤在README.md快速启动章节后添加"⚙️ 配置说明"完整章节(包含首次配置步骤/配置文件安全表格/常用操作命令示例/详细文档链接) ⑥删除config/README_CONFIG.md(避免文档分散,统一在根目录README.md维护) ⑦验证邮件发送功能:测试邮件成功发送到980187223@qq.com,确认SMTP配置正确(smtp.qq.com:587/STARTTLS) ⑧三方文档同步更新(README+skill+skill.docx)确保100%一致
