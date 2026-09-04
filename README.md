@@ -580,7 +580,7 @@ python config/crypto_tool.py encrypt-config
 **更新日期**: 2026-09-04
 **更新类型**: 🔧功能增强 + 🔒安全加固 + 📝文档规范化 + 🔐配置管理
 **影响文件**: [config/config.json](config/config.json#L47), [config/config.json.example](config/config.json.example), [config/crypto_tool.py](config/crypto_tool.py), [.gitignore](.gitignore#L24-L40), [README.md](README.md#L53-L82), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 待生成
+**Commit**: 6f57a6b5
 **变更统计**: +287行 -12行 (+275行净增)
 **作者**: 小旭二手机（西园路）**
 
@@ -651,7 +651,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-04
 **修复类型**: 🐛Bug修复 + 🎨UI优化 + 🔒安全增强 + 📝文档规范化
 **影响文件**: [main.py](main.py#L5729-L5736), [dist/app.js](dist/app.js#L2193-L2199), [test/security_audit.py](test/security_audit.py#L341-L366), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 待生成
+**Commit**: cd6a5e66
 **变更统计**: +124行 -8行 (+116行净增)
 **作者**: 小旭二手机（西园路）**
 
