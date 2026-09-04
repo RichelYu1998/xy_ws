@@ -11590,7 +11590,7 @@ class DependencyAuditor:
             elif a>b:return False
         return False
 
-_SENSITIVE_CONFIG_FIELDS=['login.password','headers.cookie','email.smtp_password']
+_SENSITIVE_CONFIG_FIELDS=['login.password','headers.cookie','email_smtp_password']
 
 class SecureConfigManager:
     """安全配置管理器 - 整合原config_secure_template.py"""
