@@ -54,7 +54,7 @@ python main.py --web
 
 ### v5.0.9.43 (2026-09-04) - 🐛 **Bug修复** - 爬虫统计卡片显示问题修复(logger.debug→logger.info确保关键统计数据正常输出)+安全审计新增日志级别最佳实践自动检测功能
 
-#### 更新内容: ①定位并修复爬虫执行结果统计卡片不显示的Bug:main.py第5729-5736行6个logger.debug()改为logger.info()(解决debug级别被过滤导致前端无法检测到关键词的问题) ②test/security_audit.py新增_scan_logging_best_practices()方法实现日志级别最佳实践自动审计(CRITICAL/HIGH/MEDIUM三级检测规则) ③更新scan_all()扫描流程从7项扩展到8项(新增第5项:日志级别最佳实践审计) ④验证修复效果:运行security_audit.py --quick确认0个问题,爬虫统计卡片可正常显示总商品数/高价商品/预计售出总价/平均售价/平台手续费 ⑤修复skill.md文档头部缺失问题:添加完整的文档标题/项目概述/编码标准/文档导航/快速启动等章节(解决文件直接从版本记录开始导致用户无法了解项目全貌的问题) ⑥三方文档同步更新(README+skill+skill.docx)确保100%一致
+#### 更新内容: ①定位并修复爬虫执行结果统计卡片不显示的Bug(根本原因:logger.info()不走stdout导致subprocess无法捕获输出→tasks[task_id]['output']为空→前端hasSpiderStats=false→showComparisonCard未调用):main.py第5727-5736行将6个logger.info()/logger.debug()改为print()(确保输出到sys.stdout被子进程正确捕获) ②test/security_audit.py新增_scan_logging_best_practices()方法实现日志级别最佳实践自动审计(CRITICAL/HIGH/MEDIUM三级检测规则) ③更新scan_all()扫描流程从7项扩展到8项(新增第5项:日志级别最佳实践审计) ④验证修复效果:运行security_audit.py --quick确认0个问题,爬虫统计卡片可正常显示总商品数/高价商品/预计售出总价/平均售价/平台手续费 ⑤修复skill.md文档头部缺失问题:添加完整的文档标题/项目概述/编码标准/文档导航/快速启动等章节(解决文件直接从版本记录开始导致用户无法了解项目全貌的问题) ⑥三方文档同步更新(README+skill+skill.docx)确保100%一致
 
 **修复日期**: 2026-09-04
 **修复类型**: 🐛Bug修复 + 🔒安全增强 + 📝文档规范化
