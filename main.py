@@ -3871,7 +3871,7 @@ class EmailNotifier:
     """邮件通知类"""
     
     def __init__(self, config_manager=None):
-        self.config_manager = config_manager or ConfigManager()
+        self.config_manager = config_manager or SecureConfigManager()
     
     def get_email_config(self):
         """获取邮件配置"""
