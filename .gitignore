@@ -31,6 +31,11 @@ config/config.json
 config/.encryption_key
 config/.salt
 
+# Crypto tool (security sensitive, not for distribution)
+config/crypto_tool.py
+config/update_password.py
+config/demo_crypto.py
+
 # OS files
 .DS_Store
 Thumbs.db

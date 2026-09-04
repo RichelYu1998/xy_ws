@@ -1,10 +1,10 @@
 {
   "login": {
-    "username": "YOUR_USERNAME",
+    "username": "YOUR_QQ_PHONE_NUMBER",
     "password": "YOUR_PASSWORD",
     "login_type": "phone"
   },
-  "target_url": "YOUR_TARGET_URL",
+  "target_url": "https://www.szwego.com/kuikly_static/index.html?page_name=personal_album_page&shopId=YOUR_SHOP_ID",
   "scroll_config": {
     "max_attempts": 30,
     "same_height_limit": 8,
@@ -15,12 +15,12 @@
     "dynamic_adjust": true
   },
   "headers": {
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;q=b3;q=0.7",
     "accept-encoding": "gzip, deflate, br, zstd",
     "accept-language": "zh-CN,zh;q=0.9",
     "cache-control": "max-age=0",
     "connection": "keep-alive",
-    "cookie": "YOUR_COOKIE",
+    "cookie": "YOUR_COOKIE_OR_USE_COOKIES_JSON",
     "host": "www.szwego.com",
     "sec-ch-ua": "\"Chromium\";v=\"146\", \"Not-A.Brand\";v=\"24\", \"Google Chrome\";v=\"146\"",
     "sec-ch-ua-mobile": "?0",
@@ -32,59 +32,21 @@
     "upgrade-insecure-requests": "1",
     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
   },
-  "cookies": [
-    {
-      "name": "sajssdk_2015_cross_new_user",
-      "value": "1",
-      "domain": ".szwego.com",
-      "path": "/",
-      "expires": -1,
-      "httpOnly": false,
-      "secure": false,
-      "sameSite": "Lax"
-    },
-    {
-      "name": "token",
-      "value": "YOUR_TOKEN",
-      "domain": ".szwego.com",
-      "path": "/",
-      "expires": -1,
-      "httpOnly": false,
-      "secure": false,
-      "sameSite": "Lax"
-    },
-    {
-      "name": "client_type",
-      "value": "net",
-      "domain": ".szwego.com",
-      "path": "/",
-      "expires": -1,
-      "httpOnly": false,
-      "secure": false,
-      "sameSite": "Lax"
-    },
-    {
-      "name": "sensorsdata2015jssdkcross",
-      "value": "YOUR_SENSORS_DATA",
-      "domain": ".szwego.com",
-      "path": "/",
-      "expires": -1,
-      "httpOnly": false,
-      "secure": false,
-      "sameSite": "Lax"
-    }
-  ],
+  "cookies": [],
   "output_file": "file/output.json",
   "cookie_file": "config/cookies.json",
   "excel_files": [
     "D:/ws/xy_ws/小旭二手机.xlsx",
+    "C:\\Users\\YourUser\\Desktop\\小旭二手机.xlsx",
     "~/.xiaoxu/xiaoxu.xlsx"
   ],
   "email_notification_enabled": true,
   "email_smtp_host": "smtp.qq.com",
   "email_smtp_port": 587,
   "email_smtp_user": "your_email@qq.com",
-  "email_smtp_password": "your_email_password",
-  "email_from_name": "公网IP监控",
-  "email_to": "980187223@qq.com"
+  "email_smtp_password": "YOUR_SMTP_AUTH_CODE_16CHARS",
+  "email_from_name": "Szwego爬虫通知",
+  "email_to": "your_notification@email.com",
+  "tunnel_type": "hostc",
+  "web_api_key": "YOUR_WEB_API_KEY_OR_AUTO_GENERATE"
 }
