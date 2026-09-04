@@ -538,24 +538,25 @@ class SecurityAuditor:
         print("  ✅ 敏感数据扫描完成")
 
     def _scan_logging_best_practices(self):
-        """日志级别最佳实践审计 - 检测关键统计信息是否使用了正确的日志级别"""
-        print("  📝 扫描日志级别使用最佳实践...")
+        """输出方式最佳实践审计 - 检测关键统计信息是否使用了正确的输出方式（print vs logger）"""
+        print("  📝 扫描输出方式使用最佳实践...")
 
-        logging_issues = {
+        output_issues = {
             'CRITICAL': [
-                (r'logger\.debug\(f*[\'"]成功获取.*个商品[\'"]', '爬虫统计-总商品数应使用logger.info()'),
-                (r'logger\.debug\(f*[\'"]售价.*>=.*599.*商品[\'"]', '爬虫统计-高价商品数应使用logger.info()'),
-                (r'logger\.debug\(f*[\'"]预计售出价格累计[\'"]', '爬虫统计-预计售出总价应使用logger.info()'),
-                (r'logger\.debug\(f*[\'"]平均每个设备售出均价[\'"]', '爬虫统计-平均售价应使用logger.info()'),
-                (r'logger\.debug\(f*[\'"]闲鱼平台手续费累计[\'"]', '爬虫统计-平台手续费应使用logger.info()'),
+                (r'logger\.(debug|info)\(f*[\'"]成功获取.*个商品[\'"]', '爬虫统计-总商品数必须使用print()而非logger'),
+                (r'logger\.(debug|info)\(f*[\'"]售价.*>=.*599.*商品[\'"]', '爬虫统计-高价商品数必须使用print()而非logger'),
+                (r'logger\.(debug|info)\(f*[\'"]预计售出价格累计[\'"]', '爬虫统计-预计售出总价必须使用print()而非logger'),
+                (r'logger\.(debug|info)\(f*[\'"]平均每个设备售出均价[\'"]', '爬虫统计-平均售价必须使用print()而非logger'),
+                (r'logger\.(debug|info)\(f*[\'"]闲鱼平台手续费累计[\'"]', '爬虫统计-平台手续费必须使用print()而非logger'),
+                (r'logger\.(debug|info)\(f*[\'"]数据已保存到[\'"]', '数据保存提示必须使用print()以确保subprocess能捕获'),
             ],
             'HIGH': [
-                (r'logger\.debug\(.*?(?:统计|总计|汇总|合计|累计|成功获取|获取到|完成)', '关键业务统计信息建议使用logger.info()'),
-                (r'logger\.debug\(.*?(?:用户|订单|支付|金额|价格|库存|商品).*?(?:创建|删除|修改|更新|变更)', '重要业务操作日志建议提升至info级别'),
+                (r'logger\.(debug|info)\(.*?(?:统计|总计|汇总|合计|累计|成功获取|获取到|完成)', '关键业务统计信息建议使用print()以确保子进程能正确捕获输出'),
+                (r'logger\.(debug|info)\(.*?(?:用户|订单|支付|金额|价格|库存|商品).*?(?:创建|删除|修改|更新|变更)', '重要业务操作如需前端显示应使用print()'),
             ],
             'MEDIUM': [
-                (r'logger\.debug\(.*?数据已保存', '数据持久化操作建议使用logger.info()'),
-                (r'logger\.debug\(.*?(?:任务完成|执行完毕|运行结束)', '任务状态变更建议使用logger.info()'),
+                (r'logger\.debug\(.*?数据已保存', '数据持久化操作如果需要被subprocess捕获应使用print()'),
+                (r'logger\.debug\(.*?(?:任务完成|执行完毕|运行结束)', '任务状态变更如果需要前端显示应使用print()'),
             ]
         }
 
@@ -570,7 +571,7 @@ class SecurityAuditor:
                 content = filepath.read_text(encoding='utf-8')
                 lines = content.split('\n')
 
-                for severity, patterns in logging_issues.items():
+                for severity, patterns in output_issues.items():
                     for pattern, desc in patterns:
                         try:
                             compiled_pattern = re.compile(pattern, re.IGNORECASE | re.DOTALL)
@@ -578,11 +579,11 @@ class SecurityAuditor:
                                 if compiled_pattern.search(line):
                                     self._add_issue(SecurityIssue(
                                         severity=severity,
-                                        category='LoggingBestPractice',
+                                        category='OutputMethodBestPractice',
                                         file_path=filename,
                                         line_number=line_num,
-                                        description=f"[日志级别] {desc}",
-                                        recommendation='将logger.debug()改为logger.info()以确保关键统计信息能够正常输出（debug级别可能被过滤导致前端无法显示统计数据）',
+                                        description=f"[输出方式] {desc}",
+                                        recommendation='将logger.debug()/logger.info()改为print()以确保输出到sys.stdout被子进程正确捕获（logger不走stdout会导致tasks[task_id][output]为空，前端无法显示统计数据）',
                                         code_snippet=line.strip()[:100]
                                     ))
                         except re.error as e:
@@ -592,7 +593,7 @@ class SecurityAuditor:
                 print(f"    ⚠️ 扫描文件 {filename} 时出错: {e}")
                 continue
 
-        print("  ✅ 日志级别最佳实践扫描完成")
+        print("  ✅ 输出方式最佳实践扫描完成")
 
     def _run_performance_stress_test(self):
         """性能压测基准测试"""
