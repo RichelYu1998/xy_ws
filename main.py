@@ -298,6 +298,183 @@ TIMEOUT_CONFIG = {
     'log_init_retry': int(os.environ.get('TIMEOUT_LOG_INIT_RETRY', '3')),
 }
 
+
+
+_SENSITIVE_CONFIG_FIELDS=['login.password','headers.cookie','email_smtp_password']
+
+class SecureConfigManager:
+    """安全配置管理器 - 整合原config_secure_template.py"""
+
+    _instance=None
+    _fernet=None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance=super().__new__(cls)
+            cls._instance._initialize()
+        return cls._instance
+
+    def _initialize(self):
+        key_file=PROJECT_DIR/'config'/'.encryption_key'
+        salt_file=PROJECT_DIR/'config'/'.salt'
+        if os.path.exists(key_file) and os.path.exists(salt_file):
+            key=self._load_key(key_file,salt_file)
+            if key:
+                if Fernet is not None:
+                    try:
+                        self._fernet=Fernet(key)
+                    except (ValueError, TypeError):pass  # [INTENTIONAL_PLACEHOLDER]
+
+    def _load_key(self,key_file,salt_file):
+        env_key=os.environ.get('CONFIG_ENCRYPTION_KEY')
+        if env_key:
+            if hashes is not None and PBKDF2HMAC is not None:
+                try:
+                    with open(salt_file,'rb') as f:salt=f.read()
+                    kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
+                    return base64.urlsafe_b64encode(kdf.derive(env_key.encode()))
+                except Exception:return None
+        if os.path.exists(key_file):
+            with open(key_file,'rb') as f:return f.read()
+        return None
+
+    def encrypt_value(self,value):
+        if not self._fernet:raise RuntimeError("加密器未初始化")
+        encrypted=self._fernet.encrypt(value.encode())
+        return f"ENC({encrypted.decode()})"
+
+    def decrypt_value(self,encrypted_value):
+        if not encrypted_value.startswith("ENC("):return encrypted_value
+        if not self._fernet:raise RuntimeError("加密器未初始化")
+        try:
+            encrypted=encrypted_value[4:-1]
+            return self._fernet.decrypt(encrypted.encode()).decode()
+        except Exception:return ""
+
+    def load_config(self):
+        config_file=PROJECT_DIR/'config'/'config.json'
+        if not os.path.exists(config_file):return {}
+        with open(config_file,'r',encoding='utf-8') as f:config=json.load(f)
+        return self._decrypt_sensitive(config)
+
+    def save_config(self,config):
+        config=self._encrypt_sensitive(config)
+        config_file=PROJECT_DIR/'config'/'config.json'
+        os.makedirs(os.path.dirname(config_file),exist_ok=True)
+        with open(config_file,'w',encoding='utf-8') as f:
+            json.dump(config,f,ensure_ascii=False,indent=2)
+
+    def _get_nested(self,obj,path):
+        keys=path.split('.')
+        current=obj
+        for key in keys:
+            if isinstance(current,dict) and key in current:current=current[key]
+            else:return None
+        return current
+
+    def _set_nested(self,obj,path,value):
+        keys=path.split('.')
+        current=obj
+        for key in keys[:-1]:
+            if key not in current or not isinstance(current[key],dict):current[key]={}
+            current=current[key]
+        current[keys[-1]]=value
+
+    def _encrypt_sensitive(self,config):
+        for field_path in _SENSITIVE_CONFIG_FIELDS:
+            value=self._get_nested(config,field_path)
+            if value and not str(value).startswith("ENC("):
+                self._set_nested(config,field_path,self.encrypt_value(str(value)))
+        return config
+
+    def _decrypt_sensitive(self,config):
+        for field_path in _SENSITIVE_CONFIG_FIELDS:
+            value=self._get_nested(config,field_path)
+            if value and str(value).startswith("ENC("):
+                self._set_nested(config,field_path,self.decrypt_value(str(value)))
+        return config
+
+    @classmethod
+    def initialize_encryption(cls,password=None):
+        """初始化加密系统"""
+        key_file=PROJECT_DIR/'config'/'.encryption_key'
+        salt_file=PROJECT_DIR/'config'/'.salt'
+        if os.path.exists(key_file):
+            return True,'加密系统已初始化'
+        if not password or len(password)<8:
+            return False,'密码长度至少需要8个字符'
+        if Fernet is None or hashes is None or PBKDF2HMAC is None:
+            return False,'cryptography库未安装'
+        try:
+            salt=os.urandom(16)
+            kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
+            key=base64.urlsafe_b64encode(kdf.derive(password.encode()))
+            os.makedirs(os.path.dirname(key_file),exist_ok=True)
+            with open(key_file,'wb') as f:f.write(key)
+            with open(salt_file,'wb') as f:f.write(salt)
+            config_file=PROJECT_DIR/'config'/'config.json'
+            if os.path.exists(config_file):
+                mgr=cls()
+                if mgr._fernet is None:
+                    mgr._fernet=Fernet(key)
+                with open(config_file,'r',encoding='utf-8') as f:config=json.load(f)
+                config=mgr._encrypt_sensitive(config)
+                with open(config_file,'w',encoding='utf-8') as f:
+                    json.dump(config,f,ensure_ascii=False,indent=2)
+            return True,'加密系统初始化成功'
+        except Exception as e:  # [HANDLED]
+            return False,f'初始化失败: {e}'
+
+logger.debug('='*60)
+logger.debug('OK - Security Check & Audit System v3.8.89.31 Loaded!')
+logger.debug('='*60)
+
+
+def _auto_encrypt_config():
+    """自动加密config.json中的明文敏感字段（首次运行或加密未激活时）"""
+    try:
+        config_file = Path(PROJECT_DIR) / 'config' / 'config.json'
+        if not config_file.exists():
+            return
+        with open(config_file, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        has_plaintext = False
+        for field_path in _SENSITIVE_CONFIG_FIELDS:
+            keys = field_path.split('.')
+            current = config
+            for key in keys:
+                if isinstance(current, dict) and key in current:
+                    current = current[key]
+                else:
+                    current = None
+                    break
+            if current and isinstance(current, str) and not current.startswith('ENC('):
+                has_plaintext = True
+                break
+        if not has_plaintext:
+            return
+        mgr = SecureConfigManager()
+        if mgr._fernet is None:
+            password = os.environ.get('CONFIG_ENCRYPTION_KEY', '')
+            if not password:
+                password = secrets.token_urlsafe(32)
+                os.environ['CONFIG_ENCRYPTION_KEY'] = password
+            success, _ = SecureConfigManager.initialize_encryption(password)
+            if not success:
+                return
+            mgr = SecureConfigManager()
+        if mgr._fernet is not None:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            config = mgr._encrypt_sensitive(config)
+            with open(config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            logger.debug('[SecureConfig] OK - Auto-encrypted sensitive fields in config.json')
+    except Exception as e:  # [HANDLED]
+        logger.debug(f'[SecureConfig] WARNING - Auto-encryption failed: {e}')
+
+_auto_encrypt_config()
+
 TUNNEL_CONFIG = {
     'cf_max_retries': int(os.environ.get('CF_MAX_RETRIES', '3')),
     'cf_retry_delay': int(os.environ.get('CF_RETRY_DELAY', '60')),
@@ -2464,16 +2641,30 @@ class Environment:
     
     @staticmethod
     def test_pip_mirror(mirror_url, timeout=None):
-        """测试pip镜像源速度"""
+        """测试pip镜像源速度（带容错）"""
+        import ssl
         if timeout is None:
-            timeout = TIMEOUT_CONFIG['http_request']
-        try:
-            start_time = time.time()
-            urllib.request.urlopen(mirror_url, timeout=timeout)
-            elapsed_time = time.time() - start_time
-            return elapsed_time
-        except (urllib.error.URLError, urllib.error.HTTPError, socket.timeout, OSError) as e:
-            return None
+            timeout = TIMEOUT_CONFIG['http_request_long']
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                start_time = time.time()
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                req = urllib.request.Request(mirror_url, method='HEAD')
+                urllib.request.urlopen(req, timeout=timeout, context=ctx)
+                elapsed_time = time.time() - start_time
+                return round(elapsed_time, 3)
+            except urllib.error.HTTPError as e:
+                elapsed_time = time.time() - start_time
+                return round(elapsed_time, 3)
+            except Exception as e:
+                if attempt < max_retries:
+                    time.sleep(0.3)
+                else:
+                    return None
+        return None
     
     @staticmethod
     def get_fastest_pip_mirror():
@@ -3875,14 +4066,15 @@ class EmailNotifier:
     
     def get_email_config(self):
         """获取邮件配置"""
+        config = self.config_manager.load_config()
         return {
-            'enabled': self.config_manager.get('email_notification_enabled', False),
-            'smtp_host': self.config_manager.get('email_smtp_host', 'smtp.qq.com'),
-            'smtp_port': self.config_manager.get('email_smtp_port', 587),
-            'smtp_user': self.config_manager.get('email_smtp_user', ''),
-            'smtp_password': self.config_manager.get('email_smtp_password', ''),
-            'from_name': self.config_manager.get('email_from_name', '公网IP监控'),
-            'to_email': self.config_manager.get('email_to', '980187223@qq.com'),
+            'enabled': config.get('email_notification_enabled', False),
+            'smtp_host': config.get('email_smtp_host', 'smtp.qq.com'),
+            'smtp_port': config.get('email_smtp_port', 587),
+            'smtp_user': config.get('email_smtp_user', ''),
+            'smtp_password': config.get('email_smtp_password', ''),
+            'from_name': config.get('email_from_name', '公网IP监控'),
+            'to_email': config.get('email_to', '980187223@qq.com'),
         }
     
     def send_tunnel_notification(self, tunnel_url, event_type='new'):
@@ -6794,13 +6986,31 @@ def select_pip_mirror(venv_path: str):
     ]
 
     def test_mirror(name, url):
-        try:
-            start = time.time()
-            urllib.request.urlopen(url, timeout=TIMEOUT_CONFIG['socket_connect'])
-            return round(time.time() - start, 3)
-        except Exception as e:  # [HANDLED]
-            logger.warning(f'Mirror test failed for {name}: {e}')
-            return None
+        import ssl
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                start = time.time()
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                req = urllib.request.Request(url, method='HEAD')
+                resp = urllib.request.urlopen(req, timeout=TIMEOUT_CONFIG['http_request_long'], context=ctx)
+                elapsed = round(time.time() - start, 3)
+                logger.debug(f'    [OK] {name}: {elapsed}s (attempt {attempt+1})')
+                return elapsed
+            except urllib.error.HTTPError as e:
+                elapsed = round(time.time() - start, 3)
+                logger.debug(f'    [~] {name}: HTTP {e.code} ({elapsed}s)')
+                return elapsed
+            except Exception as e:
+                if attempt < max_retries:
+                    logger.debug(f'    [FAIL] {name} attempt {attempt+1}: {str(e)[:60]}')
+                    time.sleep(0.5)
+                else:
+                    logger.debug(f'    [FAIL] {name}: exhausted')
+                    return None
+        return None
 
     logger.debug("[*] 检测到未配置pip镜像源，正在测试镜像源速度...")
     os.makedirs(os.path.join(venv_path, "pip_config"), exist_ok=True)
@@ -9638,7 +9848,7 @@ if __name__ == '__main__':
 
                 req = urllib.request.Request(web_url, method='HEAD')
                 req.add_header('User-Agent', 'hostc-heartbeat/1.0')
-                urllib.request.urlopen(req, timeout=TIMEOUT_CONFIG['socket_connect'])
+                urllib.request.urlopen(req, timeout=TIMEOUT_CONFIG['http_request_long'])
                 with _tunnel_state_lock:
                     tunnel_last_heartbeat = time.time()
                     tunnel_heartbeat_failed = False
@@ -11590,181 +11800,8 @@ class DependencyAuditor:
             elif a>b:return False
         return False
 
-_SENSITIVE_CONFIG_FIELDS=['login.password','headers.cookie','email_smtp_password']
-
-class SecureConfigManager:
-    """安全配置管理器 - 整合原config_secure_template.py"""
-
-    _instance=None
-    _fernet=None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance=super().__new__(cls)
-            cls._instance._initialize()
-        return cls._instance
-
-    def _initialize(self):
-        key_file=PROJECT_DIR/'config'/'.encryption_key'
-        salt_file=PROJECT_DIR/'config'/'.salt'
-        if os.path.exists(key_file) and os.path.exists(salt_file):
-            key=self._load_key(key_file,salt_file)
-            if key:
-                if Fernet is not None:
-                    try:
-                        self._fernet=Fernet(key)
-                    except (ValueError, TypeError):pass  # [INTENTIONAL_PLACEHOLDER]
-
-    def _load_key(self,key_file,salt_file):
-        env_key=os.environ.get('CONFIG_ENCRYPTION_KEY')
-        if env_key:
-            if hashes is not None and PBKDF2HMAC is not None:
-                try:
-                    with open(salt_file,'rb') as f:salt=f.read()
-                    kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
-                    return base64.urlsafe_b64encode(kdf.derive(env_key.encode()))
-                except Exception:return None
-        if os.path.exists(key_file):
-            with open(key_file,'rb') as f:return f.read()
-        return None
-
-    def encrypt_value(self,value):
-        if not self._fernet:raise RuntimeError("加密器未初始化")
-        encrypted=self._fernet.encrypt(value.encode())
-        return f"ENC({encrypted.decode()})"
-
-    def decrypt_value(self,encrypted_value):
-        if not encrypted_value.startswith("ENC("):return encrypted_value
-        if not self._fernet:raise RuntimeError("加密器未初始化")
-        try:
-            encrypted=encrypted_value[4:-1]
-            return self._fernet.decrypt(encrypted.encode()).decode()
-        except Exception:return ""
-
-    def load_config(self):
-        config_file=PROJECT_DIR/'config'/'config.json'
-        if not os.path.exists(config_file):return {}
-        with open(config_file,'r',encoding='utf-8') as f:config=json.load(f)
-        return self._decrypt_sensitive(config)
-
-    def save_config(self,config):
-        config=self._encrypt_sensitive(config)
-        config_file=PROJECT_DIR/'config'/'config.json'
-        os.makedirs(os.path.dirname(config_file),exist_ok=True)
-        with open(config_file,'w',encoding='utf-8') as f:
-            json.dump(config,f,ensure_ascii=False,indent=2)
-
-    def _get_nested(self,obj,path):
-        keys=path.split('.')
-        current=obj
-        for key in keys:
-            if isinstance(current,dict) and key in current:current=current[key]
-            else:return None
-        return current
-
-    def _set_nested(self,obj,path,value):
-        keys=path.split('.')
-        current=obj
-        for key in keys[:-1]:
-            if key not in current or not isinstance(current[key],dict):current[key]={}
-            current=current[key]
-        current[keys[-1]]=value
-
-    def _encrypt_sensitive(self,config):
-        for field_path in _SENSITIVE_CONFIG_FIELDS:
-            value=self._get_nested(config,field_path)
-            if value and not str(value).startswith("ENC("):
-                self._set_nested(config,field_path,self.encrypt_value(str(value)))
-        return config
-
-    def _decrypt_sensitive(self,config):
-        for field_path in _SENSITIVE_CONFIG_FIELDS:
-            value=self._get_nested(config,field_path)
-            if value and str(value).startswith("ENC("):
-                self._set_nested(config,field_path,self.decrypt_value(str(value)))
-        return config
-
-    @classmethod
-    def initialize_encryption(cls,password=None):
-        """初始化加密系统"""
-        key_file=PROJECT_DIR/'config'/'.encryption_key'
-        salt_file=PROJECT_DIR/'config'/'.salt'
-        if os.path.exists(key_file):
-            return True,'加密系统已初始化'
-        if not password or len(password)<8:
-            return False,'密码长度至少需要8个字符'
-        if Fernet is None or hashes is None or PBKDF2HMAC is None:
-            return False,'cryptography库未安装'
-        try:
-            salt=os.urandom(16)
-            kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
-            key=base64.urlsafe_b64encode(kdf.derive(password.encode()))
-            os.makedirs(os.path.dirname(key_file),exist_ok=True)
-            with open(key_file,'wb') as f:f.write(key)
-            with open(salt_file,'wb') as f:f.write(salt)
-            config_file=PROJECT_DIR/'config'/'config.json'
-            if os.path.exists(config_file):
-                mgr=cls()
-                if mgr._fernet is None:
-                    mgr._fernet=Fernet(key)
-                with open(config_file,'r',encoding='utf-8') as f:config=json.load(f)
-                config=mgr._encrypt_sensitive(config)
-                with open(config_file,'w',encoding='utf-8') as f:
-                    json.dump(config,f,ensure_ascii=False,indent=2)
-            return True,'加密系统初始化成功'
-        except Exception as e:  # [HANDLED]
-            return False,f'初始化失败: {e}'
-
-logger.debug('='*60)
-logger.debug('OK - Security Check & Audit System v3.8.89.31 Loaded!')
-logger.debug('='*60)
 
 
-def _auto_encrypt_config():
-    """自动加密config.json中的明文敏感字段（首次运行或加密未激活时）"""
-    try:
-        config_file = Path(PROJECT_DIR) / 'config' / 'config.json'
-        if not config_file.exists():
-            return
-        with open(config_file, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        has_plaintext = False
-        for field_path in _SENSITIVE_CONFIG_FIELDS:
-            keys = field_path.split('.')
-            current = config
-            for key in keys:
-                if isinstance(current, dict) and key in current:
-                    current = current[key]
-                else:
-                    current = None
-                    break
-            if current and isinstance(current, str) and not current.startswith('ENC('):
-                has_plaintext = True
-                break
-        if not has_plaintext:
-            return
-        mgr = SecureConfigManager()
-        if mgr._fernet is None:
-            password = os.environ.get('CONFIG_ENCRYPTION_KEY', '')
-            if not password:
-                password = secrets.token_urlsafe(32)
-                os.environ['CONFIG_ENCRYPTION_KEY'] = password
-            success, _ = SecureConfigManager.initialize_encryption(password)
-            if not success:
-                return
-            mgr = SecureConfigManager()
-        if mgr._fernet is not None:
-            with open(config_file, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            config = mgr._encrypt_sensitive(config)
-            with open(config_file, 'w', encoding='utf-8') as f:
-                json.dump(config, f, ensure_ascii=False, indent=2)
-            logger.debug('[SecureConfig] ✅ 已自动加密config.json中的敏感字段')
-    except Exception as e:  # [HANDLED]
-        logger.debug(f'[SecureConfig] ⚠️ 自动加密失败: {e}')
-
-_auto_encrypt_config()
-# 
 
 # [CSRF_FULL_IMPLEMENTATION]
 # CSRF Protection Implementation Status:

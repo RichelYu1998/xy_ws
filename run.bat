@@ -7,7 +7,7 @@ title Szwego Crawler Tool
 
 call :check_admin_rights
 if errorlevel 1 (
-    echo [*] 正在请求管理员权限...
+    call :log [*] 正在请求管理员权限...
     powershell -NoProfile -Command "Start-Process cmd -ArgumentList '/c \"%~f0\"' -Verb RunAs"
     exit /b 0
 )
@@ -49,29 +49,29 @@ goto main_start
 :check_admin_rights
 net session >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] 需要管理员权限
+    call :log [ERROR] 需要管理员权限
     exit /b 1
 )
 exit /b 0
 
 :check_prerequisites
-echo [*] 检查前置条件...
+call :log [*] 检查前置条件...
 
 where curl >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] 未找到 curl.exe，需要 Windows 10 1803+ 或 Windows 11
+    call :log [ERROR] 未找到 curl.exe，需要 Windows 10 1803+ 或 Windows 11
     exit /b 1
 )
 
 where powershell >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] 未找到 PowerShell
+    call :log [ERROR] 未找到 PowerShell
     exit /b 1
 )
 
 where winget >nul 2>&1
 if errorlevel 1 (
-    echo [*] 未找到 Winget，正在自动安装...
+    call :log [*] 未找到 Winget，正在自动安装...
     call :auto_install_winget
     where winget >nul 2>&1
     if not errorlevel 1 echo [*] Winget 安装成功
@@ -79,7 +79,7 @@ if errorlevel 1 (
 
 where choco >nul 2>&1
 if errorlevel 1 (
-    echo [*] 未找到 Chocolatey，正在自动安装...
+    call :log [*] 未找到 Chocolatey，正在自动安装...
     call :auto_install_choco
     where choco >nul 2>&1
     if not errorlevel 1 echo [*] Chocolatey 安装成功
@@ -87,21 +87,21 @@ if errorlevel 1 (
 
 where git >nul 2>&1
 if errorlevel 1 (
-    echo [*] 未找到 Git，正在自动安装...
+    call :log [*] 未找到 Git，正在自动安装...
     call :auto_install_git
     where git >nul 2>&1
     if errorlevel 1 (
-        echo [ERROR] Git 安装失败，请手动安装: https://git-scm.com/download/win
+        call :log [ERROR] Git 安装失败，请手动安装: https://git-scm.com/download/win
         exit /b 1
     )
-    echo [*] Git 安装成功
+    call :log [*] Git 安装成功
 )
 
-echo [*] 前置条件检查通过
+call :log [*] 前置条件检查通过
 exit /b 0
 
 :auto_install_winget
-echo     轮询最快Winget安装源...
+call :log 轮询最快Winget安装源...
 set "WG_MIRRORS[0]=https://mirrors.huaweicloud.com/microsoft/winget-cli/latest/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle|华为云"
 set "WG_MIRRORS[1]=https://github.com/microsoft/winget-cli/releases/latest/download/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle|GitHub官方"
 set "WG_BEST_URL="
@@ -116,26 +116,26 @@ for /L %%i in (0,1,1) do (
             if defined WG_INT if !WG_INT! LSS !WG_MIN_TIME! (
                 set "WG_MIN_TIME=!WG_INT!"
                 set "WG_BEST_URL=!WG_URL!"
-                echo         !WG_NAME!: !WG_TIME!s [!WG_INT!ms]
+                call :log !WG_NAME!: !WG_TIME!s [!WG_INT!ms]
             )
         )
     )
 )
 if defined WG_BEST_URL (
-    echo     使用最快镜像下载Winget...
+    call :log 使用最快镜像下载Winget...
     curl.exe -L -o "%TEMP%\winget-installer.msixbundle" "!WG_BEST_URL!" 2>nul
     if exist "%TEMP%\winget-installer.msixbundle" (
         powershell -NoProfile -Command "Add-AppxPackage -Path '%TEMP%\winget-installer.msixbundle'" 2>nul
         del "%TEMP%\winget-installer.msixbundle" 2>nul
     )
 ) else (
-    echo     尝试通过Microsoft Store安装Winget...
+    call :log 尝试通过Microsoft Store安装Winget...
     powershell -NoProfile -Command "Start-Process 'ms-windows-store://pdp/?ProductId=9NBLGGH4NNS2'" 2>nul
 )
 exit /b 0
 
 :auto_install_choco
-echo     轮询最快Chocolatey安装源...
+call :log 轮询最快Chocolatey安装源...
 set "CCO_MIRRORS[0]=https://mirrors.huaweicloud.com/chocolatey/install.ps1|华为云"
 set "CCO_MIRRORS[1]=https://community.chocolatey.org/install.ps1|Chocolatey官方"
 set "CCO_BEST_URL=https://community.chocolatey.org/install.ps1"
@@ -150,12 +150,12 @@ for /L %%i in (0,1,1) do (
             if defined CCO_INT if !CCO_INT! LSS !CCO_MIN_TIME! (
                 set "CCO_MIN_TIME=!CCO_INT!"
                 set "CCO_BEST_URL=!CCO_URL!"
-                echo         !CCO_NAME!: !CCO_TIME!s [!CCO_INT!ms]
+                call :log !CCO_NAME!: !CCO_TIME!s [!CCO_INT!ms]
             )
         )
     )
 )
-echo     使用最快镜像安装Chocolatey...
+call :log 使用最快镜像安装Chocolatey...
 powershell -NoProfile -Command "Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('!CCO_BEST_URL!'))" 2>nul
 
 :: 刷新当前会话的PATH（关键修复）
@@ -163,7 +163,7 @@ call :refresh_path
 exit /b 0
 
 :refresh_path
-echo     刷新环境变量...
+call :log 刷新环境变量...
 set "PATH=%PATH%;C:\ProgramData\chocolatey\bin"
 
 :: 等待choco命令可用（最多等待10秒）
@@ -174,9 +174,9 @@ for /L %%w in (1,1,10) do (
 
 :choco_ready
 if exist "C:\ProgramData\chocolatey\bin\choco.exe" (
-    echo     Chocolatey 已就绪
+    call :log Chocolatey 已就绪
 ) else (
-    echo     [WARNING] Chocolatey 可能未完全安装，部分功能可能不可用
+    call :log [WARNING] Chocolatey 可能未完全安装，部分功能可能不可用
 )
 exit /b
 
@@ -187,23 +187,23 @@ exit /b
 
 :auto_install_git
 call :get_latest_git_version
-echo     检测到Git最新版本: %GIT_LATEST_VERSION%
+call :log 检测到Git最新版本: %GIT_LATEST_VERSION%
 
 where winget >nul 2>&1
 if not errorlevel 1 (
-    echo     使用 Winget 安装 Git...
+    call :log 使用 Winget 安装 Git...
     winget install Git.Git --accept-package-agreements --accept-source-agreements --silent >nul 2>&1
     if not errorlevel 1 exit /b 0
 )
 
 where choco >nul 2>&1
 if not errorlevel 1 (
-    echo     使用 Chocolatey 安装 Git...
+    call :log 使用 Chocolatey 安装 Git...
     choco install git -y >nul 2>&1
     if not errorlevel 1 exit /b 0
 )
 
-echo     轮询最快Git镜像源并下载...
+call :log 轮询最快Git镜像源并下载...
 set "GIT_VERSION=%GIT_LATEST_VERSION%"
 set "GIT_MIRRORS[0]=https://mirrors.huaweicloud.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|华为云"
 set "GIT_MIRRORS[1]=https://registry.npmmirror.com/-/binary/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|npmmirror"
@@ -220,12 +220,12 @@ for /L %%i in (0,1,2) do (
             if defined GM_INT if !GM_INT! LSS !GIT_MIN_TIME! (
                 set "GIT_MIN_TIME=!GM_INT!"
                 set "GIT_BEST_URL=!GM_URL!"
-                echo         !GM_NAME!: !GM_TIME!s [!GM_INT!ms]
+                call :log !GM_NAME!: !GM_TIME!s [!GM_INT!ms]
             )
         )
     )
 )
-echo     使用最快镜像下载Git...
+call :log 使用最快镜像下载Git...
 if not exist "%TEMP%\git-installer.exe" (
     curl.exe -L -o "%TEMP%\git-installer.exe" "!GIT_BEST_URL!" 2>nul
 )
@@ -246,7 +246,7 @@ exit /b
 
 :log
 call :ms_timestamp
-echo [%TIMESTAMP%] %*
+    echo [%TIMESTAMP%] %*
 if not "%LOG_FILE%"=="" (
     if exist "!LOG_FILE!" (
         >> "!LOG_FILE!" echo [%TIMESTAMP%] %* 2>nul
@@ -265,7 +265,7 @@ exit /b
 
 :log_console_only
 call :ms_timestamp
-echo [%TIMESTAMP%] %*
+    echo [%TIMESTAMP%] %*
 exit /b
 
 :log_blank_console_only
@@ -450,7 +450,7 @@ exit /b 0
 
 :get_latest_python_version
 set "PYTHON_LATEST_VERSION="
-echo     正在获取Python最新版本（使用国内镜像）...
+call :log 正在获取Python最新版本（使用国内镜像）...
 
 :: 方法1: 使用短超时 + 多次重试（GitHub API）
 for /L %%r in (1,1,3) do (
@@ -461,7 +461,7 @@ for /L %%r in (1,1,3) do (
 
 :: 方法2: 失败时使用国内镜像源获取版本信息
 if not defined PYTHON_LATEST_VERSION (
-    echo     [WARNING] GitHub API 获取失败，尝试国内镜像...
+    call :log [WARNING] GitHub API 获取失败，尝试国内镜像...
     for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://mirrors.huaweicloud.com/python/ 2^>nul ^| powershell -NoProfile -Command "$input ^| Select-String -Pattern ""python-[0-9]+\.[0-9]+\.[0-9]+"" ^| Select-Object -First 1"') do (
         for /f "tokens=2 delims=-" %%p in ("%%v") do set "PYTHON_LATEST_VERSION=%%p"
     )
@@ -469,11 +469,11 @@ if not defined PYTHON_LATEST_VERSION (
 
 :python_version_done
 if not defined PYTHON_LATEST_VERSION (
-    echo     [WARNING] 所有方式获取失败，使用安全默认值
+    call :log [WARNING] 所有方式获取失败，使用安全默认值
     set "PYTHON_LATEST_VERSION=3.12.6"
 )
 
-echo     检测到Python最新版本: %PYTHON_LATEST_VERSION%
+call :log 检测到Python最新版本: %PYTHON_LATEST_VERSION%
 exit /b
 
 :auto_install_python
@@ -582,7 +582,7 @@ exit /b 0
 
 :get_latest_node_version
 set "NODE_LATEST_VERSION="
-echo     正在获取Node.js最新版本（使用国内镜像）...
+call :log 正在获取Node.js最新版本（使用国内镜像）...
 
 :: 方法1: 使用短超时 + 多次重试（GitHub API）
 for /L %%r in (1,1,3) do (
@@ -593,17 +593,17 @@ for /L %%r in (1,1,3) do (
 
 :: 方法2: 失败时使用国内镜像源获取版本信息
 if not defined NODE_LATEST_VERSION (
-    echo     [WARNING] GitHub API 获取失败，尝试国内镜像...
+    call :log [WARNING] GitHub API 获取失败，尝试国内镜像...
     for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://npmmirror.com/mirrors/node/ 2^>nul ^| powershell -NoProfile -Command "$input ^| Select-String -Pattern ""v[0-9]+\.[0-9]+\.[0-9]+"" ^| Select-Object -First 1"') do set "NODE_LATEST_VERSION=%%v"
 )
 
 :node_version_done
 if not defined NODE_LATEST_VERSION (
-    echo     [WARNING] 所有方式获取失败，使用安全默认值
+    call :log [WARNING] 所有方式获取失败，使用安全默认值
     set "NODE_LATEST_VERSION=v20.17.0"
 )
 
-echo     检测到Node.js最新版本: %NODE_LATEST_VERSION%
+call :log 检测到Node.js最新版本: %NODE_LATEST_VERSION%
 exit /b
 
 :auto_install_node
@@ -672,7 +672,7 @@ exit /b 0
 call :log [3/6] 测试PIP加速镜像源...
 
 if not defined PYTHON_CMD (
-    set "FASTEST_PIP_MIRROR=https://pypi.org/simple/"
+    set "FASTEST_PIP_MIRROR=https://mirrors.aliyun.com/pypi/simple/"
     exit /b 0
 )
 
@@ -691,7 +691,7 @@ for /L %%i in (0,1,3) do (
         set "MIRROR_NAME=%%b"
         call :log     测试 !MIRROR_NAME!...
         
-        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 1.5 --max-time 2 "!MIRROR_URL!" 2^>nul') do set "TEST_TIME=%%t"
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 8 --max-time 15 "!MIRROR_URL!" 2^>nul') do set "TEST_TIME=%%t"
         
         if defined TEST_TIME if not "!TEST_TIME!"=="0" if not "!TEST_TIME!"=="0.000000" (
             for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!TEST_TIME!\'*1000)" 2^>nul') do set "PIP_INT_TIME=%%m"
@@ -709,8 +709,8 @@ for /L %%i in (0,1,3) do (
 )
 
 if "!BEST_MIRROR!"=="" (
-    call :log [WARNING] 所有镜像测试失败，使用默认PyPI源
-    set "FASTEST_PIP_MIRROR=https://pypi.org/simple/"
+    call :log [WARNING] 所有PIP镜像测试失败，使用默认阿里云源
+    set "FASTEST_PIP_MIRROR=https://mirrors.aliyun.com/pypi/simple/"
 ) else (
     set "FASTEST_PIP_MIRROR=!BEST_MIRROR!"
     call :log_blank
@@ -776,7 +776,7 @@ for /L %%i in (0,1,1) do (
         set "NPM_NAME=%%b"
         call :log     测试 !NPM_NAME!...
         
-        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 3 "!NPM_URL!" 2^>nul') do set "NPM_TEST_TIME=%%t"
+        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 8 --max-time 15 "!NPM_URL!" 2^>nul') do set "NPM_TEST_TIME=%%t"
         
         if defined NPM_TEST_TIME if not "!NPM_TEST_TIME!"=="0" if not "!NPM_TEST_TIME!"=="0.000000" (
             for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!NPM_TEST_TIME!\'*1000)" 2^>nul') do set "NPM_INT_TIME=%%m"
@@ -794,7 +794,14 @@ for /L %%i in (0,1,1) do (
 )
 
 if "!NPM_BEST_MIRROR!"=="" (
-    call :log [WARNING] NPM镜像测试失败
+    call :log [WARNING] NPM镜像测试失败，强制使用淘宝源（范式规定：禁止官方源）
+    set "FASTEST_NPM_MIRROR=https://registry.npmmirror.com"
+    npm config set registry "!FASTEST_NPM_MIRROR!"
+    call :log [*] NPM镜像已设置为: !FASTEST_NPM_MIRROR!
+
+    call :log [*] 持久化NPM镜像到系统环境变量...
+    setx NPM_CONFIG_REGISTRY "!FASTEST_NPM_MIRROR!" >nul 2>&1
+    call :log     已写入系统环境变量: NPM_CONFIG_REGISTRY=!FASTEST_NPM_MIRROR!
 ) else (
     set "FASTEST_NPM_MIRROR=!NPM_BEST_MIRROR!"
     call :log_blank
@@ -1075,3 +1082,5 @@ call :kill_process_safe python.exe main.py
 call :kill_process_safe hostc.exe
 call :log 清理完成
 goto :eof
+
+
