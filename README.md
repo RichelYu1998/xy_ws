@@ -168,6 +168,30 @@ bandit -r . -f json -o bandit_report.json
 ## 🔄 最新更新
 ---
 
+
+### v5.0.9.46 (2026-09-04) - 范式统一 - PY-CORE-029: CMD窗口输出与web_output.log一致性规范
+
+#### 更新内容:
+1. run.bat移除UTF-8 BOM导致@echo off失效问题,所有echo改为call:log(97处修改)
+2. run.sh修复6处裸echo,统一使用log()函数(44处修改)
+3. 新增README.md日志输出规范章节(第54-95行),提供快速参考指南
+4. skill.docx从skill.md重新生成(36714 bytes)
+5. 建立自动化检查机制:未来每次修改run.bat/run.sh必须符合PY-CORE-029范式
+
+**核心改进**:
+- 禁止命令回显: 移除BOM后@echo off正常工作
+- 统一时间戳格式: [YYYY-MM-DD HH:MM:SS.mmm]
+- 双通道输出: 控制台+web_output.log同步写入
+- 消息类型标记: [*] [ERROR] [WARNING] [1/N]
+- 零裸echo: run.bat 0处/run.sh 0处(除日志函数内部)
+
+**更新日期**: 2026-09-04
+**更新类型**: 范式统一 + 文档完善 + 功能增强
+**影响文件**: run.bat, run.sh, README.md, skill.md, skill.docx
+**Commit**: 5a0be716
+**作者**: 小旭二手机（西园路）
+
+---
 ### v5.0.9.45 (2026-09-04) - 🐛 **Bug修复** - 修复邮件发送失败的根本原因(敏感配置字段名错误)
 
 #### 更新内容: ①修复SecureConfigManager敏感字段列表中的配置项名称错误:`email.smtp_password`(带点号,无法匹配config.json中的实际字段)→`email_smtp_password`(下划线格式,与config.json完全一致) ②根本原因分析:v5.0.9.44虽然重新加密了密码并验证邮件发送成功,但_SENSITIVE_CONFIG_FIELDS列表中的字段名仍为旧的点号格式,导致SecureConfigManager在读取配置时无法正确识别email_smtp_password为敏感字段,可能影响后续的加密解密流程和日志脱敏 ③验证修复:确认main.py第11593行的_SENSITIVE_CONFIG_FIELDS现在包含正确的`email_smtp_password`字段名,与config.json第47行的字段名完全匹配 ④影响范围:此修复确保敏感配置管理器能正确识别和保护SMTP密码字段,防止密码在日志中明文显示

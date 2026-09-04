@@ -2214,6 +2214,43 @@ PY-CORE-025 (API整体架构)
 
 ------
 
+
+
+### 实施记录: v5.0.9.46 (2026-09-04) - 首次全面落地
+
+#### 实施内容:
+1. **run.bat 范式化改造** (97处修改):
+   - 移除 UTF-8 BOM (EF BB BF), 解决 @echo off 失效问题
+   - 所有 echo 替换为 call :log (保留 :log 函数内部 echo)
+   - 涉及函数: :check_admin_rights, :check_prerequisites, :auto_install_* 等30+个
+   
+2. **run.sh 范式化改造** (6处修改):
+   - sudo 权限提示: echo 改为 log
+   - Python 版本获取: 5处 echo 改为 log
+   
+3. **文档同步更新**:
+   - README.md: 新增日志输出规范章节(第54-95行)
+   - skill.docx: 从 skill.md 重新生成(36714 bytes)
+
+#### 验证结果:
+- run.bat 首字节为 0x40 (@), 无 BOM
+- findstr 检查: 0处裸echo (除:log函数内)
+- grep 检查: 0处裸echo (除log()函数内)
+- CMD 窗口输出与 web_output.log 逐行一致
+- 时间戳格式正确: [YYYY-MM-DD HH:MM:SS.mmm]
+
+#### 技术细节:
+- BOM 检测: ReadAllBytes() 读取前3字节
+- 批量替换: PowerShell 正则 echo 改为 call :log
+- 回归测试: 对比 web_output.log 历史输出
+
+**实施日期**: 2026-09-04
+**实施者**: 小旭二手机（西园路）
+**Commit**: 5a0be716
+**状态**: 已完成并通过验证
+
+---
+
 ## 🔴 PY-CORE-028: 四点版本一致性保障范式 (Four-Point Version Consistency Guarantee)
 
 ### 范式描述
