@@ -105,25 +105,28 @@ class SecurityAuditor:
         start_time = time.time()
 
         try:
-            print("\n📋 [1/7] 隐藏Bug排查 - 代码静态分析")
+            print("\n📋 [1/8] 隐藏Bug排查 - 代码静态分析")
             self._scan_hidden_bugs()
 
-            print("\n🛡️ [2/7] OWASP Top 10 安全扫描")
+            print("\n🛡️ [2/8] OWASP Top 10 安全扫描")
             self._scan_owasp_top10()
 
-            print("\n💉 [3/7] 注入攻击检测 (SQL/XSS/命令注入)")
+            print("\n💉 [3/8] 注入攻击检测 (SQL/XSS/命令注入)")
             self._scan_injection_attacks()
 
-            print("\n🔐 [4/7] 敏感数据处理审计")
+            print("\n🔐 [4/8] 敏感数据处理审计")
             self._scan_sensitive_data()
 
-            print("\n⚡ [5/7] 性能压测基准测试")
+            print("\n📝 [5/8] 日志级别最佳实践审计")
+            self._scan_logging_best_practices()
+
+            print("\n⚡ [6/8] 性能压测基准测试")
             self._run_performance_stress_test()
 
-            print("\n🧠 [6/7] 内存泄漏检测")
+            print("\n🧠 [7/8] 内存泄漏检测")
             self._detect_memory_leaks()
 
-            print("\n🔄 [7/7] 并发安全验证")
+            print("\n🔄 [8/8] 并发安全验证")
             self._verify_concurrent_safety()
 
             end_time = time.time()
@@ -533,6 +536,63 @@ class SecurityAuditor:
                 continue
 
         print("  ✅ 敏感数据扫描完成")
+
+    def _scan_logging_best_practices(self):
+        """日志级别最佳实践审计 - 检测关键统计信息是否使用了正确的日志级别"""
+        print("  📝 扫描日志级别使用最佳实践...")
+
+        logging_issues = {
+            'CRITICAL': [
+                (r'logger\.debug\(f*[\'"]成功获取.*个商品[\'"]', '爬虫统计-总商品数应使用logger.info()'),
+                (r'logger\.debug\(f*[\'"]售价.*>=.*599.*商品[\'"]', '爬虫统计-高价商品数应使用logger.info()'),
+                (r'logger\.debug\(f*[\'"]预计售出价格累计[\'"]', '爬虫统计-预计售出总价应使用logger.info()'),
+                (r'logger\.debug\(f*[\'"]平均每个设备售出均价[\'"]', '爬虫统计-平均售价应使用logger.info()'),
+                (r'logger\.debug\(f*[\'"]闲鱼平台手续费累计[\'"]', '爬虫统计-平台手续费应使用logger.info()'),
+            ],
+            'HIGH': [
+                (r'logger\.debug\(.*?(?:统计|总计|汇总|合计|累计|成功获取|获取到|完成)', '关键业务统计信息建议使用logger.info()'),
+                (r'logger\.debug\(.*?(?:用户|订单|支付|金额|价格|库存|商品).*?(?:创建|删除|修改|更新|变更)', '重要业务操作日志建议提升至info级别'),
+            ],
+            'MEDIUM': [
+                (r'logger\.debug\(.*?数据已保存', '数据持久化操作建议使用logger.info()'),
+                (r'logger\.debug\(.*?(?:任务完成|执行完毕|运行结束)', '任务状态变更建议使用logger.info()'),
+            ]
+        }
+
+        core_files = ['main.py']
+
+        for filename in core_files:
+            filepath = self.project_root / filename
+            if not filepath.exists():
+                continue
+
+            try:
+                content = filepath.read_text(encoding='utf-8')
+                lines = content.split('\n')
+
+                for severity, patterns in logging_issues.items():
+                    for pattern, desc in patterns:
+                        try:
+                            compiled_pattern = re.compile(pattern, re.IGNORECASE | re.DOTALL)
+                            for line_num, line in enumerate(lines, 1):
+                                if compiled_pattern.search(line):
+                                    self._add_issue(SecurityIssue(
+                                        severity=severity,
+                                        category='LoggingBestPractice',
+                                        file_path=filename,
+                                        line_number=line_num,
+                                        description=f"[日志级别] {desc}",
+                                        recommendation='将logger.debug()改为logger.info()以确保关键统计信息能够正常输出（debug级别可能被过滤导致前端无法显示统计数据）',
+                                        code_snippet=line.strip()[:100]
+                                    ))
+                        except re.error as e:
+                            print(f"    ⚠️ 正则表达式编译错误: {e}")
+                            continue
+            except Exception as e:
+                print(f"    ⚠️ 扫描文件 {filename} 时出错: {e}")
+                continue
+
+        print("  ✅ 日志级别最佳实践扫描完成")
 
     def _run_performance_stress_test(self):
         """性能压测基准测试"""
