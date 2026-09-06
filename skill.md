@@ -108,6 +108,7 @@ python main.py --web
 
 
 
+
 ### v5.0.9.47 (2026-09-04) - 🔧 Bug修复 - 启动脚本编码问题全面修复(时间格式+中文乱码+缺失函数)
 
 #### 更新内容:
@@ -167,6 +168,7 @@ python main.py --web
 
 
 
+
 ### v5.0.9.46 (2026-09-04) - 范式统一 - PY-CORE-029: CMD窗口输出与web_output.log一致性规范
 
 #### 更新内容:
@@ -211,6 +213,7 @@ python main.py --web
 **后续维护**: 强制PY-CORE-029验证,禁止裸echo和BOM
 
 ---
+
 
 
 
@@ -307,6 +310,7 @@ python main.py --web
 - ✅ SecureConfigManager能正确识别并保护SMTP密码字段
 
 ---
+
 
 
 
@@ -475,6 +479,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.43 (2026-09-04) - 🐛 **Bug修复** - 爬虫统计卡片显示问题修复(logger.debug→logger.info确保关键统计数据正常输出)+安全审计新增日志级别最佳实践自动检测功能
 
 ##### 1. 🐛Bug修复 (🐛Bug修复 - 爬虫统计卡片显示问题修复)
@@ -549,6 +554,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.42 (2026-09-03) - 🔧 **范式修复** - PY-CORE-027范式100%合规修复-将33个版本的简化格式转为标准格式(解决API返回空changes数组问题+前端显示空白)+三方文档同步(README+skill+docx)
 
 #### 更新内容: ①扫描README.md和skill.md中所有使用`#### 更新内容: ①...②...`简化格式的版本(共33个: README 19个+skill 14个) ②将每个简化格式版本拆分为标准PY-CORE-027范式的独立#####子项(每个①②③④⑤⑥⑦⑧生成独立的变更项) ③为每个生成的#####子项添加完整的三要素结构(问题描述/修复方案/测试验证) ④从skill.md重新生成skill.docx确保三方文档100%一致 ⑤验证API /api/changelog返回的changes字段不再为空数组(最新版v5.0.9.41包含8个变更项)
@@ -616,6 +622,7 @@ python config/crypto_tool.py encrypt-config
 - ✅ 前端JavaScript能正确遍历changes数组并渲染HTML内容
 - ✅ 用户反馈问题彻底解决("最新更新"区域正常显示)
 - ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
 
 
 
@@ -777,6 +784,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.40 (2026-09-03) - ✅ **数据完善** - 100%完成占位符替换-最后4个(v2.5.24/v2.5.23)使用真实Git数据(+9行-9行/+15行-5行)+三方文档同步
 
 #### 更新内容: ①定位最后4个遗漏的占位符(位于v2.5.24和v2.5.23版本条目) ②使用git show提取精确变更统计:v2.5.24为+9行-9行,v2.5.23为+15行-5行 ③更新README.md和skill.md对应位置 ④重新生成skill.docx(v36702字节) ⑤最终验证:全文搜索确认0个占位符残留
@@ -878,6 +886,7 @@ python config/crypto_tool.py encrypt-config
 
 ---
 ---
+
 
 
 
@@ -987,6 +996,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.38 (2026-09-03) - 🔧 **范式优化** - 严格遵循PY-CORE-027范式-清除全部42个+N行-M行占位符(使用真实git数据或合理估算值)+三方文档同步
 
 #### 更新内容: ①扫描README.md和skill.md中所有+N行-M行占位符(共42处) ②对每个占位符使用git show --shortstat获取真实变更统计(或基于文件大小合理估算) ③替换为具体数值如+15行 -3行格式 ④同步更新skill.docx保持三方文档100%一致 ⑤验证所有变更统计数字与Git实际数据匹配
@@ -1087,6 +1097,7 @@ python config/crypto_tool.py encrypt-config
 **作者**: 小旭二手机（西园路）**
 
 ---
+
 
 
 
@@ -1247,6 +1258,7 @@ python config/crypto_tool.py encrypt-config
 - ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
 
 ---
+
 
 
 
@@ -1414,6 +1426,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.35 (2026-09-03) - 🖥️ **范式新增** PY-CORE-029 CMD窗口输出与web_output.log一致性范式
 
 #### 更新内容: ①新增PY-CORE-029范式定义CMD窗口输出必须与web_output.log逐行一致 ②定义7类禁止出现的窗口噪音输出(命令回显/子程序调用/条件判断/循环展开/WMIC输出/编码设置回显/BOM错误) ③定义标准输出格式[YYYY-MM-DD HH:MM:SS.mmm]消息内容 ④定义消息前缀规范([*]/[1/N]/[WARNING]/[ERROR]) ⑤定义一致性验证检查清单(8项) ⑥定义run.bat和run.sh技术实现规范 ⑦同步更新README.md/skill.md/skill.docx三方一致
@@ -1571,6 +1584,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.34 (2026-09-02) - 🔗 **表格联动增强** 双向SKU精确匹配联动(顶部/中间/底部全覆盖)
 
 #### 更新内容: ①从Git恢复原版底部联动算法(特殊处理:让匹配商品显示在目标表格底部) ②修改顶部联动逻辑:删除强制同步到顶部改为SKU精确匹配(表1顶部32972→表0也滚动到32972而非82948) ③保留原版中间位置SKU精确跟随机制(保持相同偏移量) ④保留比例回退机制(SKU不存在时按滚动比例同步) ⑤清理所有多余调试日志恢复代码简洁性 ⑥确保双向联动完整(表0↔表1互相跟随)
@@ -1716,6 +1730,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.33 (2026-09-02) - 📱 **移动端优化** 移动端页面内容溢出屏幕问题最小化修复(保持原有样式)
 
 #### 更新内容: ①在超小屏幕媒体查询(@media max-width: 575.98px)中添加html,body{overflow-x:hidden;max-width:100%}防止移动端内容横向溢出 ②仅添加3行CSS代码解决溢出问题,不改变任何原有美观的卡片/按钮/表格/字体/间距样式 ③保持所有UI元素原始设计不变,只解决内容超出屏幕宽度的技术问题
@@ -1804,6 +1819,7 @@ python config/crypto_tool.py encrypt-config
 - ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
 
 ---
+
 
 
 
@@ -1914,6 +1930,7 @@ python config/crypto_tool.py encrypt-config
 - ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
 
 ---
+
 
 
 
@@ -2044,6 +2061,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.30 (2026-09-02) - 🐛 **Bug修复** 隧道按钮点击无反应+toggleTunnel逻辑完善(启动/停止双向切换)
 
 #### 更新内容: ①修复dist/app.js中toggleTunnel()函数只有启动逻辑缺少停止逻辑的严重Bug导致隧道运行时按钮点击无反应 ②修复updateTunnelUI()中运行状态按钮被disabled=true禁用导致用户无法交互的问题 ③新增完整的停止隧道功能(fetch /api/tunnel/stop + POST) ④优化按钮状态显示(启动中/停止中/连接中/运行中四种状态+对应图标和颜色) ⑤增加操作反馈Toast提示(启动成功/停止成功/失败提示)
@@ -2169,6 +2187,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.29 (2026-09-02) - 🔧 **跨平台兼容性修复** run.sh macOS兼容性根治(版本号检测+语法错误修复)
 
 #### 更新内容: ①修复run.sh版本号检测在macOS上显示v0.0.0的问题(BSD grep不支持-P Perl正则,改用-E扩展正则并支持多段版本号如5.0.9.28) ②修复run.sh第8行单引号字符串内转义引号冲突的语法错误 ③修复run.sh第123行log语句缺失闭合双引号的语法错误 ④验证脚本在macOS上成功启动并正确显示版本号v5.0.9.28
@@ -2272,6 +2291,7 @@ python config/crypto_tool.py encrypt-config
 - ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
 
 ---
+
 
 
 
@@ -2402,6 +2422,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.27 (2026-09-02) - 🔧 **优化** security_audit.py版本号改为动态从README.md获取
 
 #### 更新内容:
@@ -2444,6 +2465,7 @@ python config/crypto_tool.py encrypt-config
 **测试验证**:
 - ✅ 版本号自动获取测试: 审计报告显示正确的当前版本
 - ✅ 兼容性测试: 不影响现有审计功能
+
 
 
 
@@ -2555,6 +2577,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.25 (2026-09-02) - 🔧 **Bug修复** generate_docx.py路径修复+skill.docx重新生成
 
 #### 更新内容: 修复test/generate_docx.py读取skill.md的相对路径错误(Path('skill.md')→Path('../skill.md'))，使脚本在test目录运行时能正确读取根目录的skill.md并输出skill.docx到根目录，重新生成最新v5.0.9.24版skill.docx
@@ -2590,6 +2613,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.24 (2026-09-02) - 🔧 **三方版本对齐** Git/README/skill.md 366个版本100%一致
 
 #### 更新内容: 补入11个Git提交版本(v3.5.0/v4.1~v4.8/v5.0/v5.0.6/v5.0.7/v5.0.9/v5.0.9.3)，确保Git提到的每个版本在README.md和skill.md中都有对应记录
@@ -2621,6 +2645,7 @@ python config/crypto_tool.py encrypt-config
 - ✅ 所有新增版本包含完整的changes详情块
 
 ---
+
 
 
 
@@ -2678,6 +2703,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.22 (2026-09-02) - 🔄 **双向完全同步** README.md与skill.md互相补充达到100%一致
 
 #### 更新内容: 实现README.md与skill.md的双向同步，清理无效版本号，确保所有349个有效版本都包含完整的changes结构
@@ -2713,6 +2739,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.20 (2026-09-02) - 📚 **全面同步** skill.md补齐所有缺失版本达到100%一致
 
 #### 更新内容: skill.md补齐所有缺失版本(308个)，与README.md达成100%一致(350个版本) - 包含完整的changes结构
@@ -2743,6 +2770,7 @@ python config/crypto_tool.py encrypt-config
 - ✅ 不影响现有内容（纯增量添加）
 
 ---
+
 
 
 
@@ -2854,6 +2882,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.18 (2026-09-02) - 📝 **范式文档更新** Changelog版本变更详情完整结构范式
 
 #### 更新内容: ①skill.md新增PY-CORE-027 Changelog版本变更详情完整结构范式 ②定义标准化的changes块结构(问题描述/修复方案/测试验证) ③提供完整的字段规范、类型标签对照表、API数据映射和自动化检查脚本
@@ -2942,6 +2971,7 @@ python config/crypto_tool.py encrypt-config
 
 
 
+
 ### v5.0.9.17 (2026-09-02) - 🔧 **全面修复** 为10个缺失changes的版本添加完整变更详情
 
 #### 更新内容: 为10个缺失changes的版本(v5.0.9.6~v5.0.9.15)添加完整的变更详情结构(问题描述/修复方案/测试验证) - 解决API返回changes为空数组的问题
@@ -2973,6 +3003,7 @@ python config/crypto_tool.py encrypt-config
 - ✅ 前端Web界面正常展示变更详情
 
 ---
+
 
 
 
@@ -3069,6 +3100,7 @@ python config/crypto_tool.py encrypt-config
 
 ❌ 错误示例1：缺少changes块
 \\\markdown
+
 
 
 
@@ -3220,269 +3252,6 @@ PY-CORE-025 (API整体架构)
 
 
 
-### v5.0.9.14 (2026-08-31) - ✨ **功能增强** changelog API每个条目补充真实影响文件和变更统计
-
-#### 更新内容: 为changelog API的每个版本条目添加真实的影响文件列表和代码变更统计
-
-**修复日期**: 2026-08-31
-**修复类型**: ✨功能增强
-**影响文件**: [main.py](main.py)
-**Commit**: 869430d0
-**变更统计**: +42行 -42行(v5.0.9.14)
-**作者**: 小旭二手机（西园路）**
-
----
-
----
-
-##### 1. changelog API每个条目补充真实影响文件和变更统计 (✨功能增强)
-
-**问题描述**:
-- **现象**: changelog API返回的部分条目缺少真实的影响文件列表和代码行数统计
-- **根因**: 未集成git show --numstat命令获取真实的文件变更信息
-- **影响范围**: [main.py](main.py)
-
-**修复方案**:
-- **技术实现**: 使用git show --numstat批量获取每个提交的真实影响文件和行数统计
-- **参考位置**: commit 869430d0, [main.py](main.py)
-
-**测试验证**:
-- ✅ 每个条目都有真实的影响文件
-- ✅ 变更统计数据准确
-
-
-
-
-### v5.0.9.13 (2026-08-31) - ✨ **功能增强** changelog API历史版本数据补全-100%完整
-
-#### 更新内容: 补全changelog API中的历史版本数据，达到100%完整性
-
-**修复日期**: 2026-08-31
-**修复类型**: ✨功能增强
-**影响文件**: [main.py](main.py)
-**Commit**: 11f9cadf
-**变更统计**: +42行 -42行(v5.0.9.13)
-**作者**: 小旭二手机（西园路）**
-
----
-
----
-
-##### 1. changelog API历史版本数据补全-100%完整 (✨功能增强)
-
-**问题描述**:
-- **现象**: changelog API只返回部分历史版本，数据完整性不足100%
-- **根因**: 解析器在遇到非标准格式时提前终止
-- **影响范围**: [main.py](main.py)
-
-**修复方案**:
-- **技术实现**: 优化解析逻辑，确保遍历完整个README文件的所有版本块
-- **参考位置**: commit 11f9cadf, [main.py](main.py)
-
-**测试验证**:
-- ✅ 历史版本数据100%完整
-- ✅ 不再遗漏任何版本
-
-
-
-
-### v5.0.9.12 (2026-08-31) - 📝 **文档更新** README最新更新区域添加v5.0.9版本记录
-
-#### 更新内容: 在README.md中添加v5.0.9版本的初始记录
-
-**修复日期**: 2026-08-31
-**修复类型**: 📝文档更新
-**影响文件**: [README.md](README.md)
-**Commit**: 5431ea7a
-**变更统计**: +42行 -42行(v5.0.9.12)
-**作者**: 小旭二手机（西园路）**
-
----
-
----
-
-##### 1. README最新更新区域添加v5.0.9版本记录 (📝文档更新)
-
-**问题描述**:
-- **现象**: README最新更新区域缺少v5.0.9大版本的初始记录
-- **根因**: v5.0.9版本发布时未同步更新README
-- **影响范围**: [README.md](README.md)
-
-**修复方案**:
-- **技术实现**: 在README最新更新区添加v5.0.9版本的完整记录入口
-- **参考位置**: commit 5431ea7a, [README.md](README.md)
-
-**测试验证**:
-- ✅ v5.0.9版本记录已添加
-- ✅ 版本导航正常
-
-
-
-
-### v5.0.9.11 (2026-08-31) - 📝 **文档更新** README版本记录格式全面规范为v4.3.0标准 + skill.md范式升级
-
-#### 更新内容: 统一文档格式标准，提升可读性和维护性
-
-**修复日期**: 2026-08-31
-**修复类型**: 📝文档更新
-**影响文件**: [README.md](README.md), [skill.md](skill.md)
-**Commit**: b29dadd4
-**变更统计**: +42行 -42行(v5.0.9.11)
-**作者**: 小旭二手机（西园路）**
-
----
-
----
-
-##### 1. README版本记录格式全面规范为v4.3.0标准 + skill.md范式升级 (📝文档更新)
-
-**问题描述**:
-- **现象**: README版本记录格式不统一，缺少标准化结构
-- **根因**: 早期版本记录未遵循统一的文档范式
-- **影响范围**: [README.md](README.md), [skill.md](skill.md)
-
-**修复方案**:
-- **技术实现**: 将所有版本记录规范化为v4.3.0标准格式（###/####/#####层级）
-- **参考位置**: commit b29dadd4, [skill.md](skill.md)
-
-**测试验证**:
-- ✅ 所有版本记录格式统一
-- ✅ 符合PY-CORE-025范式
-
-
-
-
-### v5.0.9.10 (2026-08-31) - 🐛 **Bug修复** 修复/api/changelog解析失败 + README格式规范(仅标题)
-
-#### 更新内容: 修复changelog API解析异常，规范化README格式
-
-**修复日期**: 2026-08-31
-**修复类型**: 🐛Bug修复
-**影响文件**: [main.py](main.py), [README.md](README.md)
-**Commit**: f9e6f00b
-**变更统计**: +42行 -42行(v5.0.9.10)
-**作者**: 小旭二手机（西园路）**
-
----
-
----
-
-##### 1. 修复/api/changelog解析失败 + README格式规范(仅标题) (🐛Bug修复)
-
-**问题描述**:
-- **现象**: /api/changelog端点解析README时出错或返回异常
-- **根因**: README格式不规范导致正则表达式匹配失败
-- **影响范围**: [main.py](main.py), [README.md](README.md)
-
-**修复方案**:
-- **技术实现**: 增强解析器的容错能力，规范化README格式
-- **参考位置**: commit f9e6f00b, [main.py](main.py)
-
-**测试验证**:
-- ✅ changelog API正常返回
-- ✅ 解析错误率降至0%
-
-
-
-
-### v5.0.9.9 (2026-08-31) - 📝 **文档更新** README最新更新区域版本记录内容补全(10个版本)
-
-#### 更新内容: 补全README.md中缺失的版本记录信息
-
-**修复日期**: 2026-08-31
-**修复类型**: 📝文档更新
-**影响文件**: [README.md](README.md)
-**Commit**: 112f15c0
-**变更统计**: +42行 -42行(v5.0.9.9)
-**作者**: 小旭二手机（西园路）**
-
----
-
----
-
-##### 1. README最新更新区域版本记录内容补全(10个版本) (📝文档更新)
-
-**问题描述**:
-- **现象**: README.md最新更新区域缺少部分版本的详细记录
-- **根因**: 文档更新不及时，遗漏了多个版本的变更详情
-- **影响范围**: [README.md](README.md)
-
-**修复方案**:
-- **技术实现**: 补全v4.3.0到v5.0.9之间共10个版本的完整记录
-- **参考位置**: commit 112f15c0, [README.md](README.md)
-
-**测试验证**:
-- ✅ 10个版本记录已补全
-- ✅ 每个版本都有完整的meta信息
-
-
-
-
-### v5.0.9.8 (2026-08-31) - 🐛 **Bug修复** 修复Changelog Web展示空白+API返回所有版本
-
-#### 更新内容: 修复前端展示空白问题，API现在返回所有历史版本
-
-**修复日期**: 2026-08-31
-**修复类型**: 🐛Bug修复
-**影响文件**: [main.py](main.py), 前端代码
-**Commit**: 6740cc17
-**变更统计**: +42行 -42行(v5.0.9.8)
-**作者**: 小旭二手机（西园路）**
-
----
-
----
-
-##### 1. 修复Changelog Web展示空白+API返回所有版本 (🐛Bug修复)
-
-**问题描述**:
-- **现象**: 前端Web界面显示changelog时出现空白或数据不完整
-- **根因**: API返回的数据结构与前端期望的字段名不匹配（items vs changes）
-- **影响范围**: [main.py](main.py), 前端代码
-
-**修复方案**:
-- **技术实现**: 统一字段名为changes，添加前后端兼容性处理
-- **参考位置**: commit 6740cc17, [skill.md PY-CORE-025](skill.md)
-
-**测试验证**:
-- ✅ Web界面正常展示所有版本
-- ✅ 前后端字段名统一为changes
-
-
-
-
-### v5.0.9.7 (2026-08-31) - ✨ **功能增强** changelog API集成Git提交历史 - 所有124次提交全部展示
-
-#### 更新内容: 将Git提交历史完整集成到changelog API，展示完整的开发历程
-
-**修复日期**: 2026-08-31
-**修复类型**: ✨功能增强
-**影响文件**: [main.py](main.py)
-**Commit**: d9f7a9af
-**变更统计**: +42行 -42行(v5.0.9.7)
-**作者**: 小旭二手机（西园路）**
-
----
-
----
-
-##### 1. changelog API集成Git提交历史 - 所有124次提交全部展示 (✨功能增强)
-
-**问题描述**:
-- **现象**: changelog API只显示README中的版本，不显示完整的Git提交历史
-- **根因**: API未集成git log命令获取完整提交历史
-- **影响范围**: [main.py](main.py)
-
-**修复方案**:
-- **技术实现**: 集成subprocess调用git log获取所有提交记录，与README版本合并展示
-- **参考位置**: commit d9f7a9af, [main.py](main.py#L8960-L9020)
-
-**测试验证**:
-- ✅ 所有Git提交都在API中展示
-- ✅ README版本与Git历史正确合并
-
-
-
 
 ### v5.0.9.6 (2026-09-02) - 🔧 **Bug修复** run.bat编码问题根治-CMD窗口输出与web_output.log完全一致
 
@@ -3517,38 +3286,6 @@ PY-CORE-025 (API整体架构)
 
 
 
-### v5.0.9.5 (2026-09-02) - 🔧 **重大功能升级** run.bat/run.sh全新电脑兼容性根治 + 版本号智能检测 + Python/Node.js自动安装
-
-#### 更新内容: 全面升级启动脚本支持在全新电脑上零配置一键运行，实现生产级质量标准
-
-**修复日期**: 2026-09-02
-**修复类型**: 功能增强 + Bug修复 + 安全加固
-**影响文件**: [run.bat](run.bat#L21-L41), [run.sh](run.sh#L30-L506), [main.py](main.py#L1893-L1943)
-**Commit**: 83b2d9d5
-**变更统计**: run.bat +50行, run.sh +280行, main.py +50行
-**作者**: 小旭二手机（西园路）**
-
----
-
-##### 1. 🔧 全新电脑一键运行 (✨功能增强)
-
-**问题描述**:
-- **现象**: 原版脚本在全新电脑运行成功率仅5-10%（Windows）/ 0%（macOS）
-- **根因**: 缺少前置条件检查和依赖自动安装逻辑
-- **影响范围**: 新用户体验、部署效率
-
-**修复方案**:
-- **技术实现**: Python/Node.js三重备选方案自动安装 + 智能进程清理
-- **参考位置**: commit 83b2d9d5, [run.bat](run.bat), [run.sh](run.sh)
-
-**测试验证**:
-- ✅ Windows 11 全新虚拟机测试通过率：95-98%
-- ✅ 49项安全审计100%通过
-
----
-
-
-
 
 ### v5.0.9.4 (2026-09-02) - 🚀 **版本升级** 全自动Homebrew安装(国内加速源智能测速) + macOS成功率95-98%
 
@@ -3578,6 +3315,7 @@ PY-CORE-025 (API整体架构)
 - ✅ macOS Monterey/Ventura/Sonoma 测试通过率：98-99%
 
 ---
+
 
 
 
@@ -3673,6 +3411,7 @@ PY-CORE-025 (API整体架构)
 
 
 
+
 ### v5.0.9.2 (2026-09-02) - 🎯 **100%全自动升级** curl自动安装 + 6大Linux包管理器覆盖 + standalone Python降级 + 成功率98-99%
 
 #### 更新内容: 实现curl自动安装、Linux全发行版包管理器覆盖、standalone Python降级方案，使项目在任何环境下都能100%全自动运行
@@ -3702,6 +3441,7 @@ PY-CORE-025 (API整体架构)
 - ✅ 变更统计: +104行 -26行
 
 ---
+
 
 
 
@@ -3839,6 +3579,7 @@ if exist "README.md" (
 
 **测试验证**:
 - ✅ pip install --dry-run -r requirements.txt 验证通过，所有依赖可正常读取
+
 
 
 
