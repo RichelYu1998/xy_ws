@@ -2822,34 +2822,28 @@
                                         }
                                     }
 
-                                        if (targetRow) {
-                                            const sourceRowRect = visibleRow.getBoundingClientRect();
-                                            const sourceContainerRect = sourceContainer.getBoundingClientRect();
+                                    if (targetRow) {
+                                        const sourceRowRect = visibleRow.getBoundingClientRect();
+                                        const sourceContainerRect = sourceContainer.getBoundingClientRect();
 
-                                            const offsetFromTop = sourceRowRect.top - sourceContainerRect.top;
-                                            const containerHeight = otherContainer.clientHeight;
+                                        const offsetFromTop = sourceRowRect.top - sourceContainerRect.top;
+                                        const containerHeight = otherContainer.clientHeight;
 
-                                            let targetScrollTop;
-                                            if (sourceContainer.scrollTop + sourceContainer.clientHeight >= sourceContainer.scrollHeight - 5) {
-                                                const targetRowHeight = targetRow.offsetHeight || 40;
-                                                const tableBody = otherContainer.querySelector('tbody');
-                                                const tbodyOffsetTop = tableBody ? tableBody.offsetTop : 0;
-                                                targetScrollTop = targetRow.offsetTop + targetRowHeight - containerHeight + tbodyOffsetTop + 20;
-                                            } else {
-                                                const tableBody = otherContainer.querySelector('tbody');
-                                                const tbodyOffsetTop = tableBody ? tableBody.offsetTop : 0;
-                                                targetScrollTop = (targetRow.offsetTop - tbodyOffsetTop) - offsetFromTop;
-                                            }
-
-                                            targetScrollTop = Math.max(0, Math.min(targetScrollTop, otherContainer.scrollHeight - containerHeight));
-
-                                            otherContainer.scrollTop = targetScrollTop;
+                                        let targetScrollTop;
+                                        if (sourceContainer.scrollTop + sourceContainer.clientHeight >= sourceContainer.scrollHeight - 5) {
+                                            const targetRowHeight = targetRow.offsetHeight || 40;
+                                            const tableBody = otherContainer.querySelector('tbody');
+                                            const tbodyOffsetTop = tableBody ? tableBody.offsetTop : 0;
+                                            targetScrollTop = targetRow.offsetTop + targetRowHeight - containerHeight + tbodyOffsetTop + 20;
                                         } else {
-                                            const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
-                                            const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
-                                            const scrollRatioY = maxScrollTop > 0 ? sourceContainer.scrollTop / maxScrollTop : 0;
-                                            otherContainer.scrollTop = otherMaxTop > 0 ? scrollRatioY * otherMaxTop : 0;
+                                            const tableBody = otherContainer.querySelector('tbody');
+                                            const tbodyOffsetTop = tableBody ? tableBody.offsetTop : 0;
+                                            targetScrollTop = (targetRow.offsetTop - tbodyOffsetTop) - offsetFromTop;
                                         }
+
+                                        targetScrollTop = Math.max(0, Math.min(targetScrollTop, otherContainer.scrollHeight - containerHeight));
+
+                                        otherContainer.scrollTop = targetScrollTop;
                                     } else {
                                         const maxScrollTop = sourceContainer.scrollHeight - sourceContainer.clientHeight;
                                         const otherMaxTop = otherContainer.scrollHeight - otherContainer.clientHeight;
