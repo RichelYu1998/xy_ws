@@ -2803,11 +2803,24 @@
 
                         if (visibleRow) {
                             const sku = visibleRow.getAttribute('data-sku');
+                            const desc = visibleRow.getAttribute('data-desc');
 
                             tableContainers.forEach((otherContainer, otherIndex) => {
                                 if (otherIndex !== sourceIndex) {
-                                    if (sku) {
-                                        const targetRow = otherContainer.querySelector(`tr[data-sku="${sku}"]`);
+                                    let targetRow = null;
+                                    if (sku && sku !== '-') {
+                                        targetRow = otherContainer.querySelector(`tr[data-sku="${sku}"]`);
+                                    }
+                                    if (!targetRow && desc) {
+                                        const safeDesc = desc.replace(/'/g, "\\'").replace(/"/g, '\\\\"');
+                                        const allRows = otherContainer.querySelectorAll('tr[data-desc]');
+                                        for (const row of allRows) {
+                                            if (row.getAttribute('data-desc') === desc) {
+                                                targetRow = row;
+                                                break;
+                                            }
+                                        }
+                                    }
 
                                         if (targetRow) {
                                             const sourceRowRect = visibleRow.getBoundingClientRect();
