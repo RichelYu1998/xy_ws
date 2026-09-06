@@ -512,26 +512,72 @@
             if (!identifier) return;
             if (_activeLinkedIdentifier && _activeLinkedIdentifier !== identifier) {
                 unhighlightRow(_activeLinkedIdentifier);
+                removeLinkedBadge();
             }
             if (_activeLinkedIdentifier === identifier) {
                 unhighlightRow(identifier);
+                removeLinkedBadge();
                 _activeLinkedIdentifier = null;
                 return;
             }
             _activeLinkedIdentifier = identifier;
             highlightRow(identifier);
             const allRows = findRowsByIdentifier(identifier);
+            let table0Row = null;
             allRows.forEach(row => {
                 const container = row.closest('.change-table-container');
+                const tableId = container ? container.querySelector('table')?.id : '';
+                if (tableId === 'table-all') {
+                    table0Row = row;
+                }
                 if (container) {
                     const rowRect = row.getBoundingClientRect();
                     const containerRect = container.getBoundingClientRect();
                     const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
-                    const targetScrollTop = relativeTop - container.clientHeight / 3;
+                    const targetScrollTop = Math.max(0, relativeTop - container.clientHeight / 3);
                     window._programmaticScroll = true;
                     container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
                     setTimeout(() => { window._programmaticScroll = false; }, 500);
                 }
+            });
+            if (table0Row) {
+                showLinkedBadge(table0Row);
+            }
+        }
+
+        function showLinkedBadge(row) {
+            removeLinkedBadge();
+            const desc = row.dataset.desc || row.dataset.sku || '';
+            const priceCell = row.querySelector('td:nth-child(4)');
+            const price = priceCell ? priceCell.textContent.trim() : '';
+            const skuCell = row.querySelector('td:nth-child(2)');
+            const sku = skuCell ? skuCell.textContent.trim() : '';
+            const badge = document.createElement('div');
+            badge.id = 'linked-row-badge';
+            badge.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:10px 20px;border-radius:25px;font-size:13px;font-weight:bold;z-index:9999;box-shadow:0 4px 15px rgba(102,126,234,0.4);animation:badgePulse 2s infinite;display:flex;align-items:center;gap:10px;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+            badge.innerHTML = `<span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:10px;font-size:11px;">📍 表0联动</span> <span>${desc.substring(0, 40)}${desc.length > 40 ? '...' : ''}</span> ${sku ? `<span style="opacity:0.8;">| ${sku}</span>` : ''} ${price ? `<span style="color:#ffd700;">¥${price}</span>` : ''}`;
+            document.body.appendChild(badge);
+            const style = document.createElement('style');
+            style.id = 'linked-badge-style';
+            style.textContent = '@keyframes badgePulse{0%,100%{box-shadow:0 4px 15px rgba(102,126,234,0.4)}50%{box-shadow:0 4px 25px rgba(102,126,234,0.8)}}';
+            document.head.appendChild(style);
+            row.style.transition = 'all 0.3s ease';
+            row.style.transform = 'scale(1.02)';
+            row.style.boxShadow = '0 0 20px rgba(102,126,234,0.6)';
+            row.style.zIndex = '10';
+            row.style.position = 'relative';
+        }
+
+        function removeLinkedBadge() {
+            const existing = document.getElementById('linked-row-badge');
+            if (existing) existing.remove();
+            const style = document.getElementById('linked-badge-style');
+            if (style) style.remove();
+            document.querySelectorAll('#table-all tbody tr').forEach(row => {
+                row.style.transform = '';
+                row.style.boxShadow = '';
+                row.style.zIndex = '';
+                row.style.position = '';
             });
         }
 
@@ -2570,7 +2616,7 @@
                         const sku = p.货号 || '';
                         const desc = p.商品描述 || '';
                         const isHighPrice = parseFloat((p.售价 || '¥0').replace('¥', '').replace(',', '')) >= 599;
-                        const isAdded = data.addedProducts && data.addedProducts.some(ap => ap.货号 === sku);
+                        const isAdded = p._isNew || false;
                         let rowStyle = '';
                         if (isHighPrice && isAdded) rowStyle = 'background: #e8f5e9;';
                         else if (isHighPrice) rowStyle = 'background: #fff3e0;';
@@ -2615,8 +2661,8 @@
                         </div>
                         <div class="summary-stats">
                             <span class="summary-badge" style="background: #409EFF;" id="badge-total" data-original-text="总商品: ${data.total}个">总商品: ${data.total}个</span>
-                            <span class="summary-badge" style="background: #E6A23C;" id="badge-highprice" data-original-text="高价(≥599): ${data.highPriceCount || 0}个">高价(≥599): ${data.highPriceCount || 0}个</span>
-                            <span class="summary-badge" style="background: #67c23a;" id="badge-added" data-original-text="新增: ${data.addedCount || 0}个">新增: ${data.addedCount || 0}个</span>
+                            <span class="summary-badge" style="background: #E6A23C;" id="badge-highprice" data-original-text="高价(≥599): 0个">高价(≥599): 0个</span>
+                            <span class="summary-badge" style="background: #67c23a;" id="badge-added" data-original-text="新增: 0个">新增: 0个</span>
                             <span class="summary-badge" style="background: #e8f5e9; color: #2e7d32;">↔ 高价+新增</span>
                         </div>
                         <div class="info-box" style="margin-bottom: 20px; padding: 15px;">
@@ -2641,13 +2687,31 @@
                                 <div id="match-count" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
                             </div>
                         </div>
-                        ${renderTable(data.products, '总商品列表 (' + data.total + '个)', '#409EFF', 'table-all')}
-                        ${renderTable(data.products.filter(p => { const price = parseFloat((p.售价 || '¥0').replace('¥', '').replace(',', '')); return !isNaN(price) && price >= 599; }), '高价商品 (≥599元, ' + (data.highPriceCount || 0) + '个)', '#E6A23C', 'table-highprice')}
-                        ${renderTable(data.highPriceNewProducts, '高价新增 (≥599元且不在之前Excel, ' + (data.highPriceNewCount || 0) + '个)', '#f56c6c', 'table-highprice-new')}
-                        ${renderTable(data.addedProducts, '新增商品 (' + (data.addedCount || 0) + '个)', '#67c23a', 'table-added')}
+                        <div id="tables-container">
+                        ${(() => { const allProducts = data.products || []; const highPriceProducts = allProducts.filter(p => { const price = parseFloat((p.售价 || '¥0').replace('¥', '').replace(',', '')); return !isNaN(price) && price >= 599; }); const addedProducts = allProducts.filter(p => p._isNew); const highPriceNewProducts = highPriceProducts.filter(p => p._isNew); return renderTable(allProducts, '总商品列表 (' + allProducts.length + '个)', '#409EFF', 'table-all') + renderTable(highPriceProducts, '高价商品 (≥599元, ' + highPriceProducts.length + '个)', '#E6A23C', 'table-highprice') + renderTable(highPriceNewProducts, '高价新增 (≥599元且是新增, ' + highPriceNewProducts.length + '个)', '#f56c6c', 'table-highprice-new') + renderTable(addedProducts, '新增商品 (' + addedProducts.length + '个)', '#67c23a', 'table-added'); })()}
+                        </div>
                     </div>
                 </div>`;
                 productsContent.insertAdjacentHTML('beforeend', html);
+                
+                (function() {
+                    const allProducts = data.products || [];
+                    const highPriceProducts = allProducts.filter(p => { const price = parseFloat((p.售价 || '¥0').replace('¥', '').replace(',', '')); return !isNaN(price) && price >= 599; });
+                    const addedProducts = allProducts.filter(p => p._isNew);
+                    
+                    const badgeHighPrice = document.getElementById('badge-highprice');
+                    const badgeAdded = document.getElementById('badge-added');
+                    
+                    if (badgeHighPrice) {
+                        badgeHighPrice.textContent = '高价(≥599): ' + highPriceProducts.length + '个';
+                        badgeHighPrice.setAttribute('data-original-text', '高价(≥599): ' + highPriceProducts.length + '个');
+                    }
+                    
+                    if (badgeAdded) {
+                        badgeAdded.textContent = '新增: ' + addedProducts.length + '个';
+                        badgeAdded.setAttribute('data-original-text', '新增: ' + addedProducts.length + '个');
+                    }
+                })();
                 
                 setTimeout(() => {
                     const searchInput = document.getElementById('product-search-input');

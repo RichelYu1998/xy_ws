@@ -8384,13 +8384,21 @@ if __name__ == '__main__':
                     data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
 
+                added_skus = set()
+                if isinstance(data, dict) and '小计' in data and data['小计']:
+                    last_record = data['小计'][-1] if isinstance(data['小计'], list) else None
+                    if last_record and isinstance(last_record, dict):
+                        added_skus = set(last_record.get('added', []))
+
                 for p in products:
                     img_data = p.get('图片', '')
                     if img_data:
                         p['图片'] = decode_base64_images(img_data)
                     else:
                         p['图片'] = []
-                
+                    sku = p.get('货号', '') or p.get('stock_number', '')
+                    p['_isNew'] = sku in added_skus
+
                 high_price_stats = data.get('高价商品统计', {})
                 high_price_products = high_price_stats.get('商品列表', [])
                 high_price_count = high_price_stats.get('数量', 0)
@@ -8444,12 +8452,11 @@ if __name__ == '__main__':
                 if created_times:
                     created_time = min(created_times)
                 
+                high_price_list = [p for p in products if WegoScraper.parse_price(p.get('售价', '') or p.get('price', '')) and WegoScraper.parse_price(p.get('售价', '') or p.get('price', '')) >= 599]
                 return jsonify({
                     'filename': os.path.basename(latest_file),
                     'total': len(products),
                     'products': products[:500],
-                    'highPriceProducts': high_price_products[:500],
-                    'highPriceCount': high_price_count,
                     'totalPrice': f'¥{total_price:,.2f}',
                     'avgPrice': f'¥{avg_price:,.2f}',
                     'fee': f'¥{total_fee:,.2f}',
@@ -8659,6 +8666,12 @@ if __name__ == '__main__':
                     data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
 
+                added_skus = set()
+                if isinstance(data, dict) and '小计' in data and data['小计']:
+                    last_record = data['小计'][-1] if isinstance(data['小计'], list) else None
+                    if last_record and isinstance(last_record, dict):
+                        added_skus = set(last_record.get('added', []))
+
                 for p in products:
                     media_result = []
                     img_data = p.get('图片', '')
@@ -8669,7 +8682,9 @@ if __name__ == '__main__':
                             logger.debug(f"Exception processing media: {e}")
                             media_result = decode_base64_images(img_data)
                     p['图片'] = media_result if media_result else (img_data if isinstance(img_data, list) else [img_data] if img_data else [])
-                
+                    sku = p.get('货号', '') or p.get('stock_number', '')
+                    p['_isNew'] = sku in added_skus
+
                 high_price_products = []
                 total_price = 0
                 total_fee = 0
@@ -8715,8 +8730,6 @@ if __name__ == '__main__':
                     'filename': os.path.basename(latest_file),
                     'total': len(products),
                     'products': products[:500],
-                    'highPriceProducts': high_price_products[:500],
-                    'highPriceCount': high_price_count,
                     'totalPrice': f'¥{total_price:,.2f}',
                     'avgPrice': f'¥{avg_price:,.2f}',
                     'fee': f'¥{total_fee:,.2f}',
@@ -9280,6 +9293,22 @@ if __name__ == '__main__':
                                 if ch.get('solution'):
                                     if not ch['solution'].get('reference') or ch['solution']['reference'] == '历史版本记录':
                                         ch['solution']['reference'] = '历史版本-详见README.md对应章节'
+                            if not entry.get('changes') or len(entry['changes']) == 0:
+                                entry['changes'] = [{
+                                    'id': '1',
+                                    'title': entry.get('title') or entry['meta'].get('fix_type', '📝版本更新'),
+                                    'tag': entry['meta'].get('fix_type', '📝文档更新'),
+                                    'problem': {
+                                        'phenomenon': f'版本{entry["version"]}更新详情',
+                                        'root_cause': '详见README.md对应章节',
+                                        'scope': entry['meta'].get('affected_files', '详见Git提交记录')
+                                    },
+                                    'solution': {
+                                        'implementation': entry.get('title', '版本更新'),
+                                        'reference': f'commit {entry["meta"].get("commit", "N/A")}, {entry["meta"].get("affected_files", "无文件变更")}'
+                                    },
+                                    'verification': [f'✅ 版本{entry["version"]}已发布', f'✅ Commit: {entry["meta"].get("commit", "历史版本")}']
+                                }]
                             merged_changelog.append(entry)
                     changelog = merged_changelog
                 except Exception as git_err:  # [HANDLED]

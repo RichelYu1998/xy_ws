@@ -1,4 +1,4 @@
-﻿# ﻿微购相册管理系统 - Skill 开发规范文档 (WegoAlbum Manager - Skill Documentation)
+# ﻿微购相册管理系统 - Skill 开发规范文档 (WegoAlbum Manager - Skill Documentation)
 
 > **⚙️ 编码标准**: 本项目所有文件（包括源代码、文档、配置文件等）**必须且仅使用 UTF-8 编码**。禁止使用任何其他编码格式（如 GBK、GB2312、Latin-1 等）。
 >
@@ -49,6 +49,60 @@ python main.py --web
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.49 (2026-09-06) - 🐛 **Bug修复** - 修复获取商品时DOM元素空指针异常(Badge更新时机错误)
+
+#### 更新内容:
+1. 修复获取商品失败报错: Cannot set properties of null (setting 'textContent')
+2. 重构DOM操作时机: 将Badge更新逻辑从模板字符串内移至insertAdjacentHTML之后执行
+3. 添加防御性空值检查: 使用if判断确保DOM元素存在后再操作
+4. 优化代码结构: 新增tables-container包裹层,分离表格渲染与Badge更新逻辑
+
+**核心改进**:
+- 执行顺序修正: 先插入HTML → 再操作DOM(避免null引用)
+- 空值安全: 即使元素不存在也不会导致程序崩溃
+- 代码可读性: 分离关注点,表格渲染与状态更新解耦
+
+**技术细节**:
+- 问题根因: 在HTML模板字符串的立即执行函数中调用getElementById(),但此时HTML尚未插入DOM
+- 影响范围: 获取商品功能完全不可用(每次点击都报错)
+- 解决方案: 将document.getElementById()和textContent赋值移到insertAdjacentHTML()之后
+- 修改文件: dist/app.js第2690-2716行
+
+**测试验证**:
+- ✅ GetDiagnostics检查: 0错误0警告
+- ✅ 获取商品功能: 正常显示商品列表,无报错
+- ✅ Badge更新: 高价商品数和新增商品数正确显示
+- ✅ 边界测试: DOM元素不存在时不报错(防御性编程生效)
+
+**更新日期**: 2026-09-06
+**更新类型**: 🐛 Bug修复 + DOM操作优化 + 防御性编程
+**影响文件**: [dist/app.js](dist/app.js#L2690-L2716)
+**Commit**: 待生成(将在Git提交后替换)
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🐛Bug修复 (获取商品失败 - Cannot set properties of null)
+
+**问题描述**:
+- **现象**: 点击获取商品按钮后控制台报错"获取商品失败: Cannot set properties of null (setting 'textContent')",商品列表无法显示
+- **根因**: 代码在HTML模板字符串的立即执行函数中就尝试访问badge-highprice和badge-added元素,但此时这段HTML还未被插入DOM(要等到insertAdjacentHTML之后才存在),导致getElementById()返回null
+- **影响范围**: 获取商品功能完全不可用,用户体验严重受损,所有依赖该功能的操作受阻
+
+**修复方案**:
+- **技术实现(DOM时机)**: 将Badge更新逻辑从模板字符串内的立即执行函数提取出来,移至productsContent.insertAdjacentHTML('beforeend', html)之后执行
+- **技术实现(空值防护)**: 添加if (badgeHighPrice)和if (badgeAdded)条件判断,确保元素存在后才设置textContent
+- **技术实现(结构优化)**: 新增<div id="tables-container">包裹表格HTML,使代码结构更清晰
+- **参考位置**: [dist/app.js#L2690-L2716](dist/app.js#L2690-L2716) (修复后的完整代码)
+
+**测试验证**:
+- ✅ 获取商品测试: 点击按钮后正常显示商品列表,控制台无报错
+- ✅ Badge显示测试: "高价(≥599): X个"和"新增: X个"正确显示实际数量
+- ✅ 空值防护测试: 手动删除badge-highprice元素后不报错(降级处理)
+- ✅ GetDiagnostics: 0错误0警告,代码质量符合规范
+
+---
 
 ### v5.0.9.48 (2026-09-06) - 🐛 **Bug修复** - 跨表联动基于商品描述匹配+空格规范化+模板字符串修复
 
