@@ -462,18 +462,35 @@
             panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         
-        let _activeLinkedSku = null;
+        let _activeLinkedIdentifier = null;
 
-        function highlightRow(sku, allProductsData) {
-            const data = allProductsData || window.allProductsData;
-            document.querySelectorAll(`tr[data-sku="${sku}"]`).forEach(row => {
+        function findRowsByIdentifier(identifier) {
+            if (!identifier) return [];
+            let rows = [];
+            document.querySelectorAll('tr[data-desc]').forEach(row => {
+                if (row.dataset.desc === identifier) {
+                    rows.push(row);
+                }
+            });
+            if (rows.length === 0) {
+                document.querySelectorAll(`tr[data-sku="${identifier}"]`).forEach(row => {
+                    rows.push(row);
+                });
+            }
+            return rows;
+        }
+
+        function highlightRow(identifier, allProductsData) {
+            const rows = findRowsByIdentifier(identifier);
+            rows.forEach(row => {
                 row.style.background = '#bbdefb';
             });
         }
-        
-        function unhighlightRow(sku, allProductsData) {
+
+        function unhighlightRow(identifier, allProductsData) {
             const data = allProductsData || window.allProductsData;
-            document.querySelectorAll(`tr[data-sku="${sku}"]`).forEach(row => {
+            const rows = findRowsByIdentifier(identifier);
+            rows.forEach(row => {
                 const priceCell = row.querySelector('td:nth-child(4)');
                 if (priceCell) {
                     const price = parseFloat((priceCell.textContent || '¥0').replace('¥', '').replace(',', ''));
@@ -491,19 +508,19 @@
             });
         }
 
-        function toggleLinkedHighlight(sku) {
-            if (!sku) return;
-            if (_activeLinkedSku && _activeLinkedSku !== sku) {
-                unhighlightRow(_activeLinkedSku);
+        function toggleLinkedHighlight(identifier) {
+            if (!identifier) return;
+            if (_activeLinkedIdentifier && _activeLinkedIdentifier !== identifier) {
+                unhighlightRow(_activeLinkedIdentifier);
             }
-            if (_activeLinkedSku === sku) {
-                unhighlightRow(sku);
-                _activeLinkedSku = null;
+            if (_activeLinkedIdentifier === identifier) {
+                unhighlightRow(identifier);
+                _activeLinkedIdentifier = null;
                 return;
             }
-            _activeLinkedSku = sku;
-            highlightRow(sku);
-            const allRows = document.querySelectorAll(`tr[data-sku="${sku}"]`);
+            _activeLinkedIdentifier = identifier;
+            highlightRow(identifier);
+            const allRows = findRowsByIdentifier(identifier);
             allRows.forEach(row => {
                 const container = row.closest('.change-table-container');
                 if (container) {
@@ -517,9 +534,9 @@
                 }
             });
         }
-        
-        function scrollToSku(sku) {
-            const rows = document.querySelectorAll(`tr[data-sku="${sku}"]`);
+
+        function scrollToSku(identifier) {
+            const rows = findRowsByIdentifier(identifier);
             if (rows.length > 0) {
                 rows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
@@ -2169,12 +2186,12 @@
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.addedProducts.map((p, idx) => `<tr data-sku="${escapeAttr(p.sku)}" onmouseover="highlightRow('${escapeAttr(p.sku)}')" onmouseout="unhighlightRow('${escapeAttr(p.sku)}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${escapeAttr(p.sku)}')">
+                                        ${skuData.addedProducts.map((p, idx) => { const rawName = p.name || ''; const normalizedName = rawName.replace(/\s+/g, ' ').trim(); const safeNameForAttr = normalizedName.replace(/'/g, "&#39;").replace(/"/g, "&quot;").replace(/`/g, "&#96;"); const safeNameForJS = normalizedName.replace(/'/g, "\\'").replace(/"/g, '\\\"').replace(/\\/g, '\\\\').replace(/\n/g, "\\n").replace(/\r/g, "\\r"); return `<tr data-sku="${escapeAttr(p.sku)}" data-desc="${safeNameForAttr}" onmouseover="highlightRow('${safeNameForJS}')" onmouseout="unhighlightRow('${safeNameForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeNameForJS}')">
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(  /* [ESCAPED] */p.sku)}</a></td>
                                             <td style="word-break: break-word; white-space: normal; min-width: 200px;"><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${escapeAttr(p.name || '')}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${escapeAttr(p.name || '')}">${escapeHtml(  /* [ESCAPED] */p.name || '-')}</a></td>
                                             <td>${p.price || '-'}</td>
-                                        </tr>`).join('')}
+                                        </tr>`; }).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -2211,12 +2228,12 @@
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.newHighPriceProducts.map((p, idx) => `<tr data-sku="${escapeAttr(p.sku)}" onmouseover="highlightRow('${escapeAttr(p.sku)}')" onmouseout="unhighlightRow('${escapeAttr(p.sku)}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${escapeAttr(p.sku)}')">
+                                        ${skuData.newHighPriceProducts.map((p, idx) => { const rawName = p.name || ''; const normalizedName = rawName.replace(/\s+/g, ' ').trim(); const safeNameForAttr = normalizedName.replace(/'/g, "&#39;").replace(/"/g, "&quot;").replace(/`/g, "&#96;"); const safeNameForJS = normalizedName.replace(/'/g, "\\'").replace(/"/g, '\\\"').replace(/\\/g, '\\\\').replace(/\n/g, "\\n").replace(/\r/g, "\\r"); return `<tr data-sku="${escapeAttr(p.sku)}" data-desc="${safeNameForAttr}" onmouseover="highlightRow('${safeNameForJS}')" onmouseout="unhighlightRow('${safeNameForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeNameForJS}')">
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(  /* [ESCAPED] */p.sku)}</a></td>
                                             <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${escapeAttr(p.name || '')}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${escapeAttr(p.name || '')}">${escapeHtml(  /* [ESCAPED] */p.name || '-')}</a></td>
                                             <td>${p.price || '-'}</td>
-                                        </tr>`).join('')}
+                                        </tr>`; }).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -2558,9 +2575,13 @@
                         if (isHighPrice && isAdded) rowStyle = 'background: #e8f5e9;';
                         else if (isHighPrice) rowStyle = 'background: #fff3e0;';
                         else if (isAdded) rowStyle = 'background: #e3f2fd;';
-                        const descDisplay = desc;
-                        
-                        tableHtml += `<tr data-sku="${sku}" data-desc="${desc.replace(/"/g, '&quot;')}" style="${rowStyle}" onmouseover="highlightRow('${sku}')" onmouseout="unhighlightRow('${sku}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${sku}')">
+                        const normalizedDesc = desc.replace(/\s+/g, ' ').trim();
+                        const descDisplay = normalizedDesc;
+                        const safeDescForAttr = normalizedDesc.replace(/'/g, "&#39;").replace(/"/g, "&quot;").replace(/`/g, "&#96;");
+                        const safeDescForJS = normalizedDesc.replace(/'/g, "\\'").replace(/"/g, '\\\"').replace(/\\/g, '\\\\').replace(/\n/g, "\\n").replace(/\r/g, "\\r");
+                        const identifier = desc || sku;
+
+                        tableHtml += `<tr data-sku="${sku}" data-desc="${safeDescForAttr}" style="${rowStyle}" onmouseover="highlightRow('${safeDescForJS}')" onmouseout="unhighlightRow('${safeDescForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeDescForJS}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(sku)}" class="sku-link">${escapeHtml(  /* [ESCAPED] */sku) || '-'}</a></td>
                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${escapeAttr(desc)}" class="desc-link" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${escapeHtml(  /* [ESCAPED] */descDisplay)}</a></td>
@@ -2621,7 +2642,7 @@
                             </div>
                         </div>
                         ${renderTable(data.products, '总商品列表 (' + data.total + '个)', '#409EFF', 'table-all')}
-                        ${renderTable(data.highPriceProducts, '高价商品 (≥599元, ' + (data.highPriceCount || 0) + '个)', '#E6A23C', 'table-highprice')}
+                        ${renderTable(data.products.filter(p => { const price = parseFloat((p.售价 || '¥0').replace('¥', '').replace(',', '')); return !isNaN(price) && price >= 599; }), '高价商品 (≥599元, ' + (data.highPriceCount || 0) + '个)', '#E6A23C', 'table-highprice')}
                         ${renderTable(data.highPriceNewProducts, '高价新增 (≥599元且不在之前Excel, ' + (data.highPriceNewCount || 0) + '个)', '#f56c6c', 'table-highprice-new')}
                         ${renderTable(data.addedProducts, '新增商品 (' + (data.addedCount || 0) + '个)', '#67c23a', 'table-added')}
                     </div>
