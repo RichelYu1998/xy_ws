@@ -92,7 +92,7 @@ python main.py --web
 **更新类型**: 🛡️ 企业级稳定性升级 + 🔧 架构优化
 **影响文件**: main.py, README.md, skill.md, skill.docx
 **Commit**: (94d0b79e)
-**作者**: AI Assistant (基于v5.0.9.54增强)**
+**作者**: 小旭二手机（西园路）**
 
 ---
 
