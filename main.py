@@ -1,50 +1,3 @@
-﻿
-# ============================================================
-# 全局异常处理器 - 防止未捕获异常导致服务器崩溃 (v4.6)
-# ============================================================
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """全局异常处理器：捕获所有未处理的异常，返回友好错误信息"""
-    error_id = str(uuid.uuid4())[:8]
-    exc_type = type(exc).__name__
-    exc_msg = str(exc)
-    
-    # 记录详细的错误日志
-    logger.error(f'[GLOBAL_EXCEPTION] ID={error_id} | Path={request.url.path} | Method={request.method} | Error={exc_type}: {exc_msg}', exc_info=True)
-    
-    # 根据异常类型返回不同的状态码和消息
-    if isinstance(exc, HTTPException):
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={'error': exc.detail, 'error_id': error_id, 'type': exc_type}
-        )
-    elif isinstance(exc, (json.JSONDecodeError, ValueError)):
-        return JSONResponse(
-            status_code=400,
-            content={'error': '请求数据格式错误', 'detail': str(exc), 'error_id': error_id}
-        )
-    elif isinstance(exc, (FileNotFoundError, OSError, IOError)):
-        return JSONResponse(
-            status_code=500,
-            content={'error': '文件操作失败', 'detail': str(exc), 'error_id': error_id}
-        )
-    elif isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
-        return JSONResponse(
-            status_code=504,
-            content={'error': '请求超时，请稍后重试', 'error_id': error_id}
-        )
-    else:
-        # 其他未知异常
-        return JSONResponse(
-            status_code=500,
-            content={
-                'error': '服务器内部错误',
-                'error_id': error_id,
-                'type': exc_type,
-                'message': '请查看服务器日志获取详细信息'
-            }
-        )
-# -*- coding: utf-8 -*-
 import argparse
 import asyncio
 import base64
@@ -2890,6 +2843,54 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
     openapi_url=None)
+
+
+# ============================================================
+# 全局异常处理器 - 防止未捕获异常导致服务器崩溃 (v4.6)
+# ============================================================
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """全局异常处理器：捕获所有未处理的异常，返回友好错误信息"""
+    error_id = str(uuid.uuid4())[:8]
+    exc_type = type(exc).__name__
+    exc_msg = str(exc)
+    
+    # 记录详细的错误日志
+    logger.error(f'[GLOBAL_EXCEPTION] ID={error_id} | Path={request.url.path} | Method={request.method} | Error={exc_type}: {exc_msg}', exc_info=True)
+    
+    # 根据异常类型返回不同的状态码和消息
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={'error': exc.detail, 'error_id': error_id, 'type': exc_type}
+        )
+    elif isinstance(exc, (json.JSONDecodeError, ValueError)):
+        return JSONResponse(
+            status_code=400,
+            content={'error': '请求数据格式错误', 'detail': str(exc), 'error_id': error_id}
+        )
+    elif isinstance(exc, (FileNotFoundError, OSError, IOError)):
+        return JSONResponse(
+            status_code=500,
+            content={'error': '文件操作失败', 'detail': str(exc), 'error_id': error_id}
+        )
+    elif isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+        return JSONResponse(
+            status_code=504,
+            content={'error': '请求超时，请稍后重试', 'error_id': error_id}
+        )
+    else:
+        # 其他未知异常
+        return JSONResponse(
+            status_code=500,
+            content={
+                'error': '服务器内部错误',
+                'error_id': error_id,
+                'type': exc_type,
+                'message': '请查看服务器日志获取详细信息'
+            }
+        )
+
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
