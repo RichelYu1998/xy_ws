@@ -85,7 +85,7 @@ python main.py --web
 **更新日期**: 2026-09-07
 **更新类型**: 🔧 优化 + 🐛 Bug修复 + 🛡️ 安全增强
 **影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [run.bat](run.bat)
-**Commit**: c7e3b4ee (待推送)
+**Commit**: 48035831
 **作者**: 小旭二手机（西园路）**
 
 ---
@@ -13567,6 +13567,328 @@ window.resetButtons = resetButtons;
 - ✅ **注释完整** - 中文注释，清晰描述逻辑
 - ✅ **日志详细** - 关键操作必须有日志输出
 - ✅ **异常处理** - 统一的异常捕获和处理机制
+
+---
+
+## ⚙️ 动态编码规范 (Dynamic Coding Standard) - **强制遵守**
+
+> **📌 核心原则**: 除明确例外情况外,项目所有代码必须实现**100%动态化配置**,禁止硬编码魔法数字/字符串。
+
+### 1.1 规则概述
+
+| 代码类型 | 是否需要动态化 | 动态化方式 | 示例 |
+|---------|--------------|-----------|------|
+| **main.py** (非隧道部分) | ✅ **必须动态** | `os.environ.get()` + 默认值 | 超时时间、重试次数、端口 |
+| **dist/app.js** | ✅ **必须动态** | 配置对象/API获取/默认值 | 轮询间隔、动画时长 |
+| **run.bat / run.sh** | ✅ **必须动态** | 环境变量/配置文件读取 | 版本号、镜像源 |
+| **config/*.json** | ✅ **必须动态** | 运行时读取+加密 | 用户配置 |
+| **其他所有.py/.js文件** | ✅ **必须动态** | 配置注入/参数传递 | 工具函数参数 |
+| **test/*.py** | ❌ **不需要** | 允许硬编码 | 测试用例、断言值 |
+| **CF/Hostc隧道相关** | ❌ **不需要** | 固定值 | 隧道超时、重试间隔 |
+
+---
+
+### 1.2 必须动态化的场景
+
+#### **✅ 场景A: 配置参数（超时、重试、间隔等）**
+
+```python
+# ✅ 正确 - 使用环境变量 + 默认值
+TIMEOUT_CONFIG = {
+    'socket_connect': int(os.environ.get('TIMEOUT_SOCKET_CONNECT', '5')),
+    'http_request': int(os.environ.get('TIMEOUT_HTTP_REQUEST', '10')),
+    'browser_page_load': int(os.environ.get('TIMEOUT_BROWSER_PAGE_LOAD', '30')),
+}
+
+# ❌ 错误 - 硬编码（禁止）
+TIMEOUT_CONFIG = {
+    'socket_connect': 5,
+    'http_request': 10,
+    'browser_page_load': 30,
+}
+```
+
+#### **✅ 场景B: 前端JavaScript配置**
+
+```javascript
+// ✅ 正确 - 使用配置对象（集中管理，可扩展为API获取）
+const APP_CONFIG = {
+    initDelay: parseInt(document.body.dataset.initDelay) || 300,
+    updateInterval: parseInt(document.body.dataset.updateInterval) || 1000,
+    tunnelCheckInterval: window.TUNNEL_CHECK_INTERVAL || 10000,
+};
+
+setTimeout(init, APP_CONFIG.initDelay);
+setInterval(updateTime, APP_CONFIG.updateInterval);
+
+// ❌ 错误 - 散落的硬编码（禁止）
+setTimeout(init, 300);
+setInterval(updateTime, 1000);
+```
+
+#### **✅ 场景C: 端口和地址**
+
+```python
+# ✅ 正确 - 从环境变量读取
+NETWORK_CONFIG = {
+    'default_host': os.environ.get('HOST', 'localhost'),
+    'default_port': int(os.environ.get('WEB_PORT', '8888')),
+}
+
+# ❌ 错误 - 硬编码（禁止）
+HOST = 'localhost'
+PORT = 8888
+```
+
+#### **✅ 场景D: 重试和限流参数**
+
+```python
+# ✅ 正确 - 可配置的重试策略
+RETRY_CONFIG = {
+    'default_max_retries': int(os.environ.get('RETRY_DEFAULT_MAX_RETRIES', '3')),
+    'excel_retry_delay': float(os.environ.get('RETRY_EXCEL_RETRY_DELAY', '0.5')),
+}
+
+# API频率限制示例
+MAX_REQUESTS_PER_MINUTE = int(os.environ.get('API_RATE_LIMIT', '30'))
+
+# ❌ 错误 - 硬编码（禁止）
+MAX_RETRIES = 3
+RATE_LIMIT = 30
+```
+
+---
+
+### 1.3 允许硬编码的例外情况
+
+#### **✅ 例外A: test/目录下的测试代码**
+
+```python
+# test/security_audit.py - 测试代码允许硬编码
+def test_timeout_config():
+    expected_value = 5  # ✅ 允许：测试断言值
+    assert config.timeout == expected_value
+```
+
+**原因**: 测试代码需要确定性的预期值，动态化会导致测试不稳定。
+
+#### **✅ 例外B: Cloudflare/Hostc隧道相关配置**
+
+```python
+# main.py - 隧道配置固定化（符合规范）
+TUNNEL_CONFIG = {
+    'cf_max_retries': 3,              # ✅ 允许：CF固定参数
+    'cf_retry_delay': 60,             # ✅ 允许：CF固定参数
+    'tunnel_cf_retry': 120.0,         # ✅ 允许：已固化
+    'tunnel_startup': 2.0,            # ✅ 允许：已固化
+}
+
+SLEEP_CONFIG = {
+    'tunnel_cf_retry': 120.0,         # ✅ 允许：隧道相关
+    'tunnel_startup': 2.0,            # ✅ 允许：隧道相关
+    # 其他项仍需动态化...
+    'short': float(os.environ.get('SLEEP_SHORT', '1')),  # ✅ 动态
+}
+```
+
+**原因**: 
+- CF Quick Tunnel的参数是Cloudflare服务端限制，本地修改无效
+- Hostc隧道的启动参数由工具本身决定
+- 固定化可避免环境变量误配置导致的不一致
+
+#### **✅ 例外C: UI常量和物理约束**
+
+```javascript
+// dist/app.js - UI像素阈值允许硬编码
+const swipeThreshold = 50;        // ✅ 允许：UI交互像素值
+const animationDuration = 300;    // ✅ 允许：动画时长(ms)
+
+// 但建议集中管理
+const UI_CONSTANTS = {
+    swipeThreshold: 50,
+    animationDuration: 300,
+};
+```
+
+**原因**: 这些值与用户体验和浏览器渲染相关，通常不需要运行时调整。
+
+---
+
+### 1.4 动态化最佳实践
+
+#### **实践1: 分层配置架构**
+
+```python
+# 第1层：环境变量（最高优先级，可覆盖）
+# 第2层：配置文件（config.json）
+# 第3层：代码默认值（最低优先级）
+
+def get_config(key, default, config_type=int):
+    """
+    三层配置读取：
+    1. 环境变量 > 2. config.json > 3. 默认值
+    """
+    # 尝试环境变量
+    env_value = os.environ.get(key.upper())
+    if env_value:
+        return config_type(env_value)
+    
+    # 尝试配置文件
+    if hasattr(self, 'config_data') and key in self.config_data:
+        return config_type(self.config_data[key])
+    
+    # 返回默认值
+    return default
+```
+
+#### **实践2: 前端配置注入**
+
+```python
+# main.py - 在HTML模板中注入配置
+@app.get('/')
+async def index():
+    return HTMLResponse(f"""
+    <script>
+        window.APP_CONFIG = {{
+            tunnelCheckInterval: {SLEEP_CONFIG['tunnel_cf_retry'] * 100},
+            apiRateLimit: {MAX_REQUESTS_PER_MINUTE},
+            defaultTimeout: {TIMEOUT_CONFIG['http_request'] * 1000}
+        }};
+    </script>
+    """)
+```
+
+```javascript
+// app.js - 使用注入的配置
+const CONFIG = window.APP_CONFIG || {};
+setInterval(checkTunnelStatus, CONFIG.tunnelCheckInterval || 10000);
+```
+
+#### **实践3: 配置验证和日志**
+
+```python
+def validate_config(config_dict, required_keys):
+    """验证配置完整性"""
+    missing_keys = [k for k in required_keys if k not in config_dict]
+    if missing_keys:
+        logger.warning(f"⚠️ 缺少配置项: {missing_keys}，使用默认值")
+    
+    for key, value in config_dict.items():
+        logger.debug(f"📋 配置加载: {key} = {value}")
+    
+    return config_dict
+```
+
+---
+
+### 1.5 合规检查清单
+
+在提交代码前，必须确认：
+
+- [ ] **无裸露的魔法数字**: 所有数值常量都有配置来源
+- [ ] **无硬编码字符串**: 路径、URL、地址等都可配置
+- [ ] **环境变量有默认值**: `os.environ.get('KEY', 'default')`
+- [ ] **前端配置集中管理**: 使用`CONFIG`对象而非散落值
+- [ ] **例外情况有注释**: 明确标注`# ✅ 允许：xxx原因`
+- [ ] **配置变更可追踪**: 日志记录关键配置值
+
+---
+
+### 1.6 违规示例与修正
+
+#### **❌ 违规案例1: 散落的超时硬编码**
+
+```python
+# 违规代码
+async def fetch_data():
+    response = await asyncio.wait_for(
+        session.get(url),
+        timeout=10  # ❌ 硬编码
+    )
+    
+async def process_data():
+    result = await asyncio.wait_for(
+        long_running_task(),
+        timeout=30  # ❌ 又一个硬编码
+    )
+```
+
+**修正后**:
+```python
+# 合规代码
+async def fetch_data():
+    response = await asyncio.wait_for(
+        session.get(url),
+        timeout=TIMEOUT_CONFIG['http_request']  # ✅ 动态配置
+    )
+    
+async def process_data():
+    result = await asyncio.wait_for(
+        long_running_task(),
+        timeout=TIMEOUT_CONFIG['http_request_long']  # ✅ 动态配置
+    )
+```
+
+#### **❌ 违规案例2: 前端魔法数字**
+
+```javascript
+// 违规代码
+function checkTunnelStatus() {
+    fetch('/api/tunnel/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'active') {
+                setTimeout(checkTunnelStatus, 2000);  // ❌ 硬编码2秒
+            } else {
+                setTimeout(checkTunnelStatus, 5000);  // ❌ 硬编码5秒
+            }
+        });
+}
+```
+
+**修正后**:
+```javascript
+// 合规代码
+const TUNNEL_CONFIG = {
+    activeCheckInterval: window.TUNNEL_ACTIVE_INTERVAL || 2000,
+    inactiveCheckInterval: window.TUNNEL_INACTIVE_INTERVAL || 5000,
+};
+
+function checkTunnelStatus() {
+    fetch('/api/tunnel/status')
+        .then(response => response.json())
+        .then(data => {
+            const interval = data.status === 'active' 
+                ? TUNNEL_CONFIG.activeCheckInterval 
+                : TUNNEL_CONFIG.inactiveCheckInterval;
+            setTimeout(checkTunnelStatus, interval);  // ✅ 动态配置
+        });
+}
+```
+
+---
+
+### 1.7 工具支持
+
+项目提供以下工具辅助动态编码合规性检查：
+
+1. **Pre-commit Hook**: 自动检测明显的硬编码模式
+2. **Config Validator**: 启动时验证所有必需配置项
+3. **Log Output**: 关键配置值在启动时输出到日志
+
+```bash
+# 手动触发配置检查
+python main.py --check-config
+
+# 查看当前配置值
+python main.py --show-config
+```
+
+---
+
+**📌 版本信息**: 本规范自 v5.0.9.51 (2026-09-07) 起正式生效  
+**📌 维护责任**: 所有开发者必须遵守，Code Review时重点检查  
+**📌 违规处理**: Pre-commit拦截 + Code Review退回 + 必须修正后才可合并
 
 ---
 
