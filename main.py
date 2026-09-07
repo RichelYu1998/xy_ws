@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 import argparse
 import asyncio
 import base64
@@ -11045,7 +11045,10 @@ ingress:
                     'stable_confirmed': stable_url == tunnel_url and stable_url_confirm_count >= stable_url_min_confirms
                 })
 
-            result = auto_start_tunnel(force_restart=False)
+            cf_running = cf_process is not None and cf_process.poll() is None
+            logger.debug(f"[Tunnel/API] CF状态: skip_cf={cf_running}")
+
+            result = auto_start_tunnel(force_restart=False, skip_cf=cf_running)
             if result['success'] and result.get('url'):
                 new_url = result.get('url')
                 _min_confirms_api = globals().get('stable_url_min_confirms', 3)
@@ -11068,7 +11071,7 @@ ingress:
             if not result.get('url'):
                 logger.debug(f"[Tunnel/API] ⚠️ 正常模式未获取到URL，启用备用：强制重启...")
                 sys.stdout.flush()
-                result = auto_start_tunnel(force_restart=True)
+                result = auto_start_tunnel(force_restart=True, skip_cf=cf_running)
 
             if result['success']:
                 new_url = result.get('url')

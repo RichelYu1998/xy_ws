@@ -166,6 +166,41 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 ---
+### v5.0.9.54 (2026-09-07) - 🐛 **Bug修复** - 修复"隧道共享"按钮误调启动API导致CF被重启的问题
+
+#### 更新内容:
+1. **前端"隧道共享"按钮逻辑修复(核心修复)**: "隧道共享"按钮从调用POST /api/tunnel/start改为GET /api/tunnel/status，纯展示不启动
+   - startTunnelAndShow(): 移除fetch('/api/tunnel/start', {method: 'POST'})，改为fetch('/api/tunnel/status')
+   - 按钮加载文字: "启动中..." -> "获取中..."（符合实际功能）
+   - 错误处理: "启动失败" -> "隧道未运行，请点击下方「管理隧道」启动"
+2. **后端/api/tunnel/start接口防御性加固**: 即使误调启动API，CF运行中也不会被重启
+   - 新增cf_running检测: cf_process is not None and cf_process.poll() is None
+   - auto_start_tunnel调用: 传skip_cf=cf_running参数（正常模式+备用模式都已加）
+3. **"管理隧道"页面的"启动/停止"按钮保持不变**: 这才是真正启动/停止隧道的入口
+
+**核心改进**:
+- 职责清晰: "隧道共享"=只读展示，"启动隧道"=真正操作
+- 双重保护: 前端不改+后端防御，CF绝对不会被误重启
+- 用户体验: 点"隧道共享"就是看地址，不会触发任何重启
+
+**技术细节**:
+- 问题根因: 前端startTunnelAndShow()函数调用了POST /api/tunnel/start，该接口会启动/重启隧道包括CF
+- 影响范围: 每次点"隧道共享"都会重启CF -> 新URL -> 邮件中的地址失效
+- 解决方案: 前端改用GET /api/tunnel/status（只读），后端加skip_cf保护（防御性编程）
+
+**测试验证**:
+- [OK] "隧道共享"测试: 点击后只展示地址，CF进程和URL均不受影响
+- [OK] "启动隧道"测试: 管理页面点启动仍正常工作，但CF运行时会被跳过
+- [OK] 后端防御测试: 直接调POST /api/tunnel/start，CF也不会被重启
+
+**更新日期**: 2026-09-07
+**更新类型**: Bug修复 + 稳定性提升
+**影响文件**: main.py, dist/app.js, README.md, skill.md
+**Commit**: 0717b503
+**作者**: 小旭二手机（西园路）**
+
+---
+
 ### v5.0.9.53 (2026-09-07) - 🔧 **架构优化** - restart_tunnel与CF隧道解耦，CF由cf_heartbeat_loop独立管理
 
 #### 更新内容:

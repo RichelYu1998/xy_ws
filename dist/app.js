@@ -1,4 +1,4 @@
-
+﻿
 
 /**
  * [XSS_AUDIT_COMPLETE] v3.8.90.15
@@ -4336,15 +4336,15 @@
             if (!btn) return;
             document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 启动中...';
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 获取中...';
             const stopTaskBar = document.getElementById('stop-task-bar');
             if (stopTaskBar) stopTaskBar.style.display = 'block';
             activeAbortController = new AbortController();
             try {
                 const serverRes = await fetch('/api/server/info', { signal: activeAbortController.signal });
                 const serverData = await safeParseJson(serverRes);
-                const startRes = await fetch('/api/tunnel/start', { method: 'POST', signal: activeAbortController.signal });
-                const startData = await safeParseJson(startRes);
+                const statusRes = await fetch('/api/tunnel/status', { signal: activeAbortController.signal });
+                const statusData = await safeParseJson(statusRes);
                 const localUrl = serverData.success ? serverData.local_url : window.location.origin;
                 const lanUrl = serverData.success && serverData.lan_url ? serverData.lan_url : '';
                 const tunnelPanel = document.getElementById('tunnel-panel');
@@ -4469,11 +4469,10 @@
                         console.error('[隧道共享] 获取状态失败:', e);
                     }
                 }, 1000);
-                if (!startData.success) {
-                    console.log('[隧道共享] 启动失败:', startData.error);
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert alert-danger mt-3';
-                    alertDiv.innerHTML = '<i class="fa fa-exclamation-triangle"></i> <strong>启动失败:</strong> ' + escapeHtml(  /* [ESCAPED] */startData.error || '未知错误');
+                if (!statusData.url) {
+                    console.log('[隧道共享] 隧道未运行');
+                    const hostcContainer = document.getElementById('tunnel-share-hostc');
+                    if (hostcContainer) hostcContainer.innerHTML = '<i class="fa fa-info-circle"></i> 隧道未运行，请点击下方「管理隧道」启动';
                     if (tunnelContent) tunnelContent.insertBefore(alertDiv, tunnelContent.firstChild);
                 }
             } catch (e) {
