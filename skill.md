@@ -77,7 +77,7 @@ python main.py --web
 **更新日期**: 2026-09-07
 **更新类型**: 🛡️ 安全加固 + 🐛 Bug修复 + 📝 规范合规
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md)
-**Commit**: 待Git提交后自动填充
+**Commit**: f2b00da1
 **作者**: AI Assistant (安全审计专家模式)**
 
 ---
