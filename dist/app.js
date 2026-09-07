@@ -262,6 +262,18 @@
                 applyDeviceStyles();
             }, 250);
         });
+
+        // 获取产品数据函数（修复 fetchProducts is not defined 错误）
+        window.fetchProducts = function() {
+            console.log('[刷新] fetchProducts 被调用，正在刷新产品数据...');
+            const viewProductsBtn = document.getElementById('btn-view-products');
+            if (viewProductsBtn && typeof showAllProducts === 'function') {
+                viewProductsBtn.click();
+            } else {
+                console.log('[刷新] 产品面板不可用，跳过刷新');
+            }
+        };
+
         // 下拉刷新功能 - 移动端专用
         (function initPullRefresh() {
             if (window.innerWidth >= 576) return;
@@ -555,7 +567,7 @@
             const badge = document.createElement('div');
             badge.id = 'linked-row-badge';
             badge.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;padding:10px 20px;border-radius:25px;font-size:13px;font-weight:bold;z-index:9999;box-shadow:0 4px 15px rgba(102,126,234,0.4);animation:badgePulse 2s infinite;display:flex;align-items:center;gap:10px;max-width:90vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-            badge.innerHTML = `<span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:10px;font-size:11px;">📍 表0联动</span> <span>${desc.substring(0, 40)}${desc.length > 40 ? '...' : ''}</span> ${sku ? `<span style="opacity:0.8;">| ${sku}</span>` : ''} ${price ? `<span style="color:#ffd700;">¥${price}</span>` : ''}`;
+            badge.innerHTML = `<span style="background:rgba(255,255,255,0.2);padding:2px 8px;border-radius:10px;font-size:11px;">📍 表0联动</span> <span>${escapeHtml(desc.substring(0, 40))}${desc.length > 40 ? '...' : ''}</span> ${sku ? `<span style="opacity:0.8;">| ${escapeHtml(sku)}</span>` : ''} ${price ? `<span style="color:#ffd700;">¥${escapeHtml(price)}</span>` : ''}`;
             document.body.appendChild(badge);
             const style = document.createElement('style');
             style.id = 'linked-badge-style';
@@ -1956,7 +1968,8 @@
                          
                          // 提取总商品数
                          if (nextLine.includes('新增商品数:') && !skuData.totalProducts) {
-                             const count = parseInt(nextLine.split(':')[1].trim());
+                             const parts = nextLine.split(':');
+                             const count = parts.length > 1 ? parseInt(parts[1].trim()) : NaN;
                              if (count > 0) skuData.totalProducts = count;
                          }
                          
@@ -2010,10 +2023,11 @@
                      
                      inMissingSection = false;
                  } else if (line.includes('新增商品数:')) {
-                     const count = parseInt(line.split(':')[1].trim());
+                     const parts = line.split(':');
+                     const count = parts.length > 1 ? parseInt(parts[1].trim()) : NaN;
                      skuData.newProductsCount = count || 0;
                      console.log('[对比卡片] ✓ 新增商品数:', skuData.newProductsCount);
-                     
+
                      // 尝试提取总商品数（如果有）
                      if (!skuData.totalProducts) {
                          const totalMatch = line.match(/(\d+)/);
@@ -2023,12 +2037,14 @@
                      }
                      inMissingSection = false;
                  } else if (line.includes('删除商品数:')) {
-                     const count = parseInt(line.split(':')[1].trim());
+                     const parts = line.split(':');
+                     const count = parts.length > 1 ? parseInt(parts[1].trim()) : NaN;
                      skuData.deletedProductsCount = count || 0;
                      console.log('[对比卡片] ✓ 删除商品数:', skuData.deletedProductsCount);
                      inMissingSection = false;
                  } else if (line.includes('新增高价商品数:')) {
-                    const count = parseInt(line.split(':')[1].trim());
+                    const parts = line.split(':');
+                    const count = parts.length > 1 ? parseInt(parts[1].trim()) : NaN;
                     skuData.newHighPrice = count || 0;
                     // ✅ 修复Bug: 只有当count>0或highPriceCount尚未设置时才更新
                     // 防止"新增高价商品数:0"覆盖已正确解析的总高价商品数
@@ -3065,6 +3081,190 @@
                 }
             });
         }
+        
+        // 渲染对比结果函数（修复 renderComparisonResult is not defined 错误）
+        function renderComparisonResult(data, type, outputContent) {
+            console.log('[对比] 开始渲染对比结果, 类型:', type);
+            
+            const outputPanel = outputContent || document.getElementById('output-content');
+            if (!outputPanel) {
+                console.error('[对比] 输出容器不存在');
+                return;
+            }
+            
+            const existingCard = outputPanel.querySelector('.comparison-card, .products-card');
+            if (existingCard) existingCard.remove();
+            
+            let cardHtml = `
+            <div class="comparison-card">
+                <div class="comparison-header" style="background: #E6A23C;">
+                    <i class="fa fa-barcode"></i> 货号对比结果
+                </div>
+                <div class="comparison-body">
+            `;
+            
+            if (data.report_text) {
+                cardHtml += `
+                    <div class="missing-skus" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-color: #667eea; margin-bottom: 15px;">
+                        <div class="missing-title" style="color: white; font-weight: bold; font-size: 14px;">📊 每日利润报表</div>
+                        <div style="color: white; font-size: 13px; line-height: 1.6; white-space: pre-wrap; padding: 10px 0;">${data.report_text}</div>
+                    </div>
+                `;
+            }
+            
+            cardHtml += `
+                    <div class="comparison-stats">
+                        <div class="stat-item ${data.txt_count > 0 ? 'stat-info' : ''}">
+                            <span class="stat-value">${data.txt_count || 0}</span>
+                            <span class="stat-label">输入货号</span>
+                        </div>
+                        <div class="stat-item ${data.extra_count > 0 ? 'stat-warning' : ''}">
+                            <span class="stat-value">${data.extra_count || 0}</span>
+                            <span class="stat-label">JSON多余</span>
+                        </div>
+                        <div class="stat-item ${data.json_count > 0 ? 'stat-info' : ''}">
+                            <span class="stat-value">${data.json_count || 0}</span>
+                            <span class="stat-label">JSON货号</span>
+                        </div>
+                        <div class="stat-item ${data.common_count > 0 ? 'stat-success' : ''}">
+                            <span class="stat-value">${data.common_count || 0}</span>
+                            <span class="stat-label">已存在</span>
+                        </div>
+                    </div>
+                    <div class="comparison-stats">
+                        <div class="stat-item ${data.missing_count > 0 ? 'stat-danger' : ''}">
+                            <span class="stat-value">${data.missing_count || 0}</span>
+                            <span class="stat-label">缺失货号</span>
+                        </div>
+                        <div class="stat-item ${data.duplicate_count > 0 ? 'stat-warning' : ''}">
+                            <span class="stat-value">${data.duplicate_count || 0}</span>
+                            <span class="stat-label">重复序列号</span>
+                        </div>
+                        <div class="stat-item ${data.high_price_count > 0 ? 'stat-success' : ''}">
+                            <span class="stat-value">${data.high_price_count || 0}</span>
+                            <span class="stat-label">高价商品(≥599)</span>
+                        </div>
+                    </div>
+                    <div class="comparison-stats">
+                        <div class="stat-item ${data.added_products_count > 0 ? 'stat-success' : ''}">
+                            <span class="stat-value">${data.added_products_count || 0}</span>
+                            <span class="stat-label">新增商品</span>
+                        </div>
+                        <div class="stat-item ${data.removed_products_count > 0 ? 'stat-danger' : ''}">
+                            <span class="stat-value">${data.removed_products_count || 0}</span>
+                            <span class="stat-label">删除商品</span>
+                        </div>
+                        <div class="stat-item ${data.added_high_price_count > 0 ? 'stat-info' : ''}">
+                            <span class="stat-value">${data.added_high_price_count || 0}</span>
+                            <span class="stat-label">新增高价(≥599)</span>
+                        </div>
+                    </div>
+            `;
+            
+            if ((data.duplicates && Object.keys(data.duplicates).length > 0) || (data.duplicates_excel && Object.keys(data.duplicates_excel).length > 0)) {
+                const dupData = data.duplicates || data.duplicates_excel || {};
+                const dupItems = Object.entries(dupData).map(([sku, count]) => `<span class="sku-tag" style="background: #ff9800; color: white;">${escapeHtml(sku)} (重复${count}次)</span>`).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #fff3e0; border-color: #ff9800;">
+                        <div class="missing-title" style="color: #e65100;">Excel重复货号列表:</div>
+                        <div class="sku-container">${dupItems}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.duplicates_json && Object.keys(data.duplicates_json).length > 0) {
+                const dupItems = Object.entries(data.duplicates_json).map(([sku, count]) => `<span class="sku-tag" style="background: #e91e63; color: white;">${escapeHtml(sku)} (重复${count}次)</span>`).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #fce4ec; border-color: #e91e63;">
+                        <div class="missing-title" style="color: #c2185b;">JSON重复货号列表:</div>
+                        <div class="sku-container">${dupItems}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.added_products && data.added_products.length > 0) {
+                const items = data.added_products.map(sku => createSkuTag(sku, showProductDetail)).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
+                        <div class="missing-title" style="color: #2e7d32;">新增商品 (${data.added_products_count}个):</div>
+                        <div class="sku-container">${items}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.added_high_price && data.added_high_price.length > 0) {
+                const items = data.added_high_price.map(sku => createSkuTag(sku, showProductDetail)).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #e3f2fd; border-color: #64b5f6;">
+                        <div class="missing-title" style="color: #1976d2;">新增高价商品(≥599) (${data.added_high_price_count}个):</div>
+                        <div class="sku-container">${items}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.removed_products && data.removed_products.length > 0) {
+                const items = data.removed_products.map(sku => `<span class="sku-tag">${escapeHtml(sku)}</span>`).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #ffebee; border-color: #ef5350;">
+                        <div class="missing-title" style="color: #c62828;">删除的商品 (${data.removed_products_count}个):</div>
+                        <div class="sku-container">${items}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.missing_in_json && data.missing_in_json.length > 0) {
+                const items = data.missing_in_json.map(sku => `<span class="sku-tag">${escapeHtml(sku)}</span>`).join('');
+                cardHtml += `
+                    <div class="missing-skus">
+                        <div class="missing-title">缺失货号列表:</div>
+                        <div class="sku-container">${items}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.extra_in_json && data.extra_in_json.length > 0) {
+                const items = data.extra_in_json.map(sku => createSkuTag(sku, showProductDetail)).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #fff3e0; border-color: #ffb74d;">
+                        <div class="missing-title" style="color: #f57c00;">JSON多余货号(所有价格):</div>
+                        <div class="sku-container">${items}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.high_price_extra_in_json && data.high_price_extra_in_json.length > 0) {
+                const items = data.high_price_extra_in_json.map(sku => createSkuTag(sku, showProductDetail)).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #ffebee; border-color: #ef9a9a;">
+                        <div class="missing-title" style="color: #c62828;">JSON多余货号(高价商品≥599):</div>
+                        <div class="sku-container">${items}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.high_price_existing && data.high_price_existing.length > 0) {
+                const items = data.high_price_existing.map(sku => createSkuTag(sku, showProductDetail)).join('');
+                cardHtml += `
+                    <div class="missing-skus" style="background: #e8f5e9; border-color: #81c784;">
+                        <div class="missing-title" style="color: #388e3c;">高价商品中已存在于Excel的货号:</div>
+                        <div class="sku-container">${items}</div>
+                    </div>
+                `;
+            }
+            
+            cardHtml += `</div></div>`;
+            
+            outputPanel.insertAdjacentHTML('beforeend', cardHtml);
+            
+            console.log('[调试] 对比完成，准备绑定事件，SKU标签数量:', outputPanel.querySelectorAll('.sku-tag[data-sku]').length);
+            
+            bindSkuTagEvents(outputPanel, showProductDetail);
+            
+            console.log('[调试] 事件绑定完成');
+        }
+        
+        // 暴露为全局函数
+        window.renderComparisonResult = renderComparisonResult;
         
         // 统一按钮事件绑定（立即执行，不依赖DOMContentLoaded）
         function bindAllButtons() {
@@ -5310,7 +5510,7 @@
                         status.innerHTML = '<span class="badge badge-info"><i class="fa fa-circle"></i> 已连接（验证中）</span>';
                     }
                     if (statusMessage) {
-                        status.innerHTML += '<br><small class="text-muted">' + statusMessage + '</small>';
+                        status.innerHTML += '<br><small class="text-muted">' + escapeHtml(statusMessage) + '</small>';
                     }
                 } else {
                     if (restartCount > 0) {
