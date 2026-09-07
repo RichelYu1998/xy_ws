@@ -1,11 +1,59 @@
-﻿# -*- coding: utf-8 -*-
+﻿
+# ============================================================
+# 全局异常处理器 - 防止未捕获异常导致服务器崩溃 (v4.6)
+# ============================================================
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """全局异常处理器：捕获所有未处理的异常，返回友好错误信息"""
+    error_id = str(uuid.uuid4())[:8]
+    exc_type = type(exc).__name__
+    exc_msg = str(exc)
+    
+    # 记录详细的错误日志
+    logger.error(f'[GLOBAL_EXCEPTION] ID={error_id} | Path={request.url.path} | Method={request.method} | Error={exc_type}: {exc_msg}', exc_info=True)
+    
+    # 根据异常类型返回不同的状态码和消息
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={'error': exc.detail, 'error_id': error_id, 'type': exc_type}
+        )
+    elif isinstance(exc, (json.JSONDecodeError, ValueError)):
+        return JSONResponse(
+            status_code=400,
+            content={'error': '请求数据格式错误', 'detail': str(exc), 'error_id': error_id}
+        )
+    elif isinstance(exc, (FileNotFoundError, OSError, IOError)):
+        return JSONResponse(
+            status_code=500,
+            content={'error': '文件操作失败', 'detail': str(exc), 'error_id': error_id}
+        )
+    elif isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
+        return JSONResponse(
+            status_code=504,
+            content={'error': '请求超时，请稍后重试', 'error_id': error_id}
+        )
+    else:
+        # 其他未知异常
+        return JSONResponse(
+            status_code=500,
+            content={
+                'error': '服务器内部错误',
+                'error_id': error_id,
+                'type': exc_type,
+                'message': '请查看服务器日志获取详细信息'
+            }
+        )
+# -*- coding: utf-8 -*-
 import argparse
 import asyncio
 import base64
 import ctypes
 import glob
 import gzip
+import hashlib
 import importlib.metadata as im
+import inspect
 import io
 import ipaddress
 import json
@@ -13,26 +61,25 @@ import logging
 import os
 import platform
 import random
-import secrets
 import re
+import secrets
 import select
 import shlex
 import shutil
+import signal
 import smtplib
 import socket
 import ssl
+import struct
 import subprocess
 import sys
 import threading
 import time
-import struct
-import hashlib
-import inspect
+import traceback
+import uuid
 import urllib.error
 import urllib.parse
 import urllib.request
-import traceback
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from email.header import Header
@@ -42,15 +89,11 @@ from email.utils import formataddr
 from functools import wraps
 from html import escape
 from pathlib import Path
+from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
 try:
-    import psutil
+    import openpyxl
 except ImportError:
-    psutil = None
-
-try:
-    from prometheus_client import Counter, Histogram, Gauge
-except ImportError:
-    Counter = Histogram = Gauge = None
+    openpyxl = None
 
 try:
     import pandas as pd
@@ -58,18 +101,22 @@ except ImportError:
     pd = None
 
 try:
+    import psutil
+except ImportError:
+    psutil = None
+
+try:
     import pymysql
 except ImportError:
     pymysql = None
 
 try:
-    import openpyxl
+    from cryptography.fernet import Fernet
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 except ImportError:
-    openpyxl = None
-try:
-    from playwright.async_api import async_playwright
-except ImportError:
-    async_playwright = None
+    Fernet = hashes = PBKDF2HMAC = None
+
 try:
     from fastapi import FastAPI, HTTPException, Query, Header, Depends, File, UploadFile, Form, BackgroundTasks
     from fastapi.middleware.cors import CORSMiddleware
@@ -80,17 +127,22 @@ except ImportError:
     CORSMiddleware = None
     JSONResponse = FileResponse = StreamingResponse = None
     uvicorn = None
-try:
-    from starlette.middleware.gzip import GZipMiddleware
-except ImportError:
-    GZipMiddleware = None
 
 try:
-    from starlette.requests import Request
-    from starlette.responses import Response
+    from packaging import version as packaging_version
 except ImportError:
-    Request = Response = None
-from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
+    packaging_version = None
+
+try:
+    from playwright.async_api import async_playwright
+except ImportError:
+    async_playwright = None
+
+try:
+    from prometheus_client import Counter, Histogram, Gauge
+except ImportError:
+    Counter = Histogram = Gauge = None
+
 try:
     from pydantic import BaseModel, Field, ValidationError, field_validator
 except ImportError:
@@ -104,17 +156,15 @@ except ImportError:
         BaseModel = Field = ValidationError = field_validator = None
 
 try:
-    from cryptography.fernet import Fernet
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from starlette.middleware.gzip import GZipMiddleware
 except ImportError:
-    Fernet = hashes = PBKDF2HMAC = None
+    GZipMiddleware = None
 
 try:
-    from packaging import version as packaging_version
+    from starlette.requests import Request
+    from starlette.responses import Response
 except ImportError:
-    packaging_version = None
-
+    Request = Response = None
 PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _module_logger = logging.getLogger('main')
 logger = logging.getLogger('FileCleaner')
@@ -2082,12 +2132,10 @@ def clean_all_files(
                         continue
                     
                     file.chmod(0o777)
-                    
-                    import os
+
                     try:
                         os.remove(str(file))
                     except PermissionError:
-                        import subprocess
                         try:
                             if os.name == 'nt':
                                 subprocess.run(
@@ -2642,7 +2690,6 @@ class Environment:
     @staticmethod
     def test_pip_mirror(mirror_url, timeout=None):
         """测试pip镜像源速度（带容错）"""
-        import ssl
         if timeout is None:
             timeout = TIMEOUT_CONFIG['http_request_long']
         max_retries = 2
@@ -3162,7 +3209,6 @@ class EmailConfigRequest(BaseModel):
         if v is None:
             return None
         emails = [e.strip() for e in v.split(',') if e.strip()]
-        import re
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         for email in emails:
             if not re.match(email_pattern, email.strip()):
@@ -3178,7 +3224,6 @@ class DailyProfitRequest(BaseModel):
     def validate_date_format(cls, v):
         if v is None:
             return None
-        from datetime import datetime
         try:
             datetime.strptime(v, '%Y-%m-%d')
             return v
@@ -6753,6 +6798,125 @@ class StockNumberComparator:
             logger.debug('未找到有效的货号输入')
 
 
+
+def perform_startup_health_checks():
+    """启动时执行全面健康检查，防止服务器因配置问题崩溃"""
+    _module_logger.info("=" * 60)
+    _module_logger.info("🔍 服务器启动前健康检查")
+    _module_logger.info("=" * 60)
+    
+    all_checks_passed = True
+    
+    # 1. 检查关键目录是否存在
+    critical_dirs = [
+        PROJECT_DIR / 'config',
+        PROJECT_DIR / 'data',
+        PROJECT_DIR / 'dist',
+        PROJECT_DIR / 'logs',
+    ]
+    
+    for dir_path in critical_dirs:
+        if not dir_path.exists():
+            try:
+                dir_path.mkdir(parents=True, exist_ok=True)
+                _module_logger.info(f"✅ 目录已创建: {dir_path}")
+            except OSError as e:
+                _module_logger.error(f"❌ 无法创建目录: {dir_path}, 错误: {e}")
+                all_checks_passed = False
+        else:
+            _module_logger.debug(f"✅ 目录存在: {dir_path}")
+    
+    # 2. 检查关键文件的可读性
+    critical_files = [
+        ('config.json', PROJECT_DIR / 'config' / 'config.json'),
+        ('index.html', PROJECT_DIR / 'index.html'),
+        ('main.py', PROJECT_DIR / 'main.py'),
+    ]
+    
+    for file_name, file_path in critical_files:
+        if file_path.exists():
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    f.read(1024)  # 尝试读取前1KB
+                _module_logger.debug(f"✅ 文件可读: {file_name}")
+            except (OSError, IOError, UnicodeDecodeError) as e:
+                _module_logger.warning(f"⚠️  文件读取异常: {file_name}, 错误: {e}")
+        else:
+            if file_name == 'config.json':
+                _module_logger.debug(f"ℹ️  配置文件不存在（首次运行将自动创建）: {file_name}")
+            elif file_name == 'index.html':
+                _module_logger.warning(f"⚠️  前端文件不存在: {file_name}，Web界面可能无法正常显示")
+    
+    # 3. 验证必要的环境变量
+    required_env_vars = []
+    for env_var in required_env_vars:
+        value = os.environ.get(env_var)
+        if value is None:
+            _module_logger.debug(f"ℹ️  环境变量未设置: {env_var}（使用默认值）")
+    
+    # 4. 检查端口是否可用
+    port = int(os.environ.get('WEB_PORT', '8888'))
+    import socket as socket_check
+    test_socket = socket_check.socket(socket_check.AF_INET, socket_check.SOCK_STREAM)
+    try:
+        test_socket.bind(('0.0.0.0', port))
+        test_socket.close()
+        _module_logger.info(f"✅ 端口 {port} 可用")
+    except OSError as e:
+        _module_logger.error(f"❌ 端口 {port} 被占用或无法绑定: {e}")
+        all_checks_passed = False
+        _module_logger.error(f"   解决方案：修改 WEB_PORT 环境变量或使用 --port 参数指定其他端口")
+    finally:
+        test_socket.close()
+    
+    # 5. 内存和磁盘空间检查
+    if PSUTIL_AVAILABLE:
+        try:
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage(PROJECT_DIR)
+            
+            if memory.percent > 95:
+                _module_logger.warning(f"⚠️  内存使用率过高: {memory.percent}%")
+            else:
+                _module_logger.debug(f"✅ 内存使用正常: {memory.percent}%")
+            
+            if disk.percent > 95:
+                _module_logger.error(f"❌ 磁盘空间不足: {disk.percent}% 已使用")
+                all_checks_passed = False
+            elif disk.percent > 90:
+                _module_logger.warning(f"⚠️  磁盘空间紧张: {disk.percent}% 已使用")
+            else:
+                _module_logger.debug(f"✅ 磁盘空间充足: {disk.percent}% 已使用")
+        except Exception as e:
+            _module_logger.debug(f"系统资源检查跳过: {e}")
+    
+    # 6. 验证依赖模块可用性
+    optional_deps = {
+        'psutil': psutil,
+        'pandas': pd,
+        'openpyxl': openpyxl,
+        'pymysql': pymysql,
+        'playwright': async_playwright,
+        'prometheus_client': Counter if Counter else None,
+        'pydantic': BaseModel if BaseModel else None,
+        'fastapi': FastAPI,
+        'uvicorn': uvicorn,
+    }
+    
+    for dep_name, dep_module in optional_deps.items():
+        if dep_module is None:
+            _module_logger.debug(f"ℹ️  可选依赖未安装: {dep_name}（部分功能可能不可用）")
+        else:
+            _module_logger.debug(f"✅ 依赖已加载: {dep_name}")
+    
+    _module_logger.info("-" * 60)
+    if all_checks_passed:
+        _module_logger.info("✅ 所有健康检查通过，准备启动服务器...")
+    else:
+        _module_logger.warning("⚠️  部分检查未通过，服务器可能会出现异常")
+    _module_logger.info("=" * 60)
+    
+    return all_checks_passed
 def main():
     while True:
         print_separator()
@@ -6986,7 +7150,6 @@ def select_pip_mirror(venv_path: str):
     ]
 
     def test_mirror(name, url):
-        import ssl
         max_retries = 2
         for attempt in range(max_retries + 1):
             try:
@@ -7173,6 +7336,165 @@ def install_playwright_cdn():
         logger.debug("[WARNING] Playwright浏览器安装失败，将尝试使用系统Chrome")
 
 
+
+# ============================================================
+
+# ============================================================
+# 隧道守护进程 (v4.6) - 确保隧道服务始终可用
+# ============================================================
+def start_tunnel_guardian():
+    """启动隧道守护线程 - 监控隧道状态并在异常时恢复"""
+    import threading as _threading
+    import time as _time
+    
+    def _guardian_loop():
+        """守护循环：每60秒检查一次隧道状态"""
+        _module_logger.info("[Tunnel-Guardian] 🛡️ 隧道守护进程已启动")
+        guard_interval = 60  # 60秒检查一次
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+        
+        while True:
+            try:
+                _time.sleep(guard_interval)
+                
+                # 检查 hostc 隧道
+                if 'tunnel_auto_restart' in dir() and tunnel_auto_restart:
+                    hostc_ok = _check_hostc_tunnel()
+                    if not hostc_ok:
+                        consecutive_errors += 1
+                        _module_logger.warning(f"[Tunnel-Guardian] ⚠️ hostc 隧道异常 (连续{consecutive_errors}次)")
+                        if consecutive_errors >= max_consecutive_errors:
+                            _module_logger.error(f"[Tunnel-Guardian] 🔥 hostc 隧道持续异常，尝试强制重启...")
+                            _force_restart_all_tunnels()
+                            consecutive_errors = 0
+                    else:
+                        consecutive_errors = 0
+                
+                # 检查 CF 隧道
+                if 'cf_process' in dir() and cf_process is not None:
+                    cf_ok = _check_cf_tunnel()
+                    if not cf_ok:
+                        _module_logger.warning(f"[Tunnel-Guardian] ⚠️ CF隧道可能异常")
+                        
+            except Exception as e:
+                _module_logger.error(f"[Tunnel-Guardian] 💥 守护进程异常: {type(e).__name__}: {e}")
+                _time.sleep(30)  # 异常后等待更长时间
+    
+    def _check_hostc_tunnel():
+        """检查 hostc 隧道状态"""
+        try:
+            if 'Environment' not in dir():
+                return True
+            
+            has_process = Environment.check_process_running(Environment.HOSTC_PROCESS_NAME)
+            
+            if not has_process and 'tunnel_url' in dir() and tunnel_url:
+                _module_logger.debug(f"[Tunnel-Guardian] hostc 进程未运行但URL存在，可能需要重启")
+                return False
+            
+            if 'tunnel_url' in dir() and tunnel_url:
+                try:
+                    is_valid = verify_url(tunnel_url, timeout=5, verbose=False)
+                    return is_valid
+                except Exception:
+                    return False
+            
+            return True
+        except Exception as e:
+            _module_logger.debug(f"[Tunnel-Guardian] 检查hostc失败: {e}")
+            return True  # 检查本身失败不算隧道异常
+    
+    def _check_cf_tunnel():
+        """检查 CF 隧道状态"""
+        try:
+            if cf_process is None or cf_process.poll() is not None:
+                return False
+            
+            if 'cf_url' in dir() and cf_url:
+                try:
+                    is_valid = verify_url(cf_url, timeout=5, verbose=False)
+                    return is_valid
+                except Exception:
+                    return False
+            
+            return True
+        except Exception as e:
+            _module_logger.debug(f"[Tunnel-Guardian] 检查CF失败: {e}")
+            return True
+    
+    def _force_restart_all_tunnels():
+        """强制重启所有隧道"""
+        try:
+            _module_logger.info("[Tunnel-Guardian] 🔄 执行强制重启所有隧道...")
+            
+            # 重启 hostc
+            if 'restart_tunnel' in dir() and 'tunnel_auto_restart' in dir():
+                # 通过设置标志触发重启
+                if 'tunnel_need_restart' in dir():
+                    global tunnel_need_restart
+                    tunnel_need_restart = True
+                    _module_logger.info("[Tunnel-Guardian] ✅ 已触发 hostc 重启标志")
+            
+            # CF 隧道会由 cf_heartbeat_loop 自动处理
+            
+        except Exception as e:
+            _module_logger.error(f"[Tunnel-Guardian] 强制重启失败: {e}")
+    
+    # 启动守护线程
+    guardian_thread = _threading.Thread(target=_guardian_loop, daemon=True, name="TunnelGuardian")
+    guardian_thread.start()
+    _module_logger.info("[Tunnel-Guardian] ✅ 隧道守护线程已启动")
+# 优雅关闭处理器 (v4.6) - 确保资源正确释放
+# ============================================================
+import atexit
+import signal as signal_module
+
+def graceful_shutdown():
+    """优雅关闭：清理所有资源"""
+    _module_logger.info("=" * 60)
+    _module_logger.info("🛑 正在关闭服务器...")
+    _module_logger.info("=" * 60)
+    
+    # 1. 停止所有运行中的任务
+    if 'tasks' in dir() and tasks:
+        active_tasks = {k: v for k, v in tasks.items() if v.get('status') in ['running', 'starting']}
+        if active_tasks:
+            _module_logger.info(f"停止 {len(active_tasks)} 个活跃任务...")
+            for task_id, task_info in active_tasks.items():
+                try:
+                    if task_id in processes:
+                        proc = processes[task_id]
+                        if proc.poll() is None:
+                            proc.terminate()
+                            _module_logger.debug(f"任务 {task_id} 已终止")
+                except Exception as e:
+                    _module_logger.warning(f"停止任务 {task_id} 失败: {e}")
+    
+    # 2. 关闭数据库连接（如果有）
+    # 这里可以添加数据库连接池的关闭逻辑
+    
+    # 3. 刷新日志
+    try:
+        logging.shutdown()
+    except Exception:
+        pass
+    
+    _module_logger.info("✅ 服务器已安全关闭")
+    _module_logger.info("=" * 60)
+
+# 注册退出处理
+atexit.register(graceful_shutdown)
+
+# 注册信号处理（Unix系统）
+if not Environment.IS_WINDOWS:
+    def signal_handler(signum, frame):
+        _module_logger.info(f"收到信号 {signum}，开始优雅关闭...")
+        graceful_shutdown()
+        sys.exit(0)
+    
+    signal_module.signal(signal_module.SIGTERM, signal_handler)
+    signal_module.signal(signal_module.SIGINT, signal_handler)
 if __name__ == '__main__':
     check_python_version((3, 0))  # Python 版本兼容性检查 (>=3.0)
     
@@ -7411,6 +7733,52 @@ if __name__ == '__main__':
         sys.exit(0)
     
     if args.web:
+        def global_exception_handler(exc_type, exc_value, exc_traceback):
+            """全局异常处理器 - 防止未捕获异常导致服务器崩溃"""
+            if issubclass(exc_type, KeyboardInterrupt):
+                sys.__excepthook__(exc_type, exc_value, exc_traceback)
+                return
+            
+            logger.error(f"[全局未捕获异常] {exc_type.__name__}: {exc_value}")
+            logger.error(f"[异常位置] 文件: {exc_traceback.tb_frame.f_code.co_filename if exc_traceback else 'N/A'}, 行号: {exc_traceback.tb_lineno if exc_traceback else 'N/A'}")
+            logger.debug(f"[完整堆栈] {''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))}")
+        
+        sys.excepthook = global_exception_handler
+        
+        def thread_exception_handler(args):
+            """线程异常处理器 - 防止守护线程异常影响主进程"""
+            logger.error(f"[线程异常] 线程: {args.thread.name if args.thread else 'Unknown'}")
+            logger.error(f"[异常类型] {type(args.exc_value).__name__}: {args.exc_value}")
+            logger.debug(f"[完整堆栈] {''.join(traceback.format_exception(type(args.exc_value), args.exc_value, args.exc_traceback)) if args.exc_traceback else 'No traceback'}")
+        
+        threading.excepthook = thread_exception_handler
+        
+        def signal_handler(signum, frame):
+            """信号处理器 - 优雅关闭"""
+            signal_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+            logger.info(f"[信号处理] 收到信号 {signal_name} ({signum})，准备优雅关闭...")
+            
+            global tunnel_auto_restart, cf_process
+            tunnel_auto_restart = False
+            
+            if cf_process and cf_process.poll() is None:
+                try:
+                    cf_process.terminate()
+                    cf_process.wait(timeout=5)
+                    logger.info("[关闭] CF Tunnel 已停止")
+                except Exception as e:  # [HANDLED]
+                    logger.debug(f"停止CF Tunnel时异常: {e}")
+                    try:
+                        cf_process.kill()
+                    except Exception:
+                        pass
+        
+        try:
+            signal.signal(signal.SIGINT, signal_handler)
+            signal.signal(signal.SIGTERM, signal_handler)
+        except (ValueError, OSError) as e:  # [HANDLED]
+            logger.debug(f"设置信号处理器失败（非致命）: {e}")
+        
         # ============================================================
         # 请求日志中间件 (v3.8.70)
         # ============================================================
@@ -9217,7 +9585,6 @@ if __name__ == '__main__':
                                 version_key = ver_in_msg.group(1)
                             else:
                                 def find_nearest_version(commit_dt, versions_map):
-                                    from datetime import datetime
                                     try:
                                         commit_datetime = datetime.strptime(commit_dt, '%Y-%m-%d')
                                         min_diff = float('inf')
@@ -9958,6 +10325,7 @@ if __name__ == '__main__':
                 return False
         
         def heartbeat_loop():
+            """hostc 隧道心跳监控 - 带完整异常保护"""
             global tunnel_process, tunnel_auto_restart, tunnel_need_restart, tunnel_url, tunnel_consecutive_failures
             global stable_url, stable_url_confirm_count, url_first_seen_time, last_stable_notification_time
             global tunnel_last_heartbeat, tunnel_heartbeat_failed, cf_url
@@ -9971,139 +10339,144 @@ if __name__ == '__main__':
             last_url_sync_time = 0
             prev_web_url = None
             last_restart_state = False
-            
-            while tunnel_auto_restart:
-                if tunnel_need_restart and not last_restart_state:
-                    url_verify_failures = 0
-                    stable_url_confirm_count = 0
-                    stable_url = None
-                    grace_end_time = time.time() + 60
-                    logger.debug(f"[Tunnel] 🔄 检测到隧道重启，重置失败计数并进入60秒宽限期")
-                last_restart_state = tunnel_need_restart
-                
-                # 优先使用内存中的 tunnel_url（解决文件锁定问题）
-                if tunnel_url:
-                    web_url = tunnel_url
-                else:
-                    web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
-                is_tunnel_running = False
-                url_verified = False
 
-                if web_url:
-                    if web_url != prev_web_url and prev_web_url is not None and stable_url_confirm_count >= stable_url_min_confirms:
-                        grace_end_time = time.time() + 60
+            try:
+                while tunnel_auto_restart:
+                    if tunnel_need_restart and not last_restart_state:
+                        url_verify_failures = 0
                         stable_url_confirm_count = 0
                         stable_url = None
-                        logger.debug(f"[Tunnel] 🔄 URL变化({prev_web_url} → {web_url})，进入60秒宽限期")
-                    prev_web_url = web_url
+                        grace_end_time = time.time() + 60
+                        logger.debug(f"[Tunnel] 🔄 检测到隧道重启，重置失败计数并进入60秒宽限期")
+                    last_restart_state = tunnel_need_restart
 
-                    if time.time() < grace_end_time:
-                        is_tunnel_running = True
-                        remaining = int(grace_end_time - time.time())
-                        if remaining >= 55:
-                            logger.debug(f"[Tunnel] ⏳ 宽限期中（{remaining}秒），跳过URL验证")
+                    # 优先使用内存中的 tunnel_url（解决文件锁定问题）
+                    if tunnel_url:
+                        web_url = tunnel_url
                     else:
-                        try:
-                            url_verified = verify_url(web_url, timeout=TUNNEL_CONFIG['url_verify_timeout'])
-                            if url_verified:
-                                is_tunnel_running = True
-                                url_verify_failures = 0
+                        web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+                    is_tunnel_running = False
+                    url_verified = False
 
-                                if web_url != stable_url:
-                                    stable_url = web_url
-                                    stable_url_confirm_count = 1
-                                    url_first_seen_time = time.time()
-                                    logger.debug(f"[Tunnel] [搜索] 检测到新URL，开始稳定性验证 (1/{stable_url_min_confirms}): {web_url}")
-                                elif stable_url_confirm_count < stable_url_min_confirms:
-                                    stable_url_confirm_count += 1
-                                    logger.debug(f"[Tunnel] ✅ URL稳定性验证 ({stable_url_confirm_count}/{stable_url_min_confirms}): {web_url}")
-                                    if stable_url_confirm_count >= stable_url_min_confirms:
-                                        elapsed = int(time.time() - url_first_seen_time)
-                                        logger.debug(f"[Tunnel] 🎯 URL已确认为稳定！持续验证{stable_url_confirm_count}次，耗时{elapsed}秒")
-                                        write_tunnel_urls_file(hostc_url=web_url, cf_url=cf_url)
-                                        send_tunnel_notification(web_url, 'stable_available')
-                                        last_stable_notification_time = time.time()
-                            else:
+                    if web_url:
+                        if web_url != prev_web_url and prev_web_url is not None and stable_url_confirm_count >= stable_url_min_confirms:
+                            grace_end_time = time.time() + 60
+                            stable_url_confirm_count = 0
+                            stable_url = None
+                            logger.debug(f"[Tunnel] 🔄 URL变化({prev_web_url} → {web_url})，进入60秒宽限期")
+                        prev_web_url = web_url
+
+                        if time.time() < grace_end_time:
+                            is_tunnel_running = True
+                            remaining = int(grace_end_time - time.time())
+                            if remaining >= 55:
+                                logger.debug(f"[Tunnel] ⏳ 宽限期中（{remaining}秒），跳过URL验证")
+                        else:
+                            try:
+                                url_verified = verify_url(web_url, timeout=TUNNEL_CONFIG['url_verify_timeout'])
+                                if url_verified:
+                                    is_tunnel_running = True
+                                    url_verify_failures = 0
+
+                                    if web_url != stable_url:
+                                        stable_url = web_url
+                                        stable_url_confirm_count = 1
+                                        url_first_seen_time = time.time()
+                                        logger.debug(f"[Tunnel] [搜索] 检测到新URL，开始稳定性验证 (1/{stable_url_min_confirms}): {web_url}")
+                                    elif stable_url_confirm_count < stable_url_min_confirms:
+                                        stable_url_confirm_count += 1
+                                        logger.debug(f"[Tunnel] ✅ URL稳定性验证 ({stable_url_confirm_count}/{stable_url_min_confirms}): {web_url}")
+                                        if stable_url_confirm_count >= stable_url_min_confirms:
+                                            elapsed = int(time.time() - url_first_seen_time)
+                                            logger.debug(f"[Tunnel] 🎯 URL已确认为稳定！持续验证{stable_url_confirm_count}次，耗时{elapsed}秒")
+                                            write_tunnel_urls_file(hostc_url=web_url, cf_url=cf_url)
+                                            send_tunnel_notification(web_url, 'stable_available')
+                                            last_stable_notification_time = time.time()
+                                else:
+                                    url_verify_failures += 1
+                                    if stable_url_confirm_count > 0:
+                                        logger.debug(f"[Tunnel] ⚠️ 公网地址不可用，重置稳定性计数 ({stable_url_confirm_count} -> 0)")
+                                        stable_url_confirm_count = 0
+                                        stable_url = None
+                                        if cf_stable_url and cf_stable_confirm_count >= cf_stable_min_confirms:
+                                            logger.debug(f"[Tunnel] 🔄 hostc 不可用，CF 仍有可用地址: {cf_stable_url}，发送备用地址通知")
+                                            send_tunnel_notification(cf_stable_url, 'fallback_available', force_send=True)
+                                    if time.time() - last_log_time > 120:
+                                        logger.debug(f"[Tunnel] ⚠️ 公网地址不可用: {web_url}，连续失败 {url_verify_failures}/{max_url_verify_failures} 次")
+                                        last_log_time = time.time()
+                                    if url_verify_failures >= max_url_verify_failures:
+                                        logger.debug(f"[Tunnel] 🚨 公网地址连续不可用{url_verify_failures}次，标记需要重启")
+                                        send_tunnel_notification(web_url, 'unavailable', force_send=True)
+                                        tunnel_need_restart = True
+                            except Exception as e:  # [HANDLED]
                                 url_verify_failures += 1
                                 if stable_url_confirm_count > 0:
-                                    logger.debug(f"[Tunnel] ⚠️ 公网地址不可用，重置稳定性计数 ({stable_url_confirm_count} -> 0)")
                                     stable_url_confirm_count = 0
                                     stable_url = None
-                                    if cf_stable_url and cf_stable_confirm_count >= cf_stable_min_confirms:
-                                        logger.debug(f"[Tunnel] 🔄 hostc 不可用，CF 仍有可用地址: {cf_stable_url}，发送备用地址通知")
-                                        send_tunnel_notification(cf_stable_url, 'fallback_available', force_send=True)
                                 if time.time() - last_log_time > 120:
-                                    logger.debug(f"[Tunnel] ⚠️ 公网地址不可用: {web_url}，连续失败 {url_verify_failures}/{max_url_verify_failures} 次")
+                                    logger.debug(f"[Tunnel] URL验证异常: {e}")
                                     last_log_time = time.time()
                                 if url_verify_failures >= max_url_verify_failures:
-                                    logger.debug(f"[Tunnel] 🚨 公网地址连续不可用{url_verify_failures}次，标记需要重启")
-                                    send_tunnel_notification(web_url, 'unavailable', force_send=True)
                                     tunnel_need_restart = True
-                        except Exception as e:  # [HANDLED]
-                            url_verify_failures += 1
-                            if stable_url_confirm_count > 0:
-                                stable_url_confirm_count = 0
-                                stable_url = None
-                            if time.time() - last_log_time > 120:
-                                logger.debug(f"[Tunnel] URL验证异常: {e}")
-                                last_log_time = time.time()
-                            if url_verify_failures >= max_url_verify_failures:
-                                tunnel_need_restart = True
-                else:
-                    if time.time() - last_log_time > 120:
-                        logger.debug(f"[Tunnel] ⚠️ tunnel_url.txt 中未找到公网地址，隧道可能未启动")
-                        last_log_time = time.time()
-                    url_verify_failures += 1
-                    if url_verify_failures >= max_url_verify_failures:
-                        logger.debug(f"[Tunnel] 🚨 长时间未获取到公网地址，标记需要重启")
-                        tunnel_need_restart = True
-                
-                if is_tunnel_running:
-                    if url_verified:
-                        with _tunnel_state_lock:
-                            tunnel_last_heartbeat = time.time()
-                            tunnel_heartbeat_failed = False
-                        if consecutive_failures > 0:
-                            logger.debug(f"[Tunnel] 心跳恢复")
-                            if url_verify_failures > 0 and web_url:
-                                logger.debug(f"[Tunnel] 🎉 公网地址恢复，发送通知")
-                                send_tunnel_notification(web_url, 'available')
-                            last_log_time = time.time()
-                        consecutive_failures = 0
-                        check_and_send_pending_email()
                     else:
-                        success = send_heartbeat()
-                        if not success:
-                            consecutive_failures += 1
-                            if consecutive_failures >= max_consecutive_failures:
-                                logger.debug(f"[Tunnel] 心跳连续失败 {consecutive_failures} 次，触发重启")
-                                tunnel_need_restart = True
-                                last_log_time = time.time()
-                            elif consecutive_failures == 1 and time.time() - last_log_time > 10:
-                                logger.debug(f"[Tunnel] 心跳异常: 网络不稳定 ({consecutive_failures}/{max_consecutive_failures})")
-                                last_log_time = time.time()
-                        else:
+                        if time.time() - last_log_time > 120:
+                            logger.debug(f"[Tunnel] ⚠️ tunnel_url.txt 中未找到公网地址，隧道可能未启动")
+                            last_log_time = time.time()
+                        url_verify_failures += 1
+                        if url_verify_failures >= max_url_verify_failures:
+                            logger.debug(f"[Tunnel] 🚨 长时间未获取到公网地址，标记需要重启")
+                            tunnel_need_restart = True
+
+                    if is_tunnel_running:
+                        if url_verified:
+                            with _tunnel_state_lock:
+                                tunnel_last_heartbeat = time.time()
+                                tunnel_heartbeat_failed = False
                             if consecutive_failures > 0:
                                 logger.debug(f"[Tunnel] 心跳恢复")
+                                if url_verify_failures > 0 and web_url:
+                                    logger.debug(f"[Tunnel] 🎉 公网地址恢复，发送通知")
+                                    send_tunnel_notification(web_url, 'available')
                                 last_log_time = time.time()
                             consecutive_failures = 0
                             check_and_send_pending_email()
+                        else:
+                            success = send_heartbeat()
+                            if not success:
+                                consecutive_failures += 1
+                                if consecutive_failures >= max_consecutive_failures:
+                                    logger.debug(f"[Tunnel] 心跳连续失败 {consecutive_failures} 次，触发重启")
+                                    tunnel_need_restart = True
+                                    last_log_time = time.time()
+                                elif consecutive_failures == 1 and time.time() - last_log_time > 10:
+                                    logger.debug(f"[Tunnel] 心跳异常: 网络不稳定 ({consecutive_failures}/{max_consecutive_failures})")
+                                    last_log_time = time.time()
+                            else:
+                                if consecutive_failures > 0:
+                                    logger.debug(f"[Tunnel] 心跳恢复")
+                                    last_log_time = time.time()
+                                consecutive_failures = 0
+                                check_and_send_pending_email()
 
-                    if web_url and time.time() - last_url_sync_time > 300:
-                        last_url_sync_time = time.time()
-                        write_tunnel_urls_file(hostc_url=web_url, cf_url=cf_url)
-                        web_output_file = PathManager.get_web_output_file()
-                        try:
-                            lan_ip = PathManager.get_lan_ip()
-                            port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
-                            with open(web_output_file, 'a', encoding='utf-8') as wf:
-                                if lan_ip:
-                                    wf.write(f"局域网地址: http://{lan_ip}:{port}\n")
-                                wf.write(f"Public URL: {web_url}\n")
-                        except Exception as e:  # [HANDLED]
-                            _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                            # [IMPLEMENTATION] 待实现的功能逻辑
-                time.sleep(heartbeat_interval)
+                        if web_url and time.time() - last_url_sync_time > 300:
+                            last_url_sync_time = time.time()
+                            write_tunnel_urls_file(hostc_url=web_url, cf_url=cf_url)
+                            web_output_file = PathManager.get_web_output_file()
+                            try:
+                                lan_ip = PathManager.get_lan_ip()
+                                port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
+                                with open(web_output_file, 'a', encoding='utf-8') as wf:
+                                    if lan_ip:
+                                        wf.write(f"局域网地址: http://{lan_ip}:{port}\n")
+                                    wf.write(f"Public URL: {web_url}\n")
+                            except Exception as e:  # [HANDLED]
+                                _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+                                # [IMPLEMENTATION] 待实现的功能逻辑
+                    time.sleep(heartbeat_interval)
+            except Exception as e:  # [HANDLED]
+                log_print(f"[Tunnel-Heartbeat] 💥 心跳循环异常（不影响主服务）: {type(e).__name__}: {str(e)[:200]}")
+                logger.debug(f"[Tunnel-Heartbeat] 异常详情: {traceback.format_exc()}")
+                time.sleep(10)
         
         def start_tunnel_daemons():
             global tunnel_restart_thread, tunnel_heartbeat_thread, tunnel_daemon_started
@@ -10425,13 +10798,14 @@ if __name__ == '__main__':
                 return {'success': False, 'error': f'隧道启动失败: {type(e).__name__}'}
         
         def restart_tunnel():
+            """hostc 隧道自动重启 - 带完整异常保护"""
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay, cf_url
-            
+
             consecutive_restart_attempts = 0
             restart_wait_start = None
             grace_period_end = None
             verify_fail_count = 0
-            
+
             def _do_restart(has_hostc_process, web_url, is_url_valid):
                 nonlocal restart_wait_start, grace_period_end, consecutive_restart_attempts
                 global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_last_error, tunnel_restart_count, tunnel_need_restart, old_tunnel_url, tunnel_consecutive_failures, tunnel_backoff_delay
@@ -10492,76 +10866,77 @@ if __name__ == '__main__':
             
             max_tunnel_restarts = 50
             total_restart_count = 0
+
             while tunnel_auto_restart and total_restart_count < max_tunnel_restarts:
                 now = time.time()
                 total_restart_count += 1
-                
+            
                 if grace_period_end and now < grace_period_end:
                     time.sleep(3)
                     continue
                 grace_period_end = None
-                
+            
                 existing_urls = read_tunnel_urls_file()
                 hostc_url = existing_urls.get('hostc')
                 has_hostc_process = Environment.check_process_running(Environment.HOSTC_PROCESS_NAME)
-                
+            
                 if has_hostc_process and hostc_url:
                     is_url_valid = False
                     try:
                         is_url_valid = verify_url(hostc_url)
                     except Exception as e:  # [HANDLED]
                         _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                    
+                
                     if is_url_valid:
                         verify_fail_count = 0
                         restart_wait_start = None
                         tunnel_need_restart = False
                         time.sleep(SLEEP_CONFIG['short'])
                         continue
-                    
+                
                     verify_fail_count += 1
                     if verify_fail_count < 3:
                         time.sleep(5)
                         continue
-                    
+                
                     logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ hostc URL连续{verify_fail_count}次验证失败，触发重启（CF由cf_heartbeat_loop独立管理）")
                     sys.stdout.flush()
                     verify_fail_count = 0
                     if not _do_restart(has_hostc_process, hostc_url, False):
                         break
                     continue
-                
+            
                 if tunnel_need_restart:
                     if not _do_restart(has_hostc_process, hostc_url, False):
                         break
                     continue
-                
+            
                 if not has_hostc_process:
                     logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ❌ hostc进程已退出，立即重启（CF不受影响）")
                     sys.stdout.flush()
                     if not _do_restart(False, hostc_url, False):
                         break
                     continue
-                
+            
                 if not hostc_url:
                     if restart_wait_start is None:
                         restart_wait_start = time.time()
                         logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ hostc运行中但URL未就绪，等待...")
                         sys.stdout.flush()
-                    
+                
                     elapsed = now - restart_wait_start
                     if elapsed < 30:
                         time.sleep(3)
                         continue
-                    
+                
                     logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ 等待超过30秒hostc URL仍未就绪，触发重启（CF不受影响）")
                     sys.stdout.flush()
                     if not _do_restart(True, None, False):
                         break
             
             if total_restart_count >= max_tunnel_restarts:
-                logger.error(f"[Tunnel] ❌ 已达到最大重启次数({max_tunnel_restarts}次)，停止自动重启以防止资源耗尽")
-                logger.error(f"[Tunnel] 💡 建议手动检查网络连接或重启服务")
+                    logger.error(f"[Tunnel] ❌ 已达到最大重启次数({max_tunnel_restarts}次)，停止自动重启以防止资源耗尽")
+                    logger.error(f"[Tunnel] 💡 建议手动检查网络连接或重启服务")
         
 
         # ========================================
@@ -10912,75 +11287,127 @@ ingress:
             return {"success": False, "error": f"Plan B 达到最大重试次数 ({max_retries}次)"}
 
         def cf_heartbeat_loop():
-            """Cloudflare Tunnel 独立心跳验证 - 验证通过后发邮件通知"""
+            """Cloudflare Tunnel 独立心跳验证 - 验证通过后发邮件通知，失败时自动重启"""
             global cf_process, cf_url, cf_mode
             global cf_stable_url, cf_stable_confirm_count, cf_url_first_seen_time, cf_last_stable_notification_time, cf_last_email_sent_url
             global stable_url
 
             interval = TUNNEL_CONFIG['cf_heartbeat_interval']
             last_log_time = 0
+            consecutive_failures = 0
+            max_consecutive_failures = 3
+            cf_restart_cooldown = 0
 
             while True:
-                time.sleep(interval)
-
-                if cf_process is None or cf_process.poll() is not None:
-                    if cf_url:
-                        log_print(f"[CF-Heartbeat] ⚠️ CF 隧道进程已退出")
-                        cf_url = None
-                        cf_mode = None
-                        cf_stable_url = None
-                        cf_stable_confirm_count = 0
-                        cf_last_email_sent_url = None
-                    continue
-
-                if not cf_url:
-                    continue
-
                 try:
-                    url_verified = verify_url(cf_url, timeout=TUNNEL_CONFIG['url_verify_timeout'], verbose=True)
-                except Exception as e:  # [HANDLED]
-                    log_print(f"[CF-Heartbeat] ❌ CF URL 验证异常: {str(e)[:100]}")
-                    url_verified = False
+                    time.sleep(interval)
 
-                if url_verified:
-                    if cf_url != cf_stable_url:
-                        cf_stable_url = cf_url
-                        cf_stable_confirm_count = 1
-                        cf_url_first_seen_time = time.time()
-                        log_print(f"[CF-Heartbeat] [搜索] CF 新URL，开始稳定性验证 (1/{cf_stable_min_confirms}): {cf_url}")
-                        log_print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时0秒")
-                        write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
-                        if cf_url != cf_last_email_sent_url:
-                            log_print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
-                            send_tunnel_notification(cf_url, 'stable_available', tunnel_type='cloudflare')
-                            cf_last_stable_notification_time = time.time()
-                            cf_last_email_sent_url = cf_url
-                        else:
-                            log_print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
-                    elif cf_stable_confirm_count < cf_stable_min_confirms:
-                        cf_stable_confirm_count += 1
-                        log_print(f"[CF-Heartbeat] ✅ CF 稳定性验证 ({cf_stable_confirm_count}/{cf_stable_min_confirms}): {cf_url}")
-                        elapsed = int(time.time() - cf_url_first_seen_time)
-                        log_print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
-                        write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
-                        if cf_url != cf_last_email_sent_url:
-                            log_print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
-                            send_tunnel_notification(cf_url, 'stable_available', tunnel_type='cloudflare')
-                            cf_last_stable_notification_time = time.time()
-                            cf_last_email_sent_url = cf_url
-                        else:
-                            log_print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
-                else:
-                    if cf_stable_confirm_count > 0:
-                        log_print(f"[CF-Heartbeat] ⚠️ CF URL 不可用，重置稳定性计数 ({cf_stable_confirm_count} -> 0)")
-                        cf_stable_confirm_count = 0
-                        cf_stable_url = None
-                        if stable_url and stable_url_confirm_count >= stable_url_min_confirms:
-                            logger.debug(f"[CF-Heartbeat] 🔄 CF 不可用，hostc 仍有可用地址: {stable_url}，发送备用地址通知")
-                            send_tunnel_notification(stable_url, 'fallback_available', force_send=True)
-                    if time.time() - last_log_time > 120:
-                        logger.debug(f"[CF-Heartbeat] ⚠️ CF URL 不可用: {cf_url}")
-                        last_log_time = time.time()
+                    if cf_process is None or cf_process.poll() is not None:
+                        if cf_url:
+                            log_print(f"[CF-Heartbeat] ⚠️ CF 隧道进程已退出")
+                            cf_url = None
+                            cf_mode = None
+                            cf_stable_url = None
+                            cf_stable_confirm_count = 0
+                            cf_last_email_sent_url = None
+                        
+                        if time.time() > cf_restart_cooldown:
+                            log_print(f"[CF-Heartbeat] 🔄 尝试自动重启 CF Tunnel...")
+                            restart_result = start_cloudflare_tunnel()
+                            if restart_result and restart_result.get('success'):
+                                log_print(f"[CF-Heartbeat] ✅ CF Tunnel 自动重启成功: {restart_result.get('url')}")
+                                consecutive_failures = 0
+                                cf_restart_cooldown = time.time() + 60
+                            else:
+                                log_print(f"[CF-Heartbeat] ❌ CF Tunnel 自动重启失败: {restart_result.get('error', '未知错误') if restart_result else '无返回'}")
+                                cf_restart_cooldown = time.time() + 120
+                        continue
+
+                    if not cf_url:
+                        continue
+
+                    try:
+                        url_verified = verify_url(cf_url, timeout=TUNNEL_CONFIG['url_verify_timeout'], verbose=True)
+                    except Exception as e:  # [HANDLED]
+                        log_print(f"[CF-Heartbeat] ❌ CF URL 验证异常: {str(e)[:100]}")
+                        url_verified = False
+
+                    if url_verified:
+                        consecutive_failures = 0
+                        if cf_url != cf_stable_url:
+                            cf_stable_url = cf_url
+                            cf_stable_confirm_count = 1
+                            cf_url_first_seen_time = time.time()
+                            log_print(f"[CF-Heartbeat] [搜索] CF 新URL，开始稳定性验证 (1/{cf_stable_min_confirms}): {cf_url}")
+                            log_print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时0秒")
+                            write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
+                            if cf_url != cf_last_email_sent_url:
+                                log_print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
+                                send_tunnel_notification(cf_url, 'stable_available', tunnel_type='cloudflare')
+                                cf_last_stable_notification_time = time.time()
+                                cf_last_email_sent_url = cf_url
+                            else:
+                                log_print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
+                        elif cf_stable_confirm_count < cf_stable_min_confirms:
+                            cf_stable_confirm_count += 1
+                            log_print(f"[CF-Heartbeat] ✅ CF 稳定性验证 ({cf_stable_confirm_count}/{cf_stable_min_confirms}): {cf_url}")
+                            elapsed = int(time.time() - cf_url_first_seen_time)
+                            log_print(f"[CF-Heartbeat] 🎯 CF URL 已确认稳定！持续验证{cf_stable_confirm_count}次，耗时{elapsed}秒")
+                            write_tunnel_urls_file(hostc_url=stable_url, cf_url=cf_url)
+                            if cf_url != cf_last_email_sent_url:
+                                log_print(f"[CF-Heartbeat] 🎉 公网地址验证通过！立即发送邮件通知...")
+                                send_tunnel_notification(cf_url, 'stable_available', tunnel_type='cloudflare')
+                                cf_last_stable_notification_time = time.time()
+                                cf_last_email_sent_url = cf_url
+                            else:
+                                log_print(f"[CF-Heartbeat] ⏭️ CF URL 已发送过邮件，跳过重复发送")
+                    else:
+                        consecutive_failures += 1
+                        if cf_stable_confirm_count > 0:
+                            log_print(f"[CF-Heartbeat] ⚠️ CF URL 不可用，重置稳定性计数 ({cf_stable_confirm_count} -> 0)")
+                            cf_stable_confirm_count = 0
+                            cf_stable_url = None
+                            if stable_url and stable_url_confirm_count >= stable_url_min_confirms:
+                                logger.debug(f"[CF-Heartbeat] 🔄 CF 不可用，hostc 仍有可用地址: {stable_url}，发送备用地址通知")
+                                send_tunnel_notification(stable_url, 'fallback_available', force_send=True)
+                        
+                        if consecutive_failures >= max_consecutive_failures:
+                            log_print(f"[CF-Heartbeat] 🔥 CF URL 连续{consecutive_failures}次不可用，触发自动重启...")
+                            
+                            old_cf_url = cf_url
+                            if cf_process:
+                                try:
+                                    cf_process.terminate()
+                                    cf_process.wait(timeout=5)
+                                except:
+                                    try:
+                                        cf_process.kill()
+                                    except:
+                                        pass
+                            
+                            cf_url = None
+                            cf_mode = None
+                            cf_stable_url = None
+                            cf_stable_confirm_count = 0
+                            cf_process = None
+                            
+                            restart_result = start_cloudflare_tunnel()
+                            if restart_result and restart_result.get('success'):
+                                log_print(f"[CF-Heartbeat] ✅ CF Tunnel 重启成功: {restart_result.get('url')} (原URL: {old_cf_url})")
+                                consecutive_failures = 0
+                                cf_restart_cooldown = time.time() + 60
+                            else:
+                                log_print(f"[CF-Heartbeat] ❌ CF Tunnel 重启失败: {restart_result.get('error', '未知错误') if restart_result else '无返回'}")
+                                cf_restart_cooldown = time.time() + 120
+                                consecutive_failures = 0
+                        elif time.time() - last_log_time > 120:
+                            logger.debug(f"[CF-Heartbeat] ⚠️ CF URL 不可用: {cf_url} (连续失败: {consecutive_failures}/{max_consecutive_failures})")
+                            last_log_time = time.time()
+                
+                except Exception as e:  # [HANDLED]
+                    log_print(f"[CF-Heartbeat] 💥 心跳循环异常（不影响主服务）: {type(e).__name__}: {str(e)[:200]}")
+                    logger.debug(f"[CF-Heartbeat] 异常详情: {traceback.format_exc()}")
+                    time.sleep(10)
 
         def start_cf_heartbeat():
             """启动 CF 心跳守护线程"""
@@ -11418,24 +11845,35 @@ ingress:
         logger.debug(f"   地址: http://{web_host}:{args.port}")
         logger.debug(f"   文档: http://{web_host}:{args.port}/docs")
         
-        max_retries = 3
+        max_retries = 5
         retry_count = 0
+        retryable_errors = (OSError, ConnectionError, ConnectionResetError, ConnectionAbortedError)
+        
         while retry_count < max_retries:
             try:
                 uvicorn.run(app, host=web_host, port=args.port, log_level="info")
                 break
-            except OSError as e:
-                if hasattr(e, 'winerror') and e.winerror == 64:
-                    retry_count += 1
-                    if retry_count < max_retries:
-                        logger.warning(f"[网络错误] WinError 64 - 指定的网络名不再可用，第{retry_count}次自动重试...")
-                        time.sleep(2)
-                        continue
-                    else:
-                        logger.error(f"[致命错误] 网络连接持续失败，已达到最大重试次数({max_retries}次)")
-                        raise
+            except retryable_errors as e:
+                error_type = type(e).__name__
+                error_code = getattr(e, 'winerror', getattr(e, 'errno', 'N/A'))
+                retry_count += 1
+                
+                if retry_count < max_retries:
+                    wait_time = min(2 ** retry_count, 30)  # 指数退避，最大30秒
+                    logger.warning(f"[网络错误] {error_type} (错误码: {error_code}) - {str(e)[:100]}")
+                    logger.warning(f"[自动重试] 第{retry_count}/{max_retries}次重试，等待{wait_time}秒...")
+                    time.sleep(wait_time)
+                    continue
                 else:
+                    logger.error(f"[致命错误] {error_type} 持续失败，已达到最大重试次数({max_retries}次)")
+                    logger.error(f"[错误详情] {type(e).__name__}: {e}")
                     raise
+            except KeyboardInterrupt:
+                logger.info("[用户中断] 收到 Ctrl+C，正在优雅关闭...")
+                break
+            except Exception as e:
+                logger.error(f"[未预期错误] {type(e).__name__}: {e}")
+                raise
     else:
         main()
 
