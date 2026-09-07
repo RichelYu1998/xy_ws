@@ -289,9 +289,9 @@ TIMEOUT_CONFIG = {
     'browser_element_click': int(os.environ.get('TIMEOUT_BROWSER_ELEMENT_CLICK', '1')),
     'browser_element_wait': int(os.environ.get('TIMEOUT_BROWSER_ELEMENT_WAIT', '2')),
     'browser_network_idle': int(os.environ.get('TIMEOUT_BROWSER_NETWORK_IDLE', '10')),
-    'tunnel_startup': int(os.environ.get('TIMEOUT_TUNNEL_STARTUP', '15')),
-    'tunnel_heartbeat': int(os.environ.get('TIMEOUT_TUNNEL_HEARTBEAT', '300')),
-    'tunnel_process_wait': int(os.environ.get('TIMEOUT_TUNNEL_PROCESS_WAIT', '2')),
+    'tunnel_startup': 15,
+    'tunnel_heartbeat': 300,
+    'tunnel_process_wait': 2,
     'email_send': int(os.environ.get('TIMEOUT_EMAIL_SEND', '30')),
     'file_operation': int(os.environ.get('TIMEOUT_FILE_OPERATION', '10')),
     'thread_join': int(os.environ.get('TIMEOUT_THREAD_JOIN', '10')),
@@ -476,11 +476,11 @@ def _auto_encrypt_config():
 _auto_encrypt_config()
 
 TUNNEL_CONFIG = {
-    'cf_max_retries': int(os.environ.get('CF_MAX_RETRIES', '3')),
-    'cf_retry_delay': int(os.environ.get('CF_RETRY_DELAY', '60')),
-    'cf_quick_tunnel_timeout': int(os.environ.get('CF_QUICK_TUNNEL_TIMEOUT', '120')),
-    'cf_heartbeat_interval': int(os.environ.get('CF_HEARTBEAT_INTERVAL', '30')),
-    'hostc_heartbeat_interval': int(os.environ.get('HOSTC_HEARTBEAT_INTERVAL', '30')),
+    'cf_max_retries': 3,
+    'cf_retry_delay': 60,
+    'cf_quick_tunnel_timeout': 120,
+    'cf_heartbeat_interval': 30,
+    'hostc_heartbeat_interval': 30,
     'url_verify_timeout': int(os.environ.get('URL_VERIFY_TIMEOUT', '10')),
     'url_verify_max_retries': int(os.environ.get('URL_VERIFY_MAX_RETRIES', '3')),
 }
@@ -498,8 +498,8 @@ SLEEP_CONFIG = {
     'medium': float(os.environ.get('SLEEP_MEDIUM', '2')),
     'long': float(os.environ.get('SLEEP_LONG', '3')),
     'very_long': float(os.environ.get('SLEEP_VERY_LONG', '5')),
-    'tunnel_cf_retry': float(os.environ.get('SLEEP_TUNNEL_CF_RETRY', '60')),
-    'tunnel_startup': float(os.environ.get('SLEEP_TUNNEL_STARTUP', '2')),
+    'tunnel_cf_retry': 120.0,
+    'tunnel_startup': 2.0,
 }
 
 NETWORK_CONFIG = {
@@ -7421,11 +7421,33 @@ if __name__ == '__main__':
             _rh.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
             _request_logger.addHandler(_rh)
 
+        _request_rate_limit = {}
+        
         @app.middleware("http")
         async def _log_and_security_middleware(request: Request, call_next):
             start_time = time.time()
 
             path = request.url.path
+            client_ip = request.client.host if request.client else "unknown"
+            
+            # 频率限制: 对tunnel状态查询进行限流（防止过度轮询）
+            if path == '/api/tunnel/status':
+                current_time = time.time()
+                if client_ip not in _request_rate_limit:
+                    _request_rate_limit[client_ip] = {'count': 0, 'reset_time': current_time + 60}
+                
+                rate_info = _request_rate_limit[client_ip]
+                if current_time > rate_info['reset_time']:
+                    rate_info['count'] = 0
+                    rate_info['reset_time'] = current_time + 60
+                
+                rate_info['count'] += 1
+                if rate_info['count'] > 30:  # 每分钟最多30次请求（平均2秒1次）
+                    return JSONResponse(
+                        status_code=429,
+                        content={'error': '请求过于频繁，请稍后重试'},
+                        headers={'Retry-After': '2', **_no_store_headers()}
+                    )
 
             # CSRF 防护: 写操作进行同源校验，Origin 的 host 须与请求 Host 一致 (v3.8.90.14)
             # 同源校验支持隧道动态域名(Cloudflare/hostc)，避免白名单无法枚举导致 403 回归
@@ -10415,8 +10437,11 @@ if __name__ == '__main__':
                 grace_period_end = time.time() + 60
                 return True
             
-            while tunnel_auto_restart:
+            max_tunnel_restarts = 50
+            total_restart_count = 0
+            while tunnel_auto_restart and total_restart_count < max_tunnel_restarts:
                 now = time.time()
+                total_restart_count += 1
                 
                 if grace_period_end and now < grace_period_end:
                     time.sleep(3)
@@ -10481,6 +10506,10 @@ if __name__ == '__main__':
                     sys.stdout.flush()
                     if not _do_restart(True, None, False):
                         break
+            
+            if total_restart_count >= max_tunnel_restarts:
+                logger.error(f"[Tunnel] ❌ 已达到最大重启次数({max_tunnel_restarts}次)，停止自动重启以防止资源耗尽")
+                logger.error(f"[Tunnel] 💡 建议手动检查网络连接或重启服务")
         
 
         # ========================================
@@ -11333,7 +11362,25 @@ ingress:
         logger.debug(f"\n🚀 FastAPI 服务启动中...")
         logger.debug(f"   地址: http://{web_host}:{args.port}")
         logger.debug(f"   文档: http://{web_host}:{args.port}/docs")
-        uvicorn.run(app, host=web_host, port=args.port, log_level="info")
+        
+        max_retries = 3
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                uvicorn.run(app, host=web_host, port=args.port, log_level="info")
+                break
+            except OSError as e:
+                if hasattr(e, 'winerror') and e.winerror == 64:
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        logger.warning(f"[网络错误] WinError 64 - 指定的网络名不再可用，第{retry_count}次自动重试...")
+                        time.sleep(2)
+                        continue
+                    else:
+                        logger.error(f"[致命错误] 网络连接持续失败，已达到最大重试次数({max_retries}次)")
+                        raise
+                else:
+                    raise
     else:
         main()
 

@@ -2351,9 +2351,9 @@
             
             if (!searchInput || !searchResultsCount) return;
             
-            if (_activeLinkedSku) {
-                unhighlightRow(_activeLinkedSku);
-                _activeLinkedSku = null;
+            if (_activeLinkedIdentifier) {
+                unhighlightRow(_activeLinkedIdentifier);
+                _activeLinkedIdentifier = null;
             }
             
             const allRows = document.querySelectorAll('#products-content tbody tr');
@@ -5208,7 +5208,7 @@
             loadTunnelTypeInfo();
             checkTunnelStatus();
             if (!window.tunnelStatusInterval) {
-                window.tunnelStatusInterval = setInterval(checkTunnelStatus, 2000);
+                window.tunnelStatusInterval = setInterval(checkTunnelStatus, 10000);
             }
         }
         async function loadServerInfo() {
@@ -5544,6 +5544,13 @@
             
             console.log('[清理] 页面卸载完成，所有资源已释放');
         });
+        
+        window.highlightRow = highlightRow;
+        window.unhighlightRow = unhighlightRow;
+        window.toggleLinkedHighlight = toggleLinkedHighlight;
+        window.handleVideoError = handleVideoError;
+        window.handleVideoLoad = handleVideoLoad;
+        window.closePanel = closePanel;
         
         // 添加可见性变化监听（页面隐藏时暂停轮询）
         document.addEventListener('visibilitychange', function() {
