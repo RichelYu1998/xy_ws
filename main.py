@@ -10118,35 +10118,51 @@ if __name__ == '__main__':
                 tunnel_heartbeat_thread.start()
                 logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] 启动心跳守护进程（tunnel_url.txt 为唯一权威源）")
 
-        def auto_start_tunnel(force_restart=False):
+        def auto_start_tunnel(force_restart=False, skip_cf=False):
             global tunnel_process, tunnel_url, tunnel_auto_restart, tunnel_restart_thread, tunnel_restart_count, tunnel_last_error, tunnel_need_restart, tunnel_daemon_started, tunnel_type, old_tunnel_url, cf_url
 
-            cf_binary = find_cloudflared_binary()
-            log_print(f"[Tunnel] 🔍 检测 cloudflared: {'✅ 已找到' if cf_binary else '❌ 未找到'} - {cf_binary or 'N/A'}")
-            
-            if cf_binary and not force_restart:
-                existing_urls = read_tunnel_urls_file()
-                existing_cf = existing_urls.get('cloudflare')
-                if existing_cf:
-                    try:
-                        is_cf_valid = verify_url(existing_cf, timeout=5, verbose=False)
-                        if is_cf_valid:
-                            log_print(f"[Tunnel] ✅ 发现可用CF地址，直接复用: {existing_cf}")
-                            cf_url = existing_cf
+            if skip_cf:
+                cf_process_alive = cf_process is not None and cf_process.poll() is None
+                if cf_process_alive:
+                    logger.debug(f"[Tunnel] ⏭️ skip_cf=True，CF进程运行中({cf_url})，跳过CF操作")
+                else:
+                    logger.debug(f"[Tunnel] ⏭️ skip_cf=True，CF进程未运行，跳过CF操作")
+            else:
+                cf_binary = find_cloudflared_binary()
+                log_print(f"[Tunnel] 🔍 检测 cloudflared: {'✅ 已找到' if cf_binary else '❌ 未找到'} - {cf_binary or 'N/A'}")
+                
+                if cf_binary and not force_restart:
+                    existing_urls = read_tunnel_urls_file()
+                    existing_cf = existing_urls.get('cloudflare')
+                    if existing_cf:
+                        try:
+                            is_cf_valid = verify_url(existing_cf, timeout=5, verbose=False)
+                            if is_cf_valid:
+                                log_print(f"[Tunnel] ✅ 发现可用CF地址，直接复用: {existing_cf}")
+                                cf_url = existing_cf
+                                start_cf_heartbeat()
+                            else:
+                                log_print(f"[Tunnel] ⚠️ 已有CF地址不可用: {existing_cf}，将启动新CF隧道")
+                                existing_cf = None
+                        except Exception as e:  # [HANDLED]
+                            log_print(f"[Tunnel] ⚠️ 验证已有CF地址失败: {e}，将启动新CF隧道")
+                            existing_cf = None
+                    
+                    if existing_cf:
+                        pass
+                    else:
+                        port = args.port if "args" in globals() and hasattr(args, "port") else int(os.environ.get('WEB_PORT', '8888'))
+                        log_print(f"[Tunnel] 🚀 启动新的 Cloudflare Tunnel (端口: {port})...")
+                        cf_result = start_cloudflare_tunnel(port=port)
+                        if cf_result and cf_result.get('success'):
+                            log_print(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
                             start_cf_heartbeat()
                         else:
-                            log_print(f"[Tunnel] ⚠️ 已有CF地址不可用: {existing_cf}，将启动新CF隧道")
-                            existing_cf = None
-                    except Exception as e:  # [HANDLED]
-                        log_print(f"[Tunnel] ⚠️ 验证已有CF地址失败: {e}，将启动新CF隧道")
-                        existing_cf = None
-                
-                if existing_cf:
-                    pass
-                    # [IMPLEMENTATION] 待实现的功能逻辑
-                else:
+                            cf_err = cf_result.get('error', '未知') if cf_result else '未知'
+                            log_print(f"[Tunnel] ❌ Cloudflare Tunnel 启动失败: {cf_err}")
+                elif cf_binary:
                     port = args.port if "args" in globals() and hasattr(args, "port") else int(os.environ.get('WEB_PORT', '8888'))
-                    log_print(f"[Tunnel] 🚀 启动新的 Cloudflare Tunnel (端口: {port})...")
+                    log_print(f"[Tunnel] 🚀 强制重启 Cloudflare Tunnel (端口: {port})...")
                     cf_result = start_cloudflare_tunnel(port=port)
                     if cf_result and cf_result.get('success'):
                         log_print(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
@@ -10154,18 +10170,8 @@ if __name__ == '__main__':
                     else:
                         cf_err = cf_result.get('error', '未知') if cf_result else '未知'
                         log_print(f"[Tunnel] ❌ Cloudflare Tunnel 启动失败: {cf_err}")
-            elif cf_binary:
-                port = args.port if "args" in globals() and hasattr(args, "port") else int(os.environ.get('WEB_PORT', '8888'))
-                log_print(f"[Tunnel] 🚀 强制重启 Cloudflare Tunnel (端口: {port})...")
-                cf_result = start_cloudflare_tunnel(port=port)
-                if cf_result and cf_result.get('success'):
-                    log_print(f"[Tunnel] ✅ Cloudflare Tunnel 启动成功: {cf_result.get('url')}，等待心跳验证")
-                    start_cf_heartbeat()
                 else:
-                    cf_err = cf_result.get('error', '未知') if cf_result else '未知'
-                    log_print(f"[Tunnel] ❌ Cloudflare Tunnel 启动失败: {cf_err}")
-            else:
-                log_print(f"[Tunnel] ⏭️ 未找到 cloudflared，跳过 Cloudflare Tunnel（需要安装以启用双隧道）")
+                    log_print(f"[Tunnel] ⏭️ 未找到 cloudflared，跳过 Cloudflare Tunnel（需要安装以启用双隧道）")
 
             if force_restart:
                 logger.debug(f"[Tunnel] 🔄 强制重启模式，将清理旧进程并重新启动")
@@ -10457,7 +10463,6 @@ if __name__ == '__main__':
                             tunnel_process.kill()
                         except Exception as e:  # [HANDLED]
                             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                            # [IMPLEMENTATION] 待实现的功能逻辑
                 
                 saved_old_url = old_tunnel_url
                 tunnel_process = None
@@ -10470,7 +10475,7 @@ if __name__ == '__main__':
                     return False
                 
                 try:
-                    result = auto_start_tunnel()
+                    result = auto_start_tunnel(skip_cf=True)
                     if result['success']:
                         new_url = result.get('url')
                         if new_url and saved_old_url and saved_old_url != new_url:
@@ -10496,17 +10501,16 @@ if __name__ == '__main__':
                     continue
                 grace_period_end = None
                 
-                web_url = PathManager.get_public_url_from_web_log(skip_validation=True, quiet=True)
+                existing_urls = read_tunnel_urls_file()
+                hostc_url = existing_urls.get('hostc')
                 has_hostc_process = Environment.check_process_running(Environment.HOSTC_PROCESS_NAME)
                 
-                if has_hostc_process and web_url:
+                if has_hostc_process and hostc_url:
                     is_url_valid = False
-                    if web_url:
-                        try:
-                            is_url_valid = verify_url(web_url)
-                        except Exception as e:  # [HANDLED]
-                            _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                            # [IMPLEMENTATION] 待实现的功能逻辑
+                    try:
+                        is_url_valid = verify_url(hostc_url)
+                    except Exception as e:  # [HANDLED]
+                        _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
                     
                     if is_url_valid:
                         verify_fail_count = 0
@@ -10516,30 +10520,30 @@ if __name__ == '__main__':
                         continue
                     
                     verify_fail_count += 1
-                    if verify_fail_count < 2:
+                    if verify_fail_count < 3:
                         time.sleep(5)
                         continue
                     
-                    logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ URL连续{verify_fail_count}次验证失败，触发重启")
+                    logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ hostc URL连续{verify_fail_count}次验证失败，触发重启（CF由cf_heartbeat_loop独立管理）")
                     sys.stdout.flush()
                     verify_fail_count = 0
-                    if not _do_restart(has_hostc_process, web_url, False):
+                    if not _do_restart(has_hostc_process, hostc_url, False):
                         break
                     continue
                 
                 if tunnel_need_restart:
-                    if not _do_restart(has_hostc_process, web_url, False):
+                    if not _do_restart(has_hostc_process, hostc_url, False):
                         break
                     continue
                 
                 if not has_hostc_process:
-                    logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ❌ hostc进程已退出，立即重启")
+                    logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ❌ hostc进程已退出，立即重启（CF不受影响）")
                     sys.stdout.flush()
-                    if not _do_restart(False, web_url, False):
+                    if not _do_restart(False, hostc_url, False):
                         break
                     continue
                 
-                if not web_url:
+                if not hostc_url:
                     if restart_wait_start is None:
                         restart_wait_start = time.time()
                         logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⏳ hostc运行中但URL未就绪，等待...")
@@ -10550,7 +10554,7 @@ if __name__ == '__main__':
                         time.sleep(3)
                         continue
                     
-                    logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ 等待超过30秒URL仍未就绪，触发重启")
+                    logger.debug(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Tunnel] ⚠️ 等待超过30秒hostc URL仍未就绪，触发重启（CF不受影响）")
                     sys.stdout.flush()
                     if not _do_restart(True, None, False):
                         break

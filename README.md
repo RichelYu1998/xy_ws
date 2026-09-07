@@ -166,6 +166,60 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 ---
+### v5.0.9.53 (2026-09-07) - 🔧 **架构优化** - restart_tunnel与CF隧道解耦，CF由cf_heartbeat_loop独立管理
+
+#### 更新内容:
+1. **restart_tunnel与CF隧道解耦(核心架构)**: restart_tunnel只管hostc进程，CF隧道完全交给cf_heartbeat_loop独立管理
+   - _do_restart: 调用auto_start_tunnel(skip_cf=True)，重启hostc时不碰CF进程
+   - auto_start_tunnel: 新增skip_cf参数，skip_cf=True时跳过CF验证/启动
+   - restart_tunnel主循环: 只检测hostc URL(read_tunnel_urls_file().get('hostc'))，不检测CF URL
+   - 验证失败阈值: 2次→3次(更宽容，减少误重启)
+2. **消除CF隧道误重启**: CF Quick Tunnel URL只要进程活着就有效，不再因verify_url偶发超时导致CF被杀重启
+3. **日志明确标注**: 所有重启日志标注"CF由cf_heartbeat_loop独立管理"/"CF不受影响"
+
+**核心改进**:
+- 架构清晰: restart_tunnel管hostc, cf_heartbeat_loop管CF, 职责单一
+- 稳定性提升: CF隧道不再被误重启，URL不会因hostc问题而变化
+- 验证宽容: hostc URL验证失败3次才重启(原2次)，减少网络抖动误判
+
+**技术细节**:
+- 问题根因: restart_tunnel用PathManager.get_public_url_from_web_log()获取URL，可能返回CF URL，verify_url偶发超时→误判CF失效→杀CF重启→新URL
+- 解决方案: restart_tunnel只读hostc URL，_do_restart传skip_cf=True，CF完全独立
+- 影响范围: main.py(3处函数修改)
+
+**测试验证**:
+- ✅ CF隧道测试: hostc重启时CF进程不受影响，URL不变
+- ✅ hostc重启测试: hostc崩溃后restart_tunnel正确重启hostc
+- ✅ 验证阈值测试: hostc URL偶发超时不立即重启(需连续3次)
+
+**更新日期**: 2026-09-07
+**更新类型**: 🔧 架构优化 + 🛡️ 稳定性提升
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
+**Commit**: c9e20b16
+**作者**: 小旭二手机（西园路）**
+
+---
+
+##### 1. 🔧架构优化 (restart_tunnel与CF隧道解耦)
+
+**问题描述**:
+- **现象**: CF Quick Tunnel URL频繁变化(每次restart_tunnel触发都杀CF重启)，导致外网地址不稳定
+- **根因**: restart_tunnel主循环用PathManager.get_public_url_from_web_log()获取URL(可能返回CF URL)，verify_url偶发超时→误判CF失效→_do_restart杀CF进程→auto_start_tunnel启动新CF→新URL
+- **影响范围**: CF隧道每1-2小时被误重启一次，外网地址变化，邮件中的URL失效
+
+**修复方案**:
+- **技术实现(_do_restart)**: 调用auto_start_tunnel(skip_cf=True)，重启hostc时完全跳过CF操作 [main.py#L10489](main.py#L10489)
+- **技术实现(auto_start_tunnel)**: 新增skip_cf参数，skip_cf=True时只检查CF进程存活状态，不验证/启动CF [main.py#L10121](main.py#L10121)
+- **技术实现(restart_tunnel主循环)**: 用read_tunnel_urls_file().get('hostc')替代PathManager.get_public_url_from_web_log()，只检测hostc URL [main.py#L10504](main.py#L10504)
+- **技术实现(验证阈值)**: verify_fail_count从2次提高到3次，减少网络抖动误判 [main.py#L10527](main.py#L10527)
+
+**测试验证**:
+- ✅ CF独立性测试: 手动触发hostc重启，CF进程和URL均不受影响
+- ✅ hostc崩溃测试: kill hostc进程后，restart_tunnel正确检测并重启hostc
+- ✅ 网络抖动测试: 模拟verify_url超时，连续2次不触发重启，第3次才触发
+
+---
+
 ### v5.0.9.52 (2026-09-07) - 🛡️ **安全加固+Bug修复** - XSS漏洞修复+数组越界Bug清零+代码规范全面合规
 
 #### 更新内容:
