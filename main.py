@@ -9256,6 +9256,22 @@ if __name__ == '__main__':
                             if version_key in readme_version_map and version_key not in readme_versions_used:
                                 readme_versions_used.add(version_key)
                                 readme_entry = readme_version_map[version_key]
+                                if not readme_entry.get('changes') or len(readme_entry['changes']) == 0:
+                                    readme_entry['changes'] = [{
+                                        'id': '1',
+                                        'title': readme_entry.get('title') or tag,
+                                        'tag': tag,
+                                        'problem': {
+                                            'phenomenon': commit_msg[:300],
+                                            'root_cause': '详见Git提交记录及commit message',
+                                            'scope': file_list_str
+                                        },
+                                        'solution': {
+                                            'implementation': commit_msg[:300],
+                                            'reference': f'commit {short_hash}, {file_list_str}'
+                                        },
+                                        'verification': [f'✅ 提交 {short_hash} 已合并至master分支', f'✅ 变更统计: {stats_str}']
+                                    }]
                                 if not readme_entry['meta'].get('commit') or readme_entry['meta']['commit'] == '待补充':
                                     readme_entry['meta']['commit'] = short_hash
                                 if not readme_entry['meta'].get('fix_date') or readme_entry['meta']['fix_date'] == '待补充':
@@ -9335,6 +9351,24 @@ if __name__ == '__main__':
                     changelog = merged_changelog
                 except Exception as git_err:  # [HANDLED]
                     logger.debug(f'[api_changelog] Git历史合并跳过: {git_err}', file=sys.stderr)
+                
+                for entry in changelog:
+                    if not entry.get('changes') or len(entry['changes']) == 0:
+                        entry['changes'] = [{
+                            'id': '1',
+                            'title': entry.get('title') or entry.get('meta', {}).get('fix_type', '📝版本更新'),
+                            'tag': entry.get('meta', {}).get('fix_type', '📝文档更新'),
+                            'problem': {
+                                'phenomenon': f'版本{entry.get("version", "未知")}更新详情',
+                                'root_cause': '详见README.md对应章节',
+                                'scope': entry.get('meta', {}).get('affected_files', '详见Git提交记录')
+                            },
+                            'solution': {
+                                'implementation': entry.get('title', '版本更新'),
+                                'reference': f'commit {entry.get("meta", {}).get("commit", "N/A")}'
+                            },
+                            'verification': [f'✅ 版本{entry.get("version", "未知")}已发布']
+                        }]
                 
                 def version_sort_key(version_str):
                     try:
