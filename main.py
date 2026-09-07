@@ -477,7 +477,7 @@ _auto_encrypt_config()
 
 TUNNEL_CONFIG = {
     'cf_max_retries': 3,
-    'cf_retry_delay': 60,
+    'cf_retry_delay': 300,
     'cf_quick_tunnel_timeout': 120,
     'cf_heartbeat_interval': 30,
     'hostc_heartbeat_interval': 30,
