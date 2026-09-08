@@ -9747,6 +9747,35 @@ if __name__ == '__main__':
                 
                 changelog.sort(key=lambda x: version_sort_key(x.get('version', '0.0.0')), reverse=True)
                 
+                version_merge_map = {}
+                for entry in changelog:
+                    ver = entry.get('version', 'unknown')
+                    if ver not in version_merge_map:
+                        version_merge_map[ver] = entry
+                    else:
+                        existing = version_merge_map[ver]
+                        if not existing.get('changes') or len(existing['changes']) == 0:
+                            existing['changes'] = []
+                        new_changes = entry.get('changes', [])
+                        max_id = len(existing['changes'])
+                        for nc in new_changes:
+                            max_id += 1
+                            nc['id'] = str(max_id)
+                            existing['changes'].append(nc)
+                        commits_existing = existing.get('meta', {}).get('commit', '')
+                        commits_new = entry.get('meta', {}).get('commit', '')
+                        all_commits = [c.strip() for c in (commits_existing + ',' + commits_new).split(',') if c.strip() and c.strip() != '待补充' and c.strip() != '历史版本-无Git记录' and c.strip() != 'N/A']
+                        unique_commits = list(dict.fromkeys(all_commits))
+                        if unique_commits:
+                            existing.setdefault('meta', {})['commit'] = ', '.join(unique_commits[:5])
+                        files_existing = existing.get('meta', {}).get('affected_files', '')
+                        files_new = entry.get('meta', {}).get('affected_files', '')
+                        all_files = [f.strip() for f in (files_existing + ',' + files_new).split(',') if f.strip() and f.strip() != '待补充' and f.strip() != '历史版本-详见README.md' and f.strip() != '无文件变更']
+                        unique_files = list(dict.fromkeys(all_files))
+                        if unique_files:
+                            existing.setdefault('meta', {})['affected_files'] = ', '.join(unique_files[:10])
+                changelog = list(version_merge_map.values())
+                
                 empty_changes_versions = [e.get('version','?') for e in changelog if not e.get('changes') or len(e['changes']) == 0]
                 if empty_changes_versions:
                     logger.warning(f'[api_changelog] 发现{len(empty_changes_versions)}个空changes版本，正在修复: {empty_changes_versions}', file=sys.stderr)

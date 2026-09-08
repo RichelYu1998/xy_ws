@@ -1,4 +1,4 @@
-﻿#﻿# 微购相册管理系统 (WegoAlbum Manager)
+#﻿# 微购相册管理系统 (WegoAlbum Manager)
 
 > **⚙️ 编码标准**: 本项目所有文件（包括源代码、文档、配置文件等）**必须且仅使用 UTF-8 编码**。禁止使用任何其他编码格式（如 GBK、GB2312、Latin-1 等）。
 >
@@ -164,9 +164,42 @@ bandit -r . -f json -o bandit_report.json
 
 ---
 
+## 📐 版本更新记录范式规范 (PY-CORE-027)
+
+> **创建日期**: 2026-09-08 | **最后更新**: 2026-09-08 | **优先级**: 🔴 P0 强制规范 | **适用范围**: README.md / skill.md / skill.docx
+
+### 🔴 核心原则：同版本合一 (Single-Source-of-Truth)
+
+**同一版本号在整个文档中只能出现一次，所有相关变更合并为一条完整记录。**
+
+| 规则 | 说明 | 违反后果 |
+|------|------|----------|
+| **🔴 唯一性** | 同一个 vX.Y.Z 在整个文件中**只允许出现一条**记录，绝对禁止重复 | 文件膨胀3倍+，读者困惑 |
+| **🔴 多 Commit 合并** | 同一版本的多个 Git commit（代码commit + 文档commit）**合并为一条**，用 `#####` 子项分开 | 出现多条相同版本仅 commit 不同 |
+| **同版本同内容** | README.md 和 skill.md 中**逐字一致** | 信息矛盾 |
+| **同版本同位置** | 子项必须**紧邻排列** | 阅读断裂 |
+| **单一修改源** | 先写好一份完整内容，再**复制** | 漂移差异 |
+| **三方同步** | README.md ↔ skill.md ↔ skill.docx 三方同步 | 过期信息 |
+
+**操作流程**:
+```
+收集同一版本的所有 commit → 合并为一条记录（含子项）→ 先写 skill.md → 复制到 README.md → generate_docx.py → 验证无重复
+```
+
+**Emoji对照表**: 🐛Bug修复 🔧功能优化 ✨新功能 🔒安全修复 🛡️安全加固 🎯精准修复 📝文档更新 ♻️重构 🔐配置管理 🆕新增检测
+
+**反模式警告（致命）**:
+- 🔴 **❌ 同版本重复出现**: v5.0.9.55 出现3次 → 整个文件只保留1条
+- 🔴 **❌ 多 Commit 不合并**: 代码commit和文档commit分成两条 → 用 `##### 1.` `##### 2.` 合并
+- 🟡 ❌ 同版本两处不同描述 / ❌ 子项跨版本穿插 / ❌ 缺少测试验证 / ❌ 缺少代码链接 / ❌ 模糊根因
+
+> 完整范式模板和示例请查看 [skill.md](skill.md) 的 `## 📐 版本更新记录范式规范` 章节
+
+---
+
 ## 🔄 最新更新
 ---
-### v5.0.9.55 (2026-09-07) - 🛡️ **企业级稳定性升级** - 服务器崩溃预防+隧道自动重试机制全面增强
+### v5.0.9.55 (2026-09-07) - 🛡️ **企业级稳定性升级** - 服务器崩溃预防+隧道自动重试机制全面增强+文档同步
 
 #### 更新内容:
 1. **服务器崩溃预防体系(核心升级)**: 6大防护机制，将服务器崩溃风险降低90%+
@@ -182,18 +215,18 @@ bandit -r . -f json -o bandit_report.json
    - 第3层-隧道守护进程(TunnelGuardian): 全新独立守护线程，每60秒检查，连续5次异常触发强制重启
    - 第4层-全局异常处理器: 最后防线，捕获所有遗漏异常
 3. **配置参数优化**: hostc最大重启50次+指数退避(1-5分钟)+CF重试3次/轮+冷却机制
+4. **文档同步更新**: skill.docx从skill.md重新生成+Commit hash更新+作者更正
 
-**核心改进**:
-- 稳定性提升: 配置文件损坏/数据格式错误/未预期异常/资源泄漏全部有保护
-- 隧道可靠性: 4层防护确保单点故障不影响整体可用性，自动恢复时间<1分钟
-- 可观测性: 所有操作带详细日志([Tunnel]/[CF-Heartbeat]/[Tunnel-Guardian]/[GLOBAL_EXCEPTION])
-- 代码质量: Import规范化+语法检查通过+遵循现有代码风格
+##### 1. 🛡️企业级稳定性升级 (Commits: 94d0b79e, 5c5746c1)
+**问题描述**:
+- **现象**: 服务器频繁崩溃(NameError: name 'app' is not defined) + 隧道断开后无法自动恢复
+- **根因**: 全局异常处理器在FastAPI app创建前定义，导致引用未定义变量
+- **影响范围**: 所有API请求、隧道管理、配置加载
 
-**技术细节**:
-- 新增函数: perform_startup_health_checks()(启动检查)、graceful_shutdown()(优雅关闭)、start_tunnel_guardian()(隧道守护)
-- 修改函数: load_config()、_auto_encrypt_config()、restart_tunnel()、auto_start_tunnel()、start_tunnel_daemons()
-- 删除代码: 不完整的try块(第10697行)、多余的except块(第10833-10836行)
-- 影响范围: main.py(约350行新增/修改)
+**修复方案**:
+- **技术实现(异常处理器移位)**: 将全局异常处理器移至FastAPI app创建之后 [main.py#L10489](main.py#L10489)
+- **技术实现(6大防护)**: 文件异常处理+启动健康检查+优雅关闭+Import整理+语法修复 [main.py#L10600-L10900](main.py#L10600-L10900)
+- **技术实现(4层隧道防护)**: hostc try-except + CF心跳验证 + TunnelGuardian守护 + 全局兜底 [main.py#L10200-L10450](main.py#L10200-L10450)
 
 **测试验证**:
 - ✅ 语法检查: py_compile通过，无语法错误
@@ -203,10 +236,43 @@ bandit -r . -f json -o bandit_report.json
 - ✅ 守护测试: TunnelGuardian独立运行，不依赖其他机制
 - ✅ 关闭测试: Ctrl+C触发优雅关闭，进程和资源正确清理
 
+---
+
+##### 2. 📝文档同步更新 (Commits: 4bcc27e7, 2f9e09c9, 35458a16)
+**问题描述**:
+- **现象**: skill.docx未与skill.md同步 + Commit hash为旧值 + 作者显示为"AI Assistant"
+- **根因**: 手动编辑README/skill.md后未运行generate_docx.py + commit message中hash未更新
+- **影响范围**: README.md, skill.md, skill.docx 三方文档不一致
+
+**修复方案**:
+- **技术实现(Docx生成)**: 运行generate_docx.py从skill.md重新生成skill.docx [generate_docx.py](generate_docx.py)
+- **技术实现(Hash更新)**: 将Commit字段从94d0b79e更新为5c5746c1 [README.md#L242](README.md#L242), [skill.md#L94](skill.md#L94)
+- **技术实现(作者更正)**: 将作者从"AI Assistant"更正为"小旭二手机（西园路）"
+
+**测试验证**:
+- ✅ 文件大小: skill.docx = 36714 bytes
+- ✅ 时间戳: README.md/skill.md/skill.docx 三方一致
+- ✅ Commit一致性: README.md与skill.md中的Commit字段完全一致
+
+---
+
+**核心改进**:
+- 稳定性提升: 配置文件损坏/数据格式错误/未预期异常/资源泄漏全部有保护
+- 隧道可靠性: 4层防护确保单点故障不影响整体可用性，自动恢复时间<1分钟
+- 可观测性: 所有操作带详细日志([Tunnel]/[CF-Heartbeat]/[Tunnel-Guardian]/[GLOBAL_EXCEPTION])
+- 代码质量: Import规范化+语法检查通过+遵循现有代码风格
+- 文档一致性: README.md ↔ skill.md ↔ skill.docx 三方100%同步
+
+**技术细节**:
+- 新增函数: perform_startup_health_checks()(启动检查)、graceful_shutdown()(优雅关闭)、start_tunnel_guardian()(隧道守护)
+- 修改函数: load_config()、_auto_encrypt_config()、restart_tunnel()、auto_start_tunnel()、start_tunnel_daemons()
+- 删除代码: 不完整的try块(第10697行)、多余的except块(第10833-10836行)
+- 影响范围: main.py(约350行新增/修改) + README.md + skill.md + skill.docx
+
 **更新日期**: 2026-09-07
-**更新类型**: 🛡️ 企业级稳定性升级 + 🔧 架构优化
-**影响文件**: main.py, README.md, skill.md, skill.docx
-**Commit**: 5c5746c1
+**更新类型**: 🛡️ 企业级稳定性升级 + 📝 文档更新
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 94d0b79e, 5c5746c1, 4bcc27e7, 2f9e09c9, 35458a16
 **作者**: 小旭二手机（西园路）**
 
 ---
@@ -12852,52 +12918,6 @@ D:/ws/xy_ws/
 
 ---
 
-## 🔄 最新更新
----
-### v5.0.9.55 (2026-09-07) - 🛡️ **企业级稳定性升级** - 服务器崩溃预防+隧道自动重试机制全面增强
-
-#### 更新内容:
-1. **服务器崩溃预防体系(核心升级)**: 6大防护机制，将服务器崩溃风险降低90%+
-   - 文件操作异常处理(6+处): SecureConfigManager、_auto_encrypt_config、get_excel_files_with_report等关键位置添加try-except
-   - 全局异常处理器: 捕获所有未处理异常，返回友好错误信息(带唯一ID)
-   - 启动健康检查(6项): 目录/文件/端口/内存/磁盘/依赖全面检查
-   - 优雅关闭机制: atexit+信号处理，确保资源正确释放
-   - Import语句整理: 唯一性+集中性+字母序，符合PEP8规范
-   - 语法错误修复: 5处问题修复(不完整try块/缩进错误/多余except)
-2. **隧道自动重试机制增强(4层防护)**: hostc和CF隧道都具有企业级自愈能力
-   - 第1层-hostc隧道: restart_tunnel()主循环添加全局try-except，异常后等待30秒继续
-   - 第2层-CF隧道: cf_heartbeat_loop独立心跳验证(进程监控+URL验证+自动重启)
-   - 第3层-隧道守护进程(TunnelGuardian): 全新独立守护线程，每60秒检查，连续5次异常触发强制重启
-   - 第4层-全局异常处理器: 最后防线，捕获所有遗漏异常
-3. **配置参数优化**: hostc最大重启50次+指数退避(1-5分钟)+CF重试3次/轮+冷却机制
-
-**核心改进**:
-- 稳定性提升: 配置文件损坏/数据格式错误/未预期异常/资源泄漏全部有保护
-- 隧道可靠性: 4层防护确保单点故障不影响整体可用性，自动恢复时间<1分钟
-- 可观测性: 所有操作带详细日志([Tunnel]/[CF-Heartbeat]/[Tunnel-Guardian]/[GLOBAL_EXCEPTION])
-- 代码质量: Import规范化+语法检查通过+遵循现有代码风格
-
-**技术细节**:
-- 新增函数: perform_startup_health_checks()(启动检查)、graceful_shutdown()(优雅关闭)、start_tunnel_guardian()(隧道守护)
-- 修改函数: load_config()、_auto_encrypt_config()、restart_tunnel()、auto_start_tunnel()、start_tunnel_daemons()
-- 删除代码: 不完整的try块(第10697行)、多余的except块(第10833-10836行)
-- 影响范围: main.py(约350行新增/修改)
-
-**测试验证**:
-- ✅ 语法检查: py_compile通过，无语法错误
-- ✅ 崩溃测试: 配置文件删除/损坏→返回空配置而非崩溃
-- ✅ 异常测试: 未预期异常→全局处理器捕获并返回500+错误ID
-- ✅ 隧道测试: hostc进程杀掉→<1分钟自动重启；CF进程退出→30秒内检测并重启
-- ✅ 守护测试: TunnelGuardian独立运行，不依赖其他机制
-- ✅ 关闭测试: Ctrl+C触发优雅关闭，进程和资源正确清理
-
-**更新日期**: 2026-09-07
-**更新类型**: 🛡️ 企业级稳定性升级 + 🔧 架构优化
-**影响文件**: main.py, README.md, skill.md, skill.docx
-**Commit**: 5c5746c1
-**作者**: 小旭二手机（西园路）**
-
----
  (v3.8.90.11)
 
 ## 📐 版本更新记录范式规范
@@ -16704,52 +16724,6 @@ D:/ws/xy_ws/
 
 ---
 
-## 🔄 最新更新
----
-### v5.0.9.55 (2026-09-07) - 🛡️ **企业级稳定性升级** - 服务器崩溃预防+隧道自动重试机制全面增强
-
-#### 更新内容:
-1. **服务器崩溃预防体系(核心升级)**: 6大防护机制，将服务器崩溃风险降低90%+
-   - 文件操作异常处理(6+处): SecureConfigManager、_auto_encrypt_config、get_excel_files_with_report等关键位置添加try-except
-   - 全局异常处理器: 捕获所有未处理异常，返回友好错误信息(带唯一ID)
-   - 启动健康检查(6项): 目录/文件/端口/内存/磁盘/依赖全面检查
-   - 优雅关闭机制: atexit+信号处理，确保资源正确释放
-   - Import语句整理: 唯一性+集中性+字母序，符合PEP8规范
-   - 语法错误修复: 5处问题修复(不完整try块/缩进错误/多余except)
-2. **隧道自动重试机制增强(4层防护)**: hostc和CF隧道都具有企业级自愈能力
-   - 第1层-hostc隧道: restart_tunnel()主循环添加全局try-except，异常后等待30秒继续
-   - 第2层-CF隧道: cf_heartbeat_loop独立心跳验证(进程监控+URL验证+自动重启)
-   - 第3层-隧道守护进程(TunnelGuardian): 全新独立守护线程，每60秒检查，连续5次异常触发强制重启
-   - 第4层-全局异常处理器: 最后防线，捕获所有遗漏异常
-3. **配置参数优化**: hostc最大重启50次+指数退避(1-5分钟)+CF重试3次/轮+冷却机制
-
-**核心改进**:
-- 稳定性提升: 配置文件损坏/数据格式错误/未预期异常/资源泄漏全部有保护
-- 隧道可靠性: 4层防护确保单点故障不影响整体可用性，自动恢复时间<1分钟
-- 可观测性: 所有操作带详细日志([Tunnel]/[CF-Heartbeat]/[Tunnel-Guardian]/[GLOBAL_EXCEPTION])
-- 代码质量: Import规范化+语法检查通过+遵循现有代码风格
-
-**技术细节**:
-- 新增函数: perform_startup_health_checks()(启动检查)、graceful_shutdown()(优雅关闭)、start_tunnel_guardian()(隧道守护)
-- 修改函数: load_config()、_auto_encrypt_config()、restart_tunnel()、auto_start_tunnel()、start_tunnel_daemons()
-- 删除代码: 不完整的try块(第10697行)、多余的except块(第10833-10836行)
-- 影响范围: main.py(约350行新增/修改)
-
-**测试验证**:
-- ✅ 语法检查: py_compile通过，无语法错误
-- ✅ 崩溃测试: 配置文件删除/损坏→返回空配置而非崩溃
-- ✅ 异常测试: 未预期异常→全局处理器捕获并返回500+错误ID
-- ✅ 隧道测试: hostc进程杀掉→<1分钟自动重启；CF进程退出→30秒内检测并重启
-- ✅ 守护测试: TunnelGuardian独立运行，不依赖其他机制
-- ✅ 关闭测试: Ctrl+C触发优雅关闭，进程和资源正确清理
-
-**更新日期**: 2026-09-07
-**更新类型**: 🛡️ 企业级稳定性升级 + 🔧 架构优化
-**影响文件**: main.py, README.md, skill.md, skill.docx
-**Commit**: 5c5746c1
-**作者**: 小旭二手机（西园路）**
-
----
  (v3.8.90.11)
 
 ### v3.8.89.12.5 (2026-07-31) - 🐛Bug修复 修复商品字段解析逻辑 - 支持多行JSON对象
