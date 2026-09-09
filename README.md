@@ -199,6 +199,51 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 ---
+### v5.0.9.57 (2026-09-09) - ♻️ **FastAPI DeprecationWarning 消除** - on_event("startup"/"shutdown") 迁移为 lifespan 上下文管理器
+
+#### 更新内容:
+1. **废弃 API 移除**: `@app.on_event("startup")` + `@app.on_event("shutdown")` 合并为单个 `lifespan(app)` 异步上下文管理器
+   - FastAPI 在新版本中已将 `on_event` 标记为 deprecated，启动时会弹出 DeprecationWarning
+   - 新方案：startup 逻辑放在 `yield` 之前，shutdown 清理逻辑放在 `yield` 之后，通过 `lifespan=lifespan` 参数传给 FastAPI 构造函数
+2. **新增导入**: `from contextlib import asynccontextmanager`（字母序插入 ctypes 和 glob 之间）
+3. **行为零变化**: startup（asyncio loop handler + threading.excepthook 安装）和 shutdown（CF 子进程 terminate→kill 兜底清理）逻辑完全不变
+
+##### 1. ♻️废弃API迁移 (on_event → lifespan)
+**问题描述**:
+- **现象**: 启动时弹出 `DeprecationWarning: on_event is deprecated, use lifespan event handlers instead`（main.py L2909、L2929）
+- **根因**: FastAPI 新版推荐统一使用 `lifespan` 上下文管理器管理应用生命周期，`@app.on_event` 已被标记废弃
+- **影响范围**: 启动日志有警告噪音；未来 FastAPI 大版本可能移除该 API 导致启动失败
+
+**修复方案**:
+- **技术实现(lifespan 合并)**: 新建 `@asynccontextmanager async def lifespan(app)`，startup 逻辑在 `yield` 前、shutdown 逻辑在 `yield` 后 [main.py](main.py)
+- **技术实现(FastAPI 参数)**: `FastAPI(..., lifespan=lifespan)` 传入生命周期管理器 [main.py](main.py)
+- **技术实现(旧代码删除)**: 删除原 L2949-2985 的 `_setup_crash_protection` 和 `_shutdown_cleanup` 两个独立函数 [main.py](main.py)
+
+**测试验证**:
+- ✅ 语法检查: py_compile 通过
+- ✅ on_event 残留: 0 处（全局 grep 确认）
+- ✅ lifespan 引用: 2 处（函数定义 + FastAPI 参数）
+- ✅ 启动验证: 不再出现 DeprecationWarning，startup/shutdown 行为不变
+
+**核心改进**:
+- 消除 DeprecationWarning 噪音，启动日志干净
+- 符合 FastAPI 官方推荐写法，面向未来版本兼容
+- startup/shutdown 逻辑集中在一个函数内，生命周期边界更清晰
+
+**技术细节**:
+- 修改文件: main.py（新增 lifespan 函数 41 行，删除旧函数 39 行，净增 2 行）
+- 新增导入: `from contextlib import asynccontextmanager`
+- 删除函数: `_setup_crash_protection()`、`_shutdown_cleanup()`
+- 新增函数: `lifespan(app)` — 包含 startup 逻辑（loop handler + excepthook 安装）+ shutdown 逻辑（CF 清理）
+
+**更新日期**: 2026-09-09
+**更新类型**: ♻️ 技术债务清理
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: f4ecf9ca
+**作者**: 小旭二手机（西园路）**
+
+---
+
 ### v5.0.9.56 (2026-09-09) - 🛡️ **安全攻防全面加固** - readline阻塞死锁修复+竞态条件清零+asyncio异常处理+Import唯一化
 
 #### 更新内容:
