@@ -130,7 +130,6 @@ class MarkdownToDocxConverter:
         run.font.size = Pt(9)
         run.font.color.rgb = RGBColor(0, 0, 128)
         
-        from docx.oxml.ns import qn
         run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Consolas')
         
         shading = OxmlElement('w:shd')
@@ -238,7 +237,6 @@ class MarkdownToDocxConverter:
                 run.font.name = 'Consolas'
                 run.font.size = Pt(10)
                 run.font.color.rgb = RGBColor(128, 0, 0)
-                from docx.oxml.ns import qn
                 run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Consolas')
             elif part.startswith('[') and '](' in part:
                 link_match = re.match(r'\[([^\]]+)\]\(([^)]+)\)', part)

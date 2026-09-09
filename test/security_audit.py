@@ -13,6 +13,7 @@
 
 import os
 import re
+import sys
 import json
 import time
 import threading
@@ -756,7 +757,6 @@ class SecurityAuditor:
         metrics['avg_regex_1000_runs_ms'] = round(avg_regex * 1000, 2)
 
         # 测试3: 内存占用估算
-        import sys
         total_size = 0
         for filepath in self.project_root.rglob('*'):
             if filepath.is_file() and 'node_modules' not in str(filepath) and '.git' not in str(filepath):

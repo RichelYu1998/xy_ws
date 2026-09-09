@@ -1,4 +1,5 @@
 import argparse
+import atexit
 import asyncio
 import base64
 import ctypes
@@ -13,6 +14,7 @@ import json
 import logging
 import os
 import platform
+import queue
 import random
 import re
 import secrets
@@ -2903,6 +2905,45 @@ if CORSMiddleware:
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key"],
     )
 
+
+@app.on_event("startup")
+async def _setup_crash_protection():
+    loop = asyncio.get_running_loop()
+
+    def _loop_handler(_loop, context):
+        exc = context.get('exception')
+        msg = context.get('message', 'unknown')
+        if exc:
+            logger.error(f"[asyncio_loop] 未捕获异常: {type(exc).__name__}: {exc} | context={msg}")
+        else:
+            logger.error(f"[asyncio_loop] 未捕获事件: {msg} | context={context}")
+
+    loop.set_exception_handler(_loop_handler)
+    threading.excepthook = lambda args: logger.error(
+        f"[thread_uncaught] {args.thread.name}: {args.exc_type.__name__}: {args.exc_value}",
+        exc_info=(args.exc_type, args.exc_value, args.exc_traceback)
+    )
+    logger.info("[crash_protection] asyncio exception handler + threading.excepthook 已安装")
+
+
+@app.on_event("shutdown")
+async def _shutdown_cleanup():
+    logger.info("[shutdown] 清理子进程资源...")
+    try:
+        with _cf_state_lock:
+            if cf_process and cf_process.poll() is None:
+                cf_process.terminate()
+                try:
+                    cf_process.wait(timeout=5)
+                except Exception:
+                    try:
+                        cf_process.kill()
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    logger.info("[shutdown] 清理完成")
+
 # ============================================================
 # CSRF 防护常量 (v3.8.89.29) - API Key 在 ConfigManager 定义后初始化
 # ============================================================
@@ -3364,27 +3405,38 @@ def run_command_background(task_id, command):
             processes[task_id] = process
         
         stdout_lines = []
+
+        _line_q = queue.Queue()
+
+        def _read_stdout():
+            try:
+                for _l in process.stdout:
+                    _line_q.put(_l)
+            except Exception:
+                pass
+
+        _reader_t = threading.Thread(target=_read_stdout, daemon=True)
+        _reader_t.start()
+
         while True:
             if process.poll() is not None:
-                remaining = process.stdout.read()
-                if remaining:
-                    stdout_lines.append(remaining)
+                try:
+                    _reader_t.join(timeout=2)
+                except Exception:
+                    pass
+                while not _line_q.empty():
+                    try:
+                        stdout_lines.append(_line_q.get_nowait())
+                    except queue.Empty:
+                        break
                 break
             
             try:
-                if Environment.IS_WINDOWS:
-                    time.sleep(0.1)
-                    line = process.stdout.readline()
-                    if line:
-                        stdout_lines.append(line)
-                else:
-                    readable, _, _ = select.select([process.stdout], [], [], 0.1)
-                    if readable:
-                        line = process.stdout.readline()
-                        if line:
-                            stdout_lines.append(line)
-            except Exception as e:  # [HANDLED]
-                handle_exception(e, 'run_command_background读取输出')
+                line = _line_q.get_nowait()
+                if line:
+                    stdout_lines.append(line)
+            except queue.Empty:
+                time.sleep(0.1)
             
             with _tasks_lock:
                 tasks[task_id]['output'] = ''.join(stdout_lines)
@@ -6857,8 +6909,7 @@ def perform_startup_health_checks():
     
     # 4. 检查端口是否可用
     port = int(os.environ.get('WEB_PORT', '8888'))
-    import socket as socket_check
-    test_socket = socket_check.socket(socket_check.AF_INET, socket_check.SOCK_STREAM)
+    test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         test_socket.bind(('0.0.0.0', port))
         test_socket.close()
@@ -7345,8 +7396,6 @@ def install_playwright_cdn():
 # ============================================================
 def start_tunnel_guardian():
     """启动隧道守护线程 - 监控隧道状态并在异常时恢复"""
-    import threading as _threading
-    import time as _time
     
     def _guardian_loop():
         """守护循环：每60秒检查一次隧道状态"""
@@ -7357,7 +7406,7 @@ def start_tunnel_guardian():
         
         while True:
             try:
-                _time.sleep(guard_interval)
+                time.sleep(guard_interval)
                 
                 # 检查 hostc 隧道
                 if 'tunnel_auto_restart' in dir() and tunnel_auto_restart:
@@ -7380,7 +7429,7 @@ def start_tunnel_guardian():
                         
             except Exception as e:
                 _module_logger.error(f"[Tunnel-Guardian] 💥 守护进程异常: {type(e).__name__}: {e}")
-                _time.sleep(30)  # 异常后等待更长时间
+                time.sleep(30)  # 异常后等待更长时间
     
     def _check_hostc_tunnel():
         """检查 hostc 隧道状态"""
@@ -7443,13 +7492,11 @@ def start_tunnel_guardian():
             _module_logger.error(f"[Tunnel-Guardian] 强制重启失败: {e}")
     
     # 启动守护线程
-    guardian_thread = _threading.Thread(target=_guardian_loop, daemon=True, name="TunnelGuardian")
+    guardian_thread = threading.Thread(target=_guardian_loop, daemon=True, name="TunnelGuardian")
     guardian_thread.start()
     _module_logger.info("[Tunnel-Guardian] ✅ 隧道守护线程已启动")
 # 优雅关闭处理器 (v4.6) - 确保资源正确释放
 # ============================================================
-import atexit
-import signal as signal_module
 
 def graceful_shutdown():
     """优雅关闭：清理所有资源"""
@@ -7494,8 +7541,8 @@ if not Environment.IS_WINDOWS:
         graceful_shutdown()
         sys.exit(0)
     
-    signal_module.signal(signal_module.SIGTERM, signal_handler)
-    signal_module.signal(signal_module.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
 if __name__ == '__main__':
     check_python_version((3, 0))  # Python 版本兼容性检查 (>=3.0)
     
@@ -11205,7 +11252,7 @@ ingress:
                     log_print(f"[Cloudflare] 启动 Named Tunnel: {named_config['tunnel_name']}...")
                     cmd = [cf_binary, "tunnel", "run", named_config['tunnel_name'], "--config", named_config['config_yml_path'], "--no-autoupdate"]
 
-                    cf_process = subprocess.Popen(
+                    _proc = subprocess.Popen(
                         cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
@@ -11216,13 +11263,15 @@ ingress:
                     named_url = f"https://{named_config['custom_domain']}"
                     start_time = time.time()
                     while time.time() - start_time < 15:
-                        if cf_process.poll() is not None:
+                        if _proc.poll() is not None:
                             break
                         time.sleep(SLEEP_CONFIG['short'])
 
-                    if cf_process.poll() is None:
-                        cf_url = named_url
-                        cf_mode = 'named'
+                    if _proc.poll() is None:
+                        with _cf_state_lock:
+                            cf_process = _proc
+                            cf_url = named_url
+                            cf_mode = 'named'
                         log_print(f"[Cloudflare] ✅ Plan A 成功: Named Tunnel {cf_url}，等待心跳验证后发邮件")
 
                         existing = read_tunnel_urls_file()
@@ -11230,11 +11279,10 @@ ingress:
 
                         return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "named"}
                     else:
-                        log_print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 进程退出 (code: {cf_process.returncode})，回退到 Plan B...")
-                        cf_process = None
+                        log_print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 进程退出 (code: {_proc.returncode})，回退到 Plan B...")
+                        _proc.stdout.close()
                 except Exception as e:  # [HANDLED]
                     log_print(f"[Cloudflare] ❌ Plan A 失败: Named Tunnel 启动异常: {e}，回退到 Plan B...")
-                    cf_process = None
             else:
                 log_print(f"[Cloudflare] ⏭️ Plan A 跳过: 未检测到 Named Tunnel 配置，直接 Plan B...")
 
@@ -11248,7 +11296,7 @@ ingress:
                     host = os.environ.get('HOST', 'localhost')
                     cmd = [cf_binary, "tunnel", "--url", f"http://{host}:{port}", "--no-autoupdate"]
 
-                    cf_process = subprocess.Popen(
+                    _proc = subprocess.Popen(
                         cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
@@ -11256,45 +11304,77 @@ ingress:
                         bufsize=1
                     )
 
+                    _line_q = queue.Queue()
+
+                    def _cf_read_stdout():
+                        try:
+                            for _l in _proc.stdout:
+                                _line_q.put(_l)
+                        except Exception:
+                            pass
+
+                    _reader_t = threading.Thread(target=_cf_read_stdout, daemon=True)
+                    _reader_t.start()
+
                     url_pattern = r"https://[a-z0-9\-]+\.trycloudflare\.com"
                     rate_limit_pattern = r"(429|error code: 1015|Too Many Requests)"
                     start_time = time.time()
+                    _captured = []
 
                     while time.time() - start_time < timeout:
-                        if cf_process.poll() is not None:
-                            output = cf_process.stdout.read()
+                        if _proc.poll() is not None:
+                            try:
+                                _reader_t.join(timeout=2)
+                            except Exception:
+                                pass
+                            while not _line_q.empty():
+                                try:
+                                    _captured.append(_line_q.get_nowait())
+                                except queue.Empty:
+                                    break
+                            _output = ''.join(_captured)
                             
-                            if re.search(rate_limit_pattern, str(output), re.IGNORECASE):
+                            if re.search(rate_limit_pattern, _output, re.IGNORECASE):
                                 if attempt < max_retries - 1:
                                     log_print(f"[Cloudflare] ⚠️ 第{attempt + 1}次尝试被限流 (429)，等待 {retry_delay} 秒后重试...")
+                                    _proc.stdout.close()
+                                    _proc.wait(timeout=5)
                                     time.sleep(retry_delay)
                                     break
                                 else:
                                     log_print(f"[Cloudflare] ❌ 已达最大重试次数 ({max_retries}次)，Quick Tunnel 持续限流")
-                                    log_print(f"[Cloudflare] 💡 建议: 等待 10 分钟后重试，或配置 Named Tunnel")
                                     return {"success": False, "error": f"Quick Tunnel 持续限流 (已尝试{max_retries}次)"}
                             
-                            log_print(f"[Cloudflare] ❌ Plan B 失败: Quick Tunnel 进程退出 (code: {cf_process.returncode})")
-                            log_print(f"[Cloudflare] 📋 进程输出 (前500字符): {str(output)[:500]}")
-                            return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 进程退出 (code: {cf_process.returncode})"}
+                            log_print(f"[Cloudflare] ❌ Plan B 失败: Quick Tunnel 进程退出 (code: {_proc.returncode})")
+                            log_print(f"[Cloudflare] 📋 进程输出 (前500字符): {_output[:500]}")
+                            return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 进程退出 (code: {_proc.returncode})"}
 
-                        line = cf_process.stdout.readline()
-                        if line:
-                            if re.search(rate_limit_pattern, line, re.IGNORECASE):
-                                if attempt < max_retries - 1:
-                                    log_print(f"[Cloudflare] ⚠️ 第{attempt + 1}次尝试被限流 (429)，等待 {retry_delay} 秒后重试...")
-                                    cf_process.terminate()
-                                    time.sleep(retry_delay)
-                                    break
-                                else:
-                                    log_print(f"[Cloudflare] ❌ 已达最大重试次数 ({max_retries}次)，Quick Tunnel 持续限流")
-                                    log_print(f"[Cloudflare] 💡 建议: 等待 10 分钟后重试，或配置 Named Tunnel")
-                                    return {"success": False, "error": f"Quick Tunnel 持续限流 (已尝试{max_retries}次)"}
+                        try:
+                            line = _line_q.get_nowait()
+                        except queue.Empty:
+                            time.sleep(0.2)
+                            continue
+
+                        _captured.append(line)
+
+                        if re.search(rate_limit_pattern, line, re.IGNORECASE):
+                            if attempt < max_retries - 1:
+                                log_print(f"[Cloudflare] ⚠️ 第{attempt + 1}次尝试被限流 (429)，等待 {retry_delay} 秒后重试...")
+                                _proc.terminate()
+                                _proc.wait(timeout=5)
+                                time.sleep(retry_delay)
+                                break
+                            else:
+                                log_print(f"[Cloudflare] ❌ 已达最大重试次数 ({max_retries}次)，Quick Tunnel 持续限流")
+                                return {"success": False, "error": f"Quick Tunnel 持续限流 (已尝试{max_retries}次)"}
                         
                         match = re.search(url_pattern, line)
                         if match:
-                            cf_url = match.group(0)
-                            cf_mode = 'quick'
+                            _url = match.group(0)
+                            with _cf_state_lock:
+                                cf_process = _proc
+                                cf_url = _url
+                                cf_mode = 'quick'
                             log_print(f"[Cloudflare] ✅ Plan B 成功 (第{attempt + 1}次尝试): Quick Tunnel {cf_url}，等待心跳验证后发邮件")
 
                             existing = read_tunnel_urls_file()
@@ -11302,10 +11382,15 @@ ingress:
 
                             return {"success": True, "url": cf_url, "type": "cloudflare", "mode": "quick"}
 
-                        time.sleep(0.5)
+                    try:
+                        _proc.terminate()
+                        _proc.wait(timeout=3)
+                    except Exception:
+                        try:
+                            _proc.kill()
+                        except Exception:
+                            pass
 
-                    return {"success": False, "error": f"Plan B 第{attempt + 1}次尝试超时 ({timeout}秒)"}
-                    
                 except Exception as e:  # [HANDLED]
                     log_print(f'[Cloudflare] ❌ Plan B 第{attempt + 1}次尝试异常: {type(e).__name__}: {e}')
                     if attempt < max_retries - 1:
@@ -11332,14 +11417,20 @@ ingress:
                 try:
                     time.sleep(interval)
 
-                    if cf_process is None or cf_process.poll() is not None:
-                        if cf_url:
+                    with _cf_state_lock:
+                        _cur_proc = cf_process
+                        _cur_url = cf_url
+
+                    if _cur_proc is None or _cur_proc.poll() is not None:
+                        if _cur_url:
                             log_print(f"[CF-Heartbeat] ⚠️ CF 隧道进程已退出")
-                            cf_url = None
-                            cf_mode = None
-                            cf_stable_url = None
-                            cf_stable_confirm_count = 0
-                            cf_last_email_sent_url = None
+                            with _cf_state_lock:
+                                cf_url = None
+                                cf_mode = None
+                                cf_stable_url = None
+                                cf_stable_confirm_count = 0
+                                cf_last_email_sent_url = None
+                                cf_process = None
                         
                         if time.time() > cf_restart_cooldown:
                             log_print(f"[CF-Heartbeat] 🔄 尝试自动重启 CF Tunnel...")
@@ -11353,19 +11444,21 @@ ingress:
                                 cf_restart_cooldown = time.time() + 120
                         continue
 
-                    if not cf_url:
+                    if not _cur_url:
                         continue
 
                     try:
-                        url_verified = verify_url(cf_url, timeout=TUNNEL_CONFIG['url_verify_timeout'], verbose=True)
+                        url_verified = verify_url(_cur_url, timeout=TUNNEL_CONFIG['url_verify_timeout'], verbose=True)
                     except Exception as e:  # [HANDLED]
                         log_print(f"[CF-Heartbeat] ❌ CF URL 验证异常: {str(e)[:100]}")
                         url_verified = False
 
                     if url_verified:
                         consecutive_failures = 0
-                        if cf_url != cf_stable_url:
-                            cf_stable_url = cf_url
+                        with _cf_state_lock:
+                            _live_url = cf_url
+                        if _live_url != cf_stable_url:
+                            cf_stable_url = _live_url
                             cf_stable_confirm_count = 1
                             cf_url_first_seen_time = time.time()
                             log_print(f"[CF-Heartbeat] [搜索] CF 新URL，开始稳定性验证 (1/{cf_stable_min_confirms}): {cf_url}")
@@ -11404,22 +11497,26 @@ ingress:
                         if consecutive_failures >= max_consecutive_failures:
                             log_print(f"[CF-Heartbeat] 🔥 CF URL 连续{consecutive_failures}次不可用，触发自动重启...")
                             
-                            old_cf_url = cf_url
-                            if cf_process:
+                            with _cf_state_lock:
+                                old_cf_url = cf_url
+                                _old_proc = cf_process
+
+                            if _old_proc:
                                 try:
-                                    cf_process.terminate()
-                                    cf_process.wait(timeout=5)
-                                except:
+                                    _old_proc.terminate()
+                                    _old_proc.wait(timeout=5)
+                                except Exception:
                                     try:
-                                        cf_process.kill()
-                                    except:
+                                        _old_proc.kill()
+                                    except Exception:
                                         pass
                             
-                            cf_url = None
-                            cf_mode = None
-                            cf_stable_url = None
-                            cf_stable_confirm_count = 0
-                            cf_process = None
+                            with _cf_state_lock:
+                                cf_url = None
+                                cf_mode = None
+                                cf_stable_url = None
+                                cf_stable_confirm_count = 0
+                                cf_process = None
                             
                             restart_result = start_cloudflare_tunnel()
                             if restart_result and restart_result.get('success'):
