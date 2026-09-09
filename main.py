@@ -3,6 +3,7 @@ import atexit
 import asyncio
 import base64
 import ctypes
+from contextlib import asynccontextmanager
 import glob
 import gzip
 import hashlib
@@ -2838,13 +2839,52 @@ def _get_allowed_origins():
         origins.append(f"http://127.0.0.1:{p}")
     return origins
 
+@asynccontextmanager
+async def lifespan(app):
+    loop = asyncio.get_running_loop()
+
+    def _loop_handler(_loop, context):
+        exc = context.get('exception')
+        msg = context.get('message', 'unknown')
+        if exc:
+            logger.error(f"[asyncio_loop] 未捕获异常: {type(exc).__name__}: {exc} | context={msg}")
+        else:
+            logger.error(f"[asyncio_loop] 未捕获事件: {msg} | context={context}")
+
+    loop.set_exception_handler(_loop_handler)
+    threading.excepthook = lambda args: logger.error(
+        f"[thread_uncaught] {args.thread.name}: {args.exc_type.__name__}: {args.exc_value}",
+        exc_info=(args.exc_type, args.exc_value, args.exc_traceback)
+    )
+    logger.info("[crash_protection] asyncio exception handler + threading.excepthook 已安装")
+
+    yield
+
+    logger.info("[shutdown] 清理子进程资源...")
+    try:
+        with _cf_state_lock:
+            if cf_process and cf_process.poll() is None:
+                cf_process.terminate()
+                try:
+                    cf_process.wait(timeout=5)
+                except Exception:
+                    try:
+                        cf_process.kill()
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    logger.info("[shutdown] 清理完成")
+
+
 app = FastAPI(
     title="Szwego商品爬虫",
     description="Szwego商品爬虫Web服务",
     version=get_version_from_readme(),
     docs_url=None,
     redoc_url=None,
-    openapi_url=None)
+    openapi_url=None,
+    lifespan=lifespan)
 
 
 # ============================================================
@@ -2905,44 +2945,6 @@ if CORSMiddleware:
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key"],
     )
 
-
-@app.on_event("startup")
-async def _setup_crash_protection():
-    loop = asyncio.get_running_loop()
-
-    def _loop_handler(_loop, context):
-        exc = context.get('exception')
-        msg = context.get('message', 'unknown')
-        if exc:
-            logger.error(f"[asyncio_loop] 未捕获异常: {type(exc).__name__}: {exc} | context={msg}")
-        else:
-            logger.error(f"[asyncio_loop] 未捕获事件: {msg} | context={context}")
-
-    loop.set_exception_handler(_loop_handler)
-    threading.excepthook = lambda args: logger.error(
-        f"[thread_uncaught] {args.thread.name}: {args.exc_type.__name__}: {args.exc_value}",
-        exc_info=(args.exc_type, args.exc_value, args.exc_traceback)
-    )
-    logger.info("[crash_protection] asyncio exception handler + threading.excepthook 已安装")
-
-
-@app.on_event("shutdown")
-async def _shutdown_cleanup():
-    logger.info("[shutdown] 清理子进程资源...")
-    try:
-        with _cf_state_lock:
-            if cf_process and cf_process.poll() is None:
-                cf_process.terminate()
-                try:
-                    cf_process.wait(timeout=5)
-                except Exception:
-                    try:
-                        cf_process.kill()
-                    except Exception:
-                        pass
-    except Exception:
-        pass
-    logger.info("[shutdown] 清理完成")
 
 # ============================================================
 # CSRF 防护常量 (v3.8.89.29) - API Key 在 ConfigManager 定义后初始化
