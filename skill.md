@@ -51,6 +51,22 @@ python main.py --web
 ## 🔄 最新更新
 ---
 
+### v5.0.9.58 (2026-09-11) - 🔧 **安全审计+稳定性全面加固** - security_audit多线程重构+Playwright事件循环阻塞修复+版本Commit hash全量回填
+
+> **Commit**: `933d5e4f, 4f17917e`  
+
+#### 更新内容:
+1. **security_audit.py 多线程重构(核心优化)**: 废弃硬编码行号白名单(150行)→纯正则内容自动识别，彻底解决git diff后行号偏移导致的误报；扩展扫描范围到全项目代码文件；修复Windows反斜杠路径匹配；修复UTF-8编码+线程安全锁
+2. **Playwright事件循环阻塞修复(高危)**: `launch_browser()`中同步`install_playwright_cdn()`通过`loop.run_in_executor()`改为线程池执行，不再阻塞async事件循环
+3. **Playwright资源泄漏修复**: `run_scraper/update_cookie/setup`三处添加try/finally块确保browser/context始终关闭，防止orphaned进程
+4. **生产环境traceback.print_exc → logger.exception**: 3处直接打印堆栈改为统一logger.exception
+5. **fetch_all_products返回类型统一**: None返回值全部改为[]空列表，消除下游TypeError风险
+6. **硬编码路径 → PathManager**: config/config.json等硬编码路径统一改为PathManager方法
+7. **README.md+skill.md Commit hash全量回填**: 所有版本条目补齐git commit hash(同一版本多提交用逗号拼接，最多5个)，彻底消除"待生成"占位
+8. **changelog API changes字段空值防御**: 已有自动fallback机制确保永远不为空数组
+
+---
+
 ### v5.0.9.57 (2026-09-09) - ♻️ **FastAPI DeprecationWarning 消除** - on_event("startup"/"shutdown") 迁移为 lifespan 上下文管理器
 
 > **Commit**: `c8a82058`  
