@@ -201,6 +201,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 ### v5.0.9.57 (2026-09-09) - ♻️ **FastAPI DeprecationWarning 消除** - on_event("startup"/"shutdown") 迁移为 lifespan 上下文管理器
 
+> **Commit**: `c8a82058`  
+
 #### 更新内容:
 1. **废弃 API 移除**: `@app.on_event("startup")` + `@app.on_event("shutdown")` 合并为单个 `lifespan(app)` 异步上下文管理器
    - FastAPI 在新版本中已将 `on_event` 标记为 deprecated，启动时会弹出 DeprecationWarning
@@ -245,6 +247,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ### v5.0.9.56 (2026-09-09) - 🛡️ **安全攻防全面加固** - readline阻塞死锁修复+竞态条件清零+asyncio异常处理+Import唯一化
+
+> **Commit**: `05063e34, a4330192`  
 
 #### 更新内容:
 1. **Plan B readline()阻塞死锁修复(高危)**: Cloudflare Quick Tunnel输出读取从直接readline()改为Queue+daemon线程非阻塞模式
@@ -322,6 +326,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ### v5.0.9.55 (2026-09-07) - 🛡️ **企业级稳定性升级** - 服务器崩溃预防+隧道自动重试机制全面增强+文档同步
+
+> **Commit**: `38329408, 2f9e09c9, 35458a16, 4bcc27e7, 94d0b79e`  
 
 #### 更新内容:
 1. **服务器崩溃预防体系(核心升级)**: 6大防护机制，将服务器崩溃风险降低90%+
@@ -402,6 +408,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 ### v5.0.9.54 (2026-09-07) - 🐛 **Bug修复** - 修复"隧道共享"按钮误调启动API导致CF被重启的问题
 
+> **Commit**: `22351201`  
+
 #### 更新内容:
 1. **前端"隧道共享"按钮逻辑修复(核心修复)**: "隧道共享"按钮从调用POST /api/tunnel/start改为GET /api/tunnel/status，纯展示不启动
    - startTunnelAndShow(): 移除fetch('/api/tunnel/start', {method: 'POST'})，改为fetch('/api/tunnel/status')
@@ -453,6 +461,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ### v5.0.9.53 (2026-09-07) - 🔧 **架构优化** - restart_tunnel与CF隧道解耦，CF由cf_heartbeat_loop独立管理
+
+> **Commit**: `c9c8f319, a0257623`  
 
 #### 更新内容:
 1. **restart_tunnel与CF隧道解耦(核心架构)**: restart_tunnel只管hostc进程，CF隧道完全交给cf_heartbeat_loop独立管理
@@ -507,6 +517,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ### v5.0.9.52 (2026-09-07) - 🛡️ **安全加固+Bug修复** - XSS漏洞修复+数组越界Bug清零+代码规范全面合规
+
+> **Commit**: `416c1feb, f2b00da1`  
 
 #### 更新内容:
 1. **XSS漏洞修复(核心安全)**: 修复2个XSS注入点(高危+中危)
@@ -587,6 +599,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ### v5.0.9.51 (2026-09-07) - 🔧 **优化+修复** - 服务器防崩溃+隧道配置固化+JS变量名修复
+
+> **Commit**: `48035831`  
 
 #### 更新内容:
 1. **防崩溃优化(核心)**: 5层防护机制,大幅降低服务器崩溃概率80-90%
@@ -670,6 +684,8 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.50 (2026-09-06) - 🐛 **Bug修复** - 跨表联动SKU匹配优化(货号为空时使用商品描述匹配)
 
+> **Commit**: `c7e3b4ee, 9becc1d0, 21619515, bcc5e8c2, 18fbd600`  
+
 #### 更新内容:
 1. 修复跨表联动在货号为空时的匹配失败问题
 2. 优化匹配逻辑: 优先使用data-sku,失败后降级使用data-desc精确匹配
@@ -723,6 +739,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ### v5.0.9.49 (2026-09-06) - 🐛 **Bug修复** - 修复获取商品时DOM元素空指针异常(Badge更新时机错误)
+
+> **Commit**: `73556d29, 4e1f13de, 273cd4e2, 78f9f778`  
 
 #### 更新内容:
 1. 修复获取商品失败报错: Cannot set properties of null (setting 'textContent')
@@ -778,6 +796,8 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.48 (2026-09-06) - 🐛 **Bug修复** - 跨表联动基于商品描述匹配+空格规范化+模板字符串修复
 
+> **Commit**: `9e5cce49, 0c9f699a, a9c377d1, e355f0cf`  
+
 #### 更新内容:
 1. 修复跨表联动逻辑: 从SKU匹配改为商品描述匹配,解决SKU为空时无法联动的问题
 2. 新增findRowsByIdentifier函数: 优先通过data-desc属性匹配,兜底使用data-sku
@@ -831,6 +851,8 @@ bandit -r . -f json -o bandit_report.json
 - ✅ GetDiagnostics: 0错误0警告,代码完全正确
 
 ### v5.0.9.47 (2026-09-04) - 🔧 Bug修复 - 启动脚本编码问题全面修复(时间格式+中文乱码+缺失函数)
+
+> **Commit**: `1da27a5c, 1094868e`  
 
 #### 更新内容:
 1. 修复run.sh时间格式错误(.3N): macOS date命令不支持%N纳秒格式,添加操作系统检测
@@ -887,6 +909,8 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.46 (2026-09-04) - 范式统一 - PY-CORE-029: CMD窗口输出与web_output.log一致性规范
 
+> **Commit**: `193390cb, 0469fb97, 5d21a9c7, 008cec95, 9449dca3`  
+
 #### 更新内容:
 1. run.bat移除UTF-8 BOM导致@echo off失效问题,所有echo改为call:log(97处修改)
 2. run.sh修复6处裸echo,统一使用log()函数(44处修改)
@@ -931,6 +955,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ### v5.0.9.45 (2026-09-04) - 🐛 **Bug修复** - 修复邮件发送失败的根本原因(敏感配置字段名错误)
+
+> **Commit**: `a2deb2f7, 81bd1560`  
 
 ##### 1. 🐛Bug修复 (🐛Bug修复 - 敏感配置字段名修正)
 
@@ -1025,6 +1051,8 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ### v5.0.9.44 (2026-09-04) - 🔧 **功能增强** - 邮件通知系统修复+配置加密解密工具+Git安全配置优化
+
+> **Commit**: `6f57a6b5`  
 
 ##### 1. 🔧功能增强 (🔧功能增强 - 邮件系统修复)
 
@@ -1187,6 +1215,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.43 (2026-09-04) - 🐛 **Bug修复** - 爬虫统计卡片显示问题修复(logger.debug→logger.info确保关键统计数据正常输出)+安全审计新增日志级别最佳实践自动检测功能
 
+> **Commit**: `501d30ab, 269c0b42, 126e2e5a, 14c56c40, e4d76d36`  
+
 ##### 1. 🐛Bug修复 (🐛Bug修复 - 爬虫统计卡片显示问题修复)
 
 **问题描述**:
@@ -1258,6 +1288,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.42 (2026-09-03) - 🔧 **范式修复** - PY-CORE-027范式100%合规修复-将33个版本的简化格式转为标准格式(解决API返回空changes数组问题+前端显示空白)+三方文档同步(README+skill+docx)
 
+> **Commit**: `2fe31b1a, 84f53877`  
+
 ##### 1. 🔧技术债务清理 (🔧技术债务清理)
 
 **问题描述**:
@@ -1324,6 +1356,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.41 (2026-09-03) - 🚀 **全面优化** - 全面优化启动脚本-修复9个关键问题(国内网络适配+自动提权+PATH刷新+依赖容错+Playwright参数修复)+删除.trae文件夹
+
+> **Commit**: `b36e12c6, 8569de29`  
 
 #### 更新内容: ①run.bat新增:国内网络适配(curl超时5s+重试3次+华为云镜像备用) ②run.bat新增:自动检测管理员权限并以UAC提权重启(非管理员时弹出请求窗口) ③run.bat新增:安装后刷新PATH环境变量(setx + 即时刷新当前session) ④run.bat增强:pip/Playwright安装失败容错(跳过非关键依赖+降级提示) ⑤run.bat修复:playwright install chromium参数错误(--with-deps改为--only-shell) ⑥run.sh同步以上5项改进(Bash语法适配) ⑦删除根目录.trae文件夹(37KB IDE配置) ⑧代码量:run.bat +118行/-6行 / run.sh +75行/-3行
 
@@ -1477,6 +1511,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.40 (2026-09-03) - ✅ **数据完善** - 100%完成占位符替换-最后4个(v2.5.24/v2.5.23)使用真实Git数据(+9行-9行/+15行-5行)+三方文档同步
 
+> **Commit**: `edcf5058`  
+
 #### 更新内容: ①定位最后4个遗漏的占位符(位于v2.5.24和v2.5.23版本条目) ②使用git show提取精确变更统计:v2.5.24为+9行-9行,v2.5.23为+15行-5行 ③更新README.md和skill.md对应位置 ④重新生成skill.docx(v36702字节) ⑤最终验证:全文搜索确认0个占位符残留
 
 ---
@@ -1577,6 +1613,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.39 (2026-09-03) - 🔧 **范式优化** - 严格遵循PY-CORE-027范式-使用真实Git数据替换38个占位符(拒绝估算值)+删除.trae文件夹+三方文档同步
+
+> **Commit**: `4fb03302`  
 
 #### 更新内容: ①识别README.md/skill.md中使用待补充/估算/TBD等模糊描述的字段(共38处) ②通过git log/git show提取真实Commit hash/变更文件列表/作者信息 ③将所有占位符替换为可追溯的真实Git元数据 ④删除项目根目录下.trae文件夹(IDE配置不应纳入版本控制) ⑤重新生成skill.docx确保三方文档同步
 
@@ -1679,6 +1717,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.38 (2026-09-03) - 🔧 **范式优化** - 严格遵循PY-CORE-027范式-清除全部42个+N行-M行占位符(使用真实git数据或合理估算值)+三方文档同步
 
+> **Commit**: `db629b80, 80f80208`  
+
 #### 更新内容: ①扫描README.md和skill.md中所有+N行-M行占位符(共42处) ②对每个占位符使用git show --shortstat获取真实变更统计(或基于文件大小合理估算) ③替换为具体数值如+15行 -3行格式 ④同步更新skill.docx保持三方文档100%一致 ⑤验证所有变更统计数字与Git实际数据匹配
 
 ---
@@ -1778,6 +1818,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.37 (2026-09-03) - 🔄 **版本动态化** 启动脚本支持自动获取Python/Node.js最新版本(告别硬编码版本号)
+
+> **Commit**: `5586176d, 0ae079df`  
 
 #### 更新内容: ①run.bat新增:get_latest_python_version子程序通过GitHub API动态获取Python最新版本号(替代硬编码3.11.9) ②run.bat新增:get_latest_node_version子程序通过GitHub API动态获取Node.js最新版本号(替代硬编码v20.11.1) ③run.sh新增get_latest_python_version()函数实现Linux/macOS平台同样的动态版本获取逻辑 ④修改:auto_install_python/auto_install_node调用新函数并使用%PYTHON_LATEST_VERSION%/%NODE_LATEST_VERSION%变量(替代固定版本号) ⑤所有镜像源URL中的版本号改为变量引用确保下载地址与API返回的版本一致 ⑥增加容错机制:API请求失败时回退到安全默认值(Python 3.11.9/Node.js v20.11.1) ⑦skill.docx从skill.md重新生成确保三方文档100%一致(README/skill/skill.docx)
 
@@ -1935,6 +1977,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.36 (2026-09-03) - 🚀 **功能增强** 启动脚本全面升级(Winget/Choco自动安装+镜像源智能轮询)
+
+> **Commit**: `4f6b2b84`  
 
 #### 更新内容: ①run.bat新增Winget包管理器自动安装功能(支持华为云/GitHub双源自动选择最快下载地址) ②run.bat新增Chocolatey包管理器自动安装功能(支持华为云/官方源双源智能选择) ③实现镜像源连接速度自动测试机制(curl --connect-timeout + PowerShell时间计算,选择延迟最低的镜像源) ④run.sh同步优化对应功能(确保Linux/macOS跨平台兼容性) ⑤skill.docx从skill.md重新生成确保三方文档100%一致(README/skill/skill.docx) ⑥所有新增代码严格遵循PY-CORE-029输出规范(CMD窗口输出与web_output.log逐行一致)
 
@@ -2096,6 +2140,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.35 (2026-09-03) - 🖥️ **范式新增** PY-CORE-029 CMD窗口输出与web_output.log一致性范式
 
+> **Commit**: `6e33af02, e0523ff3`  
+
 #### 更新内容: ①新增PY-CORE-029范式定义CMD窗口输出必须与web_output.log逐行一致 ②定义7类禁止出现的窗口噪音输出(命令回显/子程序调用/条件判断/循环展开/WMIC输出/编码设置回显/BOM错误) ③定义标准输出格式[YYYY-MM-DD HH:MM:SS.mmm]消息内容 ④定义消息前缀规范([*]/[1/N]/[WARNING]/[ERROR]) ⑤定义一致性验证检查清单(8项) ⑥定义run.bat和run.sh技术实现规范 ⑦同步更新README.md/skill.md/skill.docx三方一致
 
 ---
@@ -2250,6 +2296,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.34 (2026-09-02) - 🔗 **表格联动增强** 双向SKU精确匹配联动(顶部/中间/底部全覆盖)
 
+> **Commit**: `a4863324`  
+
 #### 更新内容: ①从Git恢复原版底部联动算法(特殊处理:让匹配商品显示在目标表格底部) ②修改顶部联动逻辑:删除强制同步到顶部改为SKU精确匹配(表1顶部32972→表0也滚动到32972而非82948) ③保留原版中间位置SKU精确跟随机制(保持相同偏移量) ④保留比例回退机制(SKU不存在时按滚动比例同步) ⑤清理所有多余调试日志恢复代码简洁性 ⑥确保双向联动完整(表0↔表1互相跟随)
 
 ---
@@ -2391,6 +2439,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.33 (2026-09-02) - 📱 **移动端优化** 移动端页面内容溢出屏幕问题最小化修复(保持原有样式)
 
+> **Commit**: `f7871100, 6aece7cc`  
+
 #### 更新内容: ①在超小屏幕媒体查询(@media max-width: 575.98px)中添加html,body{overflow-x:hidden;max-width:100%}防止移动端内容横向溢出 ②仅添加3行CSS代码解决溢出问题,不改变任何原有美观的卡片/按钮/表格/字体/间距样式 ③保持所有UI元素原始设计不变,只解决内容超出屏幕宽度的技术问题
 
 ---
@@ -2478,6 +2528,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.32 (2026-09-02) - 🐛 **紧急Bug修复** showToast/safeVideoUrl/renderComparisonResult未定义导致商品详情完全无法展示
+
+> **Commit**: `ea954d0b`  
 
 #### 更新内容: ①修复showToast函数定义在第4272行但在第983/1020/832行就被使用导致ReferenceError: showToast is not defined的严重错误(在文件开头第47行创建window.showToast全局包装函数作为垫片) ②修复showProductModal中safeVideoUrl变量在forEach循环内使用但从未定义导致ReferenceError: safeVideoUrl is not defined(在第799行forEach内部添加const safeVideoUrl = escapeAttr(decodedUrl)) ③修复renderComparisonResult函数在第3110行被调用但整个文件中无定义导致对比功能异常(添加typeof安全检查+备用JSON渲染方案) ④确保所有61处showToast调用不再报错(通过全局垫片函数统一处理)
 
@@ -2584,6 +2636,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.31 (2026-09-02) - 🐛 **Bug修复** 商品详情模态框不展示问题根治(API有返回值但UI无显示)
+
+> **Commit**: `e1d8c03e`  
 
 #### 更新内容: ①修复showProductDetail/showProductByDescription/searchProductBySku三个函数缺少错误处理导致模态框渲染失败时静默失败无任何反馈的问题 ②修复showProductModal函数未检查已存在的#productModal元素导致重复ID冲突或DOM操作异常 ③新增完整的try-catch错误捕获机制覆盖整个模态框渲染流程(数据获取→HTML构建→DOM插入→验证显示) ④增加详细的Console调试日志输出([商品详情]/[SKU搜索]/[商品描述]/[showProductModal]前缀便于定位问题) ⑤在insertAdjacentHTML后验证模态框元素是否成功创建并记录display状态和z-index值
 
@@ -2707,6 +2761,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.30 (2026-09-02) - 🐛 **Bug修复** 隧道按钮点击无反应+toggleTunnel逻辑完善(启动/停止双向切换)
 
+> **Commit**: `cace5932`  
+
 #### 更新内容: ①修复dist/app.js中toggleTunnel()函数只有启动逻辑缺少停止逻辑的严重Bug导致隧道运行时按钮点击无反应 ②修复updateTunnelUI()中运行状态按钮被disabled=true禁用导致用户无法交互的问题 ③新增完整的停止隧道功能(fetch /api/tunnel/stop + POST) ④优化按钮状态显示(启动中/停止中/连接中/运行中四种状态+对应图标和颜色) ⑤增加操作反馈Toast提示(启动成功/停止成功/失败提示)
 
 ---
@@ -2828,6 +2884,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.29 (2026-09-02) - 🔧 **跨平台兼容性修复** run.sh macOS兼容性根治(版本号检测+语法错误修复)
 
+> **Commit**: `620ecd2e`  
+
 #### 更新内容: ①修复run.sh版本号检测在macOS上显示v0.0.0的问题(BSD grep不支持-P Perl正则,改用-E扩展正则并支持多段版本号如5.0.9.28) ②修复run.sh第8行单引号字符串内转义引号冲突的语法错误 ③修复run.sh第123行log语句缺失闭合双引号的语法错误 ④验证脚本在macOS上成功启动并正确显示版本号v5.0.9.28
 
 ---
@@ -2930,6 +2988,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.28 (2026-09-02) - 🔐 **攻防加固** README损坏修复+app.js XSS转义加固+审计排除增强
+
+> **Commit**: `fc657422`  
 
 #### 更新内容: ①修复README.md第83行API Key认证描述被版本记录JSON数据污染的隐藏Bug(12行垃圾数据清除) ②dist/app.js XSS防护加固:showToast的message参数添加escapeHtml转义、systemInfo/cookie_name/expires/hours_remaining转义、video URL添加escapeAttr属性转义 ③安全审计日期从2026-08-30更新为2026-09-02 ④删除空临时脚本fix_audit_patterns.py ⑤security_audit.py增加17个排除模式
 
@@ -3052,6 +3112,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.27 (2026-09-02) - 🔧 **优化** security_audit.py版本号改为动态从README.md获取
 
+> **Commit**: `a14d1e70`  
+
 #### 更新内容:
 1. security_audit.py版本号从写死的v3.8.90.15改为动态从README.md获取
 2. 解决每次版本升级都需要手动修改审计脚本版本号的问题
@@ -3094,6 +3156,8 @@ python config/crypto_tool.py encrypt-config
 - ✅ 兼容性测试: 不影响现有审计功能
 
 ### v5.0.9.26 (2026-09-02) - 📝 **范式精简** PY-CORE-027两份合一+禁止占位符规则+历史叙述commit化
+
+> **Commit**: `05b1984c`  
 
 #### 更新内容: ①将skill.md中重复的两份PY-CORE-027范式精简为一份(删除第一份范式定义140行,保留完整示例和版本记录,第二份作为唯一完整范式) ②PY-CORE-027范式新增"禁止占位符"硬性规则(Commit必须用git log按版本号匹配真实hash,变更统计必须用git diff --shortstat获取真实行数) ③v5.0.9.25的Commit占位符替换为真实hash 00ee975d ④v5.0.9.23/v5.0.9.3历史叙述中的"待补充"替换为具体commit描述(48901a28/425ecd5f/75f403af/0b89a619)
 
@@ -3199,6 +3263,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.25 (2026-09-02) - 🔧 **Bug修复** generate_docx.py路径修复+skill.docx重新生成
 
+> **Commit**: `08a072e4, 409c5a67`  
+
 #### 更新内容: 修复test/generate_docx.py读取skill.md的相对路径错误(Path('skill.md')→Path('../skill.md'))，使脚本在test目录运行时能正确读取根目录的skill.md并输出skill.docx到根目录，重新生成最新v5.0.9.24版skill.docx
 
 **修复日期**: 2026-09-02
@@ -3231,6 +3297,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.24 (2026-09-02) - 🔧 **三方版本对齐** Git/README/skill.md 366个版本100%一致
 
+> **Commit**: `728a4a68, 0278a494`  
+
 #### 更新内容: 补入11个Git提交版本(v3.5.0/v4.1~v4.8/v5.0/v5.0.6/v5.0.7/v5.0.9/v5.0.9.3)，确保Git提到的每个版本在README.md和skill.md中都有对应记录
 
 **修复日期**: 2026-09-02
@@ -3262,6 +3330,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.23 (2026-09-02) - 🔧 **版本一致性修复** PY-CORE-028范式+空白changes补全+commit 48901a28真实数据替换
+
+> **Commit**: `57206dc9, fa29c2d6, 5a6158c8`  
 
 #### 更新内容: 新增PY-CORE-028版本号一致性保障范式，补全所有空白changes，将占位符替换为真实Git数据(commit 48901a28/425ecd5f/75f403af)
 
@@ -3313,6 +3383,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.22 (2026-09-02) - 🔄 **双向完全同步** README.md与skill.md互相补充达到100%一致
 
+> **Commit**: `3fbb6f28`  
+
 #### 更新内容: 实现README.md与skill.md的双向同步，清理无效版本号，确保所有349个有效版本都包含完整的changes结构
 
 **修复日期**: 2026-09-02
@@ -3346,6 +3418,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.20 (2026-09-02) - 📚 **全面同步** skill.md补齐所有缺失版本达到100%一致
 
+> **Commit**: `c5cff5ae`  
+
 #### 更新内容: skill.md补齐所有缺失版本(308个)，与README.md达成100%一致(350个版本) - 包含完整的changes结构
 
 **修复日期**: 2026-09-02
@@ -3376,6 +3450,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.19 (2026-09-02) - 🔧 **版本一致性修复** 多项格式问题修复
+
+> **Commit**: `72485527`  
 
 #### 更新内容: ①删除test开头的py文件 ②修复v5.0.9.15/v1.3.1格式问题(缺少换行符) ③添加缺失的v1.1.0/v1.2.0/v1.3.0版本到README.md ④确保README与skill版本记录保持一致
 
@@ -3480,6 +3556,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.18 (2026-09-02) - 📝 **范式文档更新** Changelog版本变更详情完整结构范式
 
+> **Commit**: `cc098add`  
+
 #### 更新内容: ①skill.md新增PY-CORE-027 Changelog版本变更详情完整结构范式 ②定义标准化的changes块结构(问题描述/修复方案/测试验证) ③提供完整的字段规范、类型标签对照表、API数据映射和自动化检查脚本
 
 ---
@@ -3564,6 +3642,8 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.17 (2026-09-02) - 🔧 **全面修复** 为10个缺失changes的版本添加完整变更详情
 
+> **Commit**: `38e3898a`  
+
 #### 更新内容: 为10个缺失changes的版本(v5.0.9.6~v5.0.9.15)添加完整的变更详情结构(问题描述/修复方案/测试验证) - 解决API返回changes为空数组的问题
 
 **修复日期**: 2026-09-02
@@ -3594,6 +3674,8 @@ python config/crypto_tool.py encrypt-config
 ---
 
 ### v5.0.9.16 (2026-09-02) - 🧠 **智能升级** changelog API自动匹配版本号
+
+> **Commit**: `da8351ed`  
 
 #### 更新内容: 实现智能版本号匹配算法，当Git提交的commit message中不包含标准版本号格式时，系统自动从README.md中最接近该提交日期的版本号进行匹配
 
@@ -3794,6 +3876,8 @@ PY-CORE-025 (API整体架构)
 
 ### v5.0.9.14 (2026-08-31) - ✨ **功能增强** changelog API每个条目补充真实影响文件和变更统计
 
+> **Commit**: `1f99aeec`  
+
 #### 更新内容: 为changelog API的每个版本条目添加真实的影响文件列表和代码变更统计
 
 **修复日期**: 2026-08-31
@@ -3823,6 +3907,8 @@ PY-CORE-025 (API整体架构)
 - ✅ 变更统计数据准确
 
 ### v5.0.9.13 (2026-08-31) - ✨ **功能增强** changelog API历史版本数据补全-100%完整
+
+> **Commit**: `c9c9602b`  
 
 #### 更新内容: 补全changelog API中的历史版本数据，达到100%完整性
 
@@ -3854,6 +3940,8 @@ PY-CORE-025 (API整体架构)
 
 ### v5.0.9.12 (2026-08-31) - 📝 **文档更新** README最新更新区域添加v5.0.9版本记录
 
+> **Commit**: `b82bc1d0`  
+
 #### 更新内容: 在README.md中添加v5.0.9版本的初始记录
 
 **修复日期**: 2026-08-31
@@ -3883,6 +3971,8 @@ PY-CORE-025 (API整体架构)
 - ✅ 版本导航正常
 
 ### v5.0.9.11 (2026-08-31) - 📝 **文档更新** README版本记录格式全面规范为v4.3.0标准 + skill.md范式升级
+
+> **Commit**: `cb26253c`  
 
 #### 更新内容: 统一文档格式标准，提升可读性和维护性
 
@@ -3914,6 +4004,8 @@ PY-CORE-025 (API整体架构)
 
 ### v5.0.9.10 (2026-08-31) - 🐛 **Bug修复** 修复/api/changelog解析失败 + README格式规范(仅标题)
 
+> **Commit**: `42e4dc4f`  
+
 #### 更新内容: 修复changelog API解析异常，规范化README格式
 
 **修复日期**: 2026-08-31
@@ -3943,6 +4035,8 @@ PY-CORE-025 (API整体架构)
 - ✅ 解析错误率降至0%
 
 ### v5.0.9.9 (2026-08-31) - 📝 **文档更新** README最新更新区域版本记录内容补全(10个版本)
+
+> **Commit**: `56fec918`  
 
 #### 更新内容: 补全README.md中缺失的版本记录信息
 
@@ -3974,6 +4068,8 @@ PY-CORE-025 (API整体架构)
 
 ### v5.0.9.8 (2026-08-31) - 🐛 **Bug修复** 修复Changelog Web展示空白+API返回所有版本
 
+> **Commit**: `ee8138c1`  
+
 #### 更新内容: 修复前端展示空白问题，API现在返回所有历史版本
 
 **修复日期**: 2026-08-31
@@ -4003,6 +4099,8 @@ PY-CORE-025 (API整体架构)
 - ✅ 前后端字段名统一为changes
 
 ### v5.0.9.7 (2026-08-31) - ✨ **功能增强** changelog API集成Git提交历史 - 所有124次提交全部展示
+
+> **Commit**: `e3e5f8c0`  
 
 #### 更新内容: 将Git提交历史完整集成到changelog API，展示完整的开发历程
 
@@ -4094,6 +4192,8 @@ PY-CORE-025 (API整体架构)
 
 ### v5.0.9.4 (2026-09-02) - 🚀 **版本升级** 全自动Homebrew安装(国内加速源智能测速) + macOS成功率95-98%
 
+> **Commit**: `814b30bd`  
+
 #### 更新内容: 实现macOS/Linux环境下Homebrew全自动安装，智能选择最快国内镜像源
 
 **修复日期**: 2026-09-02
@@ -4122,6 +4222,8 @@ PY-CORE-025 (API整体架构)
 ---
 
 ### v5.0.9.3 (2026-09-02) - 📝文档更新 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1)...
+
+> **Commit**: `dc6fef7f, 512eda94, 5ab958c1`  
 
 #### 更新内容: 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1) ②所有变更统计更新为真实Git数据(不再显示占位符(改为commit 0b89a619真实Git数据)) ③删除临时脚本
 
@@ -4207,6 +4309,8 @@ PY-CORE-025 (API整体架构)
 
 ### v5.0.9.2 (2026-09-02) - 🎯 **100%全自动升级** curl自动安装 + 6大Linux包管理器覆盖 + standalone Python降级 + 成功率98-99%
 
+> **Commit**: `62d9ed9b`  
+
 #### 更新内容: 实现curl自动安装、Linux全发行版包管理器覆盖、standalone Python降级方案，使项目在任何环境下都能100%全自动运行
 
 **修复日期**: 2026-09-02
@@ -4236,6 +4340,8 @@ PY-CORE-025 (API整体架构)
 ---
 
 ### v5.0.9.1 (2026-09-02) - 🔧 **关键修复** run.bat编码问题根治 - UTF-8 with BOM + CRLF换行符 + .gitattributes配置优化（解决无限递归崩溃问题）
+
+> **Commit**: `fc1bd804`  
 
 #### 更新内容: 彻底解决Windows环境下run.bat的编码和换行符问题，防止CMD无限递归崩溃错误
 
@@ -4278,6 +4384,8 @@ if exist "README.md" (
     for /f "delims=" %%L in ('type README.md ^| findstr /c:"
 
 ### v5.0.9 (2026-09-02) - 📝文档更新 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1)...
+
+> **Commit**: `390f5159, 1f148531, 22d84d25, eaefa0ea, 6ef392c9`  
 
 #### 更新内容: 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1) ②所有变更统计更新为真实Git数据(不再显示占位符(改为commit 0b89a619真实Git数据)) ③删除临时脚本
 
@@ -4363,6 +4471,8 @@ if exist "README.md" (
 
 ### v5.0.8 (2026-08-31) - 🐛Bug修复 版本号智能检测根治（Web显示错误版本号问题彻底解决）
 
+> **Commit**: `ebf8b9fe, 51f83d29, 396a19d8`  
+
 #### 更新内容: 重构get_version_from_readme()函数实现智能版本号检测，彻底解决Web界面显示过期版本号问题
 
 **修复日期**: 2026-08-31
@@ -4393,6 +4503,8 @@ if exist "README.md" (
 - ✅ 后续发版无需手动维护"最新更新"顺序，全自动检测
 
 ### v5.0.7 (2026-09-02) - 📝文档更新 docs: v5.0.7 - README.md(47条)+skill.md(1条)剩余非合规记录全部转为DOC-CORE-002范式
+
+> **Commit**: `fe95dc2c`  
 
 #### 更新内容: docs: v5.0.7 - README.md(47条)+skill.md(1条)剩余非合规记录全部转为DOC-CORE-002范式
 
@@ -4425,6 +4537,8 @@ if exist "README.md" (
 
 ### v5.0.6 (2026-09-02) - 📝文档更新 docs: v5.0.6 - 所有版本记录统一转为DOC-CORE-002范式(README.md 270条+skill.md 67条)
 
+> **Commit**: `a931695e`  
+
 #### 更新内容: docs: v5.0.6 - 所有版本记录统一转为DOC-CORE-002范式(README.md 270条+skill.md 67条)
 
 **修复日期**: 2026-09-02
@@ -4455,6 +4569,8 @@ if exist "README.md" (
 ---
 
 ### v5.0.5 (2026-08-31) - 📝文档更新 添加完整Git提交历史详细记录(715个提交/321个版本)+DOC-CORE-002范式规范+修复requirements.txt编码
+
+> **Commit**: `0c3a4232, 87909c3a`  
 
 #### 更新内容: 按DOC-CORE-002范式将全部715个Git提交写入README.md和skill.md，新增DOC-CORE-002详细技术文档格式范式，修复requirements.txt GBK编码混入
 
@@ -4516,6 +4632,8 @@ if exist "README.md" (
 
 ### v5.0.4 (2026-08-31) - 📝 **文档补录** v5.0.4: 从Git恢复README.md并安全添加v4.7版本记录+重新生成skill.docx
 
+> **Commit**: `72ab0a7f`  
+
 #### 更新内容: v5.0.4: 从Git恢复README.md并安全添加v4.7版本记录+重新生成skill.docx
 
 **更新日期**: 2026-08-31
@@ -4533,6 +4651,8 @@ if exist "README.md" (
 - **Commit**: 72ab0a7f
 
 ### v5.0.3 (2026-08-31) - 📝 **文档补录** v5.0.3: 补充README.md缺失的v4.7版本记录并重新生成skill.docx
+
+> **Commit**: `064367e7`  
 
 #### 更新内容: v5.0.3: 补充README.md缺失的v4.7版本记录并重新生成skill.docx
 
@@ -4552,6 +4672,8 @@ if exist "README.md" (
 
 ### v5.0.2 (2026-08-31) - 📝 **文档补录** v5.0.2: 优化文档生成流程，统一使用test/generate_docx.py动态化生成器
 
+> **Commit**: `4775297d`  
+
 #### 更新内容: v5.0.2: 优化文档生成流程，统一使用test/generate_docx.py动态化生成器
 
 **更新日期**: 2026-08-31
@@ -4570,6 +4692,8 @@ if exist "README.md" (
 
 ### v5.0.1 (2026-08-31) - 📝 **文档补录** v5.0.1: 修复skill.md表格格式错误并重新生成skill.docx文档
 
+> **Commit**: `970ce1a4, 37534fa8`  
+
 #### 更新内容: v5.0.1: 修复skill.md表格格式错误并重新生成skill.docx文档
 
 **更新日期**: 2026-08-31
@@ -4587,6 +4711,8 @@ if exist "README.md" (
 - **Commit**: 970ce1a4
 
 ### v5.0.0 (2026-08-31) - 🏗️架构优化 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx
+
+> **Commit**: `87ccb2ca`  
 
 #### 更新内容: v5.0: 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx (2026-08-31)
 
@@ -4613,6 +4739,8 @@ if exist "README.md" (
 - ✅ 提交 e53e0273 已合并至master分支
 
 ### v4.9.0 (2026-08-31) - 🏗️架构优化 ⚙️ 全面动态编码实施（架构升级）
+
+> **Commit**: `cd240866`  
 
 #### 更新内容: ⚙️ 全面动态编码实施（架构升级）
 
@@ -4643,6 +4771,8 @@ if exist "README.md" (
 
 ### v4.8.0 (2026-08-31) - 🔒安全 🔒 致命BUG清零+安全攻防全面加固（重大安全修复）
 
+> **Commit**: `6cb3daaa`  
+
 #### 更新内容: 🔒 致命BUG清零+安全攻防全面加固（重大安全修复）
 
 **修复日期**: 2026-08-31
@@ -4672,6 +4802,8 @@ if exist "README.md" (
 - ✅ XSS攻击测试全部拦截
 
 ### v4.7 (2026-08-31) - 🐛Bug修复 🌐 双隧道全自动启动+硬编码消除（重大功能升级）— 实现auto_start_tunnel()函数自动检测并启动Hostc和Cloudflare双隧道无需手动干预，新增TUNNEL_CONFIG配置字典消除硬编码（CF_MAX_RETRIES/CF_RETRY_DELAY/CF_QUICK_TUNNEL_TIMEOUT/CF_HEARTBEAT_INTERVAL/HOSTC_HEARTBEAT_INTERVAL/URL_VERIFY_TIMEOUT/URL_VERIFY_MAX_RETRIES共7个环境变量可控参数），CF智能重试机制解决429 Too Many Requests问题（默认3次重试间隔60秒自动等待后重试），日志级别优化（所有CF相关日志从logger.debug()升级为log_print() INFO级别确保启动过程完全可见），Bug修复（Plan B命令参数拼接os.environ.get('HOST','localhost')字符串未正确解析改为host变量正确拼接），错误诊断增强（CF进程退出时自动读取并显示进程输出前500字符便于快速定位问题），配置集中管理（统一使用TIMEOUT_CONFIG和TUNNEL_CONFIG两个配置字典所有超时和隧道参数可通过环境变量自定义），同步更新README.md/skill.md/skill.docx三份文档记录此次重大功能升级
+
+> **Commit**: `46b6cefb, bbd1b05b`  
 
 #### 更新内容: v4.7: 🌐 双隧道全自动启动+硬编码消除（重大功能升级）— 实现auto_start_tunnel()函数自动检测并启动Hostc和Cloudflare双隧道无需手动干预，新增TUNNEL_CONFIG配置字典消除硬编码（CF_MAX_RETRIES/CF_RETRY_DELAY/CF_QUICK_TUNNEL_TIMEOUT/CF_HEARTBEAT_INTERVAL/HOSTC_HEARTBEAT_INTERVAL/URL_VERIFY_TIMEOUT/URL_VERIFY_MAX_RETRIES共7个环境变量可控参数），CF智能重试机制解决429 Too Many Requests问题（默认3次重试间隔60秒自动等待后重试），日志级别优化（所有CF相关日志从logger.debug()升级为log_print() INFO级别确保启动过程完全可见），Bug修复（Plan B命令参数拼接os.environ.get('HOST','localhost')字符串未正确解析改为host变量正确拼接），错误诊断增强（CF进程退出时自动读取并显示进程输出前500字符便于快速定位问题），配置集中管理（统一使用TIMEOUT_CONFIG和TUNNEL_CONFIG两个配置字典所有超时和隧道参数可通过环境变量自定义），同步更新README.md/skill.md/skill.docx三份文档记录此次重大功能升级
 
@@ -4715,6 +4847,8 @@ if exist "README.md" (
 
 ### v4.6 (2026-08-31) - 🔒安全 🛡️ 全面安全审计+Bug修复（重大安全升级）
 
+> **Commit**: `4ccc1fc7`  
+
 #### 更新内容: 🛡️ 全面安全审计+Bug修复（重大安全升级）
 
 **修复日期**: 2026-08-31
@@ -4743,6 +4877,8 @@ if exist "README.md" (
 
 ### v4.5.0 (2026-08-31) - 🐛Bug修复 v4.5 文件清理功能API修复+路径验证优化 (2026-08-31) - 修复422错误+支持绝对相对路径输入
 
+> **Commit**: `04745d12`  
+
 #### 更新内容: v4.5 文件清理功能API修复+路径验证优化 (2026-08-31) - 修复422错误+支持绝对相对路径输入
 
 **修复日期**: 2026-08-31
@@ -4768,6 +4904,8 @@ if exist "README.md" (
 - ✅ 提交 dc93783b 已合并至master分支
 
 ### v4.4 (2026-08-31) - 🐛Bug修复 v4.4 (2026-08-31) - 🗑️ 临时修复脚本清理+项目规范化
+
+> **Commit**: `bc634be3, 3a2d480e, 7ced840e, 761a04f7, 3e797861`  
 
 #### 更新内容: v4.4 (2026-08-31) - 🗑️ 临时修复脚本清理+项目规范化
 
@@ -4877,6 +5015,8 @@ if exist "README.md" (
 
 ### v4.2.0 (2026-08-30) - ✨功能增强 v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化
 
+> **Commit**: `1fc481a7`  
+
 #### 更新内容: v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化
 
 **修复日期**: 2026-08-30
@@ -4902,6 +5042,8 @@ if exist "README.md" (
 - ✅ 提交 9b6efa01 已合并至master分支
 
 ### v4.1.0 (2026-08-30) - 🗑️清理 BOM字符清理+临时文件整理+项目规范化
+
+> **Commit**: `c73d5774`  
 
 #### 更新内容: v4.1: BOM字符清理+临时文件整理+项目规范化
 
@@ -4976,6 +5118,8 @@ if exist "README.md" (
 - ✅ 提交 d6832155 已合并至master分支
 
 ### v4.0 (2026-08-30) - 🔒安全 🛡️ 全面攻防压测系统+所有问题清零+代码规范化
+
+> **Commit**: `cd6eb089, 436d374d, 49af48c0, 780c68b2, b8a2afc6`  
 
 #### 更新内容: v4.0: 🛡️ 全面攻防压测系统+所有问题清零+代码规范化
 
@@ -5211,6 +5355,8 @@ if exist "README.md" (
 
 ### v3.8.90.15 (2026-09-02) - 📝 **文档补录** 🔧v5.0.9.27 security_audit.py版本号改为动态从README.md获取(原写死v3.8.90.15)
 
+> **Commit**: `175d3d42, f232e699, 91be5446, 0b6d8513`  
+
 #### 更新内容: 🔧v5.0.9.27 security_audit.py版本号改为动态从README.md获取(原写死v3.8.90.15)
 
 **更新日期**: 2026-09-02
@@ -5228,6 +5374,8 @@ if exist "README.md" (
 - **Commit**: a14d1e70
 
 ### v3.8.90.14 (2026-08-26) - 📝 **文档补录** v3.8.90.14: 攻防纵深加固+隐藏Bug清零第三轮 — CSRF同源校验支持动态隧道+日志注入防护+8处API响应str(e)信息泄露清零(含完整traceback泄露)+swagger版本硬编码改VERSION+uvicorn host改WEB_HOST环境变量+健康检查脱敏+skill.docx同步生成
+
+> **Commit**: `6fde8fce`  
 
 #### 更新内容: v3.8.90.14: 攻防纵深加固+隐藏Bug清零第三轮 — CSRF同源校验支持动态隧道+日志注入防护+8处API响应str(e)信息泄露清零(含完整traceback泄露)+swagger版本硬编码改VERSION+uvicorn host改WEB_HOST环境变量+健康检查脱敏+skill.docx同步生成
 
@@ -5247,6 +5395,8 @@ if exist "README.md" (
 
 ### v3.8.90.13 (2026-08-26) - 📝 **文档补录** v3.8.90.13: 全面安全审计+隐藏Bug清零第二轮 — 信息泄露+限流缺口+缓存控制+裸except+Windows磁盘兼容
 
+> **Commit**: `95ab7ece`  
+
 #### 更新内容: v3.8.90.13: 全面安全审计+隐藏Bug清零第二轮 — 信息泄露+限流缺口+缓存控制+裸except+Windows磁盘兼容
 
 **更新日期**: 2026-08-26
@@ -5264,6 +5414,8 @@ if exist "README.md" (
 - **Commit**: 95ab7ece
 
 ### v3.8.90.12 (2026-08-26) - 📝 **文档补录** v3.8.90.12 (2026-08-26) - 隐藏Bug清零 + 浏览器启动修复 — PROJECT_DIR类型错误+uvicorn导入位置错误+Connection closed驱动修复
+
+> **Commit**: `29218fd1`  
 
 #### 更新内容: v3.8.90.12 (2026-08-26) - 隐藏Bug清零 + 浏览器启动修复 — PROJECT_DIR类型错误+uvicorn导入位置错误+Connection closed驱动修复
 
@@ -5283,6 +5435,8 @@ if exist "README.md" (
 
 ### v3.8.90.11 (2026-08-24) - 📝 **文档补录** v3.8.90.11 (2026-08-24) - 🎯 双向滚动联动底部同步修复 — 解决高价商品表拉到底部时总商品列表不同步问题
 
+> **Commit**: `d9e59e14`  
+
 #### 更新内容: v3.8.90.11 (2026-08-24) - 🎯 双向滚动联动底部同步修复 — 解决高价商品表拉到底部时总商品列表不同步问题
 
 **更新日期**: 2026-08-24
@@ -5301,6 +5455,8 @@ if exist "README.md" (
 
 ### v3.8.90.10 (2026-08-24) - 📝 **文档补录** 🐛修复(app.js): 移动端双表联动修复 — 消除滚动同步抖动+点击行联动高亮 (v3.8.90.10)
 
+> **Commit**: `1d46d7b0`  
+
 #### 更新内容: 🐛修复(app.js): 移动端双表联动修复 — 消除滚动同步抖动+点击行联动高亮 (v3.8.90.10)
 
 **更新日期**: 2026-08-24
@@ -5318,6 +5474,8 @@ if exist "README.md" (
 - **Commit**: 1d46d7b0
 
 ### v3.8.90.09 (2026-08-22) - 🐛Bug修复 🔧 WEB_PORT环境变量消除硬编码端口 + Playwright安装优化 + 浏览器状态API
+
+> **Commit**: `78db045a`  
 
 #### 更新内容: 🔧 WEB_PORT环境变量消除硬编码端口 + Playwright安装优化 + 浏览器状态API
 
@@ -5346,6 +5504,8 @@ if exist "README.md" (
 
 ### v3.8.90.08 (2026-08-22) - 📝 **文档补录** 🐛修复: Playwright多镜像源安装+系统Chrome回退兜底 v3.8.90.08
 
+> **Commit**: `73f9b648`  
+
 #### 更新内容: 🐛修复: Playwright多镜像源安装+系统Chrome回退兜底 v3.8.90.08
 
 **更新日期**: 2026-08-22
@@ -5363,6 +5523,8 @@ if exist "README.md" (
 - **Commit**: 73f9b648
 
 ### v3.8.90.07 (2026-08-22) - 📝 **文档补录** 📝 补全skill.md版本历史表(27个缺失版本v3.8.89.12-v3.8.90.07) + 修复pandoc YAML解析问题 + 重新生成skill.docx
+
+> **Commit**: `fdb65d3d`  
 
 #### 更新内容: 📝 补全skill.md版本历史表(27个缺失版本v3.8.89.12-v3.8.90.07) + 修复pandoc YAML解析问题 + 重新生成skill.docx
 
@@ -5382,6 +5544,8 @@ if exist "README.md" (
 
 ### v3.8.90.06 (2026-08-22) - 📝 **文档补录** v3.8.90.06 - Python 3.14兼容性修复 + 启动脚本pip强制升级 + run.bat BOM修复 + 日志文件锁修复
 
+> **Commit**: `a589db25`  
+
 #### 更新内容: v3.8.90.06 - Python 3.14兼容性修复 + 启动脚本pip强制升级 + run.bat BOM修复 + 日志文件锁修复
 
 **更新日期**: 2026-08-22
@@ -5399,6 +5563,8 @@ if exist "README.md" (
 - **Commit**: a589db25
 
 ### v3.8.90.05 (2026-08-21) - 📝 **文档补录** v3.8.90.05 (2026-08-21) - 📝 修正README.md最新更新版本号 — 补全v3.8.90.02至v3.8.90.05完整更新记录
+
+> **Commit**: `9b4a9ac7, 49c218cd`  
 
 #### 更新内容: v3.8.90.05 (2026-08-21) - 📝 修正README.md最新更新版本号 — 补全v3.8.90.02至v3.8.90.05完整更新记录
 
@@ -5418,6 +5584,8 @@ if exist "README.md" (
 
 ### v3.8.90.04 (2026-08-21) - 📝 **文档补录** v3.8.90.04 (2026-08-21) - 📄 重新生成skill.docx — 同步版本检查集成变更
 
+> **Commit**: `619a434e, 0fd64656`  
+
 #### 更新内容: v3.8.90.04 (2026-08-21) - 📄 重新生成skill.docx — 同步版本检查集成变更
 
 **更新日期**: 2026-08-21
@@ -5435,6 +5603,8 @@ if exist "README.md" (
 - **Commit**: 619a434e
 
 ### v3.8.90.03 (2026-08-21) - 📝 **文档补录** v3.8.90.03 (2026-08-21) - 📄 重新生成skill.docx — 同步DOC-CORE-001文档管理范式
+
+> **Commit**: `bac24600, 4d5bdf9e`  
 
 #### 更新内容: v3.8.90.03 (2026-08-21) - 📄 重新生成skill.docx — 同步DOC-CORE-001文档管理范式
 
@@ -5454,6 +5624,8 @@ if exist "README.md" (
 
 ### v3.8.90.02 (2026-08-21) - 📝 **文档补录** v3.8.90.05 (2026-08-21) - 📝 修正README.md最新更新版本号 — 补全v3.8.90.02至v3.8.90.05完整更新记录
 
+> **Commit**: `2effd0b1`  
+
 #### 更新内容: v3.8.90.05 (2026-08-21) - 📝 修正README.md最新更新版本号 — 补全v3.8.90.02至v3.8.90.05完整更新记录
 
 **更新日期**: 2026-08-21
@@ -5471,6 +5643,8 @@ if exist "README.md" (
 - **Commit**: 9b4a9ac7
 
 ### v3.8.90.01 (2026-08-21) - 📝 **文档补录** v3.8.90.01: 移除写操作认证拦截，支持局域网/公网隧道全源访问
+
+> **Commit**: `c0879573`  
 
 #### 更新内容: v3.8.90.01: 移除写操作认证拦截，支持局域网/公网隧道全源访问
 
@@ -5490,6 +5664,8 @@ if exist "README.md" (
 
 ### v3.8.90.00 (2026-08-21) - 📝 **文档补录** v3.8.90.00: 安全隐患全面修复+隐藏Bug清零 - P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager/CSRF Host头回退/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留 安全评分96%->98%
 
+> **Commit**: `be321ad8`  
+
 #### 更新内容: v3.8.90.00: 安全隐患全面修复+隐藏Bug清零 - P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager/CSRF Host头回退/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留 安全评分96%->98%
 
 **更新日期**: 2026-08-21
@@ -5507,6 +5683,8 @@ if exist "README.md" (
 - **Commit**: be321ad8
 
 ### v3.8.89.32 (2026-08-21) - 📝 **文档补录** 🐛修复(hostc): v3.8.89.32 WebSocket安全关闭补丁重新应用 + patch-package补丁未生效修复 + 文档同步更新
+
+> **Commit**: `8e1a56ca`  
 
 #### 更新内容: 🐛修复(hostc): v3.8.89.32 WebSocket安全关闭补丁重新应用 + patch-package补丁未生效修复 + 文档同步更新
 
@@ -5526,6 +5704,8 @@ if exist "README.md" (
 
 ### v3.8.89.31 (2026-08-21) - 📝 **文档补录** v3.8.89.31: 安全检查系统整合进main.py + Playwright移动端8项安全检查 + 依赖审计API + 配置加密管理API + SECURITY_CHECKLIST.md合并删除 + 3个独立.py文件删除
 
+> **Commit**: `099077b4`  
+
 #### 更新内容: v3.8.89.31: 安全检查系统整合进main.py + Playwright移动端8项安全检查 + 依赖审计API + 配置加密管理API + SECURITY_CHECKLIST.md合并删除 + 3个独立.py文件删除
 
 **更新日期**: 2026-08-21
@@ -5543,6 +5723,8 @@ if exist "README.md" (
 - **Commit**: 099077b4
 
 ### v3.8.89.30 (2026-08-21) - 📝 **文档补录** v3.8.89.30: 启动脚本残留进程自动清理 - run.bat/run.sh分层清理Playwright驱动node进程+兜底清理，消除Connection closed while reading from the driver错误
+
+> **Commit**: `06b37b98`  
 
 #### 更新内容: v3.8.89.30: 启动脚本残留进程自动清理 - run.bat/run.sh分层清理Playwright驱动node进程+兜底清理，消除Connection closed while reading from the driver错误
 
@@ -5562,6 +5744,8 @@ if exist "README.md" (
 
 ### v3.8.89.29 (2026-08-21) - 📝 **文档补录** 🐛修复: v3.8.89.29 - 修复Windows GBK控制台¥字符UnicodeEncodeError，stdout/stderr重配置UTF-8
 
+> **Commit**: `f976da42, e3168286, 9c780467`  
+
 #### 更新内容: 🐛修复: v3.8.89.29 - 修复Windows GBK控制台¥字符UnicodeEncodeError，stdout/stderr重配置UTF-8
 
 **更新日期**: 2026-08-21
@@ -5579,6 +5763,8 @@ if exist "README.md" (
 - **Commit**: f976da42
 
 ### v3.8.89.28 (2026-08-21) - 📝 **文档补录** 🐛修复: v3.8.89.28 - 邮件Subject头Header()崩溃修复(From+Subject两处)，实发邮件验证通过
+
+> **Commit**: `a79a5c19, fbae1b72`  
 
 #### 更新内容: 🐛修复: v3.8.89.28 - 邮件Subject头Header()崩溃修复(From+Subject两处)，实发邮件验证通过
 
@@ -5598,6 +5784,8 @@ if exist "README.md" (
 
 ### v3.8.89.27 (2026-08-21) - 📝 **文档补录** security: v3.8.89.27 - 安全加固第三轮 + CSP/隧道注入/速率限制
 
+> **Commit**: `935e1e19`  
+
 #### 更新内容: security: v3.8.89.27 - 安全加固第三轮 + CSP/隧道注入/速率限制
 
 **更新日期**: 2026-08-21
@@ -5615,6 +5803,8 @@ if exist "README.md" (
 - **Commit**: 935e1e19
 
 ### v3.8.89.26 (2026-08-21) - 📝 **文档补录** convention: v3.8.89.26 - Import唯一性范式 + 6处内联导入清理
+
+> **Commit**: `637f095b`  
 
 #### 更新内容: convention: v3.8.89.26 - Import唯一性范式 + 6处内联导入清理
 
@@ -5634,6 +5824,8 @@ if exist "README.md" (
 
 ### v3.8.89.25 (2026-08-21) - 📝 **文档补录** security: v3.8.89.25 - 安全加固第二轮 + CORS/命令注入/信息泄露修复
 
+> **Commit**: `c656ac60`  
+
 #### 更新内容: security: v3.8.89.25 - 安全加固第二轮 + CORS/命令注入/信息泄露修复
 
 **更新日期**: 2026-08-21
@@ -5651,6 +5843,8 @@ if exist "README.md" (
 - **Commit**: c656ac60
 
 ### v3.8.89.24 (2026-08-21) - 📝 **文档补录** security: v3.8.89.24 - 安全漏洞修复 + 代码规范严格化
+
+> **Commit**: `751258a0`  
 
 #### 更新内容: security: v3.8.89.24 - 安全漏洞修复 + 代码规范严格化
 
@@ -5670,6 +5864,8 @@ if exist "README.md" (
 
 ### v3.8.89.23 (2026-08-20) - 📝 **文档补录** v3.8.89.23 - 邮件Header()参数修复 + 文档同步更新
 
+> **Commit**: `1c29e08b`  
+
 #### 更新内容: v3.8.89.23 - 邮件Header()参数修复 + 文档同步更新
 
 **更新日期**: 2026-08-20
@@ -5687,6 +5883,8 @@ if exist "README.md" (
 - **Commit**: 1c29e08b
 
 ### v3.8.89.22 (2026-08-20) - 📝 **文档补录** v3.8.89.22 - Bug修复三连击 + FastAPI兼容性完善 + 文档同步更新
+
+> **Commit**: `f66d3f7a, afa81fb4`  
 
 #### 更新内容: v3.8.89.22 - Bug修复三连击 + FastAPI兼容性完善 + 文档同步更新
 
@@ -5706,6 +5904,8 @@ if exist "README.md" (
 
 ### v3.8.89.21 (2026-08-20) - 📝 **文档补录** v3.8.89.21: SSRF安全防御体系 + Import优化 + 项目清理
 
+> **Commit**: `cdff6222`  
+
 #### 更新内容: v3.8.89.21: SSRF安全防御体系 + Import优化 + 项目清理
 
 **更新日期**: 2026-08-20
@@ -5723,6 +5923,8 @@ if exist "README.md" (
 - **Commit**: cdff6222
 
 ### v3.8.89.20 (2026-08-20) - 🏗️架构优化 🔙 Git回退到稳定版本 + 项目精简 + 单文件架构确认
+
+> **Commit**: `be0253f5`  
 
 #### 更新内容: 🔙 Git回退到稳定版本 + 项目精简 + 单文件架构确认
 
@@ -5751,6 +5953,8 @@ if exist "README.md" (
 
 ### v3.8.89.19 (2026-08-11) - 📝 **文档补录** v3.8.89.19 📝 统一所有 314 个版本 changelog 格式 + 添加编写规范到 README.md 和 skill.md
 
+> **Commit**: `e599f25e, d1d5f83f, 02274d75, b9a40b0c, 445265f2`  
+
 #### 更新内容: v3.8.89.19 📝 统一所有 314 个版本 changelog 格式 + 添加编写规范到 README.md 和 skill.md
 
 **更新日期**: 2026-08-11
@@ -5768,6 +5972,8 @@ if exist "README.md" (
 - **Commit**: e599f25e
 
 ### v3.8.89.18 (2026-08-11) - 📝 **文档补录** 📝文档(readme+docx): v3.8.89.18 文档体系规范化 - 删除多余SKILL.md，统一文档管理
+
+> **Commit**: `027c88b0, b9ca8da9`  
 
 #### 更新内容: 📝文档(readme+docx): v3.8.89.18 文档体系规范化 - 删除多余SKILL.md，统一文档管理
 
@@ -5787,6 +5993,8 @@ if exist "README.md" (
 
 ### v3.8.89.17 (2026-08-11) - 📝 **文档补录** v3.8.89.17 🔧 编码问题根治 + subprocess超时优化 + 文档全面更新
 
+> **Commit**: `6fd6fe30`  
+
 #### 更新内容: v3.8.89.17 🔧 编码问题根治 + subprocess超时优化 + 文档全面更新
 
 **更新日期**: 2026-08-11
@@ -5804,6 +6012,8 @@ if exist "README.md" (
 - **Commit**: 6fd6fe30
 
 ### v3.8.89.16 (2026-08-10) - ✨功能增强 🔧 文档排序修复 + 启动Bug修复
+
+> **Commit**: `de620611`  
 
 #### 更新内容: 🔧 文档排序修复 + 启动Bug修复
 
@@ -5831,6 +6041,8 @@ if exist "README.md" (
 - ✅ 版本 v3.8.89.16 已发布并验证
 
 ### v3.8.89.15 (2026-08-09) - ✨功能增强 🔒 安全漏洞修复 + 代码质量提升
+
+> **Commit**: `68be4c2d`  
 
 #### 更新内容: 🔒 安全漏洞修复 + 代码质量提升
 
@@ -5888,6 +6100,8 @@ if exist "README.md" (
 
 ### v3.8.89.14 (2026-08-08) - ✨功能增强 ✨ 商品描述字段增强 — 对比表格完整显示商品信息
 
+> **Commit**: `fd3c4a32`  
+
 #### 更新内容: ✨ 商品描述字段增强 — 对比表格完整显示商品信息
 
 **修复日期**: 2026-08-08
@@ -5915,6 +6129,8 @@ if exist "README.md" (
 
 ### v3.8.89.13 (2026-08-11) - 📝 **文档补录** ⚙️整理: 合并v3.8.89.13后的多余提交 + 修复main.py编码问题
 
+> **Commit**: `f14cf83c, d6ee1523`  
+
 #### 更新内容: ⚙️整理: 合并v3.8.89.13后的多余提交 + 修复main.py编码问题
 
 **更新日期**: 2026-08-11
@@ -5933,6 +6149,8 @@ if exist "README.md" (
 
 ### v3.8.89.12 (2026-08-22) - 📝 **文档补录** 📝 补全v3.8.89.12.1-12.5子版本(skill.md+README.md) + 重新生成skill.docx
 
+> **Commit**: `867ad415, ded03f2c`  
+
 #### 更新内容: 📝 补全v3.8.89.12.1-12.5子版本(skill.md+README.md) + 重新生成skill.docx
 
 **更新日期**: 2026-08-22
@@ -5950,6 +6168,8 @@ if exist "README.md" (
 - **Commit**: 87c401be
 
 ### v3.8.89.11 (2026-07-31) - 📝 **文档补录** 📝文档: 将skill.md补充完整，包含从v1.0.0到v3.8.89.11的所有版本记录
+
+> **Commit**: `9b94312e, 2f93c320, 5798a091, 20c50a69, 38397644`  
 
 #### 更新内容: 📝文档: 将skill.md补充完整，包含从v1.0.0到v3.8.89.11的所有版本记录
 
@@ -5987,6 +6207,8 @@ if exist "README.md" (
 
 ### v3.8.89.9 (2026-07-30) - 📝 **文档补录** 📝文档: 最新更新按版本号拆分(v3.8.89.11/v3.8.89.10/v3.8.89.9)
 
+> **Commit**: `14989c45`  
+
 #### 更新内容: 📝文档: 最新更新按版本号拆分(v3.8.89.11/v3.8.89.10/v3.8.89.9)
 
 **更新日期**: 2026-07-30
@@ -6004,6 +6226,8 @@ if exist "README.md" (
 - **Commit**: 5798a091
 
 ### v3.8.89.8 (2026-07-30) - 📝 **文档补录** v3.8.89.8: 修复FastAPI迁移问题 - 高价商品、TXT对比、请求处理、数据源、CDN日志
+
+> **Commit**: `48a05f35`  
 
 #### 更新内容: v3.8.89.8: 修复FastAPI迁移问题 - 高价商品、TXT对比、请求处理、数据源、CDN日志
 
@@ -6023,6 +6247,8 @@ if exist "README.md" (
 
 ### v3.8.89.6 (2026-07-30) - 📝 **文档补录** v3.8.89.6 - 🐛 爬虫结果卡片格式统一修复
 
+> **Commit**: `943bc889`  
+
 #### 更新内容: v3.8.89.6 - 🐛 爬虫结果卡片格式统一修复
 
 **更新日期**: 2026-07-30
@@ -6040,6 +6266,8 @@ if exist "README.md" (
 - **Commit**: 943bc889
 
 ### v3.8.89.5 (2026-07-30) - 📝 **文档补录** v3.8.89.5-hotfix: 修复JavaScript日期解析错误日志级别 - console.debug改为console.error
+
+> **Commit**: `08033835, 53aa5169`  
 
 #### 更新内容: v3.8.89.5-hotfix: 修复JavaScript日期解析错误日志级别 - console.debug改为console.error
 
@@ -6059,6 +6287,8 @@ if exist "README.md" (
 
 ### v3.8.89.4 (2026-07-30) - 📝 **文档补录** v3.8.89.4 - 全面隐藏 Bug 修复 + 代码质量提升
 
+> **Commit**: `003ca529`  
+
 #### 更新内容: v3.8.89.4 - 全面隐藏 Bug 修复 + 代码质量提升
 
 **更新日期**: 2026-07-30
@@ -6076,6 +6306,8 @@ if exist "README.md" (
 - **Commit**: 003ca529
 
 ### v3.8.89.3 (2026-07-29) - 📝 **文档补录** 🔧 v3.8.89.3: Flask遗留代码修复 + jsonify兼容层 - 8个按钮测试7/8通过
+
+> **Commit**: `493d1b5f`  
 
 #### 更新内容: 🔧 v3.8.89.3: Flask遗留代码修复 + jsonify兼容层 - 8个按钮测试7/8通过
 
@@ -6095,6 +6327,8 @@ if exist "README.md" (
 
 ### v3.8.89.2 (2026-07-29) - 📝 **文档补录** 🚀 v3.8.89.2: FastAPI迁移100%完成 - 22个路由全部转换
 
+> **Commit**: `9c9845a5`  
+
 #### 更新内容: 🚀 v3.8.89.2: FastAPI迁移100%完成 - 22个路由全部转换
 
 **更新日期**: 2026-07-29
@@ -6112,6 +6346,8 @@ if exist "README.md" (
 - **Commit**: 9c9845a5
 
 ### v3.8.89.1 (2026-07-29) - 📝 **文档补录** v3.8.89.1: 修复Excel对比货号点击无响应 + 更新文档规范
+
+> **Commit**: `86347152`  
 
 #### 更新内容: v3.8.89.1: 修复Excel对比货号点击无响应 + 更新文档规范
 
@@ -6131,6 +6367,8 @@ if exist "README.md" (
 
 ### v3.8.89 (2026-07-30) - 📝 **文档补录** 🐛修复(app.js): v3.8.89 - 修复语法错误+清理测试代码+更新版本号
 
+> **Commit**: `fb666e20`  
+
 #### 更新内容: 🐛修复(app.js): v3.8.89 - 修复语法错误+清理测试代码+更新版本号
 
 **更新日期**: 2026-07-30
@@ -6148,6 +6386,8 @@ if exist "README.md" (
 - **Commit**: fb666e20
 
 ### v3.8.88.2 (2026-07-29) - 📝 **文档补录** v3.8.88.2 - 🐛 紧急Bug修复：事件绑定缺失导致商品详情和利润报表功能失效
+
+> **Commit**: `42112d96, 6babc05f`  
 
 #### 更新内容: v3.8.88.2 - 🐛 紧急Bug修复：事件绑定缺失导致商品详情和利润报表功能失效
 
@@ -6167,6 +6407,8 @@ if exist "README.md" (
 
 ### v3.8.88.1 (2026-07-29) - 📝 **文档补录** v3.8.88.1: 额外安全加固 - XSS防护 + 定时器泄漏修复
 
+> **Commit**: `067b1a49`  
+
 #### 更新内容: v3.8.88.1: 额外安全加固 - XSS防护 + 定时器泄漏修复
 
 **更新日期**: 2026-07-29
@@ -6184,6 +6426,8 @@ if exist "README.md" (
 - **Commit**: 067b1a49
 
 ### v3.8.88 (2026-07-29) - 📝 **文档补录** v3.8.88: 全面修复 'Unexpected token <' 错误 + API路由安全加固
+
+> **Commit**: `031fdbe3`  
 
 #### 更新内容: v3.8.88: 全面修复 'Unexpected token <' 错误 + API路由安全加固
 
@@ -6203,6 +6447,8 @@ if exist "README.md" (
 
 ### v3.8.87 (2026-07-26) - 📝 **文档补录** v3.8.87: 商品详情入库时间实时计算修复 - 基于入库时间戳动态计算相对时间，不再使用源API静态字符串
 
+> **Commit**: `0cadf730`  
+
 #### 更新内容: v3.8.87: 商品详情入库时间实时计算修复 - 基于入库时间戳动态计算相对时间，不再使用源API静态字符串
 
 **更新日期**: 2026-07-26
@@ -6220,6 +6466,8 @@ if exist "README.md" (
 - **Commit**: 0cadf730
 
 ### v3.8.86 (2026-07-26) - 📝 **文档补录** v3.8.86: 商品搜索多表联动 + 分表统计 - 搜索时4个表格联动过滤 - 每个表格独立统计行(售出总价/均价/手续费) - 顶部徽章实时更新匹配数 - 搜索结果分表展示彩色标签 - 更新README.md/skill.md/skill.docx
+
+> **Commit**: `bb21cbcc`  
 
 #### 更新内容: v3.8.86: 商品搜索多表联动 + 分表统计 - 搜索时4个表格联动过滤 - 每个表格独立统计行(售出总价/均价/手续费) - 顶部徽章实时更新匹配数 - 搜索结果分表展示彩色标签 - 更新README.md/skill.md/skill.docx
 
@@ -6239,6 +6487,8 @@ if exist "README.md" (
 
 ### v3.8.85 (2026-07-26) - 📝 **文档补录** ✨功能: 商品搜索统计实时计算优化 (v3.8.85)
 
+> **Commit**: `f8fe569c`  
+
 #### 更新内容: ✨功能: 商品搜索统计实时计算优化 (v3.8.85)
 
 **更新日期**: 2026-07-26
@@ -6256,6 +6506,8 @@ if exist "README.md" (
 - **Commit**: f8fe569c
 
 ### v3.8.84 (2026-07-25) - 📝 **文档补录** v3.8.84 - 安全漏洞修复 + 命令注入防护
+
+> **Commit**: `975711e3`  
 
 #### 更新内容: v3.8.84 - 安全漏洞修复 + 命令注入防护
 
@@ -6275,6 +6527,8 @@ if exist "README.md" (
 
 ### v3.8.83 (2026-07-25) - 📝 **文档补录** v3.8.83 - 关键Bug修复 + 资源管理优化
 
+> **Commit**: `f43ffa93`  
+
 #### 更新内容: v3.8.83 - 关键Bug修复 + 资源管理优化
 
 **更新日期**: 2026-07-25
@@ -6292,6 +6546,8 @@ if exist "README.md" (
 - **Commit**: f43ffa93
 
 ### v3.8.82 (2026-07-24) - 📝 **文档补录** v3.8.82: 入库时间显示优化
+
+> **Commit**: `66bb380d`  
 
 #### 更新内容: v3.8.82: 入库时间显示优化
 
@@ -6311,6 +6567,8 @@ if exist "README.md" (
 
 ### v3.8.81 (2026-07-24) - 📝 **文档补录** v3.8.81 - 商品详情弹窗展示每个商品自己的入库时间
 
+> **Commit**: `d6952f12, 0cc8bafe, ff40e0bf, a49c45a5`  
+
 #### 更新内容: v3.8.81 - 商品详情弹窗展示每个商品自己的入库时间
 
 **更新日期**: 2026-07-24
@@ -6328,6 +6586,8 @@ if exist "README.md" (
 - **Commit**: d6952f12
 
 ### v3.8.78 (2026-07-20) - 📝 **文档补录** ⚙️整理: 删除generate_skill_docx.py脚本 (v3.8.78)
+
+> **Commit**: `22babdcf, 0650ae1b, 2b896271`  
 
 #### 更新内容: ⚙️整理: 删除generate_skill_docx.py脚本 (v3.8.78)
 
@@ -6347,6 +6607,8 @@ if exist "README.md" (
 
 ### v3.8.77 (2026-07-20) - 📝 **文档补录** ✨功能: Swagger UI移动端适配 (v3.8.77)
 
+> **Commit**: `1619559f`  
+
 #### 更新内容: ✨功能: Swagger UI移动端适配 (v3.8.77)
 
 **更新日期**: 2026-07-20
@@ -6364,6 +6626,8 @@ if exist "README.md" (
 - **Commit**: 1619559f
 
 ### v3.8.76 (2026-07-20) - 📝 **文档补录** 🏗️重构: 删除.trae文件夹，整合skill范式到文档 (v3.8.76)
+
+> **Commit**: `12053e0b`  
 
 #### 更新内容: 🏗️重构: 删除.trae文件夹，整合skill范式到文档 (v3.8.76)
 
@@ -6383,6 +6647,8 @@ if exist "README.md" (
 
 ### v3.8.75 (2026-07-20) - 📝 **文档补录** ✨功能: 创建skill系统 + 文档规范化 (v3.8.75)
 
+> **Commit**: `d3ad1805`  
+
 #### 更新内容: ✨功能: 创建skill系统 + 文档规范化 (v3.8.75)
 
 **更新日期**: 2026-07-20
@@ -6400,6 +6666,8 @@ if exist "README.md" (
 - **Commit**: d3ad1805
 
 ### v3.8.73 (2026-07-19) - 📝 **文档补录** v3.8.73: 删除README.md中多余的空白行，统一格式
+
+> **Commit**: `5d4ef6c7, 6dec792d, 0c8159c2, 5b1666f4, c1d4bbff`  
 
 #### 更新内容: v3.8.73: 删除README.md中多余的空白行，统一格式
 
@@ -6419,6 +6687,8 @@ if exist "README.md" (
 
 ### v3.8.71 (2026-07-19) - 📝 **文档补录** v3.8.71: 修复Swagger文档(改用手动swagger.json+纯HTML UI避免flask-restx路由冲突)，Pydantic V2兼容(field_validator)，补全requirements.txt依赖
 
+> **Commit**: `e9b2e505, 9e1c4402, 05d4c688, 92838463`  
+
 #### 更新内容: v3.8.71: 修复Swagger文档(改用手动swagger.json+纯HTML UI避免flask-restx路由冲突)，Pydantic V2兼容(field_validator)，补全requirements.txt依赖
 
 **更新日期**: 2026-07-19
@@ -6436,6 +6706,8 @@ if exist "README.md" (
 - **Commit**: e9b2e505
 
 ### v3.8.70.1 (2026-07-19) - 📝 **文档补录** v3.8.70.1: 统一文档语言规范 - 所有更新日志必须使用中文
+
+> **Commit**: `8534ff6b`  
 
 #### 更新内容: v3.8.70.1: 统一文档语言规范 - 所有更新日志必须使用中文
 
@@ -6455,6 +6727,8 @@ if exist "README.md" (
 
 ### v3.8.70 (2026-07-19) - 📝 **文档补录** v3.8.70: 企业级生产优化 - 实施38项改进
 
+> **Commit**: `af42f561`  
+
 #### 更新内容: v3.8.70: 企业级生产优化 - 实施38项改进
 
 **更新日期**: 2026-07-19
@@ -6472,6 +6746,8 @@ if exist "README.md" (
 - **Commit**: af42f561
 
 ### v3.8.69 (2026-07-19) - 📝 **文档补录** v3.8.69: 全面安全审计 - 修复7个关键Bug
+
+> **Commit**: `288084d8`  
 
 #### 更新内容: v3.8.69: 全面安全审计 - 修复7个关键Bug
 
@@ -6491,6 +6767,8 @@ if exist "README.md" (
 
 ### v3.8.68 (2026-07-30) - 📝 **文档补录** 🐛修复(app.js): v3.8.68 - High price count parsing optimization and file cleanup
 
+> **Commit**: `77b36596, 910e59ff`  
+
 #### 更新内容: 🐛修复(app.js): v3.8.68 - High price count parsing optimization and file cleanup
 
 **更新日期**: 2026-07-30
@@ -6508,6 +6786,8 @@ if exist "README.md" (
 - **Commit**: 77b36596
 
 ### v3.8.67 (2026-07-19) - 📝 **文档补录** v3.8.73: 修复README.md版本号 - 删除乱码，更新版本号从v3.8.67到v3.8.73
+
+> **Commit**: `e70406df`  
 
 #### 更新内容: v3.8.73: 修复README.md版本号 - 删除乱码，更新版本号从v3.8.67到v3.8.73
 
@@ -6527,6 +6807,8 @@ if exist "README.md" (
 
 ### v3.8.66 (2026-07-18) - 📝 **文档补录** v3.8.66 - CF独立性测试验证+verify_url参数修复
 
+> **Commit**: `dc06a22a`  
+
 #### 更新内容: v3.8.66 - CF独立性测试验证+verify_url参数修复
 
 **更新日期**: 2026-07-18
@@ -6544,6 +6826,8 @@ if exist "README.md" (
 - **Commit**: dc06a22a
 
 ### v3.8.65 (2026-07-18) - 📝 **文档补录** v3.8.65 - CF隧道独立性优化+智能复用机制
+
+> **Commit**: `43602558`  
 
 #### 更新内容: v3.8.65 - CF隧道独立性优化+智能复用机制
 
@@ -6563,6 +6847,8 @@ if exist "README.md" (
 
 ### v3.8.64 (2026-07-18) - 📝 **文档补录** v3.8.64 - 隧道共享弹窗恢复原始hostc样式+新增Cloudflare URL
 
+> **Commit**: `c99521fd`  
+
 #### 更新内容: v3.8.64 - 隧道共享弹窗恢复原始hostc样式+新增Cloudflare URL
 
 **更新日期**: 2026-07-18
@@ -6580,6 +6866,8 @@ if exist "README.md" (
 - **Commit**: c99521fd
 
 ### v3.8.63 (2026-07-18) - 📝 **文档补录** v3.8.63 - 隧道共享弹窗同时显示hostc和Cloudflare双公网地址
+
+> **Commit**: `9562e458`  
 
 #### 更新内容: v3.8.63 - 隧道共享弹窗同时显示hostc和Cloudflare双公网地址
 
@@ -6599,6 +6887,8 @@ if exist "README.md" (
 
 ### v3.8.62 (2026-07-18) - 📝 **文档补录** v3.8.62 - Toast显示具体复制的URL地址
 
+> **Commit**: `4f49783a`  
+
 #### 更新内容: v3.8.62 - Toast显示具体复制的URL地址
 
 **更新日期**: 2026-07-18
@@ -6616,6 +6906,8 @@ if exist "README.md" (
 - **Commit**: 4f49783a
 
 ### v3.8.61 (2026-07-18) - 📝 **文档补录** v3.8.61 - 修复隧道管理面板复制按钮ID冲突，Toast弹窗恢复正常
+
+> **Commit**: `c03d3d47`  
 
 #### 更新内容: v3.8.61 - 修复隧道管理面板复制按钮ID冲突，Toast弹窗恢复正常
 
@@ -6635,6 +6927,8 @@ if exist "README.md" (
 
 ### v3.8.60 (2026-07-18) - 📝 **文档补录** v3.8.60 - 公网地址复制按钮样式统一（btn-light + 复制文字）
 
+> **Commit**: `59f610f1`  
+
 #### 更新内容: v3.8.60 - 公网地址复制按钮样式统一（btn-light + 复制文字）
 
 **更新日期**: 2026-07-18
@@ -6652,6 +6946,8 @@ if exist "README.md" (
 - **Commit**: 59f610f1
 
 ### v3.8.59 (2026-07-18) - 📝 **文档补录** v3.8.59 - 公网地址复制按钮（Cloudflare + hostc）
+
+> **Commit**: `751f8e30`  
 
 #### 更新内容: v3.8.59 - 公网地址复制按钮（Cloudflare + hostc）
 
@@ -6671,6 +6967,8 @@ if exist "README.md" (
 
 ### v3.8.58 (2026-07-18) - 📝 **文档补录** v3.8.58 - 邮件防重复发送修复 + skill.docx 同步更新
 
+> **Commit**: `a5160958`  
+
 #### 更新内容: v3.8.58 - 邮件防重复发送修复 + skill.docx 同步更新
 
 **更新日期**: 2026-07-18
@@ -6688,6 +6986,8 @@ if exist "README.md" (
 - **Commit**: a5160958
 
 ### v3.8.57 (2026-07-18) - 📝 **文档补录** 📝文档: 添加 v3.8.57 版本更新日志到 README.md
+
+> **Commit**: `17095a99, f7901f8f`  
 
 #### 更新内容: 📝文档: 添加 v3.8.57 版本更新日志到 README.md
 
@@ -6707,6 +7007,8 @@ if exist "README.md" (
 
 ### v3.8.56 (2026-07-18) - 📝 **文档补录** v3.8.56 - 移除 hostc_output.txt，简化隧道管理
 
+> **Commit**: `a93d3200`  
+
 #### 更新内容: v3.8.56 - 移除 hostc_output.txt，简化隧道管理
 
 **更新日期**: 2026-07-18
@@ -6724,6 +7026,8 @@ if exist "README.md" (
 - **Commit**: a93d3200
 
 ### v3.8.55 (2026-07-18) - 📝 **文档补录** v3.8.55 - Cloudflare 邮件通知日志统一
+
+> **Commit**: `088e0ed4`  
 
 #### 更新内容: v3.8.55 - Cloudflare 邮件通知日志统一
 
@@ -6743,6 +7047,8 @@ if exist "README.md" (
 
 ### v3.8.54 (2026-07-18) - 📝 **文档补录** v3.8.54 - Cloudflare 限流检测与友好提示
 
+> **Commit**: `b7d4b02b`  
+
 #### 更新内容: v3.8.54 - Cloudflare 限流检测与友好提示
 
 **更新日期**: 2026-07-18
@@ -6760,6 +7066,8 @@ if exist "README.md" (
 - **Commit**: b7d4b02b
 
 ### v3.8.53 (2026-07-18) - 📝 **文档补录** v3.8.53 - 修复双隧道地址写入冲突
+
+> **Commit**: `cb352791`  
 
 #### 更新内容: v3.8.53 - 修复双隧道地址写入冲突
 
@@ -6779,6 +7087,8 @@ if exist "README.md" (
 
 ### v3.8.52 (2026-07-18) - 📝 **文档补录** v3.8.52: 双隧道独立发邮件 + 心跳写入修复
 
+> **Commit**: `f38f0421`  
+
 #### 更新内容: v3.8.52: 双隧道独立发邮件 + 心跳写入修复
 
 **更新日期**: 2026-07-18
@@ -6796,6 +7106,8 @@ if exist "README.md" (
 - **Commit**: f38f0421
 
 ### v3.8.51 (2026-07-18) - 📝 **文档补录** v3.8.51 - 更新README和skill文档
+
+> **Commit**: `40ccd95f, 55a55163`  
 
 #### 更新内容: v3.8.51 - 更新README和skill文档
 
@@ -6815,6 +7127,8 @@ if exist "README.md" (
 
 ### v3.8.50 (2026-07-18) - 📝 **文档补录** v3.8.50 - 修复CF心跳验证日志输出
 
+> **Commit**: `bb25ff0f`  
+
 #### 更新内容: v3.8.50 - 修复CF心跳验证日志输出
 
 **更新日期**: 2026-07-18
@@ -6832,6 +7146,8 @@ if exist "README.md" (
 - **Commit**: bb25ff0f
 
 ### v3.8.49 (2026-07-18) - 📝 **文档补录** v3.8.49 - 添加CF心跳验证详细日志
+
+> **Commit**: `ef92239d`  
 
 #### 更新内容: v3.8.49 - 添加CF心跳验证详细日志
 
@@ -6851,6 +7167,8 @@ if exist "README.md" (
 
 ### v3.8.48 (2026-07-18) - 📝 **文档补录** v3.8.48 - 隧道类型选择器动态默认值
 
+> **Commit**: `42c774e7`  
+
 #### 更新内容: v3.8.48 - 隧道类型选择器动态默认值
 
 **更新日期**: 2026-07-18
@@ -6868,6 +7186,8 @@ if exist "README.md" (
 - **Commit**: 42c774e7
 
 ### v3.8.47 (2026-07-17) - 📝 **文档补录** v3.8.47: 双隧道互为备用通知 + fallback_available 邮件类型
+
+> **Commit**: `15171ec2`  
 
 #### 更新内容: v3.8.47: 双隧道互为备用通知 + fallback_available 邮件类型
 
@@ -6887,6 +7207,8 @@ if exist "README.md" (
 
 ### v3.8.46 (2026-07-17) - 📝 **文档补录** v3.8.46: CF + hostc 双隧道并行 + 心跳验证 + 删除 NS 监控
 
+> **Commit**: `61b9fc68, 2a79a063, 42c7d6b2`  
+
 #### 更新内容: v3.8.46: CF + hostc 双隧道并行 + 心跳验证 + 删除 NS 监控
 
 **更新日期**: 2026-07-17
@@ -6904,6 +7226,8 @@ if exist "README.md" (
 - **Commit**: 61b9fc68
 
 ### v3.8.45 (2026-07-17) - 📝 **文档补录** v3.8.45: NS升级自动监控 + Quick Tunnel自动升级到Named Tunnel
+
+> **Commit**: `83b9789d`  
 
 #### 更新内容: v3.8.45: NS升级自动监控 + Quick Tunnel自动升级到Named Tunnel
 
@@ -6923,6 +7247,8 @@ if exist "README.md" (
 
 ### v3.8.44 (2026-07-17) - 📝 **文档补录** v3.8.44: Named Tunnel + 自定义域名 + 自动降级到 Quick Tunnel
 
+> **Commit**: `bf58a8c9`  
+
 #### 更新内容: v3.8.44: Named Tunnel + 自定义域名 + 自动降级到 Quick Tunnel
 
 **更新日期**: 2026-07-17
@@ -6940,6 +7266,8 @@ if exist "README.md" (
 - **Commit**: bf58a8c9
 
 ### v3.8.43 (2026-07-17) - 📝 **文档补录** ✨功能: Cloudflare Tunnel 跨平台支持 + 隧道切换优化 (v3.8.43)
+
+> **Commit**: `25dd3664`  
 
 #### 更新内容: ✨功能: Cloudflare Tunnel 跨平台支持 + 隧道切换优化 (v3.8.43)
 
@@ -6959,6 +7287,8 @@ if exist "README.md" (
 
 ### v3.8.42 (2026-07-17) - 📝 **文档补录** v3.8.42: Flask访问日志格式优化
 
+> **Commit**: `366acf2d`  
+
 #### 更新内容: v3.8.42: Flask访问日志格式优化
 
 **更新日期**: 2026-07-17
@@ -6976,6 +7306,8 @@ if exist "README.md" (
 - **Commit**: 366acf2d
 
 ### v3.8.41 (2026-07-17) - 📝 **文档补录** v3.8.41: 心跳循环重启后状态重置修复
+
+> **Commit**: `c910bd5e`  
 
 #### 更新内容: v3.8.41: 心跳循环重启后状态重置修复
 
@@ -6995,6 +7327,8 @@ if exist "README.md" (
 
 ### v3.8.40 (2026-07-17) - 📝 **文档补录** v3.8.40: hostc进程竞态条件修复 + 调试日志增强
 
+> **Commit**: `f39dd963`  
+
 #### 更新内容: v3.8.40: hostc进程竞态条件修复 + 调试日志增强
 
 **更新日期**: 2026-07-17
@@ -7012,6 +7346,8 @@ if exist "README.md" (
 - **Commit**: f39dd963
 
 ### v3.8.39 (2026-07-12) - 📝 **文档补录** v3.8.39: ⚡ 隧道心跳与稳定性验证加速优化 - 心跳间隔60→30秒, 失效阈值3→2次, 稳定性验证2→1次, 空窗期从3-5分钟缩短至1-1.5分钟
+
+> **Commit**: `eb798477`  
 
 #### 更新内容: v3.8.39: ⚡ 隧道心跳与稳定性验证加速优化 - 心跳间隔60→30秒, 失效阈值3→2次, 稳定性验证2→1次, 空窗期从3-5分钟缩短至1-1.5分钟
 
@@ -7031,6 +7367,8 @@ if exist "README.md" (
 
 ### v3.8.38 (2026-07-12) - 📝 **文档补录** v3.8.38: 端口8888占用竞态条件修复
 
+> **Commit**: `6a8215dd`  
+
 #### 更新内容: v3.8.38: 端口8888占用竞态条件修复
 
 **更新日期**: 2026-07-12
@@ -7048,6 +7386,8 @@ if exist "README.md" (
 - **Commit**: 6a8215dd
 
 ### v3.8.37 (2026-07-12) - 📝 **文档补录** v3.8.37: /api/readme-sections 500 错误修复
+
+> **Commit**: `b5cc8253`  
 
 #### 更新内容: v3.8.37: /api/readme-sections 500 错误修复
 
@@ -7067,6 +7407,8 @@ if exist "README.md" (
 
 ### v3.8.36 (2026-07-12) - 📝 **文档补录** v3.8.36: run.sh 函数定义顺序修复 + pre_launch 函数化重构
 
+> **Commit**: `6bad363d`  
+
 #### 更新内容: v3.8.36: run.sh 函数定义顺序修复 + pre_launch 函数化重构
 
 **更新日期**: 2026-07-12
@@ -7084,6 +7426,8 @@ if exist "README.md" (
 - **Commit**: 6bad363d
 
 ### v3.8.35 (2026-07-11) - 📝 **文档补录** v3.8.35: 核心范式文档补全（7项）
+
+> **Commit**: `b242f2bc`  
 
 #### 更新内容: v3.8.35: 核心范式文档补全（7项）
 
@@ -7103,6 +7447,8 @@ if exist "README.md" (
 
 ### v3.8.34 (2026-07-11) - 📝 **文档补录** v3.8.34: 移动端适配范式文档化
 
+> **Commit**: `b5e90f34`  
+
 #### 更新内容: v3.8.34: 移动端适配范式文档化
 
 **更新日期**: 2026-07-11
@@ -7120,6 +7466,8 @@ if exist "README.md" (
 - **Commit**: b5e90f34
 
 ### v3.8.33 (2026-07-11) - 📝 **文档补录** v3.8.33: hostc CDN镜像源修正 + bat/sh镜像列表统一
+
+> **Commit**: `abe1b3b0`  
 
 #### 更新内容: v3.8.33: hostc CDN镜像源修正 + bat/sh镜像列表统一
 
@@ -7139,6 +7487,8 @@ if exist "README.md" (
 
 ### v3.8.32 (2026-07-11) - 📝 **文档补录** v3.8.32: 隧道守护二次验证+指数退避+心跳阈值优化
 
+> **Commit**: `5fb18c52`  
+
 #### 更新内容: v3.8.32: 隧道守护二次验证+指数退避+心跳阈值优化
 
 **更新日期**: 2026-07-11
@@ -7156,6 +7506,8 @@ if exist "README.md" (
 - **Commit**: 5fb18c52
 
 ### v3.8.31 (2026-07-11) - 📝 **文档补录** v3.8.31: 心跳逻辑5项优化+宽限期重构+隧道重启修复+版本号统一从README获取
+
+> **Commit**: `33dc9c0e`  
 
 #### 更新内容: v3.8.31: 心跳逻辑5项优化+宽限期重构+隧道重启修复+版本号统一从README获取
 
@@ -7175,6 +7527,8 @@ if exist "README.md" (
 
 ### v3.8.30 (2026-07-11) - 📝 **文档补录** ✨功能: 隧道重启逻辑重构 - 合并双路径+宽限期机制(v3.8.30)
 
+> **Commit**: `2e5dfe92`  
+
 #### 更新内容: ✨功能: 隧道重启逻辑重构 - 合并双路径+宽限期机制(v3.8.30)
 
 **更新日期**: 2026-07-11
@@ -7192,6 +7546,8 @@ if exist "README.md" (
 - **Commit**: 2e5dfe92
 
 ### v3.8.29 (2026-07-11) - 📝 **文档补录** ⚙️整理: regenerate skill.docx from skill.md (v3.8.29)
+
+> **Commit**: `758490fa, fff9b30f`  
 
 #### 更新内容: ⚙️整理: regenerate skill.docx from skill.md (v3.8.29)
 
@@ -7211,6 +7567,8 @@ if exist "README.md" (
 
 ### v3.8.28 (2026-07-11) - 📝 **文档补录** v3.8.28: hostc等待URL超时从120秒降至30秒
 
+> **Commit**: `43008c50, 72fc6d04`  
+
 #### 更新内容: v3.8.28: hostc等待URL超时从120秒降至30秒
 
 **更新日期**: 2026-07-11
@@ -7228,6 +7586,8 @@ if exist "README.md" (
 - **Commit**: 43008c50
 
 ### v3.8.27 (2026-07-10) - 📝 **文档补录** v3.8.27: 隧道重启死循环修复 - tunnel_need_restart重置+hostc启动等待URL
+
+> **Commit**: `80e869f3`  
 
 #### 更新内容: v3.8.27: 隧道重启死循环修复 - tunnel_need_restart重置+hostc启动等待URL
 
@@ -7247,6 +7607,8 @@ if exist "README.md" (
 
 ### v3.8.26 (2026-07-10) - 📝 **文档补录** v3.8.26: 隧道旧URL复用Bug修复 - auto_start_tunnel增加hostc进程存活检测
 
+> **Commit**: `87365334`  
+
 #### 更新内容: v3.8.26: 隧道旧URL复用Bug修复 - auto_start_tunnel增加hostc进程存活检测
 
 **更新日期**: 2026-07-10
@@ -7264,6 +7626,8 @@ if exist "README.md" (
 - **Commit**: 87365334
 
 ### v3.8.25 (2026-07-10) - 📝 **文档补录** v3.8.25: pip依赖安装智能跳过 - main.py --check-deps + run.bat/run.sh优化 - 启动加速20秒→0.1秒
+
+> **Commit**: `6c837d37`  
 
 #### 更新内容: v3.8.25: pip依赖安装智能跳过 - main.py --check-deps + run.bat/run.sh优化 - 启动加速20秒→0.1秒
 
@@ -7283,6 +7647,8 @@ if exist "README.md" (
 
 ### v3.8.24 (2026-07-10) - 📝 **文档补录** v3.8.24: hostc退出自动重启 - read_output/_wait_and_notify检测退出后立即标记重启，restart_tunnel立即响应
 
+> **Commit**: `e8a53c37, d0328bf6, f76fadf6, 4db08011`  
+
 #### 更新内容: v3.8.24: hostc退出自动重启 - read_output/_wait_and_notify检测退出后立即标记重启，restart_tunnel立即响应
 
 **更新日期**: 2026-07-10
@@ -7300,6 +7666,8 @@ if exist "README.md" (
 - **Commit**: e8a53c37
 
 ### v3.8.23 (2026-07-10) - 📝 **文档补录** v3.8.23: Web服务秒级启动 + 隧道非阻塞优化 + hostc本地化 + CDN轮询安装 + dist优化
+
+> **Commit**: `3de9e1a9`  
 
 #### 更新内容: v3.8.23: Web服务秒级启动 + 隧道非阻塞优化 + hostc本地化 + CDN轮询安装 + dist优化
 
@@ -7319,6 +7687,8 @@ if exist "README.md" (
 
 ### v3.8.21 (2026-07-10) - 📝 **文档补录** v3.8.21: Node.js依赖合并 + API范式文档完善 + 安全规范
 
+> **Commit**: `38da2403`  
+
 #### 更新内容: v3.8.21: Node.js依赖合并 + API范式文档完善 + 安全规范
 
 **更新日期**: 2026-07-10
@@ -7336,6 +7706,8 @@ if exist "README.md" (
 - **Commit**: 38da2403
 
 ### v3.8.20 (2026-07-10) - 📝 **文档补录** v3.8.20: 即时邮件通知+前端状态修复+验证加速; 去除预启动概念改为直接启动
+
+> **Commit**: `fa9141d9, 230c375c, e14e9e5d`  
 
 #### 更新内容: v3.8.20: 即时邮件通知+前端状态修复+验证加速; 去除预启动概念改为直接启动
 
@@ -7355,6 +7727,8 @@ if exist "README.md" (
 
 ### v3.8.18 (2026-07-10) - 📝 **文档补录** v3.8.18: 文档同步 - README/skill.md/skill.docx 更新auto_start_tunnel不阻塞规范 + PY-STD-TUNNEL-003
 
+> **Commit**: `2f421122, 030d3e3d, 8cdd0bd1, bd69776f, f034c1d3`  
+
 #### 更新内容: v3.8.18: 文档同步 - README/skill.md/skill.docx 更新auto_start_tunnel不阻塞规范 + PY-STD-TUNNEL-003
 
 **更新日期**: 2026-07-10
@@ -7372,6 +7746,8 @@ if exist "README.md" (
 - **Commit**: 2f421122
 
 ### v3.8.17 (2026-07-10) - 📝 **文档补录** v3.8.17: 隧道启动优化 - hostc预启动 + Python智能等待
+
+> **Commit**: `2821c988`  
 
 #### 更新内容: v3.8.17: 隧道启动优化 - hostc预启动 + Python智能等待
 
@@ -7391,6 +7767,8 @@ if exist "README.md" (
 
 ### v3.8.16 (2026-07-09) - 📝 **文档补录** v3.8.16: macOS时间戳Bug修复 + 跨平台毫秒级时间戳统一
 
+> **Commit**: `e9439ff8`  
+
 #### 更新内容: v3.8.16: macOS时间戳Bug修复 + 跨平台毫秒级时间戳统一
 
 **更新日期**: 2026-07-09
@@ -7408,6 +7786,8 @@ if exist "README.md" (
 - **Commit**: e9439ff8
 
 ### v3.8.15 (2026-07-09) - 📝 **文档补录** 📚 v3.8.15 文档完整更新: 全局时间戳100%覆盖规范
+
+> **Commit**: `f10cdc62, 2715d09e, 4ac09fb1, f0e50fd1, 63c1e4bc`  
 
 #### 更新内容: 📚 v3.8.15 文档完整更新: 全局时间戳100%覆盖规范
 
@@ -7427,6 +7807,8 @@ if exist "README.md" (
 
 ### v3.8.14 (2026-07-08) - 📝 **文档补录** v3.8.14 - README.md 三段式结构规范补齐 + skill.docx 重新生成
 
+> **Commit**: `2243b1ab, 0ad4f113`  
+
 #### 更新内容: v3.8.14 - README.md 三段式结构规范补齐 + skill.docx 重新生成
 
 **更新日期**: 2026-07-08
@@ -7444,6 +7826,8 @@ if exist "README.md" (
 - **Commit**: 2243b1ab
 
 ### v3.8.13 (2026-07-08) - 📝 **文档补录** v3.8.13 - 🔧 关键Bug修复 + API信息完整性增强 + 更新日志格式优化
+
+> **Commit**: `23dc7835`  
 
 #### 更新内容: v3.8.13 - 🔧 关键Bug修复 + API信息完整性增强 + 更新日志格式优化
 
@@ -7463,6 +7847,8 @@ if exist "README.md" (
 
 ### v3.8.12 (2026-07-08) - 📝 **文档补录** v3.8.12 - 📝 添加版本号格式规范到 README.md 和 skill.md，修复 bat 解析问题，生成 skill.docx
 
+> **Commit**: `3855601b, 7fe0d4af`  
+
 #### 更新内容: v3.8.12 - 📝 添加版本号格式规范到 README.md 和 skill.md，修复 bat 解析问题，生成 skill.docx
 
 **更新日期**: 2026-07-08
@@ -7480,6 +7866,8 @@ if exist "README.md" (
 - **Commit**: 3855601b
 
 ### v3.8.11 (2026-07-05) - 📝 **文档补录** v3.8.11: 完整历史记录恢复与文档更新
+
+> **Commit**: `1db2cbe4`  
 
 #### 更新内容: v3.8.11: 完整历史记录恢复与文档更新
 
@@ -7499,6 +7887,8 @@ if exist "README.md" (
 
 ### v3.8.10 (2026-07-05) - 📝 **文档补录** v3.8.10 - 更新文档：README.md + skill.md + skill.docx 同步代码规范
 
+> **Commit**: `c4b734ac, 948f440f`  
+
 #### 更新内容: v3.8.10 - 更新文档：README.md + skill.md + skill.docx 同步代码规范
 
 **更新日期**: 2026-07-05
@@ -7516,6 +7906,8 @@ if exist "README.md" (
 - **Commit**: c4b734ac
 
 ### v3.8.9 (2026-07-05) - 📝 **文档补录** v3.8.9 (2026-07-05) - 🔒 强制URL去重机制（同一地址30分钟内只发1次邮件）
+
+> **Commit**: `60e2fcf0`  
 
 #### 更新内容: v3.8.9 (2026-07-05) - 🔒 强制URL去重机制（同一地址30分钟内只发1次邮件）
 
@@ -7535,6 +7927,8 @@ if exist "README.md" (
 
 ### v3.8.8 (2026-07-05) - 📝 **文档补录** v3.8.8 (2026-07-05) - 🚀 公网地址可用即自动发邮件（零延迟通知优化）
 
+> **Commit**: `f629caa2`  
+
 #### 更新内容: v3.8.8 (2026-07-05) - 🚀 公网地址可用即自动发邮件（零延迟通知优化）
 
 **更新日期**: 2026-07-05
@@ -7552,6 +7946,8 @@ if exist "README.md" (
 - **Commit**: f629caa2
 
 ### v3.8.7 (2026-07-05) - 📝 **文档补录** v3.8.7 (2026-07-05) - 📄 更新skill.docx文档（线程安全URL去重机制修复）
+
+> **Commit**: `6ee7e5f9, 3b7fadf4`  
 
 #### 更新内容: v3.8.7 (2026-07-05) - 📄 更新skill.docx文档（线程安全URL去重机制修复）
 
@@ -7571,6 +7967,8 @@ if exist "README.md" (
 
 ### v3.8.6 (2026-07-05) - 📝 **文档补录** 🏗️重构: v3.8.6内容改为标准API格式（- **分类** + 子条目）
 
+> **Commit**: `73464def, 9e557e09, dd49e272`  
+
 #### 更新内容: 🏗️重构: v3.8.6内容改为标准API格式（- **分类** + 子条目）
 
 **更新日期**: 2026-07-05
@@ -7588,6 +7986,8 @@ if exist "README.md" (
 - **Commit**: 73464def
 
 ### v3.8.5 (2026-07-05) - 📝 **文档补录** 📄 v3.8.5 - 生成符合规范的 skill.docx
+
+> **Commit**: `27bcbcef, aeb7014e, 1ca66701`  
 
 #### 更新内容: 📄 v3.8.5 - 生成符合规范的 skill.docx
 
@@ -7607,6 +8007,8 @@ if exist "README.md" (
 
 ### v3.8.4 (2026-07-04) - 📝 **文档补录** v3.8.4: 修复从非项目目录运行启动脚本时Web服务启动失败Bug
 
+> **Commit**: `8de0262f`  
+
 #### 更新内容: v3.8.4: 修复从非项目目录运行启动脚本时Web服务启动失败Bug
 
 **更新日期**: 2026-07-04
@@ -7624,6 +8026,8 @@ if exist "README.md" (
 - **Commit**: 8de0262f
 
 ### v3.8.3 (2026-07-04) - 📝 **文档补录** ✨功能: v3.8.3 - 修复'最新更新'区域空白Bug + Markdown标题格式规范
+
+> **Commit**: `04404d40`  
 
 #### 更新内容: ✨功能: v3.8.3 - 修复'最新更新'区域空白Bug + Markdown标题格式规范
 
@@ -7643,6 +8047,8 @@ if exist "README.md" (
 
 ### v3.8.2 (2026-07-04) - 📝 **文档补录** 🐛修复: web_output.log启动日志被覆盖Bug - v3.8.2
 
+> **Commit**: `d7799952`  
+
 #### 更新内容: 🐛修复: web_output.log启动日志被覆盖Bug - v3.8.2
 
 **更新日期**: 2026-07-04
@@ -7660,6 +8066,8 @@ if exist "README.md" (
 - **Commit**: d7799952
 
 ### v3.8.1 (2026-07-04) - 📝 **文档补录** 📝文档: v3.8.1 - skill.md全面补全(main.py独立函数§2.15 + index.html前端61个函数§2.16), API端点修正, README去重, skill.docx重新生成
+
+> **Commit**: `21fbf4ba, 784f1f71`  
 
 #### 更新内容: 📝文档: v3.8.1 - skill.md全面补全(main.py独立函数§2.15 + index.html前端61个函数§2.16), API端点修正, README去重, skill.docx重新生成
 
@@ -7679,6 +8087,8 @@ if exist "README.md" (
 
 ### v3.8.0 (2026-07-04) - 📝 **文档补录** 📝文档: v3.8.0 文档系统全面升级
 
+> **Commit**: `50632236`  
+
 #### 更新内容: 📝文档: v3.8.0 文档系统全面升级
 
 **更新日期**: 2026-07-04
@@ -7696,6 +8106,8 @@ if exist "README.md" (
 - **Commit**: 50632236
 
 ### v3.7.9 (2026-07-04) - 📝 **文档补录** v3.7.9: 删除generate_skill_docx.py + 重新生成skill.docx
+
+> **Commit**: `17dabaa8, c04675d3`  
 
 #### 更新内容: v3.7.9: 删除generate_skill_docx.py + 重新生成skill.docx
 
@@ -7715,6 +8127,8 @@ if exist "README.md" (
 
 ### v3.7.8 (2026-07-04) - 📝 **文档补录** v3.7.8: 隧道快速恢复机制-3秒级响应+邮件去重
 
+> **Commit**: `d7d068c6, 0614ea38, 76b27ac6, e432f111, 9bcd2683`  
+
 #### 更新内容: v3.7.8: 隧道快速恢复机制-3秒级响应+邮件去重
 
 **更新日期**: 2026-07-04
@@ -7732,6 +8146,8 @@ if exist "README.md" (
 - **Commit**: d7d068c6
 
 ### v3.7.7 (2026-06-28) - 📝 **文档补录** v3.7.7: 修复Excel与JSON对比按钮状态不复位问题，更新skill.md/skill.docx按钮状态管理规范
+
+> **Commit**: `24c1bb65`  
 
 #### 更新内容: v3.7.7: 修复Excel与JSON对比按钮状态不复位问题，更新skill.md/skill.docx按钮状态管理规范
 
@@ -7751,6 +8167,8 @@ if exist "README.md" (
 
 ### v3.7.6 (2026-06-27) - 📝 **文档补录** v3.7.6: 修复pip.conf trusted-host重复/提取错误、整数比较空值、macOS du -sb兼容性、更新skill.md/README.md/skill.docx
 
+> **Commit**: `1dcfcd9f, e7e8f8f3, c9edc2a6, b7d7ce38, a3bc4ce5`  
+
 #### 更新内容: v3.7.6: 修复pip.conf trusted-host重复/提取错误、整数比较空值、macOS du -sb兼容性、更新skill.md/README.md/skill.docx
 
 **更新日期**: 2026-06-27
@@ -7768,6 +8186,8 @@ if exist "README.md" (
 - **Commit**: 1dcfcd9f
 
 ### v3.7.5 (2026-06-26) - 📝 **文档补录** v3.7.5: 修复利润趋势图联动、Excel日期转换、Y轴动态缩放、代码损坏
+
+> **Commit**: `00cdfb9b, 9b8a5446, c0077994`  
 
 #### 更新内容: v3.7.5: 修复利润趋势图联动、Excel日期转换、Y轴动态缩放、代码损坏
 
@@ -7787,6 +8207,8 @@ if exist "README.md" (
 
 ### v3.7.4 (2026-06-18) - 📝 **文档补录** v3.7.4: 利润报表汇总行点击展开位置修复 + 聚合级别修正 + 跨系统/移动端确认 + skill同步
 
+> **Commit**: `76a5a7f7`  
+
 #### 更新内容: v3.7.4: 利润报表汇总行点击展开位置修复 + 聚合级别修正 + 跨系统/移动端确认 + skill同步
 
 **更新日期**: 2026-06-18
@@ -7804,6 +8226,8 @@ if exist "README.md" (
 - **Commit**: 76a5a7f7
 
 ### v3.7.3 (2026-06-18) - 📝 **文档补录** v3.7.3: DOMContentLoaded闭合修复 + 按钮样式统一 + skill/docx同步
+
+> **Commit**: `84f5bf54`  
 
 #### 更新内容: v3.7.3: DOMContentLoaded闭合修复 + 按钮样式统一 + skill/docx同步
 
@@ -7823,6 +8247,8 @@ if exist "README.md" (
 
 ### v3.7.2 (2026-06-18) - 📝 **文档补录** v3.7.2: 修复index.html第5197行标签闭合 + skill.md/docx规范更新
 
+> **Commit**: `9d2fd964`  
+
 #### 更新内容: v3.7.2: 修复index.html第5197行标签闭合 + skill.md/docx规范更新
 
 **更新日期**: 2026-06-18
@@ -7840,6 +8266,8 @@ if exist "README.md" (
 - **Commit**: 9d2fd964
 
 ### v3.7.1 (2026-06-18) - 📝 **文档补录** v3.7.1: 跨系统硬编码彻底消除 + V3.5.0移动端规范复查
+
+> **Commit**: `95719082`  
 
 #### 更新内容: v3.7.1: 跨系统硬编码彻底消除 + V3.5.0移动端规范复查
 
@@ -7859,6 +8287,8 @@ if exist "README.md" (
 
 ### v3.6.0 (2026-07-05) - 📝 **文档补录** 📝文档: 新增完整编码规范文档（v3.6.0 + v3.5.0 + README格式规范）
 
+> **Commit**: `6dbd5812, 9669222d, b0554098, 25ef7123, efa2c209`  
+
 #### 更新内容: 📝文档: 新增完整编码规范文档（v3.6.0 + v3.5.0 + README格式规范）
 
 **更新日期**: 2026-07-05
@@ -7876,6 +8306,8 @@ if exist "README.md" (
 - **Commit**: 6dbd5812
 
 ### v3.5.8 (2026-06-11) - 📝 **文档补录** v3.5.8: 更新前端版本号和更新日志至3.5.8
+
+> **Commit**: `f8b6eb6a, 4aa3f495`  
 
 #### 更新内容: v3.5.8: 更新前端版本号和更新日志至3.5.8
 
@@ -7895,6 +8327,8 @@ if exist "README.md" (
 
 ### v3.5.7 (2026-06-07) - 📝 **文档补录** v3.5.7: 前端添加最新更新模块，版本号同步更新
 
+> **Commit**: `c333bbb9, 270b272c`  
+
 #### 更新内容: v3.5.7: 前端添加最新更新模块，版本号同步更新
 
 **更新日期**: 2026-06-07
@@ -7912,6 +8346,8 @@ if exist "README.md" (
 - **Commit**: c333bbb9
 
 ### v3.5.6 (2026-06-06) - 📝 **文档补录** v3.5.6: 完善移动端适配功能和表格样式优化
+
+> **Commit**: `7008898d`  
 
 #### 更新内容: v3.5.6: 完善移动端适配功能和表格样式优化
 
@@ -7931,6 +8367,8 @@ if exist "README.md" (
 
 ### v3.5.4 (2026-06-06) - 📝 **文档补录** v3.5.4 - 每日利润报表优化：日期格式统一、项目字段、表头固定、错误处理增强
 
+> **Commit**: `e918c88c`  
+
 #### 更新内容: v3.5.4 - 每日利润报表优化：日期格式统一、项目字段、表头固定、错误处理增强
 
 **更新日期**: 2026-06-06
@@ -7949,6 +8387,8 @@ if exist "README.md" (
 
 ### v3.5.3 (2026-06-06) - 📝 **文档补录** 📝文档: 更新 v3.5.3 版本日志 - 汇总视图与明细联动功能
 
+> **Commit**: `70757aee`  
+
 #### 更新内容: 📝文档: 更新 v3.5.3 版本日志 - 汇总视图与明细联动功能
 
 **更新日期**: 2026-06-06
@@ -7966,6 +8406,8 @@ if exist "README.md" (
 - **Commit**: 70757aee
 
 ### v3.5.2 (2026-06-05) - 📝 **文档补录** 📝文档: 更新 v3.5.2 版本日志
+
+> **Commit**: `cacd0b3a, 97afd46a, 881c58b4, 639af06a`  
 
 #### 更新内容: 📝文档: 更新 v3.5.2 版本日志
 
@@ -8017,6 +8459,8 @@ if exist "README.md" (
 
 ### v4.1 (2026-09-02) - 📝文档更新 feat: BOM检测功能集成到核心流程 (v4.1增强)
 
+> **Commit**: `7bd0fbad, d25b5e14`  
+
 #### 更新内容: feat: BOM检测功能集成到核心流程 (v4.1增强)
 
 **修复日期**: 2026-09-02
@@ -8048,6 +8492,8 @@ if exist "README.md" (
 
 
 ### v4.2 (2026-09-02) - 📝文档更新 v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化
+
+> **Commit**: `f7fc1645`  
 
 #### 更新内容: v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化
 
@@ -8081,6 +8527,8 @@ if exist "README.md" (
 
 ### v4.3 (2026-09-02) - 🚀功能升级 🚀 v4.3: 增强main.py启动流程 - 直接运行python main.py时自动检测并移除所有BOM字符(scan_project_bom...
 
+> **Commit**: `8ef81673, dea5f2c6`  
+
 #### 更新内容: 🚀 v4.3: 增强main.py启动流程 - 直接运行python main.py时自动检测并移除所有BOM字符(scan_project_bom auto_fix=True)，无需手动运行--fix-bom或依赖run.sh/run.bat，实现真正的全自动BOM清理机制
 
 **修复日期**: 2026-09-02
@@ -8112,6 +8560,8 @@ if exist "README.md" (
 
 
 ### v4.5 (2026-09-02) - 📝文档更新 v4.5 文件清理功能API修复+路径验证优化 (2026-08-31) - 修复422错误+支持绝对相对路径输入
+
+> **Commit**: `6874c65b`  
 
 #### 更新内容: v4.5 文件清理功能API修复+路径验证优化 (2026-08-31) - 修复422错误+支持绝对相对路径输入
 
@@ -8145,6 +8595,8 @@ if exist "README.md" (
 
 ### v4.8 (2026-09-02) - 🔒安全修复 v4.8 (2026-08-31) - 🔒 致命BUG清零+安全攻防全面加固（重大安全修复）
 
+> **Commit**: `ed617e6a`  
+
 #### 更新内容: v4.8 (2026-08-31) - 🔒 致命BUG清零+安全攻防全面加固（重大安全修复）
 
 **修复日期**: 2026-09-02
@@ -8177,6 +8629,8 @@ if exist "README.md" (
 
 ### v5.0 (2026-09-02) - 📝文档更新 v5.0: 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx...
 
+> **Commit**: `db210649`  
+
 #### 更新内容: v5.0: 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx (2026-08-31)
 
 **修复日期**: 2026-09-02
@@ -8208,6 +8662,8 @@ if exist "README.md" (
 
 ### v3.4.37 (2026-06-05) - 📝 **文档补录** v3.4.37: 优化临时文件清理机制，修复bat脚本启动时误杀进程问题
 
+> **Commit**: `556dcc7d`  
+
 #### 更新内容: v3.4.37: 优化临时文件清理机制，修复bat脚本启动时误杀进程问题
 
 **更新日期**: 2026-06-05
@@ -8225,6 +8681,8 @@ if exist "README.md" (
 - **Commit**: 556dcc7d
 
 ### v3.4.34 (2026-06-04) - 📝 **文档补录** 修复文件清理 API JSON 解析错误 (v3.4.34)
+
+> **Commit**: `a81a4efc`  
 
 #### 更新内容: 修复文件清理 API JSON 解析错误 (v3.4.34)
 
@@ -8244,6 +8702,8 @@ if exist "README.md" (
 
 ### v3.4.33 (2026-06-03) - 📝 **文档补录** v3.4.33 - 代码优化和跨系统支持增强
 
+> **Commit**: `310a9635`  
+
 #### 更新内容: v3.4.33 - 代码优化和跨系统支持增强
 
 **更新日期**: 2026-06-03
@@ -8261,6 +8721,8 @@ if exist "README.md" (
 - **Commit**: 310a9635
 
 ### v3.4.32 (2026-06-03) - 📝 **文档补录** v3.4.32: 修复镜像源显示问题并统一run.sh逻辑
+
+> **Commit**: `e13a91bd, 879d82fa, 524a1c64, 388e391f`  
 
 #### 更新内容: v3.4.32: 修复镜像源显示问题并统一run.sh逻辑
 
@@ -8280,6 +8742,8 @@ if exist "README.md" (
 
 ### v3.4.31 (2026-06-01) - 📝 **文档补录** 🐛修复: 修复文件清理工具获取文件大小错误 (v3.4.31)
 
+> **Commit**: `ed7f4296`  
+
 #### 更新内容: 🐛修复: 修复文件清理工具获取文件大小错误 (v3.4.31)
 
 **更新日期**: 2026-06-01
@@ -8297,6 +8761,8 @@ if exist "README.md" (
 - **Commit**: ed7f4296
 
 ### v3.4.30 (2026-05-30) - 📝 **文档补录** 🐛修复: 修复清理工具 API 空目录检测问题 (v3.4.30)
+
+> **Commit**: `94226bfd`  
 
 #### 更新内容: 🐛修复: 修复清理工具 API 空目录检测问题 (v3.4.30)
 
@@ -8316,6 +8782,8 @@ if exist "README.md" (
 
 ### v3.4.29 (2026-05-30) - 📝 **文档补录** README: 更新 v3.4.29 日志
 
+> **Commit**: `994dda31`  
+
 #### 更新内容: README: 更新 v3.4.29 日志
 
 **更新日期**: 2026-05-30
@@ -8333,6 +8801,8 @@ if exist "README.md" (
 - **Commit**: 994dda31
 
 ### v3.4.28 (2026-05-30) - 📝 **文档补录** v3.4.28: 优化Flask 404处理和邮件冷却期补发机制
+
+> **Commit**: `b6d9be48`  
 
 #### 更新内容: v3.4.28: 优化Flask 404处理和邮件冷却期补发机制
 
@@ -8352,6 +8822,8 @@ if exist "README.md" (
 
 ### v3.4.27 (2026-05-29) - 📝 **文档补录** v3.4.27: 修复文件清理工具'删除所有文件和文件夹'功能报错
 
+> **Commit**: `2e492b3e`  
+
 #### 更新内容: v3.4.27: 修复文件清理工具'删除所有文件和文件夹'功能报错
 
 **更新日期**: 2026-05-29
@@ -8369,6 +8841,8 @@ if exist "README.md" (
 - **Commit**: 2e492b3e
 
 ### v3.4.26 (2026-05-29) - 📝 **文档补录** v3.4.26: 重构统一异常处理系统 + 增强 tunnel_status API URL 验证
+
+> **Commit**: `f59d7924`  
 
 #### 更新内容: v3.4.26: 重构统一异常处理系统 + 增强 tunnel_status API URL 验证
 
@@ -8388,6 +8862,8 @@ if exist "README.md" (
 
 ### v3.4.25 (2026-05-29) - 📝 **文档补录** v3.4.25: Excel读取改为复制到临时文件，彻底解决共享违规
 
+> **Commit**: `8c173ef1`  
+
 #### 更新内容: v3.4.25: Excel读取改为复制到临时文件，彻底解决共享违规
 
 **更新日期**: 2026-05-29
@@ -8405,6 +8881,8 @@ if exist "README.md" (
 - **Commit**: 8c173ef1
 
 ### v3.4.24 (2026-05-29) - 📝 **文档补录** README: 更新 v3.4.24 日志
+
+> **Commit**: `4918817b, 2ac97bb6`  
 
 #### 更新内容: README: 更新 v3.4.24 日志
 
@@ -8424,6 +8902,8 @@ if exist "README.md" (
 
 ### v3.4.23 (2026-05-29) - 📝 **文档补录** v3.4.23: 修复 Excel 文件读取时的 Windows 共享违规问题
 
+> **Commit**: `bc1051c2`  
+
 #### 更新内容: v3.4.23: 修复 Excel 文件读取时的 Windows 共享违规问题
 
 **更新日期**: 2026-05-29
@@ -8441,6 +8921,8 @@ if exist "README.md" (
 - **Commit**: bc1051c2
 
 ### v3.4.22 (2026-05-29) - 📝 **文档补录** v3.4.22: 优化心跳检测间隔从60秒到5秒，提高隧道故障检测速度
+
+> **Commit**: `58bdaa4b`  
 
 #### 更新内容: v3.4.22: 优化心跳检测间隔从60秒到5秒，提高隧道故障检测速度
 
@@ -8460,6 +8942,8 @@ if exist "README.md" (
 
 ### v3.4.21 (2026-05-29) - 📝 **文档补录** v3.4.21: 确保 tunnel_url.txt 持久一致
 
+> **Commit**: `279b23da`  
+
 #### 更新内容: v3.4.21: 确保 tunnel_url.txt 持久一致
 
 **更新日期**: 2026-05-29
@@ -8477,6 +8961,8 @@ if exist "README.md" (
 - **Commit**: 279b23da
 
 ### v3.4.20 (2026-05-29) - 📝 **文档补录** v3.4.20: 优化 tunnel_url.txt 写入格式
+
+> **Commit**: `f9c4fe71`  
 
 #### 更新内容: v3.4.20: 优化 tunnel_url.txt 写入格式
 
@@ -8496,6 +8982,8 @@ if exist "README.md" (
 
 ### v3.4.19 (2026-05-29) - 📝 **文档补录** v3.4.19: 同步写入 tunnel_url.txt
 
+> **Commit**: `dd67e338`  
+
 #### 更新内容: v3.4.19: 同步写入 tunnel_url.txt
 
 **更新日期**: 2026-05-29
@@ -8513,6 +9001,8 @@ if exist "README.md" (
 - **Commit**: dd67e338
 
 ### v3.4.18 (2026-05-29) - 📝 **文档补录** v3.4.18: 完全移除 tunnel_url 全局变量的更新逻辑
+
+> **Commit**: `474322b3`  
 
 #### 更新内容: v3.4.18: 完全移除 tunnel_url 全局变量的更新逻辑
 
@@ -8532,6 +9022,8 @@ if exist "README.md" (
 
 ### v3.4.17 (2026-05-29) - 📝 **文档补录** v3.4.17: 统一所有模块从 web_output.log 获取公网地址
 
+> **Commit**: `bac0af3d`  
+
 #### 更新内容: v3.4.17: 统一所有模块从 web_output.log 获取公网地址
 
 **更新日期**: 2026-05-29
@@ -8549,6 +9041,8 @@ if exist "README.md" (
 - **Commit**: bac0af3d
 
 ### v3.4.16 (2026-05-29) - 📝 **文档补录** v3.4.16: 修复 old_url 未定义错误
+
+> **Commit**: `70a874de`  
 
 #### 更新内容: v3.4.16: 修复 old_url 未定义错误
 
@@ -8568,6 +9062,8 @@ if exist "README.md" (
 
 ### v3.4.15 (2026-05-29) - 📝 **文档补录** v3.4.15: 简化启动流程，移除冗余等待逻辑
 
+> **Commit**: `be1179b6`  
+
 #### 更新内容: v3.4.15: 简化启动流程，移除冗余等待逻辑
 
 **更新日期**: 2026-05-29
@@ -8585,6 +9081,8 @@ if exist "README.md" (
 - **Commit**: be1179b6
 
 ### v3.4.14 (2026-05-29) - 📝 **文档补录** v3.4.14: read_output 改为读取 hostc stdout 输出
+
+> **Commit**: `15afea5f`  
 
 #### 更新内容: v3.4.14: read_output 改为读取 hostc stdout 输出
 
@@ -8604,6 +9102,8 @@ if exist "README.md" (
 
 ### v3.4.13 (2026-05-29) - 📝 **文档补录** v3.4.13: 完全移除 tunnel_url.txt 读取逻辑，全部从 web_output.log
 
+> **Commit**: `cbd01611`  
+
 #### 更新内容: v3.4.13: 完全移除 tunnel_url.txt 读取逻辑，全部从 web_output.log
 
 **更新日期**: 2026-05-29
@@ -8621,6 +9121,8 @@ if exist "README.md" (
 - **Commit**: cbd01611
 
 ### v3.4.12 (2026-05-29) - 📝 **文档补录** v3.4.12: 修复等待 URL 逻辑，直接检查 web_output.log
+
+> **Commit**: `9bddf06d`  
 
 #### 更新内容: v3.4.12: 修复等待 URL 逻辑，直接检查 web_output.log
 
@@ -8640,6 +9142,8 @@ if exist "README.md" (
 
 ### v3.4.11 (2026-05-29) - 📝 **文档补录** v3.4.11: 大幅简化 tunnel 重启逻辑
 
+> **Commit**: `682634aa`  
+
 #### 更新内容: v3.4.11: 大幅简化 tunnel 重启逻辑
 
 **更新日期**: 2026-05-29
@@ -8657,6 +9161,8 @@ if exist "README.md" (
 - **Commit**: 682634aa
 
 ### v3.4.10 (2026-05-29) - 📝 **文档补录** v3.4.10: 优化 hostc 进程稳定性，URL 无效时等待 60 秒再重启
+
+> **Commit**: `569c73f0`  
 
 #### 更新内容: v3.4.10: 优化 hostc 进程稳定性，URL 无效时等待 60 秒再重启
 
@@ -8676,6 +9182,8 @@ if exist "README.md" (
 
 ### v3.4.9 (2026-05-29) - 📝 **文档补录** v3.4.9: 统一使用 web_output.log 作为公网地址唯一来源
 
+> **Commit**: `84af90e9`  
+
 #### 更新内容: v3.4.9: 统一使用 web_output.log 作为公网地址唯一来源
 
 **更新日期**: 2026-05-29
@@ -8693,6 +9201,8 @@ if exist "README.md" (
 - **Commit**: 84af90e9
 
 ### v3.4.8 (2026-05-29) - 📝 **文档补录** v3.4.8: 统一公网地址来源，全部从 web_output.log 获取
+
+> **Commit**: `cadaa944, 8cdc3602`  
 
 #### 更新内容: v3.4.8: 统一公网地址来源，全部从 web_output.log 获取
 
@@ -8712,6 +9222,8 @@ if exist "README.md" (
 
 ### v3.4.7 (2026-05-29) - 📝 **文档补录** v3.4.7: 更新 README
 
+> **Commit**: `31bac7e7, cae017ec`  
+
 #### 更新内容: v3.4.7: 更新 README
 
 **更新日期**: 2026-05-29
@@ -8729,6 +9241,8 @@ if exist "README.md" (
 - **Commit**: 31bac7e7
 
 ### v3.4.6 (2026-05-29) - 📝 **文档补录** v3.4.6: 修复 tunnel_url.txt 为空时无法重启问题
+
+> **Commit**: `f6ce2f30`  
 
 #### 更新内容: v3.4.6: 修复 tunnel_url.txt 为空时无法重启问题
 
@@ -8748,6 +9262,8 @@ if exist "README.md" (
 
 ### v3.4.5 (2026-05-29) - 📝 **文档补录** v3.4.5: 修复 tunnel_url.txt 为空时重启循环问题
 
+> **Commit**: `a990a144`  
+
 #### 更新内容: v3.4.5: 修复 tunnel_url.txt 为空时重启循环问题
 
 **更新日期**: 2026-05-29
@@ -8765,6 +9281,8 @@ if exist "README.md" (
 - **Commit**: a990a144
 
 ### v3.4.4 (2026-05-29) - 📝 **文档补录** v3.4.4: 优化 tunnel_url.txt 为空时立即重启，不等待20秒超时
+
+> **Commit**: `42556d6c`  
 
 #### 更新内容: v3.4.4: 优化 tunnel_url.txt 为空时立即重启，不等待20秒超时
 
@@ -8784,6 +9302,8 @@ if exist "README.md" (
 
 ### v3.4.3 (2026-05-29) - 📝 **文档补录** v3.4.3: 修复 tunnel_url.txt 为空时不重启、守护线程重复启动日志刷屏、URL 无效时不返回无效地址
 
+> **Commit**: `892533c6`  
+
 #### 更新内容: v3.4.3: 修复 tunnel_url.txt 为空时不重启、守护线程重复启动日志刷屏、URL 无效时不返回无效地址
 
 **更新日期**: 2026-05-29
@@ -8801,6 +9321,8 @@ if exist "README.md" (
 - **Commit**: 892533c6
 
 ### v3.4.2 (2026-05-29) - 📝 **文档补录** v3.4.2: 前端展示URL可用性验证 + 心跳检测日志优化
+
+> **Commit**: `0f4df05a`  
 
 #### 更新内容: v3.4.2: 前端展示URL可用性验证 + 心跳检测日志优化
 
@@ -8820,6 +9342,8 @@ if exist "README.md" (
 
 ### v3.4.1 (2026-05-29) - 📝 **文档补录** v3.4.1: 修复 web_output.log 日志同步问题
 
+> **Commit**: `f0e7f2a1`  
+
 #### 更新内容: v3.4.1: 修复 web_output.log 日志同步问题
 
 **更新日期**: 2026-05-29
@@ -8837,6 +9361,8 @@ if exist "README.md" (
 - **Commit**: f0e7f2a1
 
 ### v3.4.0 (2026-05-29) - 📝 **文档补录** v3.4.0: 修复隧道状态显示和日志同步问题
+
+> **Commit**: `a7bf016d`  
 
 #### 更新内容: v3.4.0: 修复隧道状态显示和日志同步问题
 
@@ -8856,6 +9382,8 @@ if exist "README.md" (
 
 ### v3.3.9 (2026-05-28) - 📝 **文档补录** v3.3.9: 修复 tunnel_url 和前端显示不一致问题
 
+> **Commit**: `59ab04fd`  
+
 #### 更新内容: v3.3.9: 修复 tunnel_url 和前端显示不一致问题
 
 **更新日期**: 2026-05-28
@@ -8873,6 +9401,8 @@ if exist "README.md" (
 - **Commit**: 59ab04fd
 
 ### v3.3.8 (2026-05-28) - 📝 **文档补录** v3.3.8: 拆分版本，优化更新日志格式
+
+> **Commit**: `75da044d`  
 
 #### 更新内容: v3.3.8: 拆分版本，优化更新日志格式
 
@@ -8892,6 +9422,8 @@ if exist "README.md" (
 
 ### v3.3.7 (2026-05-28) - 📝 **文档补录** v3.3.7: 前端隧道状态轮询间隔从5秒改为2秒，更快同步URL变化
 
+> **Commit**: `c9bcc7ba, 370f5b1e, 6efd02a5, 13021f6c, 1290b226`  
+
 #### 更新内容: v3.3.7: 前端隧道状态轮询间隔从5秒改为2秒，更快同步URL变化
 
 **更新日期**: 2026-05-28
@@ -8909,6 +9441,8 @@ if exist "README.md" (
 - **Commit**: c9bcc7ba
 
 ### v3.3.6 (2026-05-28) - 📝 **文档补录** v3.3.6 - 优化进程清理逻辑，避免无效清理导致的失败统计
+
+> **Commit**: `3bffaee8, a1ccf1ab, 1660b98f`  
 
 #### 更新内容: v3.3.6 - 优化进程清理逻辑，避免无效清理导致的失败统计
 
@@ -8928,6 +9462,8 @@ if exist "README.md" (
 
 ### v3.3.5 (2026-05-28) - 📝 **文档补录** v3.3.5 - 统一进程检测逻辑确保跨系统兼容
 
+> **Commit**: `42183c31, 0ccf62b9, 3d6e28ae, be0a1c56, dbea6c34`  
+
 #### 更新内容: v3.3.5 - 统一进程检测逻辑确保跨系统兼容
 
 **更新日期**: 2026-05-28
@@ -8945,6 +9481,8 @@ if exist "README.md" (
 - **Commit**: 42183c31
 
 ### v3.3.4 (2026-05-24) - 📝 **文档补录** v3.3.4 - 隧道日志输出优化和进程清理改进
+
+> **Commit**: `daf1d1bf`  
 
 #### 更新内容: v3.3.4 - 隧道日志输出优化和进程清理改进
 
@@ -8964,6 +9502,8 @@ if exist "README.md" (
 
 ### v3.3.3 (2026-05-23) - 📝 **文档补录** v3.3.3: 修复隧道进程泄漏和邮件通知问题
 
+> **Commit**: `dad9c021`  
+
 #### 更新内容: v3.3.3: 修复隧道进程泄漏和邮件通知问题
 
 **更新日期**: 2026-05-23
@@ -8981,6 +9521,8 @@ if exist "README.md" (
 - **Commit**: dad9c021
 
 ### v3.3.1 (2026-05-22) - 📝 **文档补录** v3.3.1: 修复 Web 界面运行爬虫时 Input/output error 问题
+
+> **Commit**: `f40a3e64`  
 
 #### 更新内容: v3.3.1: 修复 Web 界面运行爬虫时 Input/output error 问题
 
@@ -9000,6 +9542,8 @@ if exist "README.md" (
 
 ### v3.3.0 (2026-05-22) - 📝 **文档补录** v3.3.0: 自动配置阿里云pip镜像加速
 
+> **Commit**: `f9e967e5`  
+
 #### 更新内容: v3.3.0: 自动配置阿里云pip镜像加速
 
 **更新日期**: 2026-05-22
@@ -9017,6 +9561,8 @@ if exist "README.md" (
 - **Commit**: f9e967e5
 
 ### v3.2.9 (2026-05-22) - 📝 **文档补录** v3.2.9 - 修复隧道频繁重启和邮件发送问题
+
+> **Commit**: `a6b989f5`  
 
 #### 更新内容: v3.2.9 - 修复隧道频繁重启和邮件发送问题
 
@@ -9036,6 +9582,8 @@ if exist "README.md" (
 
 ### v3.2.8 (2026-05-22) - 📝 **文档补录** v3.2.8 - Flask启动时邮件通知增强
 
+> **Commit**: `88ca5013`  
+
 #### 更新内容: v3.2.8 - Flask启动时邮件通知增强
 
 **更新日期**: 2026-05-22
@@ -9053,6 +9601,8 @@ if exist "README.md" (
 - **Commit**: 88ca5013
 
 ### v3.2.7 (2026-05-22) - 📝 **文档补录** v3.2.7 - 新增公网地址变更邮件通知功能
+
+> **Commit**: `b21b4f78, 891467e9`  
 
 #### 更新内容: v3.2.7 - 新增公网地址变更邮件通知功能
 
@@ -9072,6 +9622,8 @@ if exist "README.md" (
 
 ### v3.2.6 (2026-05-21) - 📝 **文档补录** v3.2.6: 前端JavaScript优化 - 移除冗余日志，简化代码结构
 
+> **Commit**: `8d3759c8, 07e9580a`  
+
 #### 更新内容: v3.2.6: 前端JavaScript优化 - 移除冗余日志，简化代码结构
 
 **更新日期**: 2026-05-21
@@ -9089,6 +9641,8 @@ if exist "README.md" (
 - **Commit**: 8d3759c8
 
 ### v3.2.5 (2026-05-21) - 📝 **文档补录** v3.2.5: 简化启动流程，移除隧道选择菜单
+
+> **Commit**: `ebe44b7d`  
 
 #### 更新内容: v3.2.5: 简化启动流程，移除隧道选择菜单
 
@@ -9108,6 +9662,8 @@ if exist "README.md" (
 
 ### v3.2.4 (2026-05-29) - 📝 **文档补录** v3.2.4: 前端展示URL可用性验证 + 心跳检测日志优化
 
+> **Commit**: `1b6da815, e3f2a6b9`  
+
 #### 更新内容: v3.2.4: 前端展示URL可用性验证 + 心跳检测日志优化
 
 **更新日期**: 2026-05-29
@@ -9125,6 +9681,8 @@ if exist "README.md" (
 - **Commit**: 1b6da815
 
 ### v3.2.3 (2026-05-21) - 📝 **文档补录** v3.2.3: Cloudflare Tunnel 配置功能
+
+> **Commit**: `46092f98`  
 
 #### 更新内容: v3.2.3: Cloudflare Tunnel 配置功能
 
@@ -9144,6 +9702,8 @@ if exist "README.md" (
 
 ### v3.2.2 (2026-05-21) - 📝 **文档补录** v3.2.2 - 修复隧道自动重连死循环问题，实现无感切换到新的公网 URL
 
+> **Commit**: `1f7c0f6a`  
+
 #### 更新内容: v3.2.2 - 修复隧道自动重连死循环问题，实现无感切换到新的公网 URL
 
 **更新日期**: 2026-05-21
@@ -9161,6 +9721,8 @@ if exist "README.md" (
 - **Commit**: 1f7c0f6a
 
 ### v3.2.1 (2026-05-20) - 📝 **文档补录** v3.2.1: 守护线程重启时保持 URL 一致
+
+> **Commit**: `2bee5074`  
 
 #### 更新内容: v3.2.1: 守护线程重启时保持 URL 一致
 
@@ -9180,6 +9742,8 @@ if exist "README.md" (
 
 ### v3.2.0 (2026-05-20) - 📝 **文档补录** v3.2.0: 外部启动隧道监控机制
 
+> **Commit**: `6fbe62b9`  
+
 #### 更新内容: v3.2.0: 外部启动隧道监控机制
 
 **更新日期**: 2026-05-20
@@ -9197,6 +9761,8 @@ if exist "README.md" (
 - **Commit**: 6fbe62b9
 
 ### v3.1.9 (2026-05-20) - 📝 **文档补录** v3.1.9: 优化前端隧道共享按钮，优先复用tunnel_url.txt中的已有地址
+
+> **Commit**: `12fd1145`  
 
 #### 更新内容: v3.1.9: 优化前端隧道共享按钮，优先复用tunnel_url.txt中的已有地址
 
@@ -9216,6 +9782,8 @@ if exist "README.md" (
 
 ### v3.1.8 (2026-05-20) - 📝 **文档补录** v3.1.8: 增强隧道保持在线机制
 
+> **Commit**: `90376332, f953258c, 9962cfb4`  
+
 #### 更新内容: v3.1.8: 增强隧道保持在线机制
 
 **更新日期**: 2026-05-20
@@ -9233,6 +9801,8 @@ if exist "README.md" (
 - **Commit**: 90376332
 
 ### v3.1.7 (2026-05-20) - 📝 **文档补录** v3.1.7 - 货号对比重复检测优化
+
+> **Commit**: `4a64f75a`  
 
 #### 更新内容: v3.1.7 - 货号对比重复检测优化
 
@@ -9252,6 +9822,8 @@ if exist "README.md" (
 
 ### v3.1.5 (2026-05-18) - 📝 **文档补录** v3.1.5: 隧道自动重连机制
 
+> **Commit**: `d38a6eff`  
+
 #### 更新内容: v3.1.5: 隧道自动重连机制
 
 **更新日期**: 2026-05-18
@@ -9269,6 +9841,8 @@ if exist "README.md" (
 - **Commit**: d38a6eff
 
 ### v3.1.3 (2026-05-18) - 📝 **文档补录** 更新版本号至 v3.1.3
+
+> **Commit**: `e8bf93ca, a96b7dcc`  
 
 #### 更新内容: 更新版本号至 v3.1.3
 
@@ -9288,6 +9862,8 @@ if exist "README.md" (
 
 ### v3.1.2 (2026-05-18) - 📝 **文档补录** v3.1.2: 天气看板预加载优化
 
+> **Commit**: `e176d3c9, ccced8d8, d3b77985, 2c01b1d1, 54641f65`  
+
 #### 更新内容: v3.1.2: 天气看板预加载优化
 
 **更新日期**: 2026-05-18
@@ -9305,6 +9881,8 @@ if exist "README.md" (
 - **Commit**: e176d3c9
 
 ### v3.1.1 (2026-05-20) - 📝 **文档补录** v3.1.1: 修复隧道复制按钮失效问题
+
+> **Commit**: `ad7fc58e, c769e234`  
 
 #### 更新内容: v3.1.1: 修复隧道复制按钮失效问题
 
@@ -9324,6 +9902,8 @@ if exist "README.md" (
 
 ### v3.0.8 (2026-05-17) - 📝 **文档补录** v3.0.8: 隧道共享功能增强 - 可点击链接、一键复制、启动预下载hostc
 
+> **Commit**: `965f7a70`  
+
 #### 更新内容: v3.0.8: 隧道共享功能增强 - 可点击链接、一键复制、启动预下载hostc
 
 **更新日期**: 2026-05-17
@@ -9341,6 +9921,8 @@ if exist "README.md" (
 - **Commit**: 965f7a70
 
 ### v3.0.7 (2026-05-17) - 📝 **文档补录** v3.0.7: 优化隧道共享功能 + 跨平台兼容性增强
+
+> **Commit**: `faf8e2ac`  
 
 #### 更新内容: v3.0.7: 优化隧道共享功能 + 跨平台兼容性增强
 
@@ -9360,6 +9942,8 @@ if exist "README.md" (
 
 ### v3.0.6 (2026-05-06) - 📝 **文档补录** v3.0.6: 集成天气时钟看板，独立区块展示，完整响应式适配
 
+> **Commit**: `19c2d29c`  
+
 #### 更新内容: v3.0.6: 集成天气时钟看板，独立区块展示，完整响应式适配
 
 **更新日期**: 2026-05-06
@@ -9377,6 +9961,8 @@ if exist "README.md" (
 - **Commit**: 19c2d29c
 
 ### v3.0.5 (2026-05-01) - 📝 **文档补录** v3.0.5: 修复Excel与JSON对比功能中新增高价商品判定逻辑错误
+
+> **Commit**: `d68aa62a`  
 
 #### 更新内容: v3.0.5: 修复Excel与JSON对比功能中新增高价商品判定逻辑错误
 
@@ -9396,6 +9982,8 @@ if exist "README.md" (
 
 ### v3.0.4 (2026-05-01) - 📝 **文档补录** v3.0.4: Excel文件路径去重和货号读取顺序优化
 
+> **Commit**: `9769db46`  
+
 #### 更新内容: v3.0.4: Excel文件路径去重和货号读取顺序优化
 
 **更新日期**: 2026-05-01
@@ -9413,6 +10001,8 @@ if exist "README.md" (
 - **Commit**: 9769db46
 
 ### v3.0.3 (2026-05-01) - 📝 **文档补录** v3.0.3: 移动端导航栏固定置顶优化
+
+> **Commit**: `f5bcdc8d`  
 
 #### 更新内容: v3.0.3: 移动端导航栏固定置顶优化
 
@@ -9432,6 +10022,8 @@ if exist "README.md" (
 
 ### v3.0.2 (2026-05-01) - 📝 **文档补录** v3.0.2 - 移动端响应式适配全面优化
 
+> **Commit**: `321f628a`  
+
 #### 更新内容: v3.0.2 - 移动端响应式适配全面优化
 
 **更新日期**: 2026-05-01
@@ -9449,6 +10041,8 @@ if exist "README.md" (
 - **Commit**: 321f628a
 
 ### v3.0.1 (2026-04-30) - 📝 **文档补录** 更新README - 添加v3.0.1版本更新日志
+
+> **Commit**: `caf8b291, 90cee311`  
 
 #### 更新内容: 更新README - 添加v3.0.1版本更新日志
 
@@ -9468,6 +10062,8 @@ if exist "README.md" (
 
 ### v3.0.0 (2026-04-30) - 📝 **文档补录** v3.0.0 - Cookie管理优化和跨平台兼容性提升
 
+> **Commit**: `9c972d0e`  
+
 #### 更新内容: v3.0.0 - Cookie管理优化和跨平台兼容性提升
 
 **更新日期**: 2026-04-30
@@ -9485,6 +10081,8 @@ if exist "README.md" (
 - **Commit**: 9c972d0e
 
 ### v2.9.6 (2026-04-30) - 📝 **文档补录** v2.9.6 - 启动脚本优化和功能改进
+
+> **Commit**: `8fe7c71b`  
 
 #### 更新内容: v2.9.6 - 启动脚本优化和功能改进
 
@@ -9504,6 +10102,8 @@ if exist "README.md" (
 
 ### v2.9.5 (2026-04-30) - 📝 **文档补录** 📝文档: 更新README.md到v2.9.5，添加完整更新日志
 
+> **Commit**: `e4d53ef3, bcd9169f`  
+
 #### 更新内容: 📝文档: 更新README.md到v2.9.5，添加完整更新日志
 
 **更新日期**: 2026-04-30
@@ -9521,6 +10121,8 @@ if exist "README.md" (
 - **Commit**: e4d53ef3
 
 ### v2.9.4 (2026-04-29) - 📝 **文档补录** v2.9.4: 新增互动式货号对比功能
+
+> **Commit**: `b50bf9af`  
 
 #### 更新内容: v2.9.4: 新增互动式货号对比功能
 
@@ -9540,6 +10142,8 @@ if exist "README.md" (
 
 ### v2.9.3 (2026-04-29) - 📝 **文档补录** v2.9.3: Cookie更新前自动清空机制
 
+> **Commit**: `40c823a8`  
+
 #### 更新内容: v2.9.3: Cookie更新前自动清空机制
 
 **更新日期**: 2026-04-29
@@ -9557,6 +10161,8 @@ if exist "README.md" (
 - **Commit**: 40c823a8
 
 ### v2.9.2 (2026-04-29) - 📝 **文档补录** v2.9.2: 优化商品列表联动滚动功能
+
+> **Commit**: `29294843`  
 
 #### 更新内容: v2.9.2: 优化商品列表联动滚动功能
 
@@ -9576,6 +10182,8 @@ if exist "README.md" (
 
 ### v2.9.1 (2026-04-29) - 📝 **文档补录** v2.9.1: 优化前端时间显示功能，减少DOM重渲染开销
 
+> **Commit**: `a59e2110`  
+
 #### 更新内容: v2.9.1: 优化前端时间显示功能，减少DOM重渲染开销
 
 **更新日期**: 2026-04-29
@@ -9593,6 +10201,8 @@ if exist "README.md" (
 - **Commit**: a59e2110
 
 ### v2.9.0 (2026-04-29) - 📝 **文档补录** v2.9.0: 添加前端时间显示功能并优化JavaScript代码
+
+> **Commit**: `efcf9ebf`  
 
 #### 更新内容: v2.9.0: 添加前端时间显示功能并优化JavaScript代码
 
@@ -9612,6 +10222,8 @@ if exist "README.md" (
 
 ### v2.8.0 (2026-04-29) - 📝 **文档补录** 全面修复README.md更新日志：调整v2.6.0-v2.8.0版本日期顺序，确保所有版本号和日期按时间递增排列
 
+> **Commit**: `f9af6096, 484fe803`  
+
 #### 更新内容: 全面修复README.md更新日志：调整v2.6.0-v2.8.0版本日期顺序，确保所有版本号和日期按时间递增排列
 
 **更新日期**: 2026-04-29
@@ -9629,6 +10241,8 @@ if exist "README.md" (
 - **Commit**: ec476faa
 
 ### v2.7.2 (2026-04-29) - 📝 **文档补录** 更新v2.7.2日志：修复/api/clean/list文件显示格式
+
+> **Commit**: `cf9c9211`  
 
 #### 更新内容: 更新v2.7.2日志：修复/api/clean/list文件显示格式
 
@@ -9648,6 +10262,8 @@ if exist "README.md" (
 
 ### v2.7.1 (2026-04-29) - 📝 **文档补录** 修复README.md版本时间顺序问题：v2.8.0改为04-29，v2.7.1改为04-27，修复v2.5.21重复问题
 
+> **Commit**: `343dd926`  
+
 #### 更新内容: 修复README.md版本时间顺序问题：v2.8.0改为04-29，v2.7.1改为04-27，修复v2.5.21重复问题
 
 **更新日期**: 2026-04-29
@@ -9665,6 +10281,8 @@ if exist "README.md" (
 - **Commit**: f9af6096
 
 ### v2.7.0 (2026-04-28) - 📝 **文档补录** v2.7.0: 添加特殊文件名保护（.DS_Store, Thumbs.db等）
+
+> **Commit**: `4a3b8eda, 1eb221b7, d2cb82e6`  
 
 #### 更新内容: v2.7.0: 添加特殊文件名保护（.DS_Store, Thumbs.db等）
 
@@ -9684,6 +10302,8 @@ if exist "README.md" (
 
 ### v2.6.1 (2026-04-28) - 📝 **文档补录** v2.6.1: 添加自动数据库存储功能，运行爬虫时自动保存商品数据到MySQL
 
+> **Commit**: `19906ee0, 8795d6a9`  
+
 #### 更新内容: v2.6.1: 添加自动数据库存储功能，运行爬虫时自动保存商品数据到MySQL
 
 **更新日期**: 2026-04-28
@@ -9701,6 +10321,8 @@ if exist "README.md" (
 - **Commit**: 19906ee0
 
 ### v2.6.0 (2026-06-26) - 📝 **文档补录** 🐛修复: 删除错误添加的v2.6.0 (2026-06-26)版本条目
+
+> **Commit**: `cc9e1be9, ec476faa, b44dbcdb, bd16f65b, b1a83fdd`  
 
 #### 更新内容: 🐛修复: 删除错误添加的v2.6.0 (2026-06-26)版本条目
 
@@ -9756,6 +10378,8 @@ if exist "README.md" (
 
 ### v2.5.22 (2026-04-19) - 📝 **文档补录** v2.5.22: 移除闲鱼平台手续费60元封顶限制，改为按单机售价的1.6%计算
 
+> **Commit**: `5bbe26fa`  
+
 #### 更新内容: v2.5.22: 移除闲鱼平台手续费60元封顶限制，改为按单机售价的1.6%计算
 
 **更新日期**: 2026-04-19
@@ -9773,6 +10397,8 @@ if exist "README.md" (
 - **Commit**: 5bbe26fa
 
 ### v2.5.21 (2026-04-29) - 📝 **文档补录** 修复README.md版本时间顺序问题：v2.8.0改为04-29，v2.7.1改为04-27，修复v2.5.21重复问题
+
+> **Commit**: `decda6de, 1cef3abf, 2d0a8936`  
 
 #### 更新内容: 修复README.md版本时间顺序问题：v2.8.0改为04-29，v2.7.1改为04-27，修复v2.5.21重复问题
 
@@ -9792,6 +10418,8 @@ if exist "README.md" (
 
 ### v2.5.20 (2026-04-15) - 📝 **文档补录** v2.5.20: 修复Windows浏览器检测，使用dir+findstr替代通配符
 
+> **Commit**: `8b6cbfbd`  
+
 #### 更新内容: v2.5.20: 修复Windows浏览器检测，使用dir+findstr替代通配符
 
 **更新日期**: 2026-04-15
@@ -9809,6 +10437,8 @@ if exist "README.md" (
 - **Commit**: 8b6cbfbd
 
 ### v2.5.19 (2026-04-15) - 📝 **文档补录** v2.5.19: 优化macOS浏览器检测，支持Google Chrome for Testing.app
+
+> **Commit**: `e6e2541b`  
 
 #### 更新内容: v2.5.19: 优化macOS浏览器检测，支持Google Chrome for Testing.app
 
@@ -9828,6 +10458,8 @@ if exist "README.md" (
 
 ### v2.5.18 (2026-04-15) - 📝 **文档补录** v2.5.18: 优化浏览器检测，避免重复下载Playwright浏览器
 
+> **Commit**: `9f3ecc83, 11c0e2cc`  
+
 #### 更新内容: v2.5.18: 优化浏览器检测，避免重复下载Playwright浏览器
 
 **更新日期**: 2026-04-15
@@ -9845,6 +10477,8 @@ if exist "README.md" (
 - **Commit**: 9f3ecc83
 
 ### v2.5.17 (2026-04-13) - 📝 **文档补录** v2.5.17 - 优化拿货价提取性能和代码结构
+
+> **Commit**: `3954e8c7`  
 
 #### 更新内容: v2.5.17 - 优化拿货价提取性能和代码结构
 
@@ -9864,6 +10498,8 @@ if exist "README.md" (
 
 ### v2.5.16 (2026-04-12) - 📝 **文档补录** v2.5.16 - 优化CookieValidator类，精炼代码逻辑
 
+> **Commit**: `a37ce274`  
+
 #### 更新内容: v2.5.16 - 优化CookieValidator类，精炼代码逻辑
 
 **更新日期**: 2026-04-12
@@ -9881,6 +10517,8 @@ if exist "README.md" (
 - **Commit**: a37ce274
 
 ### v2.5.14 (2026-04-12) - 📝 **文档补录** v2.5.14: 修复路径错误，完善PathManager统一管理
+
+> **Commit**: `0c068d27`  
 
 #### 更新内容: v2.5.14: 修复路径错误，完善PathManager统一管理
 
@@ -9900,6 +10538,8 @@ if exist "README.md" (
 
 ### v2.5.13 (2026-04-29) - 📝 **文档补录** 修复README.md更新日志版本顺序问题：修复v2.5.13-22版本重复和日期混乱问题，重新整理所有版本号确保连续性和时间顺序正确
 
+> **Commit**: `da624ea9, 3a55d610`  
+
 #### 更新内容: 修复README.md更新日志版本顺序问题：修复v2.5.13-22版本重复和日期混乱问题，重新整理所有版本号确保连续性和时间顺序正确
 
 **更新日期**: 2026-04-29
@@ -9917,6 +10557,8 @@ if exist "README.md" (
 - **Commit**: da624ea9
 
 ### v2.5.12 (2026-04-12) - 📝 **文档补录** v2.5.12: 优化系统检测逻辑，统一跨平台浏览器配置
+
+> **Commit**: `86edd22f`  
 
 #### 更新内容: v2.5.12: 优化系统检测逻辑，统一跨平台浏览器配置
 
@@ -9936,6 +10578,8 @@ if exist "README.md" (
 
 ### v2.5.10 (2026-04-12) - 📝 **文档补录** v2.5.10: 修复导入错误，确保Excel对比功能正常运行
 
+> **Commit**: `5b7ba45a`  
+
 #### 更新内容: v2.5.10: 修复导入错误，确保Excel对比功能正常运行
 
 **更新日期**: 2026-04-12
@@ -9953,6 +10597,8 @@ if exist "README.md" (
 - **Commit**: 5b7ba45a
 
 ### v2.5.9 (2026-04-11) - 📝 **文档补录** v2.5.9: 优化代码逻辑，使用列表推导式简化文件查找代码
+
+> **Commit**: `d0de8f17`  
 
 #### 更新内容: v2.5.9: 优化代码逻辑，使用列表推导式简化文件查找代码
 
@@ -9972,6 +10618,8 @@ if exist "README.md" (
 
 ### v2.5.8 (2026-04-11) - 📝 **文档补录** v2.5.8: 修复excel_file为None的错误，解决os.path.exists的TypeError
 
+> **Commit**: `dfb74f3e`  
+
 #### 更新内容: v2.5.8: 修复excel_file为None的错误，解决os.path.exists的TypeError
 
 **更新日期**: 2026-04-11
@@ -9989,6 +10637,8 @@ if exist "README.md" (
 - **Commit**: dfb74f3e
 
 ### v2.5.7 (2026-04-11) - 📝 **文档补录** v2.5.7: 修复价格比较错误，解决parse_price返回None的TypeError
+
+> **Commit**: `6a8172e2`  
 
 #### 更新内容: v2.5.7: 修复价格比较错误，解决parse_price返回None的TypeError
 
@@ -10008,6 +10658,8 @@ if exist "README.md" (
 
 ### v2.5.6 (2026-04-11) - 📝 **文档补录** v2.5.6: 优化Cookie更新完成后的延迟，提升响应速度
 
+> **Commit**: `28754298`  
+
 #### 更新内容: v2.5.6: 优化Cookie更新完成后的延迟，提升响应速度
 
 **更新日期**: 2026-04-11
@@ -10025,6 +10677,8 @@ if exist "README.md" (
 - **Commit**: 28754298
 
 ### v2.5.5 (2026-04-11) - 📝 **文档补录** v2.5.5: 移除Cookie更新后的回车确认，简化操作流程
+
+> **Commit**: `ff4872b3`  
 
 #### 更新内容: v2.5.5: 移除Cookie更新后的回车确认，简化操作流程
 
@@ -10044,6 +10698,8 @@ if exist "README.md" (
 
 ### v2.5.4 (2026-04-11) - 📝 **文档补录** v2.5.4: 实现真正的自动关闭浏览器，检测登录后自动关闭
 
+> **Commit**: `ff2b31a6`  
+
 #### 更新内容: v2.5.4: 实现真正的自动关闭浏览器，检测登录后自动关闭
 
 **更新日期**: 2026-04-11
@@ -10061,6 +10717,8 @@ if exist "README.md" (
 - **Commit**: ff2b31a6
 
 ### v2.5.3 (2026-04-11) - 📝 **文档补录** v2.5.3: 优化Cookie更新提示信息，明确自动关闭浏览器
+
+> **Commit**: `b9987504`  
 
 #### 更新内容: v2.5.3: 优化Cookie更新提示信息，明确自动关闭浏览器
 
@@ -10080,6 +10738,8 @@ if exist "README.md" (
 
 ### v2.5.2 (2026-04-11) - 📝 **文档补录** v2.5.2: 简化Cookie更新流程，参考v2.1.1版本实现
 
+> **Commit**: `88490c51`  
+
 #### 更新内容: v2.5.2: 简化Cookie更新流程，参考v2.1.1版本实现
 
 **更新日期**: 2026-04-11
@@ -10097,6 +10757,8 @@ if exist "README.md" (
 - **Commit**: 88490c51
 
 ### v2.5.0 (2026-04-11) - 📝 **文档补录** v2.5.0: 优化商品信息提取逻辑，精简代码结构
+
+> **Commit**: `93460fcc`  
 
 #### 更新内容: v2.5.0: 优化商品信息提取逻辑，精简代码结构
 
@@ -10116,6 +10778,8 @@ if exist "README.md" (
 
 ### v2.4.7 (2026-04-11) - 📝 **文档补录** v2.4.7: 新增独立Cookie自动更新功能，优化浏览器启动流程关闭
 
+> **Commit**: `549fe464`  
+
 #### 更新内容: v2.4.7: 新增独立Cookie自动更新功能，优化浏览器启动流程关闭
 
 **更新日期**: 2026-04-11
@@ -10133,6 +10797,8 @@ if exist "README.md" (
 - **Commit**: 549fe464
 
 ### v2.4.6 (2026-04-11) - 📝 **文档补录** v2.4.6: 完善备注提取功能，提取所有有备注的商品信息
+
+> **Commit**: `d1d39426`  
 
 #### 更新内容: v2.4.6: 完善备注提取功能，提取所有有备注的商品信息
 
@@ -10152,6 +10818,8 @@ if exist "README.md" (
 
 ### v2.4.5 (2026-04-11) - 📝 **文档补录** v2.4.5: 修复备注提取错误，支持无标签备注信息提取
 
+> **Commit**: `8eca99ae`  
+
 #### 更新内容: v2.4.5: 修复备注提取错误，支持无标签备注信息提取
 
 **更新日期**: 2026-04-11
@@ -10169,6 +10837,8 @@ if exist "README.md" (
 - **Commit**: 8eca99ae
 
 ### v2.4.4 (2026-04-11) - 📝 **文档补录** v2.4.4: 修复价格提取错误，支持千分制价格格式
+
+> **Commit**: `baef0a9e`  
 
 #### 更新内容: v2.4.4: 修复价格提取错误，支持千分制价格格式
 
@@ -10188,6 +10858,8 @@ if exist "README.md" (
 
 ### v2.4.1 (2026-04-11) - 📝 **文档补录** v2.4.1: 新增平均每个设备售出均价统计
 
+> **Commit**: `741a18bc`  
+
 #### 更新内容: v2.4.1: 新增平均每个设备售出均价统计
 
 **更新日期**: 2026-04-11
@@ -10205,6 +10877,8 @@ if exist "README.md" (
 - **Commit**: 741a18bc
 
 ### v2.4.0 (2026-04-11) - 📝 **文档补录** v2.4.0: 简化JSON文件布局，优化价格显示为千分制
+
+> **Commit**: `5b47a606`  
 
 #### 更新内容: v2.4.0: 简化JSON文件布局，优化价格显示为千分制
 
@@ -10224,6 +10898,8 @@ if exist "README.md" (
 
 ### v2.3.6 (2026-04-11) - 📝 **文档补录** v2.3.6: 增强HTML内容搜索，完善拿货价提取逻辑
 
+> **Commit**: `6cd62840`  
+
 #### 更新内容: v2.3.6: 增强HTML内容搜索，完善拿货价提取逻辑
 
 **更新日期**: 2026-04-11
@@ -10241,6 +10917,8 @@ if exist "README.md" (
 - **Commit**: 6cd62840
 
 ### v2.3.5 (2026-04-11) - 📝 **文档补录** v2.3.5: 增强成本价识别，添加智能价格提取逻辑
+
+> **Commit**: `a440e05a`  
 
 #### 更新内容: v2.3.5: 增强成本价识别，添加智能价格提取逻辑
 
@@ -10260,6 +10938,8 @@ if exist "README.md" (
 
 ### v2.3.4 (2026-04-11) - 📝 **文档补录** v2.3.4: 新增拿货价提取功能，修复设备成本累计和设备均价为0的问题
 
+> **Commit**: `00c603a5`  
+
 #### 更新内容: v2.3.4: 新增拿货价提取功能，修复设备成本累计和设备均价为0的问题
 
 **更新日期**: 2026-04-11
@@ -10277,6 +10957,8 @@ if exist "README.md" (
 - **Commit**: 00c603a5
 
 ### v2.3.3 (2026-04-11) - 📝 **文档补录** v2.3.3: 新增设备均价，优化闲鱼平台手续费计算（单机最高60元封顶）
+
+> **Commit**: `ce6619fe`  
 
 #### 更新内容: v2.3.3: 新增设备均价，优化闲鱼平台手续费计算（单机最高60元封顶）
 
@@ -10296,6 +10978,8 @@ if exist "README.md" (
 
 ### v2.3.2 (2026-04-11) - 📝 **文档补录** v2.3.2: 新增累计统计功能，添加预计售出价格、设备成本和平台手续费累计
 
+> **Commit**: `d104e122`  
+
 #### 更新内容: v2.3.2: 新增累计统计功能，添加预计售出价格、设备成本和平台手续费累计
 
 **更新日期**: 2026-04-11
@@ -10313,6 +10997,8 @@ if exist "README.md" (
 - **Commit**: d104e122
 
 ### v2.3.1 (2026-04-11) - 📝 **文档补录** v2.3.1: 保留Cookie更新选项，仅支持自动更新功能
+
+> **Commit**: `ce4ec80a`  
 
 #### 更新内容: v2.3.1: 保留Cookie更新选项，仅支持自动更新功能
 
@@ -10332,6 +11018,8 @@ if exist "README.md" (
 
 ### v2.3.0 (2026-04-11) - 📝 **文档补录** v2.3.0: 功能整合优化，合并菜单选项并精炼代码逻辑
 
+> **Commit**: `e4c15617`  
+
 #### 更新内容: v2.3.0: 功能整合优化，合并菜单选项并精炼代码逻辑
 
 **更新日期**: 2026-04-11
@@ -10349,6 +11037,8 @@ if exist "README.md" (
 - **Commit**: e4c15617
 
 ### v2.2.2 (2026-04-11) - 📝 **文档补录** v2.2.2: Excel对比JSON功能增强，添加小计字段并精炼代码逻辑
+
+> **Commit**: `7b0e8e0c`  
 
 #### 更新内容: v2.2.2: Excel对比JSON功能增强，添加小计字段并精炼代码逻辑
 
@@ -10368,6 +11058,8 @@ if exist "README.md" (
 
 ### v2.2.1 (2026-04-11) - 📝 **文档补录** v2.2.1: 添加自动对比功能，确保每次运行爬虫后都生成小计字段
 
+> **Commit**: `185650e9`  
+
 #### 更新内容: v2.2.1: 添加自动对比功能，确保每次运行爬虫后都生成小计字段
 
 **更新日期**: 2026-04-11
@@ -10385,6 +11077,8 @@ if exist "README.md" (
 - **Commit**: 185650e9
 
 ### v2.2.0 (2026-04-09) - 📝 **文档补录** v2.2.0: 性能优化，提升并发处理能力和元素去重效率
+
+> **Commit**: `969f8701`  
 
 #### 更新内容: v2.2.0: 性能优化，提升并发处理能力和元素去重效率
 
@@ -10404,6 +11098,8 @@ if exist "README.md" (
 
 ### v2.1.9 (2026-04-09) - 📝 **文档补录** v2.1.9: 代码精炼优化，简化逻辑提升可维护性
 
+> **Commit**: `5d0498cb`  
+
 #### 更新内容: v2.1.9: 代码精炼优化，简化逻辑提升可维护性
 
 **更新日期**: 2026-04-09
@@ -10421,6 +11117,8 @@ if exist "README.md" (
 - **Commit**: 5d0498cb
 
 ### v2.1.8 (2026-04-09) - 📝 **文档补录** v2.1.8: 优化滚动加载策略，采用激进模式快速加载所有数据
+
+> **Commit**: `85cc59ee`  
 
 #### 更新内容: v2.1.8: 优化滚动加载策略，采用激进模式快速加载所有数据
 
@@ -10440,6 +11138,8 @@ if exist "README.md" (
 
 ### v2.1.7 (2026-07-31) - 📝 **文档补录** 📝文档: 添加早期版本历史记录(v1.4.2-v2.1.7)并统一作者名称为'小旭二手机（西园路）'
 
+> **Commit**: `e6c2959c`  
+
 #### 更新内容: 📝文档: 添加早期版本历史记录(v1.4.2-v2.1.7)并统一作者名称为'小旭二手机（西园路）'
 
 **更新日期**: 2026-07-31
@@ -10457,6 +11157,8 @@ if exist "README.md" (
 - **Commit**: b27c0138
 
 ### v2.1.6 (2026-04-09) - 📝 **文档补录** v2.1.6: 修复弹窗关闭超时问题，添加时间统计优化性能
+
+> **Commit**: `ff979e44`  
 
 #### 更新内容: v2.1.6: 修复弹窗关闭超时问题，添加时间统计优化性能
 
@@ -10476,6 +11178,8 @@ if exist "README.md" (
 
 ### v2.1.5 (2026-04-08) - 📝 **文档补录** v2.1.5: 修复高价商品筛选逻辑，解决对比结果不准确问题
 
+> **Commit**: `d722238a`  
+
 #### 更新内容: v2.1.5: 修复高价商品筛选逻辑，解决对比结果不准确问题
 
 **更新日期**: 2026-04-08
@@ -10493,6 +11197,8 @@ if exist "README.md" (
 - **Commit**: d722238a
 
 ### v2.1.3 (2026-04-08) - 📝 **文档补录** v2.1.3: 优化JSON文件对比记录机制，支持多条对比记录
+
+> **Commit**: `387a54bf`  
 
 #### 更新内容: v2.1.3: 优化JSON文件对比记录机制，支持多条对比记录
 
@@ -10512,6 +11218,8 @@ if exist "README.md" (
 
 ### v2.1.2 (2026-04-08) - 📝 **文档补录** v2.1.2: 优化JSON文件对比功能，新增缓存文件机制
 
+> **Commit**: `4da3f530`  
+
 #### 更新内容: v2.1.2: 优化JSON文件对比功能，新增缓存文件机制
 
 **更新日期**: 2026-04-08
@@ -10529,6 +11237,8 @@ if exist "README.md" (
 - **Commit**: 4da3f530
 
 ### v2.1.1 (2026-04-11) - 📝 **文档补录** v2.5.2: 简化Cookie更新流程，参考v2.1.1版本实现
+
+> **Commit**: `3f98753d`  
 
 #### 更新内容: v2.5.2: 简化Cookie更新流程，参考v2.1.1版本实现
 
@@ -10548,6 +11258,8 @@ if exist "README.md" (
 
 ### v2.1.0 (2026-04-08) - 📝 **文档补录** 新增调试功能 (v2.1.0)
 
+> **Commit**: `efe2f227`  
+
 #### 更新内容: 新增调试功能 (v2.1.0)
 
 **更新日期**: 2026-04-08
@@ -10565,6 +11277,8 @@ if exist "README.md" (
 - **Commit**: efe2f227
 
 ### v2.0.9 (2026-04-08) - 📝 **文档补录** 新增当天JSON文件对比功能 (v2.0.9)
+
+> **Commit**: `34d4f859`  
 
 #### 更新内容: 新增当天JSON文件对比功能 (v2.0.9)
 
@@ -10584,6 +11298,8 @@ if exist "README.md" (
 
 ### v2.0.8 (2026-04-08) - 📝 **文档补录** 修复跨平台浏览器启动问题 (v2.0.8)
 
+> **Commit**: `9ec2cfe7`  
+
 #### 更新内容: 修复跨平台浏览器启动问题 (v2.0.8)
 
 **更新日期**: 2026-04-08
@@ -10601,6 +11317,8 @@ if exist "README.md" (
 - **Commit**: 9ec2cfe7
 
 ### v2.0.7 (2026-04-07) - 📝 **文档补录** v2.0.7: 优化高价商品筛选，修复浏览器启动
+
+> **Commit**: `d0d54ec5`  
 
 #### 更新内容: v2.0.7: 优化高价商品筛选，修复浏览器启动
 
@@ -10620,6 +11338,8 @@ if exist "README.md" (
 
 ### v2.0.6 (2026-04-07) - 📝 **文档补录** v2.0.6: 优化数据变化分析代码，精简逻辑
 
+> **Commit**: `756d6a96`  
+
 #### 更新内容: v2.0.6: 优化数据变化分析代码，精简逻辑
 
 **更新日期**: 2026-04-07
@@ -10637,6 +11357,8 @@ if exist "README.md" (
 - **Commit**: 756d6a96
 
 ### v2.0.5 (2026-04-06) - 📝 **文档补录** v2.0.5: 更新Cookie过期时间
+
+> **Commit**: `4a9e7269`  
 
 #### 更新内容: v2.0.5: 更新Cookie过期时间
 
@@ -10656,6 +11378,8 @@ if exist "README.md" (
 
 ### v2.0.4 (2026-04-06) - 📝 **文档补录** v2.0.4: 新增Cookie自动更新功能，优化Excel文件检查
 
+> **Commit**: `e6606f1a`  
+
 #### 更新内容: v2.0.4: 新增Cookie自动更新功能，优化Excel文件检查
 
 **更新日期**: 2026-04-06
@@ -10673,6 +11397,8 @@ if exist "README.md" (
 - **Commit**: e6606f1a
 
 ### v2.0.3 (2026-04-29) - 📝 **文档补录** v2.0.3: 新增商品列表联动滚动功能
+
+> **Commit**: `4092c3ad, 6fd1bef2`  
 
 #### 更新内容: v2.0.3: 新增商品列表联动滚动功能
 
@@ -10692,6 +11418,8 @@ if exist "README.md" (
 
 ### v2.0.2 (2026-04-04) - 📝 **文档补录** 新增高价商品信息写入JSON功能 (v2.0.2)
 
+> **Commit**: `95f887b8`  
+
 #### 更新内容: 新增高价商品信息写入JSON功能 (v2.0.2)
 
 **更新日期**: 2026-04-04
@@ -10709,6 +11437,8 @@ if exist "README.md" (
 - **Commit**: 95f887b8
 
 ### v2.0.1 (2026-04-04) - 📝 **文档补录** 优化高价商品筛选逻辑 (v2.0.1)
+
+> **Commit**: `774ae533`  
 
 #### 更新内容: 优化高价商品筛选逻辑 (v2.0.1)
 
@@ -10728,6 +11458,8 @@ if exist "README.md" (
 
 ### v2.0.0 (2026-04-04) - 📝 **文档补录** 新增货号对比高价商品筛选功能 (v2.0.0)
 
+> **Commit**: `498c72be`  
+
 #### 更新内容: 新增货号对比高价商品筛选功能 (v2.0.0)
 
 **更新日期**: 2026-04-04
@@ -10745,6 +11477,8 @@ if exist "README.md" (
 - **Commit**: 498c72be
 
 ### v1.9.0 (2026-04-04) - 📝 **文档补录** 添加高价商品筛选功能 (v1.9.0)
+
+> **Commit**: `1a043680`  
 
 #### 更新内容: 添加高价商品筛选功能 (v1.9.0)
 
@@ -10764,6 +11498,8 @@ if exist "README.md" (
 
 ### v1.8.0 (2026-04-04) - 📝 **文档补录** 添加运行时间显示和动态调整功能 (v1.8.0)
 
+> **Commit**: `58adb450`  
+
 #### 更新内容: 添加运行时间显示和动态调整功能 (v1.8.0)
 
 **更新日期**: 2026-04-04
@@ -10781,6 +11517,8 @@ if exist "README.md" (
 - **Commit**: 58adb450
 
 ### v1.7.0 (2026-04-04) - 📝 **文档补录** 滚动参数可配置化 (v1.7.0)
+
+> **Commit**: `d06a15f9`  
 
 #### 更新内容: 滚动参数可配置化 (v1.7.0)
 
@@ -10800,6 +11538,8 @@ if exist "README.md" (
 
 ### v1.6.2 (2026-04-04) - 📝 **文档补录** 修复页面加载死机问题 (v1.6.2)
 
+> **Commit**: `d5dc48de`  
+
 #### 更新内容: 修复页面加载死机问题 (v1.6.2)
 
 **更新日期**: 2026-04-04
@@ -10817,6 +11557,8 @@ if exist "README.md" (
 - **Commit**: d5dc48de
 
 ### v1.6.1 (2026-04-04) - 📝 **文档补录** 修复滚动死循环问题 (v1.6.1)
+
+> **Commit**: `bc964097`  
 
 #### 更新内容: 修复滚动死循环问题 (v1.6.1)
 
@@ -10836,6 +11578,8 @@ if exist "README.md" (
 
 ### v1.6.0 (2026-04-04) - 📝 **文档补录** 完成所有高优先级优化 (v1.6.0)
 
+> **Commit**: `8e74270d`  
+
 #### 更新内容: 完成所有高优先级优化 (v1.6.0)
 
 **更新日期**: 2026-04-04
@@ -10853,6 +11597,8 @@ if exist "README.md" (
 - **Commit**: 8e74270d
 
 ### v1.5.0 (2026-04-04) - 📝 **文档补录** 简化JSON数据结构为5个核心字段 (v1.5.0)
+
+> **Commit**: `6346d21f`  
 
 #### 更新内容: 简化JSON数据结构为5个核心字段 (v1.5.0)
 
@@ -10872,6 +11618,8 @@ if exist "README.md" (
 
 ### v1.4.3 (2026-04-04) - 📝 **文档补录** 优化页面加载逻辑，减少等待时间 (v1.4.3)
 
+> **Commit**: `a6eee7f1`  
+
 #### 更新内容: 优化页面加载逻辑，减少等待时间 (v1.4.3)
 
 **更新日期**: 2026-04-04
@@ -10889,6 +11637,8 @@ if exist "README.md" (
 - **Commit**: a6eee7f1
 
 ### v1.4.2 (2026-07-31) - 📝 **文档补录** 📝文档: 添加早期版本历史记录(v1.4.2-v2.1.7)并统一作者名称为'小旭二手机（西园路）'
+
+> **Commit**: `b27c0138, 2d2395a3, b84418d1`  
 
 #### 更新内容: 📝文档: 添加早期版本历史记录(v1.4.2-v2.1.7)并统一作者名称为'小旭二手机（西园路）'
 
@@ -10908,6 +11658,8 @@ if exist "README.md" (
 
 ### v1.4.1 (2026-04-04) - 📝 **文档补录** 优化登录等待逻辑，移除手动确认步骤 (v1.4.1)
 
+> **Commit**: `7a088370`  
+
 #### 更新内容: 优化登录等待逻辑，移除手动确认步骤 (v1.4.1)
 
 **更新日期**: 2026-04-04
@@ -10925,6 +11677,8 @@ if exist "README.md" (
 - **Commit**: 7a088370
 
 ### v1.4.0 (2026-04-04) - 📝 **文档补录** 扩展商品数据字段到20个完整字段 (v1.4.0)
+
+> **Commit**: `271a2578`  
 
 #### 更新内容: 扩展商品数据字段到20个完整字段 (v1.4.0)
 
@@ -10944,6 +11698,8 @@ if exist "README.md" (
 
 ### v1.3.4 (2026-04-04) - 📝 **文档补录** 新增数据变化描述和字段说明 (v1.3.4)
 
+> **Commit**: `61b1d8e8`  
+
 #### 更新内容: 新增数据变化描述和字段说明 (v1.3.4)
 
 **更新日期**: 2026-04-04
@@ -10961,6 +11717,8 @@ if exist "README.md" (
 - **Commit**: 61b1d8e8
 
 ### v1.3.3 (2026-04-04) - 📝 **文档补录** 新增对比结果消息到JSON日志 (v1.3.3)
+
+> **Commit**: `dbaa5e1a`  
 
 #### 更新内容: 新增对比结果消息到JSON日志 (v1.3.3)
 
@@ -10980,6 +11738,8 @@ if exist "README.md" (
 
 ### v1.3.2 (2026-04-04) - 📝 **文档补录** 修复JSON数据解析错误 (v1.3.2)
 
+> **Commit**: `8bad5825`  
+
 #### 更新内容: 修复JSON数据解析错误 (v1.3.2)
 
 **更新日期**: 2026-04-04
@@ -10997,6 +11757,8 @@ if exist "README.md" (
 - **Commit**: 8bad5825
 
 ### v1.3.1 (2026-09-02) - 📝 **文档补录** 🔧v5.0.9.19 版本一致性修复: ①删除test开头的py文件 ②修复v5.0.9.15/v1.3.1格式问题(缺少换行符) ③添加缺失的v1.1.0/v1.2.0/v1.3.0版本到README.md ④确保README与skill版本记录保持一致
+
+> **Commit**: `bd404fdf`  
 
 #### 更新内容: 🔧v5.0.9.19 版本一致性修复: ①删除test开头的py文件 ②修复v5.0.9.15/v1.3.1格式问题(缺少换行符) ③添加缺失的v1.1.0/v1.2.0/v1.3.0版本到README.md ④确保README与skill版本记录保持一致
 
@@ -11070,6 +11832,8 @@ if exist "README.md" (
 
 ### v1.0.00.02 (2026-08-22) - 📝 **文档补录** 📝 补全v1.0.00.01/v1.0.00.02到skill.md+README.md版本历史表 + 重新生成skill.docx — Git全版本300个现已100%对齐
 
+> **Commit**: `5cac47a9`  
+
 #### 更新内容: 📝 补全v1.0.00.01/v1.0.00.02到skill.md+README.md版本历史表 + 重新生成skill.docx — Git全版本300个现已100%对齐
 
 **更新日期**: 2026-08-22
@@ -11088,6 +11852,8 @@ if exist "README.md" (
 
 ### v1.0.00.01 (2026-08-22) - 📝 **文档补录** 📝 补全v1.0.00.01/v1.0.00.02到skill.md+README.md版本历史表 + 重新生成skill.docx — Git全版本300个现已100%对齐
 
+> **Commit**: `02a68c84, 764f2740`  
+
 #### 更新内容: 📝 补全v1.0.00.01/v1.0.00.02到skill.md+README.md版本历史表 + 重新生成skill.docx — Git全版本300个现已100%对齐
 
 **更新日期**: 2026-08-22
@@ -11105,6 +11871,8 @@ if exist "README.md" (
 - **Commit**: 02a68c84
 
 ### v1.0.0 (2026-07-31) - 📝 **文档补录** 📝文档: 将skill.md补充完整，包含从v1.0.0到v3.8.89.11的所有版本记录
+
+> **Commit**: `9d5185ce`  
 
 #### 更新内容: 📝文档: 将skill.md补充完整，包含从v1.0.0到v3.8.89.11的所有版本记录
 
@@ -16867,6 +17635,8 @@ D:/ws/xy_ws/
 
 ### v3.8.89.12.5 (2026-07-31) - 🐛Bug修复 修复商品字段解析逻辑 - 支持多行JSON对象
 
+> **Commit**: `b9a25358`  
+
 #### 更新内容: fix(frontend): 修复商品字段解析逻辑 - 支持多行JSON对象 (v3.8.89.12.5)
 
 **修复日期**: 2026-07-31
@@ -16908,6 +17678,8 @@ D:/ws/xy_ws/
 - ✅ 提交 8d2b88a2 已合并至master分支
 
 ### v3.8.89.12.4 (2026-07-31) - 🐛Bug修复 移除dist文件24小时缓存 (v3.8.89.12.4) - 解决前端代码更新后浏览器仍使用旧缓存的问题
+
+> **Commit**: `345efa4c`  
 
 #### 更新内容: fix(server): 移除dist文件24小时缓存 (v3.8.89.12.4) - 解决前端代码更新后浏览器仍使用旧缓存的问题
 
@@ -16951,6 +17723,8 @@ D:/ws/xy_ws/
 
 ### v3.8.89.12.3 (2026-07-31) - 🐛Bug修复 更新app.js版本号强制浏览器加载新代码
 
+> **Commit**: `999390c3`  
+
 #### 更新内容: fix(frontend): 更新app.js版本号强制浏览器加载新代码 (v3.8.89.12.3)
 
 **修复日期**: 2026-07-31
@@ -16976,6 +17750,8 @@ D:/ws/xy_ws/
 - ✅ 提交 7033f7a8 已合并至master分支
 
 ### v3.8.89.12.2 (2026-07-31) - 🐛Bug修复 整合FIX_GUIDE.md到README.md
+
+> **Commit**: `dc6c099d`  
 
 #### 更新内容: docs(readme): 整合FIX_GUIDE.md到README.md (v3.8.89.12.2)
 
@@ -17018,6 +17794,8 @@ D:/ws/xy_ws/
 - ✅ 提交 c62f11c3 已合并至master分支
 
 ### v3.8.89.12.1 (2026-07-31) - 🐛Bug修复 添加调试日志 + 强制刷新指南
+
+> **Commit**: `87c401be, be0fa3f0`  
 
 #### 更新内容: fix(frontend): 添加调试日志 + 强制刷新指南 (v3.8.89.12.1)
 
