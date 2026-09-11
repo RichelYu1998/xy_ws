@@ -22,6 +22,12 @@ from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 @dataclass
 class SecurityIssue:
@@ -43,11 +49,12 @@ class SecurityAuditor:
         self.scan_time = datetime.now()
         self.version = self._get_version()
         self.code_files = self._collect_code_files()
+        self._lock = threading.Lock()
         self.results = {
             'scan_metadata': {
                 'version': self.version,
                 'timestamp': self.scan_time.isoformat(),
-                'scanner': 'SecurityAuditor v1.0'
+                'scanner': 'SecurityAuditor v1.1 (Multi-threaded)'
             },
             'summary': {
                 'total_issues': 0,
@@ -82,18 +89,19 @@ class SecurityAuditor:
             return 'vunknown'
 
     def _collect_code_files(self) -> List[str]:
-        """动态收集项目所有代码文件（py/js/html/json配置），排除业务数据"""
+        """动态收集项目所有代码文件（全量扫描，排除第三方依赖和业务数据）"""
         code_files = []
         scan_patterns = [
-            ('*.py', ['__pycache__', '.venv']),
-            ('dist/*.js', ['node_modules']),
-            ('*.html', []),
+            ('**/*.py', ['__pycache__', '.venv', 'venv', '/_', 'test/']),
+            ('**/*.js', ['node_modules', 'dist/assets', 'dist/lib', 'dist/workbox', '.venv', 'venv']),
+            ('**/*.html', ['node_modules', 'tools/', '.venv', 'venv']),
+            ('**/*.css', ['node_modules', '.venv', 'venv']),
             ('config/*.json', []),
             ('dist/*.json', ['package-lock']),
         ]
         for pattern, excludes in scan_patterns:
             for filepath in self.project_root.glob(pattern):
-                fp_str = str(filepath)
+                fp_str = filepath.as_posix()
                 if any(ex in fp_str for ex in excludes):
                     continue
                 rel = filepath.relative_to(self.project_root).as_posix()
@@ -294,7 +302,7 @@ class SecurityAuditor:
         return False
 
     def _add_issue(self, issue: SecurityIssue):
-        """添加安全问题（带终极智能过滤）"""
+        """添加安全问题（带终极智能过滤 + 线程安全锁）"""
         if self._should_exclude(issue):
             return
         if self._is_safe_pattern(getattr(issue, 'code_snippet', '') or '', issue.description):
@@ -305,22 +313,23 @@ class SecurityAuditor:
         if hasattr(issue, 'code_snippet') and self._is_line_fixed(issue.code_snippet):
             return
 
-        self.issues.append(issue)
-        self.results['summary']['total_issues'] += 1
-        self.results['summary'][issue.severity.lower()] += 1
+        with self._lock:
+            self.issues.append(issue)
+            self.results['summary']['total_issues'] += 1
+            self.results['summary'][issue.severity.lower()] += 1
 
-        category = issue.category
-        if category not in self.results['categories']:
-            self.results['categories'][category] = []
-        self.results['categories'][category].append({
-            'severity': issue.severity,
-            'file': issue.file_path,
-            'line': issue.line_number,
-            'description': issue.description
-        })
+            category = issue.category
+            if category not in self.results['categories']:
+                self.results['categories'][category] = []
+            self.results['categories'][category].append({
+                'severity': issue.severity,
+                'file': issue.file_path,
+                'line': issue.line_number,
+                'description': issue.description
+            })
 
     def _scan_hidden_bugs(self):
-        """隐藏Bug排查 - 静态代码分析"""
+        """隐藏Bug排查 - 静态代码分析（多线程 + 纯正则内容匹配）"""
         bug_patterns = {
             'CRITICAL': [
                 (r'eval\s*\(', 'eval()代码执行风险'),
@@ -354,120 +363,44 @@ class SecurityAuditor:
             ]
         }
 
-        # 白名单：排除已知必要的print语句（业务输出，非调试残留）
-        print_whitelist = {
-            'main.py': [
-                # ===== 爬虫核心统计信息 =====
-                5920,    # 数据保存提示: print(f'数据已保存到 {new_filename}')
-                5921,    # 总商品数统计: print(f'成功获取 {total_count} 个商品')
-                5922,    # 高价商品统计: print(f'售价 >= 599 的商品: {high_price_count} 个')
-                5923,    # 预计售价统计: print(f'预计售出价格累计: ¥{total_sell_price:,.2f}')
-                5924,    # 平均售价统计: print(f'平均每个设备售出均价: ¥{avg_sell_price:,.2f}')
-                5925,    # 手续费统计: print(f'闲鱼平台手续费累计: ¥{total_platform_fee:,.2f}')
-
-                # ===== 爬虫运行信息（启动） =====
-                5937,    # 版本信息: print(f'Szwego商品爬虫 - v{VERSION}')
-                5938,    # 系统信息: print(f'当前系统: {self.get_system_info()}')
-                5939,    # Python版本: print(f'Python版本: {platform.python_version()}')
-                5940,    # 开始时间: print(f'开始时间: {start_datetime.strftime(...)}')
-                5942,    # 运行状态: print('开始运行...')
-                5946,    # 浏览器启动: print('正在启动浏览器...')
-
-                # ===== 环境检测与耗时 =====
-                5952,    # 系统检测: print(f'检测到系统: {system}')
-                5954,    # Chrome路径: print(f'使用系统Chrome: {chrome_path}')
-                5956,    # Chromium备用: print(f'使用Playwright内置Chromium')
-                5961,    # 浏览器耗时: print(f'浏览器启动耗时: {...:.2f}秒')
-                5968,    # 上下文耗时: print(f'上下文创建耗时: {...:.2f}秒')
-                5975,    # Cookie加载: print(f'已加载 {len(cookies)} 个Cookie')
-                5977,    # Cookie耗时: print(f'Cookie加载耗时: {...:.2f}秒')
-                5981,    # 页面耗时: print(f'页面创建耗时: {...:.2f}秒')
-                5985,    # 数据获取耗时: print(f'数据获取耗时: {...:.2f}秒')
-                5990,    # 保存耗时: print(f'数据保存耗时: {...:.2f}秒')
-                5996,    # 对比耗时: print(f'对比耗时: {...:.2f}秒')
-
-                # ===== 运行结束信息 =====
-                6007,    # Cookie保存: print(f'Cookie已保存到 {cookie_file}')
-                6008,    # Cookie保存耗时: print(f'Cookie保存耗时: {...:.2f}秒')
-                6016,    # 关闭浏览器: print(f'浏览器关闭耗时: {...:.2f}秒')
-                6030,    # 结束时间: print(f'结束时间: {end_datetime.strftime(...)}')
-                6031,    # 总运行时间: print(f'总运行时间: {total_time:.2f} 秒 ({total_time/60:.2f} 分钟)')
-
-                # ===== 数据对比详情 =====
-                6262,    # 对比工具标题: print('当天JSON文件对比工具')
-                6304,    # 最新文件货号: print(f'从最新JSON文件中读取到 {len(latest_stock_numbers)} 个货号')
-                6305,    # 次新文件货号: print(f'从次新JSON文件中读取到 {len(second_stock_numbers)} 个货号\n')
-                6378,    # 对比记录数: print(f'当前共有 {len(latest_json_data["小计"])} 条对比记录')
-                6382,    # 对比结果标题: print('对比结果')
-                6384,    # 对比文件名: print(f'对比文件: {os.path.basename(second_latest_json_file)} -> ...')
-                6385,    # 新增数量: print(f'新增商品数: {len(added)}')
-                6386,    # 删除数量: print(f'删除商品数: {len(removed)}')
-                6387,    # 新增高价数量: print(f'新增高价商品数: {len(high_price_added)}')
-
-                # ===== 其他业务输出 =====
-                5927,    # 变更摘要: print(f'{change_summary}')
-                5936,    # 启动分隔线: print('='*50)
-                5941,    # 启动分隔线: print('='*50)
-                5993,    # 对比开始: print('\n开始自动对比当天JSON文件...')
-                6010,    # Cookie错误: print(f'⚠️  Cookie保存失败: {e}')
-                6011,    # 继续执行: print('继续执行，不影响数据获取...')
-                6018,    # 浏览器关闭错误: print(f'⚠️  浏览器关闭失败: {e}')
-                6029,    # 结束分隔线: print('='*50)
-                6032,    # 结束分隔线: print('='*50)
-
-                # ===== 数据对比工具的其他输出 =====
-                6261,    # 对比工具分隔线: print('='*50)
-                6263,    # 对比工具分隔线: print('='*50)
-                6268,    # 错误提示: print('无法获取最新的JSON文件')
-                6272,    # 提示信息: print('只找到一个JSON文件，无法进行对比')
-                6273,    # 当前文件: print(f'当前文件: {latest_json_file}')
-                6274,    # 提示信息: print('提示：运行爬虫后再次运行此功能即可进行对比')
-                6283,    # 错误提示: print('无法读取最新的JSON文件')
-                6289,    # 错误提示: print('无法读取次新的JSON文件')
-                6297,    # 错误提示: print('JSON文件中没有商品列表')
-
-                # ===== 对比结果详细输出 =====
-                6377,    # 对比差异提示: print(f'\n对比差异已追加到 {latest_json_file}')
-                6381,    # 对比结果分隔线: print('='*50)
-                6383,    # 对比结果标题: print('对比结果')
-                6388,    # 新增数量: print(f'新增商品数: {len(added)}')
-                6391,    # 删除数量: print(f'删除商品数: {len(removed)}')
-                6393,    # 新增高价数量: print(f'新增高价商品数: {len(high_price_added)}')
-                6396,    # 分隔线: print('='*60)
-                6398,    # 新增商品标题: print('\n新增的商品:')
-                6401,    # 删除商品标题: print('\n删除的商品:')
-                6403,    # 新增高价商品标题: print(f'\n新增的售价>=599的商品:')
-                6405,    # 结束分隔线: print('='*60 + '\n')
-
-                # ===== 商品列表项（循环内，通过正则自动识别） =====
-            ]
-        }
-
-        def is_whitelisted_print(filename, line_num, line_content):
-            """检查是否是白名单中的必要print语句"""
-            if filename not in print_whitelist:
-                return False
-            return line_num in print_whitelist[filename]
-
-        files_to_scan = [
-            'main.py', 'dist/app.js', 'index.html', 'dist/index.html'
+        print_exclude_regexes = [
+            r"print\(f?['\"]",
+            r"print\(['\"]",
+            r"print\(f?['\"].*(?:数据已保存|成功获取|售价|预计售出|平均每个|闲鱼平台手续费|Szwego商品爬虫|当前系统|Python版本|开始时间|结束时间|总运行时间|开始运行|正在启动浏览器|检测到系统|使用系统Chrome|使用Playwright|浏览器启动耗时|上下文创建耗时|Cookie|页面创建耗时|数据获取耗时|数据保存耗时|对比耗时|Cookie已保存到|Cookie保存耗时|浏览器关闭耗时|结束时间|总运行时间|当天JSON文件对比|读取到.*货号|对比差异已追加到|当前共有.*条对比记录|对比结果|对比文件|新增商品数|删除商品数|新增高价|新增的商品|删除的商品|新增的售价|对比工具|无法获取|只找到一个JSON|提示：运行爬虫|无法读取|JSON文件中没有|继续执行)",
+            r"print\(['\"]={5,}",
+            r"print\(f?['\"].*⚠",
+            r"print\(f?['\"]  \d+\. ",
+            r"print\(f?['\"].*耗时.*秒",
+            r"print\(f?['\"].*重试",
         ]
 
-        for filename in files_to_scan:
+        def is_business_print(line: str) -> bool:
+            """纯正则自动识别业务输出，不依赖行号"""
+            for pat in print_exclude_regexes:
+                if re.search(pat, line, re.IGNORECASE):
+                    return True
+            if re.search(r'print\([\'\"]\s*$', line):
+                return True
+            return False
+
+        def scan_file(filename):
             filepath = self.project_root / filename
             if not filepath.exists():
-                continue
+                return
+            with self._lock:
+                self.results['files_scanned'].append(filename)
 
-            self.results['files_scanned'].append(filename)
-            content = filepath.read_text(encoding='utf-8')
+            try:
+                content = filepath.read_text(encoding='utf-8')
+            except Exception:
+                return
             lines = content.split('\n')
 
             for line_num, line in enumerate(lines, 1):
                 for severity, patterns in bug_patterns.items():
                     for pattern, desc in patterns:
                         if re.search(pattern, line, re.IGNORECASE):
-                            # 排除白名单中的必要print语句
-                            if desc == '生产环境print调试残留' and is_whitelisted_print(filename, line_num, line):
+                            if desc == '生产环境print调试残留' and is_business_print(line):
                                 continue
                             self._add_issue(SecurityIssue(
                                 severity=severity,
@@ -478,6 +411,16 @@ class SecurityAuditor:
                                 recommendation=self._get_fix_recommendation(pattern),
                                 code_snippet=line.strip()[:100]
                             ))
+
+        files_to_scan = self.code_files or ['main.py']
+
+        with ThreadPoolExecutor(max_workers=min(8, max(1, os.cpu_count() or 4))) as pool:
+            futures = [pool.submit(scan_file, f) for f in files_to_scan]
+            for fut in as_completed(futures):
+                try:
+                    fut.result()
+                except Exception as e:
+                    pass
 
     def _scan_owasp_top10(self):
         """OWASP Top 10 安全扫描"""

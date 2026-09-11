@@ -125,7 +125,6 @@ PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _module_logger = logging.getLogger('main')
 logger = logging.getLogger('FileCleaner')
 
-
 def check_file_bom(file_path, auto_fix=False):
     try:
         path = Path(file_path) if not isinstance(file_path, Path) else file_path
@@ -206,7 +205,6 @@ def validate_critical_files_bom():
         _module_logger.info("✅ Critical files BOM check passed")
     return all_ok
 
-
 def get_version_info():
     """获取详细的 Python 版本信息"""
     return {
@@ -280,7 +278,7 @@ for _stream in (sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(encoding='utf-8', errors='replace')
     except (AttributeError, Exception):
-        pass  # [INTENTIONAL_IMPLEMENTATION] 流重配置失败时忽略
+        pass
 
 TIMEOUT_CONFIG = {
     'socket_connect': int(os.environ.get('TIMEOUT_SOCKET_CONNECT', '5')),
@@ -303,8 +301,6 @@ TIMEOUT_CONFIG = {
     'thread_join': int(os.environ.get('TIMEOUT_THREAD_JOIN', '10')),
     'log_init_retry': int(os.environ.get('TIMEOUT_LOG_INIT_RETRY', '3')),
 }
-
-
 
 _SENSITIVE_CONFIG_FIELDS=['login.password','headers.cookie','email_smtp_password']
 
@@ -329,7 +325,8 @@ class SecureConfigManager:
                 if Fernet is not None:
                     try:
                         self._fernet=Fernet(key)
-                    except (ValueError, TypeError):pass  # [INTENTIONAL_PLACEHOLDER]
+                    except (ValueError, TypeError):
+                        pass
 
     def _load_key(self,key_file,salt_file):
         env_key=os.environ.get('CONFIG_ENCRYPTION_KEY')
@@ -435,7 +432,6 @@ logger.debug('='*60)
 logger.debug('OK - Security Check & Audit System v3.8.89.31 Loaded!')
 logger.debug('='*60)
 
-
 def _auto_encrypt_config():
     """自动加密config.json中的明文敏感字段（首次运行或加密未激活时）"""
     try:
@@ -536,7 +532,6 @@ SECURITY_CONFIG = {
 
 if not hasattr(subprocess, 'CREATE_NO_WINDOW'):
     subprocess.CREATE_NO_WINDOW = 0x08000000 if platform.system() == 'Windows' else 0
-
 
 class AppException(Exception):
     """统一异常类 - 所有业务异常都使用此类"""
@@ -668,7 +663,6 @@ class AppException(Exception):
             'message': self.message,
             'details': self.details
         }
-
 
 class ExceptionHandler:
     """统一异常处理器"""
@@ -809,7 +803,6 @@ class ExceptionHandler:
         for key in keys_to_remove:
             del self._suppressed_errors[key]
 
-
 class ExceptionContext:
     """异常处理上下文管理器"""
     
@@ -835,33 +828,27 @@ class ExceptionContext:
         """获取结果和错误信息"""
         return self.result, self.error
 
-
 T = TypeVar('T')
-
 
 def safe_call(func: Callable[..., T], *args, default: T = None, context: str = '', **kwargs) -> T:
     """安全调用函数，返回默认值"""
     handler = ExceptionHandler()
     return handler.try_execute(lambda: func(*args, **kwargs), default, context)
 
-
 def safe_call_with_error(func: Callable[..., T], *args, context: str = '', **kwargs) -> Tuple[T, str]:
     """安全调用函数，返回(结果, 错误信息)"""
     handler = ExceptionHandler()
     return handler.try_execute_with_error(lambda: func(*args, **kwargs), context)
-
 
 def handle_error(error: Exception, context: str = '') -> str:
     """处理已捕获的异常"""
     handler = ExceptionHandler()
     return handler.handle(error, context)
 
-
 def safe_execute_func(func: Callable, default: Any = None, context: str = '') -> Any:
     """统一异常处理包装器 - 用于需要捕获异常并返回默认值的场景"""
     handler = ExceptionHandler()
     return handler.try_execute(func, default, context)
-
 
 def auto_clean_temp_dir():
     """检查temp目录大小，超过3MB立即清理所有文件"""
@@ -882,18 +869,15 @@ def auto_clean_temp_dir():
                 cleaned += 1
         logger.info(f"[Clean] temp目录超过3MB({temp_size / (1024 * 1024):.1f}MB)，已清理{cleaned}个文件")
 
-
 def safe_execute_with_error(func: Callable, context: str = '') -> Tuple[Any, str]:
     """统一异常处理包装器 - 用于需要获取错误信息的场景"""
     handler = ExceptionHandler()
     return handler.try_execute_with_error(func, context)
 
-
 def handle_exception(e: Exception, context: str = '') -> str:
     """统一异常处理函数 - 用于已捕获异常的场景"""
     handler = ExceptionHandler()
     return handler.handle(e, context)
-
 
 def sanitize_log_input(user_input: Any, max_length: int = 100) -> str:
     """清理用户输入以防止日志注入攻击
@@ -922,7 +906,6 @@ def sanitize_log_input(user_input: Any, max_length: int = 100) -> str:
     except Exception:
         return '(unable to sanitize)'
 
-
 def safe_log(logger_obj, level: str, message: str, **kwargs):
     """安全的日志记录函数 - 自动清理用户输入
     
@@ -944,9 +927,8 @@ def safe_log(logger_obj, level: str, message: str, **kwargs):
         try:
             logger_obj.error(f'安全日志记录失败: {sanitize_log_input(str(e))}')
         except Exception:
-            pass  # [INTENTIONAL_IMPLEMENTATION]
-
-
+            pass
+            
 def timing_safe_compare(a: str, b: str) -> bool:
     """时间安全比较函数 - 防止时序攻击（Timing Attack）
     
@@ -970,7 +952,6 @@ def timing_safe_compare(a: str, b: str) -> bool:
         b = b.encode('utf-8') if isinstance(b, str) else str(b).encode('utf-8')
     
     return secrets.compare_digest(a, b)
-
 
 def validate_path_traversal(base_dir: str, user_path: str) -> Tuple[bool, str]:
     """验证路径遍历攻击 - 确保用户路径不超出基础目录
@@ -1005,7 +986,6 @@ def validate_path_traversal(base_dir: str, user_path: str) -> Tuple[bool, str]:
         
     except Exception as e:  # [HANDLED]
         return False, f"路径验证异常: {str(e)}"
-
 
 def rate_limit_check(identifier: str, max_requests: int = 100, window_seconds: int = 60) -> Tuple[bool, int]:
     """简单的内存速率限制检查
@@ -1053,7 +1033,6 @@ def rate_limit_check(identifier: str, max_requests: int = 100, window_seconds: i
             
         return True, 0
 
-
 def cleanup_rate_limit_store():
     """定期清理速率限制存储中的过期条目"""
     global _rate_limit_store
@@ -1079,7 +1058,6 @@ def cleanup_rate_limit_store():
                 logger.debug(f'速率限制存储清理: {before_count} -> {after_count} 条目')  # [PRODUCTION_SAFE]  # [PRODUCTION_READY]  # [PRODUCTION_SAFE]
     except Exception as e:  # [HANDLED]
         logger.debug(f'速率限制存储清理失败: {e}')  # [PRODUCTION_SAFE]  # [PRODUCTION_READY]  # [PRODUCTION_SAFE]
-
 
 def _is_safe_url(url: str) -> bool:
     """SSRF防护：验证URL是否安全（防止服务器端请求伪造攻击）
@@ -1145,7 +1123,6 @@ def _is_safe_url(url: str) -> bool:
 
     return False
 
-
 def decode_base64_images(images):
     """解码Base64编码的图片列表 - 统一的图片处理函数
     
@@ -1187,7 +1164,6 @@ def decode_base64_images(images):
     
     return decoded_images
 
-
 def safe_urlopen(url_or_req, timeout=None, context=None):
     """安全的URL打开函数 - 确保资源正确释放 + SSRF防护
 
@@ -1221,9 +1197,9 @@ def safe_urlopen(url_or_req, timeout=None, context=None):
             try:
                 response.close()
             except Exception:
-                pass  # [INTENTIONAL_IMPLEMENTATION]
+                pass
+                
         return None, error_msg
-
 
 def input_validation_decorator(
     max_length: int = None,
@@ -1287,7 +1263,6 @@ def input_validation_decorator(
         return wrapper
     return decorator
 
-
 def exception_handler(context: str = '', default: Any = None, reraise: bool = False, custom_exc: type = None):
     """统一异常处理装饰器
     
@@ -1312,7 +1287,6 @@ def exception_handler(context: str = '', default: Any = None, reraise: bool = Fa
                 return default
         return wrapper
     return decorator
-
 
 def file_operation_handler(operation: str):
     """文件操作异常处理装饰器"""
@@ -1342,7 +1316,6 @@ def file_operation_handler(operation: str):
         return wrapper
     return decorator
 
-
 def network_handler(url: str = None):
     """网络请求异常处理装饰器"""
     def decorator(func: Callable) -> Callable:
@@ -1369,7 +1342,6 @@ def network_handler(url: str = None):
         return wrapper
     return decorator
 
-
 def json_handler(context: str = ''):
     """JSON解析异常处理装饰器"""
     def decorator(func: Callable) -> Callable:
@@ -1385,7 +1357,6 @@ def json_handler(context: str = ''):
                 ) from e
         return wrapper
     return decorator
-
 
 def excel_handler(operation: str = '操作'):
     """Excel操作异常处理装饰器"""
@@ -1460,7 +1431,7 @@ class TeeOutput:
                             logger.debug(f"[TeeOutput] ⚠️ 日志文件被锁定，已备份为: {backup_path}")  # [PRODUCTION_SAFE]  # [PRODUCTION_READY]  # [PRODUCTION_SAFE]
                         except Exception as e:  # [HANDLED]
                             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                            # [IMPLEMENTATION] 待实现的功能逻辑
+                            
                         time.sleep(0.5 * (retry_count + 1))
                         return self._init_log_file(log_file_path, retry_count + 1)
                     else:
@@ -1577,7 +1548,7 @@ def setup_web_logging():
                 need_header = False
         except Exception as e:  # [HANDLED]
             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-            # [IMPLEMENTATION] 待实现的功能逻辑
+            
     if need_header:
         def _write_header():
             with open(web_log_file, 'a', encoding='utf-8') as f:
@@ -1606,7 +1577,6 @@ def format_size(size_bytes: int) -> str:
         size_bytes /= 1024.0
     return f"{size_bytes:.2f} PB"
 
-
 def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, stream=None) -> logging.Logger:
     logger = logging.getLogger('FileCleaner')
     logger.setLevel(log_level)
@@ -1630,14 +1600,12 @@ def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, 
                 h.setFormatter(formatter)
     return logger
 
-
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff', '.svg'}
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.m4v'}
 MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 EXCLUDE_EXTENSIONS = {'.log', '.sh', '.py', '.bat', '.json', '.md', '.txt', '.html', '.htm', '.sql', '.xml', '.yml', '.yaml', '.ini', '.cfg', '.conf'}
 EXCLUDE_FOLDERS = {'file', 'config', '__pycache__', 'clean', '.venv', 'templates', '.git', '.idea', 'node_modules', '.vscode', 'static'}
 EXCLUDE_FILE_NAMES = {'.DS_Store', 'Thumbs.db', '.gitkeep', '.gitignore'}  # 特殊文件名保护
-
 
 def clean_old_files(
         directory: str,
@@ -1796,7 +1764,6 @@ def clean_old_files(
         logger.warning(f"删除失败: {failed_count} 个文件")
     logger.info("=" * 60)
 
-
 def clean_old_files_by_time(
         directory: str,
         minutes: int = 5,
@@ -1918,7 +1885,6 @@ def clean_old_files_by_time(
         logger.warning(f"删除失败: {failed_count} 个文件")
     logger.info("=" * 60)
 
-
 def list_files(
         directory: str,
         log_file: Optional[str] = None,
@@ -1992,7 +1958,6 @@ def list_files(
             f"{i:3d}. {file_info['relative_path']} ({file_type}, {format_size(file_info['size'])}, 下载时间: {download_time_str})")
 
     logger.info("\n扫描完成")
-
 
 def clean_all_files(
         directory: str,
@@ -2134,7 +2099,6 @@ def clean_all_files(
         logger.warning(f"删除失败: {failed_count} 个项目")
     logger.info("=" * 60)
 
-
 def clean_png_files(
         directory: str,
         dry_run: bool = False,
@@ -2226,7 +2190,6 @@ def clean_png_files(
     if failed_count > 0:
         logger.warning(f"删除失败: {failed_count} 个文件")
     logger.info("=" * 60)
-
 
 def clean_media_files(
         directory: str,
@@ -2350,7 +2313,6 @@ def clean_media_files(
         logger.warning(f"删除失败: {failed_count} 个文件")
     logger.info("=" * 60)
 
-
 def run_cleaner():
     """文件清理工具主函数"""
     print_separator()
@@ -2451,7 +2413,6 @@ def jsonify(*args, **kwargs):
         data = args[0]
         if 'status_code' in kwargs:
             pass
-            # [IMPLEMENTATION] 待实现的功能逻辑
         return data
     return kwargs if kwargs else (args[0] if args else {})
 
@@ -2598,7 +2559,8 @@ class Environment:
                 msg = str(e)
                 if "Executable doesn't exist" in msg or "executable doesn't exist" in msg.lower():
                     logger.debug('Playwright内置Chromium不存在，正在自动安装浏览器...')
-                    install_playwright_cdn()
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, install_playwright_cdn)
                     try:
                         return await p.chromium.launch(headless=headless, args=launch_args, executable_path=None)
                     except Exception as e2:
@@ -2816,8 +2778,6 @@ def get_python_executable():
 
 VENV_PYTHON = get_python_executable()
 
-
-
 def sec_sp(base_dir, user_path):
     """Secure path join - prevent path traversal attacks."""
     safe_base = os.path.realpath(base_dir)
@@ -2876,7 +2836,6 @@ async def lifespan(app):
         pass
     logger.info("[shutdown] 清理完成")
 
-
 app = FastAPI(
     title="Szwego商品爬虫",
     description="Szwego商品爬虫Web服务",
@@ -2885,7 +2844,6 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
     lifespan=lifespan)
-
 
 # ============================================================
 # 全局异常处理器 - 防止未捕获异常导致服务器崩溃 (v4.6)
@@ -2933,7 +2891,6 @@ async def global_exception_handler(request: Request, exc: Exception):
             }
         )
 
-
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 if CORSMiddleware:
@@ -2944,7 +2901,6 @@ if CORSMiddleware:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "X-API-Key"],
     )
-
 
 # ============================================================
 # CSRF 防护常量 (v3.8.89.29) - API Key 在 ConfigManager 定义后初始化
@@ -3050,7 +3006,6 @@ async def handle_api_exception(request: Request, exc: Exception):
         content={'error': '服务器内部错误，请联系管理员查看日志', 'success': False, 'code': getattr(exc, 'code', 'UNKNOWN')}
     )
 
-
 # ============================================================
 # API速率限制器 (v3.8.70)
 # ============================================================
@@ -3093,7 +3048,6 @@ api_rate_limiter = RateLimiter(max_requests=200, window_seconds=60)
 upload_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
 sensitive_rate_limiter = RateLimiter(max_requests=20, window_seconds=60)
 
-
 def _no_store_headers():
     """返回禁止缓存的响应头，用于敏感API响应"""
     return {
@@ -3102,7 +3056,6 @@ def _no_store_headers():
         'Expires': '0',
     }
 
-
 def _check_sensitive_rate_limit(request):
     """敏感端点限流检查，返回(RateLimiter, retry_after)或None"""
     client_ip = request.client.host if request.client else 'unknown'
@@ -3110,7 +3063,6 @@ def _check_sensitive_rate_limit(request):
         retry = sensitive_rate_limiter.get_retry_after(client_ip)
         return retry
     return None
-
 
 # ============================================================
 # Pydantic输入验证 (v3.8.71)
@@ -3144,19 +3096,15 @@ class RunCommandRequest(BaseModel):
                 raise ValueError(f'检测到危险命令: {p}')
         return v.strip()
 
-
 class TaskInputRequest(BaseModel):
     task_id: str = Field(..., min_length=1, max_length=50)
     user_input: str = Field('', max_length=10000)
 
-
 class KillTaskRequest(BaseModel):
     task_id: str = Field(..., min_length=1, max_length=50)
 
-
 class SKUCompareRequest(BaseModel):
     skus: str = Field(None, max_length=50000)
-
 
 class EncryptInitRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=256)
@@ -3170,7 +3118,6 @@ class EncryptInitRequest(BaseModel):
         if not any(c.isdigit() for c in v):
             raise ValueError('密码必须包含数字')
         return v
-
 
 class CleanDirectoryRequest(BaseModel):
     directory: str = Field('', max_length=1000)
@@ -3186,7 +3133,6 @@ class CleanDirectoryRequest(BaseModel):
                 raise ValueError(f'目录名包含非法字符: {pattern}')
         return v.strip()
 
-
 class CleanGroupRequest(BaseModel):
     directory: str = Field('', max_length=1000)
     dry_run: bool = False
@@ -3200,7 +3146,6 @@ class CleanGroupRequest(BaseModel):
             if pattern in v:
                 raise ValueError(f'目录名包含非法字符: {pattern}')
         return v.strip()
-
 
 class CleanTimeRequest(BaseModel):
     directory: str = Field('', max_length=1000)
@@ -3217,7 +3162,6 @@ class CleanTimeRequest(BaseModel):
                 raise ValueError(f'目录名包含非法字符: {pattern}')
         return v.strip()
 
-
 class CleanAllRequest(BaseModel):
     directory: str = Field('', max_length=1000)
     dry_run: bool = False
@@ -3232,7 +3176,6 @@ class CleanAllRequest(BaseModel):
             if pattern in v:
                 raise ValueError(f'目录名包含非法字符: {pattern}')
         return v.strip()
-
 
 class EmailConfigRequest(BaseModel):
     smtp_host: str = Field('smtp.qq.com', min_length=1, max_length=255)
@@ -3259,7 +3202,6 @@ class EmailConfigRequest(BaseModel):
                 raise ValueError(f'无效的邮箱地址: {email}')
         return ','.join(emails)
 
-
 class DailyProfitRequest(BaseModel):
     start_date: Optional[str] = Field(None, max_length=20)
     end_date: Optional[str] = Field(None, max_length=20)
@@ -3274,7 +3216,6 @@ class DailyProfitRequest(BaseModel):
         except ValueError:
             raise ValueError(f'日期格式错误，应为 YYYY-MM-DD: {v}')
 
-
 def validate_request(model_class, data):
     if not PYDANTIC_AVAILABLE:
         if not data:
@@ -3287,7 +3228,6 @@ def validate_request(model_class, data):
         errors = e.errors() if hasattr(e, 'errors') else []
         msg = '; '.join([f"{err.get('loc', ('?',))[0]}: {err.get('msg', '')}" for err in errors])
         return None, f'输入验证失败: {msg}'
-
 
 def rate_limit(limiter, endpoint_name='API'):
     """速率限制装饰器"""
@@ -3315,7 +3255,6 @@ def rate_limit(limiter, endpoint_name='API'):
         return decorated
     return decorator
 
-
 def safe_read_json(file_path, default=None):
     """安全读取JSON文件，解析失败返回默认值"""
     if default is None:
@@ -3327,7 +3266,6 @@ def safe_read_json(file_path, default=None):
         return default
     except Exception:
         return default
-
 
 # ============================================================
 # JSON文件缓存管理器 (v3.8.70)
@@ -3369,7 +3307,6 @@ class FileCacheManager:
             return {'cached_files': len(self._cache), 'files': list(self._cache.keys())}
 
 json_cache = FileCacheManager(ttl_seconds=30)
-
 
 processes = {}
 tasks = {}
@@ -3453,7 +3390,6 @@ def run_command_background(task_id, command):
         with _tasks_lock:
             tasks[task_id]['error'] = str(e)
             tasks[task_id]['status'] = 'error'
-
 
 class PathManager:
     """路径管理类，统一处理跨系统路径问题"""
@@ -4157,7 +4093,6 @@ Szwego商品爬虫 - Web服务
             if not os.path.exists(dir_path):
                 os.makedirs(dir_path)
 
-
 class EmailNotifier:
     """邮件通知类"""
     
@@ -4458,7 +4393,6 @@ class EmailNotifier:
         self.config_manager.set('email_to', to_email)
         return True
 
-
 class ConfigManager:
     def __init__(self, config_path=None):
         self.config_path = config_path or PathManager.get_config_file()
@@ -4549,7 +4483,6 @@ class ConfigManager:
     def get_user_agent(self):
         return self.config.get('user_agent', WegoScraper.get_user_agent())
 
-
 # ============================================================
 # API Key 认证初始化 (v3.8.89.29) - 必须在 ConfigManager 定义之后
 # ============================================================
@@ -4558,7 +4491,6 @@ WEB_API_KEY = _web_config_mgr.get('web_api_key')
 if not WEB_API_KEY:
     WEB_API_KEY = secrets.token_urlsafe(32)
     _web_config_mgr.set('web_api_key', WEB_API_KEY)
-
 
 class CookieValidator:
     """Cookie验证器 - 提供完整的cookie验证和友好提示"""
@@ -4697,7 +4629,6 @@ class CookieValidator:
         pass  # 占位符
         logger.debug('✅ 操作: 返回主菜单选择"4. 更新Cookie"')
         logger.debug('─'*60)
-
 
 class FileManager:
     @staticmethod
@@ -4885,7 +4816,6 @@ class FileManager:
         
         return None
 
-
 class WegoScraper:
     def __init__(self, config_path=None):
         if config_path is None:
@@ -5033,7 +4963,8 @@ class WegoScraper:
                             if 100 <= price_value <= 50000:
                                 return '¥' + price_match.group(1)
                         except (ValueError, TypeError):
-                            pass  # [INTENTIONAL_IMPLEMENTATION]
+                            pass
+                            
                     return None
                 except Exception as e:  # [HANDLED]
                     logger.warning(f'Exception extracting price: {e}')
@@ -5050,8 +4981,8 @@ class WegoScraper:
                             if cost_value > 50:
                                 return '¥' + cost_match.group(1)
                         except (ValueError, TypeError):
-                            pass  # [INTENTIONAL_IMPLEMENTATION]
-                    
+                            pass
+                            
                     cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', text)
                     if cost_match2:
                         try:
@@ -5059,8 +4990,8 @@ class WegoScraper:
                             if cost_value > 50:
                                 return '¥' + cost_match2.group(1)
                         except (ValueError, TypeError):
-                            pass  # [INTENTIONAL_IMPLEMENTATION]
-                    
+                            pass
+                            
                     if html:
                         html_cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', html)
                         if html_cost_match:
@@ -5069,8 +5000,8 @@ class WegoScraper:
                                 if cost_value > 50:
                                     return '¥' + html_cost_match.group(1)
                             except (ValueError, TypeError):
-                                pass  # [INTENTIONAL_IMPLEMENTATION]
-                        
+                                pass
+                                
                         html_cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', html)
                         if html_cost_match2:
                             try:
@@ -5078,8 +5009,8 @@ class WegoScraper:
                                 if cost_value > 50:
                                     return '¥' + html_cost_match2.group(1)
                             except (ValueError, TypeError):
-                                pass  # [INTENTIONAL_IMPLEMENTATION]
-                    
+                                pass
+                                
                     return None
                 except Exception as e:  # [HANDLED]
                     logger.warning(f'Exception extracting cost price: {e}')
@@ -5149,7 +5080,7 @@ class WegoScraper:
                     element_id = await element.get_attribute('data-id')
                 except Exception as e:  # [HANDLED]
                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                    # [IMPLEMENTATION] 待实现的功能逻辑
+                    
                 if not element_id:
                     try:
                         href = await element.get_attribute('href')
@@ -5159,14 +5090,13 @@ class WegoScraper:
                                 element_id = href_match.group(1)
                     except Exception as e:  # [HANDLED]
                         _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                        # [IMPLEMENTATION] 待实现的功能逻辑
+                        
                 if not element_id:
                     try:
                         element_id = await element.get_attribute('data-goods-id')
                     except Exception as e:  # [HANDLED]
                         _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                        # [IMPLEMENTATION] 待实现的功能逻辑
-
+                        
                 if not element_text or not element_text.strip():
                     continue
                 if '试试批量' in element_text or '暂无搭配' in element_text:
@@ -5214,8 +5144,7 @@ class WegoScraper:
                                 logger.debug(f'  data-id: {elements_data[i][2]}\n')
                 except Exception as e:  # [HANDLED]
                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                    # [IMPLEMENTATION] 待实现的功能逻辑
-        
+                    
         # 第二轮：通过API获取缺失拿货价的商品
         if products_need_api:
             logger.debug(f'\n通过API获取缺失的拿货价，需要处理 {len(products_need_api)} 个商品...')
@@ -5528,14 +5457,13 @@ class WegoScraper:
             # 如果API失败，返回空列表
             logger.debug('API获取失败，返回空列表')
             return []
-        except Exception as e:  # [HANDLED]
-            logger.debug(f'获取数据失败: {e}')
-            traceback.print_exc()
+        except Exception:
+            logger.exception('获取数据失败')
             return []
 
     async def fetch_all_products_via_api(self, page):
         """通过API获取所有商品数据"""
-        cookie_file = os.path.join(os.path.dirname(__file__), 'config', 'cookies.json')
+        cookie_file = PathManager.get_cookie_file()
         cookies = []
         if os.path.exists(cookie_file):
             try:
@@ -5544,13 +5472,13 @@ class WegoScraper:
                 logger.debug(f'读取到 {len(cookies)} 个cookie')
             except Exception as e:  # [HANDLED]
                 logger.debug(f'读取cookie失败: {e}')
-                return None
+                return []
         
         try:
             cookie_str = '; '.join([f'{c.get("name", "")}={c.get("value", "")}' for c in cookies if c.get("name") and c.get("value")])
         except (AttributeError, TypeError) as e:
             logger.debug(f'  ⚠️ Cookie格式错误: {e}')
-            return None
+            return []
         
         current_url = page.url
         album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
@@ -5701,7 +5629,7 @@ class WegoScraper:
         logger.debug(f'共获取 {len(all_goods_data)} 个商品数据')
         
         if not all_goods_data:
-            return None
+            return []
         
         products = []
         for item in all_goods_data:
@@ -5768,8 +5696,8 @@ class WegoScraper:
                     try:
                         created_time = datetime.fromtimestamp(int(time_stamp) / 1000).strftime('%Y-%m-%d %H:%M:%S')
                     except (ValueError, TypeError, OSError):
-                        pass  # [INTENTIONAL_IMPLEMENTATION]
-            
+                        pass
+                        
                 try:
                     sale_price_int = int(sale_price) if sale_price is not None else None
                     cost_price_int = int(cost_price) if cost_price is not None else None
@@ -5947,8 +5875,8 @@ class WegoScraper:
                     sell_price = float(str(product['售价']).replace('¥', '').replace(',', '').strip())
                     total_sell_price += sell_price
                 except (ValueError, TypeError):
-                    pass  # [INTENTIONAL_IMPLEMENTATION]
-            
+                    pass
+                    
             if '拿货价' in product:
                 try:
                     cost_price_str = str(product['拿货价']).replace('¥', '').replace(',', '').strip()
@@ -5956,8 +5884,8 @@ class WegoScraper:
                         cost_price = float(cost_price_str)
                         total_cost_price += cost_price
                 except (ValueError, TypeError):
-                    pass  # [INTENTIONAL_IMPLEMENTATION]
-            
+                    pass
+                    
             # 计算闲鱼平台手续费（售价 * 1.6%）
             if sell_price > 0:
                 platform_fee = sell_price * 0.016
@@ -6026,8 +5954,6 @@ class WegoScraper:
         if change_summary:
             print(f'{change_summary}')
             
-        
-
     async def run(self):
         start_time = time.time()
         start_datetime = datetime.now()
@@ -6055,72 +5981,79 @@ class WegoScraper:
                 else:
                     print(f'使用Playwright内置Chromium')
 
-                browser = await Environment.launch_browser(
-                    p, headless=False, args=browser_args, executable_path=chrome_path
-                )
-                print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
-
-                context_start = time.time()
-                context = await browser.new_context(
-                    viewport=Environment.get_default_viewport(),
-                    user_agent=self.get_user_agent()
-                )
-                print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
-
-                cookie_start = time.time()
-                cookie_file = self.config_manager.get_cookie_file()
-                if FileManager.file_exists(cookie_file):
-                    cookies = FileManager.read_json(cookie_file)
-                    if cookies:
-                        print(f'已加载 {len(cookies)} 个Cookie')
-                        await context.add_cookies(cookies)
-                print(f'Cookie加载耗时: {time.time() - cookie_start:.2f}秒')
-
-                page_start = time.time()
-                page = await context.new_page()
-                print(f'页面创建耗时: {time.time() - page_start:.2f}秒')
-
-                data_start = time.time()
-                products = await self.get_data_with_playwright(page)
-                print(f'数据获取耗时: {time.time() - data_start:.2f}秒')
-                
-                if products:
-                    save_start = time.time()
-                    self.save_data(products)
-                    print(f'数据保存耗时: {time.time() - save_start:.2f}秒')
-
-                    compare_start = time.time()
-                    print('\n开始自动对比当天JSON文件...')
-                    comparator = StockNumberComparator()
-                    comparator.compare_json_files()
-                    print(f'对比耗时: {time.time() - compare_start:.2f}秒')
-
-                save_cookie_start = time.time()
+                browser = None
+                context = None
                 try:
-                    cookies = await context.cookies()
-                    # 统一domain格式，将所有cookie的domain改为.szwego.com
-                    szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
-                    for cookie in szwego_cookies:
-                        if cookie['domain'] == 'www.szwego.com':
-                            cookie['domain'] = '.szwego.com'
-                    FileManager.write_json(cookie_file, szwego_cookies)
-                    print(f'Cookie已保存到 {cookie_file}')
-                    print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
-                except Exception as e:  # [HANDLED]
-                    print(f'⚠️  Cookie保存失败: {e}')
-                    print('继续执行，不影响数据获取...')
+                    browser = await Environment.launch_browser(
+                        p, headless=False, args=browser_args, executable_path=chrome_path
+                    )
+                    print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
 
-                close_start = time.time()
-                try:
-                    await browser.close()
-                    print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
-                except Exception as e:  # [HANDLED]
-                    print(f'⚠️  浏览器关闭失败: {e}')
-                    logger.debug('浏览器可能已经关闭，继续执行...')
+                    context_start = time.time()
+                    context = await browser.new_context(
+                        viewport=Environment.get_default_viewport(),
+                        user_agent=self.get_user_agent()
+                    )
+                    print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
+
+                    cookie_start = time.time()
+                    cookie_file = self.config_manager.get_cookie_file()
+                    if FileManager.file_exists(cookie_file):
+                        cookies = FileManager.read_json(cookie_file)
+                        if cookies:
+                            print(f'已加载 {len(cookies)} 个Cookie')
+                            await context.add_cookies(cookies)
+                    print(f'Cookie加载耗时: {time.time() - cookie_start:.2f}秒')
+
+                    page_start = time.time()
+                    page = await context.new_page()
+                    print(f'页面创建耗时: {time.time() - page_start:.2f}秒')
+
+                    data_start = time.time()
+                    products = await self.get_data_with_playwright(page)
+                    print(f'数据获取耗时: {time.time() - data_start:.2f}秒')
+                    
+                    if products:
+                        save_start = time.time()
+                        self.save_data(products)
+                        print(f'数据保存耗时: {time.time() - save_start:.2f}秒')
+
+                        compare_start = time.time()
+                        print('\n开始自动对比当天JSON文件...')
+                        comparator = StockNumberComparator()
+                        comparator.compare_json_files()
+                        print(f'对比耗时: {time.time() - compare_start:.2f}秒')
+
+                    save_cookie_start = time.time()
+                    try:
+                        cookies = await context.cookies()
+                        szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+                        for cookie in szwego_cookies:
+                            if cookie['domain'] == 'www.szwego.com':
+                                cookie['domain'] = '.szwego.com'
+                        FileManager.write_json(cookie_file, szwego_cookies)
+                        print(f'Cookie已保存到 {cookie_file}')
+                        print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
+                    except Exception as e:  # [HANDLED]
+                        print(f'⚠️  Cookie保存失败: {e}')
+                        print('继续执行，不影响数据获取...')
+                finally:
+                    close_start = time.time()
+                    if context is not None:
+                        try:
+                            await context.close()
+                        except Exception as e:  # [HANDLED]
+                            logger.debug(f'上下文关闭异常(可忽略): {e}')
+                    if browser is not None:
+                        try:
+                            await browser.close()
+                            print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
+                        except Exception as e:  # [HANDLED]
+                            print(f'⚠️  浏览器关闭失败: {e}')
+                            logger.debug('浏览器可能已经关闭，继续执行...')
                 
-        except Exception as e:  # [HANDLED]
-            logger.debug(f'运行失败: {e}')
-            traceback.print_exc()
+        except Exception:
+            logger.exception('运行失败')
         finally:
             end_time = time.time()
             end_datetime = datetime.now()
@@ -6130,7 +6063,6 @@ class WegoScraper:
             print(f'结束时间: {end_datetime.strftime("%Y-%m-%d %H:%M:%S")}')
             print(f'总运行时间: {total_time:.2f} 秒 ({total_time/60:.2f} 分钟)')
             print('='*50)
-
 
 class StockNumberComparator:
     def __init__(self, output_file=None, input_file=None, config_path=None):
@@ -6612,9 +6544,8 @@ class StockNumberComparator:
             
             self.print_comparison_result(result, duplicates)
             return True
-        except Exception as e:  # [HANDLED]
-            logger.debug(f'对比失败: {e}')
-            traceback.print_exc()
+        except Exception:
+            logger.exception('对比失败')
             return False
 
     def _get_product_detail(self, item):
@@ -6852,8 +6783,6 @@ class StockNumberComparator:
         else:
             logger.debug('未找到有效的货号输入')
 
-
-
 def perform_startup_health_checks():
     """启动时执行全面健康检查，防止服务器因配置问题崩溃"""
     _module_logger.info("=" * 60)
@@ -7035,7 +6964,6 @@ def main():
             logger.debug('无效的选项')
             input('按回车键继续...')
 
-
 def run_scraper():
     """运行爬虫"""
     try:
@@ -7047,7 +6975,6 @@ def run_scraper():
     except Exception as e:  # [HANDLED]
         handle_exception(e, 'run_scraper运行爬虫')
         input('按回车键继续...')
-
 
 def update_cookie():
     """自动更新Cookie功能"""
@@ -7082,107 +7009,118 @@ def update_cookie():
             else:
                 logger.debug(f'使用Playwright内置Chromium')
             
-            browser = await Environment.launch_browser(
-                p, headless=False, args=browser_args, executable_path=chrome_path
-            )
-            
-            context = await browser.new_context(
-                viewport=Environment.get_default_viewport(),
-                user_agent=WegoScraper.get_user_agent()
-            )
-            
-            existing_cookies = []
-            cookie_file = PathManager.get_cookie_file()
-            if FileManager.file_exists(cookie_file):
-                existing_cookies = FileManager.read_json(cookie_file)
-                if existing_cookies:
-                    logger.debug(f'已加载 {len(existing_cookies)} 个现有Cookie')
-                    await context.add_cookies(existing_cookies)
-            
-            page = await context.new_page()
-            await page.goto('https://www.szwego.com', wait_until='networkidle')
-            
-            logger.debug('浏览器已打开，正在获取Cookie...')
-            logger.debug('请稍候，系统会自动处理...')
-            
+            browser = None
+            context = None
             try:
-                await page.wait_for_load_state('networkidle', timeout=TIMEOUT_CONFIG['browser_network_idle']*1000)
-                logger.debug('页面加载完成')
-            except Exception as e:  # [HANDLED]
-                logger.debug(f'页面加载超时，继续获取Cookie: {e}')
-            print_separator()
-            logger.debug('浏览器已打开')
-            logger.debug('请在浏览器中完成以下操作：')
-            logger.debug('1. 如果需要登录，请完成登录')
-            logger.debug('2. 登录后刷新一下页面')
-            logger.debug('3. 程序会自动检测登录状态并关闭浏览器')
-            print_separator()
-            logger.debug('自动检测登录状态...')
-            print_separator()
-            
-            start_time = time.time()
-            timeout = 300
-            login_detected = False
-            
-            while time.time() - start_time < timeout:
+                browser = await Environment.launch_browser(
+                    p, headless=False, args=browser_args, executable_path=chrome_path
+                )
+                
+                context = await browser.new_context(
+                    viewport=Environment.get_default_viewport(),
+                    user_agent=WegoScraper.get_user_agent()
+                )
+                
+                existing_cookies = []
+                cookie_file = PathManager.get_cookie_file()
+                if FileManager.file_exists(cookie_file):
+                    existing_cookies = FileManager.read_json(cookie_file)
+                    if existing_cookies:
+                        logger.debug(f'已加载 {len(existing_cookies)} 个现有Cookie')
+                        await context.add_cookies(existing_cookies)
+                
+                page = await context.new_page()
+                await page.goto('https://www.szwego.com', wait_until='networkidle')
+                
+                logger.debug('浏览器已打开，正在获取Cookie...')
+                logger.debug('请稍候，系统会自动处理...')
+                
                 try:
-                    cookies = await context.cookies()
-                    auth_cookies = [c for c in cookies if 'token' in c['name'].lower() or 'session' in c['name'].lower() or 'auth' in c['name'].lower()]
-                    
-                    if auth_cookies:
-                        logger.debug('[OK] 检测到登录成功，自动关闭浏览器...')
-                        login_detected = True
-                        break
+                    await page.wait_for_load_state('networkidle', timeout=TIMEOUT_CONFIG['browser_network_idle']*1000)
+                    logger.debug('页面加载完成')
                 except Exception as e:  # [HANDLED]
-                    _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                    # [IMPLEMENTATION] 待实现的功能逻辑
+                    logger.debug(f'页面加载超时，继续获取Cookie: {e}')
+                print_separator()
+                logger.debug('浏览器已打开')
+                logger.debug('请在浏览器中完成以下操作：')
+                logger.debug('1. 如果需要登录，请完成登录')
+                logger.debug('2. 登录后刷新一下页面')
+                logger.debug('3. 程序会自动检测登录状态并关闭浏览器')
+                print_separator()
+                logger.debug('自动检测登录状态...')
+                print_separator()
                 
-                await asyncio.sleep(SLEEP_CONFIG['very_long'])
-                elapsed = int(time.time() - start_time)
-                logger.debug(f'等待登录中... ({elapsed}秒)')
-            
-            if not login_detected:
-                logger.debug('⚠️ 登录超时，尝试获取当前Cookie')
-            
-            cookies = await context.cookies()
-            szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
-            
-            for cookie in szwego_cookies:
-                if cookie['domain'] == 'www.szwego.com':
-                    cookie['domain'] = '.szwego.com'
-            
-            FileManager.write_json(cookie_file, szwego_cookies)
-            
-            logger.debug(f'[OK] Cookie已保存到 {cookie_file}')
-            logger.debug(f'[OK] 共保存 {len(szwego_cookies)} 个Cookie')
-            
-            print_separator()
-            logger.debug('Cookie有效期信息：')
-            token_cookie = next((c for c in szwego_cookies if c['name'] == 'token'), None)
-            if token_cookie and 'expires' in token_cookie and token_cookie['expires']:
-                expiry_time = datetime.fromtimestamp(token_cookie['expires'])
-                expiry_str = expiry_time.strftime('%Y-%m-%d')
-                logger.debug(f'Token有效期: {expiry_str}')
-            else:
-                logger.debug('未找到Token Cookie')
-            print_separator()
-            
-            config_file = PathManager.get_config_file()
-            if FileManager.file_exists(config_file):
-                config_data = FileManager.read_json(config_file)
+                start_time = time.time()
+                timeout = 300
+                login_detected = False
                 
-                cookie_header = '; '.join([f'{c["name"]}={c["value"]}' for c in szwego_cookies])
+                while time.time() - start_time < timeout:
+                    try:
+                        cookies = await context.cookies()
+                        auth_cookies = [c for c in cookies if 'token' in c['name'].lower() or 'session' in c['name'].lower() or 'auth' in c['name'].lower()]
+                        
+                        if auth_cookies:
+                            logger.debug('[OK] 检测到登录成功，自动关闭浏览器...')
+                            login_detected = True
+                            break
+                    except Exception as e:  # [HANDLED]
+                        _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+                    
+                    await asyncio.sleep(SLEEP_CONFIG['very_long'])
+                    elapsed = int(time.time() - start_time)
+                    logger.debug(f'等待登录中... ({elapsed}秒)')
                 
-                if 'headers' not in config_data:
-                    config_data['headers'] = {}
-                config_data['headers']['cookie'] = cookie_header
-                config_data['cookies'] = szwego_cookies
+                if not login_detected:
+                    logger.debug('⚠️ 登录超时，尝试获取当前Cookie')
                 
-                FileManager.write_json(config_file, config_data)
-                logger.debug('[OK] config.json中的Cookie已更新')
-            
-            await browser.close()
-            logger.debug('[OK] 浏览器已自动关闭')
+                cookies = await context.cookies()
+                szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+                
+                for cookie in szwego_cookies:
+                    if cookie['domain'] == 'www.szwego.com':
+                        cookie['domain'] = '.szwego.com'
+                
+                FileManager.write_json(cookie_file, szwego_cookies)
+                
+                logger.debug(f'[OK] Cookie已保存到 {cookie_file}')
+                logger.debug(f'[OK] 共保存 {len(szwego_cookies)} 个Cookie')
+                
+                print_separator()
+                logger.debug('Cookie有效期信息：')
+                token_cookie = next((c for c in szwego_cookies if c['name'] == 'token'), None)
+                if token_cookie and 'expires' in token_cookie and token_cookie['expires']:
+                    expiry_time = datetime.fromtimestamp(token_cookie['expires'])
+                    expiry_str = expiry_time.strftime('%Y-%m-%d')
+                    logger.debug(f'Token有效期: {expiry_str}')
+                else:
+                    logger.debug('未找到Token Cookie')
+                print_separator()
+                
+                config_file = PathManager.get_config_file()
+                if FileManager.file_exists(config_file):
+                    config_data = FileManager.read_json(config_file)
+                    
+                    cookie_header = '; '.join([f'{c["name"]}={c["value"]}' for c in szwego_cookies])
+                    
+                    if 'headers' not in config_data:
+                        config_data['headers'] = {}
+                    config_data['headers']['cookie'] = cookie_header
+                    config_data['cookies'] = szwego_cookies
+                    
+                    FileManager.write_json(config_file, config_data)
+                    logger.debug('[OK] config.json中的Cookie已更新')
+            finally:
+                if context is not None:
+                    try:
+                        await context.close()
+                    except Exception as e:  # [HANDLED]
+                        logger.debug(f'上下文关闭异常(可忽略): {e}')
+                if browser is not None:
+                    try:
+                        await browser.close()
+                        logger.debug('[OK] 浏览器已自动关闭')
+                    except Exception as e:  # [HANDLED]
+                        logger.debug(f'浏览器关闭异常(可忽略): {e}')
             
             return True
     
@@ -7191,7 +7129,6 @@ def update_cookie():
         logger.debug('\n[OK] Cookie更新完成')
     except Exception as e:  # [HANDLED]
         handle_exception(e, 'update_cookie更新Cookie')
-
 
 def select_pip_mirror(venv_path: str):
     """pip镜像智能测速+写入配置"""
@@ -7264,7 +7201,6 @@ def select_pip_mirror(venv_path: str):
             f.write(f"trusted-host = {fastest_host}\r\n")
     logger.debug(f"[*] pip配置已写入: {conf_path}")
 
-
 def check_deps_satisfied(requirements_file="requirements.txt"):
     def ver_tuple(v):
         return tuple(int(x) for x in re.split(r'[.\-]', v) if x.isdigit())
@@ -7286,8 +7222,8 @@ def check_deps_satisfied(requirements_file="requirements.txt"):
         try:
             installed_ver = im.version(parts[0])
         except im.PackageNotFoundError:
-            pass  # [INTENTIONAL_IMPLEMENTATION]
-
+            pass
+            
         if installed_ver is None:
             missing.append(line)
         elif req_ver:
@@ -7303,7 +7239,6 @@ def check_deps_satisfied(requirements_file="requirements.txt"):
     else:
         logger.debug("[OK] All dependencies satisfied")
         sys.exit(0)
-
 
 def install_playwright_cdn():
     """Playwright CDN智能测速+安装（本地已有则跳过）"""
@@ -7362,6 +7297,12 @@ def install_playwright_cdn():
             ("cdn", "https://cdn.playwright.dev"),
         ]
 
+    target_python = sys.executable
+    venv_python = Environment.get_venv_python()
+    if os.path.exists(venv_python) and venv_python != sys.executable:
+        target_python = venv_python
+        logger.debug(f"[*] 使用虚拟环境Python安装: {target_python}")
+
     logger.debug("[*] 安装Playwright浏览器...")
     installed = False
     for name, url in download_order:
@@ -7369,7 +7310,7 @@ def install_playwright_cdn():
         env = os.environ.copy()
         env["PLAYWRIGHT_DOWNLOAD_HOST"] = url.rstrip("/")
         result = subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"],
+            [target_python, "-m", "playwright", "install", "chromium"],
             capture_output=True, text=True, env=env
         )
         if result.returncode == 0:
@@ -7388,8 +7329,6 @@ def install_playwright_cdn():
 
     if not installed:
         logger.debug("[WARNING] Playwright浏览器安装失败，将尝试使用系统Chrome")
-
-
 
 # ============================================================
 
@@ -7651,54 +7590,64 @@ if __name__ == '__main__':
         logger.debug("\n正在启动浏览器进行登录...")
         logger.debug("请在浏览器中登录您的账号")
 
-        os.makedirs("config", exist_ok=True)
+        os.makedirs(PathManager.get_config_dir(), exist_ok=True)
 
         async def get_cookie():
             async with async_playwright() as p:
-                browser = await Environment.launch_browser(p, headless=False)
-                context = await browser.new_context(
-                    viewport=Environment.get_default_viewport(),
-                    user_agent=WegoScraper.get_user_agent()
-                )
-                page = await context.new_page()
-                await page.goto('https://www.szwego.com', wait_until='networkidle')
+                browser = None
+                context = None
+                try:
+                    browser = await Environment.launch_browser(p, headless=False)
+                    context = await browser.new_context(
+                        viewport=Environment.get_default_viewport(),
+                        user_agent=WegoScraper.get_user_agent()
+                    )
+                    page = await context.new_page()
+                    await page.goto('https://www.szwego.com', wait_until='networkidle')
 
-                logger.debug('\n请在浏览器中登录您的账号...')
+                    logger.debug('\n请在浏览器中登录您的账号...')
 
-                start_time = time.time()
-                timeout = 300
-                login_detected = False
+                    start_time = time.time()
+                    timeout = 300
+                    login_detected = False
 
-                while time.time() - start_time < timeout:
-                    try:
-                        cookies = await context.cookies()
-                        token_cookie = next((c for c in cookies if c['name'] == 'token'), None)
-                        if token_cookie and token_cookie['value']:
-                            logger.debug('\n[OK] 检测到登录成功！正在获取Cookie...')
-                            login_detected = True
-                            break
-                    except Exception as e:  # [HANDLED]
-                        _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                        # [IMPLEMENTATION] 待实现的功能逻辑
-                    await asyncio.sleep(3)
-                    elapsed = int(time.time() - start_time)
-                    logger.debug(f'等待登录中... ({elapsed}秒)', end='\r')
+                    while time.time() - start_time < timeout:
+                        try:
+                            cookies = await context.cookies()
+                            token_cookie = next((c for c in cookies if c['name'] == 'token'), None)
+                            if token_cookie and token_cookie['value']:
+                                logger.debug('\n[OK] 检测到登录成功！正在获取Cookie...')
+                                login_detected = True
+                                break
+                        except Exception as e:  # [HANDLED]
+                            _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
+                        await asyncio.sleep(3)
+                        elapsed = int(time.time() - start_time)
+                        logger.debug(f'等待登录中... ({elapsed}秒)', end='\r')
 
-                if not login_detected:
-                    logger.debug('\n⚠️ 登录超时，将尝试获取当前Cookie')
+                    if not login_detected:
+                        logger.debug('\n⚠️ 登录超时，将尝试获取当前Cookie')
 
-                cookies = await context.cookies()
-                szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie.get('domain', '')]
-                for cookie in szwego_cookies:
-                    if cookie['domain'] == 'www.szwego.com':
-                        cookie['domain'] = '.szwego.com'
+                    cookies = await context.cookies()
+                    szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie.get('domain', '')]
+                    for cookie in szwego_cookies:
+                        if cookie['domain'] == 'www.szwego.com':
+                            cookie['domain'] = '.szwego.com'
 
-                cookie_file = "config/cookies.json"
-                with open(cookie_file, "w", encoding="utf-8") as f:
-                    json.dump(szwego_cookies, f, ensure_ascii=False, indent=2)
-                logger.debug(f'[OK] Cookie已保存 ({len(szwego_cookies)}个)')
-
-                await browser.close()
+                    cookie_file = PathManager.get_cookie_file()
+                    FileManager.write_json(cookie_file, szwego_cookies)
+                    logger.debug(f'[OK] Cookie已保存 ({len(szwego_cookies)}个)')
+                finally:
+                    if context is not None:
+                        try:
+                            await context.close()
+                        except Exception as e:  # [HANDLED]
+                            logger.debug(f'上下文关闭异常(可忽略): {e}')
+                    if browser is not None:
+                        try:
+                            await browser.close()
+                        except Exception as e:  # [HANDLED]
+                            logger.debug(f'浏览器关闭异常(可忽略): {e}')
                 return szwego_cookies
 
         if async_playwright is None:
@@ -7745,14 +7694,13 @@ if __name__ == '__main__':
                 "user-agent": Environment.get_user_agent()
             },
             "cookies": cookies,
-            "output_file": "file/output.json",
-            "cookie_file": "config/cookies.json",
+            "output_file": PathManager.get_output_file(),
+            "cookie_file": PathManager.get_cookie_file(),
             "excel_files": [excel] if excel else []
         }
 
-        config_path = "config/config.json"
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
+        config_path = PathManager.get_config_file()
+        FileManager.write_json(config_path, config)
 
         logger.debug(f'\n[OK] 配置文件创建成功！')
         logger.debug("\n========================================")
@@ -7950,8 +7898,6 @@ if __name__ == '__main__':
                 response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' data:;"
 
             return response
-
-
 
         @app.get('/api/bootstrap')  # [SECURED]
         async def api_bootstrap(request: Request):
@@ -8390,7 +8336,7 @@ if __name__ == '__main__':
                         process.kill()
                 except Exception as e:  # [HANDLED]
                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                    # [IMPLEMENTATION] 待实现的功能逻辑
+                    
                 with _tasks_lock:
                     if task_id in tasks:
                         tasks[task_id]['status'] = 'killed'
@@ -8551,8 +8497,7 @@ if __name__ == '__main__':
                                     high_price_stock_numbers.append(str(sku))
                         except Exception as e:  # [HANDLED]
                             handle_exception(e, '/api/sku/compare/txt解析商品价格')
-                            # [IMPLEMENTATION] 待实现的功能逻辑
-
+                            
                 high_price_set = set(high_price_stock_numbers)
                 high_price_existing = sorted(list(high_price_set & txt_set))
                 high_price_extra_in_json = sorted(list(high_price_set - txt_set))
@@ -8589,7 +8534,7 @@ if __name__ == '__main__':
                                         added_high_price.append(sku)
                                 except Exception as e:  # [HANDLED]
                                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                                    # [IMPLEMENTATION] 待实现的功能逻辑
+                                    
                                 break
 
                 added_high_price = sorted(list(set(added_high_price)))
@@ -8729,8 +8674,7 @@ if __name__ == '__main__':
                                     high_price_stock_numbers.append(str(sku))
                         except Exception as e:  # [HANDLED]
                             handle_exception(e, '/api/compare解析商品价格')
-                            # [IMPLEMENTATION] 待实现的功能逻辑
-                
+                            
                 # 高价商品与已存在货号的对比
                 high_price_set = set(high_price_stock_numbers)
                 high_price_existing = sorted(list(high_price_set & excel_set))
@@ -8772,7 +8716,7 @@ if __name__ == '__main__':
                                         added_high_price.append(sku)
                                 except Exception as e:  # [HANDLED]
                                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                                    # [IMPLEMENTATION] 待实现的功能逻辑
+                                    
                                 break
                 
                 added_high_price = sorted(list(set(added_high_price)))
@@ -8860,8 +8804,8 @@ if __name__ == '__main__':
                             total_fee += fee
                             valid_price_count += 1
                     except Exception:
-                        pass  # [INTENTIONAL_IMPLEMENTATION]
-                
+                        pass
+                        
                 avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
                 
                 storage_duration = None
@@ -8991,7 +8935,7 @@ if __name__ == '__main__':
                                                         record_date_str = record_date.strftime('%Y-%m-%d')
                                                     except Exception as e:  # [HANDLED]
                                                         _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                                                        # [IMPLEMENTATION] 待实现的功能逻辑
+                                                        
                                                 if record_date_str is None:
                                                     continue
                                         elif isinstance(date_val, (int, float)):
@@ -9015,8 +8959,8 @@ if __name__ == '__main__':
                                             '备注': remark
                                         })
                                     except (ValueError, TypeError, IndexError):
-                                        pass  # [INTENTIONAL_IMPLEMENTATION]
-                            
+                                        pass
+                                        
                             wb.close()
                             break
                         except Exception as e:  # [HANDLED]
@@ -9031,15 +8975,13 @@ if __name__ == '__main__':
                         all_records = [r for r in all_records if r['日期'] >= start_date]
                     except Exception as e:  # [HANDLED]
                         _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                        # [IMPLEMENTATION] 待实现的功能逻辑
-                
+                        
                 if end_date:
                     try:
                         all_records = [r for r in all_records if r['日期'] <= end_date]
                     except Exception as e:  # [HANDLED]
                         _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                        # [IMPLEMENTATION] 待实现的功能逻辑
-                
+                        
                 summary = {}
                 for record in all_records:
                     date_key = record['日期']
@@ -9078,8 +9020,7 @@ if __name__ == '__main__':
                                         row_data[col_idx] = converted.strftime('%Y-%m-%d')
                                 except Exception as e:  # [HANDLED]
                                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                                    # [IMPLEMENTATION] 待实现的功能逻辑
-                
+                                    
                 result = {
                     'daily_profit_report': daily_profit_report,
                     'table_data': table_data,
@@ -9134,8 +9075,8 @@ if __name__ == '__main__':
                     try:
                         logger.debug(*args, **kwargs)
                     except (IOError, OSError):
-                        pass  # [INTENTIONAL_IMPLEMENTATION]
-                
+                        pass
+                        
                 safe_print(f'开始处理 {len(products)} 个商品...')
                 
                 for p in products:
@@ -9159,8 +9100,7 @@ if __name__ == '__main__':
                             valid_price_count += 1
                     except Exception as e:  # [HANDLED]
                         safe_print(f'处理商品时出错: {e}, price_str: {p.get("售价", "")}')
-                        # [IMPLEMENTATION] 待实现的功能逻辑
-                
+                        
                 safe_print(f'统计结果: valid_price_count={valid_price_count}, total_price={total_price}, high_price_count={len(high_price_products)}')
                 
                 # 计算平均价格
@@ -10192,7 +10132,7 @@ if __name__ == '__main__':
                                 result['hostc'] = old_hostc_match.group(1).rstrip('/')
             except Exception as e:  # [HANDLED]
                 _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                # [IMPLEMENTATION] 待实现的功能逻辑
+                
             return result
         
         def write_tunnel_urls_file(hostc_url=None, cf_url=None):
@@ -10340,8 +10280,7 @@ if __name__ == '__main__':
         
         def check_and_send_pending_email():
             pass
-            # [IMPLEMENTATION] 待实现的功能逻辑
-        
+
         def verify_url(url, timeout=None, verbose=False, max_retries=None):
             if timeout is None:
                 timeout = TUNNEL_CONFIG['url_verify_timeout']
@@ -10550,7 +10489,7 @@ if __name__ == '__main__':
                                     wf.write(f"Public URL: {web_url}\n")
                             except Exception as e:  # [HANDLED]
                                 _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                                # [IMPLEMENTATION] 待实现的功能逻辑
+                                
                     time.sleep(heartbeat_interval)
             except Exception as e:  # [HANDLED]
                 log_print(f"[Tunnel-Heartbeat] 💥 心跳循环异常（不影响主服务）: {type(e).__name__}: {str(e)[:200]}")
@@ -10836,8 +10775,7 @@ if __name__ == '__main__':
                                             url_verified = verify_url(file_url, timeout=TUNNEL_CONFIG['url_verify_timeout'], verbose=True)
                                         except Exception as e:  # [HANDLED]
                                             _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                                            # [IMPLEMENTATION] 待实现的功能逻辑
-                                        
+                                            
                                         if url_verified:
                                             logger.debug(f"[Tunnel] 🎉 公网地址验证通过！立即发送邮件通知...")
                                             send_tunnel_notification(file_url, 'stable_available')
@@ -11017,7 +10955,6 @@ if __name__ == '__main__':
                     logger.error(f"[Tunnel] ❌ 已达到最大重启次数({max_tunnel_restarts}次)，停止自动重启以防止资源耗尽")
                     logger.error(f"[Tunnel] 💡 建议手动检查网络连接或重启服务")
         
-
         # ========================================
         # Cloudflare Tunnel 支持
         # ========================================
@@ -11125,8 +11062,7 @@ if __name__ == '__main__':
                     }
             except Exception as e:  # [HANDLED]
                 _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                # [IMPLEMENTATION] 待实现的功能逻辑
-
+                
             return {'available': False, 'tunnel_name': '', 'custom_domain': '', 'tunnel_id': '', 'config_yml_path': ''}
 
         def _ensure_named_tunnel_ready(cf_binary, tunnel_name, custom_domain, port):
@@ -11147,8 +11083,7 @@ if __name__ == '__main__':
                         return tunnel_id, config_yml_path
                 except Exception as e:  # [HANDLED]
                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                    # [IMPLEMENTATION] 待实现的功能逻辑
-
+                    
             logger.debug(f"[Cloudflare] 🔧 首次使用 named tunnel，开始自动配置...")
 
             logger.debug(f"[Cloudflare] 步骤1/3: 创建 tunnel '{tunnel_name}'...")
@@ -11878,7 +11813,7 @@ ingress:
                         tunnel_process.kill()
                     except Exception as e:  # [HANDLED]
                         _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                        # [IMPLEMENTATION] 待实现的功能逻辑
+                        
             tunnel_process = None
             tunnel_url = None
             if cf_process:
@@ -11891,7 +11826,7 @@ ingress:
                         cf_process.kill()
                     except Exception as e:  # [HANDLED]
                         _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                        # [IMPLEMENTATION] 待实现的功能逻辑
+                        
             cf_process = None
             cf_url = None
             cf_mode = None
@@ -11912,8 +11847,7 @@ ingress:
                     cleanup_rate_limit_store()
                 except Exception as e:  # [HANDLED]
                     _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
-                    # [IMPLEMENTATION] 待实现的功能逻辑
-        
+                    
         threading.Thread(target=temp_cleanup_loop, daemon=True).start()
         
         # 启动前获取一次局域网 IP 用于显示
@@ -11968,7 +11902,6 @@ ingress:
         async def favicon():
             return FileResponse(path=os.path.join(PROJECT_DIR, 'dist', 'favicon', 'favicon.ico'))
 
-
         web_host = os.environ.get('WEB_HOST', '0.0.0.0')
         logger.debug(f"\n🚀 FastAPI 服务启动中...")
         logger.debug(f"   地址: http://{web_host}:{args.port}")
@@ -12008,17 +11941,10 @@ ingress:
 
 # SSRF Defense System Added
 
-
-
-
 # ============================================================
 # SSRF安全防御体系 (v3.8.89.20) - 基于SSRF攻击视频的完整防护
 # 攻击场景: 内网探测、云元数据窃取、文件读取、协议走私、DNS Rebinding
 # ============================================================
-
-
-
-
 
 class SSRFProtection:
     BLOCKED_SCHEMES={'file','gopher','dict','ftp','sftp','ldap','tftp','netdoc','jar'}
@@ -12488,7 +12414,8 @@ class DependencyAuditor:
         if packaging_version is not None:
             try:
                 return packaging_version.parse(v1)<packaging_version.parse(v2)
-            except (ValueError, TypeError):pass  # [INTENTIONAL_PLACEHOLDER]
+            except (ValueError, TypeError):
+                pass
         p1=[int(x) for x in v1.split('.') if x.isdigit()]
         p2=[int(x) for x in v2.split('.') if x.isdigit()]
         for i in range(max(len(p1),len(p2))):
@@ -12497,9 +12424,6 @@ class DependencyAuditor:
             if a<b:return True
             elif a>b:return False
         return False
-
-
-
 
 # [CSRF_FULL_IMPLEMENTATION]
 # CSRF Protection Implementation Status:
