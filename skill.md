@@ -51,6 +51,45 @@ python main.py --web
 ## 🔄 最新更新
 ---
 
+### v5.0.9.59 (2026-09-12) - 🛡️ **企业级文件IO安全加固** - FileManager原子写入框架+read_json容错+全项目16处直接写入统一走FileManager
+
+> **Commit**: `5ca820fc`  
+
+#### 更新内容:
+1. **JSON读取容错修复(P0)**: FileManager.read_json检测到"Extra data"(截断的JSON尾巴)时，用JSONDecoder.raw_decode()取第一个有效对象，并自动截断写回磁盘修复
+2. **原子写入框架**: FileManager.write_json/write_text/write_bytes统一改为".tmp临时文件→os.replace原子替换"写入，消除Windows文件缩短时残留尾巴问题
+3. **新增FileManager.write_bytes**: 二进制文件原子写入(密钥文件、BOM修复等场景)
+4. **全项目16处直接open(w/a/wb)写入改造**: SecureConfigManager.save_config/initialize_encryption/_auto_encrypt_config、ConfigManager.save_config、key_file/salt_file、BOM移除、tunnel_url.txt、Cloudflare config.yml、pip配置文件、weblog/web_log追加写入等
+5. **追加模式安全处理**: 5处open('a')追加写入改为"FileManager.read_text读取+合并+write_text原子写入"，保证写入过程中文件不会损坏
+6. **全量JSON文件验证**: 修复前扫描219个微购相册JSON文件确认损坏文件，修复后全部通过JSON格式验证
+
+##### 1. 🛡️ FileManager原子写入框架 (JSON尾巴残留根因修复)
+**问题描述**:
+- **现象**: `JSONDecodeError: Extra data: line X column Y` 报错，典型场景是有效JSON后拼接了被截断的旧JSON尾巴
+- **根因**: Windows下open('w')写入较短新文件时，底层不保证完全截断旧文件，留下尾部残留；或者写入中途崩溃，留下半新半旧的文件
+- **影响范围**: 所有调用FileManager.read_json的场景(微购相册数据、缓存文件、配置文件)
+
+**修复方案**:
+- **技术实现(read_json容错)**: json.loads失败时检测Extra data，用JSONDecoder.raw_decode()取第一个有效对象，自动截断写回 [main.py](main.py)
+- **技术实现(原子写入)**: write_json/write_text/write_bytes统一先写.tmp临时文件，写完后os.replace(tmp→target)原子替换，崩溃不损坏目标文件 [main.py](main.py)
+- **技术实现(追加改造)**: open('a')追加写入改为FileManager.read_text+合并+write_text原子写入 [main.py](main.py)
+
+**测试验证**:
+- ✅ 编译检查: py_compile通过
+- ✅ 219个微购相册JSON文件全部通过JSON格式验证
+- ✅ 损坏文件自动修复: read_json遇到Extra data自动截断并写回磁盘
+- ✅ 原子写入: 写较小文件覆盖较大文件时无尾巴残留
+- ✅ write_text原子写入: 正常读写往返OK
+
+**核心改进**:
+- 根治JSON尾巴残留问题，无需人工干预自动修复
+- 写入中途崩溃时目标文件保持上一次完整版本
+- 所有重要数据文件的写入路径统一管理，未来不再遗漏
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**更新日期**: 2026-09-12
+**更新类型**: 🛡️ 安全加固+架构重构
+**作者**: 小旭二手机（西园路）
 ### v5.0.9.58 (2026-09-11) - 🔧 **安全审计+稳定性全面加固** - security_audit多线程重构+Playwright事件循环阻塞修复+版本Commit hash全量回填
 
 > **Commit**: `933d5e4f, 4f17917e`  
