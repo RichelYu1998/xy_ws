@@ -1,4 +1,4 @@
-#﻿# 微购相册管理系统 (WegoAlbum Manager)
+﻿#﻿# 微购相册管理系统 (WegoAlbum Manager)
 
 > **⚙️ 编码标准**: 本项目所有文件（包括源代码、文档、配置文件等）**必须且仅使用 UTF-8 编码**。禁止使用任何其他编码格式（如 GBK、GB2312、Latin-1 等）。
 >
@@ -197,7 +197,8 @@ bandit -r . -f json -o bandit_report.json
 
 ---
 
-## 🔄 最新更新### v5.0.9.59 (2026-09-12) - 🛡️ **企业级文件IO安全加固** - FileManager原子写入框架+read_json容错+全项目16处直接写入统一走FileManager
+## 🔄 最新更新
+### v5.0.9.59 (2026-09-12) - 🛡️ **企业级文件IO安全加固** - FileManager原子写入框架+read_json容错+全项目16处直接写入统一走FileManager
 
 > **Commit**: `5ca820fc`  
 
