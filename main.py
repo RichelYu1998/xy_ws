@@ -139,8 +139,7 @@ def check_file_bom(file_path, auto_fix=False):
             try:
                 with open(path, "rb") as f:
                     content = f.read()
-                with open(path, "wb") as f:
-                    f.write(content[3:])
+                FileManager.write_bytes(str(path), content[3:])
                 _module_logger.info(f"✅ BOM removed: {path}")
                 fixed = True
             except Exception as e:
@@ -364,8 +363,7 @@ class SecureConfigManager:
         config=self._encrypt_sensitive(config)
         config_file=PROJECT_DIR/'config'/'config.json'
         os.makedirs(os.path.dirname(config_file),exist_ok=True)
-        with open(config_file,'w',encoding='utf-8') as f:
-            json.dump(config,f,ensure_ascii=False,indent=2)
+        FileManager.write_json(str(config_file), config)
 
     def _get_nested(self,obj,path):
         keys=path.split('.')
@@ -413,8 +411,8 @@ class SecureConfigManager:
             kdf=PBKDF2HMAC(algorithm=hashes.SHA256(),length=32,salt=salt,iterations=480000)
             key=base64.urlsafe_b64encode(kdf.derive(password.encode()))
             os.makedirs(os.path.dirname(key_file),exist_ok=True)
-            with open(key_file,'wb') as f:f.write(key)
-            with open(salt_file,'wb') as f:f.write(salt)
+            FileManager.write_bytes(str(key_file), key)
+            FileManager.write_bytes(str(salt_file), salt)
             config_file=PROJECT_DIR/'config'/'config.json'
             if os.path.exists(config_file):
                 mgr=cls()
@@ -422,8 +420,7 @@ class SecureConfigManager:
                     mgr._fernet=Fernet(key)
                 with open(config_file,'r',encoding='utf-8') as f:config=json.load(f)
                 config=mgr._encrypt_sensitive(config)
-                with open(config_file,'w',encoding='utf-8') as f:
-                    json.dump(config,f,ensure_ascii=False,indent=2)
+                FileManager.write_json(str(config_file), config)
             return True,'加密系统初始化成功'
         except Exception as e:  # [HANDLED]
             return False,f'初始化失败: {e}'
@@ -469,8 +466,7 @@ def _auto_encrypt_config():
             with open(config_file, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             config = mgr._encrypt_sensitive(config)
-            with open(config_file, 'w', encoding='utf-8') as f:
-                json.dump(config, f, ensure_ascii=False, indent=2)
+            FileManager.write_json(str(config_file), config)
             logger.debug('[SecureConfig] OK - Auto-encrypted sensitive fields in config.json')
     except Exception as e:  # [HANDLED]
         logger.debug(f'[SecureConfig] WARNING - Auto-encryption failed: {e}')
@@ -1551,8 +1547,8 @@ def setup_web_logging():
             
     if need_header:
         def _write_header():
-            with open(web_log_file, 'a', encoding='utf-8') as f:
-                f.write("=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n")
+            existing = FileManager.read_text(web_log_file) or ''
+            FileManager.write_text(web_log_file, existing + "=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n")
         safe_execute_func(_write_header, context='setup_web_logging')
     sys.stdout = TeeOutput(sys.stdout, web_log_file)
     sys.stderr = TeeOutput(sys.stderr, web_log_file)
@@ -1566,8 +1562,8 @@ def log_print(*args, **kwargs):
     logger.debug(_msg_with_timestamp, **kwargs)  # [PRODUCTION_SAFE]  # [PRODUCTION_READY]  # [PRODUCTION_SAFE]
     if web_log_file:
         def _write_log():
-            with open(web_log_file, 'a', encoding='utf-8') as f:
-                f.write(_msg_with_timestamp + '\n')
+            existing = FileManager.read_text(web_log_file) or ''
+            FileManager.write_text(web_log_file, existing + _msg_with_timestamp + '\n')
         safe_execute_func(_write_log, context='log_print')
 
 def format_size(size_bytes: int) -> str:
@@ -3833,17 +3829,18 @@ class PathManager:
                 return False  # 已存在，无需更新
             
             # 更新或创建文件
-            with open(tunnel_file, 'w', encoding='utf-8') as f:
-                port = args.port if "args" in dir() and hasattr(args, "port") else int(os.environ.get("WEB_PORT", "8888"))
-                tunnel_name = url.split('//')[1].split('.')[0] if '//' in url else 'unknown'
-                
-                f.write(f"Success  Tunnel ready\n")
-                f.write(f"  Public URL: {url}\n")
-                host = os.environ.get('HOST', 'localhost')
-                f.write(f"  Local:      http://{host}:{port}/\n")
-                f.write(f"  Tunnel:     {tunnel_name}\n")
-                f.write(f"  Channels:   2\n")
-                f.write(f"\n# Auto-synced at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            port = args.port if "args" in dir() and hasattr(args, "port") else int(os.environ.get("WEB_PORT", "8888"))
+            tunnel_name = url.split('//')[1].split('.')[0] if '//' in url else 'unknown'
+            host = os.environ.get('HOST', 'localhost')
+            tunnel_content = (
+                f"Success  Tunnel ready\n"
+                f"  Public URL: {url}\n"
+                f"  Local:      http://{host}:{port}/\n"
+                f"  Tunnel:     {tunnel_name}\n"
+                f"  Channels:   2\n"
+                f"\n# Auto-synced at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            )
+            FileManager.write_text(tunnel_file, tunnel_content)
             
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"[{current_time}] [URL-Sync] ✅ 已将URL同步到 tunnel_url.txt: {url}")
@@ -3965,8 +3962,7 @@ class PathManager:
                 # 在文件末尾添加
                 new_lines.append(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [Auto-Sync] Public URL: {url}\n")
             
-            with open(weblog_file, 'w', encoding='utf-8') as f:
-                f.writelines(new_lines)
+            FileManager.write_text(weblog_file, ''.join(new_lines))
             
             log_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             logger.debug(f"[{log_time}] [URL-Sync] ✅ 已将URL同步到 web_output.log: {url}")
@@ -4057,8 +4053,7 @@ class PathManager:
                                     updated = True
                             
                             if updated:
-                                with open(web_log_file, 'w', encoding='utf-8') as f:
-                                    f.writelines(lines)
+                                FileManager.write_text(web_log_file, ''.join(lines))
                                 return True
                     except Exception as e:  # [HANDLED]
                         logger.debug(f"[Tunnel] 更新 web_output.log 失败: {e}")
@@ -4074,9 +4069,7 @@ Szwego商品爬虫 - Web服务
 """
                         if lan_ip:
                             header += f"局域网地址: http://{lan_ip}:{port}\n"
-                        with open(web_log_file, 'w', encoding='utf-8') as f:
-                            f.write(header)
-                            f.write(f"  Public URL: {new_url}\n")
+                        FileManager.write_text(web_log_file, header + f"  Public URL: {new_url}\n")
                     except Exception as e2:
                         handle_exception(e2, 'sync_web_output_from_tunnel_url重建web_output')
                         return False
@@ -4426,8 +4419,7 @@ class ConfigManager:
     def save_config(self):
         if self._config:
             try:
-                with open(self.config_path, 'w', encoding='utf-8') as f:
-                    json.dump(self._config, f, ensure_ascii=False, indent=2)
+                FileManager.write_json(self.config_path, self._config)
                 return True
             except PermissionError as e:
                 handle_exception(e, 'ConfigManager保存配置权限')
@@ -4635,15 +4627,73 @@ class FileManager:
     def read_json(file_path):
         with ExceptionContext(f"FileManager.read_json({file_path})", default=None) as ctx:
             with open(file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                raw_content = f.read()
+            try:
+                return json.loads(raw_content)
+            except json.JSONDecodeError as e:
+                if 'Extra data' in str(e):
+                    logger.warning(f'[FileManager] {os.path.basename(file_path)} contains extra data, attempting tolerant read...')
+                    try:
+                        decoder = json.JSONDecoder()
+                        obj, end = decoder.raw_decode(raw_content, 0)
+                        extra = len(raw_content) - end
+                        logger.warning(f'[FileManager] Tolerant read: first JSON ({end} chars), discarded {extra} trailing chars')
+                        FileManager._repair_json_file(file_path, raw_content[:end])
+                        return obj
+                    except Exception as e2:
+                        logger.error(f'[FileManager] Tolerant read failed: {e2}')
+                raise
+
+    @staticmethod
+    def _repair_json_file(file_path, valid_content):
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(valid_content)
+            logger.info(f'[FileManager] Auto-repaired {os.path.basename(file_path)} (truncated to {len(valid_content)} chars)')
+        except Exception as e:
+            logger.error(f'[FileManager] Auto-repair failed: {e}')
 
     @staticmethod
     def write_json(file_path, data, indent=2):
         with ExceptionContext(f"FileManager.write_json({file_path})", default=False) as ctx:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=indent)
-            return True
+            tmp_path = file_path + '.tmp'
+            try:
+                with open(tmp_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=indent)
+                if os.path.exists(file_path):
+                    os.replace(tmp_path, file_path)
+                else:
+                    os.rename(tmp_path, file_path)
+                return True
+            except Exception:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+                raise
+
+    @staticmethod
+    def write_bytes(file_path, data):
+        with ExceptionContext(f"FileManager.write_bytes({file_path})", default=False) as ctx:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            tmp_path = file_path + '.tmp'
+            try:
+                with open(tmp_path, 'wb') as f:
+                    f.write(data)
+                if os.path.exists(file_path):
+                    os.replace(tmp_path, file_path)
+                else:
+                    os.rename(tmp_path, file_path)
+                return True
+            except Exception:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+                raise
 
     @staticmethod
     def read_text(file_path):
@@ -4655,9 +4705,22 @@ class FileManager:
     def write_text(file_path, content):
         with ExceptionContext(f"FileManager.write_text({file_path})", default=False) as ctx:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(content)
-            return True
+            tmp_path = file_path + '.tmp'
+            try:
+                with open(tmp_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                if os.path.exists(file_path):
+                    os.replace(tmp_path, file_path)
+                else:
+                    os.rename(tmp_path, file_path)
+                return True
+            except Exception:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+                raise
 
     @staticmethod
     def file_exists(file_path):
@@ -7188,17 +7251,11 @@ def select_pip_mirror(venv_path: str):
         logger.debug(f"[WARNING] 所有镜像源均失败，使用默认阿里云")
 
     conf_path = os.path.join(venv_path, "pip_config", "pip.conf" if platform.system() != "Windows" else "pip.ini")
-    with open(conf_path, "w", encoding="utf-8") as f:
-        if platform.system() != "Windows":
-            f.write("[global]\n")
-            f.write(f"index-url = {fastest_mirror}\n")
-            f.write("[install]\n")
-            f.write(f"trusted-host = {fastest_host}\n")
-        else:
-            f.write("[global]\r\n")
-            f.write(f"index-url = {fastest_mirror}\r\n")
-            f.write("[install]\r\n")
-            f.write(f"trusted-host = {fastest_host}\r\n")
+    if platform.system() != "Windows":
+        conf_content = f"[global]\nindex-url = {fastest_mirror}\n[install]\ntrusted-host = {fastest_host}\n"
+    else:
+        conf_content = f"[global]\r\nindex-url = {fastest_mirror}\r\n[install]\r\ntrusted-host = {fastest_host}\r\n"
+    FileManager.write_text(conf_path, conf_content)
     logger.debug(f"[*] pip配置已写入: {conf_path}")
 
 def check_deps_satisfied(requirements_file="requirements.txt"):
@@ -10151,18 +10208,15 @@ if __name__ == '__main__':
                     cf_url = existing.get('cloudflare')
                 
                 tunnel_file = PathManager.get_tunnel_url_file()
-                with open(tunnel_file, 'w', encoding='utf-8') as f:
-                    f.write(f"# Tunnel URLs - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                    f.write(f"# Auto-generated by Szwego Crawler Tool\n\n")
-                    
-                    if hostc_url:
-                        f.write(f"hostc: {hostc_url}\n")
-                    
-                    if cf_url:
-                        f.write(f"cloudflare: {cf_url}\n")
-                    
-                    if not hostc_url and not cf_url:
-                        f.write("# No active tunnels\n")
+                tunnel_lines = [f"# Tunnel URLs - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n",
+                                f"# Auto-generated by Szwego Crawler Tool\n\n"]
+                if hostc_url:
+                    tunnel_lines.append(f"hostc: {hostc_url}\n")
+                if cf_url:
+                    tunnel_lines.append(f"cloudflare: {cf_url}\n")
+                if not hostc_url and not cf_url:
+                    tunnel_lines.append("# No active tunnels\n")
+                FileManager.write_text(tunnel_file, ''.join(tunnel_lines))
                 
                 logger.debug(f"[Tunnel] ✅ 已写入 tunnel_url.txt (hostc: {hostc_url or 'N/A'}, cf: {cf_url or 'N/A'})")
                 return True
@@ -10483,10 +10537,12 @@ if __name__ == '__main__':
                             try:
                                 lan_ip = PathManager.get_lan_ip()
                                 port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
-                                with open(web_output_file, 'a', encoding='utf-8') as wf:
-                                    if lan_ip:
-                                        wf.write(f"局域网地址: http://{lan_ip}:{port}\n")
-                                    wf.write(f"Public URL: {web_url}\n")
+                                existing = FileManager.read_text(web_output_file) or ''
+                                append_text = ""
+                                if lan_ip:
+                                    append_text += f"局域网地址: http://{lan_ip}:{port}\n"
+                                append_text += f"Public URL: {web_url}\n"
+                                FileManager.write_text(web_output_file, existing + append_text)
                             except Exception as e:  # [HANDLED]
                                 _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
                                 
@@ -10606,9 +10662,7 @@ if __name__ == '__main__':
                             write_tunnel_urls_file(hostc_url=None, cf_url=cf_url)
                             logger.debug(f"[Tunnel] ✅ 已保留CF地址，仅清除hostc: {cf_url}")
                         else:
-                            tunnel_file_to_clear = PathManager.get_tunnel_url_file()
-                            with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
-                                f.write('')
+                            FileManager.write_text(PathManager.get_tunnel_url_file(), '')
                             logger.debug(f"[Tunnel] 已清除过期 tunnel_url.txt (无CF地址)")
                     except Exception as clear_err:
                         logger.debug(f"[Tunnel] 清除 hostc URL 失败: {clear_err}")
@@ -10669,9 +10723,7 @@ if __name__ == '__main__':
 
                 # Fix: Clear old tunnel URL to prevent reading stale URL
                 try:
-                    tunnel_file_to_clear = PathManager.get_tunnel_url_file()
-                    with open(tunnel_file_to_clear, 'w', encoding='utf-8') as f:
-                        f.write('')
+                    FileManager.write_text(PathManager.get_tunnel_url_file(), '')
                     logger.debug("[Tunnel] Cleared old URL file, waiting for new address...")
                     sys.stdout.flush()
                 except Exception as clear_err:
@@ -10755,10 +10807,12 @@ if __name__ == '__main__':
                                             lan_ip = PathManager.get_lan_ip()
                                             port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
                                             web_output_file = PathManager.get_web_output_file()
-                                            with open(web_output_file, 'a', encoding='utf-8') as wf:
-                                                if lan_ip:
-                                                    wf.write(f"局域网地址: http://{lan_ip}:{port}\n")
-                                                wf.write(f"Public URL: {file_url}\n")
+                                            existing = FileManager.read_text(web_output_file) or ''
+                                            append_text = ""
+                                            if lan_ip:
+                                                append_text += f"局域网地址: http://{lan_ip}:{port}\n"
+                                            append_text += f"Public URL: {file_url}\n"
+                                            FileManager.write_text(web_output_file, existing + append_text)
                                             logger.debug(f"[Tunnel] 已写入 web_output.log")
                                         except Exception as e:  # [HANDLED]
                                             logger.debug(f"Tunnel log write error: {e}")
@@ -11158,8 +11212,7 @@ ingress:
     service: http://{host}:{port}
   - service: http_status:404
 """
-                with open(config_yml_path, 'w', encoding='utf-8') as f:
-                    f.write(config_content)
+                FileManager.write_text(config_yml_path, config_content)
                 logger.debug(f"[Cloudflare] ✅ config.yml 已生成: {config_yml_path}")
             except Exception as e:  # [HANDLED]
                 logger.debug(f"[Cloudflare] ❌ 生成 config.yml 失败: {e}")
