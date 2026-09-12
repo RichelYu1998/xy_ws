@@ -200,7 +200,7 @@ bandit -r . -f json -o bandit_report.json
 ## 🔄 最新更新
 ### v5.0.9.60 (2026-09-12) - ♻️ **数据模型去冗余+文档结构修复** - 删除product字典10个重复英文键+3处冗余赋值+changelog空changes补全+v5.0.9.58缺#####子项修复
 
-> **Commit**: `54719c96`  
+> **Commit**: `54719c96, f440e741`  
 
 #### 更新内容:
 1. **product字典双语键去冗余**: 删除fetch_all_products_via_api中10个重复英文键(name/price/cost_price/stock_number/remark/staff/image/created_time/timestamp)，只保留中文键
