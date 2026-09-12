@@ -1,4 +1,4 @@
-﻿# ﻿微购相册管理系统 - Skill 开发规范文档 (WegoAlbum Manager - Skill Documentation)
+# ﻿微购相册管理系统 - Skill 开发规范文档 (WegoAlbum Manager - Skill Documentation)
 
 > **⚙️ 编码标准**: 本项目所有文件（包括源代码、文档、配置文件等）**必须且仅使用 UTF-8 编码**。禁止使用任何其他编码格式（如 GBK、GB2312、Latin-1 等）。
 >
@@ -51,6 +51,55 @@ python main.py --web
 ## 🔄 最新更新
 ---
 
+### v5.0.9.60 (2026-09-12) - ♻️ **数据模型去冗余+文档结构修复** - 删除product字典10个重复英文键+3处冗余赋值+changelog空changes补全+v5.0.9.58缺#####子项修复
+
+> **Commit**: `待生成`  
+
+#### 更新内容:
+1. **product字典双语键去冗余**: 删除fetch_all_products_via_api中10个重复英文键(name/price/cost_price/stock_number/remak/staff/image/created_time/timestamp)，只保留中文键
+2. **cache合并冗余赋值删除**: 删除save_data中product['price']=cache_price和product['cost_price']=cache_cost两行冗余写入
+3. **changelog API changes字段空值修复**: v5.0.9.58在README.md和skill.md中均缺少#####子项导致changes为空，已补全
+4. **skill.md v5.0.9.59结构错位修复**: ##### 2. PermissionError子项被错误放到v5.0.9.58 header下，已移回v5.0.9.59
+5. **skill.md v5.0.9.58 header恢复**: 结构错位导致v5.0.9.58的### header丢失，已恢复并补齐##### 1.子项
+
+##### 1. ♻️ 数据模型去冗余 (product字典双语键删除)
+**问题描述**:
+- **现象**: product字典每个属性写了两遍(中文键+英文键)，如`'商品描述': title, 'name': title`，共10对重复
+- **根因**: 早期设计同时支持中文键(前端展示)和英文键(代码访问)，但前端app.js 100%使用中文键，英文键从未被直接访问
+- **影响范围**: fetch_all_products_via_api返回的每个product对象含10个无用键，内存浪费+维护风险(改一处忘改另一处导致数据不一致)
+
+**修复方案**:
+- **技术实现(构造端)**: 删除product字典中10个英文键(name/price/cost_price/stock_number/remark/staff/image/created_time/timestamp)，只保留中文键 [main.py](main.py)
+- **技术实现(写入端)**: 删除save_data中`product['price']=cache_price`和`product['cost_price']=cache_cost`两行冗余赋值 [main.py](main.py)
+- **技术实现(读取端保留)**: 读取端的`.get('售价') or .get('price')`降级兼容代码保留，对旧缓存文件(含历史英文键)有兜底作用
+
+**测试验证**:
+- ✅ 编译检查: py_compile通过
+- ✅ 前端兼容: app.js 100%使用中文键(p.货号/p.商品描述等)，无影响
+- ✅ 旧缓存兼容: 读取端or降级分支保留，历史英文键数据仍可读取
+
+##### 2. 📝 文档结构修复 (changelog空changes补全+结构错位修复)
+**问题描述**:
+- **现象**: README.md v5.0.9.58缺少#####子项导致changelog API返回changes为空数组；skill.md v5.0.9.59的##### 2.子项被错误放到v5.0.9.58 header下
+- **根因**: v5.0.9.58条目只写了#### 更新内容列表但未添加#####格式子项；skill.md在合并编辑时##### 2.子项和v5.0.9.58 header的顺序错位
+- **影响范围**: changelog API对v5.0.9.58返回空changes数组；skill.md v5.0.9.58被解析为v5.0.9.59的子项
+
+**修复方案**:
+- **技术实现(README.md)**: 为v5.0.9.58新增##### 1.子项(含问题描述/修复方案/测试验证完整结构) [README.md](README.md)
+- **技术实现(skill.md结构)**: 将##### 2. PermissionError移回v5.0.9.59下；恢复v5.0.9.58的### header；为v5.0.9.58新增##### 1.子项 [skill.md](skill.md)
+
+**测试验证**:
+- ✅ README.md: 所有版本均有#####子项
+- ✅ skill.md: 所有版本均有#####子项，结构无错位
+- ✅ changelog API: v5.0.9.58 changes字段不再为空
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**更新日期**: 2026-09-12
+**更新类型**: ♻️ 重构+📝 文档更新
+**作者**: 小旭二手机（西园路）
+
+---
+
 ### v5.0.9.59 (2026-09-12) - 🛡️ **企业级文件IO安全加固** - FileManager原子写入框架+read_json容错+全项目16处直接写入统一走FileManager
 
 > **Commit**: `5ca820fc, faac750b`  
@@ -91,7 +140,8 @@ python main.py --web
 **更新日期**: 2026-09-12
 **更新类型**: 🛡️ 安全加固+架构重构
 **作者**: 小旭二手机（西园路）
-### v5.0.9.58 (2026-09-11) - 🔧 **安全审计+稳定性全面加固** - security_audit多线程重构+Playwright事件循环阻塞修复+版本Commit hash全量回填
+
+---
 
 ##### 2. 🛡️ PermissionError根因修复 (WinError 5拒绝访问) + TeeOutput共享模式加固
 
@@ -124,7 +174,9 @@ python main.py --web
 **更新类型**: 🛡️ Bug修复+稳定性加固
 **作者**: 小旭二手机（西园路）
 
+---
 
+### v5.0.9.58 (2026-09-11) - 🔧 **安全审计+稳定性全面加固** - security_audit多线程重构+Playwright事件循环阻塞修复+版本Commit hash全量回填
 
 > **Commit**: `933d5e4f, 4f17917e`  
 
@@ -137,6 +189,28 @@ python main.py --web
 6. **硬编码路径 → PathManager**: config/config.json等硬编码路径统一改为PathManager方法
 7. **README.md+skill.md Commit hash全量回填**: 所有版本条目补齐git commit hash(同一版本多提交用逗号拼接，最多5个)，彻底消除"待生成"占位
 8. **changelog API changes字段空值防御**: 已有自动fallback机制确保永远不为空数组
+
+##### 1. 🔧安全审计+稳定性全面加固 (security_audit重构+Playwright修复+Commit hash回填)
+**问题描述**:
+- **现象**: security_audit硬编码行号白名单在git diff后行号偏移导致误报；Playwright同步install阻塞async事件循环；版本条目缺少git commit hash
+- **根因**: security_audit用固定行号白名单无法适应代码变动；install_playwright_cdn()是同步IO调用；文档更新时commit hash未及时回填
+- **影响范围**: 安全审计误报率上升；Playwright启动阻塞整个async事件循环；changelog API无法关联代码变更
+
+**修复方案**:
+- **技术实现(security_audit重构)**: 废弃硬编码行号白名单→纯正则内容自动识别+多线程扫描+Windows反斜杠修复+UTF-8编码修复 [main.py](main.py)
+- **技术实现(Playwright修复)**: install_playwright_cdn()通过loop.run_in_executor()改为线程池执行；3处try/finally确保browser/context关闭 [main.py](main.py)
+- **技术实现(Commit hash回填)**: 同一版本多commit合并(最多5个)，消除"待生成"占位 [README.md](README.md) [skill.md](skill.md)
+
+**测试验证**:
+- ✅ 编译检查: py_compile通过
+- ✅ security_audit: 纯正则匹配，零硬编码行号
+- ✅ Playwright: async事件循环不再阻塞
+- ✅ Commit hash: 所有版本条目已补齐
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
+**更新日期**: 2026-09-11
+**更新类型**: 🔧 功能优化+安全加固
+**作者**: 小旭二手机（西园路）
 
 ---
 

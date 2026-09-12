@@ -5813,23 +5813,14 @@ class WegoScraper:
                 
                 product = {
                     '商品描述': title,
-                    'name': title,
                     '售价': f'¥{sale_price_int:,}' if sale_price_int is not None else '',
-                    'price': f'¥{sale_price_int:,}' if sale_price_int is not None else '',
                     '拿货价': f'¥{cost_price_int:,}' if cost_price_int is not None else '',
-                    'cost_price': f'¥{cost_price_int:,}' if cost_price_int is not None else '',
                     '货号': goods_num,
-                    'stock_number': goods_num,
                     '备注': remark,
-                    'remark': remark,
                     '员工': staff_nick,
-                    'staff': staff_nick,
                     '图片': media_b64,
-                    'image': media_b64,
                     '入库时间': old_time,
-                    'created_time': old_time,
-                    '入库时间戳': created_time,
-                    'timestamp': created_time
+                    '入库时间戳': created_time
                 }
                 products.append(product)
             except Exception as e:  # [HANDLED]
@@ -5949,7 +5940,6 @@ class WegoScraper:
                 cache_price = cache_product.get('售价', '') or cache_product.get('price', '')
                 if cache_price.strip():
                     product['售价'] = cache_price
-                    product['price'] = cache_price
                     merged_count += 1
             
             # 检查拿货价是否为空
@@ -5958,7 +5948,6 @@ class WegoScraper:
                 cache_cost = cache_product.get('拿货价', '') or cache_product.get('cost_price', '')
                 if cache_cost.strip():
                     product['拿货价'] = cache_cost
-                    product['cost_price'] = cache_cost
         
         if merged_count > 0:
             logger.debug(f'[OK] 已从cache合并 {merged_count} 个商品的价格信息')
