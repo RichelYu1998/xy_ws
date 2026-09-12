@@ -200,7 +200,7 @@ bandit -r . -f json -o bandit_report.json
 ## 🔄 最新更新
 ### v5.0.9.59 (2026-09-12) - 🛡️ **企业级文件IO安全加固** - FileManager原子写入框架+read_json容错+全项目16处直接写入统一走FileManager
 
-> **Commit**: `5ca820fc`  
+> **Commit**: `5ca820fc, faac750b`  
 
 #### 更新内容:
 1. **JSON读取容错修复(P0)**: FileManager.read_json检测到"Extra data"(截断的JSON尾巴)时，用JSONDecoder.raw_decode()取第一个有效对象，并自动截断写回磁盘修复
