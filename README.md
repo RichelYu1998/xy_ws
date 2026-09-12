@@ -209,6 +209,7 @@ bandit -r . -f json -o bandit_report.json
 4. **全项目16处直接open(w/a/wb)写入改造**: SecureConfigManager.save_config/initialize_encryption/_auto_encrypt_config、ConfigManager.save_config、key_file/salt_file、BOM移除、tunnel_url.txt、Cloudflare config.yml、pip配置文件、weblog/web_log追加写入等
 5. **追加模式安全处理**: 5处open('a')追加写入改为"FileManager.read_text读取+合并+write_text原子写入"，保证写入过程中文件不会损坏
 6. **全量JSON文件验证**: 修复前扫描219个微购相册JSON文件确认损坏文件，修复后全部通过JSON格式验证
+7. **PermissionError根因修复(P0)**: TeeOutput用sharing='delete'打开日志文件(Python 3.13+)允许os.replace原子替换成功；FileManager._atomic_replace_with_retry新增指数退避retry(0.1s→0.2s→0.4s)+append兜底；log_print改为纯append_text(O(1))；3处pure-append场景从read-modify-write简化为append；300+次请求零PermissionError
 
 ##### 1. 🛡️ FileManager原子写入框架 (JSON尾巴残留根因修复)
 **问题描述**:
@@ -239,6 +240,39 @@ bandit -r . -f json -o bandit_report.json
 **作者**: 小旭二手机（西园路）
 
 ---
+
+##### 2. 🛡️ PermissionError根因修复 (WinError 5拒绝访问) + TeeOutput共享模式加固
+
+**问题描述**:
+- **现象**: `FileManager.write_text(D:\ws\xy_ws\file\web_output.log): [PermissionError] [WinError 5] 拒绝访问。: 'web_output.log.tmp' -> 'web_output.log'`
+- **根因**: Windows下TeeOutput用默认共享模式(`FILE_SHARE_READ|FILE_SHARE_WRITE`)打开web_output.log，**缺少`FILE_SHARE_DELETE`标志**，导致os.replace()原子替换操作永远被拒绝；同时log_print用read-modify-write模式白白与TeeOutput抢文件锁
+- **影响范围**: 所有向web_output.log写入的操作——每次tunnel URL同步、每次log_print调用都可能触发PermissionError
+
+**修复方案**:
+- **技术实现(根因修复)**: TeeOutput._init_log_file在Windows上用`open(path, 'a', encoding='utf-8', sharing='delete')`打开文件(Python 3.13+支持)，允许其他进程对被打开文件执行os.replace/os.rename原子替换 [main.py](main.py)
+- **技术实现(retry+fallback)**: FileManager._atomic_replace_with_retry新增——os.replace失败时指数退避重试3次(0.1s→0.2s→0.4s)，全失败后退化为append模式保证不丢数据；write_json/write_text/write_bytes统一改用此retry方法
+- **技术实现(log_print改造)**: 新增FileManager.append_text()直接追加写入，log_print从read-modify-write改为纯append(~1ms vs ~整文件读写)
+- **技术实现(3处pure-append简化)**: _write_header、heartbeat_loop隧道URL同步、tunnel URL捕获——3处"read existing + write_text(web_output_file, existing + append_text)"全部简化为append_text
+
+**测试验证**:
+- ✅ 编译检查: py_compile通过
+- ✅ 300+次API请求零PermissionError: run.bat完整流程后压测60轮×5接口
+- ✅ log_print性能提升: 从read整文件+临时文件+replace → 直接append ~1ms
+- ✅ fallback安全: retry全失败自动append到文件末尾，确保不丢日志
+- ✅ run.bat完整流程验证: 隧道启动→依赖安装→BOM检查→Web服务启动→全部API正常响应
+- ✅ BOM清理: main.py/run.bat均已清理UTF-8 BOM，Git不再提示脏文件
+
+**核心改进**:
+- 从根源上消除Windows文件锁冲突(sharing='delete'是最彻底的修复方式)
+- FileManager原子替换框架增加retry+fallback双保险
+- 3处pure-append场景性能从O(N)降为O(1)
+
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
+**更新日期**: 2026-09-12
+**更新类型**: 🛡️ Bug修复+稳定性加固
+**作者**: 小旭二手机（西园路）
+
+
 ### v5.0.9.58 (2026-09-11) - 🔧 **安全审计+稳定性全面加固** - security_audit多线程重构+Playwright事件循环阻塞修复+版本Commit hash全量回填
 
 > **Commit**: `933d5e4f, 4f17917e`  

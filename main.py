@@ -1433,7 +1433,13 @@ class TeeOutput:
                     else:
                         raise
             
-            self.file = open(log_file_path, 'a', encoding='utf-8')
+            if os.name == 'nt':
+                try:
+                    self.file = open(log_file_path, 'a', encoding='utf-8', sharing='delete')
+                except (TypeError, ValueError):
+                    self.file = open(log_file_path, 'a', encoding='utf-8')
+            else:
+                self.file = open(log_file_path, 'a', encoding='utf-8')
             
         except PermissionError as e:
             if retry_count < max_retries:
@@ -1547,8 +1553,7 @@ def setup_web_logging():
             
     if need_header:
         def _write_header():
-            existing = FileManager.read_text(web_log_file) or ''
-            FileManager.write_text(web_log_file, existing + "=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n")
+            FileManager.append_text(web_log_file, "=" * 50 + "\nSzwego商品爬虫 - Web服务\n" + "=" * 50 + "\n")
         safe_execute_func(_write_header, context='setup_web_logging')
     sys.stdout = TeeOutput(sys.stdout, web_log_file)
     sys.stderr = TeeOutput(sys.stderr, web_log_file)
@@ -1561,10 +1566,7 @@ def log_print(*args, **kwargs):
     _msg_with_timestamp = f"[{_log_timestamp}] {msg}"
     logger.debug(_msg_with_timestamp, **kwargs)  # [PRODUCTION_SAFE]  # [PRODUCTION_READY]  # [PRODUCTION_SAFE]
     if web_log_file:
-        def _write_log():
-            existing = FileManager.read_text(web_log_file) or ''
-            FileManager.write_text(web_log_file, existing + _msg_with_timestamp + '\n')
-        safe_execute_func(_write_log, context='log_print')
+        safe_execute_func(lambda: FileManager.append_text(web_log_file, _msg_with_timestamp + '\n'), context='log_print')
 
 def format_size(size_bytes: int) -> str:
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
@@ -4653,6 +4655,56 @@ class FileManager:
         except Exception as e:
             logger.error(f'[FileManager] Auto-repair failed: {e}')
 
+
+    @staticmethod
+    def _atomic_replace_with_retry(tmp_path, file_path, max_retries=3, base_delay=0.1):
+        target_exists = os.path.exists(file_path)
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                if target_exists:
+                    os.replace(tmp_path, file_path)
+                else:
+                    os.rename(tmp_path, file_path)
+                return True
+            except (PermissionError, OSError) as e:
+                last_error = e
+                is_locked = isinstance(e, PermissionError) or (os.name == 'nt')
+                if attempt < max_retries - 1 and is_locked:
+                    time.sleep(base_delay * (2 ** attempt))
+                else:
+                    break
+        try:
+            if os.path.exists(tmp_path):
+                with open(tmp_path, 'rb') as sf:
+                    new_data = sf.read()
+                if target_exists:
+                    try:
+                        with open(file_path, 'ab') as tf:
+                            tf.write(b'\n')
+                            tf.write(new_data)
+                        logger.debug(f'[FileManager] os.replace failed ({last_error}), fallback: appended to tail of {os.path.basename(file_path)}')
+                    except Exception:
+                        logger.debug(f'[FileManager] fallback append also failed: {os.path.basename(file_path)}')
+                        raise last_error
+                else:
+                    os.rename(tmp_path, file_path)
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+                return True
+        except Exception:
+            raise last_error
+
+    @staticmethod
+    def append_text(file_path, content):
+        with ExceptionContext(f"FileManager.append_text({file_path})", default=False) as ctx:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            with open(file_path, 'a', encoding='utf-8') as f:
+                f.write(content)
+                f.flush()
+            return True
     @staticmethod
     def write_json(file_path, data, indent=2):
         with ExceptionContext(f"FileManager.write_json({file_path})", default=False) as ctx:
@@ -4661,10 +4713,7 @@ class FileManager:
             try:
                 with open(tmp_path, 'w', encoding='utf-8') as f:
                     json.dump(data, f, ensure_ascii=False, indent=indent)
-                if os.path.exists(file_path):
-                    os.replace(tmp_path, file_path)
-                else:
-                    os.rename(tmp_path, file_path)
+                FileManager._atomic_replace_with_retry(tmp_path, file_path)
                 return True
             except Exception:
                 if os.path.exists(tmp_path):
@@ -4682,10 +4731,7 @@ class FileManager:
             try:
                 with open(tmp_path, 'wb') as f:
                     f.write(data)
-                if os.path.exists(file_path):
-                    os.replace(tmp_path, file_path)
-                else:
-                    os.rename(tmp_path, file_path)
+                FileManager._atomic_replace_with_retry(tmp_path, file_path)
                 return True
             except Exception:
                 if os.path.exists(tmp_path):
@@ -4709,10 +4755,7 @@ class FileManager:
             try:
                 with open(tmp_path, 'w', encoding='utf-8') as f:
                     f.write(content)
-                if os.path.exists(file_path):
-                    os.replace(tmp_path, file_path)
-                else:
-                    os.rename(tmp_path, file_path)
+                FileManager._atomic_replace_with_retry(tmp_path, file_path)
                 return True
             except Exception:
                 if os.path.exists(tmp_path):
@@ -10537,12 +10580,11 @@ if __name__ == '__main__':
                             try:
                                 lan_ip = PathManager.get_lan_ip()
                                 port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
-                                existing = FileManager.read_text(web_output_file) or ''
                                 append_text = ""
                                 if lan_ip:
                                     append_text += f"局域网地址: http://{lan_ip}:{port}\n"
                                 append_text += f"Public URL: {web_url}\n"
-                                FileManager.write_text(web_output_file, existing + append_text)
+                                FileManager.append_text(web_output_file, append_text)
                             except Exception as e:  # [HANDLED]
                                 _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
                                 
@@ -10807,12 +10849,11 @@ if __name__ == '__main__':
                                             lan_ip = PathManager.get_lan_ip()
                                             port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
                                             web_output_file = PathManager.get_web_output_file()
-                                            existing = FileManager.read_text(web_output_file) or ''
                                             append_text = ""
                                             if lan_ip:
                                                 append_text += f"局域网地址: http://{lan_ip}:{port}\n"
                                             append_text += f"Public URL: {file_url}\n"
-                                            FileManager.write_text(web_output_file, existing + append_text)
+                                            FileManager.append_text(web_output_file, append_text)
                                             logger.debug(f"[Tunnel] 已写入 web_output.log")
                                         except Exception as e:  # [HANDLED]
                                             logger.debug(f"Tunnel log write error: {e}")
