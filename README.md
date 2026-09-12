@@ -200,10 +200,10 @@ bandit -r . -f json -o bandit_report.json
 ## 🔄 最新更新
 ### v5.0.9.60 (2026-09-12) - ♻️ **数据模型去冗余+文档结构修复** - 删除product字典10个重复英文键+3处冗余赋值+changelog空changes补全+v5.0.9.58缺#####子项修复
 
-> **Commit**: `待生成`  
+> **Commit**: `54719c96`  
 
 #### 更新内容:
-1. **product字典双语键去冗余**: 删除fetch_all_products_via_api中10个重复英文键(name/price/cost_price/stock_number/remak/staff/image/created_time/timestamp)，只保留中文键
+1. **product字典双语键去冗余**: 删除fetch_all_products_via_api中10个重复英文键(name/price/cost_price/stock_number/remark/staff/image/created_time/timestamp)，只保留中文键
 2. **cache合并冗余赋值删除**: 删除save_data中product['price']=cache_price和product['cost_price']=cache_cost两行冗余写入
 3. **changelog API changes字段空值修复**: v5.0.9.58在README.md和skill.md中均缺少#####子项导致changes为空，已补全
 4. **skill.md v5.0.9.59结构错位修复**: ##### 2. PermissionError子项被错误放到v5.0.9.58 header下，已移回v5.0.9.59
