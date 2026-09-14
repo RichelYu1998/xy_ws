@@ -143,10 +143,60 @@ class MarkdownToDocxConverter:
                                 hint.font.size = Pt(9)
                                 hint.font.color.rgb = RGBColor(128, 128, 128)
                                 hint.font.italic = True
+    def _normalize_fences(self, lines):
+        """Normalize markdown fences to match author's convention:
+        - ```lang always opens a new block (close previous if open)
+        - ``` always closes the nearest open block
+        - Unclosed blocks auto-close at headings or EOF
+        """
+        result = []
+        is_open = False
+
+        for line in lines:
+            if line.startswith('```'):
+                lang = line[3:].strip()
+                if lang:
+                    if is_open:
+                        result.append('```')
+                    result.append(line)
+                    is_open = True
+                else:
+                    if is_open:
+                        result.append(line)
+                        is_open = False
+            elif is_open and re.match(r'^#{1,6}\s', line):
+                result.append('```')
+                is_open = False
+                result.append(line)
+            else:
+                result.append(line)
+
+        if is_open:
+            result.append('```')
+
+        return result
+
     def convert(self, md_path: str, output_path: str = 'skill.docx'):
         md_content = Path(md_path).read_text(encoding='utf-8')
-        lines = md_content.split('\n')
+        raw_lines = md_content.split('\n')
+        lines = self._normalize_fences(raw_lines)
+
+        # First pass: collect all heading bookmark IDs so navigation links
+        # can reference them even though the nav table appears BEFORE the headings
+        # Must also respect fence state!
+        is_open = False
+        for line in lines:
+            if line.startswith('```'):
+                lang = line[3:].strip()
+                is_open = not is_open
+            elif line.startswith('#') and not is_open:
+                level = len(line) - len(line.lstrip('#'))
+                text = line.lstrip('#').strip()
+                if 2 <= level <= 3:
+                    bookmark_id = self._generate_bookmark_id(text)
+                    self.heading_bookmarks[bookmark_id] = None
         
+        # Second pass: generate doc content
         i = 0
         while i < len(lines):
             line = lines[i]
@@ -264,7 +314,7 @@ class MarkdownToDocxConverter:
                 
                 header_cells = table.rows[0].cells
                 for i, cell_text in enumerate(rows[0][:num_cols]):
-                    header_cells[i].text = cell_text
+                    header_cells[i].text = self._clean_text(cell_text)
                     for paragraph in header_cells[i].paragraphs:
                         for run in paragraph.runs:
                             run.bold = True
@@ -281,35 +331,48 @@ class MarkdownToDocxConverter:
                         if is_nav_table and i == num_cols - 1:
                             self._add_clickable_link(row[i], cell_text)
                         else:
-                            row[i].text = cell_text
+                            row[i].text = self._clean_text(cell_text)
 
         return start_idx
 
     def _add_clickable_link(self, cell, text):
-        """Add styled link text (visual only - user uses Ctrl+F to navigate)"""
         cell.text = ''
         para = cell.paragraphs[0]
 
-        # Parse Markdown link: [text](#anchor)
         link_match = re.match(r'\[([^\]]+)\]\(([^)]+)\)', text)
 
         if link_match:
             display_text = link_match.group(1)
-            
-            # Add styled text to indicate it is a navigation link
-            run_icon = para.add_run('🔗 ')
-            run_icon.font.size = Pt(10)
-            
-            run_link = para.add_run(display_text)
-            run_link.font.color.rgb = RGBColor(0, 102, 204)   # Blue
-            run_link.font.underline = True                      # Underline
-            run_link.font.size = Pt(10)
-            run_link.bold = True                                # Bold
-            
-            run_hint = para.add_run(' (Ctrl+F 搜索标题)')
-            run_hint.font.size = Pt(9)
-            run_hint.font.color.rgb = RGBColor(128, 128, 128)  # Gray
-            run_hint.italic = True                              # Italic
+            raw_anchor = link_match.group(2).lstrip('#')
+
+            bookmark_id = self._find_heading_bookmark_id(raw_anchor)
+
+            hyperlink = OxmlElement('w:hyperlink')
+            hyperlink.set(qn('w:anchor'), bookmark_id)
+
+            run = OxmlElement('w:r')
+            rPr = OxmlElement('w:rPr')
+
+            color = OxmlElement('w:color')
+            color.set(qn('w:val'), '0066CC')
+            rPr.append(color)
+
+            u = OxmlElement('w:u')
+            u.set(qn('w:val'), 'single')
+            rPr.append(u)
+
+            b = OxmlElement('w:b')
+            rPr.append(b)
+
+            run.append(rPr)
+
+            t_elem = OxmlElement('w:t')
+            t_elem.set(qn('xml:space'), 'preserve')
+            t_elem.text = f'🔗 {display_text}'
+            run.append(t_elem)
+
+            hyperlink.append(run)
+            para._p.append(hyperlink)
         else:
             run = para.add_run(text)
             run.font.size = Pt(10)
@@ -322,6 +385,24 @@ class MarkdownToDocxConverter:
         anchor = anchor.replace(' ', '-')
         anchor = re.sub(r'-+', '-', anchor)
         return anchor.strip('-')
+
+    def _find_heading_bookmark_id(self, markdown_anchor):
+        direct_id = self._generate_bookmark_id(markdown_anchor)
+        if direct_id in self.heading_bookmarks:
+            return direct_id
+        if markdown_anchor in self.heading_bookmarks:
+            return markdown_anchor
+        direct_no_dash = direct_id.replace('-', '')
+        for heading_bm_id in self.heading_bookmarks:
+            if heading_bm_id in direct_id or direct_id in heading_bm_id:
+                return heading_bm_id
+            hb_no_dash = heading_bm_id.replace('-', '')
+            if hb_no_dash == direct_no_dash:
+                return heading_bm_id
+            if hb_no_dash and direct_no_dash:
+                if hb_no_dash in direct_no_dash or direct_no_dash in hb_no_dash:
+                    return heading_bm_id
+        return direct_id
 
     def _add_bookmark_to_paragraph(self, para, bookmark_name):
         """Add a Word bookmark to a paragraph"""

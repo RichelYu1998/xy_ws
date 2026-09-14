@@ -257,6 +257,7 @@ bandit -r . -f json -o bandit_report.json
 - ✅ skill.docx: 导航表格位置列显示为蓝色下划线超链接，点击后跳转到对应章节标题
 
 **影响文件**: [skill.md](skill.md), [README.md](README.md), [skill.docx](skill.docx)
+**Commit**: 55d25701
 
 ---
 
@@ -307,6 +308,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-12
 **更新类型**: ♻️ 重构+📝 文档更新
 **作者**: 小旭二手机（西园路）
+**Commit**: 2e3d4428, f440e741, 54719c96
 
 ---
 
@@ -383,6 +385,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-12
 **更新类型**: 🛡️ Bug修复+稳定性加固
 **作者**: 小旭二手机（西园路）
+**Commit**: b5a67441, faac750b, 36b826fd, 034f0fe7, 5ca820fc
 
 
 ### v5.0.9.58 (2026-09-11) - 🔧 **安全审计+稳定性全面加固** - security_audit多线程重构+Playwright事件循环阻塞修复+版本Commit hash全量回填
@@ -420,6 +423,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-11
 **更新类型**: 🔧 功能优化+安全加固
 **作者**: 小旭二手机（西园路）
+**Commit**: 9f90e5e5
 
 ---
 ### v5.0.9.57 (2026-09-09) - ♻️ **FastAPI DeprecationWarning 消除** - on_event("startup"/"shutdown") 迁移为 lifespan 上下文管理器
@@ -543,7 +547,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-09
 **更新类型**: 🛡️ 安全攻防加固 + 📝 代码规范合规
 **影响文件**: [main.py](main.py), [generate_docx.py](test/generate_docx.py), [security_audit.py](test/security_audit.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), run.bat
-**Commit**: a4330192
+**Commit**: 05063e34, a4330192
 **作者**: 小旭二手机（西园路）**
 
 ---
@@ -714,7 +718,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-07
 **更新类型**: 🔧 架构优化 + 🛡️ 稳定性提升
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
-**Commit**: a0257623
+**Commit**: c9c8f319, a0257623
 **作者**: 小旭二手机（西园路）**
 
 ---
@@ -777,7 +781,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-07
 **更新类型**: 🛡️ 安全加固 + 🐛 Bug修复 + 📝 规范合规
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md)
-**Commit**: f2b00da1
+**Commit**: 416c1feb, f2b00da1
 **作者**: AI Assistant (安全审计专家模式)**
 
 ---
@@ -935,7 +939,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-06
 **更新类型**: 🐛 Bug修复 + 跨表联动优化 + 匹配算法增强
 **影响文件**: [dist/app.js](dist/app.js#L2804-L2822)
-**Commit**: 18fbd600
+**Commit**: c7e3b4ee, 9becc1d0, 21619515, bcc5e8c2, 18fbd600
 **作者**: 小旭二手机（西园路）**
 
 ---
@@ -991,7 +995,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-06
 **更新类型**: 🐛 Bug修复 + DOM操作优化 + 防御性编程
 **影响文件**: [dist/app.js](dist/app.js#L2690-L2716)
-**Commit**: 273cd4e2
+**Commit**: 73556d29, 4e1f13de, 273cd4e2, 78f9f778
 **作者**: 小旭二手机（西园路）**
 
 ---
@@ -1049,7 +1053,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-06
 **更新类型**: 🐛 Bug修复 + 联动逻辑重构 + 安全增强
 **影响文件**: dist/app.js, skill.docx
-**Commit**: 9e5cce49
+**Commit**: 9e5cce49, 0c9f699a, a9c377d1, e355f0cf
 **作者**: 小旭二手机（西园路）**
 
 ---
@@ -1105,7 +1109,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-04
 **更新类型**: 🔧 Bug修复 + 编码规范 + 兼容性增强
 **影响文件**: run.sh, README.md, skill.md, skill.docx
-**Commit**: 1da27a5c
+**Commit**: 1da27a5c, 1094868e
 **作者**: 小旭二手机（西园路）**
 
 ---
@@ -1151,7 +1155,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-04
 **更新类型**: 范式统一 + 文档完善 + 功能增强
 **影响文件**: run.bat, run.sh, README.md, skill.md, skill.docx
-**Commit**: 0c9f699a
+**Commit**: 193390cb, 0469fb97, 5d21a9c7, 008cec95, 9449dca3
 **作者**: 小旭二手机（西园路）**
 
 ---
@@ -1259,7 +1263,7 @@ bandit -r . -f json -o bandit_report.json
 **更新日期**: 2026-09-04
 **更新类型**: 🐛Bug修复 + 🔒安全加固
 **影响文件**: [main.py](main.py#L11593)
-**Commit**: a2deb2f7
+**Commit**: a2deb2f7, 81bd1560
 **变更统计**: +1行 -1行
 **作者**: 小旭二手机（西园路）**
 
@@ -1503,7 +1507,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-04
 **修复类型**: 🐛Bug修复 + 🎨UI优化 + 🔒安全增强 + 📝文档规范化
 **影响文件**: [main.py](main.py#L5729-L5736), [dist/app.js](dist/app.js#L2193-L2199), [test/security_audit.py](test/security_audit.py#L341-L366), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 501d30ab
+**Commit**: 501d30ab, 269c0b42, 126e2e5a, 14c56c40, e4d76d36
 **变更统计**: +124行 -8行 (+116行净增)
 **作者**: 小旭二手机（西园路）**
 
@@ -1572,7 +1576,7 @@ python config/crypto_tool.py encrypt-config
 **更新日期**: 2026-09-03
 **修复类型**: 🔧技术债务清理 + 📝文档规范化 + 🐛Bug修复
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 2fe31b1a
+**Commit**: 2fe31b1a, 84f53877
 **变更统计**: +2811行 -30行 (+2781行净增)
 **作者**: 小旭二手机（西园路）**
 
@@ -1725,7 +1729,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-03
 **修复类型**: 🚀功能增强 + 🌐网络适配 + 🔐权限管理 + 🐛Bug修复
 **影响文件**: [run.bat](run.bat), [run.sh](run.sh), [.trae/](.trae/)
-**Commit**: b36e12c6
+**Commit**: b36e12c6, 8569de29
 **变更统计**: +0行 -0行 (+0行净增)
 **作者**: 小旭二手机（西园路）**
 
@@ -2034,7 +2038,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-03
 **修复类型**: 🔧技术债务清理 + 📝文档规范化
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: db629b80
+**Commit**: db629b80, 80f80208
 **变更统计**: +0行 -0行 (+0行净增)
 **作者**: 小旭二手机（西园路）**
 
@@ -2170,7 +2174,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-03
 **修复类型**: 🔄功能增强 + 📦依赖管理优化 + 🔧技术债务清理
 **影响文件**: [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
-**Commit**: 5586176d
+**Commit**: 5586176d, 0ae079df
 **变更统计**: +40行 -8行 (+32行净增)
 **作者**: 小旭二手机（西园路）**
 
@@ -2491,7 +2495,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-03
 **修复类型**: 📝范式定义 + 🖥️输出规范
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 6e33af02
+**Commit**: 6e33af02, e0523ff3
 **变更统计**: +200行 -0行
 **作者**: 小旭二手机（西园路）**
 
@@ -2722,7 +2726,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-02
 **修复类型**: 📱移动端优化 + 🐛Bug修复
 **影响文件**: [index.html](index.html), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: f7871100
+**Commit**: f7871100, 6aece7cc
 **变更统计**: +7行 -4行
 **作者**: 小旭二手机（西园路）**
 
@@ -3493,7 +3497,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-02
 **修复类型**: 🔧Bug修复 + 📝文档更新
 **影响文件**: [test/generate_docx.py](test/generate_docx.py#L15), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
-**Commit**: 08a072e4
+**Commit**: 08a072e4, 409c5a67
 **变更统计**: +66行 -2行
 **作者**: 小旭二手机（西园路）**
 
@@ -3527,7 +3531,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-02
 **修复类型**: 🔧版本对齐 + 数据完整性
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 728a4a68
+**Commit**: 728a4a68, 0278a494
 **变更统计**: +704行 -0行
 **作者**: 小旭二手机（西园路）**
 
@@ -3561,7 +3565,7 @@ python config/crypto_tool.py encrypt-config
 **修复日期**: 2026-09-02
 **修复类型**: 🔧Bug修复 + 📝范式定义
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 57206dc9
+**Commit**: 57206dc9, fa29c2d6, 5a6158c8
 **变更统计**: +938行 -173行
 **作者**: 小旭二手机（西园路）**
 
@@ -4506,7 +4510,7 @@ PY-CORE-025 (API整体架构)
 **修复日期**: 2026-09-02
 **修复类型**: 📝文档更新
 **影响文件**: [README.md](README.md)
-**Commit**: 0278a494
+**Commit**: dc6fef7f, 512eda94, 5ab958c1
 **变更统计**: +115行 -187行
 **作者**: 小旭二手机（西园路）**
 
@@ -4668,7 +4672,7 @@ if exist "README.md" (
 **修复日期**: 2026-09-02
 **修复类型**: 📝文档更新
 **影响文件**: [README.md](README.md)
-**Commit**: 0278a494
+**Commit**: 390f5159, 1f148531, 22d84d25, eaefa0ea, 6ef392c9
 **变更统计**: +115行 -187行
 **作者**: 小旭二手机（西园路）**
 
@@ -4701,7 +4705,7 @@ if exist "README.md" (
 **修复日期**: 2026-08-31
 **修复类型**: Bug修复
 **影响文件**: [main.py](main.py#L2206-L2236), [README.md](README.md#L129)
-**Commit**: ebf8b9fe
+**Commit**: ebf8b9fe, 51f83d29, 396a19d8
 **变更统计**: main.py +30行修改, README.md +15行修改
 **作者**: 小旭二手机（西园路）
 
@@ -4800,7 +4804,7 @@ if exist "README.md" (
 **修复日期**: 2026-08-31
 **修复类型**: 文档更新
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [requirements.txt](requirements.txt), [skill.docx](skill.docx)
-**Commit**: 0c3a4232
+**Commit**: 0c3a4232, 87909c3a
 **变更统计**: 3个文件修改, +15541行新增, -6行删除
 **作者**: 小旭二手机（西园路）
 
@@ -4921,7 +4925,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-31
 **更新类型**: 📝 文档补录
-**Commit**: 970ce1a4
+**Commit**: 970ce1a4, 37534fa8
 **作者**: RichelYu1998
 
 ---
@@ -5584,7 +5588,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-09-02
 **更新类型**: 📝 文档补录
-**Commit**: a14d1e70
+**Commit**: d9e03b2c, 175d3d42, f232e699, 91be5446, 0b6d8513
 **作者**: RichelYu1998
 
 ---
@@ -5813,7 +5817,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-21
 **更新类型**: 📝 文档补录
-**Commit**: 619a434e
+**Commit**: 619a434e, 0fd64656
 **作者**: RichelYu1998
 
 ---
@@ -5833,7 +5837,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-21
 **更新类型**: 📝 文档补录
-**Commit**: bac24600
+**Commit**: bac24600, 4d5bdf9e
 **作者**: RichelYu1998
 
 ---
@@ -5973,7 +5977,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-21
 **更新类型**: 📝 文档补录
-**Commit**: f976da42
+**Commit**: f976da42, e3168286, 9c780467
 **作者**: RichelYu1998
 
 ---
@@ -5993,7 +5997,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-21
 **更新类型**: 📝 文档补录
-**Commit**: a79a5c19
+**Commit**: a79a5c19, fbae1b72
 **作者**: RichelYu1998
 
 ---
@@ -6113,7 +6117,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-20
 **更新类型**: 📝 文档补录
-**Commit**: f66d3f7a
+**Commit**: f66d3f7a, afa81fb4
 **作者**: RichelYu1998
 
 ---
@@ -6182,7 +6186,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-11
 **更新类型**: 📝 文档补录
-**Commit**: e599f25e
+**Commit**: e599f25e, d1d5f83f, 02274d75, b9a40b0c, 445265f2
 **作者**: RichelYu1998
 
 ---
@@ -6202,7 +6206,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-11
 **更新类型**: 📝 文档补录
-**Commit**: 027c88b0
+**Commit**: 027c88b0, b9ca8da9
 **作者**: RichelYu1998
 
 ---
@@ -6358,7 +6362,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-11
 **更新类型**: 📝 文档补录
-**Commit**: f14cf83c
+**Commit**: f14cf83c, d6ee1523
 **作者**: RichelYu1998
 
 ---
@@ -6378,7 +6382,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-22
 **更新类型**: 📝 文档补录
-**Commit**: 87c401be
+**Commit**: 87c401be, 867ad415, b9a25358, 345efa4c, 999390c3
 **作者**: RichelYu1998
 
 ---
@@ -6398,7 +6402,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-31
 **更新类型**: 📝 文档补录
-**Commit**: 9d5185ce
+**Commit**: 9b94312e, 2f93c320, 5798a091, 20c50a69, 38397644
 **作者**: RichelYu1998
 
 ---
@@ -6496,7 +6500,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-30
 **更新类型**: 📝 文档补录
-**Commit**: 08033835
+**Commit**: 08033835, 53aa5169
 **作者**: RichelYu1998
 
 ---
@@ -6616,7 +6620,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-29
 **更新类型**: 📝 文档补录
-**Commit**: 42112d96
+**Commit**: 42112d96, 6babc05f
 **作者**: RichelYu1998
 
 ---
@@ -6796,7 +6800,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-24
 **更新类型**: 📝 文档补录
-**Commit**: d6952f12
+**Commit**: d6952f12, 0cc8bafe, ff40e0bf, a49c45a5
 **作者**: RichelYu1998
 
 ---
@@ -6816,7 +6820,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-20
 **更新类型**: 📝 文档补录
-**Commit**: 22babdcf
+**Commit**: 22babdcf, 0650ae1b, 2b896271
 **作者**: RichelYu1998
 
 ---
@@ -6896,7 +6900,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-19
 **更新类型**: 📝 文档补录
-**Commit**: 5d4ef6c7
+**Commit**: 5d4ef6c7, 6dec792d, 0c8159c2, 5b1666f4, c1d4bbff
 **作者**: RichelYu1998
 
 ---
@@ -6916,7 +6920,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-19
 **更新类型**: 📝 文档补录
-**Commit**: e9b2e505
+**Commit**: e9b2e505, 9e1c4402, 05d4c688, 92838463
 **作者**: RichelYu1998
 
 ---
@@ -6996,7 +7000,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-30
 **更新类型**: 📝 文档补录
-**Commit**: 77b36596
+**Commit**: 77b36596, 910e59ff
 **作者**: RichelYu1998
 
 ---
@@ -7216,7 +7220,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-18
 **更新类型**: 📝 文档补录
-**Commit**: 17095a99
+**Commit**: 17095a99, f7901f8f
 **作者**: RichelYu1998
 
 ---
@@ -7336,7 +7340,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-18
 **更新类型**: 📝 文档补录
-**Commit**: 40ccd95f
+**Commit**: 40ccd95f, 55a55163
 **作者**: RichelYu1998
 
 ---
@@ -7436,7 +7440,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-17
 **更新类型**: 📝 文档补录
-**Commit**: 61b9fc68
+**Commit**: 61b9fc68, 2a79a063, 42c7d6b2
 **作者**: RichelYu1998
 
 ---
@@ -7776,7 +7780,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-11
 **更新类型**: 📝 文档补录
-**Commit**: 758490fa
+**Commit**: 758490fa, fff9b30f
 **作者**: RichelYu1998
 
 ---
@@ -7796,7 +7800,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-11
 **更新类型**: 📝 文档补录
-**Commit**: 43008c50
+**Commit**: 43008c50, 72fc6d04
 **作者**: RichelYu1998
 
 ---
@@ -7876,7 +7880,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-10
 **更新类型**: 📝 文档补录
-**Commit**: e8a53c37
+**Commit**: e8a53c37, d0328bf6, f76fadf6, 4db08011
 **作者**: RichelYu1998
 
 ---
@@ -7936,7 +7940,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-10
 **更新类型**: 📝 文档补录
-**Commit**: fa9141d9
+**Commit**: fa9141d9, 230c375c, e14e9e5d
 **作者**: RichelYu1998
 
 ---
@@ -7956,7 +7960,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-10
 **更新类型**: 📝 文档补录
-**Commit**: 2f421122
+**Commit**: 2f421122, 030d3e3d, 8cdd0bd1, bd69776f, f034c1d3
 **作者**: RichelYu1998
 
 ---
@@ -8016,7 +8020,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-09
 **更新类型**: 📝 文档补录
-**Commit**: f10cdc62
+**Commit**: f10cdc62, 2715d09e, 4ac09fb1, f0e50fd1, 63c1e4bc
 **作者**: RichelYu1998
 
 ---
@@ -8036,7 +8040,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-08
 **更新类型**: 📝 文档补录
-**Commit**: 2243b1ab
+**Commit**: 2243b1ab, 0ad4f113
 **作者**: RichelYu1998
 
 ---
@@ -8076,7 +8080,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-08
 **更新类型**: 📝 文档补录
-**Commit**: 3855601b
+**Commit**: 3855601b, 7fe0d4af
 **作者**: RichelYu1998
 
 ---
@@ -8116,7 +8120,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-05
 **更新类型**: 📝 文档补录
-**Commit**: c4b734ac
+**Commit**: c4b734ac, 948f440f
 **作者**: RichelYu1998
 
 ---
@@ -8176,7 +8180,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-05
 **更新类型**: 📝 文档补录
-**Commit**: 6ee7e5f9
+**Commit**: 6ee7e5f9, 3b7fadf4
 **作者**: RichelYu1998
 
 ---
@@ -8196,7 +8200,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-05
 **更新类型**: 📝 文档补录
-**Commit**: 73464def
+**Commit**: 73464def, 9e557e09, dd49e272
 **作者**: RichelYu1998
 
 ---
@@ -8216,7 +8220,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-05
 **更新类型**: 📝 文档补录
-**Commit**: 27bcbcef
+**Commit**: 27bcbcef, aeb7014e, 1ca66701
 **作者**: RichelYu1998
 
 ---
@@ -8296,7 +8300,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-04
 **更新类型**: 📝 文档补录
-**Commit**: 21fbf4ba
+**Commit**: 21fbf4ba, 784f1f71
 **作者**: RichelYu1998
 
 ---
@@ -8336,7 +8340,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-04
 **更新类型**: 📝 文档补录
-**Commit**: 17dabaa8
+**Commit**: 17dabaa8, c04675d3
 **作者**: RichelYu1998
 
 ---
@@ -8356,7 +8360,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-04
 **更新类型**: 📝 文档补录
-**Commit**: d7d068c6
+**Commit**: d7d068c6, 0614ea38, 76b27ac6, e432f111, 9bcd2683
 **作者**: RichelYu1998
 
 ---
@@ -8396,7 +8400,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-06-27
 **更新类型**: 📝 文档补录
-**Commit**: 1dcfcd9f
+**Commit**: 1dcfcd9f, e7e8f8f3, c9edc2a6, b7d7ce38, a3bc4ce5
 **作者**: RichelYu1998
 
 ---
@@ -8416,7 +8420,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-06-26
 **更新类型**: 📝 文档补录
-**Commit**: 00cdfb9b
+**Commit**: 00cdfb9b, 9b8a5446, c0077994
 **作者**: RichelYu1998
 
 ---
@@ -8516,7 +8520,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-05
 **更新类型**: 📝 文档补录
-**Commit**: 6dbd5812
+**Commit**: 6dbd5812, 9669222d, b0554098, 25ef7123, efa2c209
 **作者**: RichelYu1998
 
 ---
@@ -8536,7 +8540,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-06-11
 **更新类型**: 📝 文档补录
-**Commit**: f8b6eb6a
+**Commit**: f8b6eb6a, 4aa3f495
 **作者**: RichelYu1998
 
 ---
@@ -8636,7 +8640,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-06-05
 **更新类型**: 📝 文档补录
-**Commit**: cacd0b3a
+**Commit**: cacd0b3a, 97afd46a, 881c58b4, 639af06a
 **作者**: RichelYu1998
 
 ---
@@ -8951,7 +8955,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-06-03
 **更新类型**: 📝 文档补录
-**Commit**: e13a91bd
+**Commit**: e13a91bd, 879d82fa, 524a1c64, 388e391f
 **作者**: RichelYu1998
 
 ---
@@ -9111,7 +9115,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-29
 **更新类型**: 📝 文档补录
-**Commit**: 4918817b
+**Commit**: 4918817b, 2ac97bb6
 **作者**: RichelYu1998
 
 ---
@@ -9431,7 +9435,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-29
 **更新类型**: 📝 文档补录
-**Commit**: cadaa944
+**Commit**: cadaa944, 8cdc3602
 **作者**: RichelYu1998
 
 ---
@@ -9451,7 +9455,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-29
 **更新类型**: 📝 文档补录
-**Commit**: 31bac7e7
+**Commit**: 31bac7e7, cae017ec
 **作者**: RichelYu1998
 
 ---
@@ -9651,7 +9655,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-28
 **更新类型**: 📝 文档补录
-**Commit**: c9bcc7ba
+**Commit**: c9bcc7ba, 370f5b1e, 6efd02a5, 13021f6c, 1290b226
 **作者**: RichelYu1998
 
 ---
@@ -9671,7 +9675,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-28
 **更新类型**: 📝 文档补录
-**Commit**: 3bffaee8
+**Commit**: 3bffaee8, a1ccf1ab, 1660b98f
 **作者**: RichelYu1998
 
 ---
@@ -9691,7 +9695,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-28
 **更新类型**: 📝 文档补录
-**Commit**: 42183c31
+**Commit**: 42183c31, 0ccf62b9, 3d6e28ae, be0a1c56, dbea6c34
 **作者**: RichelYu1998
 
 ---
@@ -9831,7 +9835,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-22
 **更新类型**: 📝 文档补录
-**Commit**: b21b4f78
+**Commit**: b21b4f78, 891467e9
 **作者**: RichelYu1998
 
 ---
@@ -9851,7 +9855,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-21
 **更新类型**: 📝 文档补录
-**Commit**: 8d3759c8
+**Commit**: 8d3759c8, 07e9580a
 **作者**: RichelYu1998
 
 ---
@@ -9891,7 +9895,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-29
 **更新类型**: 📝 文档补录
-**Commit**: 1b6da815
+**Commit**: 1b6da815, e3f2a6b9
 **作者**: RichelYu1998
 
 ---
@@ -10011,7 +10015,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-20
 **更新类型**: 📝 文档补录
-**Commit**: 90376332
+**Commit**: 90376332, f953258c, 9962cfb4
 **作者**: RichelYu1998
 
 ---
@@ -10071,7 +10075,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-18
 **更新类型**: 📝 文档补录
-**Commit**: e8bf93ca
+**Commit**: e8bf93ca, a96b7dcc
 **作者**: RichelYu1998
 
 ---
@@ -10091,7 +10095,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-18
 **更新类型**: 📝 文档补录
-**Commit**: e176d3c9
+**Commit**: e176d3c9, ccced8d8, d3b77985, 2c01b1d1, 54641f65
 **作者**: RichelYu1998
 
 ---
@@ -10111,7 +10115,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-05-20
 **更新类型**: 📝 文档补录
-**Commit**: ad7fc58e
+**Commit**: ad7fc58e, c769e234
 **作者**: RichelYu1998
 
 ---
@@ -10271,7 +10275,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-04-30
 **更新类型**: 📝 文档补录
-**Commit**: caf8b291
+**Commit**: caf8b291, 90cee311
 **作者**: RichelYu1998
 
 ---
@@ -10331,7 +10335,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-04-30
 **更新类型**: 📝 文档补录
-**Commit**: e4d53ef3
+**Commit**: e4d53ef3, bcd9169f
 **作者**: RichelYu1998
 
 ---
@@ -10451,7 +10455,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-04-29
 **更新类型**: 📝 文档补录
-**Commit**: ec476faa
+**Commit**: f9af6096, 484fe803
 **作者**: RichelYu1998
 
 ---
@@ -10511,7 +10515,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-04-28
 **更新类型**: 📝 文档补录
-**Commit**: 4a3b8eda
+**Commit**: 4a3b8eda, 1eb221b7, d2cb82e6
 **作者**: RichelYu1998
 
 ---
@@ -10531,7 +10535,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-04-28
 **更新类型**: 📝 文档补录
-**Commit**: 19906ee0
+**Commit**: 19906ee0, 8795d6a9
 **作者**: RichelYu1998
 
 ---
@@ -10551,7 +10555,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-06-26
 **更新类型**: 📝 文档补录
-**Commit**: cc9e1be9
+**Commit**: cc9e1be9, ec476faa, b44dbcdb, bd16f65b, b1a83fdd
 **作者**: RichelYu1998
 
 ---
@@ -10627,7 +10631,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-04-29
 **更新类型**: 📝 文档补录
-**Commit**: f9af6096
+**Commit**: decda6de, 1cef3abf, 2d0a8936
 **作者**: RichelYu1998
 
 ---
@@ -10687,7 +10691,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-04-15
 **更新类型**: 📝 文档补录
-**Commit**: 9f3ecc83
+**Commit**: 9f3ecc83, 11c0e2cc
 **作者**: RichelYu1998
 
 ---
@@ -10767,7 +10771,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-04-29
 **更新类型**: 📝 文档补录
-**Commit**: da624ea9
+**Commit**: da624ea9, 3a55d610
 **作者**: RichelYu1998
 
 ---
@@ -11627,7 +11631,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-04-29
 **更新类型**: 📝 文档补录
-**Commit**: 4092c3ad
+**Commit**: 4092c3ad, 6fd1bef2
 **作者**: RichelYu1998
 
 ---
@@ -11867,7 +11871,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-07-31
 **更新类型**: 📝 文档补录
-**Commit**: b27c0138
+**Commit**: b27c0138, 2d2395a3, b84418d1
 **作者**: RichelYu1998
 
 ---
@@ -12081,7 +12085,7 @@ if exist "README.md" (
 
 **更新日期**: 2026-08-22
 **更新类型**: 📝 文档补录
-**Commit**: 02a68c84
+**Commit**: 02a68c84, 764f2740
 **作者**: RichelYu1998
 
 ---
