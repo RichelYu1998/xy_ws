@@ -198,6 +198,37 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ## 🔄 最新更新
+### v5.0.9.62 (2026-09-14) - 🎯 **文档规范全面加固** - Commit hash全量回填+空changes消除+导航跳转修复+generate_docx.py增强
+
+> **Commit**: 57f636f3
+
+#### 更新内容:
+1. **Commit hash全量回填**: 为所有缺失Commit的版本补全真实Git提交hash
+2. **空changes消除**: changelog API返回的空changes数组全部补全
+3. **导航跳转修复**: 文档导航超链接可点击跳转到对应章节
+4. **generate_docx.py增强**: Word文档生成器功能完善
+
+##### 1. 🎯 文档规范全面加固 (Commit hash全量回填+空changes消除+导航跳转修复+generate_docx.py增强)
+**问题描述**:
+- **现象**: 部分版本Commit字段缺失占位符；changelog API部分版本返回空changes数组；文档导航无法跳转
+- **根因**: 详见Git提交记录及commit message
+- **影响范围**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_docx.py](test/generate_docx.py)
+
+**修复方案**:
+- **技术实现**: Commit hash全量回填+空changes消除+导航跳转修复+generate_docx.py增强
+- **参考位置**: commit 57f636f3, [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_docx.py](test/generate_docx.py)
+
+**测试验证**:
+- ✅ 提交 57f636f3 已合并至master分支
+- ✅ 变更统计: +298行 -208行
+
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_docx.py](test/generate_docx.py)
+**更新日期**: 2026-09-14
+**更新类型**: 🎯 文档规范加固
+**作者**: 小旭二手机（西园路）
+
+---
+
 ### v5.0.9.61 (2026-09-14) - 🎯 **移动端真机闪屏+联动失效精准修复** - 点击序列号后表0数据消失/闪屏/联动失效三重问题彻底解决
 
 > **Commit**: 2e3d4428 (已提交到本地)
