@@ -200,31 +200,46 @@ bandit -r . -f json -o bandit_report.json
 ## 🔄 最新更新
 ### v5.0.9.62 (2026-09-14) - 🎯 **文档规范全面加固** - Commit hash全量回填+空changes消除+导航跳转修复+generate_docx.py增强
 
-> **Commit**: 57f636f3
+> **Commit**: 57f636f3, d28ba9ab
 
 #### 更新内容:
 1. **Commit hash全量回填**: 为所有缺失Commit的版本补全真实Git提交hash
 2. **空changes消除**: changelog API返回的空changes数组全部补全
 3. **导航跳转修复**: 文档导航超链接可点击跳转到对应章节
-4. **generate_docx.py增强**: Word文档生成器功能完善
+4. **generate_docx.py路径修复**: main()函数改用Path(__file__).parent.parent动态定位项目根目录，从test目录直接运行即可正确找到skill.md和输出skill.docx
+5. **skill.docx重新生成**: 基于最新skill.md(含v5.0.9.62)重新生成Word文档(348.4KB)
 
-##### 1. 🎯 文档规范全面加固 (Commit hash全量回填+空changes消除+导航跳转修复+generate_docx.py增强)
+##### 1. 🎯 文档规范全面加固 (Commit hash全量回填+空changes消除+导航跳转修复)
 **问题描述**:
 - **现象**: 部分版本Commit字段缺失占位符；changelog API部分版本返回空changes数组；文档导航无法跳转
 - **根因**: 详见Git提交记录及commit message
-- **影响范围**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_docx.py](test/generate_docx.py)
+- **影响范围**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
 
 **修复方案**:
-- **技术实现**: Commit hash全量回填+空changes消除+导航跳转修复+generate_docx.py增强
-- **参考位置**: commit 57f636f3, [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_docx.py](test/generate_docx.py)
+- **技术实现**: Commit hash全量回填+空changes消除+导航跳转修复
+- **参考位置**: commit 57f636f3, [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
 
 **测试验证**:
 - ✅ 提交 57f636f3 已合并至master分支
 - ✅ 变更统计: +298行 -208行
 
+##### 2. 🔧 generate_docx.py路径修复 (跨目录运行支持)
+**问题描述**:
+- **现象**: 从test目录执行`python3 generate_docx.py`报FileNotFoundError: skill.md，必须从项目根目录运行才能正常工作
+- **根因**: main()函数硬编码相对路径'skill.md'和'skill.docx'，未考虑脚本位于子目录的情况
+- **影响范围**: [test/generate_docx.py](test/generate_docx.py), [skill.docx](skill.docx)
+
+**修复方案**:
+- **技术实现**: 使用Path(__file__).resolve().parent.parent动态定位项目根目录，md_path和docx_path均基于base_dir构建 [test/generate_docx.py](test/generate_docx.py)
+- **参考位置**: commit d28ba9ab
+
+**测试验证**:
+- ✅ cd test && python3 generate_docx.py 成功生成skill.docx(348.4KB)
+- ✅ 根目录运行同样正常
+
 **影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_docx.py](test/generate_docx.py)
 **更新日期**: 2026-09-14
-**更新类型**: 🎯 文档规范加固
+**更新类型**: 🎯 文档规范加固 + 🔧 Bug修复
 **作者**: 小旭二手机（西园路）
 
 ---
