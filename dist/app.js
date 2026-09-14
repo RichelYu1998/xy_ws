@@ -543,13 +543,21 @@
                     table0Row = row;
                 }
                 if (container) {
+                    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
                     const rowRect = row.getBoundingClientRect();
                     const containerRect = container.getBoundingClientRect();
                     const relativeTop = rowRect.top - containerRect.top + container.scrollTop;
                     const targetScrollTop = Math.max(0, relativeTop - container.clientHeight / 3);
                     window._programmaticScroll = true;
-                    container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
-                    setTimeout(() => { window._programmaticScroll = false; }, 500);
+                    if (isMobileDevice) {
+                        // 移动端：使用instant避免闪烁和联动冲突
+                        container.scrollTop = targetScrollTop;
+                        setTimeout(() => { window._programmaticScroll = false; }, 100);
+                    } else {
+                        // 桌面端：使用平滑滚动
+                        container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+                        setTimeout(() => { window._programmaticScroll = false; }, 500);
+                    }
                 }
             });
             if (table0Row) {
@@ -573,11 +581,18 @@
             style.id = 'linked-badge-style';
             style.textContent = '@keyframes badgePulse{0%,100%{box-shadow:0 4px 15px rgba(102,126,234,0.4)}50%{box-shadow:0 4px 25px rgba(102,126,234,0.8)}}';
             document.head.appendChild(style);
-            row.style.transition = 'all 0.3s ease';
-            row.style.transform = 'scale(1.02)';
-            row.style.boxShadow = '0 0 20px rgba(102,126,234,0.6)';
-            row.style.zIndex = '10';
-            row.style.position = 'relative';
+
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (isMobile) {
+                row.style.background = '#bbdefb';
+                row.style.boxShadow = 'inset 0 0 0 2px #667eea';
+            } else {
+                row.style.transition = 'all 0.3s ease';
+                row.style.transform = 'scale(1.02)';
+                row.style.boxShadow = '0 0 20px rgba(102,126,234,0.6)';
+                row.style.zIndex = '10';
+                row.style.position = 'relative';
+            }
         }
 
         function removeLinkedBadge() {
@@ -585,11 +600,33 @@
             if (existing) existing.remove();
             const style = document.getElementById('linked-badge-style');
             if (style) style.remove();
-            document.querySelectorAll('#table-all tbody tr').forEach(row => {
-                row.style.transform = '';
-                row.style.boxShadow = '';
-                row.style.zIndex = '';
-                row.style.position = '';
+            document.querySelectorAll('#products-content tbody tr[data-desc]').forEach(row => {
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                if (isMobile) {
+                    row.style.background = '';
+                    row.style.boxShadow = '';
+                    const priceCell = row.querySelector('td:nth-child(4)');
+                    if (priceCell) {
+                        const priceText = priceCell.textContent || '';
+                        const priceMatch = priceText.match(/¥?([\\d,]+\\.?\\d*)/);
+                        const price = priceMatch ? parseFloat(priceMatch[1].replace(/,/g, '')) : 0;
+                        const skuCell = row.querySelector('td:nth-child(2)');
+                        const skuText = skuCell ? skuCell.textContent : '';
+                        const isAdded = window.allProductsData?.addedProducts?.some(ap => ap.货号 === skuText);
+                        if (!isNaN(price) && price >= 599 && isAdded) {
+                            row.style.background = '#e8f5e9';
+                        } else if (!isNaN(price) && price >= 599) {
+                            row.style.background = '#fff3e0';
+                        } else if (isAdded) {
+                            row.style.background = '#e3f2fd';
+                        }
+                    }
+                } else {
+                    row.style.transform = '';
+                    row.style.boxShadow = '';
+                    row.style.zIndex = '';
+                    row.style.position = '';
+                }
             });
         }
 
