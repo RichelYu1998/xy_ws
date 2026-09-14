@@ -500,12 +500,16 @@ class MarkdownToDocxConverter:
 
 
 def main():
+    base_dir = Path(__file__).resolve().parent.parent
+    md_path = str(base_dir / 'skill.md')
+    docx_path = str(base_dir / 'skill.docx')
+
     print('📖 正在解析 skill.md...')
     
     converter = MarkdownToDocxConverter()
     
     print('📝 正在生成 skill.docx (完整版)...')
-    output_file = converter.convert('skill.md', 'skill.docx')
+    output_file = converter.convert(md_path, docx_path)
     
     file_size = Path(output_file).stat().st_size
     print(f'✅ 完成! 文件大小: {file_size / 1024:.1f} KB')
