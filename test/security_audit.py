@@ -138,6 +138,9 @@ class SecurityAuditor:
             print("\n🔄 [8/8] 并发安全验证")
             self._verify_concurrent_safety()
 
+            print("\n🔐 [9/9] 加密系统安全审计")
+            self._audit_encryption_system()
+
             end_time = time.time()
             self.results['performance_metrics']['total_scan_time'] = f"{end_time - start_time:.2f}s"
 
@@ -824,6 +827,146 @@ class SecurityAuditor:
                 continue
 
         print("  ✅ 并发安全验证完成")
+
+    def _audit_encryption_system(self):
+        """加密系统安全审计（新增第9项检查）"""
+        print("  🔐 审计加密系统安全性...")
+
+        config_dir = self.project_root / 'config'
+        salt_file = config_dir / '.salt'
+        key_file = config_dir / '.encryption_key'
+        config_file = config_dir / 'config.json'
+
+        # 检查1: Salt文件存在性
+        if not salt_file.exists():
+            self._add_issue(SecurityIssue(
+                severity='HIGH',
+                category='EncryptionSecurity',
+                file_path='config/.salt',
+                line_number=0,
+                description="[加密系统] Salt文件不存在，敏感数据未加密保护",
+                recommendation="运行 `cd test && py salt_crypto_tool.py init --password YOUR_PASSWORD` 初始化加密系统",
+                code_snippet="config/.salt (missing)"
+            ))
+        else:
+            # 检查2: Salt文件权限
+            try:
+                import stat
+                salt_stat = salt_file.stat()
+                mode = oct(salt_stat.st_mode)[-3:]
+                if mode != '600' and mode != '644':
+                    self._add_issue(SecurityIssue(
+                        severity='MEDIUM',
+                        category='EncryptionSecurity',
+                        file_path='config/.salt',
+                        line_number=0,
+                        description=f"[加密系统] Salt文件权限过于宽松 ({mode})，建议设置为600",
+                        recommendation="运行: chmod 600 config/.salt (Linux/Mac) 或在Windows中设置仅管理员可访问",
+                        code_snippet=f"Salt file permissions: {mode}"
+                    ))
+            except Exception:
+                pass
+
+            # 检查3: Salt文件大小（应该是16字节）
+            try:
+                salt_size = salt_file.stat().st_size
+                if salt_size != 16:
+                    self._add_issue(SecurityIssue(
+                        severity='HIGH',
+                        category='EncryptionSecurity',
+                        file_path='config/.salt',
+                        line_number=0,
+                        description=f"[加密系统] Salt文件大小异常 ({salt_size}字节)，标准应为16字节",
+                        recommendation="重新初始化加密系统: `py salt_crypto_tool.py init --password NEW_PASSWORD`",
+                        code_snippet=f"Salt size: {salt_size} bytes (expected 16)"
+                    ))
+            except Exception:
+                pass
+
+        # 检查4: Key文件存在性
+        if not key_file.exists():
+            if salt_file.exists():
+                self._add_issue(SecurityIssue(
+                    severity='CRITICAL',
+                    category='EncryptionSecurity',
+                    file_path='config/.encryption_key',
+                    line_number=0,
+                    description="[加密系统] Key文件丢失但Salt文件存在，无法解密已加密数据！",
+                    recommendation="如果有备份的key文件请恢复；否则需要删除salt和config.json后重新初始化",
+                    code_snippet=".encryption_key (missing)"
+                ))
+
+        # 检查5: Config.json中的明文敏感字段
+        if config_file.exists():
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+
+                sensitive_fields = [
+                    'cookie.token', 'cookie.session', 'database.password',
+                    'api.secret_key', 'auth.jwt_secret'
+                ]
+
+                plaintext_count = 0
+                for field_path in sensitive_fields:
+                    keys = field_path.split('.')
+                    current = config
+                    for key in keys:
+                        if isinstance(current, dict) and key in current:
+                            current = current[key]
+                        else:
+                            current = None
+                            break
+
+                    if current and not str(current).startswith("ENC("):
+                        plaintext_count += 1
+                        if plaintext_count <= 3:  # 只报告前3个避免刷屏
+                            self._add_issue(SecurityIssue(
+                                severity='HIGH',
+                                category='EncryptionSecurity',
+                                file_path='config/config.json',
+                                line_number=0,
+                                description=f"[加密系统] 敏感字段 {field_path} 未加密存储为明文",
+                                recommendation="运行: cd test && py salt_crypto_tool.py encrypt",
+                                code_snippet=f"{field_path}: {str(current)[:50]}..."
+                            ))
+
+                if plaintext_count > 3:
+                    self._add_issue(SecurityIssue(
+                        severity='HIGH',
+                        category='EncryptionSecurity',
+                        file_path='config/config.json',
+                        line_number=0,
+                        description=f"[加密系统] 还有 {plaintext_count - 3} 个敏感字段未加密",
+                        recommendation="运行: cd test && py salt_crypto_tool.py encrypt 加密所有敏感字段",
+                        code_snippet=f"Total plaintext fields: {plaintext_count}"
+                    ))
+
+            except Exception as e:
+                self._add_issue(SecurityIssue(
+                    severity='MEDIUM',
+                    category='EncryptionSecurity',
+                    file_path='config/config.json',
+                    line_number=0,
+                    description=f"[加密系统] 无法读取config.json检查加密状态: {e}",
+                    recommendation="检查文件格式和权限",
+                    code_snippet=str(e)[:80]
+                ))
+
+        # 检查6: 环境变量泄露风险
+        env_key = os.environ.get('CONFIG_ENCRYPTION_KEY')
+        if env_key:
+            self._add_issue(SecurityIssue(
+                severity='INFO',
+                category='EncryptionSecurity',
+                file_path='Environment Variables',
+                line_number=0,
+                description="[加密系统] 检测到CONFIG_ENCRYPTION_KEY环境变量已设置",
+                recommendation="确保环境变量不会记录到shell历史或日志中；生产环境建议使用密钥管理服务",
+                code_snippet="CONFIG_ENCRYPTION_KEY=***"
+            ))
+
+        print("  ✅ 加密系统审计完成")
 
     def _get_fix_recommendation(self, pattern: str) -> str:
         """获取修复建议"""
