@@ -849,23 +849,96 @@ class SecurityAuditor:
                 code_snippet="config/.salt (missing)"
             ))
         else:
-            # 检查2: Salt文件权限
+            # 检查2: Salt文件权限（仅Linux/Mac检查，Windows使用ACL）
             try:
-                import stat
-                salt_stat = salt_file.stat()
-                mode = oct(salt_stat.st_mode)[-3:]
-                if mode != '600' and mode != '644':
-                    self._add_issue(SecurityIssue(
-                        severity='MEDIUM',
-                        category='EncryptionSecurity',
-                        file_path='config/.salt',
-                        line_number=0,
-                        description=f"[加密系统] Salt文件权限过于宽松 ({mode})，建议设置为600",
-                        recommendation="运行: chmod 600 config/.salt (Linux/Mac) 或在Windows中设置仅管理员可访问",
-                        code_snippet=f"Salt file permissions: {mode}"
-                    ))
-            except Exception:
-                pass
+                import platform
+                current_os = platform.system().lower()
+
+                if current_os in ['linux', 'darwin']:  # Linux or macOS
+                    import stat
+                    salt_stat = salt_file.stat()
+                    mode = oct(salt_stat.st_mode)[-3:]
+                    if mode not in ['400', '600', '644']:
+                        self._add_issue(SecurityIssue(
+                            severity='MEDIUM',
+                            category='EncryptionSecurity',
+                            file_path='config/.salt',
+                            line_number=0,
+                            description=f"[加密系统] Salt文件权限过于宽松 ({mode})，建议设置为600",
+                            recommendation="运行: chmod 600 config/.salt (限制为仅所有者可读写)",
+                            code_snippet=f"Salt file permissions: {mode}"
+                        ))
+                elif current_os == 'windows':
+                    # Windows系统：检查文件是否具有适当的NTFS权限
+                    try:
+                        import ntsecuritycon as con
+                        import win32security
+
+                        # 获取文件的DACL
+                        sd = win32security.GetFileSecurity(str(salt_file), win32security.DACL_SECURITY_INFORMATION)
+                        dacl = sd.GetSecurityDescriptorDacl()
+
+                        if dacl is None:
+                            # NULL DACL意味着完全访问（非常危险！）
+                            self._add_issue(SecurityIssue(
+                                severity='HIGH',
+                                category='EncryptionSecurity',
+                                file_path='config/.salt',
+                                line_number=0,
+                                description="[加密系统] Windows下Salt文件没有DACL保护（NULL DACL），任何用户都可访问",
+                                recommendation="右键文件 → 属性 → 安全 → 编辑权限，移除'Everyone'和'Users'组，仅保留Administrator",
+                                code_snippet="NULL DACL (no permission restrictions)"
+                            ))
+                        else:
+                            # 检查是否有过度开放的权限（如Everyone有写入权限）
+                            acl_count = dacl.GetAceCount()
+                            for i in range(acl_count):
+                                ace = dacl.GetAce(i)
+                                trustee_name = ace[2]
+                                access_mask = ace[1]
+                                ace_type = ace[0][0]
+
+                                # 检查是否是允许类型的ACE且包含写入/完全控制权限
+                                if ace_type == 0:  # ACCESS_ALLOWED_ACE_TYPE
+                                    trustee_str = str(trustee_name) if hasattr(trustee_name, '__str__') else 'Unknown'
+                                    has_write = bool(access_mask & (con.FILE_GENERIC_WRITE | con.FILE_ALL_ACCESS | con.WRITE_DAC | con.WRITE_OWNER))
+
+                                    if has_write and trustee_str.lower() in ['everyone', 'users', 'authenticated users']:
+                                        self._add_issue(SecurityIssue(
+                                            severity='MEDIUM',
+                                            category='EncryptionSecurity',
+                                            file_path='config/.salt',
+                                            line_number=0,
+                                            description=f"[加密系统] Windows下'{trustee_str}'组对Salt文件有写入权限",
+                                            recommendation="移除该组的写权限，仅保留Administrator和SYSTEM的完全控制权",
+                                            code_snippet=f"{trustee_name} has write access (mask: {access_mask})"
+                                        ))
+                                        break  # 只报告第一个问题避免刷屏
+
+                    except ImportError:
+                        # pywin32未安装，跳过详细检查（这是正常的，不是安全问题）
+                        pass
+                    except Exception as perm_error:
+                        # 权限检查失败但不影响主流程
+                        print(f"    ℹ️  Windows权限详细检查跳过: {perm_error}")
+                else:
+                    # 其他Unix-like系统
+                    import stat
+                    salt_stat = salt_file.stat()
+                    mode = oct(salt_stat.st_mode)[-3:]
+                    if mode not in ['400', '600', '644']:
+                        self._add_issue(SecurityIssue(
+                            severity='MEDIUM',
+                            category='EncryptionSecurity',
+                            file_path='config/.salt',
+                            line_number=0,
+                            description=f"[加密系统] Salt文件权限过于宽松 ({mode})",
+                            recommendation="根据当前操作系统设置适当的文件权限（建议仅所有者可读写）",
+                            code_snippet=f"Salt file permissions: {mode}"
+                        ))
+            except Exception as perm_check_error:
+                # 权限检查失败不应阻止整个审计
+                print(f"    ℹ️  权限检查异常: {perm_check_error}")
 
             # 检查3: Salt文件大小（应该是16字节）
             try:
