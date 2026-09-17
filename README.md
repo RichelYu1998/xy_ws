@@ -198,6 +198,49 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ## 🔄 最新更新
+### v5.0.9.63 (2026-09-17) - 🎯 **移动端按钮布局优化** - 按钮大小统一+自动换行+响应式适配改进
+
+> **Commit**: ecf8b515
+
+#### 更新内容:
+1. **移动端按钮挤在一行问题修复**: 将`flex-wrap: nowrap`改为`flex-wrap: wrap`，允许按钮自动换行，不再强制单行横向滚动
+2. **按钮大小不一致问题修复**: 移除`width: 100%`和`flex: 1 1 auto`，改用`width: calc(50% - 4px)`+`min-width: 140px`+`max-width: 180px`统一所有按钮宽度
+3. **按钮可点击性优化**: 最小高度从32px提升至44px（符合移动端触摸目标标准），内边距从4px 3px增加至8px 10px
+4. **字体和图标优化**: 字体从9px提升至11px（提高可读性），图标从14px提升至16px（更清晰）
+5. **布局居中对齐**: 添加`justify-content: center`使按钮组居中显示，视觉更平衡
+
+##### 1. 🎯 移动端按钮布局优化 (大小一致+自动换行+响应式改进)
+**问题描述**:
+- **现象**: 在移动端（屏幕宽度<576px）访问时，功能按钮区域存在两个问题：①所有按钮挤在一行，需要横向滚动才能看到全部按钮；②按钮大小不一致，文字长的按钮（如"闲鱼与JSON对比"）比文字短的按钮（如"运行爬虫"）宽很多，视觉不协调
+- **根因**: CSS样式`.func-btn-container`设置了`flex-wrap: nowrap`强制不换行+`overflow-x: auto`允许横向滚动；`.func-btn`设置了`width: 100%`+`flex: 1 1 auto`导致按钮按比例分配宽度，文字长度不同导致实际宽度不同
+- **影响范围**: 所有使用移动设备（iPhone/Android手机）访问系统的用户，特别是屏幕宽度较小的设备
+
+**修复方案**:
+- **技术实现(换行修复)**: `.func-btn-container`的`flex-wrap`从`nowrap`改为`wrap`，移除`overflow-x: auto`，添加`justify-content: center` [index.html](index.html#L820-L826)
+- **技术实现(统一宽度)**: `.func-btn`移除`width: 100%`和`flex: 1 1 auto`，改用`width: calc(50% - 4px)`实现每行2个按钮+`min-width: 140px`设置最小宽度+`max-width: 180px`限制最大宽度+`flex: 0 0 auto`禁止自动伸缩 [index.html](index.html#L827-L837)
+- **技术实现(尺寸优化)**: `min-height`从32px改为44px（符合WCAG 2.1移动端触摸目标最小44x44CSS像素标准）；`padding`从`4px 3px`改为`8px 10px`；`font-size`从9px改为11px；图标`font-size`从14px改为16px [index.html](index.html#L828-L836)
+- **参考位置**: commit ecf8b515, [index.html](index.html) 第820-840行（@media查询内）
+
+**测试验证**:
+- ✅ 移动端模拟器(iPhone SE 375px): 按钮每行显示2个，大小完全一致，无需横向滚动
+- ✅ 移动端模拟器(Android Galaxy S21 360px): 同上效果，跨设备兼容
+- ✅ 桌面端回归测试(1920px): 按钮布局保持不变（修改仅在`@media (max-width: 575.98px)`查询内）
+- ✅ 触摸测试: 44px最小高度确保手指容易点击，无误触
+- ✅ 文字长度边界测试: "闲鱼与JSON对比"（8个字符）和"运行爬虫"（4个字符）按钮宽度一致
+- ✅ 符合PY-CORE-027 Changelog版本变更详情完整结构范式
+
+**核心改进**:
+- 从根源上解决移动端按钮布局的两个核心问题（挤在一起+大小不一）
+- 符合移动端UX最佳实践（44px触摸目标、合适的字体大小、自动换行）
+- 桌面端100%无影响（响应式设计，仅影响<576px屏幕）
+
+**影响文件**: [index.html](index.html), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**更新日期**: 2026-09-17
+**更新类型**: 🎯 UI优化 + 🔧 响应式设计改进
+**作者**: AI Assistant (Trae IDE)
+
+---
+
 ### v5.0.9.62 (2026-09-14) - 🎯 **文档规范全面加固** - Commit hash全量回填+空changes消除+导航跳转修复+generate_docx.py增强
 
 > **Commit**: 57f636f3, d28ba9ab
