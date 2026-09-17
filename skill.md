@@ -87,9 +87,9 @@ python main.py --web
 
 ### 🔍 验证方法
 
-#### 自动化检查脚本 (check_versions.py)
+#### 自动化检查脚本 (test/check_versions.py)
 ```python
-# 运行命令: py check_versions.py
+# 运行命令: cd test && py check_versions.py
 # 输出示例:
 # ✅ PERFECT MATCH: All three sources are 100% consistent!
 # README.md: 62 versions, order OK
@@ -133,13 +133,13 @@ python main.py --web
 2. **更新README**: 在"最新更新"顶部插入完整的PY-CORE-027格式记录
 3. **更新skill**: 复制README的内容到skill.md相同位置（或使用脚本自动同步）
 4. **生成docx**: `cd test && py generate_docx.py`
-5. **验证一致性**: `py check_versions.py` 确认输出"PERFECT MATCH"
+5. **验证一致性**: `cd test && py check_versions.py` 确认输出"PERFECT MATCH"
 6. **推送Git**: `git push origin master`
 
 #### 紧急修复流程
 如果发现不一致：
 1. 立即停止发布
-2. 运行`py check_versions.py`定位差异
+2. 运行`cd test && py check_versions.py`定位差异
 3. 以**版本数最多的文档**为准（通常是Git历史）
 4. 补齐/删除其他文档的差异内容
 5. 重新运行验证脚本确认通过
