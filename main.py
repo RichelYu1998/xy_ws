@@ -6255,7 +6255,7 @@ class StockNumberComparator:
                 safe_execute_func(lambda: os.remove(temp_file), context='load_excel_data清理临时文件')
             auto_clean_temp_dir()
 
-    def load_all_excel_data(self, remove_duplicates=True):
+    def load_all_excel_data(self, remove_duplicates=True, platform='闲鱼'):
         all_stock_numbers = []
         excel_files = self.config_manager.get_all_excel_files()
         
@@ -6265,7 +6265,7 @@ class StockNumberComparator:
         
         excel_files = list(dict.fromkeys(os.path.abspath(f) for f in excel_files))
         
-        logger.debug(f'找到 {len(excel_files)} 个Excel文件')
+        logger.debug(f'找到 {len(excel_files)} 个Excel文件，当前平台: {platform}')
         
         for excel_file in excel_files:
             temp_file = None
@@ -6281,10 +6281,10 @@ class StockNumberComparator:
                 logger.debug(f'正在读取Excel文件: {excel_file}')
                 workbook = openpyxl.load_workbook(temp_file, read_only=True, data_only=True)
                 
-                sheet = next((workbook[sheet_name] for sheet_name in workbook.sheetnames if '闲鱼' in sheet_name), None)
+                sheet = next((workbook[sheet_name] for sheet_name in workbook.sheetnames if platform in sheet_name), None)
                 
                 if sheet is None:
-                    logger.debug('未找到"闲鱼"工作表，使用第一个工作表')
+                    logger.debug(f'未找到"{platform}"工作表，使用第一个工作表')
                     sheet = workbook.active
                 else:
                     logger.debug(f'使用工作表: {sheet.title}')
@@ -6542,10 +6542,10 @@ class StockNumberComparator:
             handle_exception(e, 'compare_json_files对比JSON文件')
             return False
 
-    def compare_excel_with_json(self):
+    def compare_excel_with_json(self, platform='闲鱼'):
         try:
             print_separator()
-            logger.debug('Excel与JSON数据对比工具')
+            logger.debug(f'{platform}与JSON数据对比工具')
             print_separator()
             
             latest_json_file = FileManager.get_latest_json_file()
@@ -6572,7 +6572,7 @@ class StockNumberComparator:
                 and WegoScraper.parse_price(p.get('售价', '') or p.get('price','')) >= 599
             ]
             
-            excel_stock_numbers = self.load_all_excel_data(remove_duplicates=False)
+            excel_stock_numbers = self.load_all_excel_data(remove_duplicates=False, platform=platform)
             if not excel_stock_numbers:
                 logger.debug('无法从Excel文件读取货号')
                 return False
@@ -8657,7 +8657,7 @@ if __name__ == '__main__':
                 return jsonify({'error': 'SKU对比失败'}, status_code=500)
 
         @app.get('/api/sku/compare/excel')  # [SECURED]
-        async def compare_sku_excel():
+        async def compare_sku_excel(platform: str = Query('闲鱼', description="平台名称：闲鱼、小红书等")):
             try:
                 if pd is None:
                     return jsonify({'error': 'pandas未安装，Excel对比功能不可用'}, status_code=500)
@@ -8679,48 +8679,40 @@ if __name__ == '__main__':
                 excel_files_list, daily_profit_report = get_excel_files_with_report()
                 
                 excel_stock_numbers = []
-                
+
                 for excel_file in excel_files_list:
                     if os.path.exists(excel_file):
                         try:
-                            
+
                             excel_dfs = FileManager.safe_read_excel(excel_file, max_retries=3, retry_delay=1.0)
                             if excel_dfs is None:
                                 logger.debug(f'无法读取Excel文件: {excel_file}')
                                 continue
-                            
-                            df = None
-                            sheet_name = None
-                            sku_column = None
-                            
-                            for sheet, temp_df in excel_dfs.items():
-                                if '货号' in temp_df.columns:
-                                    df = temp_df
-                                    sheet_name = sheet
-                                    sku_column = '货号'
-                                    break
-                                elif '序列号' in temp_df.columns:
-                                    df = temp_df
-                                    sheet_name = sheet
-                                    sku_column = '序列号'
-                                    break
-                                elif '闲鱼' in sheet:
-                                    if len(temp_df.columns) > 4:
-                                        second_row = temp_df.iloc[1].tolist()
-                                        if '序列号' in second_row:
-                                            col_idx = second_row.index('序列号')
-                                            temp_df.columns = second_row
-                                            temp_df = temp_df.drop([0, 1]).reset_index(drop=True)
-                                            df = temp_df
-                                            sheet_name = sheet
-                                            sku_column = '序列号'
-                                            break
-                            
-                            if df is not None and sku_column is not None:
-                                file_stock_numbers = [str(int(x)) if isinstance(x, float) and x == int(x) else str(x).strip() 
-                                                             for x in df[sku_column].dropna() 
-                                                             if str(x).strip() and str(x).strip() != 'nan' and str(x).strip() != '序列号']
-                                excel_stock_numbers.extend(file_stock_numbers)
+
+                            logger.debug(f'📂 处理Excel: {os.path.basename(excel_file)}, 平台: {platform}')
+                            logger.debug(f'   可用工作表: {list(excel_dfs.keys())}')
+
+                            for sheet_name, temp_df in excel_dfs.items():
+                                if platform in sheet_name:
+                                    logger.debug(f'✅ 找到"{platform}"工作表: {sheet_name}, 列数: {len(temp_df.columns)}, 行数: {len(temp_df)}')
+
+                                    if len(temp_df.columns) >= 5:
+                                        e_col_data = temp_df.iloc[:, 4].dropna()
+
+                                        valid_skus = []
+                                        for val in e_col_data:
+                                            val_str = str(val).strip()
+                                            if val_str and val_str != 'nan' and re.match(r'^[A-Za-z0-9]{3,10}$', val_str):
+                                                valid_skus.append(val_str)
+
+                                        if valid_skus:
+                                            excel_stock_numbers.extend(valid_skus)
+                                            logger.debug(f'✅ 从"{sheet_name}"的E列读取到 {len(valid_skus)} 个货号')
+                                        else:
+                                            logger.debug(f'⚠️ "{sheet_name}"的E列没有有效货号数据')
+                                    else:
+                                        logger.debug(f'⚠️ "{sheet_name}"列数不足5列，无法读取E列')
+
                         except PermissionError as e:
                             if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e):
                                 return jsonify({
@@ -8729,12 +8721,21 @@ if __name__ == '__main__':
                                     'path': excel_file
                                 }), 423
                             raise
-                        except Exception as e:  # [HANDLED]
-                            logger.debug(f'读取Excel文件失败: {excel_file} - {e}')
+                        except Exception as e:
+                            logger.debug(f'读取Excel失败: {excel_file} - {e}')
                             continue
-                
+
+                logger.debug(f'📊 [{platform}] 共读取到 {len(excel_stock_numbers)} 个货号')
+
                 if not excel_stock_numbers:
-                    return jsonify({'error': f'Excel文件中未找到"货号"或"序列号"列'}, status_code=404)
+                    return jsonify({
+                        'error': f'[{platform}] 未找到"{platform}"子表的E列货号数据',
+                        'detail': f'请检查Excel文件中是否有名为"{platform}"的工作表(子表)，且该工作表的E列(第5列)包含货号数据(3-10位字母数字)',
+                        'platform': platform,
+                        'suggestion': f'确保Excel中有包含"{platform}"名称的工作表，并且E列有有效的货号数据'
+                    }), 404
+
+                logger.debug(f'\n🎉 [{platform}] 数据读取成功！开始对比分析...\n')
                 
                 json_set = set(json_stock_numbers)
                 excel_set = set(excel_stock_numbers)
