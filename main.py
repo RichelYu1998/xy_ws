@@ -8897,9 +8897,9 @@ if __name__ == '__main__':
                         pass
                         
 
-                    # ??????????
+                    # 累加拿货价（成朩）
                     try:
-                        cost_str = p.get('???', '') or p.get('cost_price', '') or p.get('????', '')
+                        cost_str = p.get('拿货价', '') or p.get('cost_price', '') or p.get('回收价格', '')
                         if cost_str and str(cost_str).strip():
                             cost_clean = str(cost_str).replace('?', '').replace(',', '').strip()
                             cost = float(cost_clean)
@@ -8946,7 +8946,7 @@ if __name__ == '__main__':
                     'totalPrice': f'¥{total_price:,.2f}',
                     'avgPrice': f'¥{avg_price:,.2f}',
                     'fee': f'¥{total_fee:,.2f}',
-                    'costPrice': f'\xa5{total_cost_price:,.2f}',\n                    'system': Environment.SYSTEM,
+                    'costPrice': f'¥{total_cost_price:,.2f}',
                     'storage_duration': storage_duration,
                     'created_time': created_time
                 })
