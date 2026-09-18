@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import atexit
 import asyncio
 import base64
