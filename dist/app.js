@@ -2541,7 +2541,15 @@
                 });
                 
                 if (window.allProductsData) {
-                    updateStatistics(window.allProductsData.totalPrice, window.allProductsData.avgPrice, window.allProductsData.fee);
+                    updateStatistics(
+                        window.allProductsData.totalPrice,
+                        window.allProductsData.avgPrice,
+                        window.allProductsData.fee,
+                        window.allProductsData.costPrice,
+                        window.allProductsData.profit,
+                        window.allProductsData.profitRate,
+                        window.allProductsData.netProfitRate
+                    );
                 }
                 return;
             }
@@ -2600,6 +2608,7 @@
                 const tableRows = document.querySelectorAll('#' + tableId + ' tbody tr');
                 let tableMatchCount = 0;
                 let tableSellPrice = 0;
+                let tableCostPrice = 0;
                 
                 tableRows.forEach(row => {
                     const sku = (row.getAttribute('data-sku') || '').toLowerCase();
@@ -2647,6 +2656,14 @@
                             }
                         }
                         
+                        const costAttr = row.getAttribute('data-cost');
+                        if (costAttr) {
+                            const cost = parseFloat(costAttr.replace(/,/g, ''));
+                            if (!isNaN(cost) && cost > 0) {
+                                tableCostPrice += cost;
+                            }
+                        }
+                        
                         if (searchType === 'price') {
                             row.style.background = 'rgba(245, 108, 108, 0.2)';
                         } else if (searchType === 'price_range') {
@@ -2669,7 +2686,7 @@
                     }
                 });
                 
-                perTableCounts[tableId] = { count: tableMatchCount, total: tableRows.length, price: tableSellPrice };
+                perTableCounts[tableId] = { count: tableMatchCount, total: tableRows.length, price: tableSellPrice, cost: tableCostPrice };
                 
                 const tableAvgPrice = tableMatchCount > 0 ? tableSellPrice / tableMatchCount : 0;
                 const tableFee = tableSellPrice * 0.016;
@@ -2721,9 +2738,23 @@
             
             const allTablePrice = perTableCounts['table-all'] ? perTableCounts['table-all'].price : 0;
             const allTableCount = perTableCounts['table-all'] ? perTableCounts['table-all'].count : 0;
+            const allTableCost = perTableCounts['table-all'] ? perTableCounts['table-all'].cost : 0;
             const allTableAvg = allTableCount > 0 ? allTablePrice / allTableCount : 0;
             const allTableFee = allTablePrice * 0.016;
-            updateStatistics('¥' + allTablePrice.toFixed(2), '¥' + allTableAvg.toFixed(2), '¥' + allTableFee.toFixed(2));
+            const allTableProfit = allTablePrice - allTableCost;
+            const allTableProfitRate = allTablePrice > 0 ? (allTableProfit / allTablePrice * 100) : 0;
+            const allTableNetProfit = allTableProfit - allTableFee;
+            const allTableNetProfitRate = allTablePrice > 0 ? (allTableNetProfit / allTablePrice * 100) : 0;
+
+            updateStatistics(
+                '¥' + allTablePrice.toFixed(2),
+                '¥' + allTableAvg.toFixed(2),
+                '¥' + allTableFee.toFixed(2),
+                '¥' + allTableCost.toFixed(2),
+                '¥' + allTableProfit.toFixed(2),
+                allTableProfitRate.toFixed(2) + '%',
+                allTableNetProfitRate.toFixed(2) + '%'
+            );
             
             searchResultsCount.style.display = 'block';
             const matchCount = document.getElementById('match-count');
@@ -2861,7 +2892,9 @@
                         const safeDescForJS = normalizedDesc.replace(/'/g, "\\'").replace(/"/g, '\\\"').replace(/\\/g, '\\\\').replace(/\n/g, "\\n").replace(/\r/g, "\\r");
                         const identifier = desc || sku;
 
-                        tableHtml += `<tr data-sku="${sku}" data-desc="${safeDescForAttr}" style="${rowStyle}" onmouseover="highlightRow('${safeDescForJS}')" onmouseout="unhighlightRow('${safeDescForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeDescForJS}')">
+                        const _costPrice = (p.拿货价 || p.cost_price || p.回收价格 || '');
+                        const _costAttr = _costPrice ? ` data-cost="${_costPrice.toString().replace('¥', '').replace(',', '')}"` : '';
+                        tableHtml += `<tr data-sku="${sku}" data-desc="${safeDescForAttr}"${_costAttr} style="${rowStyle}" onmouseover="highlightRow('${safeDescForJS}')" onmouseout="unhighlightRow('${safeDescForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeDescForJS}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(sku)}" class="sku-link">${escapeHtml(  /* [ESCAPED] */sku) || '-'}</a></td>
                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${escapeAttr(desc)}" class="desc-link" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${escapeHtml(  /* [ESCAPED] */descDisplay)}</a></td>
