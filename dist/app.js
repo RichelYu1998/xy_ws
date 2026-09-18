@@ -2826,6 +2826,28 @@
                         }
                     }
                 </style>
+                <script>
+                    (function() {
+                        function applyMobileFullWidth() {
+                            if (window.innerWidth <= 480) {
+                                var items = document.querySelectorAll('.responsive-item');
+                                items.forEach(function(item) {
+                                    item.style.cssText = item.style.cssText + '; width: 100% !important; max-width: 100% !important; min-width: 100% !important; display: block !important; flex: none !important; float: none !important; clear: both !important; position: relative !important; left: 0 !important; right: 0 !important;';
+                                });
+                                var rows = document.querySelectorAll('.responsive-row');
+                                rows.forEach(function(row) {
+                                    row.style.cssText = row.style.cssText + '; display: block !important; width: 100% !important;';
+                                });
+                                var stats = document.querySelector('.responsive-stats');
+                                if (stats) {
+                                    stats.style.cssText = stats.style.cssText + '; display: block !important; width: 100% !important;';
+                                }
+                            }
+                        }
+                        applyMobileFullWidth();
+                        window.addEventListener('resize', applyMobileFullWidth);
+                    })();
+                </script>
                 <div class="comparison-card products-card">
                     <div class="comparison-header" style="background: #409EFF;">
                         <i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}${data.storage_duration ? ` <span style="font-size: 14px; opacity: 0.9; margin-left: 15px;"><i class="fa fa-clock-o"></i> 入库时间: ${data.storage_duration}</span>` : ''}
