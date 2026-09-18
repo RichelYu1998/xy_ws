@@ -2751,10 +2751,15 @@
                     }
 
                     @media (max-width: 480px) {
+                        .comparison-body {
+                            padding: 8px !important;
+                        }
                         .responsive-stats {
                             display: block !important;
                             gap: 0 !important;
                             width: 100% !important;
+                            padding: 0 !important;
+                            margin: 0 !important;
                         }
                         .responsive-row {
                             display: block !important;
@@ -2763,7 +2768,8 @@
                             justify-content: unset !important;
                             gap: 0 !important;
                             width: 100% !important;
-                            margin-bottom: 8px !important;
+                            margin: 0 0 8px 0 !important;
+                            padding: 0 !important;
                             box-sizing: border-box !important;
                         }
                         .responsive-row:last-child {
