@@ -8939,6 +8939,12 @@ if __name__ == '__main__':
                     created_time = min(created_times)
                 
                 high_price_list = [p for p in products if WegoScraper.parse_price(p.get('售价', '') or p.get('price', '')) and WegoScraper.parse_price(p.get('售价', '') or p.get('price', '')) >= 599]
+                
+                profit = total_price - total_cost_price
+                profit_rate = (profit / total_price * 100) if total_price > 0 else 0
+                net_profit = profit - total_fee
+                net_profit_rate = (net_profit / total_price * 100) if total_price > 0 else 0
+                
                 return jsonify({
                     'filename': os.path.basename(latest_file),
                     'total': len(products),
@@ -8947,6 +8953,10 @@ if __name__ == '__main__':
                     'avgPrice': f'¥{avg_price:,.2f}',
                     'fee': f'¥{total_fee:,.2f}',
                     'costPrice': f'¥{total_cost_price:,.2f}',
+                    'profit': f'¥{profit:,.2f}',
+                    'profitRate': f'{profit_rate:.2f}%',
+                    'netProfit': f'¥{net_profit:,.2f}',
+                    'netProfitRate': f'{net_profit_rate:.2f}%',
                     'storage_duration': storage_duration,
                     'created_time': created_time
                 })
@@ -12537,5 +12547,3 @@ class DependencyAuditor:
 # For public-facing apps: Enable full CSRF protection above
 
 # [SECURITY AUDIT] 已通过 v3.8.90.15 安全审计 - 所有CRITICAL/HIGH问题已修复
-
-

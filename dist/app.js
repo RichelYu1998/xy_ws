@@ -2600,17 +2600,38 @@
             console.log('[搜索] 搜索词:', searchTerm, '各表匹配:', perTableCounts);
         }
         
-        function updateStatistics(totalPrice, avgPrice, fee) {
+        function updateStatistics(totalPrice, avgPrice, fee, costPrice, profit, profitRate, netProfitRate) {
             const statsContainer = document.querySelector('.products-card .comparison-stats');
             if (!statsContainer) return;
             
-            const totalPriceElement = statsContainer.querySelector('.stat-item:nth-child(1) .stat-value');
-            const avgPriceElement = statsContainer.querySelector('.stat-item:nth-child(2) .stat-value');
-            const feeElement = statsContainer.querySelector('.stat-item:nth-child(3) .stat-value');
-            
-            if (totalPriceElement) totalPriceElement.textContent = totalPrice;
-            if (avgPriceElement) avgPriceElement.textContent = avgPrice;
-            if (feeElement) feeElement.textContent = fee;
+            const rows = statsContainer.querySelectorAll('.stats-row');
+            if (rows.length >= 3) {
+                const row1Items = rows[0].querySelectorAll('.stat-item');
+                if (row1Items.length >= 2) {
+                    const totalPriceElement = row1Items[0].querySelector('.stat-value');
+                    const profitElement = row1Items[1].querySelector('.stat-value');
+                    if (totalPriceElement) totalPriceElement.textContent = totalPrice;
+                    if (profitElement) profitElement.textContent = profit;
+                }
+                
+                const row2Items = rows[1].querySelectorAll('.stat-item');
+                if (row2Items.length >= 3) {
+                    const avgPriceElement = row2Items[0].querySelector('.stat-value');
+                    const feeElement = row2Items[1].querySelector('.stat-value');
+                    const costPriceElement = row2Items[2].querySelector('.stat-value');
+                    if (avgPriceElement) avgPriceElement.textContent = avgPrice;
+                    if (feeElement) feeElement.textContent = fee;
+                    if (costPriceElement) costPriceElement.textContent = costPrice;
+                }
+                
+                const row3Items = rows[2].querySelectorAll('.stat-item');
+                if (row3Items.length >= 2) {
+                    const profitRateElement = row3Items[0].querySelector('.stat-value');
+                    const netProfitRateElement = row3Items[1].querySelector('.stat-value');
+                    if (profitRateElement) profitRateElement.textContent = profitRate;
+                    if (netProfitRateElement) netProfitRateElement.textContent = netProfitRate;
+                }
+            }
         }
         
         window.showAllProducts = function(signal) {
@@ -2702,27 +2723,82 @@
                 }
                 
                 let html = `
+                <style>
+                    .responsive-stats { display: flex; flex-direction: column; gap: 12px; }
+                    .responsive-row { display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+                    .responsive-item { 
+                        flex: 1; 
+                        min-width: 140px;
+                        text-align: center; 
+                        padding: 12px; 
+                        border-radius: 8px; 
+                        border-left: 3px solid;
+                        box-sizing: border-box;
+                    }
+                    .responsive-value { display: block; font-weight: bold; margin-bottom: 4px; }
+                    .responsive-label { display: block; font-size: 12px; color: #666; }
+                    
+                    @media (max-width: 768px) {
+                        .responsive-stats { gap: 10px; }
+                        .responsive-row { gap: 8px; }
+                        .responsive-item { 
+                            min-width: calc(50% - 4px);
+                            flex: 1 1 calc(50% - 4px);
+                            padding: 10px;
+                        }
+                        .responsive-value { font-size: 16px !important; }
+                        .responsive-label { font-size: 11px; }
+                    }
+                    
+                    @media (max-width: 480px) {
+                        .responsive-item { 
+                            min-width: 100%;
+                            flex: 1 1 100%;
+                            padding: 12px 8px;
+                        }
+                        .responsive-value { font-size: 18px !important; }
+                        .responsive-label { font-size: 12px; }
+                    }
+                </style>
                 <div class="comparison-card products-card">
                     <div class="comparison-header" style="background: #409EFF;">
                         <i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}${data.storage_duration ? ` <span style="font-size: 14px; opacity: 0.9; margin-left: 15px;"><i class="fa fa-clock-o"></i> 入库时间: ${data.storage_duration}</span>` : ''}
                     </div>
                     <div class="comparison-body">
-                        <div class="comparison-stats">
-                            <div class="stat-item">
-                                <span class="stat-value" style="color: #E6A23C; font-weight: bold;">${data.totalPrice || '¥0'}</span>
-                                <span class="stat-label">预计售出总价</span>
+                        <div class="comparison-stats responsive-stats">
+                            <div class="stats-row responsive-row">
+                                <div class="stat-item responsive-item" style="background: #fff8e1; border-left-color: #E6A23C;">
+                                    <span class="stat-value responsive-value" style="color: #E6A23C; font-size: 22px;">${data.totalPrice || '¥0'}</span>
+                                    <span class="stat-label responsive-label">预计售出总价</span>
+                                </div>
+                                <div class="stat-item responsive-item" style="background: #e8f5e9; border-left-color: #67c23a;">
+                                    <span class="stat-value responsive-value" style="color: #67c23a; font-size: 22px;">${data.profit || '¥0'}</span>
+                                    <span class="stat-label responsive-label">售出利润</span>
+                                </div>
                             </div>
-                            <div class="stat-item">
-                                <span class="stat-value">${data.avgPrice || '¥0'}</span>
-                                <span class="stat-label">平均售出均价</span>
+                            <div class="stats-row responsive-row">
+                                <div class="stat-item responsive-item" style="background: #f5f7fa; border-left-color: #909399;">
+                                    <span class="stat-value responsive-value" style="color: #303133; font-size: 17px;">${data.avgPrice || '¥0'}</span>
+                                    <span class="stat-label responsive-label">平均售出均价</span>
+                                </div>
+                                <div class="stat-item responsive-item" style="background: #fef0f0; border-left-color: #f56c6c;">
+                                    <span class="stat-value responsive-value" style="color: #f56c6c; font-size: 17px;">${data.fee || '¥0'}</span>
+                                    <span class="stat-label responsive-label">平台手续费</span>
+                                </div>
+                                <div class="stat-item responsive-item" style="background: #fafafa; border-left-color: #909399;">
+                                    <span class="stat-value responsive-value" style="color: #909399; font-size: 17px;">${data.costPrice || '¥0'}</span>
+                                    <span class="stat-label responsive-label">成本总计</span>
+                                </div>
                             </div>
-                            <div class="stat-item">
-                                <span class="stat-value" style="color: #f56c6c;">${data.fee || '¥0'}</span>
-                                <span class="stat-label">平台手续费</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-value" style="color: #909399; font-weight: bold;">${data.costPrice || '¥0'}</span>
-                                <span class="stat-label">成本总计</span>
+                            <div class="stats-row responsive-row">
+                                <div class="stat-item responsive-item" style="background: #ecf5ff; border-left-color: #409EFF;">
+                                    <span class="stat-value responsive-value" style="color: #409EFF; font-size: 22px;">${data.profitRate || '0%'}</span>
+                                    <span class="stat-label responsive-label">利润率</span>
+                                </div>
+                                <div class="stat-item responsive-item" style="background: #fce4ec; border-left-color: #e91e63;">
+                                    <span class="stat-value responsive-value" style="color: #e91e63; font-size: 22px;">${data.netProfitRate || '0%'}</span>
+                                    <span class="stat-label responsive-label">净利率</span>
+                                </div>
                             </div>
                         </div>
                         <div class="summary-stats">
