@@ -2752,26 +2752,36 @@
 
                     @media (max-width: 480px) {
                         .responsive-stats {
-                            gap: 8px;
+                            display: block !important;
+                            gap: 0 !important;
                             width: 100% !important;
                         }
                         .responsive-row {
-                            display: flex !important;
-                            flex-direction: column !important;
-                            gap: 8px;
+                            display: block !important;
+                            flex-direction: unset !important;
+                            flex-wrap: unset !important;
+                            justify-content: unset !important;
+                            gap: 0 !important;
                             width: 100% !important;
+                            margin-bottom: 8px !important;
                             box-sizing: border-box !important;
                         }
+                        .responsive-row:last-child {
+                            margin-bottom: 0 !important;
+                        }
                         .responsive-item {
+                            display: block !important;
                             width: 100% !important;
                             max-width: 100% !important;
-                            flex: none !important;
-                            flex-basis: 100% !important;
-                            min-width: 100% !important;
+                            flex: unset !important;
+                            flex-basis: unset !important;
+                            min-width: unset !important;
                             padding: 14px 12px;
-                            margin: 0 !important;
+                            margin: 0 0 8px 0 !important;
                             box-sizing: border-box !important;
-                            display: block !important;
+                        }
+                        .responsive-item:last-child {
+                            margin-bottom: 0 !important;
                         }
                         .responsive-value { font-size: 20px !important; }
                         .responsive-label { font-size: 13px !important; }
