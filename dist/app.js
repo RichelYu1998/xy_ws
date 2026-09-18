@@ -2829,36 +2829,77 @@
                 <script>
                     (function() {
                         function applyMobileFullWidth() {
+                            console.log('[Mobile] Screen width:', window.innerWidth, '=>', window.innerWidth <= 480 ? 'APPLYING mobile styles' : 'Skipping (PC mode)');
                             if (window.innerWidth <= 480) {
-                                // 暴力清零所有父容器的padding和margin
-                                var card = document.querySelector('.comparison-card.products-card');
-                                if (card) {
-                                    card.style.cssText = 'padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;' + card.style.cssText;
+                                try {
+                                    // 第1层：卡片容器
+                                    var card = document.querySelector('.comparison-card.products-card');
+                                    if (card) {
+                                        card.setAttribute('style', 'padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;');
+                                        console.log('[Mobile] Card styled:', card.offsetWidth);
+                                    }
+
+                                    // 第2层：内容区域
+                                    var body = document.querySelector('.comparison-card.products-card .comparison-body');
+                                    if (body) {
+                                        body.setAttribute('style', 'padding: 4px !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;');
+                                        console.log('[Mobile] Body styled, width:', body.offsetWidth);
+                                    }
+
+                                    // 第3层：统计容器
+                                    var stats = document.querySelector('.responsive-stats');
+                                    if (stats) {
+                                        stats.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; gap: 0 !important;');
+                                        console.log('[Mobile] Stats styled, width:', stats.offsetWidth);
+                                    }
+
+                                    // 第4层：行容器
+                                    var rows = document.querySelectorAll('.responsive-row');
+                                    console.log('[Mobile] Found', rows.length, 'rows');
+                                    rows.forEach(function(row, idx) {
+                                        row.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 0 8px 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important;');
+                                    });
+
+                                    // 第5层：每个卡片 - 使用setAttribute直接覆盖
+                                    var items = document.querySelectorAll('.responsive-item');
+                                    console.log('[Mobile] Found', items.length, 'items');
+                                    items.forEach(function(item, index) {
+                                        var marginBottom = (index < items.length - 1) ? '10px' : '0';
+                                        item.setAttribute('style',
+                                            'width: 100% !important; ' +
+                                            'max-width: 100% !important; ' +
+                                            'min-width: 100% !important; ' +
+                                            'display: block !important; ' +
+                                            'flex: none !important; ' +
+                                            'float: none !important; ' +
+                                            'clear: both !important; ' +
+                                            'position: relative !important; ' +
+                                            'left: 0 !important; ' +
+                                            'right: 0 !important; ' +
+                                            'padding: 16px 14px !important; ' +
+                                            'margin: 0 0 ' + marginBottom + ' 0 !important; ' +
+                                            'box-sizing: border-box !important; ' +
+                                            'border-radius: 8px !important;'
+                                        );
+                                        console.log('[Mobile] Item', index, 'styled, width:', item.offsetWidth);
+                                    });
+                                    console.log('[Mobile] ✅ All styles applied!');
+                                } catch(e) {
+                                    console.error('[Mobile] Error:', e);
                                 }
-                                var body = document.querySelector('.comparison-card.products-card .comparison-body');
-                                if (body) {
-                                    body.style.cssText = 'padding: 4px !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;' + body.style.cssText;
-                                }
-                                var stats = document.querySelector('.responsive-stats');
-                                if (stats) {
-                                    stats.style.cssText = 'display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; gap: 0 !important;' + stats.style.cssText;
-                                }
-                                var rows = document.querySelectorAll('.responsive-row');
-                                rows.forEach(function(row) {
-                                    row.style.cssText = 'display: block !important; padding: 0 !important; margin: 0 0 8px 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important;' + row.style.cssText;
-                                });
-                                // 每个卡片：最强样式
-                                var items = document.querySelectorAll('.responsive-item');
-                                items.forEach(function(item, index) {
-                                    item.style.cssText = 'width: 100% !important; max-width: 100% !important; min-width: 100% !important; display: block !important; flex: none !important; float: none !important; clear: both !important; position: relative !important; left: 0 !important; right: 0 !important; padding: 16px 14px !important; margin: 0 0 ' + (index < items.length - 1 ? '10px' : '0') + ' 0 !important; box-sizing: border-box !important; border-radius: 8px !important;' + item.style.cssText;
-                                });
                             }
                         }
-                        // 延迟执行确保DOM完全渲染
-                        setTimeout(applyMobileFullWidth, 100);
+
+                        // 多次延迟执行，确保DOM完全就绪
+                        setTimeout(applyMobileFullWidth, 50);
+                        setTimeout(applyMobileFullWidth, 150);
+                        setTimeout(applyMobileFullWidth, 300);
+
+                        // 监听事件
                         window.addEventListener('resize', applyMobileFullWidth);
                         window.addEventListener('orientationchange', function() {
                             setTimeout(applyMobileFullWidth, 200);
+                            setTimeout(applyMobileFullWidth, 400);
                         });
                     })();
                 </script>
