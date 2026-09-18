@@ -8897,7 +8897,7 @@ if __name__ == '__main__':
                         pass
                         
 
-                    # 累加拿货价（成朩）
+                    # 累加拿货价（成本）
                     try:
                         cost_str = p.get('拿货价', '') or p.get('cost_price', '') or p.get('回收价格', '')
                         if cost_str and str(cost_str).strip():
