@@ -2939,6 +2939,21 @@
                                 console.log('[Mobile] ✅ Found', items.length, 'items');
                                 items.forEach(function(item, index) {
                                     var marginBottom = (index < items.length - 1) ? '10px' : '0';
+
+                                    // 保留原始颜色
+                                    var originalBg = item.style.background || item.style.backgroundColor || '';
+                                    var originalBorderLeftColor = item.style.borderLeftColor || '';
+
+                                    // 如果原始样式中没有，尝试从computed style获取
+                                    if (!originalBg || originalBg === '') {
+                                        var computedStyle = window.getComputedStyle(item);
+                                        originalBg = computedStyle.background || computedStyle.backgroundColor || '';
+                                    }
+                                    if (!originalBorderLeftColor || originalBorderLeftColor === '') {
+                                        var computedStyle2 = window.getComputedStyle(item);
+                                        originalBorderLeftColor = computedStyle2.borderLeftColor || '';
+                                    }
+
                                     item.setAttribute('style',
                                         'width: 100% !important; ' +
                                         'max-width: 100% !important; ' +
@@ -2953,9 +2968,11 @@
                                         'padding: 16px 14px !important; ' +
                                         'margin: 0 0 ' + marginBottom + ' 0 !important; ' +
                                         'box-sizing: border-box !important; ' +
-                                        'border-radius: 8px !important;'
+                                        'border-radius: 8px !important; ' +
+                                        'background: ' + originalBg + ' !important; ' +
+                                        'border-left-color: ' + originalBorderLeftColor + ' !important;'
                                     );
-                                    console.log('[Mobile] ✅ Item', index, 'styled, width:', item.offsetWidth);
+                                    console.log('[Mobile] ✅ Item', index, 'styled, width:', item.offsetWidth, 'bg:', originalBg);
                                 });
                                 console.log('[Mobile] 🎉 All styles applied successfully!');
                             } catch(e) {
