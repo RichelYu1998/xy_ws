@@ -2826,83 +2826,6 @@
                         }
                     }
                 </style>
-                <script>
-                    (function() {
-                        function applyMobileFullWidth() {
-                            console.log('[Mobile] Screen width:', window.innerWidth, '=>', window.innerWidth <= 480 ? 'APPLYING mobile styles' : 'Skipping (PC mode)');
-                            if (window.innerWidth <= 480) {
-                                try {
-                                    // 第1层：卡片容器
-                                    var card = document.querySelector('.comparison-card.products-card');
-                                    if (card) {
-                                        card.setAttribute('style', 'padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;');
-                                        console.log('[Mobile] Card styled:', card.offsetWidth);
-                                    }
-
-                                    // 第2层：内容区域
-                                    var body = document.querySelector('.comparison-card.products-card .comparison-body');
-                                    if (body) {
-                                        body.setAttribute('style', 'padding: 4px !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;');
-                                        console.log('[Mobile] Body styled, width:', body.offsetWidth);
-                                    }
-
-                                    // 第3层：统计容器
-                                    var stats = document.querySelector('.responsive-stats');
-                                    if (stats) {
-                                        stats.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; gap: 0 !important;');
-                                        console.log('[Mobile] Stats styled, width:', stats.offsetWidth);
-                                    }
-
-                                    // 第4层：行容器
-                                    var rows = document.querySelectorAll('.responsive-row');
-                                    console.log('[Mobile] Found', rows.length, 'rows');
-                                    rows.forEach(function(row, idx) {
-                                        row.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 0 8px 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important;');
-                                    });
-
-                                    // 第5层：每个卡片 - 使用setAttribute直接覆盖
-                                    var items = document.querySelectorAll('.responsive-item');
-                                    console.log('[Mobile] Found', items.length, 'items');
-                                    items.forEach(function(item, index) {
-                                        var marginBottom = (index < items.length - 1) ? '10px' : '0';
-                                        item.setAttribute('style',
-                                            'width: 100% !important; ' +
-                                            'max-width: 100% !important; ' +
-                                            'min-width: 100% !important; ' +
-                                            'display: block !important; ' +
-                                            'flex: none !important; ' +
-                                            'float: none !important; ' +
-                                            'clear: both !important; ' +
-                                            'position: relative !important; ' +
-                                            'left: 0 !important; ' +
-                                            'right: 0 !important; ' +
-                                            'padding: 16px 14px !important; ' +
-                                            'margin: 0 0 ' + marginBottom + ' 0 !important; ' +
-                                            'box-sizing: border-box !important; ' +
-                                            'border-radius: 8px !important;'
-                                        );
-                                        console.log('[Mobile] Item', index, 'styled, width:', item.offsetWidth);
-                                    });
-                                    console.log('[Mobile] ✅ All styles applied!');
-                                } catch(e) {
-                                    console.error('[Mobile] Error:', e);
-                                }
-                            }
-                        }
-
-                        // 多次延迟执行，确保DOM完全就绪
-                        setTimeout(applyMobileFullWidth, 50);
-                        setTimeout(applyMobileFullWidth, 150);
-                        setTimeout(applyMobileFullWidth, 300);
-
-                        // 监听事件
-                        window.addEventListener('resize', applyMobileFullWidth);
-                        window.addEventListener('orientationchange', function() {
-                            setTimeout(applyMobileFullWidth, 200);
-                            setTimeout(applyMobileFullWidth, 400);
-                        });
-                    })();
-                </script>
                 <div class="comparison-card products-card">
                     <div class="comparison-header" style="background: #409EFF;">
                         <i class="fa fa-list"></i> 商品数据汇总 - ${data.filename}${data.storage_duration ? ` <span style="font-size: 14px; opacity: 0.9; margin-left: 15px;"><i class="fa fa-clock-o"></i> 入库时间: ${data.storage_duration}</span>` : ''}
@@ -2978,7 +2901,81 @@
                     </div>
                 </div>`;
                 productsContent.insertAdjacentHTML('beforeend', html);
-                
+
+                // 手机端全宽修复：在DOM插入后执行
+                (function() {
+                    function applyMobileFullWidth() {
+                        console.log('[Mobile] Screen width:', window.innerWidth, '=>', window.innerWidth <= 480 ? 'APPLYING mobile styles' : 'Skipping (PC mode)');
+                        if (window.innerWidth <= 480) {
+                            try {
+                                var card = document.querySelector('.comparison-card.products-card');
+                                if (card) {
+                                    card.setAttribute('style', 'padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;');
+                                    console.log('[Mobile] ✅ Card styled, width:', card.offsetWidth);
+                                } else {
+                                    console.warn('[Mobile] ⚠️ Card not found!');
+                                    return;
+                                }
+
+                                var body = document.querySelector('.comparison-card.products-card .comparison-body');
+                                if (body) {
+                                    body.setAttribute('style', 'padding: 4px !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;');
+                                    console.log('[Mobile] ✅ Body styled, width:', body.offsetWidth);
+                                }
+
+                                var stats = document.querySelector('.responsive-stats');
+                                if (stats) {
+                                    stats.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; gap: 0 !important;');
+                                    console.log('[Mobile] ✅ Stats styled, width:', stats.offsetWidth);
+                                }
+
+                                var rows = document.querySelectorAll('.responsive-row');
+                                console.log('[Mobile] ✅ Found', rows.length, 'rows');
+                                rows.forEach(function(row, idx) {
+                                    row.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 0 8px 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important;');
+                                });
+
+                                var items = document.querySelectorAll('.responsive-item');
+                                console.log('[Mobile] ✅ Found', items.length, 'items');
+                                items.forEach(function(item, index) {
+                                    var marginBottom = (index < items.length - 1) ? '10px' : '0';
+                                    item.setAttribute('style',
+                                        'width: 100% !important; ' +
+                                        'max-width: 100% !important; ' +
+                                        'min-width: 100% !important; ' +
+                                        'display: block !important; ' +
+                                        'flex: none !important; ' +
+                                        'float: none !important; ' +
+                                        'clear: both !important; ' +
+                                        'position: relative !important; ' +
+                                        'left: 0 !important; ' +
+                                        'right: 0 !important; ' +
+                                        'padding: 16px 14px !important; ' +
+                                        'margin: 0 0 ' + marginBottom + ' 0 !important; ' +
+                                        'box-sizing: border-box !important; ' +
+                                        'border-radius: 8px !important;'
+                                    );
+                                    console.log('[Mobile] ✅ Item', index, 'styled, width:', item.offsetWidth);
+                                });
+                                console.log('[Mobile] 🎉 All styles applied successfully!');
+                            } catch(e) {
+                                console.error('[Mobile] ❌ Error:', e);
+                            }
+                        }
+                    }
+
+                    // 立即执行 + 多次延迟
+                    setTimeout(applyMobileFullWidth, 10);
+                    setTimeout(applyMobileFullWidth, 100);
+                    setTimeout(applyMobileFullWidth, 300);
+
+                    window.addEventListener('resize', applyMobileFullWidth);
+                    window.addEventListener('orientationchange', function() {
+                        setTimeout(applyMobileFullWidth, 200);
+                        setTimeout(applyMobileFullWidth, 500);
+                    });
+                })();
+
                 (function() {
                     const allProducts = data.products || [];
                     const highPriceProducts = allProducts.filter(p => { const price = parseFloat((p.售价 || '¥0').replace('¥', '').replace(',', '')); return !isNaN(price) && price >= 599; });
