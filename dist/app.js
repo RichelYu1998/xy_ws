@@ -2726,22 +2726,22 @@
                 <style>
                     .responsive-stats { display: flex; flex-direction: column; gap: 12px; }
                     .responsive-row { display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
-                    .responsive-item { 
-                        flex: 1; 
+                    .responsive-item {
+                        flex: 1;
                         min-width: 140px;
-                        text-align: center; 
-                        padding: 12px; 
-                        border-radius: 8px; 
+                        text-align: center;
+                        padding: 12px;
+                        border-radius: 8px;
                         border-left: 3px solid;
                         box-sizing: border-box;
                     }
                     .responsive-value { display: block; font-weight: bold; margin-bottom: 4px; }
                     .responsive-label { display: block; font-size: 12px; color: #666; }
-                    
+
                     @media (max-width: 768px) {
                         .responsive-stats { gap: 10px; }
                         .responsive-row { gap: 8px; }
-                        .responsive-item { 
+                        .responsive-item {
                             min-width: calc(50% - 4px);
                             flex: 1 1 calc(50% - 4px);
                             padding: 10px;
@@ -2749,15 +2749,24 @@
                         .responsive-value { font-size: 16px !important; }
                         .responsive-label { font-size: 11px; }
                     }
-                    
+
                     @media (max-width: 480px) {
-                        .responsive-item { 
-                            min-width: 100%;
-                            flex: 1 1 100%;
-                            padding: 12px 8px;
+                        .responsive-stats { gap: 8px; }
+                        .responsive-row {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 8px;
+                            width: 100%;
                         }
-                        .responsive-value { font-size: 18px !important; }
-                        .responsive-label { font-size: 12px; }
+                        .responsive-item {
+                            width: 100%;
+                            flex: 1 1 100%;
+                            min-width: 100%;
+                            padding: 14px 12px;
+                            margin: 0;
+                        }
+                        .responsive-value { font-size: 20px !important; }
+                        .responsive-label { font-size: 13px; }
                     }
                 </style>
                 <div class="comparison-card products-card">
