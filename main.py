@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import atexit
 import asyncio
 import base64
@@ -8901,7 +8901,7 @@ if __name__ == '__main__':
                     try:
                         cost_str = p.get('拿货价', '') or p.get('cost_price', '') or p.get('回收价格', '')
                         if cost_str and str(cost_str).strip():
-                            cost_clean = str(cost_str).replace('?', '').replace(',', '').strip()
+                            cost_clean = str(cost_str).replace('¥', '').replace(',', '').strip()
                             cost = float(cost_clean)
                             if cost > 0:
                                 total_cost_price += cost
@@ -12537,3 +12537,5 @@ class DependencyAuditor:
 # For public-facing apps: Enable full CSRF protection above
 
 # [SECURITY AUDIT] 已通过 v3.8.90.15 安全审计 - 所有CRITICAL/HIGH问题已修复
+
+
