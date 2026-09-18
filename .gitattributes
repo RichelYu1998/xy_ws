@@ -1,43 +1,16 @@
-# ============================================
-# 微购相册管理系统 - Git 编码规范配置
-# 强制所有文本文件使用 UTF-8 without BOM
-# 版本: v4.1 (2026-08-30)
-# ============================================
+# Auto detect text files and perform LF normalization
+* text=auto
 
-# 全局默认：自动检测文本/二进制 + Unix换行符
-* text=auto eol=lf
-
-# Python 文件 - UTF-8 无 BOM
-*.py text eol=lf encoding=utf-8 diff=python
-
-# JavaScript/TypeScript - UTF-8 无 BOM
-*.js text eol=lf encoding=utf-8 diff=javascript
-
-# Web 前端文件 - UTF-8 无 BOM
-*.html text eol=lf encoding=utf-8 diff=html
-*.css text eol=lf encoding=utf-8 diff=css
-*.md text eol=lf encoding=utf-8
-*.json text eol=lf encoding=utf-8
-*.xml text eol=lf encoding=utf-8
-*.yaml text eol=lf encoding=utf-8
-*.yml text eol=lf encoding=utf-8
-
-# Shell 脚本 - UTF-8 无 BOM (Unix/Linux/macOS)
-*.sh text eol=lf encoding=utf-8
-
-# Windows 批处理文件 - UTF-8 with BOM + CRLF (Windows 必需)
-*.bat text eol=crlf encoding=utf-8-bom
-
-# 二进制文件标记（不进行编码转换）
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.woff binary
-*.woff2 binary
-*.ttf binary
-*.exe binary
-*.zip binary
+# Force LF for specific file types
+*.md text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.bat text eol=crlf
+*.sh text eol=lf
+*.json text eol=lf
 *.docx binary
-*.pdf binary
+
+# Normalize all text files to UTF-8
+*.md text working-tree-encoding=UTF-8
+*.py text working-tree-encoding=UTF-8
+*.js text working-tree-encoding=UTF-8
