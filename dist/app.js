@@ -2751,22 +2751,30 @@
                     }
 
                     @media (max-width: 480px) {
-                        .responsive-stats { gap: 8px; }
-                        .responsive-row {
-                            display: flex;
-                            flex-direction: column;
+                        .responsive-stats {
                             gap: 8px;
-                            width: 100%;
+                            width: 100% !important;
+                        }
+                        .responsive-row {
+                            display: flex !important;
+                            flex-direction: column !important;
+                            gap: 8px;
+                            width: 100% !important;
+                            box-sizing: border-box !important;
                         }
                         .responsive-item {
-                            width: 100%;
-                            flex: 1 1 100%;
-                            min-width: 100%;
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            flex: none !important;
+                            flex-basis: 100% !important;
+                            min-width: 100% !important;
                             padding: 14px 12px;
-                            margin: 0;
+                            margin: 0 !important;
+                            box-sizing: border-box !important;
+                            display: block !important;
                         }
                         .responsive-value { font-size: 20px !important; }
-                        .responsive-label { font-size: 13px; }
+                        .responsive-label { font-size: 13px !important; }
                     }
                 </style>
                 <div class="comparison-card products-card">
