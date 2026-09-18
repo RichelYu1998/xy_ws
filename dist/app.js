@@ -2830,22 +2830,36 @@
                     (function() {
                         function applyMobileFullWidth() {
                             if (window.innerWidth <= 480) {
-                                var items = document.querySelectorAll('.responsive-item');
-                                items.forEach(function(item) {
-                                    item.style.cssText = item.style.cssText + '; width: 100% !important; max-width: 100% !important; min-width: 100% !important; display: block !important; flex: none !important; float: none !important; clear: both !important; position: relative !important; left: 0 !important; right: 0 !important;';
-                                });
-                                var rows = document.querySelectorAll('.responsive-row');
-                                rows.forEach(function(row) {
-                                    row.style.cssText = row.style.cssText + '; display: block !important; width: 100% !important;';
-                                });
+                                // 暴力清零所有父容器的padding和margin
+                                var card = document.querySelector('.comparison-card.products-card');
+                                if (card) {
+                                    card.style.cssText = 'padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;' + card.style.cssText;
+                                }
+                                var body = document.querySelector('.comparison-card.products-card .comparison-body');
+                                if (body) {
+                                    body.style.cssText = 'padding: 4px !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;' + body.style.cssText;
+                                }
                                 var stats = document.querySelector('.responsive-stats');
                                 if (stats) {
-                                    stats.style.cssText = stats.style.cssText + '; display: block !important; width: 100% !important;';
+                                    stats.style.cssText = 'display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; gap: 0 !important;' + stats.style.cssText;
                                 }
+                                var rows = document.querySelectorAll('.responsive-row');
+                                rows.forEach(function(row) {
+                                    row.style.cssText = 'display: block !important; padding: 0 !important; margin: 0 0 8px 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important;' + row.style.cssText;
+                                });
+                                // 每个卡片：最强样式
+                                var items = document.querySelectorAll('.responsive-item');
+                                items.forEach(function(item, index) {
+                                    item.style.cssText = 'width: 100% !important; max-width: 100% !important; min-width: 100% !important; display: block !important; flex: none !important; float: none !important; clear: both !important; position: relative !important; left: 0 !important; right: 0 !important; padding: 16px 14px !important; margin: 0 0 ' + (index < items.length - 1 ? '10px' : '0') + ' 0 !important; box-sizing: border-box !important; border-radius: 8px !important;' + item.style.cssText;
+                                });
                             }
                         }
-                        applyMobileFullWidth();
+                        // 延迟执行确保DOM完全渲染
+                        setTimeout(applyMobileFullWidth, 100);
                         window.addEventListener('resize', applyMobileFullWidth);
+                        window.addEventListener('orientationchange', function() {
+                            setTimeout(applyMobileFullWidth, 200);
+                        });
                     })();
                 </script>
                 <div class="comparison-card products-card">
