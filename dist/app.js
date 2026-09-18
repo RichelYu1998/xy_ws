@@ -2752,45 +2752,78 @@
 
                     @media (max-width: 480px) {
                         .comparison-body {
-                            padding: 8px !important;
+                            padding: 6px !important;
+                            margin: 0 !important;
+                            width: 100% !important;
+                            box-sizing: border-box !important;
+                            overflow-x: hidden !important;
+                        }
+                        .comparison-card {
+                            width: 100% !important;
+                            max-width: 100% !important;
+                            margin: 0 !important;
+                            box-sizing: border-box !important;
                         }
                         .responsive-stats {
                             display: block !important;
                             gap: 0 !important;
                             width: 100% !important;
+                            max-width: 100% !important;
                             padding: 0 !important;
                             margin: 0 !important;
+                            box-sizing: border-box !important;
                         }
                         .responsive-row {
                             display: block !important;
                             flex-direction: unset !important;
                             flex-wrap: unset !important;
                             justify-content: unset !important;
+                            align-items: unset !important;
                             gap: 0 !important;
                             width: 100% !important;
+                            max-width: 100% !important;
                             margin: 0 0 8px 0 !important;
                             padding: 0 !important;
                             box-sizing: border-box !important;
+                            overflow: hidden !important;
                         }
                         .responsive-row:last-child {
                             margin-bottom: 0 !important;
                         }
+                        .stat-item.responsive-item,
                         .responsive-item {
                             display: block !important;
+                            visibility: visible !important;
                             width: 100% !important;
                             max-width: 100% !important;
-                            flex: unset !important;
-                            flex-basis: unset !important;
-                            min-width: unset !important;
-                            padding: 14px 12px;
-                            margin: 0 0 8px 0 !important;
+                            min-width: 100% !important;
+                            flex: none !important;
+                            flex-basis: 100% !important;
+                            flex-grow: 0 !important;
+                            flex-shrink: 0 !important;
+                            float: none !important;
+                            clear: both !important;
+                            position: relative !important;
+                            left: 0 !important;
+                            right: 0 !important;
+                            padding: 16px 14px !important;
+                            margin: 0 0 10px 0 !important;
                             box-sizing: border-box !important;
+                            border-radius: 8px !important;
                         }
                         .responsive-item:last-child {
                             margin-bottom: 0 !important;
                         }
-                        .responsive-value { font-size: 20px !important; }
-                        .responsive-label { font-size: 13px !important; }
+                        .responsive-value {
+                            font-size: 20px !important;
+                            display: block !important;
+                            width: 100% !important;
+                        }
+                        .responsive-label {
+                            font-size: 13px !important;
+                            display: block !important;
+                            width: 100% !important;
+                        }
                     }
                 </style>
                 <div class="comparison-card products-card">
