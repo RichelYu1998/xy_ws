@@ -1836,6 +1836,8 @@
                     if (match) {
                         skuData.fee = '¥' + match[1];
                         console.log('[对比卡片] ✓ 平台手续费:', skuData.fee);
+                    }
+                }
 
                 // 6. 成本总计
                 if (line.includes('成本总计') || line.includes('累计成本')) {
@@ -1845,8 +1847,43 @@
                         console.log('[对比卡片] ✓ 成本总计:', skuData.costPrice);
                     }
                 }
+
+                // 7. 售出利润
+                if (line.includes('售出利润')) {
+                    const match = line.match(/¥?\s*([\d,]+\.\d{2})/);
+                    if (match) {
+                        skuData.profit = '¥' + match[1];
+                        console.log('[对比卡片] ✓ 售出利润:', skuData.profit);
                     }
                 }
+
+                // 8. 利润率
+                if (line.includes('利润率') && !line.includes('净利率')) {
+                    const match = line.match(/([\d,]+\.\d+)%?/);
+                    if (match) {
+                        skuData.profitRate = match[1] + '%';
+                        console.log('[对比卡片] ✓ 利润率:', skuData.profitRate);
+                    }
+                }
+
+                // 9. 净利润
+                if (line.includes('净利润')) {
+                    const match = line.match(/¥?\s*([\d,]+\.\d{2})/);
+                    if (match) {
+                        skuData.netProfit = '¥' + match[1];
+                        console.log('[对比卡片] ✓ 净利润:', skuData.netProfit);
+                    }
+                }
+
+                // 10. 净利率
+                if (line.includes('净利率')) {
+                    const match = line.match(/([\d,]+\.\d+)%?/);
+                    if (match) {
+                        skuData.netProfitRate = match[1] + '%';
+                        console.log('[对比卡片] ✓ 净利率:', skuData.netProfitRate);
+                    }
+                }
+            }
             }
 
             console.log('[对比卡片] 解析结果:', JSON.stringify(skuData));
