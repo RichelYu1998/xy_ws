@@ -1884,7 +1884,6 @@
                     }
                 }
             }
-            }
 
             console.log('[对比卡片] 解析结果:', JSON.stringify(skuData));
             
