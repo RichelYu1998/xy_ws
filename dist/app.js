@@ -1800,6 +1800,15 @@
                     if (match) {
                         skuData.fee = '¥' + match[1];
                         console.log('[对比卡片] ✓ 平台手续费:', skuData.fee);
+
+                // 6. 成本总计
+                if (line.includes('成本总计') || line.includes('累计成本')) {
+                    const match = line.match(/¥?\s*([\d,]+\.\d{2})/);
+                    if (match) {
+                        skuData.costPrice = '¥' + match[1];
+                        console.log('[对比卡片] ✓ 成本总计:', skuData.costPrice);
+                    }
+                }
                     }
                 }
             }
@@ -2710,6 +2719,10 @@
                             <div class="stat-item">
                                 <span class="stat-value" style="color: #f56c6c;">${data.fee || '¥0'}</span>
                                 <span class="stat-label">平台手续费</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" style="color: #909399; font-weight: bold;">${data.costPrice || '¥0'}</span>
+                                <span class="stat-label">成本总计</span>
                             </div>
                         </div>
                         <div class="summary-stats">
