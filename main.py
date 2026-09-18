@@ -8104,7 +8104,13 @@ if __name__ == '__main__':
                     '/changelog': {'get': {'summary': '获取更新日志', 'tags': ['系统'], 'responses': {'200': {'description': '更新日志'}}}},
                     '/run': {'post': {'summary': '执行命令', 'tags': ['任务'], 'requestBody': {'content': {'application/json': {'schema': {'type': 'object', 'required': ['command'], 'properties': {'command': {'type': 'string', 'description': '要执行的命令'}}}}}}, 'responses': {'200': {'description': '执行结果'}}}},
                     '/products': {'get': {'summary': '获取商品列表', 'tags': ['商品'], 'parameters': [{'name': 'date', 'in': 'query', 'schema': {'type': 'string'}, 'description': '日期'}], 'responses': {'200': {'description': '商品列表'}}}},
-                    '/product/search': {'get': {'summary': '搜索商品', 'tags': ['商品'], 'parameters': [{'name': 'keyword', 'in': 'query', 'schema': {'type': 'string'}, 'description': '搜索关键词'}], 'responses': {'200': {'description': '搜索结果'}}}},
+                    '/product/search': {'get': {'summary': '搜索商品（支持货号/描述/售价/价格区间）', 'tags': ['商品'], 'parameters': [
+                        {'name': 'sku', 'in': 'query', 'schema': {'type': 'string'}, 'description': '货号或描述关键词（当search_type为sku或description时使用）'},
+                        {'name': 'price', 'in': 'query', 'schema': {'type': 'string'}, 'description': '售价（当search_type为price时使用，如：799 或 ¥1,500）'},
+                        {'name': 'price_min', 'in': 'query', 'schema': {'type': 'string'}, 'description': '最低价（当search_type为price_range时使用，可选，如：500）'},
+                        {'name': 'price_max', 'in': 'query', 'schema': {'type': 'string'}, 'description': '最高价（当search_type为price_range时使用，可选，如：2000）'},
+                        {'name': 'search_type', 'in': 'query', 'schema': {'type': 'string', 'enum': ['sku', 'description', 'price', 'price_range']}, 'description': '搜索类型：sku=按货号, description=按描述, price=按售价, price_range=按价格区间（默认：sku）'}
+                    ], 'responses': {'200': {'description': '搜索结果（单个商品返回product字段，多个商品返回products数组，价格区间搜索额外返回search_price_range字段）'}}}},
                     '/daily-profit': {'get': {'summary': '获取每日利润', 'tags': ['商品'], 'responses': {'200': {'description': '利润数据'}}}},
                     '/sku/compare': {'get': {'summary': 'SKU对比', 'tags': ['商品'], 'responses': {'200': {'description': '对比结果'}}}},
                     '/tunnel/status': {'get': {'summary': '获取隧道状态', 'tags': ['隧道'], 'responses': {'200': {'description': '隧道状态'}}}},
@@ -9277,17 +9283,64 @@ if __name__ == '__main__':
                 return jsonify({'found': False, 'error': '服务器内部错误'})
         
         @app.get('/api/product/search')  # [SECURED]
-        async def search_product(sku: str = ''):
-            sku = sku.strip()
-            if not sku:
-                return jsonify({'error': '请提供货号'}, status_code=400)
+        async def search_product(sku: str = '', price: str = '', price_min: str = '', price_max: str = '', search_type: str = 'sku'):
+            search_type = search_type.strip().lower()
 
-            if len(sku) > 100:
-                return jsonify({'error': '货号过长（最大100字符）'}, status_code=400)
+            if search_type not in ['sku', 'description', 'price', 'price_range']:
+                return jsonify({'error': '无效的搜索类型（支持：sku/description/price/price_range）'}, status_code=400)
 
-            if not re.match(r'^[a-zA-Z0-9\u4e00-\u9fa5\-_]+$', sku):
-                safe_log(logger, 'warning', '[search_product] 检测到可疑货号: {sku}', sku=sku)
-                return jsonify({'error': '货号包含非法字符（仅允许字母、数字、中文、横线和下划线）'}, status_code=400)
+            if search_type == 'sku':
+                sku = sku.strip()
+                if not sku:
+                    return jsonify({'error': '请提供货号'}, status_code=400)
+
+                if len(sku) > 100:
+                    return jsonify({'error': '货号过长（最大100字符）'}, status_code=400)
+
+                if not re.match(r'^[a-zA-Z0-9\u4e00-\u9fa5\-_]+$', sku):
+                    safe_log(logger, 'warning', '[search_product] 检测到可疑货号: {sku}', sku=sku)
+                    return jsonify({'error': '货号包含非法字符（仅允许字母、数字、中文、横线和下划线）'}, status_code=400)
+
+            elif search_type == 'price':
+                price = price.strip()
+                if not price:
+                    return jsonify({'error': '请提供售价'}, status_code=400)
+
+                try:
+                    price_float = float(price.replace('¥', '').replace(',', '').strip())
+                    if price_float <= 0:
+                        return jsonify({'error': '售价必须大于0'}, status_code=400)
+                except ValueError:
+                    return jsonify({'error': '售价格式无效，请输入有效数字'}, status_code=400)
+
+            elif search_type == 'price_range':
+                price_min = price_min.strip() if price_min else ''
+                price_max = price_max.strip() if price_max else ''
+
+                if not price_min and not price_max:
+                    return jsonify({'error': '请至少提供一个价格（最低价或最高价）'}, status_code=400)
+
+                parsed_min = None
+                parsed_max = None
+
+                if price_min:
+                    try:
+                        parsed_min = float(price_min.replace('¥', '').replace(',', '').strip())
+                        if parsed_min < 0:
+                            return jsonify({'error': '最低价不能为负数'}, status_code=400)
+                    except ValueError:
+                        return jsonify({'error': '最低价格式无效，请输入有效数字'}, status_code=400)
+
+                if price_max:
+                    try:
+                        parsed_max = float(price_max.replace('¥', '').replace(',', '').strip())
+                        if parsed_max < 0:
+                            return jsonify({'error': '最高价不能为负数'}, status_code=400)
+                    except ValueError:
+                        return jsonify({'error': '最高价格式无效，请输入有效数字'}, status_code=400)
+
+                if parsed_min and parsed_max and parsed_min > parsed_max:
+                    return jsonify({'error': '最低价不能大于最高价'}, status_code=400)
 
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
@@ -9297,27 +9350,29 @@ if __name__ == '__main__':
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
-                for p in products:
-                    if p.get('货号') == sku:
-                        media_result = []
-                        new_image_url = p.get('图片', '')
-                        if new_image_url:
-                            try:
-                                # 检查是否为有效的JSON字符串
-                                if isinstance(new_image_url, str):
-                                    # 防止HTML或非法数据导致解析失败
-                                    if new_image_url.strip().startswith('<') or not new_image_url.strip().startswith('['):
-                                        img_data = new_image_url
-                                    else:
-                                        try:
-                                            img_data = json.loads(new_image_url)
-                                        except (json.JSONDecodeError, TypeError):
+                
+                matched_products = []
+                
+                if search_type == 'sku':
+                    for p in products:
+                        if p.get('货号') == sku:
+                            media_result = []
+                            new_image_url = p.get('图片', '')
+                            if new_image_url:
+                                try:
+                                    if isinstance(new_image_url, str):
+                                        if new_image_url.strip().startswith('<') or not new_image_url.strip().startswith('['):
                                             img_data = new_image_url
-                                else:
+                                        else:
+                                            try:
+                                                img_data = json.loads(new_image_url)
+                                            except (json.JSONDecodeError, TypeError):
+                                                img_data = new_image_url
+                                    else:
+                                        img_data = new_image_url
+                                except Exception as e:  # [HANDLED]
+                                    logger.debug(f'  ⚠️ 图片URL解析异常: {e}')
                                     img_data = new_image_url
-                            except Exception as e:  # [HANDLED]
-                                logger.debug(f'  ⚠️ 图片URL解析异常: {e}')
-                                img_data = new_image_url
                             if isinstance(img_data, list):
                                 for b64_str in img_data:
                                     try:
@@ -9339,9 +9394,70 @@ if __name__ == '__main__':
                                 except Exception as e:  # [HANDLED]
                                     logger.debug(f"Exception processing media: {e}")
                                     media_result = [img_data]
-                        p['图片'] = media_result
-                        return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
-                return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
+                            p['图片'] = media_result
+                            return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
+                    return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
+                
+                elif search_type == 'description':
+                    for p in products:
+                        stored_desc = p.get('商品描述', '') or p.get('商品名称', '')
+                        if sku.lower() in stored_desc.lower():
+                            images = p.get('图片', [])
+                            p['图片'] = decode_base64_images(images) if images else []
+                            matched_products.append(p)
+                    if matched_products:
+                        return jsonify({'found': True, 'products': matched_products[:50], 'total': len(matched_products), 'filename': os.path.basename(latest_file)})
+                    return jsonify({'found': False, 'error': f'未找到包含 "{sku}" 的商品'})
+                
+                elif search_type == 'price':
+                    for p in products:
+                        price_str = p.get('售价', '') or p.get('price', '')
+                        if price_str:
+                            try:
+                                product_price = float(price_str.replace('¥', '').replace(',', '').strip())
+                                if abs(product_price - price_float) < 0.01:
+                                    images = p.get('图片', [])
+                                    p['图片'] = decode_base64_images(images) if images else []
+                                    matched_products.append(p)
+                            except (ValueError, TypeError):
+                                continue
+                    if matched_products:
+                        return jsonify({'found': True, 'products': matched_products[:50], 'total': len(matched_products), 'filename': os.path.basename(latest_file), 'search_price': f'¥{price_float:,.2f}'})
+                    return jsonify({'found': False, 'error': f'未找到售价为 ¥{price_float:,.2f} 的商品'})
+                
+                elif search_type == 'price_range':
+                    for p in products:
+                        price_str = p.get('售价', '') or p.get('price', '')
+                        if price_str:
+                            try:
+                                product_price = float(price_str.replace('¥', '').replace(',', '').strip())
+                                
+                                in_range = True
+                                if parsed_min and product_price < parsed_min:
+                                    in_range = False
+                                if parsed_max and product_price > parsed_max:
+                                    in_range = False
+                                
+                                if in_range:
+                                    images = p.get('图片', [])
+                                    p['图片'] = decode_base64_images(images) if images else []
+                                    matched_products.append(p)
+                            except (ValueError, TypeError):
+                                continue
+                    if matched_products:
+                        range_desc = f'¥{parsed_min:,.2f}' if parsed_min else '0'
+                        range_desc += f' - ¥{parsed_max:,.2f}' if parsed_max else '+'
+                        return jsonify({
+                            'found': True, 
+                            'products': matched_products[:100], 
+                            'total': len(matched_products), 
+                            'filename': os.path.basename(latest_file),
+                            'search_price_range': range_desc,
+                            'price_min': parsed_min,
+                            'price_max': parsed_max
+                        })
+                    return jsonify({'found': False, 'error': f'未找到价格在 {range_desc} 范围内的商品'})
+                
             except Exception as e:  # [HANDLED]
                 logger.error(f'[search_product] 搜索失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({'error': '搜索商品失败'}, status_code=500)

@@ -637,35 +637,71 @@
             }
         }
         
-        function searchProductBySku(sku) {
-            if (!sku) return;
-            console.log('[SKU搜索] 开始搜索:', sku);
-            const url = '/api/product/search?sku=' + encodeURIComponent(sku);
+        function searchProductBySku(sku, searchType = 'sku', minPrice = null, maxPrice = null) {
+            if (!sku && searchType !== 'price_range') return;
+            console.log('[商品搜索] 开始搜索:', sku, '类型:', searchType, '价格区间:', minPrice, '-', maxPrice);
+            
+            let url = '/api/product/search?';
+            
+            if (searchType === 'price_range' || searchType === 'price_range') {
+                if (minPrice) url += 'price_min=' + encodeURIComponent(minPrice) + '&';
+                if (maxPrice) url += 'price_max=' + encodeURIComponent(maxPrice) + '&';
+                url += 'search_type=price_range';
+            } else if (searchType === 'price') {
+                url += 'price=' + encodeURIComponent(sku) + '&search_type=price';
+            } else if (searchType === 'description') {
+                url += 'sku=' + encodeURIComponent(sku) + '&search_type=description';
+            } else {
+                url += 'sku=' + encodeURIComponent(sku) + '&search_type=sku';
+            }
+            
             fetch(url)
             .then(response => safeParseJson(response))
             .then(data => {
-                console.log('[SKU搜索] API返回:', data);
+                console.log('[商品搜索] API返回:', data);
                 if (data.error) {
-                    console.error('[SKU搜索] 搜索失败:', data.error);
+                    console.error('[商品搜索] 搜索失败:', data.error);
                     showToast('搜索失败: ' + data.error, 'error');
                     return;
                 }
                 if (data.product) {
-                    console.log('[SKU搜索] 找到商品, 显示模态框');
+                    console.log('[商品搜索] 找到单个商品, 显示模态框');
                     try {
                         showProductModal(data.product);
-                        console.log('[SKU搜索] ✅ 模态框已显示');
+                        console.log('[商品搜索] ✅ 模态框已显示');
                     } catch (modalError) {
-                        console.error('[SKU搜索] ❌ 显示模态框失败:', modalError);
+                        console.error('[商品搜索] ❌ 显示模态框失败:', modalError);
                         showToast('显示商品详情失败: ' + modalError.message, 'error');
                     }
+                } else if (data.products && data.products.length > 0) {
+                    console.log('[商品搜索] 找到', data.products.length, '个匹配商品');
+                    if (data.products.length === 1) {
+                        try {
+                            showProductModal(data.products[0]);
+                            console.log('[商品搜索] ✅ 显示唯一匹配商品');
+                        } catch (modalError) {
+                            console.error('[商品搜索] ❌ 显示模态框失败:', modalError);
+                            showToast('显示商品详情失败: ' + modalError.message, 'error');
+                        }
+                    } else {
+                        showToast(`找到 ${data.total || data.products.length} 个匹配商品（已在前端列表中高亮显示）`, 'success');
+                    }
                 } else {
-                    console.warn('[SKU搜索] 未找到商品');
-                    showToast('未找到该商品', 'warning');
+                    console.warn('[商品搜索] 未找到商品');
+                    
+                    let errorMsg = data.error || '未找到匹配的商品';
+                    if (searchType === 'price_range' && (minPrice || maxPrice)) {
+                        const rangeStr = (minPrice ? '¥' + parseFloat(minPrice).toLocaleString() : '0') + 
+                                        ' - ' + 
+                                        (maxPrice ? '¥' + parseFloat(maxPrice).toLocaleString() : '+');
+                        errorMsg = `未找到价格在 ${rangeStr} 范围内的商品`;
+                    }
+                    
+                    showToast(errorMsg, 'warning');
                 }
             })
             .catch(error => {
-                console.error('[SKU搜索] 查询异常:', error);
+                console.error('[商品搜索] 查询异常:', error);
                 showToast('搜索商品出错: ' + error.message, 'error');
             });
         }
@@ -2410,8 +2446,11 @@
         function filterProducts(searchTerm) {
             const searchInput = document.getElementById('product-search-input');
             const searchResultsCount = document.getElementById('search-results-count');
+            const searchTypeSelect = document.getElementById('search-type-select');
             
             if (!searchInput || !searchResultsCount) return;
+            
+            const searchType = searchTypeSelect ? searchTypeSelect.value : 'sku';
             
             if (_activeLinkedIdentifier) {
                 unhighlightRow(_activeLinkedIdentifier);
@@ -2471,11 +2510,55 @@
                 return;
             }
             
-            const searchLower = searchTerm.toLowerCase().trim();
             let totalMatchCount = 0;
             
             const tableIds = ['table-all', 'table-highprice', 'table-highprice-new', 'table-added'];
             const perTableCounts = {};
+            
+            let searchPrice = null;
+            let searchMinPrice = null;
+            let searchMaxPrice = null;
+            
+            if (searchType === 'price') {
+                const priceClean = searchTerm.replace('¥', '').replace(',', '').trim();
+                searchPrice = parseFloat(priceClean);
+                if (isNaN(searchPrice)) {
+                    showToast('售价格式无效，请输入有效数字', 'error');
+                    return;
+                }
+            } else if (searchType === 'price_range') {
+                const parts = searchTerm.split('-');
+                
+                if (parts[0] && parts[0].trim()) {
+                    const minClean = parts[0].replace('¥', '').replace(',', '').trim();
+                    searchMinPrice = parseFloat(minClean);
+                    if (isNaN(searchMinPrice) || searchMinPrice < 0) {
+                        showToast('最低价格式无效，请输入正数', 'error');
+                        return;
+                    }
+                }
+                
+                if (parts[1] && parts[1].trim()) {
+                    const maxClean = parts[1].replace('¥', '').replace(',', '').trim();
+                    searchMaxPrice = parseFloat(maxClean);
+                    if (isNaN(searchMaxPrice) || searchMaxPrice < 0) {
+                        showToast('最高价格式无效，请输入正数', 'error');
+                        return;
+                    }
+                }
+                
+                if (searchMinPrice === null && searchMaxPrice === null) {
+                    showToast('请至少输入最低价或最高价', 'warning');
+                    return;
+                }
+                
+                if (searchMinPrice !== null && searchMaxPrice !== null && searchMinPrice > searchMaxPrice) {
+                    showToast(`最低价 (¥${searchMinPrice.toLocaleString()}) 不能大于最高价 (¥${searchMaxPrice.toLocaleString()})`, 'error');
+                    return;
+                }
+            }
+            
+            const searchLower = searchTerm.toLowerCase().trim();
             
             tableIds.forEach(tableId => {
                 const tableRows = document.querySelectorAll('#' + tableId + ' tbody tr');
@@ -2485,18 +2568,40 @@
                 tableRows.forEach(row => {
                     const sku = (row.getAttribute('data-sku') || '').toLowerCase();
                     const desc = (row.getAttribute('data-desc') || '').toLowerCase();
+                    const priceCell = row.querySelector('td:nth-child(4)');
+                    const priceText = priceCell ? (priceCell.textContent || '') : '';
                     
-                    const skuMatch = sku.includes(searchLower);
-                    const descMatch = desc.includes(searchLower);
+                    let isMatch = false;
+
+                    if (searchType === 'sku') {
+                        isMatch = sku.includes(searchLower);
+                    } else if (searchType === 'description') {
+                        isMatch = desc.includes(searchLower);
+                    } else if (searchType === 'price' && searchPrice !== null) {
+                        const rowPriceMatch = priceText.match(/¥?([\d,]+\.?\d*)/);
+                        if (rowPriceMatch) {
+                            const rowPrice = parseFloat(rowPriceMatch[1].replace(/,/g, ''));
+                            isMatch = !isNaN(rowPrice) && Math.abs(rowPrice - searchPrice) < 0.01;
+                        }
+                    } else if (searchType === 'price_range' && (searchMinPrice !== null || searchMaxPrice !== null)) {
+                        const rowPriceMatch = priceText.match(/¥?([\d,]+\.?\d*)/);
+                        if (rowPriceMatch) {
+                            const rowPrice = parseFloat(rowPriceMatch[1].replace(/,/g, ''));
+                            if (!isNaN(rowPrice)) {
+                                let inRange = true;
+                                if (searchMinPrice !== null && rowPrice < searchMinPrice) inRange = false;
+                                if (searchMaxPrice !== null && rowPrice > searchMaxPrice) inRange = false;
+                                isMatch = inRange;
+                            }
+                        }
+                    }
                     
-                    if (skuMatch || descMatch) {
+                    if (isMatch) {
                         row.style.display = '';
                         tableMatchCount++;
                         totalMatchCount++;
                         
-                        const priceCell = row.querySelector('td:nth-child(4)');
                         if (priceCell) {
-                            const priceText = priceCell.textContent || '';
                             const priceMatch = priceText.match(/¥?([\d,]+\.?\d*)/);
                             if (priceMatch) {
                                 const price = parseFloat(priceMatch[1].replace(/,/g, ''));
@@ -2506,12 +2611,22 @@
                             }
                         }
                         
-                        if (skuMatch && descMatch) {
-                            row.style.background = 'rgba(64, 158, 255, 0.2)';
-                        } else if (skuMatch) {
-                            row.style.background = 'rgba(103, 194, 58, 0.2)';
-                        } else {
+                        if (searchType === 'price') {
+                            row.style.background = 'rgba(245, 108, 108, 0.2)';
+                        } else if (searchType === 'price_range') {
+                            row.style.background = 'rgba(155, 89, 182, 0.2)';
+                        } else if (searchType === 'description') {
                             row.style.background = 'rgba(230, 162, 60, 0.2)';
+                        } else {
+                            const skuMatch = sku.includes(searchLower);
+                            const descMatch = desc.includes(searchLower);
+                            if (skuMatch && descMatch) {
+                                row.style.background = 'rgba(64, 158, 255, 0.2)';
+                            } else if (skuMatch) {
+                                row.style.background = 'rgba(103, 194, 58, 0.2)';
+                            } else {
+                                row.style.background = 'rgba(230, 162, 60, 0.2)';
+                            }
                         }
                     } else {
                         row.style.display = 'none';
@@ -2874,11 +2989,14 @@
                             <span class="summary-badge" style="background: #e8f5e9; color: #2e7d32;">↔ 高价+新增</span>
                         </div>
                         <div class="info-box" style="margin-bottom: 20px; padding: 15px;">
-                            <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text" style="background: #409EFF; color: white; border-color: #409EFF;">
-                                        <i class="fa fa-search"></i> 搜索商品
-                                    </span>
+                            <div class="input-group mb-2">
+                                <div class="input-group-prepend" style="width: auto;">
+                                    <select id="search-type-select" class="form-control" style="max-width: 130px; border-color: #409EFF; background: #f8f9fa;">
+                                        <option value="sku">按货号</option>
+                                        <option value="description">按描述</option>
+                                        <option value="price">按售价</option>
+                                        <option value="price_range">价格区间</option>
+                                    </select>
                                 </div>
                                 <input type="text" id="product-search-input" class="form-control" placeholder="输入货号或商品描述进行搜索..." 
                                     style="border-color: #409EFF;">
@@ -2888,7 +3006,22 @@
                                     </button>
                                 </div>
                             </div>
-                            <small class="form-text text-muted" style="margin-top: 8px;">
+                            
+                            <div id="price-range-inputs" style="display: none; margin-bottom: 10px;">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        <label for="price-min-input" class="mb-0 mr-2" style="font-size: 14px;">¥</label>
+                                        <input type="number" id="price-min-input" class="form-control form-control-sm" style="width: 120px; display: inline-block;" placeholder="最低价（可选）" min="0" step="0.01">
+                                    </div>
+                                    <div class="col-auto" style="font-size: 18px; color: #666;">—</div>
+                                    <div class="col-auto">
+                                        <label for="price-max-input" class="mb-0 mr-2" style="font-size: 14px;">¥</label>
+                                        <input type="number" id="price-max-input" class="form-control form-control-sm" style="width: 120px; display: inline-block;" placeholder="最高价（可选）" min="0" step="0.01">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <small class="form-text text-muted" id="search-hint-text" style="margin-top: 8px;">
                                 <i class="fa fa-info-circle"></i> 支持模糊搜索,可输入货号(如: A001)或商品描述关键词
                             </small>
                             <div id="search-results-count" style="margin-top: 10px; display: none;">
@@ -3015,6 +3148,64 @@
                 setTimeout(() => {
                     const searchInput = document.getElementById('product-search-input');
                     const clearBtn = document.getElementById('clear-search-btn');
+                    const searchTypeSelect = document.getElementById('search-type-select');
+                    const searchHint = document.getElementById('search-hint-text');
+                    const priceRangeInputs = document.getElementById('price-range-inputs');
+                    const priceMinInput = document.getElementById('price-min-input');
+                    const priceMaxInput = document.getElementById('price-max-input');
+                    
+                    const updateSearchPlaceholder = () => {
+                        if (!searchInput || !searchTypeSelect || !searchHint) return;
+                        
+                        const type = searchTypeSelect.value;
+                        
+                        if (type === 'price_range') {
+                            searchInput.style.display = 'none';
+                            if (priceRangeInputs) priceRangeInputs.style.display = 'block';
+                            searchHint.innerHTML = '<i class="fa fa-info-circle"></i> 输入价格区间筛选商品（可只填最低价或最高价）';
+                            
+                            if (priceMinInput && priceMaxInput) {
+                                const handlePriceRangeSearch = () => {
+                                    filterProducts((priceMinInput?.value || '') + '-' + (priceMaxInput?.value || ''));
+                                };
+                                
+                                priceMinInput.removeEventListener('input', handlePriceRangeSearch);
+                                priceMinInput.addEventListener('input', handlePriceRangeSearch);
+                                priceMaxInput.removeEventListener('input', handlePriceRangeSearch);
+                                priceMaxInput.addEventListener('input', handlePriceRangeSearch);
+                            }
+                        } else {
+                            searchInput.style.display = '';
+                            if (priceRangeInputs) priceRangeInputs.style.display = 'none';
+                            
+                            switch(type) {
+                                case 'sku':
+                                    searchInput.placeholder = '输入货号进行搜索(如: A001, 46624)...';
+                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索货号字段</strong>，支持模糊匹配（如输入 "466" 可找到货号包含 466 的商品）';
+                                    break;
+                                case 'description':
+                                    searchInput.placeholder = '输入商品名称或描述关键词...';
+                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索商品名称和描述</strong>，支持模糊匹配（如输入 "iPhone" 可找到所有 iPhone 相关商品）';
+                                    break;
+                                case 'price':
+                                    searchInput.placeholder = '输入精确售价(如: 799, 1500, 3299)...';
+                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索售价字段</strong>，精确匹配价格（如输入 "500" 只会找到售价正好是 ¥500 的商品）';
+                                    break;
+                            }
+                        }
+                    };
+                    
+                    if (searchTypeSelect) {
+                        searchTypeSelect.addEventListener('change', () => {
+                            updateSearchPlaceholder();
+                            if (searchTypeSelect.value !== 'price_range' && searchInput) {
+                                filterProducts(searchInput.value);
+                            } else {
+                                filterProducts((priceMinInput?.value || '') + '-' + (priceMaxInput?.value || ''));
+                            }
+                        });
+                        updateSearchPlaceholder();
+                    }
                     
                     if (searchInput) {
                         searchInput.addEventListener('input', function() {
@@ -3026,8 +3217,10 @@
                         clearBtn.addEventListener('click', function() {
                             if (searchInput) {
                                 searchInput.value = '';
-                                filterProducts('');
                             }
+                            if (priceMinInput) priceMinInput.value = '';
+                            if (priceMaxInput) priceMaxInput.value = '';
+                            filterProducts('');
                         });
                     }
                     
