@@ -8877,6 +8877,8 @@ if __name__ == '__main__':
                 
                 total_price = 0
                 total_fee = 0
+                total_cost_price = 0
+
                 valid_price_count = 0
                 
                 for p in products:
@@ -8894,6 +8896,18 @@ if __name__ == '__main__':
                     except Exception:
                         pass
                         
+
+                    # ??????????
+                    try:
+                        cost_str = p.get('???', '') or p.get('cost_price', '') or p.get('????', '')
+                        if cost_str and str(cost_str).strip():
+                            cost_clean = str(cost_str).replace('?', '').replace(',', '').strip()
+                            cost = float(cost_clean)
+                            if cost > 0:
+                                total_cost_price += cost
+                    except Exception:
+                        pass
+
                 avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
                 
                 storage_duration = None
@@ -8932,7 +8946,7 @@ if __name__ == '__main__':
                     'totalPrice': f'¥{total_price:,.2f}',
                     'avgPrice': f'¥{avg_price:,.2f}',
                     'fee': f'¥{total_fee:,.2f}',
-                    'system': Environment.SYSTEM,
+                    'costPrice': f'\xa5{total_cost_price:,.2f}',\n                    'system': Environment.SYSTEM,
                     'storage_duration': storage_duration,
                     'created_time': created_time
                 })
