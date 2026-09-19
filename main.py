@@ -123,7 +123,9 @@ except ImportError:
     Request = Response = None
 PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _module_logger = logging.getLogger('main')
+_module_logger.setLevel(logging.DEBUG)
 logger = logging.getLogger('FileCleaner')
+logger.setLevel(logging.DEBUG)
 
 def check_file_bom(file_path, auto_fix=False):
     try:
@@ -2406,13 +2408,15 @@ def get_version_from_readme():
     return "0.0.0"
 
 def jsonify(*args, **kwargs):
-    """FastAPI兼容层：模拟Flask的jsonify函数"""
+    """FastAPI兼容层：模拟Flask的jsonify函数，支持status_code参数"""
+    status_code = kwargs.pop('status_code', None)
     if args and isinstance(args[0], dict):
         data = args[0]
-        if 'status_code' in kwargs:
-            pass
-        return data
-    return kwargs if kwargs else (args[0] if args else {})
+    else:
+        data = kwargs if kwargs else (args[0] if args else {})
+    if status_code is not None:
+        return JSONResponse(content=data, status_code=status_code)
+    return data
 
 VERSION = get_version_from_readme()
 
@@ -2797,8 +2801,43 @@ def _get_allowed_origins():
         origins.append(f"http://127.0.0.1:{p}")
     return origins
 
+_blocking_io_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix='blocking_io')
+_loop_watchdog_last_tick = time.time()
+_LOOP_WATCHDOG_THRESHOLD = 30
+_loop_watchdog_alerted = False
+
+def _loop_watchdog():
+    global _loop_watchdog_alerted
+    while True:
+        time.sleep(10)
+        stalled = time.time() - _loop_watchdog_last_tick
+        if stalled > _LOOP_WATCHDOG_THRESHOLD:
+            if not _loop_watchdog_alerted:
+                _loop_watchdog_alerted = True
+                _msg = f"[loop_watchdog] ⚠️ 事件循环可能卡死！已 {stalled:.0f}s 无响应（阈值 {_LOOP_WATCHDOG_THRESHOLD}s）"
+                logger.error(_msg)
+                log_print(_msg)
+            if stalled > _LOOP_WATCHDOG_THRESHOLD * 3:
+                _msg = f"[loop_watchdog] 🚨 事件循环严重卡死 {stalled:.0f}s，准备强制重启服务器..."
+                logger.critical(_msg)
+                log_print(_msg)
+                try:
+                    import signal
+                    os.kill(os.getpid(), signal.SIGTERM)
+                except Exception:
+                    os._exit(1)
+        else:
+            _loop_watchdog_alerted = False
+
+async def _tick_watchdog():
+    while True:
+        global _loop_watchdog_last_tick
+        _loop_watchdog_last_tick = time.time()
+        await asyncio.sleep(5)
+
 @asynccontextmanager
 async def lifespan(app):
+    global _blocking_io_executor
     loop = asyncio.get_running_loop()
 
     def _loop_handler(_loop, context):
@@ -2816,8 +2855,14 @@ async def lifespan(app):
     )
     logger.info("[crash_protection] asyncio exception handler + threading.excepthook 已安装")
 
+    watchdog_thread = threading.Thread(target=_loop_watchdog, daemon=True, name='loop_watchdog')
+    watchdog_thread.start()
+    watchdog_task = asyncio.create_task(_tick_watchdog())
+    logger.info("[crash_protection] 事件循环看门狗已启动（阈值 %ds）", _LOOP_WATCHDOG_THRESHOLD)
+
     yield
 
+    watchdog_task.cancel()
     logger.info("[shutdown] 清理子进程资源...")
     try:
         with _cf_state_lock:
@@ -2830,6 +2875,10 @@ async def lifespan(app):
                         cf_process.kill()
                     except Exception:
                         pass
+    except Exception:
+        pass
+    try:
+        _blocking_io_executor.shutdown(wait=False)
     except Exception:
         pass
     logger.info("[shutdown] 清理完成")
@@ -3010,16 +3059,28 @@ async def handle_api_exception(request: Request, exc: Exception):
 class RateLimiter:
     """IP级别速率限制器"""
 
+    MAX_TRACKED_IPS = 10000
+
     def __init__(self, max_requests=100, window_seconds=60):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self.requests = {}
         self._lock = threading.Lock()
+        self._last_cleanup = time.time()
 
     def is_allowed(self, client_ip):
         """检查是否允许请求"""
         current_time = time.time()
         with self._lock:
+            if current_time - self._last_cleanup > 300:
+                self._last_cleanup = current_time
+                expired = [k for k, v in self.requests.items() if not v or current_time - v[-1] > self.window_seconds]
+                for k in expired:
+                    del self.requests[k]
+            if len(self.requests) > self.MAX_TRACKED_IPS:
+                oldest_ips = sorted(self.requests.keys(), key=lambda k: self.requests[k][-1] if self.requests[k] else 0)[:len(self.requests) - self.MAX_TRACKED_IPS]
+                for k in oldest_ips:
+                    del self.requests[k]
             if client_ip not in self.requests:
                 self.requests[client_ip] = []
             self.requests[client_ip] = [
@@ -3375,13 +3436,29 @@ def run_command_background(task_id, command):
             except queue.Empty:
                 time.sleep(0.1)
             
+            if len(stdout_lines) > 10000:
+                stdout_lines = stdout_lines[-10000:]
+            
             with _tasks_lock:
-                tasks[task_id]['output'] = ''.join(stdout_lines)
+                output_text = ''.join(stdout_lines)
+                if len(output_text) > 500000:
+                    output_text = output_text[-500000:]
+                tasks[task_id]['output'] = output_text
         
-        process.wait()
+        try:
+            process.wait(timeout=TIMEOUT_CONFIG['subprocess_wait'])
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+                process.wait(timeout=5)
+            except Exception:
+                pass
         with _tasks_lock:
             tasks[task_id]['returncode'] = process.returncode
-            tasks[task_id]['output'] = ''.join(stdout_lines)
+            final_output = ''.join(stdout_lines)
+            if len(final_output) > 500000:
+                final_output = final_output[-500000:]
+            tasks[task_id]['output'] = final_output
             tasks[task_id]['status'] = 'completed'
     except Exception as e:  # [HANDLED]
         handle_exception(e, 'run_command_background')
@@ -7875,6 +7952,7 @@ if __name__ == '__main__':
             _request_logger.addHandler(_rh)
 
         _request_rate_limit = {}
+        _rate_limit_last_cleanup = [time.time()]
         
         @app.middleware("http")
         async def _log_and_security_middleware(request: Request, call_next):
@@ -7883,8 +7961,23 @@ if __name__ == '__main__':
             path = request.url.path
             client_ip = request.client.host if request.client else "unknown"
             
-            # 频率限制: 对tunnel状态查询进行限流（防止过度轮询）
-            if path == '/api/tunnel/status':
+            # 定期清理限流字典（防止IP堆积导致内存泄漏）
+            if start_time - _rate_limit_last_cleanup[0] > 300:
+                _rate_limit_last_cleanup[0] = start_time
+                expired = [k for k, v in _request_rate_limit.items() if start_time > v.get('reset_time', 0) + 300]
+                for k in expired:
+                    del _request_rate_limit[k]
+            
+            # 请求体大小限制（防止超大请求打崩服务器）
+            content_length = request.headers.get('content-length', '0')
+            try:
+                if int(content_length) > 10 * 1024 * 1024:
+                    return JSONResponse(status_code=413, content={'error': '请求体过大（最大10MB）'}, headers=_no_store_headers())
+            except (ValueError, TypeError):
+                pass
+            
+            # 频率限制: 对高频轮询接口进行限流（防止过度轮询打崩服务器）
+            if path == '/api/tunnel/status' or path.startswith('/output/'):
                 current_time = time.time()
                 if client_ip not in _request_rate_limit:
                     _request_rate_limit[client_ip] = {'count': 0, 'reset_time': current_time + 60}
@@ -7895,7 +7988,8 @@ if __name__ == '__main__':
                     rate_info['reset_time'] = current_time + 60
                 
                 rate_info['count'] += 1
-                if rate_info['count'] > 30:  # 每分钟最多30次请求（平均2秒1次）
+                rate_limit = 30 if path == '/api/tunnel/status' else 60
+                if rate_info['count'] > rate_limit:
                     return JSONResponse(
                         status_code=429,
                         content={'error': '请求过于频繁，请稍后重试'},
@@ -7927,7 +8021,11 @@ if __name__ == '__main__':
                     if cl > 1024 * 1024:
                         _request_logger.warning(f'大请求体: {cl / 1024:.1f}KB')
 
-            response = await call_next(request)
+            try:
+                response = await asyncio.wait_for(call_next(request), timeout=120)
+            except asyncio.TimeoutError:
+                _request_logger.error(f'[TIMEOUT] 请求超时(120s): {request.method} {path} | IP: {client_ip}')
+                return JSONResponse(status_code=504, content={'error': '请求处理超时'}, headers=_no_store_headers())
 
             if not path.startswith('/static'):
                 if response.status_code >= 400:
@@ -8003,9 +8101,12 @@ if __name__ == '__main__':
             status_code = 200
             if PSUTIL_AVAILABLE:
                 try:
-                    cpu_percent = psutil.cpu_percent(interval=0.1)
-                    memory = psutil.virtual_memory()
-                    disk = psutil.disk_usage(os.path.abspath(os.sep))
+                    def _collect_system_stats():
+                        cpu = psutil.cpu_percent(interval=0)
+                        mem = psutil.virtual_memory()
+                        dsk = psutil.disk_usage(os.path.abspath(os.sep))
+                        return cpu, mem, dsk
+                    cpu_percent, memory, disk = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _collect_system_stats)
                     health_data['cpu_percent'] = cpu_percent
                     health_data['memory_percent'] = memory.percent
                     health_data['memory_used_gb'] = round(memory.used / (1024**3), 2)
@@ -8359,6 +8460,12 @@ if __name__ == '__main__':
                 return JSONResponse(status_code=429, content={'error': '请求过于频繁', 'retry_after': api_rate_limiter.get_retry_after(client_ip)}, headers={'Retry-After': str(api_rate_limiter.get_retry_after(client_ip))})
             command = req.command
 
+            # 并发任务数限制（防止同时启动过多子进程耗尽资源）
+            with _tasks_lock:
+                running_count = sum(1 for t in tasks.values() if t.get('status') in ('starting', 'running'))
+            if running_count >= 5:
+                raise HTTPException(status_code=429, detail=f'并发任务数已达上限(5)，当前运行中: {running_count}')
+
             # 命令长度限制
             if len(command) > 10000:
                 raise HTTPException(status_code=400, detail='命令长度超过限制（最大10000字符）')
@@ -8406,11 +8513,22 @@ if __name__ == '__main__':
                 if task_id not in processes:
                     raise HTTPException(status_code=404, detail='没有正在运行的进程')
                 process = processes[task_id]
+            if process.poll() is not None:
+                with _processes_lock:
+                    processes.pop(task_id, None)
+                with _tasks_lock:
+                    if task_id in tasks and tasks[task_id].get('status') not in ('completed', 'error', 'killed'):
+                        tasks[task_id]['status'] = 'completed'
+                raise HTTPException(status_code=404, detail='进程已结束')
             try:
                 process.stdin.write(user_input + '\n')
                 process.stdin.flush()
                 return JSONResponse(content={'success': True, 'message': '输入已发送'})
-            except Exception as e:  # [HANDLED]
+            except (BrokenPipeError, OSError, ValueError) as e:
+                with _processes_lock:
+                    processes.pop(task_id, None)
+                raise HTTPException(status_code=500, detail='进程已结束，无法发送输入')
+            except Exception as e:
                 raise HTTPException(status_code=500, detail='Internal server error')
 
         @app.post('/kill')  # [SECURED]
@@ -8447,16 +8565,29 @@ if __name__ == '__main__':
                 if task_id not in tasks:
                     raise HTTPException(status_code=404, detail='任务不存在')
                 task = tasks[task_id]
-            return JSONResponse(content={'status': task['status'], 'output': task.get('output', ''), 'returncode': task.get('returncode'), 'error': task.get('error')})
+                # 自动清理：保留最近50个已完成任务，防止tasks字典无限膨胀
+                if len(tasks) > 50:
+                    completed_ids = [k for k, v in tasks.items() if v.get('status') in ('completed', 'error', 'killed') and k != task_id]
+                    for old_id in completed_ids[:len(tasks) - 50]:
+                        tasks.pop(old_id, None)
+                        processes.pop(old_id, None)
+                output_text = task.get('output', '')
+                if len(output_text) > 500000:
+                    output_text = output_text[-500000:] + '\n\n[...输出已截断，仅保留最后500KB...]'
+            return JSONResponse(content={'status': task['status'], 'output': output_text, 'returncode': task.get('returncode'), 'error': task.get('error')})
 
         @app.get('/api/cookie')  # [SECURED]
         async def get_cookie_status():
             cookie_file = os.path.join(PROJECT_DIR, 'config', 'cookies.json')
-            if not os.path.exists(cookie_file):
+            def _load_cookie_json():
+                if not os.path.exists(cookie_file):
+                    return None
+                with open(cookie_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            cookies = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_cookie_json)
+            if cookies is None:
                 raise HTTPException(status_code=404, detail='Cookie文件不存在')
             try:
-                with open(cookie_file, 'r', encoding='utf-8') as f:
-                    cookies = json.load(f)
 
                 if not cookies or len(cookies) == 0:
                     raise HTTPException(status_code=404, detail='Cookie文件为空')
@@ -8494,22 +8625,29 @@ if __name__ == '__main__':
         @app.get('/api/sku/compare')  # [SECURED]
         async def compare_sku():
             try:
-                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                if not json_files:
+                def _load_sku_compare_data():
+                    json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+                    if not json_files:
+                        return None, None, None, None
+                    try:
+                        latest_json = max(json_files, key=os.path.getmtime)
+                    except (OSError, ValueError):
+                        return None, None, None, None
+                    with open(latest_json, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    products = data.get('商品列表', []) if isinstance(data, dict) else data
+                    json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                    input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
+                    txt_stock_numbers = []
+                    if os.path.exists(input_file):
+                        with open(input_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
+                    return data, json_stock_numbers, txt_stock_numbers, latest_json
+                data, json_stock_numbers, txt_stock_numbers, latest_json = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_sku_compare_data)
+                if data is None:
                     raise HTTPException(status_code=404, detail='没有找到JSON文件')
-                latest_json = max(json_files, key=os.path.getmtime)
-
-                with open(latest_json, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
-                json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
-
-                input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
-                txt_stock_numbers = []
-                if os.path.exists(input_file):
-                    with open(input_file, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        txt_stock_numbers = sorted(set(re.findall(r'\d+', content)))
 
                 json_set = set(json_stock_numbers)
                 txt_set = set(txt_stock_numbers)
@@ -8538,19 +8676,32 @@ if __name__ == '__main__':
         @app.api_route('/api/sku/compare/txt', methods=['GET', 'POST'])
         async def compare_sku_txt(request: Request):
             try:
-                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                if not json_files:
+                def _load_compare_txt_data():
+                    json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+                    if not json_files:
+                        return None, None, None, None
+                    try:
+                        latest_json = max(json_files, key=os.path.getmtime)
+                    except (OSError, ValueError):
+                        return None, None, None, None
+                    with open(latest_json, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    products = data.get('商品列表', []) if isinstance(data, dict) else data
+                    json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                    txt_stock_numbers_raw = []
+                    input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
+                    if os.path.exists(input_file):
+                        with open(input_file, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            txt_stock_numbers_raw = [s.strip() for s in content.split() if s.strip()]
+                    return data, json_stock_numbers, txt_stock_numbers_raw, latest_json
+                data, json_stock_numbers, txt_stock_numbers_raw, latest_json = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_compare_txt_data)
+                if data is None:
                     return jsonify({'error': '没有找到JSON文件'}, status_code=404)
-                latest_json = max(json_files, key=os.path.getmtime)
-
-                with open(latest_json, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
-                json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
 
-                txt_stock_numbers_raw = []
                 if request.method == 'POST':
-                    req_data = await request.json()  # [SECURITY] VALIDATED
+                    req_data = await request.json()
                     input_skus = req_data.get('skus', '')
 
                     if len(input_skus) > 50000:
@@ -8560,12 +8711,6 @@ if __name__ == '__main__':
 
                     if len(txt_stock_numbers_raw) > 10000:
                         return jsonify({'error': '货号数量过多（最大10000个）'}, status_code=400)
-                else:
-                    input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
-                    if os.path.exists(input_file):
-                        with open(input_file, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            txt_stock_numbers_raw = [s.strip() for s in content.split() if s.strip()]
                 
                 txt_stock_numbers = sorted(set(txt_stock_numbers_raw))
                 duplicates = StockNumberComparator.find_duplicate_stock_numbers(txt_stock_numbers_raw)
@@ -8607,8 +8752,10 @@ if __name__ == '__main__':
                 added_high_price = []
 
                 if os.path.exists(diff_log_file):
-                    with open(diff_log_file, 'r', encoding='utf-8') as f:
-                        diff_data = json.load(f)
+                    def _load_diff_log():
+                        with open(diff_log_file, 'r', encoding='utf-8') as _f:
+                            return json.load(_f)
+                    diff_data = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_diff_log)
                     if diff_data.get('logs'):
                         last_log = diff_data['logs'][-1]
                         added_products_all = last_log.get('added', [])
@@ -8669,65 +8816,75 @@ if __name__ == '__main__':
                 today = datetime.now().strftime('%Y%m%d')
                 diff_log_file = os.path.join(PROJECT_DIR, 'file', f'diff_log_{today}.json')
                 
-                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                json_files = [f for f in json_files if '_cache' not in f]
-                if not json_files:
+                def _load_sku_excel_data():
+                    json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+                    json_files = [f for f in json_files if '_cache' not in f]
+                    if not json_files:
+                        return None, None, None, None
+                    try:
+                        latest_json = max(json_files, key=os.path.getmtime)
+                    except (OSError, ValueError):
+                        return None, None, None, None
+                    with open(latest_json, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    products = data.get('商品列表', []) if isinstance(data, dict) else data
+                    json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                    excel_files_list, daily_profit_report = get_excel_files_with_report()
+                    return data, json_stock_numbers, (excel_files_list, daily_profit_report), latest_json
+                data, json_stock_numbers, excel_info, latest_json = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_sku_excel_data)
+                if data is None:
                     return jsonify({'error': '没有找到JSON文件'}, status_code=404)
-                latest_json = max(json_files, key=os.path.getmtime)
-                
-                with open(latest_json, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
-                json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
-                
-                excel_files_list, daily_profit_report = get_excel_files_with_report()
+                excel_files_list, daily_profit_report = excel_info
                 
                 excel_stock_numbers = []
 
-                for excel_file in excel_files_list:
-                    if os.path.exists(excel_file):
-                        try:
-
-                            excel_dfs = FileManager.safe_read_excel(excel_file, max_retries=3, retry_delay=1.0)
-                            if excel_dfs is None:
-                                logger.debug(f'无法读取Excel文件: {excel_file}')
-                                continue
-
-                            logger.debug(f'📂 处理Excel: {os.path.basename(excel_file)}, 平台: {platform}')
-                            logger.debug(f'   可用工作表: {list(excel_dfs.keys())}')
-
-                            for sheet_name, temp_df in excel_dfs.items():
-                                if platform in sheet_name:
-                                    logger.debug(f'✅ 找到"{platform}"工作表: {sheet_name}, 列数: {len(temp_df.columns)}, 行数: {len(temp_df)}')
-
-                                    if len(temp_df.columns) >= 5:
-                                        e_col_data = temp_df.iloc[:, 4].dropna()
-
-                                        valid_skus = []
-                                        for val in e_col_data:
-                                            val_str = str(val).strip()
-                                            if val_str and val_str != 'nan' and re.match(r'^[A-Za-z0-9]{3,10}$', val_str):
-                                                valid_skus.append(val_str)
-
-                                        if valid_skus:
-                                            excel_stock_numbers.extend(valid_skus)
-                                            logger.debug(f'✅ 从"{sheet_name}"的E列读取到 {len(valid_skus)} 个货号')
+                def _read_excel_skus():
+                    _skus = []
+                    _permission_error = None
+                    for excel_file in excel_files_list:
+                        if os.path.exists(excel_file):
+                            try:
+                                excel_dfs = FileManager.safe_read_excel(excel_file, max_retries=3, retry_delay=1.0)
+                                if excel_dfs is None:
+                                    logger.debug(f'无法读取Excel文件: {excel_file}')
+                                    continue
+                                logger.debug(f'📂 处理Excel: {os.path.basename(excel_file)}, 平台: {platform}')
+                                logger.debug(f'   可用工作表: {list(excel_dfs.keys())}')
+                                for sheet_name, temp_df in excel_dfs.items():
+                                    if platform in sheet_name:
+                                        logger.debug(f'✅ 找到"{platform}"工作表: {sheet_name}, 列数: {len(temp_df.columns)}, 行数: {len(temp_df)}')
+                                        if len(temp_df.columns) >= 5:
+                                            e_col_data = temp_df.iloc[:, 4].dropna()
+                                            valid_skus = []
+                                            for val in e_col_data:
+                                                val_str = str(val).strip()
+                                                if val_str and val_str != 'nan' and re.match(r'^[A-Za-z0-9]{3,10}$', val_str):
+                                                    valid_skus.append(val_str)
+                                            if valid_skus:
+                                                _skus.extend(valid_skus)
+                                                logger.debug(f'✅ 从"{sheet_name}"的E列读取到 {len(valid_skus)} 个货号')
+                                            else:
+                                                logger.debug(f'⚠️ "{sheet_name}"的E列没有有效货号数据')
                                         else:
-                                            logger.debug(f'⚠️ "{sheet_name}"的E列没有有效货号数据')
-                                    else:
-                                        logger.debug(f'⚠️ "{sheet_name}"列数不足5列，无法读取E列')
-
-                        except PermissionError as e:
-                            if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e):
-                                return jsonify({
-                                    'error': f'Excel文件被其他程序占用，请关闭后再试',
-                                    'detail': f'文件: {os.path.basename(excel_file)}',
-                                    'path': excel_file
-                                }), 423
-                            raise
-                        except Exception as e:
-                            logger.debug(f'读取Excel失败: {excel_file} - {e}')
-                            continue
+                                            logger.debug(f'⚠️ "{sheet_name}"列数不足5列，无法读取E列')
+                            except PermissionError as e:
+                                if "sharing violation" in str(e).lower() or "另一个程序" in str(e) or "正在使用" in str(e):
+                                    _permission_error = {
+                                        'error': f'Excel文件被其他程序占用，请关闭后再试',
+                                        'detail': f'文件: {os.path.basename(excel_file)}',
+                                        'path': excel_file
+                                    }
+                                    break
+                                logger.debug(f'读取Excel失败: {excel_file} - {e}')
+                                continue
+                            except Exception as e:
+                                logger.debug(f'读取Excel失败: {excel_file} - {e}')
+                                continue
+                    return _skus, _permission_error
+                excel_stock_numbers, _perm_err = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _read_excel_skus)
+                if _perm_err:
+                    return jsonify(_perm_err, status_code=423)
 
                 logger.debug(f'📊 [{platform}] 共读取到 {len(excel_stock_numbers)} 个货号')
 
@@ -8788,8 +8945,10 @@ if __name__ == '__main__':
                 added_high_price = []
                 
                 if os.path.exists(diff_log_file):
-                    with open(diff_log_file, 'r', encoding='utf-8') as f:
-                        diff_data = json.load(f)
+                    def _load_diff_log():
+                        with open(diff_log_file, 'r', encoding='utf-8') as _f:
+                            return json.load(_f)
+                    diff_data = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_diff_log)
                     if diff_data.get('logs'):
                         last_log = diff_data['logs'][-1]
                         added_products_all = last_log.get('added', [])
@@ -8853,13 +9012,22 @@ if __name__ == '__main__':
 
         @app.get('/api/products')  # [SECURED]
         async def get_all_products():
-            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-            if not json_files:
-                return jsonify({'error': '没有找到JSON文件'}, status_code=404)
-            latest_file = max(json_files, key=os.path.getmtime)
             try:
-                with open(latest_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                def _load_products_json():
+                    json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+                    if not json_files:
+                        return None, 'no_files'
+                    try:
+                        latest_file = max(json_files, key=os.path.getmtime)
+                    except (OSError, ValueError):
+                        return None, 'invalid_files'
+                    with open(latest_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    return data, os.path.basename(latest_file)
+                data, latest_filename = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_products_json)
+                if data is None:
+                    error_msg = '没有找到JSON文件' if latest_filename == 'no_files' else '没有找到有效的JSON文件'
+                    return jsonify({'error': error_msg}, status_code=404)
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
 
                 added_skus = set()
@@ -8952,7 +9120,7 @@ if __name__ == '__main__':
                 net_profit_rate = (net_profit / total_price * 100) if total_price > 0 else 0
                 
                 return jsonify({
-                    'filename': os.path.basename(latest_file),
+                    'filename': latest_filename,
                     'total': len(products),
                     'products': products[:500],
                     'totalPrice': f'¥{total_price:,.2f}',
@@ -8976,7 +9144,7 @@ if __name__ == '__main__':
                 if pd is None or openpyxl is None:
                     return jsonify({'error': 'pandas或openpyxl未安装，每日利润报表功能不可用'}, status_code=500)
                 
-                excel_files_list, daily_profit_report = get_excel_files_with_report()
+                excel_files_list, daily_profit_report = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, get_excel_files_with_report)
                 
                 table_data = []
                 all_records = []
@@ -8985,7 +9153,7 @@ if __name__ == '__main__':
                     if os.path.exists(excel_file):
                         try:
                             
-                            wb = openpyxl.load_workbook(excel_file, data_only=True)
+                            wb = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: openpyxl.load_workbook(excel_file, data_only=True))
                             sheet_name = '每日利润'
                             if sheet_name in wb.sheetnames:
                                 ws = wb[sheet_name]
@@ -9159,7 +9327,10 @@ if __name__ == '__main__':
             json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
             if not json_files:
                 return jsonify({'error': '没有找到JSON文件'}, status_code=404)
-            latest_file = max(json_files, key=os.path.getmtime)
+            try:
+                latest_file = max(json_files, key=os.path.getmtime)
+            except (OSError, ValueError):
+                return jsonify({'error': '没有找到有效的JSON文件'}, status_code=404)
             try:
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -9242,13 +9413,21 @@ if __name__ == '__main__':
             sku = sku.strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}, status_code=400)
-            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-            if not json_files:
-                return jsonify({'found': False, 'error': '没有找到JSON文件'})
-            latest_file = max(json_files, key=os.path.getmtime)
-            try:
+            def _load_product_json():
+                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+                if not json_files:
+                    return None, None
+                try:
+                    latest_file = max(json_files, key=os.path.getmtime)
+                except (OSError, ValueError):
+                    return None, None
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                return data, latest_file
+            data, latest_file = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_product_json)
+            if data is None:
+                return jsonify({'found': False, 'error': '没有找到JSON文件'})
+            try:
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 for p in products:
                     if str(p.get('货号')) == str(sku):
@@ -9342,13 +9521,21 @@ if __name__ == '__main__':
                 if parsed_min and parsed_max and parsed_min > parsed_max:
                     return jsonify({'error': '最低价不能大于最高价'}, status_code=400)
 
-            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-            if not json_files:
-                return jsonify({'error': '没有找到JSON文件'}, status_code=404)
-            latest_file = max(json_files, key=os.path.getmtime)
-            try:
+            def _load_search_json():
+                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+                if not json_files:
+                    return None, None
+                try:
+                    latest_file = max(json_files, key=os.path.getmtime)
+                except (OSError, ValueError):
+                    return None, None
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                return data, latest_file
+            data, latest_file = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_search_json)
+            if data is None:
+                return jsonify({'error': '没有找到JSON文件'}, status_code=404)
+            try:
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 
                 matched_products = []
@@ -9475,13 +9662,21 @@ if __name__ == '__main__':
                 safe_log(logger, 'warning', '[get_product_by_description] 检测到可疑字符 in description: {desc}', desc=description)
                 return JSONResponse(content={'error': '商品描述包含非法字符'}, status_code=400)
 
-            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-            if not json_files:
-                return jsonify({'found': False, 'error': '没有找到JSON文件'})
-            latest_file = max(json_files, key=os.path.getmtime)
-            try:
+            def _load_desc_json():
+                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
+                if not json_files:
+                    return None, None
+                try:
+                    latest_file = max(json_files, key=os.path.getmtime)
+                except (OSError, ValueError):
+                    return None, None
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                return data, latest_file
+            data, latest_file = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_desc_json)
+            if data is None:
+                return jsonify({'found': False, 'error': '没有找到JSON文件'})
+            try:
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 for p in products:
                     stored_desc = p.get('商品描述', '')
@@ -9516,7 +9711,7 @@ if __name__ == '__main__':
                 log_file = os.path.join(directory, 'clean_files.log')
 
                 log_stream = io.StringIO()
-                list_files(directory=directory, log_file=log_file, stream=log_stream)
+                await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: list_files(directory=directory, log_file=log_file, stream=log_stream))
 
                 return jsonify({'success': True, 'output': log_stream.getvalue()})
             except Exception as e:  # [HANDLED]
@@ -9538,7 +9733,7 @@ if __name__ == '__main__':
                 log_file = os.path.join(directory, 'clean_files.log')
 
                 log_stream = io.StringIO()
-                clean_old_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: clean_old_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream))
 
                 return jsonify({'success': True, 'output': log_stream.getvalue()})
             except Exception as e:  # [HANDLED]
@@ -9564,7 +9759,7 @@ if __name__ == '__main__':
                 log_file = os.path.join(directory, 'clean_files.log')
 
                 log_stream = io.StringIO()
-                clean_old_files_by_time(directory=directory, minutes=minutes, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: clean_old_files_by_time(directory=directory, minutes=minutes, dry_run=dry_run, log_file=log_file, stream=log_stream))
 
                 return jsonify({'success': True, 'output': log_stream.getvalue()})
             except Exception as e:  # [HANDLED]
@@ -9586,7 +9781,7 @@ if __name__ == '__main__':
                 log_file = os.path.join(directory, 'clean_files.log')
 
                 log_stream = io.StringIO()
-                clean_all_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: clean_all_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream))
 
                 output = log_stream.getvalue()
                 response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
@@ -9611,7 +9806,7 @@ if __name__ == '__main__':
                 log_file = os.path.join(directory, 'clean_files.log')
 
                 log_stream = io.StringIO()
-                clean_png_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: clean_png_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream))
                 
                 output = log_stream.getvalue()
                 response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
@@ -9636,7 +9831,7 @@ if __name__ == '__main__':
                 log_file = os.path.join(directory, 'clean_files.log')
 
                 log_stream = io.StringIO()
-                clean_media_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream)
+                await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: clean_media_files(directory=directory, dry_run=dry_run, log_file=log_file, stream=log_stream))
                 
                 output = log_stream.getvalue()
                 response_data = json.dumps({'success': True, 'output': output}, ensure_ascii=False)
@@ -9653,8 +9848,7 @@ if __name__ == '__main__':
         async def get_changelog():
             try:
                 readme_path = os.path.join(PROJECT_DIR, 'README.md')
-                with open(readme_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                content = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: open(readme_path, 'r', encoding='utf-8').read())
                 lines = content.split('\n')
                 changelog = []
                 current_entry = None
@@ -9953,7 +10147,7 @@ if __name__ == '__main__':
                             merged_changelog.append(entry)
                     changelog = merged_changelog
                 except Exception as git_err:  # [HANDLED]
-                    logger.debug(f'[api_changelog] Git历史合并跳过: {git_err}', file=sys.stderr)
+                    logger.debug(f'[api_changelog] Git历史合并跳过: {git_err}')
                 
                 for entry in changelog:
                     if not entry.get('changes') or len(entry['changes']) == 0:
@@ -10013,7 +10207,7 @@ if __name__ == '__main__':
                 
                 empty_changes_versions = [e.get('version','?') for e in changelog if not e.get('changes') or len(e['changes']) == 0]
                 if empty_changes_versions:
-                    logger.warning(f'[api_changelog] 发现{len(empty_changes_versions)}个空changes版本，正在修复: {empty_changes_versions}', file=sys.stderr)
+                    logger.warning(f'[api_changelog] 发现{len(empty_changes_versions)}个空changes版本，正在修复: {empty_changes_versions}')
                     for entry in changelog:
                         if not entry.get('changes') or len(entry['changes']) == 0:
                             entry['changes'] = [{
@@ -10027,15 +10221,15 @@ if __name__ == '__main__':
                 
                 result = {'success': True, 'changelog': changelog}
                 _debug_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                logger.debug(f'[{_debug_time}] [DEBUG] changelog API 返回: {len(changelog)} 个版本', file=sys.stderr)
+                logger.debug(f'[{_debug_time}] [DEBUG] changelog API 返回: {len(changelog)} 个版本')
                 if changelog:
-                    logger.debug(f'[{_debug_time}] [DEBUG] 最新版本: {changelog[0]["version"]}, 包含 {len(changelog[0]["changes"])} 个项目', file=sys.stderr)
+                    logger.debug(f'[{_debug_time}] [DEBUG] 最新版本: {changelog[0]["version"]}, 包含 {len(changelog[0]["changes"])} 个项目')
                     for idx, item in enumerate(changelog[0]['changes']):
-                        logger.debug(f'[{_debug_time}] [DEBUG]   项目{idx}: tag={item.get("tag")}, title={str(item.get("title", ""))[:50]}', file=sys.stderr)
+                        logger.debug(f'[{_debug_time}] [DEBUG]   项目{idx}: tag={item.get("tag")}, title={str(item.get("title", ""))[:50]}')
                 return jsonify(result)
             except Exception as e:  # [HANDLED]
                 _error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                logger.debug(f'[{_error_time}] [ERROR] changelog 解析失败: {e}', file=sys.stderr)
+                logger.debug(f'[{_error_time}] [ERROR] changelog 解析失败: {e}')
                 traceback.print_exc(file=sys.stderr)
                 logger.error(f'[api_changelog] 解析失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({'success': False, 'error': '更新日志解析失败'}, status_code=500)
@@ -10211,14 +10405,14 @@ if __name__ == '__main__':
                     return jsonify({'success': False, 'error': '收件人邮箱格式不正确'})
 
                 notifier = EmailNotifier()
-                notifier.save_email_config(
+                await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: notifier.save_email_config(
                     smtp_host=smtp_host.strip(),
                     smtp_port=smtp_port,
                     smtp_user=smtp_user,
                     smtp_password=smtp_password,
                     from_name=from_name[:64],
                     to_email=to_email.strip()
-                )
+                ))
                 return jsonify({'success': True, 'message': '邮件配置已保存'})
             except Exception as e:  # [HANDLED]
                 logger.error(f'[save_email_config] 保存失败: {type(e).__name__}: {e}', exc_info=True)
@@ -10264,7 +10458,7 @@ if __name__ == '__main__':
                     from_name=from_name[:64],
                     to_email=to_email.strip()
                 )
-                success = test_notifier.send_tunnel_notification('https://test.example.com', 'test')
+                success = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, lambda: test_notifier.send_tunnel_notification('https://test.example.com', 'test'))
                 if success:
                     return jsonify({'success': True, 'message': '测试邮件发送成功'})
                 else:
@@ -10726,11 +10920,9 @@ if __name__ == '__main__':
                             try:
                                 lan_ip = PathManager.get_lan_ip()
                                 port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
-                                append_text = ""
                                 if lan_ip:
-                                    append_text += f"局域网地址: http://{lan_ip}:{port}\n"
-                                append_text += f"Public URL: {web_url}\n"
-                                FileManager.append_text(web_output_file, append_text)
+                                    log_print(f"局域网地址: http://{lan_ip}:{port}")
+                                log_print(f"Public URL: {web_url}")
                             except Exception as e:  # [HANDLED]
                                 _module_logger.debug(f'静默异常: {type(e).__name__}: {e}', exc_info=True)
                                 
@@ -10994,13 +11186,9 @@ if __name__ == '__main__':
                                         try:
                                             lan_ip = PathManager.get_lan_ip()
                                             port = args.port if 'args' in dir() and hasattr(args, 'port') else int(os.environ.get('WEB_PORT', '8888'))
-                                            web_output_file = PathManager.get_web_output_file()
-                                            append_text = ""
                                             if lan_ip:
-                                                append_text += f"局域网地址: http://{lan_ip}:{port}\n"
-                                            append_text += f"Public URL: {file_url}\n"
-                                            FileManager.append_text(web_output_file, append_text)
-                                            logger.debug(f"[Tunnel] 已写入 web_output.log")
+                                                log_print(f"局域网地址: http://{lan_ip}:{port}")
+                                            log_print(f"Public URL: {file_url}")
                                         except Exception as e:  # [HANDLED]
                                             logger.debug(f"Tunnel log write error: {e}")
                                         
@@ -12197,7 +12385,7 @@ ingress:
         
         while retry_count < max_retries:
             try:
-                uvicorn.run(app, host=web_host, port=args.port, log_level="info")
+                uvicorn.run(app, host=web_host, port=args.port, log_level="info", timeout_keep_alive=30, limit_concurrency=200, limit_max_requests=5000)
                 break
             except retryable_errors as e:
                 error_type = type(e).__name__

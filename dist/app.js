@@ -1540,6 +1540,10 @@
         checkCookieStatus();
         
         function resetButtons() {
+            if (typeof pollingInterval !== 'undefined' && pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
             currentTaskId = null;
             currentChoice = null;
             document.querySelectorAll('.btn-run').forEach(b => {
@@ -1595,8 +1599,30 @@
         }
         
         window.pollOutput = function() {
+            if (!currentTaskId) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                return;
+            }
             fetch('/output/' + currentTaskId)
-            .then(response => safeParseJson(response))
+            .then(response => {
+                if (response.status === 429) {
+                    console.warn('pollOutput 被限流(429)，暂停轮询');
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    return { status: 'error', error: '请求过于频繁，已暂停轮询' };
+                }
+                if (!response.ok && response.status !== 200) {
+                    console.warn('pollOutput 收到非200响应:', response.status);
+                    if (response.status === 404) {
+                        clearInterval(pollingInterval);
+                        pollingInterval = null;
+                        currentTaskId = null;
+                        return { status: 'error', error: '任务不存在' };
+                    }
+                }
+                return safeParseJson(response);
+            })
             .then(data => {
                 const outputDiv = document.getElementById('output-content');
                 const statusDiv = document.getElementById('output-status');
@@ -1698,6 +1724,10 @@
             })
             .catch(error => {
                 console.error('pollOutput 出错:', error);
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                currentTaskId = null;
+                currentChoice = null;
             });
         }
         
