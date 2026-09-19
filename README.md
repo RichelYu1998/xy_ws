@@ -199,9 +199,9 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
-### v5.0.9.70 (2026-09-19) - 🛡️ **启动脚本生产级加固: 健康检查+自动重启系统** - run.bat新增Web服务健康检查(15s间隔+连续3次失败触发)+自动重启机制(最多10次+10s冷却+60s启动超时)+进程残留清理(python.exe/cloudflared.exe)+run.sh同步实现相同自动重启逻辑+详细日志输出[HealthCheck/AutoRestart]
+### v5.0.9.70 (2026-09-19) - 🛡️ **启动脚本生产级加固+Playwright子进程权限修复** - run.bat新增Web服务健康检查(15s间隔+连续3次失败触发)+自动重启机制(最多10次+10s冷却+60s启动超时)+进程残留清理(python.exe/cloudflared.exe)+run.sh同步+修复Web子进程模式下Playwright启动PermissionError(stderr管道句柄无法继承→重定向到真实文件)
 
-> **Commit**: ed8dd2b4
+> **Commit**: ed8dd2b4, eebc47c1, f7e29a79
 
 #### 更新内容:
 1. **run.bat健康检查系统**: 新增`:check_web_health`函数，每15秒通过curl检测localhost:WEB_PORT的HTTP状态码(200/302判定为正常)，连续3次失败(HEALTH_MAX_FAILS=3)触发自动重启
@@ -210,6 +210,7 @@ bandit -r . -f json -o bandit_report.json
 4. **进程清理增强**: 重启前强制终止python.exe main.py和cloudflared.exe进程，避免端口占用和资源泄漏
 5. **启动验证机制**: 重启后60秒内持续检测HTTP状态码，200/302判定为成功，超时则记录警告日志但不影响后续运行
 6. **日志标准化**: 所有HealthCheck和AutoRestart事件统一使用[YYYY-MM-DD HH:MM:SS.mmm]时间戳格式，便于问题排查和运维监控
+7. **Playwright子进程PermissionError修复**: 当Web服务通过subprocess.Popen(stderr=STDOUT)启动爬虫时，stderr管道句柄无法被Playwright的node.exe孙进程继承，导致CreateProcess失败报WinError 5拒绝访问；在main.py入口处检测非Web模式且stderr非终端时，将stderr重定向到真实日志文件(file/stderr_subprocess.log)，使sys.stderr.fileno()返回可继承的文件句柄
 
 ##### 1. 🛡️ run.bat Web服务健康检查系统 (15s间隔+3次失败触发)
 **问题描述**:
@@ -252,6 +253,23 @@ bandit -r . -f json -o bandit_report.json
 - ✅ 进程清理: 重启前tasklist确认python.exe/cloudflared.exe已被终止
 - ✅ 冷却机制: 强制sleep 10秒生效，避免秒级重启导致端口未释放
 - ✅ 跨平台一致性: run.bat(Windows)和run.sh(Linux/MacOS)行为完全一致
+
+##### 3. 🐛 Playwright子进程PermissionError修复 (WinError 5拒绝访问)
+**问题描述**:
+- **现象**: 通过Web服务/api/run端点启动爬虫任务时，Playwright启动浏览器失败，报错PermissionError: [WinError 5] 拒绝访问，堆栈指向asyncio.create_subprocess_exec→_winapi.CreateProcess
+- **根因**: [main.py](main.py#L3413)的run_command_background使用subprocess.Popen(stderr=subprocess.STDOUT)启动爬虫子进程，子进程的stderr是管道句柄；Playwright通过sys.stderr.fileno()获取句柄并传给node.exe孙进程，Windows管道句柄不可被孙进程继承，CreateProcess调用失败
+- **影响范围**: 所有通过Web界面启动的爬虫任务(任务1爬虫/任务4更新Cookie等)，完全无法使用浏览器自动化功能
+
+**修复方案**:
+- **技术实现(stderr重定向)**: 在[main.py#L7679-L7695](main.py#L7679-L7695)的__main__入口处，检测非--web模式且sys.stderr.isatty()==False时，将sys.stderr重定向到file/stderr_subprocess.log真实文件，使fileno()返回可继承的文件句柄
+- **技术实现(Web模式豁免)**: --web模式不重定向，uvicorn需要正常stderr输出
+- **参考位置**: 修改文件: main.py(+17行，位于if __name__ == '__main__'入口处)
+
+**测试验证**:
+- ✅ 功能验证: 以subprocess(stderr=STDOUT)方式运行python main.py --task 1，Playwright正常启动浏览器，成功获取94个商品，返回码0
+- ✅ 错误消除: 不再出现PermissionError: [WinError 5] 拒绝访问
+- ✅ 兼容性: 直接终端运行(非子进程)不受影响，stderr仍为终端
+- ✅ Web模式: --web模式stderr保持原样，uvicorn日志正常输出
 
 ### v5.0.9.69 (2026-09-19) - 🐛 **服务器崩溃预防全面修复** - 修复logger.debug(file=sys.stderr)导致/api/changelog 500错误(6处)+修复latest_json变量作用域NameError(3个路由)+修复lambda json.load(open())文件句柄泄漏(2处)+修复FastAPI不兼容return jsonify(),423写法+事件循环看门狗+ThreadPoolExecutor阻塞操作卸载+内存泄漏防护+速率限制+日志标准化
 

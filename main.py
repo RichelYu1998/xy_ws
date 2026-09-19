@@ -2805,6 +2805,18 @@ _blocking_io_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix='bl
 _loop_watchdog_last_tick = time.time()
 _LOOP_WATCHDOG_THRESHOLD = 30
 _loop_watchdog_alerted = False
+_MEM_WATCHDOG_THRESHOLD_MB = 1500
+
+def _get_process_memory_mb():
+    try:
+        import psutil
+        return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+    except Exception:
+        try:
+            import resource
+            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+        except Exception:
+            return 0
 
 def _loop_watchdog():
     global _loop_watchdog_alerted
@@ -2828,6 +2840,17 @@ def _loop_watchdog():
                     os._exit(1)
         else:
             _loop_watchdog_alerted = False
+
+        mem_mb = _get_process_memory_mb()
+        if mem_mb > _MEM_WATCHDOG_THRESHOLD_MB:
+            _msg = f"[mem_watchdog] 🚨 进程内存 {mem_mb:.0f}MB 超过阈值 {_MEM_WATCHDOG_THRESHOLD_MB}MB，准备重启..."
+            logger.critical(_msg)
+            log_print(_msg)
+            try:
+                import signal
+                os.kill(os.getpid(), signal.SIGTERM)
+            except Exception:
+                os._exit(1)
 
 async def _tick_watchdog():
     while True:
@@ -2854,11 +2877,13 @@ async def lifespan(app):
         exc_info=(args.exc_type, args.exc_value, args.exc_traceback)
     )
     logger.info("[crash_protection] asyncio exception handler + threading.excepthook 已安装")
+    log_print("[crash_protection] asyncio exception handler + threading.excepthook 已安装")
 
     watchdog_thread = threading.Thread(target=_loop_watchdog, daemon=True, name='loop_watchdog')
     watchdog_thread.start()
     watchdog_task = asyncio.create_task(_tick_watchdog())
     logger.info("[crash_protection] 事件循环看门狗已启动（阈值 %ds）", _LOOP_WATCHDOG_THRESHOLD)
+    log_print(f"[crash_protection] 事件循环看门狗已启动（阈值 {_LOOP_WATCHDOG_THRESHOLD}s）")
 
     yield
 
@@ -7650,7 +7675,25 @@ if not Environment.IS_WINDOWS:
     signal.signal(signal.SIGINT, signal_handler)
 if __name__ == '__main__':
     check_python_version((3, 0))  # Python 版本兼容性检查 (>=3.0)
-    
+
+    # 修复：当作为子进程运行时（stderr 被重定向为管道），Playwright 启动 node.exe
+    # 会因无法继承管道句柄而报 PermissionError [WinError 5]。
+    # 将 stderr 重定向到真实文件，使 sys.stderr.fileno() 返回可继承的文件句柄。
+    # Web 服务模式不重定向（uvicorn 需要正常 stderr）。
+    _is_web_mode = '--web' in sys.argv
+    if not _is_web_mode and sys.stderr is not None:
+        try:
+            _is_tty = sys.stderr.isatty()
+        except Exception:
+            _is_tty = False
+        if not _is_tty:
+            try:
+                _stderr_log = os.path.join(PathManager.get_file_dir(), 'stderr_subprocess.log')
+                _stderr_fh = open(_stderr_log, 'a', encoding='utf-8', buffering=1)
+                sys.stderr = _stderr_fh
+            except Exception:
+                pass
+
     parser = argparse.ArgumentParser(description='Szwego商品爬虫')
     parser.add_argument('--web', action='store_true', help='启动Web服务模式')
     parser.add_argument('--port', type=int, default=int(os.environ.get('WEB_PORT', '8888')), help=f'Web服务端口 (默认{os.environ.get("WEB_PORT", "8888")})')
@@ -12385,7 +12428,7 @@ ingress:
         
         while retry_count < max_retries:
             try:
-                uvicorn.run(app, host=web_host, port=args.port, log_level="info", timeout_keep_alive=30, limit_concurrency=200, limit_max_requests=5000)
+                uvicorn.run(app, host=web_host, port=args.port, log_level="info", timeout_keep_alive=30, limit_concurrency=200)
                 break
             except retryable_errors as e:
                 error_type = type(e).__name__
