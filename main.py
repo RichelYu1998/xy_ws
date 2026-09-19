@@ -9683,6 +9683,15 @@ if __name__ == '__main__':
                         if current_entry:
                             if current_change:
                                 current_entry['changes'].append(current_change)
+                            if not current_entry['changes']:
+                                current_entry['changes'] = [{
+                                    'id': '1',
+                                    'title': current_entry.get('title', '版本更新'),
+                                    'tag': '📝版本更新',
+                                    'problem': {},
+                                    'solution': {},
+                                    'verification': []
+                                }]
                             changelog.append(current_entry)
                         current_entry = {
                             'version': version_match.group(1),
@@ -9751,6 +9760,15 @@ if __name__ == '__main__':
                 if current_entry:
                     if current_change:
                         current_entry['changes'].append(current_change)
+                    if not current_entry['changes']:
+                        current_entry['changes'] = [{
+                            'id': '1',
+                            'title': current_entry.get('title', '版本更新'),
+                            'tag': '📝版本更新',
+                            'problem': {},
+                            'solution': {},
+                            'verification': []
+                        }]
                     changelog.append(current_entry)
                 readme_version_map = {entry['version']: entry for entry in changelog}
                 readme_versions_used = set()
@@ -11403,6 +11421,25 @@ ingress:
             if not cf_binary:
                 return {"success": False, "error": "未找到 cloudflared"}
 
+            with _cf_state_lock:
+                if cf_process and cf_process.poll() is None:
+                    log_print("[Cloudflare] 🧹 检测到旧 CF 进程正在运行，尝试终止...")
+                    try:
+                        cf_process.terminate()
+                        try:
+                            cf_process.wait(timeout=5)
+                            log_print("[Cloudflare] ✅ 旧 CF 进程已正常终止")
+                        except Exception:
+                            cf_process.kill()
+                            log_print("[Cloudflare] ⚠️ 旧 CF 进程强制终止")
+                    except Exception as e:  # [HANDLED]
+                        log_print(f"[Cloudflare] ⚠️ 终止旧进程异常: {e}")
+                    cf_process = None
+                    cf_url = None
+                    time.sleep(1)
+
+            Environment.kill_process_by_name('cloudflared.exe')
+
             named_config = _detect_named_tunnel_config()
 
             if named_config['available']:
@@ -11506,6 +11543,31 @@ ingress:
                             
                             log_print(f"[Cloudflare] ❌ Plan B 失败: Quick Tunnel 进程退出 (code: {_proc.returncode})")
                             log_print(f"[Cloudflare] 📋 进程输出 (前500字符): {_output[:500]}")
+
+                            _sock = None
+                            try:
+                                _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                                _sock.settimeout(1)
+                                _result = _sock.connect_ex(('localhost', port))
+                                if _result == 0:
+                                    log_print(f"[Cloudflare] ⚠️ 端口 {port} 已被占用，可能存在冲突")
+                                else:
+                                    log_print(f"[Cloudflare] ℹ️ 端口 {port} 未被占用")
+                            except Exception as _se:
+                                log_print(f"[Cloudflare] ⚠️ 检测端口失败: {_se}")
+                            finally:
+                                if _sock:
+                                    _sock.close()
+
+                            try:
+                                _result = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq cloudflared.exe'], capture_output=True, text=True, timeout=5)
+                                if 'cloudflared.exe' in _result.stdout:
+                                    log_print(f"[Cloudflare] ⚠️ 检测到其他 cloudflared 进程正在运行:\n{_result.stdout}")
+                                else:
+                                    log_print(f"[Cloudflare] ✅ 无其他 cloudflared 进程")
+                            except Exception as _pe:
+                                log_print(f"[Cloudflare] ⚠️ 检查进程列表失败: {_pe}")
+
                             return {"success": False, "error": f"Plan B 也失败了: Quick Tunnel 进程退出 (code: {_proc.returncode})"}
 
                         try:

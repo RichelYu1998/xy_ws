@@ -283,6 +283,7 @@ call :log_blank
 call :log [*] 清理残留进程...
 call :kill_process_safe python.exe main.py
 call :kill_process_safe hostc.exe
+call :kill_process_safe cloudflared.exe
 ping -n 2 127.0.0.1 >nul 2>&1
 
 call :wait_for_port !WEB_PORT! 10
@@ -1085,5 +1086,6 @@ call :log_blank
 call :log 正在清理进程...
 call :kill_process_safe python.exe main.py
 call :kill_process_safe hostc.exe
+call :kill_process_safe cloudflared.exe
 call :log 清理完成
 goto :eof
