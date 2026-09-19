@@ -201,7 +201,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.68 (2026-09-19) - 🧹 **进程残留清理系统+代码规范修复** - 彻底解决Cloudflare Tunnel启动失败问题(run.bat添加cloudflared.exe进程清理+main.py启动前主动清理旧进程+增强错误诊断输出)+Python Import规范修复(移除函数内部重复import)
 
-> **Commit**: 待提交
+> **Commit**: 3f111a32
 
 #### 更新内容:
 1. **run.bat启动清理增强**: 在启动和退出时自动清理cloudflared.exe残留进程（原仅清理python.exe和hostc.exe），彻底解决旧进程占用导致CF Tunnel连续失败50次的问题

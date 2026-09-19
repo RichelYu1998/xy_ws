@@ -16,6 +16,8 @@ import re
 import sys
 import json
 import time
+import stat
+import platform
 import threading
 import asyncio
 from datetime import datetime
@@ -851,11 +853,9 @@ class SecurityAuditor:
         else:
             # 检查2: Salt文件权限（仅Linux/Mac检查，Windows使用ACL）
             try:
-                import platform
                 current_os = platform.system().lower()
 
-                if current_os in ['linux', 'darwin']:  # Linux or macOS
-                    import stat
+                if current_os in ['linux', 'darwin']:
                     salt_stat = salt_file.stat()
                     mode = oct(salt_stat.st_mode)[-3:]
                     if mode not in ['400', '600', '644']:
@@ -869,7 +869,6 @@ class SecurityAuditor:
                             code_snippet=f"Salt file permissions: {mode}"
                         ))
                 elif current_os == 'windows':
-                    # Windows系统：检查文件是否具有适当的NTFS权限
                     try:
                         import ntsecuritycon as con
                         import win32security
@@ -922,8 +921,6 @@ class SecurityAuditor:
                         # 权限检查失败但不影响主流程
                         print(f"    ℹ️  Windows权限详细检查跳过: {perm_error}")
                 else:
-                    # 其他Unix-like系统
-                    import stat
                     salt_stat = salt_file.stat()
                     mode = oct(salt_stat.st_mode)[-3:]
                     if mode not in ['400', '600', '644']:

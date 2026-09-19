@@ -183,6 +183,7 @@ pre_launch() {
     log "[*] 清理残留进程..."
     pkill -9 -f "python.*main.py" 2>/dev/null || true
     pkill -9 -f "hostc" 2>/dev/null || true
+    pkill -9 -f "cloudflared" 2>/dev/null || true
     sleep 1
 
     wait_for_port $WEB_PORT 10
@@ -1299,6 +1300,7 @@ cleanup_exit() {
     log "正在清理进程..."
     pkill -9 -f "python.*main.py" 2>/dev/null || true
     pkill -9 -f "hostc" 2>/dev/null || true
+    pkill -9 -f "cloudflared" 2>/dev/null || true
     if [ -n "$CLEANUP_PID" ]; then
         kill $CLEANUP_PID 2>/dev/null || true
     fi
