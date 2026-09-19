@@ -201,7 +201,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.70 (2026-09-19) - 🛡️ **启动脚本生产级加固+Playwright子进程权限修复** - run.bat新增Web服务健康检查(15s间隔+连续3次失败触发)+自动重启机制(最多10次+10s冷却+60s启动超时)+进程残留清理(python.exe/cloudflared.exe)+run.sh同步+修复Web子进程模式下Playwright启动PermissionError(stderr管道句柄无法继承→重定向到真实文件)
 
-> **Commit**: ed8dd2b4, eebc47c1, f7e29a79
+> **Commit**: ed8dd2b4, eebc47c1, f7e29a79, 292e7250
 
 #### 更新内容:
 1. **run.bat健康检查系统**: 新增`:check_web_health`函数，每15秒通过curl检测localhost:WEB_PORT的HTTP状态码(200/302判定为正常)，连续3次失败(HEALTH_MAX_FAILS=3)触发自动重启
