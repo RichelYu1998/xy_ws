@@ -201,7 +201,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.69 (2026-09-19) - 🐛 **服务器崩溃预防全面修复** - 修复logger.debug(file=sys.stderr)导致/api/changelog 500错误(6处)+修复latest_json变量作用域NameError(3个路由)+修复lambda json.load(open())文件句柄泄漏(2处)+修复FastAPI不兼容return jsonify(),423写法+事件循环看门狗+ThreadPoolExecutor阻塞操作卸载+内存泄漏防护+速率限制+日志标准化
 
-> **Commit**: 待生成
+> **Commit**: c72d7a70
 
 #### 更新内容:
 1. **logger.debug(file=sys.stderr) TypeError修复**: 移除6处logging调用中非法的file=sys.stderr参数(file是print()的参数不是logging的参数)，彻底解决/api/changelog每次请求500 Internal Server Error
