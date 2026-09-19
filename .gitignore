@@ -55,6 +55,9 @@ get*.py
 # Fix scripts (temporary, not to be uploaded)
 fix*.py
 
+# Exception: Official automation tools (should be committed)
+!test/fix_readme_and_sync.py
+
 # Version file (managed in code, not standalone)
 version.txt
 
