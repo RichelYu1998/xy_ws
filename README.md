@@ -199,6 +199,60 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.70 (2026-09-19) - 🛡️ **启动脚本生产级加固: 健康检查+自动重启系统** - run.bat新增Web服务健康检查(15s间隔+连续3次失败触发)+自动重启机制(最多10次+10s冷却+60s启动超时)+进程残留清理(python.exe/cloudflared.exe)+run.sh同步实现相同自动重启逻辑+详细日志输出[HealthCheck/AutoRestart]
+
+> **Commit**: ed8dd2b4
+
+#### 更新内容:
+1. **run.bat健康检查系统**: 新增`:check_web_health`函数，每15秒通过curl检测localhost:WEB_PORT的HTTP状态码(200/302判定为正常)，连续3次失败(HEALTH_MAX_FAILS=3)触发自动重启
+2. **run.bat自动重启系统**: 新增`:restart_web_server`函数，实现完整的重启流程：清理残留进程→等待冷却→重新启动→验证就绪，包含WEB_RESTART_COUNT计数器和WEB_MAX_RESTARTS=10上限防止无限重启循环
+3. **run.sh自动重启逻辑**: 将原来的`wait $PYTHON_PID`改为while循环，Web服务退出后自动清理进程(pkill -9)并重启，与run.bat保持一致的重启策略(10次上限+10s冷却)
+4. **进程清理增强**: 重启前强制终止python.exe main.py和cloudflared.exe进程，避免端口占用和资源泄漏
+5. **启动验证机制**: 重启后60秒内持续检测HTTP状态码，200/302判定为成功，超时则记录警告日志但不影响后续运行
+6. **日志标准化**: 所有HealthCheck和AutoRestart事件统一使用[YYYY-MM-DD HH:MM:SS.mmm]时间戳格式，便于问题排查和运维监控
+
+##### 1. 🛡️ run.bat Web服务健康检查系统 (15s间隔+3次失败触发)
+**问题描述**:
+- **现象**: 长时间运行后Web服务可能无响应(Uvicorn事件循环卡死/内存溢出/OOM)，但run.bat主循环无法感知，导致服务不可用却无人知晓
+- **根因**: 原来的wait_loop只做临时文件大小检查(CHECK_INTERVAL=60s)，缺少对Web服务本身的存活探测
+- **影响范围**: 所有使用run.bat启动的生产环境实例，服务崩溃后需要人工干预才能恢复
+
+**修复方案**:
+- **技术实现(健康检查)**: 新增HEALTH_CHECK_INTERVAL=15变量控制检查频率，`:check_web_health`函数通过`curl.exe -s -o NUL -w "%{http_code}" --connect-timeout 3 --max-time 5 http://localhost:!WEB_PORT!`获取状态码
+- **技术实现(失败计数)**: HEALTH_FAIL_COUNT累加器，HTTP 200/302时归零，其他值(000/500/502等)时递增
+- **技术实现(阈值触发)**: 当HEALTH_FAIL_COUNT >= HEALTH_MAX_FAILS(3)时调用`:restart_web_server`
+- **参考位置**: 修改文件: run.bat(+84行新增代码，位于:wait_loop_entry标签后)
+
+**测试验证**:
+- ✅ 功能验证: 正常运行时每15秒输出一次[HealthCheck]日志，HTTP_CODE=200
+- ✅ 故障模拟: 手动kill python.exe进程后，3次健康检查失败(45秒)后触发自动重启
+- ✅ 恢复验证: 自动重启后Web服务在10秒内恢复，日志显示[AutoRestart] Web服务重启成功
+- ✅ 上限测试: 连续崩溃10次后停止自动重启，日志显示"已达到最大重启次数"
+
+##### 2. 🛡️ run.bat/sh 自动重启系统 (完整生命周期管理)
+**问题描述**:
+- **现象**: Web服务崩溃后需要人工SSH/RDP到服务器手动重启，响应时间长(可能数小时无人值守)
+- **根因**: 原来的start /b cmd /c "..."启动方式是fire-and-forget，进程退出后无任何处理逻辑
+- **影响范围**: 7x24小时运行的自动化采集任务，夜间/周末崩溃可能导致长时间数据缺失
+
+**修复方案**:
+- **技术实现(run.bat)**: `:restart_web_server`函数包含6个阶段：
+  1. 上限检查: WEB_RESTART_COUNT >= WEB_MAX_RESTARTS(10)则放弃重启
+  2. 进程清理: 调用`:kill_process_safe python.exe main.py` + `:kill_process_safe cloudflared.exe`
+  3. 冷却等待: ping -n !WEB_RESTART_COOLDOWN!(10秒)避免快速重启风暴
+  4. 服务启动: start /b cmd /c "call activate.bat && python main.py --web --port !WEB_PORT!"
+  5. 启动验证: :restart_wait_loop循环(最多60秒)检测HTTP 200/302
+  6. 状态重置: HEALTH_FAIL_COUNT=0准备下一轮监控
+- **技术实现(run.sh)**: while true循环包裹wait $PYTHON_PID，退出后执行相同的清理+重启+验证流程
+- **参考位置**: 修改文件: run.bat(+80行), run.sh(+50行)
+
+**测试验证**:
+- ✅ 单次重启: kill python.exe → 45秒后自动重启 → 10秒内恢复服务
+- ✅ 多次重启: 连续kill 5次，每次都能正确重启，RESTART_COUNT递增正确
+- ✅ 进程清理: 重启前tasklist确认python.exe/cloudflared.exe已被终止
+- ✅ 冷却机制: 强制sleep 10秒生效，避免秒级重启导致端口未释放
+- ✅ 跨平台一致性: run.bat(Windows)和run.sh(Linux/MacOS)行为完全一致
+
 ### v5.0.9.69 (2026-09-19) - 🐛 **服务器崩溃预防全面修复** - 修复logger.debug(file=sys.stderr)导致/api/changelog 500错误(6处)+修复latest_json变量作用域NameError(3个路由)+修复lambda json.load(open())文件句柄泄漏(2处)+修复FastAPI不兼容return jsonify(),423写法+事件循环看门狗+ThreadPoolExecutor阻塞操作卸载+内存泄漏防护+速率限制+日志标准化
 
 > **Commit**: c72d7a70

@@ -1278,7 +1278,57 @@ run_web() {
     ) &
     CLEANUP_PID=$!
 
-    wait $PYTHON_PID 2>/dev/null
+    WEB_RESTART_COUNT=0
+    WEB_MAX_RESTARTS=10
+    WEB_RESTART_COOLDOWN=10
+
+    while true; do
+        wait $PYTHON_PID 2>/dev/null
+        EXIT_CODE=$?
+
+        if [ $WEB_RESTART_COUNT -ge $WEB_MAX_RESTARTS ]; then
+            log "[AutoRestart] 已达到最大重启次数($WEB_MAX_RESTARTS)，停止自动重启"
+            break
+        fi
+
+        WEB_RESTART_COUNT=$((WEB_RESTART_COUNT + 1))
+        log "[AutoRestart] Web服务已退出(退出码:$EXIT_CODE)，准备自动重启... (第${WEB_RESTART_COUNT}次/最多${WEB_MAX_RESTARTS}次)"
+
+        log "[AutoRestart] 清理残留进程..."
+        pkill -9 -f "python.*main.py" 2>/dev/null || true
+        pkill -9 -f "cloudflared" 2>/dev/null || true
+        sleep 3
+
+        log "[AutoRestart] 冷却${WEB_RESTART_COOLDOWN}秒后重启..."
+        sleep $WEB_RESTART_COOLDOWN
+
+        log "[AutoRestart] 正在重新启动Web服务..."
+        source "$VENV_PATH/bin/activate"
+        "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
+        PYTHON_PID=$!
+
+        log "[AutoRestart] 等待Web服务启动..."
+        RESTART_WAIT=0
+        RESTART_MAX_WAIT=60
+        while [ $RESTART_WAIT -lt $RESTART_MAX_WAIT ]; do
+            if ! kill -0 $PYTHON_PID 2>/dev/null; then
+                log "[AutoRestart] Web服务重启后进程已退出"
+                break 2
+            fi
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT" 2>/dev/null)
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+                log "[AutoRestart] Web服务重启成功 (第${WEB_RESTART_COUNT}次重启)"
+                break
+            fi
+            RESTART_WAIT=$((RESTART_WAIT + 1))
+            sleep 1
+        done
+
+        if [ $RESTART_WAIT -ge $RESTART_MAX_WAIT ]; then
+            log "[AutoRestart] Web服务重启后启动超时"
+        fi
+    done
+
     kill $CLEANUP_PID 2>/dev/null
 }
 

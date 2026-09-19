@@ -1062,15 +1062,99 @@ call :log_blank_console_only
 :wait_loop_entry
 set "CHECK_INTERVAL=60"
 set "CHECK_COUNTER=0"
+set "HEALTH_CHECK_INTERVAL=15"
+set "HEALTH_COUNTER=0"
+set "HEALTH_FAIL_COUNT=0"
+set "HEALTH_MAX_FAILS=3"
+set "WEB_RESTART_COUNT=0"
+set "WEB_MAX_RESTARTS=10"
+set "WEB_RESTART_COOLDOWN=10"
 
 :wait_loop
 ping -n 2 127.0.0.1 >nul 2>&1
 set /a CHECK_COUNTER+=1
+set /a HEALTH_COUNTER+=1
 if !CHECK_COUNTER! geq !CHECK_INTERVAL! (
     set "CHECK_COUNTER=0"
     call :check_temp_size
 )
+if !HEALTH_COUNTER! geq !HEALTH_CHECK_INTERVAL! (
+    set "HEALTH_COUNTER=0"
+    call :check_web_health
+)
 goto wait_loop
+
+:check_web_health
+set "HTTP_CODE="
+for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" --connect-timeout 3 --max-time 5 http://localhost:!WEB_PORT! 2^>nul') do set "HTTP_CODE=%%i"
+if not defined HTTP_CODE set "HTTP_CODE=000"
+if "!HTTP_CODE!"=="200" (
+    if !HEALTH_FAIL_COUNT! gtr 0 (
+        call :ms_timestamp
+        call :log [!TIMESTAMP!] [HealthCheck] Web服务恢复正常 (此前连续!HEALTH_FAIL_COUNT!次失败)
+    )
+    set "HEALTH_FAIL_COUNT=0"
+    goto :eof
+)
+if "!HTTP_CODE!"=="302" (
+    if !HEALTH_FAIL_COUNT! gtr 0 (
+        call :ms_timestamp
+        call :log [!TIMESTAMP!] [HealthCheck] Web服务恢复正常 (此前连续!HEALTH_FAIL_COUNT!次失败)
+    )
+    set "HEALTH_FAIL_COUNT=0"
+    goto :eof
+)
+set /a HEALTH_FAIL_COUNT+=1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [HealthCheck] Web服务无响应 (HTTP !HTTP_CODE!, 连续第!HEALTH_FAIL_COUNT!次失败)
+if !HEALTH_FAIL_COUNT! geq !HEALTH_MAX_FAILS! (
+    call :restart_web_server
+)
+goto :eof
+
+:restart_web_server
+if !WEB_RESTART_COUNT! geq !WEB_MAX_RESTARTS! (
+    call :ms_timestamp
+    call :log [!TIMESTAMP!] [AutoRestart] 已达到最大重启次数(!WEB_MAX_RESTARTS!)，停止自动重启
+    set "HEALTH_FAIL_COUNT=0"
+    goto :eof
+)
+set /a WEB_RESTART_COUNT+=1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [AutoRestart] Web服务崩溃，准备自动重启... (第!WEB_RESTART_COUNT!次/最多!WEB_MAX_RESTARTS!次)
+call :kill_process_safe python.exe main.py
+call :kill_process_safe cloudflared.exe
+ping -n 3 127.0.0.1 >nul 2>&1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [AutoRestart] 冷却!WEB_RESTART_COOLDOWN!秒后重启...
+ping -n !WEB_RESTART_COOLDOWN! 127.0.0.1 >nul 2>&1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [AutoRestart] 正在重新启动Web服务...
+call "!VENV_PATH!\Scripts\activate.bat"
+start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT!" < nul
+call :ms_timestamp
+call :log [!TIMESTAMP!] [AutoRestart] 等待Web服务启动...
+set "RESTART_WAIT=0"
+set "RESTART_MAX_WAIT=60"
+:restart_wait_loop
+set /a RESTART_WAIT+=1
+if !RESTART_WAIT! gtr !RESTART_MAX_WAIT! (
+    call :ms_timestamp
+    call :log [!TIMESTAMP!] [AutoRestart] Web服务重启后启动超时
+    goto restart_wait_done
+)
+set "HTTP_CODE="
+for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" --connect-timeout 3 --max-time 5 http://localhost:!WEB_PORT! 2^>nul') do set "HTTP_CODE=%%i"
+if not defined HTTP_CODE set "HTTP_CODE=000"
+if not "!HTTP_CODE!"=="200" if not "!HTTP_CODE!"=="302" (
+    ping -n 1 127.0.0.1 >nul 2>&1
+    goto restart_wait_loop
+)
+call :ms_timestamp
+call :log [!TIMESTAMP!] [AutoRestart] Web服务重启成功 (第!WEB_RESTART_COUNT!次重启)
+:restart_wait_done
+set "HEALTH_FAIL_COUNT=0"
+goto :eof
 
 :check_temp_size
 call :get_dir_size temp
