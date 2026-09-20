@@ -6145,7 +6145,10 @@ class WegoScraper:
         print(f'数据已保存到 {new_filename}')
         print(f'成功获取 {total_count} 个商品')
         print(f'售价 >= 599 的商品: {high_price_count} 个')
-        print(f'预计售出总价: ¥{total_sell_price:,.2f}  |  平均售出价: ¥{avg_sell_price:,.2f}  |  平台手续费: ¥{total_platform_fee:,.2f}  |  成本总计: ¥{total_cost_price:,.2f}')
+        print(f'预计售出总价: ¥{total_sell_price:,.2f}')
+        print(f'平均售出均价: ¥{avg_sell_price:,.2f}')
+        print(f'闲鱼平台手续费累计: ¥{total_platform_fee:,.2f}')
+        print(f'成本总计: ¥{total_cost_price:,.2f}')
         if change_summary:
             print(f'{change_summary}')
             
