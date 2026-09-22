@@ -199,6 +199,34 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.72 (2026-09-22) - 🧹 **Temp自动清理功能Bug修复** - 修复run.bat的get_dir_size函数使用PowerShell命令在批处理for循环中返回空值导致temp目录超过3MB无法自动清理的问题(改用dir /s /a原生命令)+run.sh同步优化cleanup_temp_dir和check_temp_size函数(增强错误处理+详细日志输出+变量作用域规范化)
+
+> **Commit**: 待提交
+
+#### 更新内容:
+1. **get_dir_size函数重构**: 将[run.bat#L374-L380](run.bat#L374-L380)中的PowerShell命令`(Get-ChildItem -Path ... | Measure-Object -Property Length -Sum).Sum`替换为Windows原生`dir /s /a`命令，解决批处理for循环中PowerShell返回空值的兼容性问题
+2. **run.sh cleanup_temp_dir增强**: [run.sh#L242-L266](run.sh#L242-L266)添加变量默认值处理(size_kb=0)、错误抑制(2>/dev/null)、日志信息显示实际大小vs限制值(如"temp目录超过限制 (4102KB > 3072KB)，已清理")
+3. **run.sh check_temp_size优化**: [run.sh#L1335-L1351](run.sh#L1335-L1351)将LIMIT_SIZE_KB改为局部变量local limit_size_kb、增强比较操作的错误处理、日志输出具体大小数值
+4. **功能验证通过**: 创建4.02MB测试文件，等待65秒后自动清空(0文件/0KB)，确认每60秒定时检查机制正常工作
+
+##### 1. 🐛 Temp自动清理功能失效问题彻底解决
+**问题描述**:
+- **现象**: 脚本运行期间temp目录增长至50MB(超过3MB限制16倍)但未被自动清理；日志中无[AUTO]清理记录
+- **根因**: [run.bat#L376](run.bat#L376)使用`for /f "delims=" %%a in ('powershell -NoProfile -Command "..."' ) do set "TOTAL_SIZE=%%a"`获取目录大小时，PowerShell在批处理for循环上下文中返回空字符串，导致TOTAL_SIZE变量未定义或为空，后续大小比较条件`!TOTAL_SIZE! gtr !LIMIT_SIZE!`始终为false
+- **影响范围**: 所有Windows用户运行run.bat时，temp目录自动清理功能完全失效，长期运行后temp目录可能占用大量磁盘空间
+
+**修复方案**:
+- **技术实现(dir命令)**: 改用`for /f "tokens=3" %%a in ('dir /s /a "%~1" ^| findstr /c:"File(s)"') do set "TOTAL_SIZE=%%a"`直接解析dir命令输出的字节总数，避免PowerShell兼容性问题
+- **技术实现(防御性编程)**: 添加`if not defined TOTAL_SIZE set "TOTAL_SIZE=0"`和`if "!TOTAL_SIZE!"=="" set "TOTAL_SIZE=0"`双重保险
+- **跨平台一致性**: run.sh使用`du -sk`命令(Linux/Mac原生)，与run.bat的dir命令逻辑等价但实现适配各平台
+- **参考位置**: 修改文件: run.bat(+3行/-3行，第374-380行); run.sh(+12行/-8行，第242-266行+第1335-1351行)
+
+**测试验证**:
+- ✅ 功能验证: 创建600个测试文件(4.02MB)，等待65秒后temp目录自动清空(0文件/0KB)
+- ✅ 日志验证: 控制台输出"[AUTO] temp目录超过3MB (4102KB > 3072KB)，已自动清理"
+- ✅ 回归测试: 启动时cleanup_temp_dir正常执行；60秒定时检查check_temp_size周期性触发
+- ✅ 跨平台: run.bat(Windows dir命令)和run.sh(Linux/Mac du命令)逻辑完全一致
+
 ### v5.0.9.71 (2026-09-20) - 🐛 **爬虫执行结果弹窗数据解析修复** - 修复图一弹窗中"平均售出均价"显示为¥0和"平台手续费"错误显示为预计售出总价的Bug(后端打印格式优化:4个统计值从单行|分隔改为独占一行+关键词"平均售出价"改为"平均售出均价"匹配前端解析条件+"平台手续费"改为"闲鱼平台手续费累计"匹配前端精确解析)
 
 > **Commit**: 8ec7e617

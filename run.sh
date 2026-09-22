@@ -242,17 +242,21 @@ wait_for_port() {
 cleanup_temp_dir() {
     local dir_name=$1
     local max_size_kb=$2
-    
+
     if [ -d "$dir_name" ]; then
         local size_kb
         size_kb=$(du -sk "$dir_name" 2>/dev/null | awk '{print $1}')
-        
-        if [ -n "$size_kb" ] && [ "$size_kb" -gt "$max_size_kb" ]; then
-            rm -rf "${dir_name:?}"/*
-            printf -v msg "[*] %s目录超过限制，已清理" "$dir_name"
+
+        if [ -z "$size_kb" ]; then
+            size_kb=0
+        fi
+
+        if [ -n "$size_kb" ] && [ "$size_kb" -gt "$max_size_kb" ] 2>/dev/null; then
+            rm -rf "${dir_name:?}"/* 2>/dev/null
+            printf -v msg "[*] %s目录超过限制 (%sKB > %sKB)，已清理" "$dir_name" "$size_kb" "$max_size_kb"
             log "$msg"
         else
-            printf -v msg "[*] %s目录未超过限制，跳过清理" "$dir_name"
+            printf -v msg "[*] %s目录未超过限制 (%sKB <= %sKB)，跳过清理" "$dir_name" "$size_kb" "$max_size_kb"
             log "$msg"
         fi
     else
@@ -1336,11 +1340,15 @@ check_temp_size() {
     if [ -d "temp" ]; then
         local size_kb
         size_kb=$(du -sk temp 2>/dev/null | awk '{print $1}')
-        LIMIT_SIZE_KB=3072
+        local limit_size_kb=3072
         
-        if [ -n "$size_kb" ] && [ "$size_kb" -gt "$LIMIT_SIZE_KB" ]; then
-            rm -rf temp/*
-            log_console_only "[AUTO] temp目录超过3MB，已自动清理"
+        if [ -z "$size_kb" ] || [ "$size_kb" = "0" ]; then
+            size_kb=0
+        fi
+        
+        if [ -n "$size_kb" ] && [ "$size_kb" -gt "$limit_size_kb" ] 2>/dev/null; then
+            rm -rf temp/* 2>/dev/null
+            log_console_only "[AUTO] temp目录超过3MB (${size_kb}KB > ${limit_size_kb}KB)，已自动清理"
         fi
     fi
 }

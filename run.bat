@@ -373,7 +373,7 @@ exit /b
 
 :get_dir_size
 set "TOTAL_SIZE=0"
-for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path \'%~1\' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum" 2^>nul') do set "TOTAL_SIZE=%%a"
+for /f "tokens=3" %%a in ('dir /s /a "%~1" 2^>nul ^| findstr /c:"File(s)"') do set "TOTAL_SIZE=%%a"
 if not defined TOTAL_SIZE set "TOTAL_SIZE=0"
 if "!TOTAL_SIZE!"=="" set "TOTAL_SIZE=0"
 goto :eof
