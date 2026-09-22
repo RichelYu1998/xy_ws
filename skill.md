@@ -199,33 +199,35 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
-### v5.0.9.72 (2026-09-22) - 🧹 **Temp自动清理功能Bug修复** - 修复run.bat的get_dir_size函数使用PowerShell命令在批处理for循环中返回空值导致temp目录超过3MB无法自动清理的问题(改用dir /s /a原生命令)+run.sh同步优化cleanup_temp_dir和check_temp_size函数(增强错误处理+详细日志输出+变量作用域规范化)
+### v5.0.9.72 (2026-09-22) - 🧹 **Temp自动清理功能Bug修复（完全清空）** - 修复run.bat的get_dir_size函数使用PowerShell命令在批处理for循环中返回空值导致temp目录超过3MB无法自动清理的问题(改用dir /s /a原生命令)+将清理方式从删除文件升级为完全清空目录(rd/s/q+rm -rf删除所有文件和子文件夹)+run.sh同步修改(cleanup_temp_dir和check_temp_size函数)
 
 > **Commit**: 待提交
 
 #### 更新内容:
-1. **get_dir_size函数重构**: 将[run.bat#L374-L380](run.bat#L374-L380)中的PowerShell命令`(Get-ChildItem -Path ... | Measure-Object -Property Length -Sum).Sum`替换为Windows原生`dir /s /a`命令，解决批处理for循环中PowerShell返回空值的兼容性问题
-2. **run.sh cleanup_temp_dir增强**: [run.sh#L242-L266](run.sh#L242-L266)添加变量默认值处理(size_kb=0)、错误抑制(2>/dev/null)、日志信息显示实际大小vs限制值(如"temp目录超过限制 (4102KB > 3072KB)，已清理")
-3. **run.sh check_temp_size优化**: [run.sh#L1335-L1351](run.sh#L1335-L1351)将LIMIT_SIZE_KB改为局部变量local limit_size_kb、增强比较操作的错误处理、日志输出具体大小数值
-4. **功能验证通过**: 创建4.02MB测试文件，等待65秒后自动清空(0文件/0KB)，确认每60秒定时检查机制正常工作
+1. **get_dir_size函数重构**: 将[run.bat#L381-L387](run.bat#L381-L387)中的PowerShell命令`(Get-ChildItem -Path ... | Measure-Object -Property Length -Sum).Sum`替换为Windows原生`dir /s /a`命令，解决批处理for循环中PowerShell返回空值的兼容性问题
+2. **cleanup_temp_dir完全清空升级**: [run.bat#L355-L377](run.bat#L355-L377)将`del /f /s /q "%DIR_NAME%\*.*"(仅删除文件)改为`rd /s /q "%DIR_NAME%" + mkdir`(删除整个目录并重建，确保完全清空包括子文件夹)
+3. **check_temp_size完全清空升级**: [run.bat#L1159-L1168](run.bat#L1159-L1168)将`del /f /s /q temp\*.*`改为`rd /s /q temp + mkdir temp`，实现60秒定时检查时的完全清空
+4. **run.sh同步修改**: [run.sh#L242-L271](run.sh#L242-L271)cleanup_temp_dir改用`rm -rf "${dir_name}" + mkdir -p`;[run.sh#L1336-L1360](run.sh#L1336-L1360)check_temp_size改用`rm -rf temp + mkdir -p`
+5. **功能验证通过**: 创建374.42MB测试数据(13,726个文件+1,468个子文件夹含多层嵌套)，等待65秒后完全清空(0文件/0文件夹/0KB)
 
-##### 1. 🐛 Temp自动清理功能失效问题彻底解决
+##### 1. 🐛 Temp自动清理功能失效问题彻底解决（完全清空版）
 **问题描述**:
-- **现象**: 脚本运行期间temp目录增长至50MB(超过3MB限制16倍)但未被自动清理；日志中无[AUTO]清理记录
-- **根因**: [run.bat#L376](run.bat#L376)使用`for /f "delims=" %%a in ('powershell -NoProfile -Command "..."' ) do set "TOTAL_SIZE=%%a"`获取目录大小时，PowerShell在批处理for循环上下文中返回空字符串，导致TOTAL_SIZE变量未定义或为空，后续大小比较条件`!TOTAL_SIZE! gtr !LIMIT_SIZE!`始终为false
-- **影响范围**: 所有Windows用户运行run.bat时，temp目录自动清理功能完全失效，长期运行后temp目录可能占用大量磁盘空间
+- **现象**: 脚本运行期间temp目录增长至50MB(超过3MB限制16倍)但未被自动清理；日志中无[AUTO]清理记录；即使清理也仅删除文件不删除子文件夹
+- **根因**: [run.bat#L363](run.bat#L363)使用`for /f "delims=" %%a in ('powershell -NoProfile -Command "..."' ) do set "DIR_SIZE=%%a"`获取目录大小时，PowerShell在批处理for循环上下文中返回空字符串，导致DIR_SIZE变量未定义或为空；且原`del /f /s /q`命令只删除文件不删除子文件夹
+- **影响范围**: 所有用户运行脚本时，temp目录自动清理功能完全失效或清理不彻底，长期运行后temp目录可能占用大量磁盘空间并积累深层嵌套的子目录结构
 
 **修复方案**:
 - **技术实现(dir命令)**: 改用`for /f "tokens=3" %%a in ('dir /s /a "%~1" ^| findstr /c:"File(s)"') do set "TOTAL_SIZE=%%a"`直接解析dir命令输出的字节总数，避免PowerShell兼容性问题
-- **技术实现(防御性编程)**: 添加`if not defined TOTAL_SIZE set "TOTAL_SIZE=0"`和`if "!TOTAL_SIZE!"=="" set "TOTAL_SIZE=0"`双重保险
-- **跨平台一致性**: run.sh使用`du -sk`命令(Linux/Mac原生)，与run.bat的dir命令逻辑等价但实现适配各平台
-- **参考位置**: 修改文件: run.bat(+3行/-3行，第374-380行); run.sh(+12行/-8行，第242-266行+第1335-1351行)
+- **技术实现(完全清空)**: Windows使用`rd /s /q "%DIR_NAME%"`删除整个目录树+`mkdir "%DIR_NAME%"`重建空目录；Linux/Mac使用`rm -rf "${dir_name}"` + `mkdir -p "${dir_name}"`
+- **技术实现(防御性编程)**: 添加`if not defined TOTAL_SIZE set "TOTAL_SIZE=0"`和`if "!TOTAL_SIZE!"=="" set "TOTAL_SIZE=0"`双重保险；所有操作添加`>nul 2>&1`或`2>/dev/null`抑制错误输出
+- **跨平台一致性**: run.bat使用`rd/s/q`(Windows原生)；run.sh使用`rm -rf`(Linux/Mac原生)，逻辑完全等价但实现适配各平台
+- **参考位置**: 修改文件: run.bat(+4行/-2行，第355-387行+第1159-1168行); run.sh(+4行/-4行，第242-271行+第1336-1360行)
 
 **测试验证**:
-- ✅ 功能验证: 创建600个测试文件(4.02MB)，等待65秒后temp目录自动清空(0文件/0KB)
-- ✅ 日志验证: 控制台输出"[AUTO] temp目录超过3MB (4102KB > 3072KB)，已自动清理"
-- ✅ 回归测试: 启动时cleanup_temp_dir正常执行；60秒定时检查check_temp_size周期性触发
-- ✅ 跨平台: run.bat(Windows dir命令)和run.sh(Linux/Mac du命令)逻辑完全一致
+- ✅ 功能验证: 创建374.42MB测试数据(13,726个文件+1,468个子文件夹含subfolder1/deep多层嵌套)，等待65秒后temp目录完全清空(0文件/0文件夹/0KB)
+- ✅ 日志验证: 控制台输出"[AUTO] temp目录超过3MB (383408KB > 3072KB)，已完全清空（删除所有文件和子文件夹）"
+- ✅ 回归测试: 启动时cleanup_temp_dir正常执行完全清空；60秒定时检查check_temp_size周期性触发完全清空
+- ✅ 跨平台: run.bat(Windows rd/s/q命令)和run.sh(Linux/Mac rm -rf命令)逻辑完全一致，均实现完全清空
 
 ### v5.0.9.71 (2026-09-20) - 🐛 **爬虫执行结果弹窗数据解析修复** - 修复图一弹窗中"平均售出均价"显示为¥0和"平台手续费"错误显示为预计售出总价的Bug(后端打印格式优化:4个统计值从单行|分隔改为独占一行+关键词"平均售出价"改为"平均售出均价"匹配前端解析条件+"平台手续费"改为"闲鱼平台手续费累计"匹配前端精确解析)
 

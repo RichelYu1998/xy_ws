@@ -358,8 +358,9 @@ set "MAX_SIZE=%~2"
 if exist "%DIR_NAME%" (
     for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path \'%DIR_NAME%\' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum" 2^>nul') do set "DIR_SIZE=%%a"
     if defined DIR_SIZE if !DIR_SIZE! gtr %MAX_SIZE% (
-        del /f /s /q "%DIR_NAME%\*.*" >nul 2>&1
-        set "MSG=[*] %DIR_NAME%目录超过限制，已清理"
+        rd /s /q "%DIR_NAME%" >nul 2>&1
+        mkdir "%DIR_NAME%" >nul 2>&1
+        set "MSG=[*] %DIR_NAME%目录超过限制，已完全清空"
         call :log %MSG%
     ) else (
         set "MSG=[*] %DIR_NAME%目录未超过限制，跳过清理"
@@ -1160,8 +1161,9 @@ goto :eof
 call :get_dir_size temp
 set "LIMIT_SIZE=3145728"
 if !TOTAL_SIZE! gtr !LIMIT_SIZE! (
-    del /f /s /q temp\*.* >nul 2>&1
-    call :log_console_only [AUTO] temp目录超过3MB，已自动清理
+    rd /s /q temp >nul 2>&1
+    mkdir temp >nul 2>&1
+    call :log_console_only [AUTO] temp目录超过3MB，已完全清空（删除所有文件和子文件夹）
 )
 goto :eof
 

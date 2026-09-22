@@ -252,8 +252,9 @@ cleanup_temp_dir() {
         fi
 
         if [ -n "$size_kb" ] && [ "$size_kb" -gt "$max_size_kb" ] 2>/dev/null; then
-            rm -rf "${dir_name:?}"/* 2>/dev/null
-            printf -v msg "[*] %s目录超过限制 (%sKB > %sKB)，已清理" "$dir_name" "$size_kb" "$max_size_kb"
+            rm -rf "${dir_name:?}" 2>/dev/null
+            mkdir -p "${dir_name}" 2>/dev/null
+            printf -v msg "[*] %s目录超过限制 (%sKB > %sKB)，已完全清空" "$dir_name" "$size_kb" "$max_size_kb"
             log "$msg"
         else
             printf -v msg "[*] %s目录未超过限制 (%sKB <= %sKB)，跳过清理" "$dir_name" "$size_kb" "$max_size_kb"
@@ -1341,14 +1342,15 @@ check_temp_size() {
         local size_kb
         size_kb=$(du -sk temp 2>/dev/null | awk '{print $1}')
         local limit_size_kb=3072
-        
+
         if [ -z "$size_kb" ] || [ "$size_kb" = "0" ]; then
             size_kb=0
         fi
-        
+
         if [ -n "$size_kb" ] && [ "$size_kb" -gt "$limit_size_kb" ] 2>/dev/null; then
-            rm -rf temp/* 2>/dev/null
-            log_console_only "[AUTO] temp目录超过3MB (${size_kb}KB > ${limit_size_kb}KB)，已自动清理"
+            rm -rf temp 2>/dev/null
+            mkdir -p temp 2>/dev/null
+            log_console_only "[AUTO] temp目录超过3MB (${size_kb}KB > ${limit_size_kb}KB)，已完全清空（删除所有文件和子文件夹）"
         fi
     fi
 }
