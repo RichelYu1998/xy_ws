@@ -3347,6 +3347,9 @@
                         let lastPartiallyVisibleRow = null;
 
                         for (const row of rows) {
+                            // 跳过被搜索隐藏的行
+                            if (row.style.display === 'none') continue;
+                            
                             const rowRect = row.getBoundingClientRect();
                             const isInView = rowRect.bottom > containerRect.top && rowRect.top < containerRect.bottom;
 
@@ -3471,6 +3474,23 @@
                             console.log('[联动事件] 滚动触发 - 表格:', index, '(', title, ')');
                             syncScroll(target, index);
                         }, { passive: true });
+                        
+                        // 移动端：touchmove时实时联动
+                        const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                        if (isMobileDevice) {
+                            let lastTouchY = 0;
+                            container.addEventListener('touchstart', function(e) {
+                                lastTouchY = e.touches[0].clientY;
+                            }, { passive: true });
+                            container.addEventListener('touchmove', function(e) {
+                                const touchY = e.touches[0].clientY;
+                                const deltaY = lastTouchY - touchY;
+                                lastTouchY = touchY;
+                                if (Math.abs(deltaY) > 3) {
+                                    syncScroll(container, index);
+                                }
+                            }, { passive: true });
+                        }
                     });
 
                     const isMobile = window.innerWidth < 768;

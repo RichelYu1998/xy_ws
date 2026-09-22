@@ -201,7 +201,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.72 (2026-09-22) - 🧹 **Temp自动清理功能Bug修复（完全清空）** - 修复run.bat的get_dir_size函数使用PowerShell命令在批处理for循环中返回空值导致temp目录超过3MB无法自动清理的问题(改用dir /s /a原生命令)+将清理方式从删除文件升级为完全清空目录(rd/s/q+rm -rf删除所有文件和子文件夹)+run.sh同步修改(cleanup_temp_dir和check_temp_size函数)
 
-> **Commit**: 待提交
+> **Commit**: 50962908, a565ebd8
 
 #### 更新内容:
 1. **get_dir_size函数重构**: 将[run.bat#L381-L387](run.bat#L381-L387)中的PowerShell命令`(Get-ChildItem -Path ... | Measure-Object -Property Length -Sum).Sum`替换为Windows原生`dir /s /a`命令，解决批处理for循环中PowerShell返回空值的兼容性问题
