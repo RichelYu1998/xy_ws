@@ -199,6 +199,41 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.73 (2026-09-22) - 🐛 **移动端表格联动修复** - 添加touch事件支持实现移动端实时联动+修复findFirstVisibleRow函数跳过隐藏行解决搜索后底部滚动失效+修复底部滚动计算公式去除多余偏移量
+
+> **Commit**: 76bde1ad
+
+#### 更新内容:
+1. **移动端touch事件支持**: 为表格容器添加touchstart/touchmove事件监听，在移动设备上滑动时实时触发syncScroll联动
+2. **跳过隐藏行修复**: 在findFirstVisibleRow函数中添加`if (row.style.display === 'none') continue`跳过被搜索筛选隐藏的行，避免获取错误的offsetTop导致滚动到顶部
+3. **底部滚动计算修复**: 去除targetScrollTop计算公式中多余的tbodyOffsetTop偏移量，确保底部滚动时表0正确显示对应商品
+4. **三方文档同步**: README.md+skill.md Commit hash更新+skill.docx重新生成(348.7KB)
+
+##### 1. 🐛 移动端表格联动失效+搜索后底部滚动错误
+**问题描述**:
+- **现象**: 移动端手指滑动表1时表0不联动；搜索后滚动表1到底部，表0不显示对应商品(如12477)
+- **根因**: 移动端仅依赖scroll事件，但touchmove期间不触发scroll；findFirstVisibleRow未跳过display:none的行，获取到错误的offsetTop(0)；底部滚动计算公式多了tbodyOffsetTop
+- **影响范围**: 移动端用户体验，搜索筛选后的表格联动
+
+**修复方案**:
+- **技术实现(touch事件)**: 检测移动设备(`/iPhone|iPad|iPod|Android/i`)，添加touchmove事件监听，滑动时直接调用syncScroll [dist/app.js](dist/app.js)
+- **技术实现(跳过隐藏行)**: findFirstVisibleRow遍历行时添加`if (row.style.display === 'none') continue` [dist/app.js](dist/app.js)
+- **技术实现(底部计算)**: 将`targetRow.offsetTop + targetRowHeight - containerHeight + tbodyOffsetTop + 20`改为`targetRow.offsetTop + targetRowHeight - containerHeight + 20` [dist/app.js](dist/app.js)
+- **参考位置**: commit 76bde1ad, [dist/app.js](dist/app.js#L3465-L3520)
+
+**测试验证**:
+- ✅ 移动端touch滑动表1，表0实时同步滚动
+- ✅ 搜索"100"后滚动表1到底部，表0正确显示12477
+- ✅ 桌面端滚轮滚动保持正常
+- ✅ 三方文档同步完成
+
+**影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**更新日期**: 2026-09-22
+**更新类型**: 🐛 Bug修复 + 📱 移动端优化
+**作者**: 小旭二手机（西园路）
+
+----
+
 ### v5.0.9.72 (2026-09-22) - 🧹 **Temp自动清理功能Bug修复（完全清空）** - 修复run.bat的get_dir_size函数使用PowerShell命令在批处理for循环中返回空值导致temp目录超过3MB无法自动清理的问题(改用dir /s /a原生命令)+将清理方式从删除文件升级为完全清空目录(rd/s/q+rm -rf删除所有文件和子文件夹)+run.sh同步修改(cleanup_temp_dir和check_temp_size函数)
 
 > **Commit**: 50962908, a565ebd8
