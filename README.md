@@ -16,20 +16,38 @@
 ## 💻 环境要求
 
 ### 基础环境
-- **Python**: 3.8+ (推荐 3.10+, 兼容至 3.14)
-- **pip**: 最新版本 (安装依赖前会自动升级)
+- **Python**: 3.0+ (推荐 3.10+, 兼容至 3.14)
+- **pip**: 23.0+ (安装依赖前会自动升级)
 - **操作系统**: Windows 10/11, Linux (Ubuntu 20.04+), macOS 10.15+
 
-### Python依赖
+### Python 依赖 ([requirements.txt](requirements.txt))
+
+| 分类 | 依赖包 | 版本要求 | 用途 |
+|------|--------|----------|------|
+| **Web 框架** | `fastapi` | `>=0.115.0,<0.130.0` | 异步 Web 框架 |
+| | `uvicorn[standard]` | `>=0.30.0,<0.40.0` | ASGI 服务器 |
+| | `python-multipart` | `>=0.0.12,<0.1.0` | 文件上传支持 |
+| **数据验证** | `pydantic` | `>=2.7.0,<2.13.0` | 数据模型校验 |
+| **浏览器自动化** | `playwright` | `==1.52.0` | 闲鱼页面爬取 |
+| **数据处理** | `openpyxl` | `>=3.1.0,<3.2.0` | Excel 文件读写 |
+| | `pandas` | `>=2.0.0,<2.4.0` | 数据分析处理 |
+| **数据库** | `pymysql` | `>=1.0.0,<1.3.0` | MySQL 连接 |
+| **系统监控** | `psutil` | `>=5.9.0,<7.0.0` | 系统资源监控 |
+| | `prometheus-client` | `>=0.19.0,<0.25.0` | 指标采集暴露 |
+| **安全加密** | `cryptography` | `>=41.0.0,<44.0.0` | 配置加密存储 |
+| **文档生成** | `python-docx` | `>=1.0.0,<2.0.0` | Word 文档导出 |
+| **工具库** | `packaging` | `>=23.0,<25.0` | 版本号解析 |
+
 ```bash
-# 安装所有依赖（自动升级pip并优先选择wheel包）
+# 一键安装所有依赖
 pip install -r requirements.txt
 
-# 或手动安装核心依赖
-pip install fastapi uvicorn pydantic openpyxl pandas pymysql playwright psutil prometheus-client
+# 安装 Playwright 浏览器（首次必需）
+playwright install chromium
 ```
-### Node.js环境（前端构建）
-- **Node.js**: 16+ (用于Playwright浏览器自动化)
+
+### Node.js 环境（Playwright 依赖）
+- **Node.js**: 16+ (Playwright 浏览器下载需要)
 - **npm**: 8+
 
 ### 快速启动
@@ -48,6 +66,36 @@ run.bat
 
 # 或使用启动脚本（Linux/macOS）
 chmod +x run.sh && ./run.sh
+```
+
+## 📂 项目结构
+
+```
+SzwegoSpider/
+├── main.py                 # 主程序文件
+├── run.bat                 # Windows启动脚本
+├── run.sh                  # Linux/Mac启动脚本
+├── README.md               # 项目说明文档
+├── requirements.txt        # Python依赖
+├── config/                 # 配置文件目录
+│   ├── config.json         # 主配置文件
+│   ├── config.json.example # 配置模板（脱敏）
+│   ├── cookies.json        # Cookie存储
+│   ├── cookies.json.example# Cookie模板
+│   └── input_stock_numbers.txt  # 货号输入文件
+├── file/                   # 数据文件目录
+│   ├── output.json         # 商品数据输出
+│   ├── duplicate_log.json  # 重复序列号日志
+│   └── diff_log_*.json     # 差异日志(按日期)
+├── dist/                   # 前端构建产物
+│   ├── index.html          # Web界面入口
+│   ├── app.js              # 前端主逻辑
+│   └── assets/             # 静态资源
+├── test/                   # 测试目录
+│   ├── test_main.py        # 主测试文件
+│   └── generate_docx.py    # 文档生成脚本
+└── tools/                  # 工具目录
+    └── cloudflared/        # 内网穿透工具
 ```
 
 ## ⚙️ 配置说明

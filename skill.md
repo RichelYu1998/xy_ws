@@ -16,20 +16,38 @@
 ## 💻 环境要求
 
 ### 基础环境
-- **Python**: 3.8+ (推荐 3.10+, 兼容至 3.14)
-- **pip**: 最新版本 (安装依赖前会自动升级)
+- **Python**: 3.0+ (推荐 3.10+, 兼容至 3.14)
+- **pip**: 23.0+ (安装依赖前会自动升级)
 - **操作系统**: Windows 10/11, Linux (Ubuntu 20.04+), macOS 10.15+
 
-### Python依赖
+### Python 依赖 ([requirements.txt](requirements.txt))
+
+| 分类 | 依赖包 | 版本要求 | 用途 |
+|------|--------|----------|------|
+| **Web 框架** | `fastapi` | `>=0.115.0,<0.130.0` | 异步 Web 框架 |
+| | `uvicorn[standard]` | `>=0.30.0,<0.40.0` | ASGI 服务器 |
+| | `python-multipart` | `>=0.0.12,<0.1.0` | 文件上传支持 |
+| **数据验证** | `pydantic` | `>=2.7.0,<2.13.0` | 数据模型校验 |
+| **浏览器自动化** | `playwright` | `==1.52.0` | 闲鱼页面爬取 |
+| **数据处理** | `openpyxl` | `>=3.1.0,<3.2.0` | Excel 文件读写 |
+| | `pandas` | `>=2.0.0,<2.4.0` | 数据分析处理 |
+| **数据库** | `pymysql` | `>=1.0.0,<1.3.0` | MySQL 连接 |
+| **系统监控** | `psutil` | `>=5.9.0,<7.0.0` | 系统资源监控 |
+| | `prometheus-client` | `>=0.19.0,<0.25.0` | 指标采集暴露 |
+| **安全加密** | `cryptography` | `>=41.0.0,<44.0.0` | 配置加密存储 |
+| **文档生成** | `python-docx` | `>=1.0.0,<2.0.0` | Word 文档导出 |
+| **工具库** | `packaging` | `>=23.0,<25.0` | 版本号解析 |
+
 ```bash
-# 安装所有依赖（自动升级pip并优先选择wheel包）
+# 一键安装所有依赖
 pip install -r requirements.txt
 
-# 或手动安装核心依赖
-pip install fastapi uvicorn pydantic openpyxl pandas pymysql playwright psutil prometheus-client
+# 安装 Playwright 浏览器（首次必需）
+playwright install chromium
 ```
-### Node.js环境（前端构建）
-- **Node.js**: 16+ (用于Playwright浏览器自动化)
+
+### Node.js 环境（Playwright 依赖）
+- **Node.js**: 16+ (Playwright 浏览器下载需要)
 - **npm**: 8+
 
 ### 快速启动
@@ -48,6 +66,36 @@ run.bat
 
 # 或使用启动脚本（Linux/macOS）
 chmod +x run.sh && ./run.sh
+```
+
+## 📂 项目结构
+
+```
+SzwegoSpider/
+├── main.py                 # 主程序文件
+├── run.bat                 # Windows启动脚本
+├── run.sh                  # Linux/Mac启动脚本
+├── README.md               # 项目说明文档
+├── requirements.txt        # Python依赖
+├── config/                 # 配置文件目录
+│   ├── config.json         # 主配置文件
+│   ├── config.json.example # 配置模板（脱敏）
+│   ├── cookies.json        # Cookie存储
+│   ├── cookies.json.example# Cookie模板
+│   └── input_stock_numbers.txt  # 货号输入文件
+├── file/                   # 数据文件目录
+│   ├── output.json         # 商品数据输出
+│   ├── duplicate_log.json  # 重复序列号日志
+│   └── diff_log_*.json     # 差异日志(按日期)
+├── dist/                   # 前端构建产物
+│   ├── index.html          # Web界面入口
+│   ├── app.js              # 前端主逻辑
+│   └── assets/             # 静态资源
+├── test/                   # 测试目录
+│   ├── test_main.py        # 主测试文件
+│   └── generate_docx.py    # 文档生成脚本
+└── tools/                  # 工具目录
+    └── cloudflared/        # 内网穿透工具
 ```
 
 ## ⚙️ 配置说明
@@ -198,6 +246,41 @@ bandit -r . -f json -o bandit_report.json
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.73 (2026-09-22) - 🐛 **移动端表格联动修复** - 添加touch事件支持实现移动端实时联动+修复findFirstVisibleRow函数跳过隐藏行解决搜索后底部滚动失效+修复底部滚动计算公式去除多余偏移量
+
+> **Commit**: 76bde1ad
+
+#### 更新内容:
+1. **移动端touch事件支持**: 为表格容器添加touchstart/touchmove事件监听，在移动设备上滑动时实时触发syncScroll联动
+2. **跳过隐藏行修复**: 在findFirstVisibleRow函数中添加`if (row.style.display === 'none') continue`跳过被搜索筛选隐藏的行，避免获取错误的offsetTop导致滚动到顶部
+3. **底部滚动计算修复**: 去除targetScrollTop计算公式中多余的tbodyOffsetTop偏移量，确保底部滚动时表0正确显示对应商品
+4. **三方文档同步**: README.md+skill.md Commit hash更新+skill.docx重新生成(348.7KB)
+
+##### 1. 🐛 移动端表格联动失效+搜索后底部滚动错误
+**问题描述**:
+- **现象**: 移动端手指滑动表1时表0不联动；搜索后滚动表1到底部，表0不显示对应商品(如12477)
+- **根因**: 移动端仅依赖scroll事件，但touchmove期间不触发scroll；findFirstVisibleRow未跳过display:none的行，获取到错误的offsetTop(0)；底部滚动计算公式多了tbodyOffsetTop
+- **影响范围**: 移动端用户体验，搜索筛选后的表格联动
+
+**修复方案**:
+- **技术实现(touch事件)**: 检测移动设备(`/iPhone|iPad|iPod|Android/i`)，添加touchmove事件监听，滑动时直接调用syncScroll [dist/app.js](dist/app.js)
+- **技术实现(跳过隐藏行)**: findFirstVisibleRow遍历行时添加`if (row.style.display === 'none') continue` [dist/app.js](dist/app.js)
+- **技术实现(底部计算)**: 将`targetRow.offsetTop + targetRowHeight - containerHeight + tbodyOffsetTop + 20`改为`targetRow.offsetTop + targetRowHeight - containerHeight + 20` [dist/app.js](dist/app.js)
+- **参考位置**: commit 76bde1ad, [dist/app.js](dist/app.js#L3465-L3520)
+
+**测试验证**:
+- ✅ 移动端touch滑动表1，表0实时同步滚动
+- ✅ 搜索"100"后滚动表1到底部，表0正确显示12477
+- ✅ 桌面端滚轮滚动保持正常
+- ✅ 三方文档同步完成
+
+**影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**更新日期**: 2026-09-22
+**更新类型**: 🐛 Bug修复 + 📱 移动端优化
+**作者**: 小旭二手机（西园路）
+
+----
 
 ### v5.0.9.72 (2026-09-22) - 🧹 **Temp自动清理功能Bug修复（完全清空）** - 修复run.bat的get_dir_size函数使用PowerShell命令在批处理for循环中返回空值导致temp目录超过3MB无法自动清理的问题(改用dir /s /a原生命令)+将清理方式从删除文件升级为完全清空目录(rd/s/q+rm -rf删除所有文件和子文件夹)+run.sh同步修改(cleanup_temp_dir和check_temp_size函数)
 
