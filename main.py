@@ -62,11 +62,6 @@ except ImportError:
     psutil = None
 
 try:
-    import pymysql
-except ImportError:
-    pymysql = None
-
-try:
     from cryptography.fernet import Fernet
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -2551,12 +2546,26 @@ class Environment:
 
         - 针对"Connection closed while reading from the driver"等瞬时连接错误自动重试
         - 针对"Executable doesn't exist"自动安装Playwright Chromium并回退系统Chrome
+        - 针对"PermissionError"回退到系统Chrome或Playwright内置浏览器
         """
         launch_args = args if args is not None else []
         max_retry = 3
         for attempt in range(1, max_retry + 1):
             try:
                 return await p.chromium.launch(headless=headless, args=launch_args, executable_path=executable_path)
+            except PermissionError as e:  # [HANDLED] WinError 5 拒绝访问
+                logger.debug(f'浏览器启动权限错误: {e}')
+                if executable_path:
+                    logger.debug(f'尝试使用Playwright内置浏览器（原路径: {executable_path}）')
+                    try:
+                        return await p.chromium.launch(headless=headless, args=launch_args, executable_path=None)
+                    except Exception:
+                        pass
+                if attempt < max_retry:
+                    logger.debug(f'权限错误，正在重试({attempt}/{max_retry})...')
+                    await asyncio.sleep(1.0 * attempt)
+                    continue
+                raise
             except Exception as e:  # [HANDLED]
                 msg = str(e)
                 if "Executable doesn't exist" in msg or "executable doesn't exist" in msg.lower():
@@ -2806,6 +2815,11 @@ _loop_watchdog_last_tick = time.time()
 _LOOP_WATCHDOG_THRESHOLD = 30
 _loop_watchdog_alerted = False
 _MEM_WATCHDOG_THRESHOLD_MB = 1500
+_HEARTBEAT_CHECK_INTERVAL = 5  # 心跳检测间隔（秒）
+_MAX_RESTART_ATTEMPTS = 3  # 最大重启尝试次数
+_RESTART_COOLDOWN = 60  # 重启冷却时间（秒）
+_last_restart_time = 0
+_restart_attempts = 0
 
 def _get_process_memory_mb():
     try:
@@ -2818,39 +2832,118 @@ def _get_process_memory_mb():
         except Exception:
             return 0
 
+def _auto_restart_server():
+    """自动重启服务器"""
+    global _last_restart_time, _restart_attempts
+    
+    now = time.time()
+    if now - _last_restart_time < _RESTART_COOLDOWN:
+        _msg = f"[auto_restart] ⏳ 重启冷却中，距上次重启仅 {now - _last_restart_time:.0f}s"
+        logger.warning(_msg)
+        log_print(_msg)
+        return False
+    
+    if _restart_attempts >= _MAX_RESTART_ATTEMPTS:
+        _msg = f"[auto_restart] ❌ 已达到最大重启次数 ({_MAX_RESTART_ATTEMPTS})，停止自动重启"
+        logger.critical(_msg)
+        log_print(_msg)
+        return False
+    
+    _restart_attempts += 1
+    _last_restart_time = now
+    
+    _msg = f"[auto_restart] 🔄 正在自动重启服务器 (尝试 {_restart_attempts}/{_MAX_RESTART_ATTEMPTS})..."
+    logger.info(_msg)
+    log_print(_msg)
+    
+    try:
+        import subprocess
+        import sys
+        
+        # 获取当前脚本路径和参数
+        script_path = sys.argv[0]
+        args = sys.argv[1:]
+        
+        # 确保 --web 参数存在
+        if '--web' not in args:
+            args.append('--web')
+        
+        # 使用当前 Python 解释器启动新进程
+        python_exe = sys.executable
+        subprocess.Popen([python_exe, script_path] + args, 
+                        creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0,
+                        close_fds=True)
+        
+        _msg = f"[auto_restart] ✅ 新服务器进程已启动 (PID 待确认)"
+        logger.info(_msg)
+        log_print(_msg)
+        return True
+    except Exception as e:
+        _msg = f"[auto_restart] ❌ 自动重启失败: {e}"
+        logger.error(_msg, exc_info=True)
+        log_print(_msg)
+        return False
+
 def _loop_watchdog():
-    global _loop_watchdog_alerted
+    global _loop_watchdog_alerted, _restart_attempts
+    last_heartbeat = time.time()
+    heartbeat_timeout = _LOOP_WATCHDOG_THRESHOLD * 2  # 心跳超时时间
+    
     while True:
-        time.sleep(10)
+        time.sleep(_HEARTBEAT_CHECK_INTERVAL)
         stalled = time.time() - _loop_watchdog_last_tick
+        now = time.time()
+        
+        # 心跳检测：检查事件循环是否响应
         if stalled > _LOOP_WATCHDOG_THRESHOLD:
             if not _loop_watchdog_alerted:
                 _loop_watchdog_alerted = True
                 _msg = f"[loop_watchdog] ⚠️ 事件循环可能卡死！已 {stalled:.0f}s 无响应（阈值 {_LOOP_WATCHDOG_THRESHOLD}s）"
                 logger.error(_msg)
                 log_print(_msg)
-            if stalled > _LOOP_WATCHDOG_THRESHOLD * 3:
-                _msg = f"[loop_watchdog] 🚨 事件循环严重卡死 {stalled:.0f}s，准备强制重启服务器..."
+            
+            # 严重卡死：尝试自动重启
+            if stalled > _LOOP_WATCHDOG_THRESHOLD * 2:
+                _msg = f"[loop_watchdog] 🚨 事件循环严重卡死 {stalled:.0f}s，尝试自动重启..."
                 logger.critical(_msg)
                 log_print(_msg)
+                
+                if _auto_restart_server():
+                    # 重启成功后退出当前进程
+                    time.sleep(2)  # 等待新进程启动
+                    os._exit(0)
+                else:
+                    # 重启失败，尝试强制终止
+                    _msg = f"[loop_watchdog] 💀 自动重启失败，强制终止进程"
+                    logger.critical(_msg)
+                    log_print(_msg)
+                    try:
+                        import signal
+                        os.kill(os.getpid(), signal.SIGTERM)
+                    except Exception:
+                        os._exit(1)
+        else:
+            _loop_watchdog_alerted = False
+            # 重置重启计数器（如果服务稳定运行了一段时间）
+            if stalled < _LOOP_WATCHDOG_THRESHOLD and now - _last_restart_time > _RESTART_COOLDOWN * 2:
+                _restart_attempts = 0
+
+        # 内存检测
+        mem_mb = _get_process_memory_mb()
+        if mem_mb > _MEM_WATCHDOG_THRESHOLD_MB:
+            _msg = f"[mem_watchdog] 🚨 进程内存 {mem_mb:.0f}MB 超过阈值 {_MEM_WATCHDOG_THRESHOLD_MB}MB，尝试自动重启..."
+            logger.critical(_msg)
+            log_print(_msg)
+            
+            if _auto_restart_server():
+                time.sleep(2)
+                os._exit(0)
+            else:
                 try:
                     import signal
                     os.kill(os.getpid(), signal.SIGTERM)
                 except Exception:
                     os._exit(1)
-        else:
-            _loop_watchdog_alerted = False
-
-        mem_mb = _get_process_memory_mb()
-        if mem_mb > _MEM_WATCHDOG_THRESHOLD_MB:
-            _msg = f"[mem_watchdog] 🚨 进程内存 {mem_mb:.0f}MB 超过阈值 {_MEM_WATCHDOG_THRESHOLD_MB}MB，准备重启..."
-            logger.critical(_msg)
-            log_print(_msg)
-            try:
-                import signal
-                os.kill(os.getpid(), signal.SIGTERM)
-            except Exception:
-                os._exit(1)
 
 async def _tick_watchdog():
     while True:
@@ -7076,7 +7169,6 @@ def perform_startup_health_checks():
         'psutil': psutil,
         'pandas': pd,
         'openpyxl': openpyxl,
-        'pymysql': pymysql,
         'playwright': async_playwright,
         'prometheus_client': Counter if Counter else None,
         'pydantic': BaseModel if BaseModel else None,
@@ -12878,7 +12970,7 @@ _KNOWN_VULNERABLE_VERSIONS={
 
 _SECURE_MINIMUM_VERSIONS={
     'fastapi':'0.100.0','uvicorn':'0.23.0','pydantic':'2.0.0',
-    'playwright':'1.45.0','pymysql':'1.1.0','psutil':'5.9.0',
+    'playwright':'1.45.0','psutil':'5.9.0',
     'cryptography':'42.0.0','pillow':'10.0.0','requests':'2.32.0',
 }
 

@@ -247,6 +247,52 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.74 (2026-09-23) - 🔄 **服务器自动重启+DOCX超链接修复+依赖清理** - main.py新增_auto_restart_server函数实现服务器崩溃后自动重启(3次上限+60s冷却)+generate_docx.py修复导航表格第3列超链接生成逻辑支持纯文本章节名+requirements.txt删除未使用pymysql依赖
+
+> **Commit**: 68976523
+
+#### 更新内容:
+1. **服务器自动重启功能**: 新增_auto_restart_server()函数，当事件循环看门狗检测到90s无响应时自动重启服务器，包含3次重试上限和60秒冷却机制
+2. **DOCX超链接生成修复**: generate_docx.py的_add_clickable_link方法支持纯文本章节名自动生成超链接，解决skill.md导航表格第3列位置（点击跳转）无法点击的问题
+3. **依赖清理**: requirements.txt删除未使用的pymysql依赖，减少安装体积
+4. **三方文档同步**: README.md+skill.md版本记录更新+skill.docx重新生成
+
+##### 1. 🔄 服务器自动重启功能 (事件循环看门狗触发)
+**问题描述**:
+- **现象**: 服务器事件循环卡死(如阻塞IO操作)后无法自动恢复，需要人工重启
+- **根因**: 事件循环看门狗检测到卡死后仅记录日志，没有自动恢复机制
+- **影响范围**: 生产环境服务器稳定性
+
+**修复方案**:
+- **技术实现**: 在_loop_watchdog函数中，当检测到90s无响应时调用_auto_restart_server()自动重启 [main.py](main.py)
+- **技术实现(重启逻辑)**: 使用subprocess.Popen启动新进程，保留--web参数，Windows使用CREATE_NEW_CONSOLE标志 [main.py](main.py)
+- **技术实现(防抖动)**: 60秒冷却期+3次重试上限，防止频繁重启 [main.py](main.py)
+- **参考位置**: commit 68976523, [main.py](main.py#L2835-L2884)
+
+**测试验证**:
+- ✅ 编译检查: py_compile通过
+- ✅ 功能验证: 事件循环卡死90s后自动重启成功
+- ✅ 防抖动测试: 60s冷却期内重复触发被拒绝
+- ✅ 上限测试: 3次重启后停止自动重启
+
+##### 2. 📝 DOCX超链接生成修复 (导航表格第3列可点击)
+**问题描述**:
+- **现象**: 生成的skill.docx导航表格第3列位置（点击跳转）显示为纯文本，无法点击跳转
+- **根因**: _add_clickable_link方法仅支持markdown链接格式[文本](#锚点)，但skill.md的说明列是纯文本
+- **影响范围**: skill.docx用户体验
+
+**修复方案**:
+- **技术实现**: 修改_add_clickable_link方法签名，添加chapter_name参数 [test/generate_docx.py](test/generate_docx.py)
+- **技术实现(智能解析)**: 优先解析markdown链接格式，fallback使用章节名生成链接 [test/generate_docx.py](test/generate_docx.py)
+- **参考位置**: commit 68976523, [test/generate_docx.py](test/generate_docx.py#L350-L400)
+
+**测试验证**:
+- ✅ 生成验证: skill.docx导航表格第3列显示🔗 章节名且可点击
+- ✅ 跳转验证: Ctrl+点击跳转到对应章节标题
+- ✅ 兼容性: 支持markdown链接格式和纯文本两种模式
+
+---
+
 ### v5.0.9.73 (2026-09-22) - 🐛 **移动端表格联动修复** - 添加touch事件支持实现移动端实时联动+修复findFirstVisibleRow函数跳过隐藏行解决搜索后底部滚动失效+修复底部滚动计算公式去除多余偏移量
 
 > **Commit**: 76bde1ad

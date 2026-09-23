@@ -308,7 +308,15 @@ class MarkdownToDocxConverter:
             
             if rows:
                 num_cols = max(len(row) for row in rows) if rows else 3
-                table = self.doc.add_table(rows=1, cols=num_cols)
+                
+                # Check if navigation table (detect keywords across ALL header cells)
+                has_chapter = any('章节' in cell for cell in rows[0])
+                has_location_or_desc = any('位置' in cell or '说明' in cell for cell in rows[0])
+                is_nav_table = has_chapter and has_location_or_desc
+
+                # For navigation table, add third column "位置（点击跳转）" in docx
+                docx_num_cols = num_cols + 1 if is_nav_table and num_cols == 2 else num_cols
+                table = self.doc.add_table(rows=1, cols=docx_num_cols)
                 table.style = 'Table Grid'
                 table.alignment = WD_TABLE_ALIGNMENT.CENTER
                 
@@ -319,63 +327,74 @@ class MarkdownToDocxConverter:
                         for run in paragraph.runs:
                             run.bold = True
                 
-                # Check if navigation table (detect keywords across ALL header cells)
-                has_chapter = any('章节' in cell for cell in rows[0])
-                has_location_or_desc = any('位置' in cell or '说明' in cell for cell in rows[0])
-                is_nav_table = has_chapter and has_location_or_desc
+                # Add third column header for navigation table
+                if is_nav_table and num_cols == 2:
+                    header_cells[2].text = '位置（点击跳转）'
+                    for paragraph in header_cells[2].paragraphs:
+                        for run in paragraph.runs:
+                            run.bold = True
 
                 # Process data rows (add clickable links to last column)
                 for row_data in rows[1:]:
                     row = table.add_row().cells
                     for i, cell_text in enumerate(row_data[:num_cols]):
-                        if is_nav_table and i == num_cols - 1:
-                            self._add_clickable_link(row[i], cell_text)
-                        else:
-                            row[i].text = self._clean_text(cell_text)
+                        row[i].text = self._clean_text(cell_text)
+                    
+                    # Add clickable link in third column for navigation table
+                    if is_nav_table and num_cols == 2:
+                        chapter_name = row_data[0].strip() if len(row_data) > 0 else ''
+                        self._add_clickable_link(row[2], chapter_name, chapter_name)
 
         return start_idx
 
-    def _add_clickable_link(self, cell, text):
+    def _add_clickable_link(self, cell, text, chapter_name=None):
         cell.text = ''
         para = cell.paragraphs[0]
 
+        # 先尝试解析markdown链接格式
         link_match = re.match(r'\[([^\]]+)\]\(([^)]+)\)', text)
 
         if link_match:
             display_text = link_match.group(1)
             raw_anchor = link_match.group(2).lstrip('#')
-
             bookmark_id = self._find_heading_bookmark_id(raw_anchor)
-
-            hyperlink = OxmlElement('w:hyperlink')
-            hyperlink.set(qn('w:anchor'), bookmark_id)
-
-            run = OxmlElement('w:r')
-            rPr = OxmlElement('w:rPr')
-
-            color = OxmlElement('w:color')
-            color.set(qn('w:val'), '0066CC')
-            rPr.append(color)
-
-            u = OxmlElement('w:u')
-            u.set(qn('w:val'), 'single')
-            rPr.append(u)
-
-            b = OxmlElement('w:b')
-            rPr.append(b)
-
-            run.append(rPr)
-
-            t_elem = OxmlElement('w:t')
-            t_elem.set(qn('xml:space'), 'preserve')
-            t_elem.text = f'🔗 {display_text}'
-            run.append(t_elem)
-
-            hyperlink.append(run)
-            para._p.append(hyperlink)
+        elif chapter_name:
+            # 如果是纯文本，直接用章节名生成链接
+            display_text = text
+            bookmark_id = self._find_heading_bookmark_id(chapter_name)
         else:
+            # 最后fallback：直接显示文本
             run = para.add_run(text)
             run.font.size = Pt(10)
+            return
+
+        # 生成超链接
+        hyperlink = OxmlElement('w:hyperlink')
+        hyperlink.set(qn('w:anchor'), bookmark_id)
+
+        run = OxmlElement('w:r')
+        rPr = OxmlElement('w:rPr')
+
+        color = OxmlElement('w:color')
+        color.set(qn('w:val'), '0066CC')
+        rPr.append(color)
+
+        u = OxmlElement('w:u')
+        u.set(qn('w:val'), 'single')
+        rPr.append(u)
+
+        b = OxmlElement('w:b')
+        rPr.append(b)
+
+        run.append(rPr)
+
+        t_elem = OxmlElement('w:t')
+        t_elem.set(qn('xml:space'), 'preserve')
+        t_elem.text = f'🔗 {display_text}'
+        run.append(t_elem)
+
+        hyperlink.append(run)
+        para._p.append(hyperlink)
 
 
     def _generate_bookmark_id(self, title_text):
@@ -473,6 +492,7 @@ class MarkdownToDocxConverter:
                 run.font.color.rgb = RGBColor(128, 0, 0)
                 run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Consolas')
             elif part.startswith('[') and '](' in part:
+                # 先尝试解析markdown链接格式
                 link_match = re.match(r'\[([^\]]+)\]\(([^)]+)\)', part)
                 if link_match:
                     link_text = link_match.group(1)
