@@ -10207,15 +10207,15 @@ if __name__ == '__main__':
                                         },
                                         'verification': [f'✅ 提交 {short_hash} 已合并至master分支', f'✅ 变更统计: {stats_str}']
                                     }]
-                                if not readme_entry['meta'].get('commit') or readme_entry['meta']['commit'] == '待补充':
+                                if not readme_entry['meta'].get('commit') or readme_entry['meta']['commit'] in ('待补充', '待生成'):
                                     readme_entry['meta']['commit'] = short_hash
-                                if not readme_entry['meta'].get('fix_date') or readme_entry['meta']['fix_date'] == '待补充':
+                                if not readme_entry['meta'].get('fix_date') or readme_entry['meta']['fix_date'] in ('待补充', '待生成'):
                                     readme_entry['meta']['fix_date'] = commit_date
-                                if not readme_entry['meta'].get('author') or readme_entry['meta']['author'] == '待补充':
+                                if not readme_entry['meta'].get('author') or readme_entry['meta']['author'] in ('待补充', '待生成'):
                                     readme_entry['meta']['author'] = '小旭二手机（西园路）'
-                                if not readme_entry['meta'].get('affected_files') or readme_entry['meta']['affected_files'] == '待补充':
+                                if not readme_entry['meta'].get('affected_files') or readme_entry['meta']['affected_files'] in ('待补充', '待生成'):
                                     readme_entry['meta']['affected_files'] = file_list_str
-                                if not readme_entry['meta'].get('change_stats') or readme_entry['meta']['change_stats'] == '待补充':
+                                if not readme_entry['meta'].get('change_stats') or readme_entry['meta']['change_stats'] in ('待补充', '待生成'):
                                     readme_entry['meta']['change_stats'] = stats_str
                                 merged_changelog.append(readme_entry)
                             else:
@@ -10249,17 +10249,17 @@ if __name__ == '__main__':
                                 })
                     for entry in changelog:
                         if entry['version'] not in readme_versions_used:
-                            if not entry['meta'].get('commit') or entry['meta']['commit'] == '待补充':
+                            if not entry['meta'].get('commit') or entry['meta']['commit'] in ('待补充', '待生成'):
                                 entry['meta']['commit'] = '历史版本-无Git记录'
-                            if not entry['meta'].get('affected_files') or entry['meta']['affected_files'] == '待补充':
+                            if not entry['meta'].get('affected_files') or entry['meta']['affected_files'] in ('待补充', '待生成'):
                                 entry['meta']['affected_files'] = '历史版本-详见README.md'
-                            if not entry['meta'].get('change_stats') or entry['meta']['change_stats'] == '待补充':
+                            if not entry['meta'].get('change_stats') or entry['meta']['change_stats'] in ('待补充', '待生成'):
                                 entry['meta']['change_stats'] = '历史版本-无统计记录'
-                            if not entry['meta'].get('author') or entry['meta']['author'] == '待补充':
+                            if not entry['meta'].get('author') or entry['meta']['author'] in ('待补充', '待生成'):
                                 entry['meta']['author'] = '小旭二手机（西园路）'
                             for ch in entry['changes']:
                                 if ch.get('problem'):
-                                    if not ch['problem'].get('scope') or ch['problem']['scope'] == '待补充':
+                                    if not ch['problem'].get('scope') or ch['problem']['scope'] in ('待补充', '待生成'):
                                         ch['problem']['scope'] = '历史版本-详见README.md'
                                     if not ch['problem'].get('root_cause') or ch['problem']['root_cause'] == '详见历史提交记录':
                                         ch['problem']['root_cause'] = '历史版本-早期手动记录，无Git提交关联'
@@ -10331,13 +10331,13 @@ if __name__ == '__main__':
                             existing['changes'].append(nc)
                         commits_existing = existing.get('meta', {}).get('commit', '')
                         commits_new = entry.get('meta', {}).get('commit', '')
-                        all_commits = [c.strip() for c in (commits_existing + ',' + commits_new).split(',') if c.strip() and c.strip() != '待补充' and c.strip() != '历史版本-无Git记录' and c.strip() != 'N/A']
+                        all_commits = [c.strip() for c in (commits_existing + ',' + commits_new).split(',') if c.strip() and c.strip() != '待补充' and c.strip() != '待生成' and c.strip() != '历史版本-无Git记录' and c.strip() != 'N/A']
                         unique_commits = list(dict.fromkeys(all_commits))
                         if unique_commits:
                             existing.setdefault('meta', {})['commit'] = ', '.join(unique_commits[:5])
                         files_existing = existing.get('meta', {}).get('affected_files', '')
                         files_new = entry.get('meta', {}).get('affected_files', '')
-                        all_files = [f.strip() for f in (files_existing + ',' + files_new).split(',') if f.strip() and f.strip() != '待补充' and f.strip() != '历史版本-详见README.md' and f.strip() != '无文件变更']
+                        all_files = [f.strip() for f in (files_existing + ',' + files_new).split(',') if f.strip() and f.strip() != '待补充' and f.strip() != '待生成' and f.strip() != '历史版本-详见README.md' and f.strip() != '无文件变更']
                         unique_files = list(dict.fromkeys(all_files))
                         if unique_files:
                             existing.setdefault('meta', {})['affected_files'] = ', '.join(unique_files[:10])

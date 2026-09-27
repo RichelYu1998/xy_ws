@@ -247,6 +247,68 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.75 (2026-09-27) - 🔧 **启动脚本版本自动检测升级+隧道独立显示修复+前端alertDiv错误修复** - run.bat/run.sh新增Git/Node.js/Python/hostc/cloudflared版本自动检测与升级逻辑(含版本兼容性检查)+修复hostc和Cloudflare隧道独立显示互不影响+修复前端alertDiv is not defined错误+dist/package.json添加cloudflared依赖
+
+> **Commit**: 52f32ea7
+
+#### 更新内容:
+1. **启动脚本版本自动检测升级**: run.bat和run.sh新增Git、Node.js、Python、hostc、cloudflared五个工具的版本自动检测与升级函数，启动时自动检查是否为最新版本并在兼容性允许范围内升级
+2. **隧道独立显示修复**: 修改dist/app.js中隧道状态显示逻辑，hostc和Cloudflare隧道独立显示，一个失败不影响另一个的展示
+3. **前端alertDiv错误修复**: 移除dist/app.js中对未定义变量alertDiv的引用，修复"操作失败: alertDiv is not defined"错误
+4. **cloudflared依赖添加**: dist/package.json添加cloudflared依赖，确保内网穿透工具可通过npm安装
+5. **run.bat延迟扩展修复**: 修复hostc路径解析中!"!HOSTC_BIN!"!导致的延迟扩展解析错误，使用setlocal disabledelayedexpansion/endlocal模式处理变量
+6. **run.sh语法修复**: 修复run.sh中误用的批处理注释语法(::)改为bash注释语法(#)
+7. **三方文档同步**: README.md+skill.md版本记录更新+skill.docx重新生成
+
+##### 1. 🔧 启动脚本版本自动检测与升级 (Git/Node.js/Python/hostc/cloudflared)
+**问题描述**:
+- **现象**: 启动脚本不检查工具版本，hostc版本过旧导致"This hostc CLI is incompatible with the tunnel server protocol"错误，其他工具也可能版本不兼容
+- **根因**: run.bat/run.sh中仅检查工具是否安装，未检查版本是否为最新且兼容
+- **影响范围**: 所有用户启动脚本时，可能因工具版本过旧导致功能异常
+
+**修复方案**:
+- **技术实现(版本检测)**: 新增check_hostc_latest_version/check_node_latest_version/check_python_latest_version/check_git_latest_version/check_cloudflared_latest_version函数 [run.bat](run.bat) [run.sh](run.sh)
+- **技术实现(版本比较)**: 使用语义化版本比较(主版本号.次版本号.修订号逐级比较)，仅在兼容性允许时升级 [run.bat](run.bat)
+- **技术实现(自动升级)**: 检测到版本过旧时自动执行升级命令(npm i -g hostc@latest等)，升级后验证版本 [run.bat](run.bat) [run.sh](run.sh)
+- **参考位置**: commit 52f32ea7, [run.bat](run.bat#L771-L900) [run.sh](run.sh#L670-L800)
+
+**测试验证**:
+- ✅ hostc版本检测: 检测到1.3.0过旧，自动升级至2.0.3
+- ✅ Git版本检测: 已安装时检查版本并提示升级
+- ✅ Node.js版本检测: 通过npmmirror API获取最新版本
+- ✅ Python版本检测: 通过GitHub API获取最新版本
+- ✅ cloudflared版本检测: 通过npm view获取最新版本
+
+##### 2. 🐛 隧道独立显示修复 (hostc与Cloudflare互不影响)
+**问题描述**:
+- **现象**: hostc隧道崩溃后，Cloudflare隧道状态也不显示，两个隧道应独立运行互不影响
+- **根因**: 前端隧道状态显示逻辑中，hostc失败时整体状态被置为未运行
+- **影响范围**: 使用双隧道模式的用户，一个隧道故障导致另一个也无法查看状态
+
+**修复方案**:
+- **技术实现**: 修改dist/app.js中隧道状态判断逻辑，分别检查hostc和Cloudflare的url状态 [dist/app.js](dist/app.js)
+- **参考位置**: commit 52f32ea7, [dist/app.js](dist/app.js)
+
+**测试验证**:
+- ✅ hostc隧道失败时，Cloudflare隧道状态正常显示
+- ✅ Cloudflare隧道失败时，hostc隧道状态正常显示
+- ✅ 双隧道同时运行时，两者状态均正常显示
+
+##### 3. 🐛 前端alertDiv is not defined错误修复
+**问题描述**:
+- **现象**: 操作失败时弹出"操作失败: alertDiv is not defined"错误
+- **根因**: dist/app.js中引用了未定义的变量alertDiv
+- **影响范围**: 所有通过Web界面操作的用户
+
+**修复方案**:
+- **技术实现**: 移除dist/app.js中对alertDiv的引用，使用已有的通知机制 [dist/app.js](dist/app.js)
+- **参考位置**: commit 52f32ea7, [dist/app.js](dist/app.js)
+
+**测试验证**:
+- ✅ 操作失败时正确显示错误信息，不再出现alertDiv错误
+
+---
+
 ### v5.0.9.74 (2026-09-23) - 🔄 **服务器自动重启+DOCX超链接修复+依赖清理** - main.py新增_auto_restart_server函数实现服务器崩溃后自动重启(3次上限+60s冷却)+generate_docx.py修复导航表格第3列超链接生成逻辑支持纯文本章节名+requirements.txt删除未使用pymysql依赖
 
 > **Commit**: 68976523

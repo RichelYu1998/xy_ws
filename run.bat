@@ -86,7 +86,20 @@ if errorlevel 1 (
 )
 
 where git >nul 2>&1
-if errorlevel 1 (
+if not errorlevel 1 (
+    for /f "delims=" %%v in ('git --version 2^>nul') do set "CUR_GIT_VER=%%v"
+    call :log     当前Git版本: !CUR_GIT_VER!
+    
+    call :check_git_latest_version
+    if errorlevel 1 (
+        call :log [*] 检测到Git新版本，正在自动升级...
+        call :auto_install_git
+        for /f "delims=" %%v in ('git --version 2^>nul') do set "CUR_GIT_VER=%%v"
+        call :log [*] Git已升级: !CUR_GIT_VER!
+    ) else (
+        call :log [*] Git已是最新版本
+    )
+) else (
     call :log [*] 未找到 Git，正在自动安装...
     call :auto_install_git
     where git >nul 2>&1
@@ -297,10 +310,48 @@ if not exist "!HOSTC_BIN!" (
     call :install_hostc
 )
 if exist "!HOSTC_BIN!" (
-    for /f "delims=" %%v in ('"!HOSTC_BIN!" --version 2^>nul') do set "HOSTC_VER=%%v"
-    call :log [*] hostc v!HOSTC_VER! 已就绪
+    setlocal disabledelayedexpansion
+    for /f "delims=" %%v in ('"%HOSTC_BIN%" --version 2^>nul') do endlocal & set "HOSTC_VER=%%v"
+    call :log [*] 当前 hostc 版本: v!HOSTC_VER!
+    
+    call :check_hostc_latest_version !HOSTC_VER!
+    if errorlevel 1 (
+        call :log [*] 检测到新版本，正在自动升级 hostc...
+        call :install_hostc
+        setlocal disabledelayedexpansion
+        for /f "delims=" %%v in ('"%HOSTC_BIN%" --version 2^>nul') do endlocal & set "HOSTC_VER=%%v"
+        call :log [*] hostc 已升级到最新版: v!HOSTC_VER!
+    ) else (
+        call :log [*] hostc v!HOSTC_VER! 已是最新版本
+    )
 ) else (
     call :log [WARNING] hostc 安装失败，隧道将不可用
+)
+
+call :log_blank
+call :log [*] 检查 cloudflared 隧道工具...
+set "CFD_BIN=%CD%\dist\node_modules\.bin\cloudflared.cmd"
+if not exist "!CFD_BIN!" (
+    where cloudflared >nul 2>&1 && set "CFD_BIN=cloudflared"
+)
+if exist "!CFD_BIN!" (
+    setlocal disabledelayedexpansion
+    for /f "delims=" %%v in ('"%CFD_BIN%" --version 2^>nul') do endlocal & set "CFD_VER=%%v"
+    call :log     当前cloudflared版本: !CFD_VER!
+    
+    call :check_cloudflared_latest_version !CFD_VER!
+    if errorlevel 1 (
+        call :log [*] 检测到cloudflared新版本，正在自动升级...
+        call :install_cloudflared
+        setlocal disabledelayedexpansion
+        for /f "delims=" %%v in ('"%CFD_BIN%" --version 2^>nul') do endlocal & set "CFD_VER=%%v"
+        call :log [*] cloudflared已升级到最新版: !CFD_VER!
+    ) else (
+        call :log [*] cloudflared已是最新版本
+    )
+) else (
+    call :log [*] 未找到cloudflared，正在安装...
+    call :install_cloudflared
 )
 
 call :log_blank
@@ -425,6 +476,23 @@ if not defined PYTHON_CMD (
         call :log [*] 正在自动安装Python...
         call :auto_install_python
         if errorlevel 1 exit /b 1
+    )
+) else (
+    for /f "delims=" %%v in ('"!PYTHON_CMD!" --version 2^>nul') do set "CUR_PY_VER=%%v"
+    call :log     当前Python版本: !CUR_PY_VER!
+    
+    call :check_python_latest_version !CUR_PY_VER!
+    if errorlevel 1 (
+        call :log [*] 检测到Python新版本，正在自动升级...
+        call :auto_install_python
+        if errorlevel 1 (
+            call :log [WARNING] Python升级失败，继续使用当前版本
+        ) else (
+            for /f "delims=" %%v in ('"!PYTHON_CMD!" --version 2^>nul') do set "CUR_PY_VER=%%v"
+            call :log [*] Python已升级到最新版: !CUR_PY_VER!
+        )
+    ) else (
+        call :log [*] Python已是最新版本
     )
 )
 
@@ -560,20 +628,35 @@ exit /b 1
 call :log [2/6] 检测Node.js环境...
 
 where node >nul 2>&1
-if errorlevel 1 (
-    call :log Node.js未在PATH中，正在尝试查找或自动安装...
+if not errorlevel 1 (
+    for /f "delims=" %%v in ('node --version 2^>nul') do set "CUR_NODE_VER=%%v"
+    call :log     当前Node.js版本: !CUR_NODE_VER!
     
-    where nvm >nul 2>&1
-    if not errorlevel 1 (
-        call :log     使用NVM管理Node.js...
-        nvm use lts >nul 2>&1 || nvm install lts
-        nvm use lts
-        goto :node_verify_install
+    call :check_node_latest_version !CUR_NODE_VER!
+    if errorlevel 1 (
+        call :log [*] 检测到Node.js新版本，正在自动升级...
+        call :auto_install_node
+        for /f "delims=" %%v in ('node --version 2^>nul') do set "CUR_NODE_VER=%%v"
+        call :log [*] Node.js已升级到最新版: !CUR_NODE_VER!
+    ) else (
+        call :log [*] Node.js v!CUR_NODE_VER! 已是最新版本
     )
     
-    call :log [*] 正在自动安装Node.js...
-    call :auto_install_node
+    goto :node_verify_install
 )
+
+call :log Node.js未在PATH中，正在尝试查找或自动安装...
+
+where nvm >nul 2>&1
+if not errorlevel 1 (
+    call :log     使用NVM管理Node.js...
+    nvm use lts >nul 2>&1 || nvm install lts
+    nvm use lts
+    goto :node_verify_install
+)
+
+call :log [*] 正在自动安装Node.js...
+call :auto_install_node
 
 :node_verify_install
 where node >nul 2>&1
@@ -759,6 +842,167 @@ if errorlevel 1 (
 ) else (
     call :log [*] hostc 安装成功
 )
+exit /b 0
+
+
+:check_hostc_latest_version
+call :check_hostc_latest_version_impl %1
+exit /b %ERRORLEVEL%
+
+:check_hostc_latest_version_impl
+set "CURRENT_VER=%~1"
+if not defined CURRENT_VER (
+    call :log [WARNING] 无法获取当前 hostc 版本，跳过版本检查
+    exit /b 0
+)
+
+call :log [*] 检查 hostc 最新版本...
+
+:: 获取最新版本号（使用 npm view 命令）
+for /f "delims=" %%v in ('npm view hostc version 2^>nul') do set "LATEST_VER=%%v"
+
+if not defined LATEST_VER (
+    call :log [WARNING] 无法获取 hostc 最新版本信息，跳过升级检查
+    exit /b 0
+)
+
+call :log     当前版本: v!CURRENT_VER!
+call :log     最新版本: v!LATEST_VER!
+
+:: 简单的版本比较（仅比较主版本号.次版本号.修订号）
+for /f "tokens=1,2,3 delims=." %%a in ("!CURRENT_VER!") do set "CUR_MAJOR=%%a" & set "CUR_MINOR=%%b" & set "CUR_PATCH=%%c"
+for /f "tokens=1,2,3 delims=." %%a in ("!LATEST_VER!") do set "LAT_MAJOR=%%a" & set "LAT_MINOR=%%b" & set "LAT_PATCH=%%c"
+
+:: 比较主版本号
+if !CUR_MAJOR! LSS !LAT_MAJOR! (
+    exit /b 1
+)
+if !CUR_MAJOR! GTR !LAT_MAJOR! (
+    exit /b 0
+)
+
+:: 比较次版本号
+if !CUR_MINOR! LSS !LAT_MINOR! (
+    exit /b 1
+)
+if !CUR_MINOR! GTR !LAT_MINOR! (
+    exit /b 0
+)
+
+:: 比较修订号
+if !CUR_PATCH! LSS !LAT_PATCH! (
+    exit /b 1
+)
+
+exit /b 0
+
+:check_node_latest_version
+set "CUR_NODE_VER=%~1"
+if not defined CUR_NODE_VER (
+    call :log [WARNING] 无法获取当前 Node.js 版本，跳过版本检查
+    exit /b 0
+)
+call :log [*] 检查 Node.js 最新版本...
+call :get_latest_node_version
+for /f "tokens=1 delims=v" %%a in ("!CUR_NODE_VER!") do set "CUR_NODE_NUM=%%a"
+for /f "tokens=1 delims=v" %%a in ("!NODE_LATEST_VERSION!") do set "LAT_NODE_NUM=%%a"
+call :log     当前版本: v!CUR_NODE_NUM!
+call :log     最新版本: !NODE_LATEST_VERSION!
+for /f "tokens=1,2,3 delims=." %%a in ("!CUR_NODE_NUM!") do set "CN_MAJ=%%a" & set "CN_MIN=%%b" & set "CN_PAT=%%c"
+for /f "tokens=1,2,3 delims=." %%a in ("!LAT_NODE_NUM!") do set "LN_MAJ=%%a" & set "LN_MIN=%%b" & set "LN_PAT=%%c"
+if !CN_MAJ! LSS !LN_MAJ! exit /b 1
+if !CN_MAJ! GTR !LN_MAJ! exit /b 0
+if !CN_MIN! LSS !LN_MIN! exit /b 1
+if !CN_MIN! GTR !LN_MIN! exit /b 0
+if !CN_PAT! LSS !LN_PAT! exit /b 1
+exit /b 0
+
+:check_python_latest_version
+set "CUR_PY_VER_STR=%~1"
+if not defined CUR_PY_VER_STR (
+    call :log [WARNING] 无法获取当前 Python 版本，跳过版本检查
+    exit /b 0
+)
+call :log [*] 检查 Python 最新版本...
+call :get_latest_python_version
+for /f "tokens=2 delims= " %%a in ("!CUR_PY_VER_STR!") do set "CUR_PY_NUM=%%a"
+if not defined CUR_PY_NUM set "CUR_PY_NUM=!CUR_PY_VER_STR!"
+for /f "tokens=1,2,3 delims=." %%a in ("!CUR_PY_NUM!") do set "CP_MAJ=%%a" & set "CP_MIN=%%b" & set "CP_PAT=%%c"
+for /f "tokens=1,2,3 delims=." %%a in ("!PYTHON_LATEST_VERSION!") do set "LP_MAJ=%%a" & set "LP_MIN=%%b" & set "LP_PAT=%%c"
+if not defined CP_MAJ set "CP_MAJ=0"
+if not defined CP_MIN set "CP_MIN=0"
+if not defined CP_PAT set "CP_PAT=0"
+if not defined LP_MAJ set "LP_MAJ=0"
+if not defined LP_MIN set "LP_MIN=0"
+if not defined LP_PAT set "LP_PAT=0"
+call :log     当前版本: !CUR_PY_NUM!
+call :log     最新版本: !PYTHON_LATEST_VERSION!
+if !CP_MAJ! LSS !LP_MAJ! exit /b 1
+if !CP_MAJ! GTR !LP_MAJ! exit /b 0
+if !CP_MIN! LSS !LP_MIN! exit /b 1
+if !CP_MIN! GTR !LP_MIN! exit /b 0
+if !CP_PAT! LSS !LP_PAT! exit /b 1
+exit /b 0
+
+:check_git_latest_version
+call :get_latest_git_version
+for /f "delims=" %%v in ('git --version 2^>nul') do set "CUR_GIT_FULL=%%v"
+for /f "tokens=3 delims= " %%a in ("!CUR_GIT_FULL!") do set "CUR_GIT_NUM=%%a"
+for /f "tokens=1 delims=v" %%a in ("!GIT_LATEST_VERSION!") do set "LAT_GIT_NUM=%%a"
+if not defined CUR_GIT_NUM (
+    call :log [WARNING] 无法获取当前 Git 版本，跳过版本检查
+    exit /b 0
+)
+call :log     当前版本: !CUR_GIT_NUM!
+call :log     最新版本: v!LAT_GIT_NUM!
+for /f "tokens=1,2,3 delims=." %%a in ("!CUR_GIT_NUM!") do set "CG_MAJ=%%a" & set "CG_MIN=%%b" & set "CG_PAT=%%c"
+for /f "tokens=1,2,3 delims=." %%a in ("!LAT_GIT_NUM!") do set "LG_MAJ=%%a" & set "LG_MIN=%%b" & set "LG_PAT=%%c"
+if !CG_MAJ! LSS !LG_MAJ! exit /b 1
+if !CG_MAJ! GTR !LG_MAJ! exit /b 0
+if !CG_MIN! LSS !LG_MIN! exit /b 1
+if !CG_MIN! GTR !LG_MIN! exit /b 0
+if !CG_PAT! LSS !LG_PAT! exit /b 1
+exit /b 0
+
+:install_cloudflared
+call :log [*] 安装 cloudflared...
+npm install cloudflared@latest --prefix dist 2>nul
+if errorlevel 1 (
+    call :log [WARNING] cloudflared 安装失败，Cloudflare隧道将不可用
+) else (
+    call :log [*] cloudflared 安装成功
+)
+exit /b 0
+
+:check_cloudflared_latest_version
+set "CUR_CFD_VER=%~1"
+if not defined CUR_CFD_VER (
+    call :log [WARNING] 无法获取当前 cloudflared 版本，跳过版本检查
+    exit /b 0
+)
+call :log [*] 检查 cloudflared 最新版本...
+for /f "delims=" %%v in ('npm view cloudflared version 2^>nul') do set "CFD_LATEST_VER=%%v"
+if not defined CFD_LATEST_VER (
+    call :log [WARNING] 无法获取 cloudflared 最新版本信息，跳过升级检查
+    exit /b 0
+)
+for /f "tokens=2 delims= " %%a in ("!CUR_CFD_VER!") do set "CUR_CFD_NUM=%%a"
+if not defined CUR_CFD_NUM set "CUR_CFD_NUM=!CUR_CFD_VER!"
+call :log     当前版本: !CUR_CFD_NUM!
+call :log     最新版本: !CFD_LATEST_VER!
+for /f "tokens=1,2,3 delims=." %%a in ("!CUR_CFD_NUM!") do set "CC_MAJ=%%a" & set "CC_MIN=%%b" & set "CC_PAT=%%c"
+for /f "tokens=1,2,3 delims=." %%a in ("!CFD_LATEST_VER!") do set "LC_MAJ=%%a" & set "LC_MIN=%%b" & set "LC_PAT=%%c"
+if not defined CC_MAJ set "CC_MAJ=0"
+if not defined CC_MIN set "CC_MIN=0"
+if not defined CC_PAT set "CC_PAT=0"
+if not defined LC_MAJ set "LC_MAJ=0"
+if not defined LC_MIN set "LC_MIN=0"
+if not defined LC_PAT set "LC_PAT=0"
+if !CC_MAJ! LSS !LC_MAJ! exit /b 1
+if !CC_MAJ! GTR !LC_MAJ! exit /b 0
+if !CC_MIN! LSS !LC_MIN! exit /b 1
+if !CC_MIN! GTR !LC_MIN! exit /b 0
+if !CC_PAT! LSS !LC_PAT! exit /b 1
 exit /b 0
 
 :test_npm_mirrors

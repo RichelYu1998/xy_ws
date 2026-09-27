@@ -3,7 +3,7 @@ export LANG="zh_CN.UTF-8"
 export LC_ALL="zh_CN.UTF-8"
 cd "$(dirname "$0")"
 
-:: 自动检测并请求sudo权限（如果需要）
+# 自动检测并请求sudo权限（如果需要）
 if [ "$(id -u)" -ne 0 ]; then
     if command -v sudo &> /dev/null; then
         log "[*] 检测到非root用户，部分操作可能需要sudo权限"
@@ -113,7 +113,19 @@ check_prerequisites() {
         log "[✅] curl 安装成功"
     fi
 
-    if ! command -v git &> /dev/null; then
+    if command -v git &> /dev/null; then
+        local cur_git_ver=$(git --version 2>/dev/null | awk '{print $3}')
+        log "    当前Git版本: v$cur_git_ver"
+        
+        if check_git_latest_version "$cur_git_ver"; then
+            log "[*] 检测到Git新版本，正在自动升级..."
+            auto_install_git
+            cur_git_ver=$(git --version 2>/dev/null | awk '{print $3}')
+            log "[*] Git已升级: v$cur_git_ver"
+        else
+            log "[*] Git已是最新版本"
+        fi
+    else
         log "[*] 未检测到git，正在自动安装..."
         case "$(uname -s)" in
             Darwin)
@@ -198,9 +210,43 @@ pre_launch() {
     fi
     if [ -f "$HOSTC_BIN" ]; then
         HOSTC_VER=$("$HOSTC_BIN" --version 2>/dev/null || echo "unknown")
-        log "[*] hostc v${HOSTC_VER} 已就绪"
+        log "[*] 当前 hostc 版本: v${HOSTC_VER}"
+        
+        if check_hostc_latest_version "$HOSTC_VER"; then
+            log "[*] 检测到新版本，正在自动升级 hostc..."
+            install_hostc
+            HOSTC_VER=$("$HOSTC_BIN" --version 2>/dev/null || echo "unknown")
+            log "[*] hostc 已升级到最新版: v${HOSTC_VER}"
+        else
+            log "[*] hostc v${HOSTC_VER} 已是最新版本"
+        fi
     else
         log "[WARNING] hostc 安装失败，隧道将不可用"
+    fi
+
+    log_blank
+    log "[*] 检查 cloudflared 隧道工具..."
+    CFD_BIN="$(pwd)/dist/node_modules/.bin/cloudflared"
+    if [ ! -f "$CFD_BIN" ]; then
+        if command -v cloudflared &> /dev/null; then
+            CFD_BIN="cloudflared"
+        fi
+    fi
+    if [ -f "$CFD_BIN" ] || command -v cloudflared &> /dev/null; then
+        local cur_cfd_ver=$("$CFD_BIN" --version 2>/dev/null | awk '{print $3}')
+        log "    当前cloudflared版本: $cur_cfd_ver"
+        
+        if check_cloudflared_latest_version "$cur_cfd_ver"; then
+            log "[*] 检测到cloudflared新版本，正在自动升级..."
+            install_cloudflared
+            cur_cfd_ver=$("$CFD_BIN" --version 2>/dev/null | awk '{print $3}')
+            log "[*] cloudflared已升级到最新版: $cur_cfd_ver"
+        else
+            log "[*] cloudflared已是最新版本"
+        fi
+    else
+        log "[*] 未找到cloudflared，正在安装..."
+        install_cloudflared
     fi
 
     log_blank
@@ -313,6 +359,25 @@ detect_python_env() {
     if [ -z "$PYTHON_CMD" ]; then
         log "[ERROR] 无法找到或安装Python"
         return 1
+    fi
+
+    # Python已找到，检查版本是否需要升级
+    local cur_py_ver=$("$PYTHON_CMD" --version 2>&1 | awk '{print $2}')
+    if [ -n "$cur_py_ver" ]; then
+        log "    当前Python版本: $cur_py_ver"
+        
+        if check_python_latest_version "$cur_py_ver"; then
+            log "[*] 检测到Python新版本，正在自动升级..."
+            auto_install_python
+            if [ $? -eq 0 ]; then
+                cur_py_ver=$("$PYTHON_CMD" --version 2>&1 | awk '{print $2}')
+                log "[*] Python已升级到最新版: $cur_py_ver"
+            else
+                log "[WARNING] Python升级失败，继续使用当前版本"
+            fi
+        else
+            log "[*] Python已是最新版本"
+        fi
     fi
 
     log_blank
@@ -699,7 +764,18 @@ detect_node_env() {
     log "[2/6] 检测Node.js环境..."
 
     if command -v node &> /dev/null; then
-        log "Node.js版本: $(node --version 2>&1)"
+        local cur_node_ver=$(node --version 2>/dev/null)
+        log "    当前Node.js版本: $cur_node_ver"
+        
+        if check_node_latest_version "$cur_node_ver"; then
+            log "[*] 检测到Node.js新版本，正在自动升级..."
+            auto_install_node
+            cur_node_ver=$(node --version 2>/dev/null)
+            log "[*] Node.js已升级到最新版: $cur_node_ver"
+        else
+            log "[*] Node.js v$cur_node_ver 已是最新版本"
+        fi
+        
         log "NPM版本: $(npm --version 2>&1)"
         return 0
     fi
@@ -900,6 +976,132 @@ test_pip_mirrors() {
     fi
 }
 
+# 检查 Node.js 是否是最新版本
+# 参数: $1 = 当前版本号
+# 返回: 0 = 已是最新, 1 = 需要升级
+check_node_latest_version() {
+    local current_ver="$1"
+    current_ver=${current_ver#v}
+    
+    if [ -z "$current_ver" ]; then
+        log "[WARNING] 无法获取当前 Node.js 版本，跳过版本检查"
+        return 0
+    fi
+    
+    log "[*] 检查 Node.js 最新版本..."
+    
+    local latest_ver=$(curl -s --connect-timeout 5 --max-time 10 https://npmmirror.com/mirrors/node/index.json 2>/dev/null | grep -oP '"version":\s*"v[^"]*"' | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
+    
+    if [ -z "$latest_ver" ]; then
+        log "[WARNING] 无法获取 Node.js 最新版本信息，跳过升级检查"
+        return 0
+    fi
+    
+    log "    当前版本: v$current_ver"
+    log "    最新版本: v$latest_ver"
+    
+    if [ "$(printf '%s\n' "$current_ver" "$latest_ver" | sort -V | head -n1)" != "$latest_ver" ]; then
+        return 1
+    fi
+    
+    return 0
+}
+
+# 检查 Python 是否是最新版本
+check_python_latest_version() {
+    local current_ver="$1"
+    
+    if [ -z "$current_ver" ]; then
+        log "[WARNING] 无法获取当前 Python 版本，跳过版本检查"
+        return 0
+    fi
+    
+    log "[*] 检查 Python 最新版本..."
+    
+    local latest_ver=$(curl -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/python/cpython/releases/latest 2>/dev/null | grep -oP '"tag_name":\s*"v[^"]*"' | head -1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+    
+    if [ -z "$latest_ver" ]; then
+        log "[WARNING] 无法获取 Python 最新版本信息，跳过升级检查"
+        return 0
+    fi
+    
+    log "    当前版本: $current_ver"
+    log "    最新版本: $latest_ver"
+    
+    if [ "$(printf '%s\n' "$current_ver" "$latest_ver" | sort -V | head -n1)" != "$latest_ver" ]; then
+        return 1
+    fi
+    
+    return 0
+}
+
+# 检查 Git 是否是最新版本
+check_git_latest_version() {
+    local current_ver="$1"
+    
+    if [ -z "$current_ver" ]; then
+        log "[WARNING] 无法获取当前 Git 版本，跳过版本检查"
+        return 0
+    fi
+    
+    log "[*] 检查 Git 最新版本..."
+    
+    local latest_ver=$(curl -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/git/git/releases/latest 2>/dev/null | grep -oP '"tag_name":\s*"v[^"]*"' | head -1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+    
+    if [ -z "$latest_ver" ]; then
+        log "[WARNING] 无法获取 Git 最新版本信息，跳过升级检查"
+        return 0
+    fi
+    
+    log "    当前版本: v$current_ver"
+    log "    最新版本: v$latest_ver"
+    
+    if [ "$(printf '%s\n' "$current_ver" "$latest_ver" | sort -V | head -n1)" != "$latest_ver" ]; then
+        return 1
+    fi
+    
+    return 0
+}
+
+# 安装 cloudflared
+install_cloudflared() {
+    log "[*] 安装 cloudflared..."
+    npm install cloudflared@latest --prefix dist 2>/dev/null
+    if [ $? -ne 0 ]; then
+        log "[WARNING] cloudflared 安装失败，Cloudflare隧道将不可用"
+    else
+        log "[*] cloudflared 安装成功"
+    fi
+}
+
+# 检查 cloudflared 是否是最新版本
+check_cloudflared_latest_version() {
+    local current_ver="$1"
+    
+    if [ -z "$current_ver" ]; then
+        log "[WARNING] 无法获取当前 cloudflared 版本，跳过版本检查"
+        return 0
+    fi
+    
+    log "[*] 检查 cloudflared 最新版本..."
+    
+    local latest_ver=$(npm view cloudflared version 2>/dev/null || echo "")
+    
+    if [ -z "$latest_ver" ]; then
+        log "[WARNING] 无法获取 cloudflared 最新版本信息，跳过升级检查"
+        return 0
+    fi
+    
+    log "    当前版本: $current_ver"
+    log "    最新版本: $latest_ver"
+    
+    if [ "$(printf '%s\n' "$current_ver" "$latest_ver" | sort -V | head -n1)" != "$latest_ver" ]; then
+        return 1
+    fi
+    
+    return 0
+}
+
 install_hostc() {
     log "[*] CDN轮询安装 hostc..."
 
@@ -935,6 +1137,38 @@ install_hostc() {
     fi
 }
 
+
+# 检查 hostc 是否是最新版本
+# 参数: $1 = 当前版本号
+# 返回: 0 = 已是最新, 1 = 需要升级
+check_hostc_latest_version() {
+    local current_ver="$1"
+    
+    if [ -z "$current_ver" ] || [ "$current_ver" = "unknown" ]; then
+        log "[WARNING] 无法获取当前 hostc 版本，跳过版本检查"
+        return 0
+    fi
+    
+    log "[*] 检查 hostc 最新版本..."
+    
+    # 获取最新版本号
+    local latest_ver=$(npm view hostc version 2>/dev/null || echo "")
+    
+    if [ -z "$latest_ver" ]; then
+        log "[WARNING] 无法获取 hostc 最新版本信息，跳过升级检查"
+        return 0
+    fi
+    
+    log "    当前版本: v${current_ver}"
+    log "    最新版本: v${latest_ver}"
+    
+    # 简单的版本比较（使用 sort -V）
+    if [ "$(printf '%s\n' "$current_ver" "$latest_ver" | sort -V | head -n1)" != "$latest_ver" ]; then
+        return 1  # 需要升级
+    fi
+    
+    return 0  # 已是最新
+}
 test_npm_mirrors() {
     log "[4/6] 测试NPM加速镜像源..."
 

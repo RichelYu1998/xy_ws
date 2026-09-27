@@ -5064,11 +5064,36 @@
                         console.error('[隧道共享] 获取状态失败:', e);
                     }
                 }, 1000);
-                if (!statusData.url) {
+                if (!statusData.url && !statusData.cloudflare?.url) {
                     console.log('[隧道共享] 隧道未运行');
                     const hostcContainer = document.getElementById('tunnel-share-hostc');
                     if (hostcContainer) hostcContainer.innerHTML = '<i class="fa fa-info-circle"></i> 隧道未运行，请点击下方「管理隧道」启动';
-                    if (tunnelContent) tunnelContent.insertBefore(alertDiv, tunnelContent.firstChild);
+                } else if (!statusData.url && statusData.cloudflare?.url) {
+                    console.log('[隧道共享] 使用 Cloudflare 隧道');
+                    const hostcContainer = document.getElementById('tunnel-share-hostc');
+                    if (hostcContainer) {
+                        hostcContainer.className = 'p-2 bg-info text-white rounded mb-2';
+                        hostcContainer.innerHTML = `
+                            <i class="fa fa-cloud"></i>
+                            <a href="${safeUrl(statusData.cloudflare.url)}" target="_blank" class="text-white font-weight-bold" style="word-break: break-all;">
+                                <i class="fa fa-external-link"></i> ${escapeHtml(statusData.cloudflare.url)}
+                            </a>
+                            <span class="badge badge-light ml-1">Cloudflare</span>
+                            <button class="btn btn-sm btn-light ml-2" id="btn-copy-hostc-url" data-url="${escapeAttr(statusData.cloudflare.url)}">
+                                <i class="fa fa-copy"></i> 复制
+                            </button>
+                        `;
+                        const cfCopyBtn = document.getElementById('btn-copy-hostc-url');
+                        if (cfCopyBtn) {
+                            cfCopyBtn.onclick = function() {
+                                copyToClipboard(this.dataset.url);
+                                this.innerHTML = '<i class="fa fa-check"></i> 已复制';
+                                setTimeout(() => {
+                                    this.innerHTML = '<i class="fa fa-copy"></i> 复制';
+                                }, 2000);
+                            };
+                        }
+                    }
                 }
             } catch (e) {
                 if (e.name === 'AbortError') {
