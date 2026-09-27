@@ -249,7 +249,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.75 (2026-09-27) - 🔧 **启动脚本版本自动检测升级+隧道独立显示修复+前端alertDiv错误修复** - run.bat/run.sh新增Git/Node.js/Python/hostc/cloudflared版本自动检测与升级逻辑(含版本兼容性检查)+修复hostc和Cloudflare隧道独立显示互不影响+修复前端alertDiv is not defined错误+dist/package.json添加cloudflared依赖
 
-> **Commit**: 52f32ea7
+> **Commit**: 22989c6f
 
 #### 更新内容:
 1. **启动脚本版本自动检测升级**: run.bat和run.sh新增Git、Node.js、Python、hostc、cloudflared五个工具的版本自动检测与升级函数，启动时自动检查是否为最新版本并在兼容性允许范围内升级
@@ -270,7 +270,7 @@ bandit -r . -f json -o bandit_report.json
 - **技术实现(版本检测)**: 新增check_hostc_latest_version/check_node_latest_version/check_python_latest_version/check_git_latest_version/check_cloudflared_latest_version函数 [run.bat](run.bat) [run.sh](run.sh)
 - **技术实现(版本比较)**: 使用语义化版本比较(主版本号.次版本号.修订号逐级比较)，仅在兼容性允许时升级 [run.bat](run.bat)
 - **技术实现(自动升级)**: 检测到版本过旧时自动执行升级命令(npm i -g hostc@latest等)，升级后验证版本 [run.bat](run.bat) [run.sh](run.sh)
-- **参考位置**: commit 52f32ea7, [run.bat](run.bat#L771-L900) [run.sh](run.sh#L670-L800)
+- **参考位置**: commit 22989c6f, [run.bat](run.bat#L771-L900) [run.sh](run.sh#L670-L800)
 
 **测试验证**:
 - ✅ hostc版本检测: 检测到1.3.0过旧，自动升级至2.0.3
@@ -287,7 +287,7 @@ bandit -r . -f json -o bandit_report.json
 
 **修复方案**:
 - **技术实现**: 修改dist/app.js中隧道状态判断逻辑，分别检查hostc和Cloudflare的url状态 [dist/app.js](dist/app.js)
-- **参考位置**: commit 52f32ea7, [dist/app.js](dist/app.js)
+- **参考位置**: commit 22989c6f, [dist/app.js](dist/app.js)
 
 **测试验证**:
 - ✅ hostc隧道失败时，Cloudflare隧道状态正常显示
@@ -302,7 +302,7 @@ bandit -r . -f json -o bandit_report.json
 
 **修复方案**:
 - **技术实现**: 移除dist/app.js中对alertDiv的引用，使用已有的通知机制 [dist/app.js](dist/app.js)
-- **参考位置**: commit 52f32ea7, [dist/app.js](dist/app.js)
+- **参考位置**: commit 22989c6f, [dist/app.js](dist/app.js)
 
 **测试验证**:
 - ✅ 操作失败时正确显示错误信息，不再出现alertDiv错误
