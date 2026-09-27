@@ -92,10 +92,7 @@ if not errorlevel 1 (
     
     call :check_git_latest_version
     if errorlevel 1 (
-        call :log [*] 检测到Git新版本，正在自动升级...
-        call :auto_install_git
-        for /f "delims=" %%v in ('git --version 2^>nul') do set "CUR_GIT_VER=%%v"
-        call :log [*] Git已升级: !CUR_GIT_VER!
+        call :log [提示] 检测到Git有新版本，如需升级请手动执行: winget install Git.Git
     ) else (
         call :log [*] Git已是最新版本
     )
@@ -194,8 +191,22 @@ if exist "C:\ProgramData\chocolatey\bin\choco.exe" (
 exit /b
 
 :get_latest_git_version
-for /f "delims=" %%v in ('curl.exe -s https://api.github.com/repos/git-for-windows/git/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input | ConvertFrom-Json | Select-Object -ExpandProperty tag_name"') do set "GIT_LATEST_VERSION=%%v"
-if not defined GIT_LATEST_VERSION set "GIT_LATEST_VERSION=2.47.1"
+set "GIT_LATEST_VERSION="
+
+:: 方法1: npmmirror国内镜像（优先）
+for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://registry.npmmirror.com/-/binary/git-for-windows/git/releases/latest 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json).tag_name } catch {}"') do set "GIT_LATEST_VERSION=%%v"
+
+:: 方法2: 华为云镜像
+if not defined GIT_LATEST_VERSION (
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/git-for-windows/git/releases/latest 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json).tag_name } catch {}"') do set "GIT_LATEST_VERSION=%%v"
+)
+
+:: 方法3: 清华镜像
+if not defined GIT_LATEST_VERSION (
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/git-for-windows/git/releases/latest 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json).tag_name } catch {}"') do set "GIT_LATEST_VERSION=%%v"
+)
+
+if not defined GIT_LATEST_VERSION set "GIT_LATEST_VERSION=2.49.0"
 exit /b
 
 :auto_install_git
@@ -341,11 +352,7 @@ if exist "!CFD_BIN!" (
     
     call :check_cloudflared_latest_version !CFD_VER!
     if errorlevel 1 (
-        call :log [*] 检测到cloudflared新版本，正在自动升级...
-        call :install_cloudflared
-        setlocal disabledelayedexpansion
-        for /f "delims=" %%v in ('"%CFD_BIN%" --version 2^>nul') do endlocal & set "CFD_VER=%%v"
-        call :log [*] cloudflared已升级到最新版: !CFD_VER!
+        call :log [提示] 检测到cloudflared有新版本，如需升级请手动执行: npm install cloudflared@latest --prefix dist
     ) else (
         call :log [*] cloudflared已是最新版本
     )
@@ -483,14 +490,7 @@ if not defined PYTHON_CMD (
     
     call :check_python_latest_version !CUR_PY_VER!
     if errorlevel 1 (
-        call :log [*] 检测到Python新版本，正在自动升级...
-        call :auto_install_python
-        if errorlevel 1 (
-            call :log [WARNING] Python升级失败，继续使用当前版本
-        ) else (
-            for /f "delims=" %%v in ('"!PYTHON_CMD!" --version 2^>nul') do set "CUR_PY_VER=%%v"
-            call :log [*] Python已升级到最新版: !CUR_PY_VER!
-        )
+        call :log [提示] 检测到Python有新版本，如需升级请手动执行: winget install Python.Python.3.12
     ) else (
         call :log [*] Python已是最新版本
     )
@@ -527,25 +527,22 @@ exit /b 0
 set "PYTHON_LATEST_VERSION="
 call :log 正在获取Python最新版本（使用国内镜像）...
 
-:: 方法1: 使用短超时 + 多次重试（GitHub API）
-for /L %%r in (1,1,3) do (
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/python/cpython/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input ^| ConvertFrom-Json ^| Select-Object -ExpandProperty tag_name"') do set "PYTHON_LATEST_VERSION=%%v"
-    if defined PYTHON_LATEST_VERSION goto :python_version_done
-    if %%r lss 3 echo     重试获取... (%%r/3)
+:: 方法1: npmmirror国内镜像（优先）
+for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://registry.npmmirror.com/-/binary/python/ 2^>nul ^| powershell -NoProfile -Command "$input -split '\n' | Select-String -Pattern 'href=.+python-3\.\d+\.\d+' | Select-Object -Last 1 | ForEach-Object { if ($_ -match 'python-(3\.\d+\.\d+)') { $matches[1] } }"') do set "PYTHON_LATEST_VERSION=%%v"
+
+:: 方法2: 华为云镜像
+if not defined PYTHON_LATEST_VERSION (
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/python/ 2^>nul ^| powershell -NoProfile -Command "$input -split '\n' | Select-String -Pattern 'href=.+python-3\.\d+\.\d+' | Select-Object -Last 1 | ForEach-Object { if ($_ -match 'python-(3\.\d+\.\d+)') { $matches[1] } }"') do set "PYTHON_LATEST_VERSION=%%v"
 )
 
-:: 方法2: 失败时使用国内镜像源获取版本信息
+:: 方法3: 清华镜像
 if not defined PYTHON_LATEST_VERSION (
-    call :log [WARNING] GitHub API 获取失败，尝试国内镜像...
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://mirrors.huaweicloud.com/python/ 2^>nul ^| powershell -NoProfile -Command "$input ^| Select-String -Pattern ""python-[0-9]+\.[0-9]+\.[0-9]+"" ^| Select-Object -First 1"') do (
-        for /f "tokens=2 delims=-" %%p in ("%%v") do set "PYTHON_LATEST_VERSION=%%p"
-    )
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/python/ 2^>nul ^| powershell -NoProfile -Command "$input -split '\n' | Select-String -Pattern 'href=.+python-3\.\d+\.\d+' | Select-Object -Last 1 | ForEach-Object { if ($_ -match 'python-(3\.\d+\.\d+)') { $matches[1] } }"') do set "PYTHON_LATEST_VERSION=%%v"
 )
 
-:python_version_done
 if not defined PYTHON_LATEST_VERSION (
-    call :log [WARNING] 所有方式获取失败，使用安全默认值
-    set "PYTHON_LATEST_VERSION=3.12.6"
+    call :log [WARNING] 所有国内镜像获取失败，使用安全默认值
+    set "PYTHON_LATEST_VERSION=3.14.0"
 )
 
 call :log 检测到Python最新版本: %PYTHON_LATEST_VERSION%
@@ -634,12 +631,9 @@ if not errorlevel 1 (
     
     call :check_node_latest_version !CUR_NODE_VER!
     if errorlevel 1 (
-        call :log [*] 检测到Node.js新版本，正在自动升级...
-        call :auto_install_node
-        for /f "delims=" %%v in ('node --version 2^>nul') do set "CUR_NODE_VER=%%v"
-        call :log [*] Node.js已升级到最新版: !CUR_NODE_VER!
+        call :log [提示] 检测到Node.js有新版本，如需升级请手动执行: winget install OpenJS.NodeJS.LTS
     ) else (
-        call :log [*] Node.js v!CUR_NODE_VER! 已是最新版本
+        call :log [*] Node.js !CUR_NODE_VER! 已是最新版本
     )
     
     goto :node_verify_install
@@ -674,23 +668,22 @@ exit /b 0
 set "NODE_LATEST_VERSION="
 call :log 正在获取Node.js最新版本（使用国内镜像）...
 
-:: 方法1: 使用短超时 + 多次重试（GitHub API）
-for /L %%r in (1,1,3) do (
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/nodejs/release/releases/latest 2^>nul ^| powershell -NoProfile -Command "$input ^| ConvertFrom-Json ^| Select-Object -ExpandProperty tag_name"') do set "NODE_LATEST_VERSION=%%v"
-    if defined NODE_LATEST_VERSION goto :node_version_done
-    if %%r lss 3 echo     重试获取... (%%r/3)
+:: 方法1: npmmirror国内镜像（优先，直接获取index.json）
+for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://npmmirror.com/mirrors/node/index.json 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json)[0].version } catch {}"') do set "NODE_LATEST_VERSION=%%v"
+
+:: 方法2: 华为云镜像
+if not defined NODE_LATEST_VERSION (
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/nodejs/index.json 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json)[0].version } catch {}"') do set "NODE_LATEST_VERSION=%%v"
 )
 
-:: 方法2: 失败时使用国内镜像源获取版本信息
+:: 方法3: 清华镜像
 if not defined NODE_LATEST_VERSION (
-    call :log [WARNING] GitHub API 获取失败，尝试国内镜像...
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 5 --max-time 10 https://npmmirror.com/mirrors/node/ 2^>nul ^| powershell -NoProfile -Command "$input ^| Select-String -Pattern ""v[0-9]+\.[0-9]+\.[0-9]+"" ^| Select-Object -First 1"') do set "NODE_LATEST_VERSION=%%v"
+    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/index.json 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json)[0].version } catch {}"') do set "NODE_LATEST_VERSION=%%v"
 )
 
-:node_version_done
 if not defined NODE_LATEST_VERSION (
-    call :log [WARNING] 所有方式获取失败，使用安全默认值
-    set "NODE_LATEST_VERSION=v20.17.0"
+    call :log [WARNING] 所有国内镜像获取失败，使用安全默认值
+    set "NODE_LATEST_VERSION=v20.20.1"
 )
 
 call :log 检测到Node.js最新版本: %NODE_LATEST_VERSION%
@@ -925,7 +918,8 @@ if not defined CUR_PY_VER_STR (
 )
 call :log [*] 检查 Python 最新版本...
 call :get_latest_python_version
-for /f "tokens=2 delims= " %%a in ("!CUR_PY_VER_STR!") do set "CUR_PY_NUM=%%a"
+set "CUR_PY_NUM="
+for /f "delims=" %%a in ('echo !CUR_PY_VER_STR! ^| powershell -NoProfile -Command "if ($input -match '(\d+\.\d+\.\d+)') { $matches[1] } else { $input.Trim() }"') do set "CUR_PY_NUM=%%a"
 if not defined CUR_PY_NUM set "CUR_PY_NUM=!CUR_PY_VER_STR!"
 for /f "tokens=1,2,3 delims=." %%a in ("!CUR_PY_NUM!") do set "CP_MAJ=%%a" & set "CP_MIN=%%b" & set "CP_PAT=%%c"
 for /f "tokens=1,2,3 delims=." %%a in ("!PYTHON_LATEST_VERSION!") do set "LP_MAJ=%%a" & set "LP_MIN=%%b" & set "LP_PAT=%%c"
@@ -986,7 +980,8 @@ if not defined CFD_LATEST_VER (
     call :log [WARNING] 无法获取 cloudflared 最新版本信息，跳过升级检查
     exit /b 0
 )
-for /f "tokens=2 delims= " %%a in ("!CUR_CFD_VER!") do set "CUR_CFD_NUM=%%a"
+set "CUR_CFD_NUM="
+for /f "delims=" %%a in ('echo !CUR_CFD_VER! ^| powershell -NoProfile -Command "if ($input -match '(\d+\.\d+\.\d+)') { $matches[1] } else { $input.Trim() }"') do set "CUR_CFD_NUM=%%a"
 if not defined CUR_CFD_NUM set "CUR_CFD_NUM=!CUR_CFD_VER!"
 call :log     当前版本: !CUR_CFD_NUM!
 call :log     最新版本: !CFD_LATEST_VER!

@@ -118,10 +118,7 @@ check_prerequisites() {
         log "    当前Git版本: v$cur_git_ver"
         
         if check_git_latest_version "$cur_git_ver"; then
-            log "[*] 检测到Git新版本，正在自动升级..."
-            auto_install_git
-            cur_git_ver=$(git --version 2>/dev/null | awk '{print $3}')
-            log "[*] Git已升级: v$cur_git_ver"
+            log "[提示] 检测到Git有新版本，如需升级请手动执行: 系统包管理器 install git"
         else
             log "[*] Git已是最新版本"
         fi
@@ -237,10 +234,7 @@ pre_launch() {
         log "    当前cloudflared版本: $cur_cfd_ver"
         
         if check_cloudflared_latest_version "$cur_cfd_ver"; then
-            log "[*] 检测到cloudflared新版本，正在自动升级..."
-            install_cloudflared
-            cur_cfd_ver=$("$CFD_BIN" --version 2>/dev/null | awk '{print $3}')
-            log "[*] cloudflared已升级到最新版: $cur_cfd_ver"
+            log "[提示] 检测到cloudflared有新版本，如需升级请手动执行: npm install cloudflared@latest --prefix dist"
         else
             log "[*] cloudflared已是最新版本"
         fi
@@ -367,14 +361,7 @@ detect_python_env() {
         log "    当前Python版本: $cur_py_ver"
         
         if check_python_latest_version "$cur_py_ver"; then
-            log "[*] 检测到Python新版本，正在自动升级..."
-            auto_install_python
-            if [ $? -eq 0 ]; then
-                cur_py_ver=$("$PYTHON_CMD" --version 2>&1 | awk '{print $2}')
-                log "[*] Python已升级到最新版: $cur_py_ver"
-            else
-                log "[WARNING] Python升级失败，继续使用当前版本"
-            fi
+            log "[提示] 检测到Python有新版本，如需升级请手动执行: 系统包管理器 install python3"
         else
             log "[*] Python已是最新版本"
         fi
@@ -676,24 +663,22 @@ get_latest_python_version() {
     PYTHON_LATEST_VERSION=""
     log "    正在获取Python最新版本（使用国内镜像）..."
 
-    :: 方法1: 使用短超时 + 多次重试（GitHub API）
-    for r in 1 2 3; do
-        PYTHON_LATEST_VERSION=$(curl -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/python/cpython/releases/latest 2>/dev/null | grep -oE '"tag_name":\s*"v[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-        if [ -n "$PYTHON_LATEST_VERSION" ]; then
-            break
-        fi
-        log "    重试获取... ($r/3)"
-    done
+    # 方法1: npmmirror国内镜像（优先）
+    PYTHON_LATEST_VERSION=$(curl -s --connect-timeout 8 --max-time 15 https://registry.npmmirror.com/-/binary/python/ 2>/dev/null | grep -oE 'href="[^"]*python-3\.[0-9]+\.[0-9]+' | grep -oE '3\.[0-9]+\.[0-9]+' | sort -V | tail -1)
 
-    :: 方法2: 失败时使用国内镜像源获取版本信息
+    # 方法2: 华为云镜像
     if [ -z "$PYTHON_LATEST_VERSION" ]; then
-        log "    [WARNING] GitHub API 获取失败，尝试国内镜像..."
-        PYTHON_LATEST_VERSION=$(curl -s --connect-timeout 5 --max-time 10 https://mirrors.huaweicloud.com/python/ 2>/dev/null | grep -oE 'python-[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/python-//')
+        PYTHON_LATEST_VERSION=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/python/ 2>/dev/null | grep -oE 'href="[^"]*python-3\.[0-9]+\.[0-9]+' | grep -oE '3\.[0-9]+\.[0-9]+' | sort -V | tail -1)
+    fi
+
+    # 方法3: 清华镜像
+    if [ -z "$PYTHON_LATEST_VERSION" ]; then
+        PYTHON_LATEST_VERSION=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/python/ 2>/dev/null | grep -oE 'href="[^"]*python-3\.[0-9]+\.[0-9]+' | grep -oE '3\.[0-9]+\.[0-9]+' | sort -V | tail -1)
     fi
 
     if [ -z "$PYTHON_LATEST_VERSION" ]; then
-        log "    [WARNING] 所有方式获取失败，使用安全默认值"
-        PYTHON_LATEST_VERSION="3.12.6"
+        log "    [WARNING] 所有国内镜像获取失败，使用安全默认值"
+        PYTHON_LATEST_VERSION="3.14.0"
     fi
 
     log "    检测到Python最新版本: $PYTHON_LATEST_VERSION"
@@ -768,10 +753,7 @@ detect_node_env() {
         log "    当前Node.js版本: $cur_node_ver"
         
         if check_node_latest_version "$cur_node_ver"; then
-            log "[*] 检测到Node.js新版本，正在自动升级..."
-            auto_install_node
-            cur_node_ver=$(node --version 2>/dev/null)
-            log "[*] Node.js已升级到最新版: $cur_node_ver"
+            log "[提示] 检测到Node.js有新版本，如需升级请手动执行: 系统包管理器 install nodejs"
         else
             log "[*] Node.js v$cur_node_ver 已是最新版本"
         fi
@@ -990,7 +972,20 @@ check_node_latest_version() {
     
     log "[*] 检查 Node.js 最新版本..."
     
-    local latest_ver=$(curl -s --connect-timeout 5 --max-time 10 https://npmmirror.com/mirrors/node/index.json 2>/dev/null | grep -oP '"version":\s*"v[^"]*"' | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
+    local latest_ver=""
+    
+    # 方法1: npmmirror国内镜像（优先）
+    latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://npmmirror.com/mirrors/node/index.json 2>/dev/null | grep -oP '"version":\s*"v[^"]*"' | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
+    
+    # 方法2: 华为云镜像
+    if [ -z "$latest_ver" ]; then
+        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/nodejs/index.json 2>/dev/null | grep -oP '"version":\s*"v[^"]*"' | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
+    fi
+    
+    # 方法3: 清华镜像
+    if [ -z "$latest_ver" ]; then
+        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/index.json 2>/dev/null | grep -oP '"version":\s*"v[^"]*"' | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
+    fi
     
     if [ -z "$latest_ver" ]; then
         log "[WARNING] 无法获取 Node.js 最新版本信息，跳过升级检查"
@@ -1018,7 +1013,20 @@ check_python_latest_version() {
     
     log "[*] 检查 Python 最新版本..."
     
-    local latest_ver=$(curl -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/python/cpython/releases/latest 2>/dev/null | grep -oP '"tag_name":\s*"v[^"]*"' | head -1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+    local latest_ver=""
+    
+    # 方法1: npmmirror国内镜像（优先）
+    latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://registry.npmmirror.com/-/binary/python/ 2>/dev/null | grep -oE 'href="[^"]*python-3\.[0-9]+\.[0-9]+' | grep -oE '3\.[0-9]+\.[0-9]+' | sort -V | tail -1)
+    
+    # 方法2: 华为云镜像
+    if [ -z "$latest_ver" ]; then
+        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/python/ 2>/dev/null | grep -oE 'href="[^"]*python-3\.[0-9]+\.[0-9]+' | grep -oE '3\.[0-9]+\.[0-9]+' | sort -V | tail -1)
+    fi
+    
+    # 方法3: 清华镜像
+    if [ -z "$latest_ver" ]; then
+        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/python/ 2>/dev/null | grep -oE 'href="[^"]*python-3\.[0-9]+\.[0-9]+' | grep -oE '3\.[0-9]+\.[0-9]+' | sort -V | tail -1)
+    fi
     
     if [ -z "$latest_ver" ]; then
         log "[WARNING] 无法获取 Python 最新版本信息，跳过升级检查"
@@ -1046,7 +1054,20 @@ check_git_latest_version() {
     
     log "[*] 检查 Git 最新版本..."
     
-    local latest_ver=$(curl -s --connect-timeout 5 --max-time 10 https://api.github.com/repos/git/git/releases/latest 2>/dev/null | grep -oP '"tag_name":\s*"v[^"]*"' | head -1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+    local latest_ver=""
+    
+    # 方法1: npmmirror国内镜像（优先）
+    latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://registry.npmmirror.com/-/binary/git-for-windows/git/releases/latest 2>/dev/null | grep -oP '"tag_name":\s*"[^"]*"' | head -1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+    
+    # 方法2: 华为云镜像
+    if [ -z "$latest_ver" ]; then
+        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/git-for-windows/ 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 | sed 's/v//')
+    fi
+    
+    # 方法3: 清华镜像
+    if [ -z "$latest_ver" ]; then
+        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/git-for-windows/ 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sort -V | tail -1 | sed 's/v//')
+    fi
     
     if [ -z "$latest_ver" ]; then
         log "[WARNING] 无法获取 Git 最新版本信息，跳过升级检查"
