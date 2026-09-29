@@ -8207,6 +8207,7 @@ if __name__ == '__main__':
                 return JSONResponse(status_code=504, content={'error': '请求处理超时'}, headers=_no_store_headers())
 
             if not path.startswith('/static'):
+                status_code_code = response.status_code
                 if status_code_code >= 400:
                     _request_logger.warning(f'[{status_code_code}] {path}')
 

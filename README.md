@@ -247,6 +247,32 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.77 (2026-09-29) - 🐛 **中间件status_code_code未定义500错误修复** - _log_and_security_middleware中间件中status_code_code变量未定义导致NameError(所有请求返回500 Internal Server Error)+添加status_code_code=response.status_code赋值+服务恢复正常200响应
+
+> **Commit**: 7db538e2
+
+#### 更新内容:
+1. **中间件变量未定义修复**: 在_log_and_security_middleware中间件中，`status_code_code`变量在条件判断中使用但从未赋值，导致`NameError: name 'status_code_code' is not defined`
+2. **500错误消除**: 该NameError被全局异常处理器捕获后返回500，导致所有HTTP请求(包括GET /)都返回500 Internal Server Error
+3. **服务恢复**: 修复后添加`status_code_code = response.status_code`从response对象获取状态码，服务恢复正常200响应
+4. **三方文档同步**: README.md+skill.md版本记录更新+skill.docx重新生成
+
+##### 1. 🐛 中间件status_code_code未定义修复 (NameError→500→全部请求失败)
+**问题描述**:
+- **现象**: Web服务启动后所有请求返回500 Internal Server Error，日志显示`NameError: name 'status_code_code' is not defined`
+- **根因**: _log_and_security_middleware中间件中第8210行使用`if status_code_code >= 400:`判断，但`status_code_code`变量从未被定义或赋值，Python运行时抛出NameError
+- **影响范围**: 所有HTTP请求，Web服务完全不可用
+
+**修复方案**:
+- **技术实现(变量赋值)**: 在条件判断前添加`status_code_code = response.status_code`，从Starlette Response对象获取HTTP状态码 [main.py](main.py#L8210)
+- **参考位置**: commit 7db538e2, [main.py](main.py#L8208-L8213)
+
+**测试验证**:
+- ✅ 修复前: GET / → 500 Internal Server Error
+- ✅ 修复后: GET / → 200 OK (Content-Length: 64678)
+- ✅ 编译检查: py_compile通过
+- ✅ 服务启动: 无NameError异常
+
 ### v5.0.9.76 (2026-09-29) - 🛡️ **API翻页防崩溃加固+page.url异常保护** - fetch_all_products_via_api函数将Playwright的page.request.get替换为urllib.request.urlopen实现API请求与浏览器进程完全解耦(防止浏览器崩溃导致只获取32个商品)+添加pageSize=100参数+翻页上限从20提升至50+page.url获取添加try/except异常保护+备选target_url回退机制
 
 > **Commit**: bc138e21
