@@ -249,7 +249,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.78 (2026-09-29) - 🔧 **资源泄漏修复+代码规范合规** - urllib响应对象未关闭导致HTTP连接泄漏(多处添加resp.close() try/finally)+函数内重复import移除(psutil/subprocess/sys/signal)+dir()改为globals()修复变量作用域+rate_limit_lock全局声明+max_attempts<=0守护+隧道模块级状态变量提取+cf心跳间隔30→60+URL验证超时10→15
 
-> **Commit**: 待生成
+> **Commit**: 3137d02b
 
 #### 更新内容:
 1. **资源泄漏修复**: 多处urllib.request.urlopen响应对象未调用close()导致HTTP连接句柄泄漏，添加try/finally块确保resp.close()执行（Environment.check_url/select_pip_mirror/install_playwright_cdn/fetch_all_products_via_api等）
