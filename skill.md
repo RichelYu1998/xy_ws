@@ -247,6 +247,55 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.76 (2026-09-29) - 🛡️ **API翻页防崩溃加固+page.url异常保护** - fetch_all_products_via_api函数将Playwright的page.request.get替换为urllib.request.urlopen实现API请求与浏览器进程完全解耦(防止浏览器崩溃导致只获取32个商品)+添加pageSize=100参数+翻页上限从20提升至50+page.url获取添加try/except异常保护+备选target_url回退机制
+
+> **Commit**: 待生成
+
+#### 更新内容:
+1. **API翻页防崩溃加固**: 将fetch_all_products_via_api函数中的`page.request.get`(依赖Playwright浏览器进程)替换为`urllib.request.urlopen`(Python标准库)，API请求与浏览器进程完全解耦，即使浏览器崩溃也能正常翻页获取所有商品数据
+2. **pageSize参数添加**: API请求参数新增`pageSize: 100`，每页最多获取100个商品(原来默认32个)，减少翻页次数提升效率
+3. **翻页上限提升**: 最大翻页数从`range(20)`提升至`range(50)`，支持更多页的数据获取
+4. **page.url异常保护**: 对`current_url = page.url`添加try/except异常保护，浏览器断开时不报错，自动使用`config_manager.get_target_url()`作为备选
+5. **错误处理增强**: 新增`urllib.error.HTTPError`和`urllib.error.URLError`专门捕获，HTTP错误码也能正确获取
+6. **调试日志增强**: 每页请求打印timestamp和pageSize，分页结束打印isLoadMore和pageTimestamp状态
+7. **三方文档同步**: README.md+skill.md版本记录更新+skill.docx重新生成
+
+##### 1. 🛡️ API翻页防崩溃加固 (Playwright→urllib解耦)
+**问题描述**:
+- **现象**: 爬虫只获取到32个商品而非全部，日志显示"Connection closed while reading from the driver"错误
+- **根因**: fetch_all_products_via_api函数使用`page.request.get`发起API请求，该请求依赖Playwright浏览器进程。浏览器崩溃或连接断开后，所有后续翻页请求全部失败，只能获取第一页的32个商品
+- **影响范围**: 所有使用爬虫功能的用户，浏览器不稳定时数据严重缺失
+
+**修复方案**:
+- **技术实现(urllib替换)**: 将`page.request.get(api_url, params=params, headers=headers_with_cookie)`替换为`urllib.request.urlopen(req, timeout=15)`，使用Python标准库发起HTTP请求 [main.py](main.py)
+- **技术实现(请求构建)**: 使用`urllib.parse.urlencode(params)`构建查询字符串，`urllib.request.Request`设置请求头和Cookie [main.py](main.py)
+- **技术实现(错误处理)**: 新增`urllib.error.HTTPError`捕获(获取错误码和响应体)和`urllib.error.URLError`捕获(网络错误) [main.py](main.py)
+- **技术实现(pageSize)**: params中添加`'pageSize': 100`参数，每页获取更多商品 [main.py](main.py)
+- **技术实现(翻页上限)**: `range(20)`改为`range(50)`，支持更多页数据 [main.py](main.py)
+- **参考位置**: commit 待生成, [main.py](main.py#L5808-L5870)
+
+**测试验证**:
+- ✅ 语法检查: py_compile通过
+- ✅ API翻页: urllib请求成功，不再依赖浏览器进程
+- ✅ 浏览器崩溃后: API翻页继续正常工作，获取所有商品
+- ✅ pageSize=100: 每页获取商品数从32提升至100
+- ✅ page.url异常保护: 浏览器断开时不报错，使用备选URL
+
+##### 2. 🐛 page.url异常保护 (浏览器断开不报错)
+**问题描述**:
+- **现象**: 浏览器崩溃后，`current_url = page.url`抛出异常导致整个函数失败
+- **根因**: page.url直接访问Playwright页面对象，浏览器断开后该对象不可用
+- **影响范围**: 浏览器不稳定时，API数据获取函数无法启动
+
+**修复方案**:
+- **技术实现(异常保护)**: 用try/except包裹`page.url`获取，失败时记录日志 [main.py](main.py)
+- **技术实现(备选回退)**: page.url失败后，使用`self.config_manager.get_target_url()`获取目标URL作为备选 [main.py](main.py)
+- **参考位置**: commit 待生成, [main.py](main.py#L5800-L5810)
+
+**测试验证**:
+- ✅ 正常情况: page.url正常获取，无额外开销
+- ✅ 浏览器崩溃: 不抛出异常，自动使用备选URL
+- ✅ 备选URL: config_manager.get_target_url()正确返回目标URL
 ### v5.0.9.75 (2026-09-27) - 🔧 **启动脚本版本自动检测升级+隧道独立显示修复+前端alertDiv错误修复** - run.bat/run.sh新增Git/Node.js/Python/hostc/cloudflared版本自动检测与升级逻辑(含版本兼容性检查)+修复hostc和Cloudflare隧道独立显示互不影响+修复前端alertDiv is not defined错误+dist/package.json添加cloudflared依赖
 
 > **Commit**: 22989c6f

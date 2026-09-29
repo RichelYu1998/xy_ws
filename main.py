@@ -3938,10 +3938,10 @@ class PathManager:
             if error:
                 return (False, error)
             
-            if response.status in [200, 301, 302, 303, 307, 308]:
+            if status_code in [200, 301, 302, 303, 307, 308]:
                 return (True, None)
             else:
-                return (False, f"HTTP状态码: {response.status}")
+                return (False, f"HTTP状态码: {status_code}")
                 
         except urllib.error.HTTPError as e:
             if e.code in [401, 403, 404, 405]:
@@ -3965,10 +3965,10 @@ class PathManager:
             if error:
                 return (False, error)
             
-            if response.status in [200, 301, 302, 303, 307, 308]:
+            if status_code in [200, 301, 302, 303, 307, 308]:
                 return (True, None)
             else:
-                return (False, f"HTTP状态码: {response.status}")
+                return (False, f"HTTP状态码: {status_code}")
                 
         except urllib.error.HTTPError as e:
             if e.code in [401, 403, 404, 405]:
@@ -5474,7 +5474,17 @@ class WegoScraper:
             logger.debug(f'  ⚠️ Cookie格式错误: {e}')
             return
         
-        current_url = page.url
+        current_url = ''
+        try:
+            current_url = page.url
+        except Exception as e:
+            logger.debug(f'  获取page.url失败(浏览器可能已断开): {e}')
+        if not current_url:
+            try:
+                current_url = self.config_manager.get_target_url()
+                logger.debug(f'  使用target_url作为备选: {current_url}')
+            except Exception:
+                pass
         album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
         
         try:
@@ -5500,38 +5510,46 @@ class WegoScraper:
         
         # 获取所有商品（处理分页）
         page_timestamp = ''
-        for page_num in range(20):
+        for page_num in range(50):
             params = {
                 'albumId': album_id,
                 'searchValue': '',
                 'searchImg': '',
                 'startDate': '',
                 'endDate': '',
-                'sourceId': ''
+                'sourceId': '',
+                'pageSize': 100
             }
             # 只有第一页不需要timestamp，后续需要
             if page_timestamp:
                 params['timestamp'] = page_timestamp
             
             try:
-                headers_with_cookie = dict(headers)
-                headers_with_cookie['Cookie'] = cookie_str
-                
+                query_string = urllib.parse.urlencode(params)
+                full_url = f'{api_url}?{query_string}'
+
+                logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, pageSize=100')
+
+                req = urllib.request.Request(full_url)
+                for key, value in headers.items():
+                    req.add_header(key, value)
+                req.add_header('Cookie', cookie_str)
+
                 try:
-                    response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
-                except Exception as req_error:
-                    logger.debug(f'  ⚠️ API请求异常: {req_error}')
-                    if 'pattern' in str(req_error).lower():
-                        logger.debug(f'  💡 可能原因: URL格式错误或网络问题')
+                    resp = urllib.request.urlopen(req, timeout=15)
+                    status_code = resp.getcode()
+                    text = resp.read().decode('utf-8', errors='replace')
+                except urllib.error.HTTPError as http_err:
+                    status_code = http_err.code
+                    text = http_err.read().decode('utf-8', errors='replace') if http_err.fp else ''
+                except urllib.error.URLError as url_err:
+                    logger.debug(f'  URL请求失败: {url_err}')
                     break
-                
-                if response.status == 200:
-                    try:
-                        text = await response.text()
-                    except Exception as text_error:
-                        logger.debug(f'  ⚠️ 响应内容读取失败: {text_error}')
-                        break
-                    
+                except Exception as req_error:
+                    logger.debug(f'  API请求异常: {req_error}')
+                    break
+
+                if status_code == 200:
                     # 检查是否返回了HTML而非JSON（常见问题：Cookie过期、反爬等）
                     if text.strip().startswith('<'):
                         logger.debug(f'  ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）')
@@ -5578,7 +5596,14 @@ class WegoScraper:
                         
                         if items:
                             all_goods_data.extend(items)
-                            logger.debug(f'  第{page_num+1}页: 获取 {len(items)} 个商品')
+                            
+                            is_load_more = pagination.get('isLoadMore', False)
+                            try:
+                                page_timestamp = str(pagination.get('pageTimestamp', ''))
+                            except (ValueError, TypeError):
+                                page_timestamp = ''
+                            
+                            logger.debug(f'  第{page_num+1}页: 获取 {len(items)} 个商品, isLoadMore={is_load_more}, 累计={len(all_goods_data)}')
                             
                             if page_num == 0 and items:
                                 try:
@@ -5598,8 +5623,10 @@ class WegoScraper:
                             if is_load_more and page_timestamp:
                                 params['timestamp'] = page_timestamp
                             else:
+                                logger.debug(f'  分页结束: isLoadMore={is_load_more}, pageTimestamp={page_timestamp or "(空)"}')
                                 break
                         else:
+                            logger.debug(f'  第{page_num+1}页: 无商品数据，结束分页')
                             break
                     except json.JSONDecodeError as e:
                         logger.debug(f'  ❌ JSON解析失败: {e}')
@@ -5609,21 +5636,19 @@ class WegoScraper:
                         handle_exception(e, 'fetch_cost_prices_via_api解析响应')
                         break
                 else:
-                    logger.debug(f'  请求失败: HTTP {response.status}')
+                    logger.debug(f'  请求失败: HTTP {status_code}')
                     
-                    # 打印错误响应内容以帮助调试
-                    error_text = await response.text()
-                    if error_text:
-                        logger.debug(f'  📄 错误响应内容: {error_text[:300]}...')
+                    if text:
+                        logger.debug(f'  错误响应内容: {text[:300]}...')
                     
                     # 根据状态码给出具体建议
-                    if response.status == 401:
+                    if status_code == 401:
                         logger.debug(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
-                    elif response.status == 403:
+                    elif status_code == 403:
                         logger.debug(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
-                    elif response.status == 429:
+                    elif status_code == 429:
                         logger.debug(f'  💡 建议: 请求过于频繁，请稍后重试')
-                    elif response.status >= 500:
+                    elif status_code >= 500:
                         logger.debug(f'  💡 建议: 服务器内部错误，请稍后重试或联系管理员')
                     
                     break
@@ -5781,7 +5806,17 @@ class WegoScraper:
             logger.debug(f'  ⚠️ Cookie格式错误: {e}')
             return []
         
-        current_url = page.url
+        current_url = ''
+        try:
+            current_url = page.url
+        except Exception as e:
+            logger.debug(f'  获取page.url失败(浏览器可能已断开): {e}')
+        if not current_url:
+            try:
+                current_url = self.config_manager.get_target_url()
+                logger.debug(f'  使用target_url作为备选: {current_url}')
+            except Exception:
+                pass
         album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
         
         try:
@@ -5805,38 +5840,46 @@ class WegoScraper:
         all_goods_data = []
         page_timestamp = ''
         
-        logger.debug('开始通过API获取所有商品...')
-        for page_num in range(20):
+        logger.debug('开始通过API获取所有商品（使用urllib，不依赖浏览器）...')
+        for page_num in range(50):
             params = {
                 'albumId': album_id,
                 'searchValue': '',
                 'searchImg': '',
                 'startDate': '',
                 'endDate': '',
-                'sourceId': ''
+                'sourceId': '',
+                'pageSize': 100
             }
             if page_timestamp:
                 params['timestamp'] = page_timestamp
             
             try:
-                headers_with_cookie = dict(headers)
-                headers_with_cookie['Cookie'] = cookie_str
-                
+                query_string = urllib.parse.urlencode(params)
+                full_url = f'{api_url}?{query_string}'
+
+                logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, pageSize=100')
+
+                req = urllib.request.Request(full_url)
+                for key, value in headers.items():
+                    req.add_header(key, value)
+                req.add_header('Cookie', cookie_str)
+
                 try:
-                    response = await page.request.get(api_url, params=params, headers=headers_with_cookie)
-                except Exception as req_error:
-                    logger.debug(f'  ⚠️ API请求异常: {req_error}')
-                    if 'pattern' in str(req_error).lower():
-                        logger.debug(f'  💡 可能原因: URL格式错误或网络问题')
+                    resp = urllib.request.urlopen(req, timeout=15)
+                    status_code = resp.getcode()
+                    text = resp.read().decode('utf-8', errors='replace')
+                except urllib.error.HTTPError as http_err:
+                    status_code = http_err.code
+                    text = http_err.read().decode('utf-8', errors='replace') if http_err.fp else ''
+                except urllib.error.URLError as url_err:
+                    logger.debug(f'  URL请求失败: {url_err}')
                     break
-                
-                if response.status == 200:
-                    try:
-                        text = await response.text()
-                    except Exception as text_error:
-                        logger.debug(f'  ⚠️ 响应内容读取失败: {text_error}')
-                        break
-                    
+                except Exception as req_error:
+                    logger.debug(f'  API请求异常: {req_error}')
+                    break
+
+                if status_code == 200:
                     # 检查是否返回了HTML而非JSON（常见问题：Cookie过期、反爬等）
                     if text.strip().startswith('<'):
                         logger.debug(f'  ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）')
@@ -5905,21 +5948,19 @@ class WegoScraper:
                         logger.debug(f'  解析失败: {e}')
                         break
                 else:
-                    logger.debug(f'  请求失败: HTTP {response.status}')
+                    logger.debug(f'  请求失败: HTTP {status_code}')
                     
-                    # 打印错误响应内容以帮助调试
-                    error_text = await response.text()
-                    if error_text:
-                        logger.debug(f'  📄 错误响应内容: {error_text[:300]}...')
+                    if text:
+                        logger.debug(f'  错误响应内容: {text[:300]}...')
                     
                     # 根据状态码给出具体建议
-                    if response.status == 401:
+                    if status_code == 401:
                         logger.debug(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
-                    elif response.status == 403:
+                    elif status_code == 403:
                         logger.debug(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
-                    elif response.status == 429:
+                    elif status_code == 429:
                         logger.debug(f'  💡 建议: 请求过于频繁，请稍后重试')
-                    elif response.status >= 500:
+                    elif status_code >= 500:
                         logger.debug(f'  💡 建议: 服务器内部错误，请稍后重试或联系管理员')
                     
                     break
@@ -8166,8 +8207,8 @@ if __name__ == '__main__':
                 return JSONResponse(status_code=504, content={'error': '请求处理超时'}, headers=_no_store_headers())
 
             if not path.startswith('/static'):
-                if response.status_code >= 400:
-                    _request_logger.warning(f'[{response.status_code}] {path}')
+                if status_code_code >= 400:
+                    _request_logger.warning(f'[{status_code_code}] {path}')
 
                 duration = (time.time() - start_time) * 1000
                 response.headers['X-Response-Time'] = f'{duration:.2f}ms'
@@ -8181,7 +8222,7 @@ if __name__ == '__main__':
                 if REQUEST_COUNT is not None:
                     try:
                         endpoint = getattr(request.state, 'endpoint', None) or path
-                        REQUEST_COUNT.labels(request.method, endpoint, response.status_code).inc()
+                        REQUEST_COUNT.labels(request.method, endpoint, status_code_code).inc()
                     except Exception as e:  # [HANDLED]
                         logger.debug(f"Silent exception: {e}")
 
@@ -10875,7 +10916,7 @@ if __name__ == '__main__':
                     if error:
                         return False
                     
-                    if response.status in [200, 301, 302, 307, 308]:
+                    if status_code in [200, 301, 302, 307, 308]:
                         if verbose:
                             if attempt > 0:
                                 logger.debug(f"[Email] ✅ URL验证成功 (第{attempt+1}次尝试): {url}")
