@@ -247,6 +247,69 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.78 (2026-09-29) - 🔧 **资源泄漏修复+代码规范合规** - urllib响应对象未关闭导致HTTP连接泄漏(多处添加resp.close() try/finally)+函数内重复import移除(psutil/subprocess/sys/signal)+dir()改为globals()修复变量作用域+rate_limit_lock全局声明+max_attempts<=0守护+隧道模块级状态变量提取+cf心跳间隔30→60+URL验证超时10→15
+
+> **Commit**: 待生成
+
+#### 更新内容:
+1. **资源泄漏修复**: 多处urllib.request.urlopen响应对象未调用close()导致HTTP连接句柄泄漏，添加try/finally块确保resp.close()执行（Environment.check_url/select_pip_mirror/install_playwright_cdn/fetch_all_products_via_api等）
+2. **代码规范合规**: 移除函数内重复import(psutil/subprocess/sys/signal)，统一使用文件顶部导入，符合PEP 8 import规范
+3. **变量作用域修复**: `args in dir()`改为`args in globals()`，dir()无法可靠检测模块级变量，globals()为正确方式
+4. **rate_limit_lock全局声明**: rate_limit_check函数中`_rate_limit_lock`未在global声明中列出导致UnboundLocalError，添加至global声明
+5. **max_attempts守护**: 滚动配置max_attempts<=0时导致range(0)不执行，添加默认值30守护
+6. **隧道模块级状态变量**: 将main()内嵌闭包中的隧道状态变量(tunnel_process/cf_process等)提取为模块级，供main()和模块级函数共享
+7. **心跳间隔调优**: cf_heartbeat_interval从30s调整为60s，减少不必要的心跳请求
+8. **URL验证超时调优**: url_verify_timeout从10s调整为15s，避免网络波动误判
+
+##### 1. 🔧 urllib响应对象未关闭导致连接泄漏 (HTTP连接句柄耗尽)
+**问题描述**:
+- **现象**: 长时间运行后出现"Too many open files"或urllib请求无响应，系统资源逐渐耗尽
+- **根因**: 多处urllib.request.urlopen()返回的response对象未调用close()，HTTP连接句柄未释放，长时间运行后句柄数累积导致资源泄漏
+- **影响范围**: Environment.check_url、select_pip_mirror、install_playwright_cdn、fetch_all_products_via_api等所有使用urllib的函数
+
+**修复方案**:
+- **技术实现(resp.close)**: 在所有urllib.request.urlopen()调用处添加try/finally块，确保resp.close()被执行 [main.py](main.py)
+- **技术实现(resp=None初始化)**: 在try块前初始化resp=None，finally中判断if resp再close，避免NameError [main.py](main.py)
+- **技术实现(异常吞没)**: close()操作包裹try/except Exception: pass，关闭失败不影响主流程 [main.py](main.py)
+- **参考位置**: [main.py](main.py#L2629-L2640) [main.py](main.py#L3944-L3982) [main.py](main.py#L5558-L5577)
+
+**测试验证**:
+- ✅ 语法检查: py_compile通过
+- ✅ 资源释放: resp.close()在try/finally中确保执行
+- ✅ 异常安全: close()失败不影响主流程
+- ✅ 长时间运行: HTTP连接句柄正常释放
+
+##### 2. 📝 函数内重复import移除 (PEP 8 import规范)
+**问题描述**:
+- **现象**: _get_process_memory_mb、_auto_restart_server、_loop_watchdog函数内分别import psutil/subprocess/sys/signal，这些模块已在文件顶部导入
+- **根因**: 早期代码直接在使用处import，未遵循PEP 8"所有import在文件顶部"规范
+- **影响范围**: 代码可读性、import效率、规范一致性
+
+**修复方案**:
+- **技术实现(移除重复import)**: 删除函数内的import psutil、import subprocess、import sys、import signal语句，直接使用文件顶部已导入的模块 [main.py](main.py)
+- **技术实现(保留条件import)**: resource模块为Unix专有，保留在try/except内的条件import [main.py](main.py#L2835)
+- **参考位置**: [main.py](main.py#L2830-L2838) [main.py](main.py#L2864-L2867) [main.py](main.py#L2922-L2925) [main.py](main.py#L2943-L2946)
+
+**测试验证**:
+- ✅ 语法检查: py_compile通过
+- ✅ import检查: 仅resource为函数内条件import(平台专有)，其余全部在文件顶部
+- ✅ 功能验证: psutil/subprocess/sys/signal正常使用
+
+##### 3. 🐛 dir()改为globals()修复变量作用域 (NameError风险)
+**问题描述**:
+- **现象**: `args in dir()`无法可靠检测模块级args变量，导致args.port访问可能抛出NameError
+- **根因**: dir()返回当前局部作用域名称列表，在函数内部无法正确检测模块级变量；globals()返回模块全局命名空间，为正确方式
+- **影响范围**: PathManager.update_tunnel_file、PathManager.check_and_update_tunnel、start_web等函数
+
+**修复方案**:
+- **技术实现(globals替换)**: 将`"args" in dir()`改为`"args" in globals()`，正确检测模块级args变量 [main.py](main.py)
+- **参考位置**: [main.py](main.py#L4044) [main.py](main.py#L4274) [main.py](main.py#L7343)
+
+**测试验证**:
+- ✅ 语法检查: py_compile通过
+- ✅ 作用域检测: globals()正确返回模块级变量
+- ✅ 端口获取: args.port正常获取，无NameError
+
 ### v5.0.9.77 (2026-09-29) - 🐛 **中间件status_code_code未定义500错误修复** - _log_and_security_middleware中间件中status_code_code变量未定义导致NameError(所有请求返回500 Internal Server Error)+添加status_code_code=response.status_code赋值+服务恢复正常200响应
 
 > **Commit**: 7db538e2
