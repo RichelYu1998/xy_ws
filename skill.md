@@ -249,7 +249,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.76 (2026-09-29) - 🛡️ **API翻页防崩溃加固+page.url异常保护** - fetch_all_products_via_api函数将Playwright的page.request.get替换为urllib.request.urlopen实现API请求与浏览器进程完全解耦(防止浏览器崩溃导致只获取32个商品)+添加pageSize=100参数+翻页上限从20提升至50+page.url获取添加try/except异常保护+备选target_url回退机制
 
-> **Commit**: 待生成
+> **Commit**: bc138e21
 
 #### 更新内容:
 1. **API翻页防崩溃加固**: 将fetch_all_products_via_api函数中的`page.request.get`(依赖Playwright浏览器进程)替换为`urllib.request.urlopen`(Python标准库)，API请求与浏览器进程完全解耦，即使浏览器崩溃也能正常翻页获取所有商品数据
@@ -272,7 +272,7 @@ bandit -r . -f json -o bandit_report.json
 - **技术实现(错误处理)**: 新增`urllib.error.HTTPError`捕获(获取错误码和响应体)和`urllib.error.URLError`捕获(网络错误) [main.py](main.py)
 - **技术实现(pageSize)**: params中添加`'pageSize': 100`参数，每页获取更多商品 [main.py](main.py)
 - **技术实现(翻页上限)**: `range(20)`改为`range(50)`，支持更多页数据 [main.py](main.py)
-- **参考位置**: commit 待生成, [main.py](main.py#L5808-L5870)
+- **参考位置**: commit bc138e21, [main.py](main.py#L5808-L5870)
 
 **测试验证**:
 - ✅ 语法检查: py_compile通过
@@ -290,7 +290,7 @@ bandit -r . -f json -o bandit_report.json
 **修复方案**:
 - **技术实现(异常保护)**: 用try/except包裹`page.url`获取，失败时记录日志 [main.py](main.py)
 - **技术实现(备选回退)**: page.url失败后，使用`self.config_manager.get_target_url()`获取目标URL作为备选 [main.py](main.py)
-- **参考位置**: commit 待生成, [main.py](main.py#L5800-L5810)
+- **参考位置**: commit bc138e21, [main.py](main.py#L5800-L5810)
 
 **测试验证**:
 - ✅ 正常情况: page.url正常获取，无额外开销
