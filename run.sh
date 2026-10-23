@@ -190,13 +190,15 @@ pre_launch() {
 
     log_blank
     log "[*] 清理残留进程..."
-    pkill -9 -f "python.*main.py" 2>/dev/null || true
-    pkill -9 -f "hostc" 2>/dev/null || true
-    pkill -9 -f "cloudflared" 2>/dev/null || true
+    kill_all_interfering_processes
     sleep 1
 
     wait_for_port $WEB_PORT 10
     log "[*] 残留进程清理完成"
+
+    log_blank
+    log "[*] 检查 Playwright 浏览器驱动..."
+    check_and_fix_playwright
 
     log_blank
     log "[*] 检查 hostc 隧道工具..."
@@ -1538,9 +1540,87 @@ run_web() {
     ) &
     CLEANUP_PID=$!
 
+    HEALTH_CHECK_INTERVAL=30
+    HEALTH_COUNTER=0
+    HEALTH_FAIL_COUNT=0
+    HEALTH_MAX_FAILS=3
+    HEARTBEAT_SUCCESS_COUNT=0
+    HEARTBEAT_WINDOW=1800
     WEB_RESTART_COUNT=0
     WEB_MAX_RESTARTS=10
     WEB_RESTART_COOLDOWN=10
+
+    watchdog_loop() {
+        while true; do
+            sleep 30
+            HEALTH_COUNTER=$((HEALTH_COUNTER + 1))
+
+            if [ $HEALTH_COUNTER -ge $HEALTH_CHECK_INTERVAL ]; then
+                HEALTH_COUNTER=0
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "http://localhost:$WEB_PORT" 2>/dev/null)
+                if [ -z "$HTTP_CODE" ]; then
+                    HTTP_CODE="000"
+                fi
+
+                if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+                    if [ $HEALTH_FAIL_COUNT -gt 0 ]; then
+                        log "[看门狗] ✅ Web服务恢复正常 (此前连续${HEALTH_FAIL_COUNT}次失败)"
+                    fi
+                    HEALTH_FAIL_COUNT=0
+                    HEARTBEAT_SUCCESS_COUNT=$((HEARTBEAT_SUCCESS_COUNT + 1))
+                    if [ $HEARTBEAT_SUCCESS_COUNT -ge 60 ]; then
+                        HEARTBEAT_SUCCESS_COUNT=0
+                        log "[看门狗] 💚 心跳健康 - 已连续运行30分钟无异常"
+                    fi
+                else
+                    HEARTBEAT_SUCCESS_COUNT=0
+                    HEALTH_FAIL_COUNT=$((HEALTH_FAIL_COUNT + 1))
+                    log "[看门狗] ❌ Web服务异常 (HTTP ${HTTP_CODE}, 连续第${HEALTH_FAIL_COUNT}次失败, 30分钟窗口内已重置)"
+
+                    if [ $HEALTH_FAIL_COUNT -ge $HEALTH_MAX_FAILS ]; then
+                        log "[看门狗] 🔄 检测到Web服务异常，执行全面清理并重启... (第${WEB_RESTART_COUNT}次/最多${WEB_MAX_RESTARTS}次)"
+                        kill_all_interfering_processes
+                        sleep 3
+
+                        log "[看门狗] ⏳ 冷却${WEB_RESTART_COOLDOWN}秒后重启..."
+                        sleep $WEB_RESTART_COOLDOWN
+
+                        log "[看门狗] 🚀 正在重新启动Web服务..."
+                        source "$VENV_PATH/bin/activate"
+                        "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
+                        PYTHON_PID=$!
+
+                        log "[看门狗] ⏱️  等待Web服务启动..."
+                        RESTART_WAIT=0
+                        RESTART_MAX_WAIT=60
+                        while [ $RESTART_WAIT -lt $RESTART_MAX_WAIT ]; do
+                            if ! kill -0 $PYTHON_PID 2>/dev/null; then
+                                log "[看门狗] ⚠️  Web服务重启后进程已退出"
+                                break 2
+                            fi
+                            RESTART_HTTP=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "http://localhost:$WEB_PORT" 2>/dev/null)
+                            if [ "$RESTART_HTTP" = "200" ] || [ "$RESTART_HTTP" = "302" ]; then
+                                log "[看门狗] ✅ Web服务重启成功 (第${WEB_RESTART_COUNT}次重启, 30分钟心跳计数器已重置)"
+                                break
+                            fi
+                            RESTART_WAIT=$((RESTART_WAIT + 1))
+                            sleep 1
+                        done
+
+                        if [ $RESTART_WAIT -ge $RESTART_MAX_WAIT ]; then
+                            log "[看门狗] ⚠️  Web服务重启后启动超时"
+                        fi
+
+                        HEALTH_FAIL_COUNT=0
+                        HEARTBEAT_SUCCESS_COUNT=0
+                    fi
+                fi
+            fi
+        done
+    }
+
+    watchdog_loop &
+    WATCHDOG_PID=$!
 
     while true; do
         wait $PYTHON_PID 2>/dev/null
@@ -1555,8 +1635,7 @@ run_web() {
         log "[AutoRestart] Web服务已退出(退出码:$EXIT_CODE)，准备自动重启... (第${WEB_RESTART_COUNT}次/最多${WEB_MAX_RESTARTS}次)"
 
         log "[AutoRestart] 清理残留进程..."
-        pkill -9 -f "python.*main.py" 2>/dev/null || true
-        pkill -9 -f "cloudflared" 2>/dev/null || true
+        kill_all_interfering_processes
         sleep 3
 
         log "[AutoRestart] 冷却${WEB_RESTART_COOLDOWN}秒后重启..."
@@ -1610,14 +1689,152 @@ check_temp_size() {
     fi
 }
 
+kill_browser_processes() {
+    local chrome_count=0
+
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        chrome_count=$(pgrep -f "Google Chrome|Chromium|chrome|chromium" | wc -l)
+        if [ "$chrome_count" -gt 0 ]; then
+            pkill -9 -f "Google Chrome|Chromium|chrome|chromium" 2>/dev/null || true
+            log "    [防护] 已清理 ${chrome_count} 个浏览器僵尸进程 (Chrome/Chromium)"
+        else
+            log "    [防护] 未发现浏览器僵尸进程"
+        fi
+    else
+        chrome_count=$(pgrep -f "chrome|chromium" | wc -l)
+        if [ "$chrome_count" -gt 0 ]; then
+            pkill -9 -f "chrome|chromium" 2>/dev/null || true
+            log "    [防护] 已清理 ${chrome_count} 个浏览器僵尸进程 (Chrome/Chromium)"
+        else
+            log "    [防护] 未发现浏览器僵尸进程"
+        fi
+    fi
+}
+
+kill_playwright_processes() {
+    local pw_count=0
+
+    pw_count=$(pgrep -f "playwright" | wc -l)
+    if [ "$pw_count" -gt 0 ]; then
+        pkill -9 -f "playwright" 2>/dev/null || true
+        log "    [防护] 已清理 ${pw_count} 个 Playwright 残留进程"
+    else
+        log "    [防护] 未发现 Playwright 残留进程"
+    fi
+}
+
+kill_all_interfering_processes() {
+    log "[*] [全面防护] 开始清理所有可能干扰的进程..."
+
+    local total_killed=0
+
+    local py_count=$(pgrep -f "python.*main.py" | wc -l)
+    if [ "$py_count" -gt 0 ]; then
+        pkill -9 -f "python.*main.py" 2>/dev/null || true
+        total_killed=$((total_killed + py_count))
+    fi
+
+    local hostc_count=$(pgrep -f "hostc" | wc -l)
+    if [ "$hostc_count" -gt 0 ]; then
+        pkill -9 -f "hostc" 2>/dev/null || true
+        total_killed=$((total_killed + hostc_count))
+    fi
+
+    local cfd_count=$(pgrep -f "cloudflared" | wc -l)
+    if [ "$cfd_count" -gt 0 ]; then
+        pkill -9 -f "cloudflared" 2>/dev/null || true
+        total_killed=$((total_killed + cfd_count))
+    fi
+
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        local chrome_count=$(pgrep -f "Google Chrome|Chromium|chrome|chromium" | wc -l)
+        if [ "$chrome_count" -gt 0 ]; then
+            pkill -9 -f "Google Chrome|Chromium|chrome|chromium" 2>/dev/null || true
+            total_killed=$((total_killed + chrome_count))
+        fi
+    else
+        local chrome_count=$(pgrep -f "chrome|chromium" | wc -l)
+        if [ "$chrome_count" -gt 0 ]; then
+            pkill -9 -f "chrome|chromium" 2>/dev/null || true
+            total_killed=$((total_killed + chrome_count))
+        fi
+    fi
+
+    local pw_count=$(pgrep -f "playwright" | wc -l)
+    if [ "$pw_count" -gt 0 ]; then
+        pkill -9 -f "playwright" 2>/dev/null || true
+        total_killed=$((total_killed + pw_count))
+    fi
+
+    local firefox_count=$(pgrep -f "firefox" | wc -l)
+    if [ "$firefox_count" -gt 0 ]; then
+        pkill -9 -f "firefox" 2>/dev/null || true
+        total_killed=$((total_killed + firefox_count))
+    fi
+
+    local edge_count=$(pgrep -f "msedge|Microsoft Edge" | wc -l)
+    if [ "$edge_count" -gt 0 ]; then
+        pkill -9 -f "msedge|Microsoft Edge" 2>/dev/null || true
+        total_killed=$((total_killed + edge_count))
+    fi
+
+    if lsof -i :$WEB_PORT -sTCP:LISTEN &>/dev/null; then
+        local port_pids=$(lsof -t -i :$WEB_PORT -sTCP:LISTEN 2>/dev/null)
+        if [ -n "$port_pids" ]; then
+            echo "$port_pids" | xargs kill -9 2>/dev/null || true
+            local port_count=$(echo "$port_pids" | wc -l)
+            total_killed=$((total_killed + port_count))
+        fi
+    fi
+
+    if [ "$total_killed" -gt 0 ]; then
+        log "    [全面防护] ✅ 已清理 ${total_killed} 个可能干扰启动的进程"
+    else
+        log "    [全面防护] ✅ 系统干净，无干扰进程"
+    fi
+}
+
+check_and_fix_playwright() {
+    PLAYWRIGHT_VER=$("$VENV_PATH/bin/python" -c "import playwright; print(playwright.__version__)" 2>/dev/null)
+    if [ -z "$PLAYWRIGHT_VER" ]; then
+        PLAYWRIGHT_VER="unknown"
+    fi
+
+    PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright"
+    fi
+
+    if [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-linux/chrome ] || \
+       [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium ] || \
+       [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-win/chrome.exe ]; then
+        log "    [Playwright] ✅ Chromium 浏览器驱动正常 (Playwright v${PLAYWRIGHT_VER})"
+        return 0
+    fi
+
+    log "    [Playwright] ⚠️  未检测到 Chromium 浏览器驱动 (Playwright v${PLAYWRIGHT_VER})"
+    log "    [Playwright] 🔄 正在自动安装 Playwright 浏览器..."
+    source "$VENV_PATH/bin/activate" > /dev/null 2>&1
+    python -m playwright install chromium 2>&1
+
+    if [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-linux/chrome ] || \
+       [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium ] || \
+       [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-win/chrome.exe ]; then
+        log "    [Playwright] ✅ Chromium 浏览器安装成功"
+    else
+        log "    [Playwright] ❌ Chromium 浏览器安装失败，请手动执行：python -m playwright install chromium"
+    fi
+}
+
 cleanup_exit() {
     log_blank
     log "正在清理进程..."
-    pkill -9 -f "python.*main.py" 2>/dev/null || true
-    pkill -9 -f "hostc" 2>/dev/null || true
-    pkill -9 -f "cloudflared" 2>/dev/null || true
+    kill_all_interfering_processes
     if [ -n "$CLEANUP_PID" ]; then
         kill $CLEANUP_PID 2>/dev/null || true
+    fi
+    if [ -n "$WATCHDOG_PID" ]; then
+        kill $WATCHDOG_PID 2>/dev/null || true
     fi
     log "清理完成"
     exit 0

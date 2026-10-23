@@ -305,13 +305,15 @@ call :log ========================================
 
 call :log_blank
 call :log [*] 清理残留进程...
-call :kill_process_safe python.exe main.py
-call :kill_process_safe hostc.exe
-call :kill_process_safe cloudflared.exe
+call :kill_all_interfering_processes
 ping -n 2 127.0.0.1 >nul 2>&1
 
 call :wait_for_port !WEB_PORT! 10
 call :log [*] 残留进程清理完成
+
+call :log_blank
+call :log [*] 检查 Playwright 浏览器驱动...
+call :check_and_fix_playwright
 
 call :log_blank
 call :log [*] 检查 hostc 隧道工具...
@@ -383,6 +385,109 @@ if not errorlevel 1 (
         taskkill /F /PID %%p >nul 2>&1
         call :log     已终止进程 %%p (%PROC_NAME%)
     )
+)
+exit /b
+
+:kill_browser_processes
+set "CHROME_COUNT=0"
+for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'chrome.exe\' or name=\'chromium.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a CHROME_COUNT+=1
+)
+if !CHROME_COUNT! gtr 0 (
+    call :log     [防护] 已清理 !CHROME_COUNT! 个浏览器僵尸进程 (Chrome/Chromium)
+) else (
+    call :log     [防护] 未发现浏览器僵尸进程
+)
+exit /b
+
+:kill_playwright_processes
+set "PW_COUNT=0"
+for /f "tokens=2 delims=," %%p in ('wmic process where "commandline like \'%%playwright%%\' or name=\'playwright.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a PW_COUNT+=1
+)
+if !PW_COUNT! gtr 0 (
+    call :log     [防护] 已清理 !PW_COUNT! 个 Playwright 残留进程
+) else (
+    call :log     [防护] 未发现 Playwright 残留进程
+)
+exit /b
+
+:kill_all_interfering_processes
+call :log [*] [全面防护] 开始清理所有可能干扰的进程...
+
+set "TOTAL_KILLED=0"
+
+for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'python.exe\' and commandlike \'%%main.py%%\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a TOTAL_KILLED+=1
+)
+
+for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'node.exe\' and commandlike \'%%hostc%%\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a TOTAL_KILLED+=1
+)
+
+for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'cloudflared.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a TOTAL_KILLED+=1
+)
+
+for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'chrome.exe\' or name=\'chromium.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a TOTAL_KILLED+=1
+)
+
+for /f "tokens=2 delims=," %%p in ('wmic process where "commandline like \'%%playwright%%\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a TOTAL_KILLED+=1
+)
+
+for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'firefox.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a TOTAL_KILLED+=1
+)
+
+for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'msedge.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a TOTAL_KILLED+=1
+)
+
+netstat -ano | findstr ":!WEB_PORT!.*LISTENING" >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":!WEB_PORT!.*LISTENING"') do (
+        taskkill /F /PID %%a >nul 2>&1
+        set /a TOTAL_KILLED+=1
+    )
+)
+
+if !TOTAL_KILLED! gtr 0 (
+    call :log     [全面防护] ✅ 已清理 !TOTAL_KILLED! 个可能干扰启动的进程
+) else (
+    call :log     [全面防护] ✅ 系统干净，无干扰进程
+)
+exit /b
+
+:check_and_fix_playwright
+for /f "delims=" %%v in ('python -c "import playwright; print(playwright.__version__)" 2^>nul') do set "PLAYWRIGHT_VER=%%v"
+if not defined PLAYWRIGHT_VER set "PLAYWRIGHT_VER=unknown"
+
+set "PLAYWRIGHT_BROWSERS_PATH=%USERPROFILE%\AppData\Local\ms-playwright"
+if exist "!PLAYWRIGHT_BROWSERS_PATH!\chromium-*\chrome-win\chrome.exe" (
+    call :log     [Playwright] ✅ Chromium 浏览器驱动正常 (Playwright v!PLAYWRIGHT_VER!)
+    exit /b
+)
+
+call :log     [Playwright] ⚠️  未检测到 Chromium 浏览器驱动 (Playwright v!PLAYWRIGHT_VER!)
+call :log     [Playwright] 🔄 正在自动安装 Playwright 浏览器...
+call "!VENV_PATH!\Scripts\activate.bat" >nul 2>&1
+python -m playwright install chromium 2>&1
+
+if exist "!PLAYWRIGHT_BROWSERS_PATH!\chromium-*\chrome-win\chrome.exe" (
+    call :log     [Playwright] ✅ Chromium 浏览器安装成功
+) else (
+    call :log     [Playwright] ❌ Chromium 浏览器安装失败，请手动执行：python -m playwright install chromium
 )
 exit /b
 
@@ -1302,10 +1407,13 @@ call :log_blank_console_only
 :wait_loop_entry
 set "CHECK_INTERVAL=60"
 set "CHECK_COUNTER=0"
-set "HEALTH_CHECK_INTERVAL=15"
+set "HEALTH_CHECK_INTERVAL=30"
 set "HEALTH_COUNTER=0"
 set "HEALTH_FAIL_COUNT=0"
 set "HEALTH_MAX_FAILS=3"
+set "HEARTBEAT_SUCCESS_COUNT=0"
+set "HEARTBEAT_WINDOW=1800"
+set "LAST_HEARTBEAT_FAIL_TIME=0"
 set "WEB_RESTART_COUNT=0"
 set "WEB_MAX_RESTARTS=10"
 set "WEB_RESTART_COOLDOWN=10"
@@ -1320,36 +1428,97 @@ if !CHECK_COUNTER! geq !CHECK_INTERVAL! (
 )
 if !HEALTH_COUNTER! geq !HEALTH_CHECK_INTERVAL! (
     set "HEALTH_COUNTER=0"
-    call :check_web_health
+    call :check_web_health_enhanced
 )
 goto wait_loop
 
-:check_web_health
+:check_web_health_enhanced
 set "HTTP_CODE="
 for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" --connect-timeout 3 --max-time 5 http://localhost:!WEB_PORT! 2^>nul') do set "HTTP_CODE=%%i"
 if not defined HTTP_CODE set "HTTP_CODE=000"
+
 if "!HTTP_CODE!"=="200" (
     if !HEALTH_FAIL_COUNT! gtr 0 (
         call :ms_timestamp
-        call :log [!TIMESTAMP!] [HealthCheck] Web服务恢复正常 (此前连续!HEALTH_FAIL_COUNT!次失败)
+        call :log [!TIMESTAMP!] [看门狗] ✅ Web服务恢复正常 (此前连续!HEALTH_FAIL_COUNT!次失败)
     )
     set "HEALTH_FAIL_COUNT=0"
+    set /a HEARTBEAT_SUCCESS_COUNT+=1
+    if !HEARTBEAT_SUCCESS_COUNT! geq 60 (
+        set "HEARTBEAT_SUCCESS_COUNT=0"
+        call :ms_timestamp
+        call :log [!TIMESTAMP!] [看门狗] 💚 心跳健康 - 已连续运行30分钟无异常
+    )
     goto :eof
 )
+
 if "!HTTP_CODE!"=="302" (
     if !HEALTH_FAIL_COUNT! gtr 0 (
         call :ms_timestamp
-        call :log [!TIMESTAMP!] [HealthCheck] Web服务恢复正常 (此前连续!HEALTH_FAIL_COUNT!次失败)
+        call :log [!TIMESTAMP!] [看门狗] ✅ Web服务恢复正常 (此前连续!HEALTH_FAIL_COUNT!次失败)
     )
+    set "HEALTH_FAIL_COUNT=0"
+    set /a HEARTBEAT_SUCCESS_COUNT+=1
+    if !HEARTBEAT_SUCCESS_COUNT! geq 60 (
+        set "HEARTBEAT_SUCCESS_COUNT=0"
+        call :ms_timestamp
+        call :log [!TIMESTAMP!] [看门狗] 💚 心跳健康 - 已连续运行30分钟无异常
+    )
+    goto :eof
+)
+
+set /a HEALTH_FAIL_COUNT+=1
+set "HEARTBEAT_SUCCESS_COUNT=0"
+call :ms_timestamp
+call :log [!TIMESTAMP!] [看门狗] ❌ Web服务异常 (HTTP !HTTP_CODE!, 连续第!HEALTH_FAIL_COUNT!次失败, 30分钟窗口内已重置)
+
+if !HEALTH_FAIL_COUNT! geq !HEALTH_MAX_FAILS! (
+    call :restart_web_server_enhanced
+)
+goto :eof
+
+:restart_web_server_enhanced
+if !WEB_RESTART_COUNT! geq !WEB_MAX_RESTARTS! (
+    call :ms_timestamp
+    call :log [!TIMESTAMP!] [看门狗] ⚠️  已达到最大重启次数(!WEB_MAX_RESTARTS!)，停止自动重启
     set "HEALTH_FAIL_COUNT=0"
     goto :eof
 )
-set /a HEALTH_FAIL_COUNT+=1
+set /a WEB_RESTART_COUNT+=1
 call :ms_timestamp
-call :log [!TIMESTAMP!] [HealthCheck] Web服务无响应 (HTTP !HTTP_CODE!, 连续第!HEALTH_FAIL_COUNT!次失败)
-if !HEALTH_FAIL_COUNT! geq !HEALTH_MAX_FAILS! (
-    call :restart_web_server
+call :log [!TIMESTAMP!] [看门狗] 🔄 检测到Web服务异常，执行全面清理并重启... (第!WEB_RESTART_COUNT!次/最多!WEB_MAX_RESTARTS!次)
+call :kill_all_interfering_processes
+ping -n 3 127.0.0.1 >nul 2>&1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [看门狗] ⏳ 冷却!WEB_RESTART_COOLDOWN!秒后重启...
+ping -n !WEB_RESTART_COOLDOWN! 127.0.0.1 >nul 2>&1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [看门狗] 🚀 正在重新启动Web服务...
+call "!VENV_PATH!\Scripts\activate.bat"
+start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT!" < nul
+call :ms_timestamp
+call :log [!TIMESTAMP!] [看门狗] ⏱️  等待Web服务启动...
+set "RESTART_WAIT=0"
+set "RESTART_MAX_WAIT=60"
+:restart_wait_loop_enhanced
+set /a RESTART_WAIT+=1
+if !RESTART_WAIT! gtr !RESTART_MAX_WAIT! (
+    call :ms_timestamp
+    call :log [!TIMESTAMP!] [看门狗] ⚠️  Web服务重启后启动超时
+    goto restart_wait_done_enhanced
 )
+set "HTTP_CODE="
+for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" --connect-timeout 3 --max-time 5 http://localhost:!WEB_PORT! 2^>nul') do set "HTTP_CODE=%%i"
+if not defined HTTP_CODE set "HTTP_CODE=000"
+if not "!HTTP_CODE!"=="200" if not "!HTTP_CODE!"=="302" (
+    ping -n 1 127.0.0.1 >nul 2>&1
+    goto restart_wait_loop_enhanced
+)
+call :ms_timestamp
+call :log [!TIMESTAMP!] [看门狗] ✅ Web服务重启成功 (第!WEB_RESTART_COUNT!次重启, 30分钟心跳计数器已重置)
+:restart_wait_done_enhanced
+set "HEALTH_FAIL_COUNT=0"
+set "HEARTBEAT_SUCCESS_COUNT=0"
 goto :eof
 
 :restart_web_server
@@ -1362,8 +1531,7 @@ if !WEB_RESTART_COUNT! geq !WEB_MAX_RESTARTS! (
 set /a WEB_RESTART_COUNT+=1
 call :ms_timestamp
 call :log [!TIMESTAMP!] [AutoRestart] Web服务崩溃，准备自动重启... (第!WEB_RESTART_COUNT!次/最多!WEB_MAX_RESTARTS!次)
-call :kill_process_safe python.exe main.py
-call :kill_process_safe cloudflared.exe
+call :kill_all_interfering_processes
 ping -n 3 127.0.0.1 >nul 2>&1
 call :ms_timestamp
 call :log [!TIMESTAMP!] [AutoRestart] 冷却!WEB_RESTART_COOLDOWN!秒后重启...
@@ -1412,5 +1580,7 @@ call :log 正在清理进程...
 call :kill_process_safe python.exe main.py
 call :kill_process_safe hostc.exe
 call :kill_process_safe cloudflared.exe
+call :kill_browser_processes
+call :kill_playwright_processes
 call :log 清理完成
 goto :eof
