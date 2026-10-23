@@ -249,7 +249,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.79 (2026-10-23) - 🛡️ **企业级启动防护体系** - 全面进程清理系统(8类进程4节点全覆盖)+30分钟心跳检测看门狗(30秒检测+3次失败自动重启)+Playwright浏览器驱动自动检测修复(缺失损坏自动安装)+run.bat/run.sh双平台同步
 
-> **Commit**: 待生成
+> **Commit**: 3d9238d3
 
 #### 更新内容:
 1. **全面进程清理系统(kill_all_interfering_processes)**: 启动前自动清理8类可能干扰的进程(Python主进程/hostc隧道/cloudflared隧道/Chrome-Chromium浏览器/Playwright驱动/Firefox浏览器/Edge浏览器/端口占用进程)，覆盖4个关键节点(程序启动/程序退出/自动重启/看门狗重启)，确保100%干净启动环境

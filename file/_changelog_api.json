@@ -69,7 +69,7 @@
         "affected_files": "[run.bat](run.bat), [run.sh](run.sh), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)",
         "author": "AI Assistant",
         "change_stats": "+350行/-50行",
-        "commit": "待生成",
+        "commit": "3d9238d3",
         "fix_date": "2026-10-23"
       },
       "title": "🛡️ 企业级启动防护体系",
