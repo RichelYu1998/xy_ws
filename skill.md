@@ -254,7 +254,7 @@ bandit -r . -f json -o bandit_report.json
 #### 更新内容:
 1. **JSON输入三重验证(OWASP Input Validation)**: API端点接收用户JSON输入时添加try-catch捕获解析异常+验证请求体必须是字典类型+验证skus字段必须是字符串类型，防止恶意提交畸形JSON导致服务崩溃或注入攻击，符合OWASP安全最佳实践 [main.py](main.py#L8977-L8989)
 2. **API备注字段100%完整读取(noteArr全量遍历)**: 修复商品有多条备注时只读取第一条导致信息丢失的bug，现在遍历noteArr数组中所有备注项并用换行符`\n`连接，确保业务信息100%完整保留 [main.py](main.py#L6019-L6032)
-3. **员工信息字段增强(staffInfo完整读取)**: 从仅读取员工昵称(staffNick)升级为同时读取员工ID(staffId)，格式化输出为"店长 (ID: 12345)"，向后兼容无ID时只显示昵称 [main.py](main.py#L6034-L6044)
+3. **员工信息字段优化(staffInfo读取)**: 读取员工昵称(staffNick)字段，简洁显示为"店长"，去除冗长的员工ID显示，提升界面可读性 [main.py](main.py#L6036-L6040)
 4. **API字段调试日志新增**: 在fetch_all_products_via_api函数中添加自动记录API返回的第一个商品完整字段列表和数据样本(前500字符)，便于发现API升级后新增字段或排查数据缺失问题 [main.py](main.py#L5997-L6001)
 
 ##### 1. 🔒 JSON输入验证漏洞修复 (HIGH级别安全加固)
@@ -293,23 +293,22 @@ bandit -r . -f json -o bandit_report.json
 - ✅ 空值处理: noteArr中包含空字符串或None时自动过滤
 - ✅ 异常安全: noteArr非list类型或元素非dict时不崩溃
 
-##### 3. 👤 员工信息字段增强 (数据完整性优化)
+##### 3. 👤 员工信息字段优化 (界面可读性提升)
 **问题描述**:
-- **现象**: 商品数据中只显示员工昵称，缺少员工ID等重要标识信息
-- **根因**: 原代码只读取staffInfo.staffNick字段，未读取staffId等其他字段
-- **影响范围**: [main.py](main.py#L6034) 所有商品的员工信息展示
+- **现象**: 商品数据显示冗长的员工ID信息（如"店长 (ID: S23071523033886420001323)"），影响界面美观和可读性
+- **根因**: 原代码同时读取并显示staffId字段，但该ID对业务无实际意义
+- **影响范围**: [main.py](main.py#L6036) 所有商品的员工信息展示
 
 **修复方案**:
-- **技术实现(多字段读取)**: 同时读取staffNick和staffId两个字段 [main.py](main.py#L6037-L6038)
-- **技术实现(格式化输出)**: 有ID时格式化为"昵称 (ID: xxx)"，无ID时只显示昵称 [main.py#L6039]
-- **技术实现(向后兼容)**: 如果staffInfo不是dict或没有staffId字段，不影响原有功能 [main.py](main.py#L6036)
-- **参考位置**: [main.py](main.py#L6034-L6044)
+- **技术实现(简化显示)**: 只读取staffNick字段，去除staffId字段的读取和显示 [main.py](main.py#L6036-L6040)
+- **技术实现(简洁输出)**: 直接显示员工昵称如"店长"，不附加任何ID信息
+- **参考位置**: [main.py](main.py#L6036-L6040)
 
 **测试验证**:
-- ✅ 完整信息: staffInfo={staffNick:"店长", staffId:"12345"} → "店长 (ID: 12345)"
-- ✅ 缺失ID: staffInfo={staffNick:"店长"} → "店长"（向后兼容）
+- ✅ 正常显示: staffInfo={staffNick:"店长"} → "店长"
 - ✅ 空对象: staffInfo={} → ""（不崩溃）
 - ✅ 非字典: staffInfo="字符串" → ""（异常安全）
+- ✅ 界面效果: 员工列简洁清晰，无冗长ID干扰
 
 ##### 4. 🔍 API字段调试日志 (可观测性提升)
 **问题描述**:

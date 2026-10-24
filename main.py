@@ -6039,11 +6039,9 @@ class WegoScraper:
                 
                 staff_info = item.get('staffInfo', {})
                 staff_nick = ''
-                staff_id = ''
                 if isinstance(staff_info, dict):
                     staff_nick = str(staff_info.get('staffNick', '')).strip()
-                    staff_id = str(staff_info.get('staffId', '')).strip()
-                staff_info_str = f'{staff_nick} (ID: {staff_id})' if staff_id else staff_nick
+                staff_info_str = staff_nick
                 
                 media_b64_list = []
                 imgs_src = item.get('imgsSrc', [])
