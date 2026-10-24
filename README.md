@@ -249,7 +249,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.80 (2026-10-24) - 🔒 **安全加固+数据完整性修复** - JSON输入三重验证防注入(格式+类型+字段类型验证)+API备注字段100%完整读取(遍历noteArr数组所有项用换行连接)+员工信息增强(staffNick+staffId双字段)+API字段调试日志(自动记录返回字段列表便于发现遗漏) - 符合OWASP Input Validation最佳实践
 
-> **Commit**: 待生成
+> **Commit**: 42257bd2
 
 #### 更新内容:
 1. **JSON输入三重验证(OWASP Input Validation)**: API端点接收用户JSON输入时添加try-catch捕获解析异常+验证请求体必须是字典类型+验证skus字段必须是字符串类型，防止恶意提交畸形JSON导致服务崩溃或注入攻击，符合OWASP安全最佳实践 [main.py](main.py#L8977-L8989)
