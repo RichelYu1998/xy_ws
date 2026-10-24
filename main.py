@@ -5990,6 +5990,12 @@ class WegoScraper:
             return []
         
         products = []
+        
+        if all_goods_data and len(all_goods_data) > 0:
+            first_item = all_goods_data[0] if isinstance(all_goods_data[0], dict) else {}
+            logger.debug(f'  📋 API商品字段列表: {list(first_item.keys())}')
+            logger.debug(f'  📊 第一个商品完整数据(前500字符): {str(first_item)[:500]}')
+        
         for item in all_goods_data:
             try:
                 if not isinstance(item, dict):
@@ -6020,12 +6026,24 @@ class WegoScraper:
                 remark = ''
                 if isinstance(note_arr, list) and note_arr:
                     try:
-                        remark = str(note_arr[0].get('value', '')) if isinstance(note_arr[0], dict) else ''
-                    except (IndexError, AttributeError, TypeError):
+                        remarks_list = []
+                        for note_item in note_arr:
+                            if isinstance(note_item, dict):
+                                note_value = str(note_item.get('value', '')).strip()
+                                if note_value:
+                                    remarks_list.append(note_value)
+                        remark = '\n'.join(remarks_list)
+                    except (IndexError, AttributeError, TypeError) as e:
+                        logger.debug(f'解析备注失败: {e}')
                         remark = ''
                 
                 staff_info = item.get('staffInfo', {})
-                staff_nick = str(staff_info.get('staffNick', '')) if isinstance(staff_info, dict) else ''
+                staff_nick = ''
+                staff_id = ''
+                if isinstance(staff_info, dict):
+                    staff_nick = str(staff_info.get('staffNick', '')).strip()
+                    staff_id = str(staff_info.get('staffId', '')).strip()
+                staff_info_str = f'{staff_nick} (ID: {staff_id})' if staff_id else staff_nick
                 
                 media_b64_list = []
                 imgs_src = item.get('imgsSrc', [])
@@ -6069,7 +6087,7 @@ class WegoScraper:
                     '拿货价': f'¥{cost_price_int:,}' if cost_price_int is not None else '',
                     '货号': goods_num,
                     '备注': remark,
-                    '员工': staff_nick,
+                    '员工': staff_info_str,
                     '图片': media_b64,
                     '入库时间': old_time,
                     '入库时间戳': created_time
@@ -8955,8 +8973,18 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
 
                 if request.method == 'POST':
-                    req_data = await request.json()
+                    try:
+                        req_data = await request.json()
+                    except Exception as json_err:
+                        logger.warning(f'JSON解析失败: {json_err}')
+                        return jsonify({'error': 'JSON格式错误，请检查输入数据'}, status_code=400)
+                    
+                    if not isinstance(req_data, dict):
+                        return jsonify({'error': '请求体必须是JSON对象'}, status_code=400)
+                    
                     input_skus = req_data.get('skus', '')
+                    if not isinstance(input_skus, str):
+                        return jsonify({'error': 'skus字段必须是字符串'}, status_code=400)
 
                     if len(input_skus) > 50000:
                         return jsonify({'error': '输入数据过长（最大50000字符）'}, status_code=400)
