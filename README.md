@@ -299,9 +299,9 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
-### v5.0.9.81 (2026-10-26) - 🛡️ **跨平台防崩溃系统** - Windows cmd.exe 0xc0000005崩溃防护+macOS/Linux SIGHUP/rlimit资源限制+自动内存清理(5分钟)+资源监控线程+增强版看门狗(渐进式处理)+浏览器启动优化(14项参数+5次重试)+Playwright检测bug修复(find替代通配符)+内置守护进程模式(--watchdog)+curl超时修复+IS_MACOS属性名修复
+### v5.0.9.81 (2026-10-26) - 🛡️ **跨平台防崩溃系统** - Windows cmd.exe 0xc0000005崩溃防护+macOS/Linux SIGHUP/rlimit资源限制+自动内存清理(5分钟)+资源监控线程+增强版看门狗(渐进式处理)+浏览器启动优化(14项参数+5次重试)+Playwright检测bug修复(find替代通配符)+内置守护进程模式(--watchdog)+curl超时修复+IS_MACOS属性名修复+隧道后台异步启动(解决Cloudflare 429限流阻塞uvicorn)
 
-> **Commit**: 7efa1499,5e83b9c1,ca1ea8c7
+> **Commit**: 7efa1499,5e83b9c1,ca1ea8c7,f0b52f33,16a28490
 
 #### 更新内容:
 1. **Windows系统级崩溃防护**: 禁用cmd.exe错误弹框(SetErrorMode SEM_NOGPFAULTERRORBOX)防止0xc0000005访问违规卡死+设置高优先级进程(SetPriorityClass HIGH_PRIORITY_CLASS) [main.py](main.py)
@@ -314,6 +314,7 @@ bandit -r . -f json -o bandit_report.json
 8. **内置守护进程模式**: watchdog_daemon.py功能完整整合进main.py --watchdog参数+子进程启动自身+崩溃自动重启+内存超限监控+子进程输出继承CMD窗口(HTTP日志正常显示) [main.py](main.py)
 9. **curl超时修复**: run.bat/run.sh中curl检测添加--connect-timeout 3 -m 5超时参数+watchdog模式FLASK_MAX_WAIT提升至120秒 [run.bat](run.bat) [run.sh](run.sh)
 10. **IS_MACOS属性名修复**: Environment.IS_MACOS不存在改为Environment.IS_MAC，修复Web服务启动崩溃(AttributeError) [main.py](main.py)
+11. **隧道后台异步启动**: Cloudflare Tunnel启动改为threading.Thread后台异步执行，不再阻塞uvicorn启动（429限流等300秒问题彻底解决，启动时间从4分钟+超时降至4秒）[main.py](main.py)
 
 ##### 1. 🛡️ Windows系统级崩溃防护 (解决cmd.exe 0xc0000005)
 **问题描述**:
@@ -377,6 +378,27 @@ bandit -r . -f json -o bandit_report.json
 - ✅ Linux: find检测chrome-linux/chrome路径正确
 - ✅ Windows(MSYS): find检测chrome-win/chrome.exe路径正确
 - ✅ 已安装时跳过安装，未安装时自动安装
+
+##### 11. ⚡ 隧道后台异步启动 (解决Cloudflare 429限流阻塞uvicorn)
+**问题描述**:
+- **现象**: 2026-10-26 13:19:04启动Web服务后，run.bat显示"等待 Web 服务启动完成..."卡住4分钟+，最终报"[ERROR] Web服务启动超时"退出
+- **根因**: Cloudflare Tunnel启动时遇到429限流(Too Many Requests)，需要等300秒重试。原代码中`auto_start_tunnel()`和`uvicorn.run()`是**串行执行**——隧道卡住就全卡住，uvicorn无法启动
+- **时间线证据**: 13:19:09 Cloudflare 429限流(等300s) → 13:22:58 run.bat超时放弃 → 13:23:05 uvicorn这才真正启动（但已超时）
+- **影响范围**: [main.py](main.py) 所有通过--watchdog或直接--web启动的场景
+
+**修复方案**:
+- **技术实现(后台线程)**: 将`auto_start_tunnel()`调用包裹在`threading.Thread(target=_start_tunnel_background, daemon=True)`中异步执行 [main.py](main.py#L13023-L13042)
+- **技术实现(不阻塞uvicorn)**: 隧道线程启动后立即继续执行到`uvicorn.run()`，Web服务4秒内就绪
+- **技术实现(异常安全)**: 后台线程内部try-catch捕获异常并记录日志，不影响主进程
+- **技术实现(start_tunnel_daemons延迟)**: `start_tunnel_daemons()`也移入后台线程，在隧道启动完成后才启动隧道守护进程
+- **参考位置**: [main.py](main.py#L13023-L13042) _start_tunnel_background函数
+
+**测试验证**:
+- ✅ 启动速度: run.bat从"等待 Web 服务启动完成..."到"Web 服务已就绪"仅**4秒**（之前4分钟+超时）
+- ✅ 隧道功能: Cloudflare Tunnel仍在后台正常启动，13:23:02显示"Plan B 成功"
+- ✅ HTTP日志: uvicorn启动后立即开始处理请求(INFO: 192.168.31.36 - "GET / HTTP/1.1" 200 OK)
+- ✅ 异常安全: 模拟隧道启动失败时不影响Web服务运行
+- ✅ watchdog模式: --watchdog模式下curl检测4秒内成功，不再超时
 
 **影响文件**: [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh)
 
