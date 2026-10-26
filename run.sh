@@ -1472,13 +1472,13 @@ run_web() {
     log "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ==="
     
     if [ "$USE_WATCHDOG_DAEMON" = "1" ]; then
-        log "[*] 使用守护进程模式启动（防闪退增强版）..."
-        nohup python watchdog_daemon.py -- "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" \
+        log "[*] 使用内置守护进程模式启动（防闪退增强版）..."
+        nohup "$VENV_PATH/bin/python" main.py --watchdog --web --port "$WEB_PORT" \
             >> "$(pwd)/file/watchdog_daemon.log" 2>&1 &
         PYTHON_PID=$!
         WATCHDOG_PID=$PYTHON_PID
         echo "$PYTHON_PID" > "$(pwd)/file/watchdog.pid"
-        log "[*] 守护进程已启动 (PID: $PYTHON_PID)"
+        log "[*] 内置守护进程已启动 (PID: $PYTHON_PID)"
     else
         log "[*] 使用标准模式启动..."
         nohup "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &

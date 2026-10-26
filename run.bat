@@ -1347,7 +1347,7 @@ if not defined USE_WATCHDOG_DAEMON set "USE_WATCHDOG_DAEMON=1"
 
 if "!USE_WATCHDOG_DAEMON!"=="1" (
     call :log [*] 使用守护进程模式启动Web服务（防闪退增强版）...
-    start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python watchdog_daemon.py -- python main.py --web --port !WEB_PORT!" < nul
+    start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --watchdog --web --port !WEB_PORT!" < nul
 ) else (
     call :log [*] 使用标准模式启动Web服务...
     start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT!" < nul

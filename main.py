@@ -8216,12 +8216,152 @@ if __name__ == '__main__':
     parser.add_argument('--url', '-l', help='目标店铺URL')
     parser.add_argument('--excel', '-e', help='Excel文件路径')
     parser.add_argument('--task', type=int, choices=[1, 2, 3, 4, 6], help='直接执行指定任务后退出 (1:爬虫, 2:货号对比, 3:Excel对比, 4:更新Cookie, 6:文件清理)')
+    parser.add_argument('--watchdog', action='store_true', help='内置守护进程模式：监控子进程崩溃自动重启（替代外部watchdog_daemon.py）')
     parser.add_argument('--install-playwright', action='store_true', help='Playwright CDN智能测速+安装浏览器')
     parser.add_argument('--check-deps', action='store_true', help='检查requirements.txt依赖是否已满足')
     parser.add_argument('--select-pip-mirror', action='store_true', help='pip镜像智能测速并写入配置')
     parser.add_argument('--fix-bom', action='store_true', help='检测并移除项目中所有文件的UTF-8 BOM字符 (ZWNBSP U+FEFF)')
     parser.add_argument('--check-bom', action='store_true', help='仅扫描项目中的BOM文件，不进行修复')
     args = parser.parse_args()
+
+    # ============================================================
+    # 内置守护进程模式 (v5.0.9.81) - 替代外部watchdog_daemon.py
+    # 用法: python main.py --watchdog --web --port 8888
+    # 原理: 以子进程启动自身(不带--watchdog)，监控崩溃自动重启
+    # ============================================================
+    if args.watchdog:
+        _wd_max_restarts = 50
+        _wd_max_memory_mb = 2000
+        _wd_cooldown = 10
+        _wd_crash_log = os.path.join(PathManager.get_file_dir(), 'crash_history.log')
+        _wd_restart_count = 0
+        _wd_start_time = time.time()
+
+        def _wd_log_crash(reason):
+            try:
+                with open(_wd_crash_log, 'a', encoding='utf-8') as f:
+                    f.write(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {reason}\n")
+            except Exception:
+                pass
+
+        def _wd_kill_proc(proc):
+            if not proc:
+                return
+            try:
+                if psutil:
+                    p = psutil.Process(proc.pid)
+                    children = p.children(recursive=True)
+                    for c in children:
+                        try:
+                            c.terminate()
+                        except Exception:
+                            pass
+                    try:
+                        p.terminate()
+                    except Exception:
+                        pass
+                    gone, alive = psutil.wait_procs(children + [p], timeout=5)
+                    for a in alive:
+                        try:
+                            a.kill()
+                        except Exception:
+                            pass
+                else:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+            except Exception:
+                pass
+
+        def _wd_check_memory(proc):
+            if not psutil or not proc:
+                return False
+            try:
+                mem_mb = psutil.Process(proc.pid).memory_info().rss / (1024 * 1024)
+                if mem_mb > _wd_max_memory_mb:
+                    logger.warning(f"[watchdog] 内存超限: {mem_mb:.0f}MB > {_wd_max_memory_mb}MB")
+                    return True
+            except Exception:
+                pass
+            return False
+
+        _wd_sub_cmd = [sys.executable, os.path.abspath(__file__)]
+        for a in sys.argv[1:]:
+            if a != '--watchdog':
+                _wd_sub_cmd.append(a)
+        if '--web' not in _wd_sub_cmd:
+            _wd_sub_cmd.append('--web')
+
+        logger.info("=" * 50)
+        logger.info("[watchdog] 内置守护进程启动")
+        logger.info(f"[watchdog] 子命令: {' '.join(_wd_sub_cmd)}")
+        logger.info(f"[watchdog] 最大重启: {_wd_max_restarts}次 | 内存限制: {_wd_max_memory_mb}MB")
+        logger.info("=" * 50)
+
+        def _wd_signal_handler(signum, frame):
+            logger.info("[watchdog] 收到停止信号，正在关闭...")
+            if _wd_process:
+                _wd_kill_proc(_wd_process)
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, _wd_signal_handler)
+        signal.signal(signal.SIGTERM, _wd_signal_handler)
+
+        _wd_process = None
+        while _wd_restart_count < _wd_max_restarts:
+            try:
+                env = os.environ.copy()
+                env['WATCHDOG_MODE'] = '1'
+                if sys.platform == 'win32':
+                    _wd_process = subprocess.Popen(
+                        _wd_sub_cmd, env=env,
+                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                    )
+                else:
+                    _wd_process = subprocess.Popen(
+                        _wd_sub_cmd, env=env, preexec_fn=os.setsid
+                    )
+                logger.info(f"[watchdog] 子进程已启动 (PID: {_wd_process.pid})")
+            except Exception as e:
+                logger.error(f"[watchdog] 启动失败: {e}")
+                time.sleep(_wd_cooldown)
+                _wd_restart_count += 1
+                continue
+
+            while True:
+                try:
+                    _wd_retcode = _wd_process.poll()
+                except Exception:
+                    _wd_retcode = -1
+                if _wd_retcode is not None:
+                    break
+                if _wd_check_memory(_wd_process):
+                    logger.warning("[watchdog] 内存超限，正在重启子进程...")
+                    _wd_log_crash(f"内存超限(>{_wd_max_memory_mb}MB)，子进程被重启")
+                    _wd_kill_proc(_wd_process)
+                    time.sleep(2)
+                    break
+                time.sleep(2)
+
+            if _wd_retcode == 0:
+                logger.info("[watchdog] 子进程正常退出")
+                break
+
+            _wd_restart_count += 1
+            logger.warning(f"[watchdog] 子进程异常退出(码:{_wd_retcode})，第{_wd_restart_count}次重启...")
+            _wd_log_crash(f"子进程异常退出(码:{_wd_retcode})，第{_wd_restart_count}次重启")
+
+            if _wd_restart_count >= _wd_max_restarts:
+                logger.error(f"[watchdog] 已达最大重启次数({_wd_max_restarts})，停止")
+                break
+
+            time.sleep(_wd_cooldown)
+
+        _wd_uptime = time.time() - _wd_start_time
+        logger.info(f"[watchdog] 守护进程结束，运行: {_wd_uptime:.0f}s，重启: {_wd_restart_count}次")
+        sys.exit(0)
 
     # BOM 字符检测与修复（v4.1 新增功能）
     if args.fix_bom:

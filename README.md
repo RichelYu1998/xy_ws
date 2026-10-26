@@ -66,8 +66,8 @@ run.bat
 # macOS/Linux
 chmod +x run.sh && ./run.sh
 
-# 手动启动守护进程（跨平台通用）
-python watchdog_daemon.py -- python main.py --web --port 8888
+# 手动启动内置守护进程（跨平台通用）
+python main.py --watchdog --web --port 8888
 ```
 
 ## 🛡️ 跨平台防崩溃系统 (v2.0)
@@ -98,7 +98,7 @@ USE_WATCHDOG_DAEMON=0 ./run.sh                # macOS/Linux
 | `_MAX_RESTART_ATTEMPTS` | `5` | 最大重启次数 |
 | `_MEMORY_CLEANUP_INTERVAL` | `300` | 内存清理间隔(秒) |
 
-### 守护进程配置 ([watchdog_daemon.py](watchdog_daemon.py))
+### 内置守护进程配置 ([main.py --watchdog](main.py))
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
 | `max_restarts` | `50` | 最大重启次数 |
@@ -117,7 +117,7 @@ USE_WATCHDOG_DAEMON=0 ./run.sh                # macOS/Linux
 # 运行完整测试套件
 python test_crossplatform.py
 
-# 预期输出: 3/3 通过 (main.py 6/6 + watchdog_daemon.py 10/10 + 平台特定功能)
+# 预期输出: 3/3 通过 (main.py 6/6 + 内置守护进程 10/10 + 平台特定功能)
 ```
 
 ## 📂 项目结构
