@@ -13018,20 +13018,26 @@ ingress:
         logger.debug("=" * 50)
         logger.debug(f"访问地址: http://{os.environ.get('HOST', 'localhost')}:{args.port}")
         logger.debug(f"局域网地址: http://{lan_ip_startup}:{args.port}" if lan_ip_startup else "")
-        logger.debug("[Tunnel] 正在自动启动隧道...")
-        
-        tunnel_result = auto_start_tunnel()
-        if tunnel_result['success']:
-            url = tunnel_result.get('url')
-            if url:
-                logger.debug(f"[Tunnel] 隧道启动成功: {url}")
-            else:
-                logger.debug(f"[Tunnel] 隧道已就绪，公网地址将由心跳机制获取和验证")
-        else:
-            logger.debug(f"[Tunnel] 隧道启动失败: {tunnel_result.get('error', '未知错误')}")
-        
-        start_tunnel_daemons()
-        
+        logger.debug("[Tunnel] 正在后台启动隧道...")
+
+        def _start_tunnel_background():
+            try:
+                tunnel_result = auto_start_tunnel()
+                if tunnel_result['success']:
+                    url = tunnel_result.get('url')
+                    if url:
+                        logger.info(f"[Tunnel] 隧道启动成功: {url}")
+                    else:
+                        logger.info(f"[Tunnel] 隧道已就绪，公网地址将由心跳机制获取和验证")
+                else:
+                    logger.warning(f"[Tunnel] 隧道启动失败: {tunnel_result.get('error', '未知错误')}")
+                start_tunnel_daemons()
+            except Exception as e:
+                logger.error(f"[Tunnel] 后台隧道启动异常: {e}")
+
+        _tunnel_thread = threading.Thread(target=_start_tunnel_background, daemon=True)
+        _tunnel_thread.start()
+
         logger.debug("按 Ctrl+C 停止服务")
         logger.debug("=" * 50)
         
