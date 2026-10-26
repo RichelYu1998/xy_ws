@@ -311,7 +311,7 @@ bandit -r . -f json -o bandit_report.json
 5. **增强版看门狗**: 渐进式处理(30s预警→清理→60s重启)+连续卡死追踪+最大重试5次+分级警告 [main.py](main.py)
 6. **浏览器启动优化**: 14项防崩溃参数(--no-sandbox/--disable-gpu/--disable-dev-shm-usage等)+5次智能重试(指数退避1s→16s)+多级回退(自定义→Playwright内置→系统Chrome) [main.py](main.py)
 7. **Playwright检测bug修复**: run.sh中[ -f */chromium-* ]通配符不展开改为find命令+按平台分别检测(macOS/Linux/Windows) [run.sh](run.sh)
-8. **内置守护进程模式**: watchdog_daemon.py功能完整整合进main.py --watchdog参数+子进程启动自身+崩溃自动重启+内存超限监控+子进程日志重定向(watchdog_child.log) [main.py](main.py)
+8. **内置守护进程模式**: watchdog_daemon.py功能完整整合进main.py --watchdog参数+子进程启动自身+崩溃自动重启+内存超限监控+子进程输出继承CMD窗口(HTTP日志正常显示) [main.py](main.py)
 9. **curl超时修复**: run.bat/run.sh中curl检测添加--connect-timeout 3 -m 5超时参数+watchdog模式FLASK_MAX_WAIT提升至120秒 [run.bat](run.bat) [run.sh](run.sh)
 10. **IS_MACOS属性名修复**: Environment.IS_MACOS不存在改为Environment.IS_MAC，修复Web服务启动崩溃(AttributeError) [main.py](main.py)
 

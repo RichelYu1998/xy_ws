@@ -8310,24 +8310,19 @@ if __name__ == '__main__':
         signal.signal(signal.SIGTERM, _wd_signal_handler)
 
         _wd_process = None
-        _wd_log_file = None
         _wd_log_path = os.path.join(PathManager.get_file_dir(), 'watchdog_child.log')
         while _wd_restart_count < _wd_max_restarts:
             try:
                 env = os.environ.copy()
                 env['WATCHDOG_MODE'] = '1'
-                _wd_log_file = open(_wd_log_path, 'a', encoding='utf-8')
                 if sys.platform == 'win32':
                     _wd_process = subprocess.Popen(
                         _wd_sub_cmd, env=env,
-                        stdout=_wd_log_file, stderr=subprocess.STDOUT,
                         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
                     )
                 else:
                     _wd_process = subprocess.Popen(
-                        _wd_sub_cmd, env=env,
-                        stdout=_wd_log_file, stderr=subprocess.STDOUT,
-                        preexec_fn=os.setsid
+                        _wd_sub_cmd, env=env, preexec_fn=os.setsid
                     )
                 logger.info(f"[watchdog] 子进程已启动 (PID: {_wd_process.pid})")
             except Exception as e:
@@ -8351,13 +8346,6 @@ if __name__ == '__main__':
                     break
                 time.sleep(2)
 
-            if _wd_log_file:
-                try:
-                    _wd_log_file.close()
-                except Exception:
-                    pass
-                _wd_log_file = None
-
             if _wd_retcode == 0:
                 logger.info("[watchdog] 子进程正常退出")
                 break
@@ -8372,11 +8360,6 @@ if __name__ == '__main__':
 
             time.sleep(_wd_cooldown)
 
-        if _wd_log_file:
-            try:
-                _wd_log_file.close()
-            except Exception:
-                pass
         _wd_uptime = time.time() - _wd_start_time
         logger.info(f"[watchdog] 守护进程结束，运行: {_wd_uptime:.0f}s，重启: {_wd_restart_count}次")
         sys.exit(0)
