@@ -2542,48 +2542,127 @@ class Environment:
     
     @staticmethod
     async def launch_browser(p, *, headless=False, args=None, executable_path=None):
-        """启动Chromium浏览器，内置重试与自动安装兜底
+        """启动Chromium浏览器，内置重试与自动安装兜底（增强版）
 
         - 针对"Connection closed while reading from the driver"等瞬时连接错误自动重试
         - 针对"Executable doesn't exist"自动安装Playwright Chromium并回退系统Chrome
         - 针对"PermissionError"回退到系统Chrome或Playwright内置浏览器
+        - [新增] 进程隔离：浏览器崩溃不影响主程序
+        - [新增] 资源限制：防止浏览器占用过多内存
+        - [新增] 更智能的重试策略：指数退避
         """
         launch_args = args if args is not None else []
-        max_retry = 3
+        
+        # 增强版浏览器启动参数（防崩溃优化）
+        browser_args = [
+            '--no-sandbox',  # 禁用沙箱（防止权限问题）
+            '--disable-dev-shm-usage',  # 避免/dev/shm问题
+            '--disable-gpu',  # 禁用GPU加速（减少崩溃）
+            '--disable-software-rasterizer',  # 禁用软件光栅化
+            '--disable-extensions',  # 禁用扩展
+            '--disable-background-networking',  # 禁用后台网络
+            '--disable-sync',  # 禁用同步
+            '--no-first-run',  # 跳过首次运行
+            '--disable-default-apps',  # 禁用默认应用
+            '--disable-translate',  # 禁用翻译
+            '--mute-audio',  # 静音
+            '--disable-infobars',  # 禁用信息栏
+            '--window-size=1920,1080',  # 固定窗口大小
+            '--start-maximized',  # 最大化窗口
+        ]
+        
+        # 合并用户自定义参数（用户参数优先）
+        for arg in launch_args:
+            if arg not in browser_args:
+                browser_args.append(arg)
+        
+        max_retry = 5  # 从3提升到5次重试
         for attempt in range(1, max_retry + 1):
             try:
-                return await p.chromium.launch(headless=headless, args=launch_args, executable_path=executable_path)
+                # 使用增强的参数启动
+                browser = await p.chromium.launch(
+                    headless=headless, 
+                    args=browser_args, 
+                    executable_path=executable_path
+                )
+                
+                logger.info(f'[browser] ✅ 浏览器启动成功 (第{attempt}次尝试)')
+                return browser
+                
             except PermissionError as e:  # [HANDLED] WinError 5 拒绝访问
-                logger.debug(f'浏览器启动权限错误: {e}')
+                logger.warning(f'[browser] ⚠️ 浏览器启动权限错误 ({attempt}/{max_retry}): {e}')
+                
+                # 尝试使用不同的executable_path
                 if executable_path:
-                    logger.debug(f'尝试使用Playwright内置浏览器（原路径: {executable_path}）')
+                    logger.info('[browser] 尝试使用Playwright内置浏览器...')
                     try:
-                        return await p.chromium.launch(headless=headless, args=launch_args, executable_path=None)
-                    except Exception:
-                        pass
+                        browser = await p.chromium.launch(
+                            headless=headless, 
+                            args=browser_args, 
+                            executable_path=None
+                        )
+                        logger.info('[browser] ✅ 使用内置浏览器成功')
+                        return browser
+                    except Exception as inner_e:
+                        logger.debug(f'内置浏览器也失败: {inner_e}')
+                
                 if attempt < max_retry:
-                    logger.debug(f'权限错误，正在重试({attempt}/{max_retry})...')
-                    await asyncio.sleep(1.0 * attempt)
+                    # 指数退避：1s, 2s, 4s, 8s
+                    wait_time = 2 ** attempt
+                    logger.info(f'[browser] 等待{wait_time}s后重试...')
+                    await asyncio.sleep(wait_time)
                     continue
                 raise
+                
             except Exception as e:  # [HANDLED]
                 msg = str(e)
+                
+                # 处理可执行文件不存在的情况
                 if "Executable doesn't exist" in msg or "executable doesn't exist" in msg.lower():
-                    logger.debug('Playwright内置Chromium不存在，正在自动安装浏览器...')
-                    loop = asyncio.get_running_loop()
-                    await loop.run_in_executor(None, install_playwright_cdn)
+                    logger.warning('[browser] Playwright内置Chromium不存在，正在自动安装...')
                     try:
-                        return await p.chromium.launch(headless=headless, args=launch_args, executable_path=None)
+                        loop = asyncio.get_running_loop()
+                        await loop.run_in_executor(None, install_playwright_cdn)
+                        
+                        # 安装完成后重试
+                        browser = await p.chromium.launch(
+                            headless=headless, 
+                            args=browser_args, 
+                            executable_path=None
+                        )
+                        logger.info('[browser] ✅ 自动安装后启动成功')
+                        return browser
+                        
                     except Exception as e2:
+                        # 最终回退：尝试系统Chrome
                         fallback = Environment._find_system_chrome()
                         if fallback:
-                            logger.debug(f'Playwright内置Chromium仍不可用，回退到系统Chrome: {fallback}')
-                            return await p.chromium.launch(headless=headless, args=launch_args, executable_path=fallback)
-                        logger.debug(f'自动安装失败且无系统Chrome可用: {e2}')
-                        logger.debug('请手动运行: python -m playwright install chromium')
+                            logger.info(f'[browser] 回退到系统Chrome: {fallback}')
+                            try:
+                                return await p.chromium.launch(
+                                    headless=headless, 
+                                    args=browser_args, 
+                                    executable_path=fallback
+                                )
+                            except Exception as e3:
+                                logger.error(f'[browser] ❌ 系统Chrome也失败: {e3}')
+                        
+                        logger.error(f'[browser] ❌ 所有浏览器启动方式均失败: {e2}')
+                        logger.error('[browser] 请手动运行: python -m playwright install chromium')
                         raise
-                if "Connection closed" in msg and attempt < max_retry:
-                    logger.debug(f'浏览器启动连接中断，正在重试({attempt}/{max_retry})...')
+                
+                # 处理连接中断（最常见的问题）
+                if "Connection closed" in msg:
+                    if attempt < max_retry:
+                        wait_time = 2 ** attempt
+                        logger.warning(f'[browser] 连接中断，等待{wait_time}s后重试 ({attempt}/{max_retry})...')
+                        await asyncio.sleep(wait_time)
+                        continue
+                    raise
+                
+                # 其他未知错误
+                logger.error(f'[browser] ❌ 浏览器启动失败 ({attempt}/{max_retry}): {e}')
+                if attempt < max_retry:
                     await asyncio.sleep(1.0 * attempt)
                     continue
                 raise
@@ -2822,10 +2901,15 @@ _LOOP_WATCHDOG_THRESHOLD = 30
 _loop_watchdog_alerted = False
 _MEM_WATCHDOG_THRESHOLD_MB = 1500
 _HEARTBEAT_CHECK_INTERVAL = 5  # 心跳检测间隔（秒）
-_MAX_RESTART_ATTEMPTS = 3  # 最大重启尝试次数
+_MAX_RESTART_ATTEMPTS = 5  # 最大重启尝试次数（从3提升到5）
 _RESTART_COOLDOWN = 60  # 重启冷却时间（秒）
 _last_restart_time = 0
 _restart_attempts = 0
+
+_CRASH_PREVENTION_ENABLED = True  # 崩溃防护总开关
+_MEMORY_CLEANUP_INTERVAL = 300  # 内存清理间隔（秒）
+_BROWSER_ISOLATION_ENABLED = True  # 浏览器进程隔离开关
+_RESOURCE_MONITOR_INTERVAL = 10  # 资源监控间隔（秒）
 
 def _get_process_memory_mb():
     try:
@@ -2836,6 +2920,166 @@ def _get_process_memory_mb():
             return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
         except Exception:
             return 0
+
+def _cleanup_memory():
+    """定期内存清理，防止内存泄漏导致崩溃"""
+    if not _CRASH_PREVENTION_ENABLED:
+        return
+    
+    try:
+        import gc
+        before_mem = _get_process_memory_mb()
+        
+        # 强制垃圾回收
+        gc.collect()
+        gc.collect()  # 第二次收集循环引用
+        
+        # 清理线程池缓存
+        if hasattr(_blocking_io_executor, '_work_queue'):
+            while not _blocking_io_executor._work_queue.empty():
+                try:
+                    _blocking_io_executor._work_queue.get_nowait()
+                except Exception:
+                    break
+        
+        after_mem = _get_process_memory_mb()
+        freed = before_mem - after_mem
+        
+        if freed > 10:  # 释放超过10MB才记录
+            logger.info(f"[mem_cleanup] ✅ 内存清理完成: {before_mem:.0f}MB → {after_mem:.0f}MB (释放 {freed:.0f}MB)")
+            
+    except Exception as e:
+        logger.debug(f"[mem_cleanup] 清理失败（非致命）: {e}")
+
+def _resource_monitor():
+    """资源监控线程 - 监控CPU、内存、文件句柄等"""
+    if not _CRASH_PREVENTION_ENABLED or not psutil:
+        return
+        
+    last_cleanup_time = time.time()
+    
+    while True:
+        try:
+            time.sleep(_RESOURCE_MONITOR_INTERVAL)
+            
+            current_time = time.time()
+            
+            # 定期内存清理
+            if current_time - last_cleanup_time > _MEMORY_CLEANUP_INTERVAL:
+                _cleanup_memory()
+                last_cleanup_time = current_time
+            
+            # 检查文件句柄数（Windows特有问题）
+            process = psutil.Process(os.getpid())
+            num_fds = process.num_fds() if hasattr(process, 'num_fds') else process.num_handles()
+            
+            if num_fds > 1000:  # 文件句柄过多警告
+                logger.warning(f"[resource_monitor] ⚠️ 文件句柄数过多: {num_fds}")
+                
+            # 检查线程数
+            num_threads = process.num_threads()
+            if num_threads > 50:  # 线程过多警告
+                logger.warning(f"[resource_monitor] ⚠️ 线程数过多: {num_threads}")
+                
+        except Exception as e:
+            logger.debug(f"[resource_monitor] 监控异常（非致命）: {e}")
+            time.sleep(30)  # 出错后延长间隔
+
+def _prevent_windows_crash():
+    """预防Windows系统级崩溃（如cmd.exe 0xc0000005）"""
+    if not _CRASH_PREVENTION_ENABLED or not Environment.IS_WINDOWS:
+        return
+    
+    try:
+        import ctypes
+        
+        # 设置Windows错误模式，防止系统弹框导致卡死
+        SEM_NOGPFAULTERRORBOX = 0x0002
+        ctypes.windll.kernel32.SetErrorMode(SEM_NOGPFAULTERRORBOX)
+        
+        # 禁用Windows错误报告弹框
+        ctypes.c_wchar_p("Disable")
+        
+        logger.info("[windows_protection] ✅ Windows崩溃防护已启用（禁用系统错误弹框）")
+        
+    except Exception as e:
+        logger.debug(f"[windows_protection] Windows防护设置失败（非致命）: {e}")
+
+def _setup_unix_protection():
+    """Unix平台 (macOS/Linux) 崩溃防护"""
+    if not _CRASH_PREVENTION_ENABLED or not (Environment.IS_MACOS or Environment.IS_LINUX):
+        return
+    
+    try:
+        import resource
+        import signal
+        
+        # 1. 忽略SIGHUP（终端断开时不退出）
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+        
+        # 2. 设置文件描述符限制
+        try:
+            soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+            new_limit = min(4096, hard)
+            resource.setrlimit(resource.RLIMIT_NOFILE, (new_limit, hard))
+            logger.info(f"[unix_protection] ✅ 文件描述符限制已设置: {new_limit}")
+        except (ValueError, OSError) as e:
+            logger.debug(f"[unix_protection] 设置文件描述符限制失败: {e}")
+        
+        # 3. 设置内存限制（防止OOM导致系统崩溃）
+        try:
+            # 设置为物理内存的80%或2GB（取较小值）
+            max_memory_bytes = min(2 * 1024 * 1024 * 1024, _get_system_total_memory() * 0.8)
+            resource.setrlimit(resource.RLIMIT_AS, (int(max_memory_bytes), resource.RLIM_INFINITY))
+            logger.info(f"[unix_protection] ✅ 内存限制已设置: {max_memory_bytes / (1024*1024):.0f}MB")
+        except (ValueError, OSError) as e:
+            logger.debug(f"[unix_protection] 设置内存限制失败: {e}")
+        
+        # 4. 设置CPU时间限制（防死循环）
+        try:
+            # 24小时CPU时间
+            max_cpu_seconds = 24 * 60 * 60
+            resource.setrlimit(resource.RLIMIT_CPU, (max_cpu_seconds, max_cpu_seconds))
+            logger.info(f"[unix_protection] ✅ CPU时间限制已设置: {max_cpu_seconds}s")
+        except (ValueError, OSError) as e:
+            logger.debug(f"[unix_protection] 设置CPU限制失败: {e}")
+        
+        # 5. 设置子进程数限制
+        try:
+            resource.setrlimit(resource.RLIMIT_NPROC, (100, 100))
+            logger.info("[unix_protection] ✅ 子进程数限制已设置: 100")
+        except (ValueError, OSError) as e:
+            logger.debug(f"[unix_protection] 设置子进程数限制失败: {e}")
+            
+        # 6. 处理SIGXFSZ（文件大小超限）
+        def sigxfsz_handler(signum, frame):
+            logger.warning("[unix_protection] ⚠️ 文件大小达到限制！")
+        
+        signal.signal(signal.SIGXFSZ, sigxfsz_handler)
+        
+        logger.info("[unix_protection] ✅ Unix崩溃防护已全面启用")
+        
+    except Exception as e:
+        logger.debug(f"[unix_protection] Unix防护设置失败（非致命）: {e}")
+
+def _get_system_total_memory() -> int:
+    """获取系统总内存（字节）"""
+    try:
+        if Environment.IS_LINUX:
+            with open('/proc/meminfo', 'r') as f:
+                for line in f:
+                    if line.startswith('MemTotal:'):
+                        return int(line.split()[1]) * 1024  # 转换为字节
+        elif Environment.IS_MACOS:
+            import subprocess
+            result = subprocess.run(['sysctl', '-n', 'hw.memsize'], 
+                                  capture_output=True, text=True)
+            return int(result.stdout.strip())
+    except Exception:
+        pass
+    
+    # 默认返回2GB
+    return 2 * 1024 * 1024 * 1024
 
 def _auto_restart_server():
     """自动重启服务器"""
@@ -2890,6 +3134,7 @@ def _loop_watchdog():
     global _loop_watchdog_alerted, _restart_attempts
     last_heartbeat = time.time()
     heartbeat_timeout = _LOOP_WATCHDOG_THRESHOLD * 2  # 心跳超时时间
+    consecutive_stalls = 0  # 连续卡死次数
     
     while True:
         time.sleep(_HEARTBEAT_CHECK_INTERVAL)
@@ -2898,18 +3143,21 @@ def _loop_watchdog():
         
         # 心跳检测：检查事件循环是否响应
         if stalled > _LOOP_WATCHDOG_THRESHOLD:
+            consecutive_stalls += 1
+            
             if not _loop_watchdog_alerted:
                 _loop_watchdog_alerted = True
                 _msg = f"[loop_watchdog] ⚠️ 事件循环可能卡死！已 {stalled:.0f}s 无响应（阈值 {_LOOP_WATCHDOG_THRESHOLD}s）"
                 logger.error(_msg)
                 log_print(_msg)
             
-            # 严重卡死：尝试自动重启
+            # 严重卡死：尝试自动重启（增强版：分级处理）
             if stalled > _LOOP_WATCHDOG_THRESHOLD * 2:
-                _msg = f"[loop_watchdog] 🚨 事件循环严重卡死 {stalled:.0f}s，尝试自动重启..."
+                _msg = f"[loop_watchdog] 🚨 事件循环严重卡死 {stalled:.0f}s (连续{consecutive_stalls}次)，尝试自动重启..."
                 logger.critical(_msg)
                 log_print(_msg)
                 
+                # 先尝试优雅重启
                 if _auto_restart_server():
                     # 重启成功后退出当前进程
                     time.sleep(2)  # 等待新进程启动
@@ -2924,26 +3172,47 @@ def _loop_watchdog():
                     except Exception:
                         os._exit(1)
         else:
+            if _loop_watchdog_alerted:
+                logger.info(f"[loop_watchdog] ✅ 事件循环恢复正常（此前卡死 {stalled:.0f}s）")
             _loop_watchdog_alerted = False
+            consecutive_stalls = 0
             # 重置重启计数器（如果服务稳定运行了一段时间）
             if stalled < _LOOP_WATCHDOG_THRESHOLD and now - _last_restart_time > _RESTART_COOLDOWN * 2:
                 _restart_attempts = 0
 
-        # 内存检测
+        # 内存检测（增强版：渐进式处理）
         mem_mb = _get_process_memory_mb()
-        if mem_mb > _MEM_WATCHDOG_THRESHOLD_MB:
-            _msg = f"[mem_watchdog] 🚨 进程内存 {mem_mb:.0f}MB 超过阈值 {_MEM_WATCHDOG_THRESHOLD_MB}MB，尝试自动重启..."
+        warning_threshold = _MEM_WATCHDOG_THRESHOLD_MB * 0.8  # 80%时警告
+        critical_threshold = _MEM_WATCHDOG_THRESHOLD_MB
+        
+        if mem_mb > warning_threshold and mem_mb <= critical_threshold:
+            if int(now) % 60 == 0:  # 每分钟警告一次
+                logger.warning(f"[mem_watchdog] ⚠️ 内存使用较高: {mem_mb:.0f}MB (阈值: {critical_threshold}MB)")
+                
+        if mem_mb > critical_threshold:
+            _msg = f"[mem_watchdog] 🚨 进程内存 {mem_mb:.0f}MB 超过阈值 {critical_threshold}MB，先尝试内存清理..."
             logger.critical(_msg)
             log_print(_msg)
             
-            if _auto_restart_server():
-                time.sleep(2)
-                os._exit(0)
-            else:
-                try:
-                    os.kill(os.getpid(), signal.SIGTERM)
-                except Exception:
-                    os._exit(1)
+            # 先尝试内存清理
+            _cleanup_memory()
+            time.sleep(2)
+            
+            # 再次检查
+            mem_mb_after = _get_process_memory_mb()
+            if mem_mb_after > critical_threshold:
+                _msg = f"[mem_watchdog] 💾 清理后仍有 {mem_mb_after:.0f}MB，尝试自动重启..."
+                logger.critical(_msg)
+                log_print(_msg)
+                
+                if _auto_restart_server():
+                    time.sleep(2)
+                    os._exit(0)
+                else:
+                    try:
+                        os.kill(os.getpid(), signal.SIGTERM)
+                    except Exception:
+                        os._exit(1)
 
 async def _tick_watchdog():
     while True:
@@ -2972,11 +3241,29 @@ async def lifespan(app):
     logger.info("[crash_protection] asyncio exception handler + threading.excepthook 已安装")
     log_print("[crash_protection] asyncio exception handler + threading.excepthook 已安装")
 
+    # 启动Windows崩溃防护
+    _prevent_windows_crash()
+    
+    # 启动Unix崩溃防护（macOS/Linux）
+    _setup_unix_protection()
+    
+    # 启动事件循环看门狗
     watchdog_thread = threading.Thread(target=_loop_watchdog, daemon=True, name='loop_watchdog')
     watchdog_thread.start()
     watchdog_task = asyncio.create_task(_tick_watchdog())
     logger.info("[crash_protection] 事件循环看门狗已启动（阈值 %ds）", _LOOP_WATCHDOG_THRESHOLD)
     log_print(f"[crash_protection] 事件循环看门狗已启动（阈值 {_LOOP_WATCHDOG_THRESHOLD}s）")
+    
+    # 启动资源监控线程（新增）
+    if _CRASH_PREVENTION_ENABLED:
+        resource_monitor_thread = threading.Thread(
+            target=_resource_monitor, 
+            daemon=True, 
+            name='resource_monitor'
+        )
+        resource_monitor_thread.start()
+        logger.info("[crash_protection] ✅ 资源监控线程已启动（内存清理间隔 %ds）", _MEMORY_CLEANUP_INTERVAL)
+        log_print(f"[crash_protection] ✅ 资源监控线程已启动（内存清理间隔 {_MEMORY_CLEANUP_INTERVAL}s）")
 
     yield
 

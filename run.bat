@@ -1341,7 +1341,17 @@ if !WEB_PORT! gtr 65535 set "WEB_PORT=8888"
 
 call :ms_timestamp
 call :log [!TIMESTAMP!] === Web服务启动 ===
-start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT!" < nul
+
+:: 检查是否使用守护进程模式（默认启用）
+if not defined USE_WATCHDOG_DAEMON set "USE_WATCHDOG_DAEMON=1"
+
+if "!USE_WATCHDOG_DAEMON!"=="1" (
+    call :log [*] 使用守护进程模式启动Web服务（防闪退增强版）...
+    start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python watchdog_daemon.py -- python main.py --web --port !WEB_PORT!" < nul
+) else (
+    call :log [*] 使用标准模式启动Web服务...
+    start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --web --port !WEB_PORT!" < nul
+)
 
 call :log 等待 Web 服务启动完成...
 ping -n 2 127.0.0.1 >nul 2>&1

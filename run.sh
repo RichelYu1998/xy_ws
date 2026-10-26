@@ -20,6 +20,7 @@ fi
 
 mkdir -p file
 LOG_FILE="$(pwd)/file/web_output.log"
+USE_WATCHDOG_DAEMON="${USE_WATCHDOG_DAEMON:-1}"
 > "$LOG_FILE"
 
 log() {
@@ -1469,8 +1470,22 @@ run_web() {
         WEB_PORT=8888
     fi
     log "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ==="
-    "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
-    PYTHON_PID=$!
+    
+    if [ "$USE_WATCHDOG_DAEMON" = "1" ]; then
+        log "[*] 使用守护进程模式启动（防闪退增强版）..."
+        nohup python watchdog_daemon.py -- "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" \
+            >> "$(pwd)/file/watchdog_daemon.log" 2>&1 &
+        PYTHON_PID=$!
+        WATCHDOG_PID=$PYTHON_PID
+        echo "$PYTHON_PID" > "$(pwd)/file/watchdog.pid"
+        log "[*] 守护进程已启动 (PID: $PYTHON_PID)"
+    else
+        log "[*] 使用标准模式启动..."
+        nohup "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
+        PYTHON_PID=$!
+        echo "$PYTHON_PID" > "$(pwd)/file/web.pid"
+        log "[*] Web服务已启动 (PID: $PYTHON_PID)"
+    fi
 
     log "等待 Web 服务启动完成..."
     sleep 1
@@ -1619,54 +1634,65 @@ run_web() {
         done
     }
 
-    watchdog_loop &
-    WATCHDOG_PID=$!
+    if [ "$USE_WATCHDOG_DAEMON" != "1" ]; then
+        watchdog_loop &
+        WATCHDOG_PID=$!
+        log "[*] 内置看门狗已启动 (PID: $WATCHDOG_PID)"
+    else
+        log "[*] 使用外部守护进程模式，跳过内置看门狗"
+    fi
 
-    while true; do
+    if [ "$USE_WATCHDOG_DAEMON" = "1" ]; then
+        log "[*] 守护进程模式下运行中... (按 Ctrl+C 停止)"
         wait $PYTHON_PID 2>/dev/null
-        EXIT_CODE=$?
+        log "[*] 守护进程已退出"
+    else
+        while true; do
+            wait $PYTHON_PID 2>/dev/null
+            EXIT_CODE=$?
 
-        if [ $WEB_RESTART_COUNT -ge $WEB_MAX_RESTARTS ]; then
-            log "[AutoRestart] 已达到最大重启次数($WEB_MAX_RESTARTS)，停止自动重启"
-            break
-        fi
-
-        WEB_RESTART_COUNT=$((WEB_RESTART_COUNT + 1))
-        log "[AutoRestart] Web服务已退出(退出码:$EXIT_CODE)，准备自动重启... (第${WEB_RESTART_COUNT}次/最多${WEB_MAX_RESTARTS}次)"
-
-        log "[AutoRestart] 清理残留进程..."
-        kill_all_interfering_processes
-        sleep 3
-
-        log "[AutoRestart] 冷却${WEB_RESTART_COOLDOWN}秒后重启..."
-        sleep $WEB_RESTART_COOLDOWN
-
-        log "[AutoRestart] 正在重新启动Web服务..."
-        source "$VENV_PATH/bin/activate"
-        "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
-        PYTHON_PID=$!
-
-        log "[AutoRestart] 等待Web服务启动..."
-        RESTART_WAIT=0
-        RESTART_MAX_WAIT=60
-        while [ $RESTART_WAIT -lt $RESTART_MAX_WAIT ]; do
-            if ! kill -0 $PYTHON_PID 2>/dev/null; then
-                log "[AutoRestart] Web服务重启后进程已退出"
-                break 2
-            fi
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT" 2>/dev/null)
-            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
-                log "[AutoRestart] Web服务重启成功 (第${WEB_RESTART_COUNT}次重启)"
+            if [ $WEB_RESTART_COUNT -ge $WEB_MAX_RESTARTS ]; then
+                log "[AutoRestart] 已达到最大重启次数($WEB_MAX_RESTARTS)，停止自动重启"
                 break
             fi
-            RESTART_WAIT=$((RESTART_WAIT + 1))
-            sleep 1
-        done
 
-        if [ $RESTART_WAIT -ge $RESTART_MAX_WAIT ]; then
-            log "[AutoRestart] Web服务重启后启动超时"
-        fi
-    done
+            WEB_RESTART_COUNT=$((WEB_RESTART_COUNT + 1))
+            log "[AutoRestart] Web服务已退出(退出码:$EXIT_CODE)，准备自动重启... (第${WEB_RESTART_COUNT}次/最多${WEB_MAX_RESTARTS}次)"
+
+            log "[AutoRestart] 清理残留进程..."
+            kill_all_interfering_processes
+            sleep 3
+
+            log "[AutoRestart] 冷却${WEB_RESTART_COOLDOWN}秒后重启..."
+            sleep $WEB_RESTART_COOLDOWN
+
+            log "[AutoRestart] 正在重新启动Web服务..."
+            source "$VENV_PATH/bin/activate"
+            "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
+            PYTHON_PID=$!
+
+            log "[AutoRestart] 等待Web服务启动..."
+            RESTART_WAIT=0
+            RESTART_MAX_WAIT=60
+            while [ $RESTART_WAIT -lt $RESTART_MAX_WAIT ]; do
+                if ! kill -0 $PYTHON_PID 2>/dev/null; then
+                    log "[AutoRestart] Web服务重启后进程已退出"
+                    break 2
+                fi
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT" 2>/dev/null)
+                if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+                    log "[AutoRestart] Web服务重启成功 (第${WEB_RESTART_COUNT}次重启)"
+                    break
+                fi
+                RESTART_WAIT=$((RESTART_WAIT + 1))
+                sleep 1
+            done
+
+            if [ $RESTART_WAIT -ge $RESTART_MAX_WAIT ]; then
+                log "[AutoRestart] Web服务重启后启动超时"
+            fi
+        done
+    fi
 
     kill $CLEANUP_PID 2>/dev/null
 }
@@ -1794,6 +1820,20 @@ kill_all_interfering_processes() {
     fi
 }
 
+check_chromium_exists() {
+    local browsers_path="$1"
+    
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        find "$browsers_path" -path "*/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium" -type f 2>/dev/null | grep -q . && return 0
+    elif [[ "$(uname -s)" == "Linux" ]]; then
+        find "$browsers_path" -path "*/chromium-*/chrome-linux/chrome" -type f 2>/dev/null | grep -q . && return 0
+    elif [[ "$(uname -s)" =~ ^MSYS|^MINGW ]]; then
+        find "$browsers_path" -path "*/chromium-*/chrome-win/chrome.exe" -type f 2>/dev/null | grep -q . && return 0
+    fi
+    
+    return 1
+}
+
 check_and_fix_playwright() {
     PLAYWRIGHT_VER=$("$VENV_PATH/bin/python" -c "import playwright; print(playwright.__version__)" 2>/dev/null)
     if [ -z "$PLAYWRIGHT_VER" ]; then
@@ -1805,9 +1845,7 @@ check_and_fix_playwright() {
         PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright"
     fi
 
-    if [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-linux/chrome ] || \
-       [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium ] || \
-       [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-win/chrome.exe ]; then
+    if check_chromium_exists "$PLAYWRIGHT_BROWSERS_PATH"; then
         log "    [Playwright] ✅ Chromium 浏览器驱动正常 (Playwright v${PLAYWRIGHT_VER})"
         return 0
     fi
@@ -1817,9 +1855,7 @@ check_and_fix_playwright() {
     source "$VENV_PATH/bin/activate" > /dev/null 2>&1
     python -m playwright install chromium 2>&1
 
-    if [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-linux/chrome ] || \
-       [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium ] || \
-       [ -f "$PLAYWRIGHT_BROWSERS_PATH"/chromium-*/chrome-win/chrome.exe ]; then
+    if check_chromium_exists "$PLAYWRIGHT_BROWSERS_PATH"; then
         log "    [Playwright] ✅ Chromium 浏览器安装成功"
     else
         log "    [Playwright] ❌ Chromium 浏览器安装失败，请手动执行：python -m playwright install chromium"

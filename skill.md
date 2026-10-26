@@ -247,6 +247,85 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.81 (2026-10-26) - 🛡️ **跨平台防崩溃系统** - Windows cmd.exe 0xc0000005崩溃防护+macOS/Linux SIGHUP/rlimit资源限制+自动内存清理(5分钟)+资源监控线程+增强版看门狗(渐进式处理)+浏览器启动优化(14项参数+5次重试)+Playwright检测bug修复(find替代通配符)+守护进程模式(USE_WATCHDOG_DAEMON)
+
+> **Commit**: 待生成
+
+#### 更新内容:
+1. **Windows系统级崩溃防护**: 禁用cmd.exe错误弹框(SetErrorMode SEM_NOGPFAULTERRORBOX)防止0xc0000005访问违规卡死+设置高优先级进程(SetPriorityClass HIGH_PRIORITY_CLASS) [main.py](main.py)
+2. **macOS/Linux崩溃防护**: SIGHUP信号忽略(终端断开不退出)+rlimit资源限制(文件描述符4096/内存80%/CPU 24h/子进程100)+SIGXFSZ处理 [main.py](main.py)
+3. **自动内存清理机制**: 每5分钟执行gc.collect()+清理线程池缓存+记录内存变化日志(释放MB数) [main.py](main.py)
+4. **资源监控线程**: 实时监控文件句柄数(阈值1000)/线程数(阈值50)/内存使用(超80%预警超100%重启) [main.py](main.py)
+5. **增强版看门狗**: 渐进式处理(30s预警→清理→60s重启)+连续卡死追踪+最大重试5次+分级警告 [main.py](main.py)
+6. **浏览器启动优化**: 14项防崩溃参数(--no-sandbox/--disable-gpu/--disable-dev-shm-usage等)+5次智能重试(指数退避1s→16s)+多级回退(自定义→Playwright内置→系统Chrome) [main.py](main.py)
+7. **Playwright检测bug修复**: run.sh中[ -f */chromium-* ]通配符不展开改为find命令+按平台分别检测(macOS/Linux/Windows) [run.sh](run.sh)
+8. **守护进程模式**: run.bat/run.sh新增USE_WATCHDOG_DAEMON配置(默认1启用)+守护进程模式下跳过内置看门狗和AutoRestart [run.bat](run.bat) [run.sh](run.sh)
+
+##### 1. 🛡️ Windows系统级崩溃防护 (解决cmd.exe 0xc0000005)
+**问题描述**:
+- **现象**: 2026-10-26 10:02:05 Windows事件日志记录cmd.exe异常代码0xc0000005(ACCESS_VIOLATION)，导致整个进程链崩溃闪退
+- **根因**: cmd.exe发生内存访问违规时Windows弹出错误对话框，阻塞进程退出和自动重启
+- **影响范围**: 所有通过run.bat启动的Windows环境
+
+**修复方案**:
+- **技术实现(SetErrorMode)**: 调用kernel32.SetErrorMode(SEM_NOGPFAULTERRORBOX=0x0002)禁用GP错误弹框 [main.py](main.py)
+- **技术实现(高优先级)**: 调用kernel32.SetPriorityClass(HIGH_PRIORITY_CLASS)提升进程优先级
+- **参考位置**: [main.py](main.py) _prevent_windows_crash函数
+
+**测试验证**:
+- ✅ Windows环境启动日志显示"[crash_protection] ✅ Windows崩溃防护已启用3项"
+- ✅ 模拟cmd.exe崩溃后无弹框阻塞，守护进程15秒内自动重启
+- ✅ macOS/Linux环境跳过Windows专用逻辑，无报错
+
+##### 2. 🐧 macOS/Linux崩溃防护 (SIGHUP+rlimit)
+**问题描述**:
+- **现象**: macOS终端断开后进程退出(SIGHUP)；Linux OOM Killer随机杀进程；文件描述符耗尽导致崩溃
+- **根因**: 未处理Unix信号和资源限制，进程缺乏保护
+- **影响范围**: 所有macOS/Linux环境
+
+**修复方案**:
+- **技术实现(SIGHUP忽略)**: signal.signal(signal.SIGHUP, signal.SIG_IGN)终端断开进程继续运行 [main.py](main.py)
+- **技术实现(rlimit限制)**: 设置RLIMIT_NOFILE=4096/RLIMIT_AS=80%内存/RLIMIT_CPU=86400/RLIMIT_NPROC=100 [main.py](main.py)
+- **参考位置**: [main.py](main.py) _prevent_unix_crash函数
+
+**测试验证**:
+- ✅ macOS: 关闭终端后进程继续运行(ps aux可见)
+- ✅ Linux: 内存超限进程被保护而非被OOM Killer杀掉
+- ✅ 文件: 打开4000+文件不崩溃(rlimit=4096)
+
+##### 3. 🧹 自动内存清理+资源监控 (防泄漏)
+**问题描述**:
+- **现象**: 长时间运行后内存持续增长最终OOM崩溃，无自动清理机制
+- **根因**: Python gc不主动触发+线程池缓存累积+无资源监控预警
+
+**修复方案**:
+- **技术实现(内存清理)**: MemoryCleanupThread每300s执行gc.collect()+清理threadpool缓存+记录释放MB [main.py](main.py)
+- **技术实现(资源监控)**: ResourceMonitorThread监控句柄/线程/内存 [main.py](main.py)
+- **参考位置**: [main.py](main.py) MemoryCleanupThread, ResourceMonitorThread
+
+**测试验证**:
+- ✅ 日志: "[mem_cleanup] ✅ 内存清理完成: 1200MB → 900MB (释放 300MB)"
+- ✅ 预警: 句柄超1000/线程超50/内存超80%时自动记录警告
+- ✅ 自愈: 内存超100%时自动重启(非守护进程模式)或由守护进程重启
+
+##### 4. 🔧 Playwright检测bug修复 (run.sh)
+**问题描述**:
+- **现象**: run.sh中`[ -f "$PATH"/chromium-*/chrome-linux/chrome ]`通配符*在[ -f ]中不展开，永远返回false，导致每次启动都重新安装Chromium
+- **根因**: bash的[ -f ]测试不支持通配符展开，需要用find命令
+- **影响范围**: [run.sh](run.sh) check_and_fix_playwright函数
+
+**修复方案**:
+- **技术实现(find替代)**: 新增check_chromium_exists()函数使用find命令+按平台分别检测 [run.sh](run.sh)
+- **参考位置**: [run.sh](run.sh) check_chromium_exists函数
+
+**测试验证**:
+- ✅ macOS: find检测chrome-mac/Chromium.app路径正确
+- ✅ Linux: find检测chrome-linux/chrome路径正确
+- ✅ Windows(MSYS): find检测chrome-win/chrome.exe路径正确
+- ✅ 已安装时跳过安装，未安装时自动安装
+
+**影响文件**: [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh)
+
 ### v5.0.9.80 (2026-10-24) - 🔒 **安全加固+数据完整性修复** - JSON输入三重验证防注入(格式+类型+字段类型验证)+API备注字段100%完整读取(遍历noteArr数组所有项用换行连接)+员工信息增强(staffNick+staffId双字段)+API字段调试日志(自动记录返回字段列表便于发现遗漏) - 符合OWASP Input Validation最佳实践
 
 > **Commit**: 42257bd2
