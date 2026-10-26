@@ -301,7 +301,7 @@ bandit -r . -f json -o bandit_report.json
 
 ### v5.0.9.81 (2026-10-26) - 🛡️ **跨平台防崩溃系统** - Windows cmd.exe 0xc0000005崩溃防护+macOS/Linux SIGHUP/rlimit资源限制+自动内存清理(5分钟)+资源监控线程+增强版看门狗(渐进式处理)+浏览器启动优化(14项参数+5次重试)+Playwright检测bug修复(find替代通配符)+内置守护进程模式(--watchdog)+curl超时修复+IS_MACOS属性名修复
 
-> **Commit**: 7efa1499,5e83b9c1
+> **Commit**: 7efa1499,5e83b9c1,ca1ea8c7
 
 #### 更新内容:
 1. **Windows系统级崩溃防护**: 禁用cmd.exe错误弹框(SetErrorMode SEM_NOGPFAULTERRORBOX)防止0xc0000005访问违规卡死+设置高优先级进程(SetPriorityClass HIGH_PRIORITY_CLASS) [main.py](main.py)
