@@ -299,9 +299,9 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
-### v5.0.9.81 (2026-10-26) - 🛡️ **跨平台防崩溃系统** - Windows cmd.exe 0xc0000005崩溃防护+macOS/Linux SIGHUP/rlimit资源限制+自动内存清理(5分钟)+资源监控线程+增强版看门狗(渐进式处理)+浏览器启动优化(14项参数+5次重试)+Playwright检测bug修复(find替代通配符)+守护进程模式(USE_WATCHDOG_DAEMON)
+### v5.0.9.81 (2026-10-26) - 🛡️ **跨平台防崩溃系统** - Windows cmd.exe 0xc0000005崩溃防护+macOS/Linux SIGHUP/rlimit资源限制+自动内存清理(5分钟)+资源监控线程+增强版看门狗(渐进式处理)+浏览器启动优化(14项参数+5次重试)+Playwright检测bug修复(find替代通配符)+内置守护进程模式(--watchdog)+curl超时修复+IS_MACOS属性名修复
 
-> **Commit**: 7efa1499
+> **Commit**: 7efa1499,5e83b9c1
 
 #### 更新内容:
 1. **Windows系统级崩溃防护**: 禁用cmd.exe错误弹框(SetErrorMode SEM_NOGPFAULTERRORBOX)防止0xc0000005访问违规卡死+设置高优先级进程(SetPriorityClass HIGH_PRIORITY_CLASS) [main.py](main.py)
@@ -311,7 +311,9 @@ bandit -r . -f json -o bandit_report.json
 5. **增强版看门狗**: 渐进式处理(30s预警→清理→60s重启)+连续卡死追踪+最大重试5次+分级警告 [main.py](main.py)
 6. **浏览器启动优化**: 14项防崩溃参数(--no-sandbox/--disable-gpu/--disable-dev-shm-usage等)+5次智能重试(指数退避1s→16s)+多级回退(自定义→Playwright内置→系统Chrome) [main.py](main.py)
 7. **Playwright检测bug修复**: run.sh中[ -f */chromium-* ]通配符不展开改为find命令+按平台分别检测(macOS/Linux/Windows) [run.sh](run.sh)
-8. **守护进程模式**: run.bat/run.sh新增USE_WATCHDOG_DAEMON配置(默认1启用)+守护进程模式下跳过内置看门狗和AutoRestart [run.bat](run.bat) [run.sh](run.sh)
+8. **内置守护进程模式**: watchdog_daemon.py功能完整整合进main.py --watchdog参数+子进程启动自身+崩溃自动重启+内存超限监控+子进程日志重定向(watchdog_child.log) [main.py](main.py)
+9. **curl超时修复**: run.bat/run.sh中curl检测添加--connect-timeout 3 -m 5超时参数+watchdog模式FLASK_MAX_WAIT提升至120秒 [run.bat](run.bat) [run.sh](run.sh)
+10. **IS_MACOS属性名修复**: Environment.IS_MACOS不存在改为Environment.IS_MAC，修复Web服务启动崩溃(AttributeError) [main.py](main.py)
 
 ##### 1. 🛡️ Windows系统级崩溃防护 (解决cmd.exe 0xc0000005)
 **问题描述**:

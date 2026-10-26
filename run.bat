@@ -1357,7 +1357,11 @@ call :log 等待 Web 服务启动完成...
 ping -n 2 127.0.0.1 >nul 2>&1
 
 set "FLASK_WAIT_COUNT=0"
-set "FLASK_MAX_WAIT=60"
+if "!USE_WATCHDOG_DAEMON!"=="1" (
+    set "FLASK_MAX_WAIT=120"
+) else (
+    set "FLASK_MAX_WAIT=60"
+)
 
 :wait_flask
 set /a FLASK_WAIT_COUNT+=1
@@ -1366,7 +1370,7 @@ if !FLASK_WAIT_COUNT! gtr !FLASK_MAX_WAIT! (
     goto :wait_loop_entry
 )
 set "HTTP_CODE="
-for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" http://localhost:!WEB_PORT! 2^>nul') do set "HTTP_CODE=%%i"
+for /f "delims=" %%i in ('curl.exe -s --connect-timeout 3 -m 5 -o NUL -w "%%{http_code}" http://localhost:!WEB_PORT! 2^>nul') do set "HTTP_CODE=%%i"
 if not defined HTTP_CODE set "HTTP_CODE=000"
 if not "!HTTP_CODE!"=="200" if not "!HTTP_CODE!"=="302" (
     ping -n 1 127.0.0.1 >nul 2>&1

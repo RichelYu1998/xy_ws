@@ -1491,13 +1491,17 @@ run_web() {
     sleep 1
 
     FLASK_WAIT_COUNT=0
-    FLASK_MAX_WAIT=60
+    if [ "$USE_WATCHDOG_DAEMON" = "1" ]; then
+        FLASK_MAX_WAIT=120
+    else
+        FLASK_MAX_WAIT=60
+    fi
     while [ $FLASK_WAIT_COUNT -lt $FLASK_MAX_WAIT ]; do
         if ! kill -0 $PYTHON_PID 2>/dev/null; then
             log "[ERROR] Web 服务进程已退出，请检查日志: file/web_output.log"
             exit 1
         fi
-        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT" 2>/dev/null)
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "http://localhost:$WEB_PORT" 2>/dev/null)
         if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
             break
         fi
@@ -1679,7 +1683,7 @@ run_web() {
                     log "[AutoRestart] Web服务重启后进程已退出"
                     break 2
                 fi
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$WEB_PORT" 2>/dev/null)
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "http://localhost:$WEB_PORT" 2>/dev/null)
                 if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
                     log "[AutoRestart] Web服务重启成功 (第${WEB_RESTART_COUNT}次重启)"
                     break

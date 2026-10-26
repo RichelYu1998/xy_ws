@@ -231,7 +231,7 @@ bandit -r . -f json -o bandit_report.json
 
 **操作流程**:
 ```
-收集同一版本的所有 commit → 合并为一条记录（含子项）→ 先写 skill.md → 复制到 README.md → generate_docx.py → 验证无重复
+收集同一版本的所有 commit → 合并为一条记录（含子项）→ 先写 skill.md → 复制到 README.md → python test/generate_docx.py → 验证无重复
 ```
 
 **Emoji对照表**: 🐛Bug修复 🔧功能优化 ✨新功能 🔒安全修复 🛡️安全加固 🎯精准修复 📝文档更新 ♻️重构 🔐配置管理 🆕新增检测
@@ -247,9 +247,9 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
-### v5.0.9.81 (2026-10-26) - 🛡️ **跨平台防崩溃系统** - Windows cmd.exe 0xc0000005崩溃防护+macOS/Linux SIGHUP/rlimit资源限制+自动内存清理(5分钟)+资源监控线程+增强版看门狗(渐进式处理)+浏览器启动优化(14项参数+5次重试)+Playwright检测bug修复(find替代通配符)+守护进程模式(USE_WATCHDOG_DAEMON)
+### v5.0.9.81 (2026-10-26) - 🛡️ **跨平台防崩溃系统** - Windows cmd.exe 0xc0000005崩溃防护+macOS/Linux SIGHUP/rlimit资源限制+自动内存清理(5分钟)+资源监控线程+增强版看门狗(渐进式处理)+浏览器启动优化(14项参数+5次重试)+Playwright检测bug修复(find替代通配符)+内置守护进程模式(--watchdog)+curl超时修复+IS_MACOS属性名修复
 
-> **Commit**: 7efa1499
+> **Commit**: 7efa1499,5e83b9c1
 
 #### 更新内容:
 1. **Windows系统级崩溃防护**: 禁用cmd.exe错误弹框(SetErrorMode SEM_NOGPFAULTERRORBOX)防止0xc0000005访问违规卡死+设置高优先级进程(SetPriorityClass HIGH_PRIORITY_CLASS) [main.py](main.py)
@@ -259,7 +259,9 @@ bandit -r . -f json -o bandit_report.json
 5. **增强版看门狗**: 渐进式处理(30s预警→清理→60s重启)+连续卡死追踪+最大重试5次+分级警告 [main.py](main.py)
 6. **浏览器启动优化**: 14项防崩溃参数(--no-sandbox/--disable-gpu/--disable-dev-shm-usage等)+5次智能重试(指数退避1s→16s)+多级回退(自定义→Playwright内置→系统Chrome) [main.py](main.py)
 7. **Playwright检测bug修复**: run.sh中[ -f */chromium-* ]通配符不展开改为find命令+按平台分别检测(macOS/Linux/Windows) [run.sh](run.sh)
-8. **守护进程模式**: run.bat/run.sh新增USE_WATCHDOG_DAEMON配置(默认1启用)+守护进程模式下跳过内置看门狗和AutoRestart [run.bat](run.bat) [run.sh](run.sh)
+8. **内置守护进程模式**: watchdog_daemon.py功能完整整合进main.py --watchdog参数+子进程启动自身+崩溃自动重启+内存超限监控+子进程日志重定向(watchdog_child.log) [main.py](main.py)
+9. **curl超时修复**: run.bat/run.sh中curl检测添加--connect-timeout 3 -m 5超时参数+watchdog模式FLASK_MAX_WAIT提升至120秒 [run.bat](run.bat) [run.sh](run.sh)
+10. **IS_MACOS属性名修复**: Environment.IS_MACOS不存在改为Environment.IS_MAC，修复Web服务启动崩溃(AttributeError) [main.py](main.py)
 
 ##### 1. 🛡️ Windows系统级崩溃防护 (解决cmd.exe 0xc0000005)
 **问题描述**:
@@ -16672,63 +16674,61 @@ diff README.md skill.docx >/dev/null 2>&1 && echo "✅ 文档已同步" || echo 
 
 ---
 
-## 📄 文档生成方法
+## 📄 文档生成方法 (PY-CORE-031: skill.docx生成范式)
 
-### 方法1: 使用 Pandoc (推荐)
+> **创建日期**: 2026-10-26 | **最后更新**: 2026-10-26 | **优先级**: 🔴 P0 强制规范 | **适用范围**: skill.docx / test/generate_docx.py / skill.md
 
-安装 Pandoc: https://pandoc.org/installing.html
+### 🔴 核心原则：唯一生成器 (Single Generator)
 
-pandoc skill.md -o skill.docx
+**skill.docx 必须且只能使用 `test/generate_docx.py` 生成，禁止使用pandoc/在线工具/手动Word等其他方式。**
 
-### 方法2: 使用 Python python-docx
+| 规则 | 说明 | 违反后果 |
+|------|------|----------|
+| **🔴 唯一生成器** | skill.docx 只能由 `test/generate_docx.py` 从 skill.md 生成 | 导航链接失效/样式不一致/代码块丢失 |
+| **🔴 源文件唯一** | 生成源文件只能是 skill.md，不能从 README.md 生成 | 内容与skill.md不一致 |
+| **🔴 每次同步** | 修改 skill.md 后必须重新生成 skill.docx | 三方文档不同步 |
+| **🟡 验证大小** | 生成后验证文件大小 > 100KB | 生成失败/内容缺失 |
 
-pip install python-docx markdown
+### 生成命令
 
-Python脚本示例：
-from docx import Document
+```bash
+# 从项目根目录运行
+python test/generate_docx.py
 
-def md_to_docx(md_file, docx_file):
-    doc = Document()
+# 或从test目录运行
+cd test && python generate_docx.py
+```
 
-    with open(md_file, 'r', encoding='utf-8') as f:
-        content = f.read()
+### 生成器特性 (test/generate_docx.py)
 
-    lines = content.split('\n')
-
-    for line in lines:
-        if line.startswith('# '):
-            doc.add_heading(line[2:], level=1)
-        elif line.startswith('## '):
-            doc.add_heading(line[3:], level=2)
-        elif line.startswith('### '):
-            doc.add_heading(line[4:], level=3)
-        elif line.startswith('#### '):
-            doc.add_heading(line[5:], level=4)
-        elif line.strip():
-            doc.add_paragraph(line)
-
-    doc.save(docx_file)
-
-if __name__ == '__main__':
-    md_to_docx('skill.md', 'skill.docx')
-    print('✅ skill.docx 生成成功')
-
-### 方法3: 使用在线工具
-
-访问 https://cloudconvert.com/md-to-docx 上传 skill.md 文件
-
-### 方法4: 使用 Microsoft Word
-
-文件 → 打开 → 选择 skill.md → 另存为 skill.docx
+| 特性 | 说明 |
+|------|------|
+| **Markdown完整解析** | 标题/代码块/表格/引用/列表/分隔线/行内格式(粗体/斜体/代码) |
+| **导航书签链接** | H2/H3标题自动生成Word书签，导航表格第3列可点击跳转 |
+| **代码块样式** | Consolas字体+深蓝色+灰色背景缩进 |
+| **表格样式** | Table Grid居中对齐，导航表格自动添加第3列跳转链接 |
+| **中文字体** | Microsoft YaHei全局字体，1.5倍行距 |
+| **标题层级颜色** | H1深蓝(0,51,102)→H2(0,76,153)→H3(0,102,153)→H4(51,102,153) |
+| **Fence归一化** | 自动修复未闭合代码块，heading处自动关闭 |
 
 ### 验证生成结果
 
 生成后检查以下内容：
-- [ ] 所有标题层级正确
-- [ ] 代码块格式完整
-- [ ] 表格显示正常
+- [ ] 文件大小 > 100KB（正常约350-400KB）
+- [ ] 导航表格第3列显示🔗且可点击跳转
+- [ ] 代码块显示Consolas字体+灰色背景
 - [ ] 中文字符无乱码
-- [ ] 文档版本号为 v3.8.68
+- [ ] 文档版本号与skill.md一致
+- [ ] 三方文档同步：README.md ↔ skill.md ↔ skill.docx
+
+### 禁止使用的方法
+
+| 方法 | 原因 |
+|------|------|
+| ❌ pandoc | 不支持导航书签链接，样式不可控 |
+| ❌ 在线工具(cloudconvert等) | 隐私泄露风险，不支持自定义样式 |
+| ❌ 手动Microsoft Word | 无法自动化，容易遗忘同步 |
+| ❌ 简易python-docx脚本 | 不支持导航链接/代码块样式/表格格式 |
 
 
 ---
