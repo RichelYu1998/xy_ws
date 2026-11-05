@@ -247,6 +247,81 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.82 (2026-11-05) - 🔧 **依赖检查逻辑重构+镜像测速修复+hostc升级回显修复+Playwright驱动安装** - check_deps_satisfied()改用packaging库正确解析requirements.txt(含extras如uvicorn[standard])+run.bat 8处PowerShell单引号语法错误修复([double]\'!VAR!\'*1000→[double]!VAR!*1000)+hostc升级后endlocal位置错误导致版本号未更新修复+Playwright Chromium浏览器驱动安装(解决Connection closed异常)
+
+> **Commit**: ceebfea8
+
+#### 更新内容:
+1. **check_deps_satisfied()依赖检查逻辑重构**: 原来使用简单正则分割解析requirements.txt，遇到`uvicorn[standard]>=0.30.0`等带extras和完整版本约束的行会解析错误，导致始终返回缺失。现改用`packaging.requirements.Requirement`和`packaging.version.Version`正确解析，支持extras标识(自动对应到包名uvicorn)和语义化版本约束(=,>=,>等) [main.py](main.py#L7903-L7933)
+2. **run.bat 8处PowerShell单引号语法错误修复**: 所有镜像测速中`[double]\'!VAR!\'*1000`的多余单引号包裹导致PowerShell无法正确解析数值，测速结果始终为空，所有镜像被错误判定为超时。现改为`[double]!VAR!*1000`，涉及winget/清华PIP/阿里云PIP/豆瓣PIP/中科大PIP/淘宝NPM/官方NPM/hostc共8处 [run.bat](run.bat#L125) [run.bat](run.bat#L159) [run.bat](run.bat#L243) [run.bat](run.bat#L698) [run.bat](run.bat#L826) [run.bat](run.bat#L885) [run.bat](run.bat#L926) [run.bat](run.bat#L1133)
+3. **hostc升级后版本号未更新修复**: hostc检测到新版本并执行安装后，重新获取版本号的代码中`setlocal disabledelayedexpansion`放在`for`循环外部而`endlocal`放在`for`循环内部，导致升级后`HOSTC_VER`变量被清除，版本号始终显示旧值。修复为将`setlocal`/`endlocal`都移入`for`循环内部正确配对 [run.bat](run.bat#L334)
+4. **Playwright Chromium浏览器驱动安装**: Playwright Chromium浏览器二进制文件不存在导致启动时`Connection closed while reading from the driver`异常，已执行`playwright install chromium`安装驱动(136MB chromium_headless_shell + winldd)，验证可正常启动headless浏览器 [main.py](main.py)
+
+##### 1. 🔧 check_deps_satisfied()依赖检查逻辑重构 (数据解析Bug)
+**问题描述**:
+- **现象**: `--check-deps`始终返回exit code 1，即使所有依赖版本均满足requirements.txt要求，仅uvicorn[standard]缺失时也误报大量依赖不满足
+- **根因**: 原代码使用`re.split(r"[><=!~\s;]+", line)`将`uvicorn[standard]>=0.30.0`分割为`["uvicorn", "standard", "0", "30", "0"]`，取`parts[1]`得到`"standard"`而非版本号`"0.30.0"`，导致版本比较失败
+- **影响范围**: [main.py](main.py#L7903) 所有依赖检查场景
+
+**修复方案**:
+- **技术实现(packaging库)**: 使用`packaging.requirements.Requirement`正确解析完整依赖行，自动提取包名(含extras如`uvicorn[standard]`→`req.name="uvicorn"`) [main.py](main.py#L7910-L7911)
+- **技术实现(语义化版本比较)**: 使用`packaging.version.Version`进行语义化版本比较，支持`>=`,`>`,`=`,`<`,`<=`等完整约束 [main.py](main.py#L7920)
+- **技术实现(marker支持)**: 保留对environment markers(如`sys_platform=='win32'`)的支持，非当前环境标记的依赖自动跳过 [main.py](main.py#L7915-L7917)
+- **技术实现(异常安全)**: `InvalidRequirement`和`InvalidVersion`异常时自动加入缺失列表，避免崩溃 [main.py](main.py#L7913-L7914) [main.py](main.py#L7919)
+- **参考位置**: [main.py](main.py#L7903-L7933)
+
+**测试验证**:
+- ✅ uvicorn[standard]: `Requirement("uvicorn[standard]>=0.30.0")` → `name="uvicorn"`, specifier正确匹配
+- ✅ 普通依赖: `fastapi>=0.115.0` → 版本比较正常工作
+- ✅ 退出码: 所有依赖满足时返回exit code 0
+
+##### 2. 🔧 run.bat PowerShell单引号语法错误修复 (8处镜像测速失败)
+**问题描述**:
+- **现象**: 所有镜像源测速结果始终为空，run.bat日志显示所有镜像"超时"或"无响应"，最终使用默认阿里云源
+- **根因**: PowerShell表达式`[double]\'!WG_TIME!\'*1000`中多余的`\'`和`\'`包裹变量名，导致PowerShell将整个字符串`!WG_TIME!`作为无效标识符，表达式报错返回空值，所有镜像测试均被跳过
+- **影响范围**: [run.bat](run.bat) winget/清华PIP/阿里云PIP/豆瓣PIP/中科大PIP/淘宝NPM/官方NPM/hostc共8处测速逻辑
+
+**修复方案**:
+- **技术实现(移除单引号)**: 将所有`[double]\'!VAR!\'*1000`改为`[double]!VAR!*1000`，让PowerShell正确将批处理变量展开为数值字符串 [run.bat](run.bat#L125) [run.bat](run.bat#L159) [run.bat](run.bat#L243) [run.bat](run.bat#L698) [run.bat](run.bat#L826) [run.bat](run.bat#L885) [run.bat](run.bat#L926) [run.bat](run.bat#L1133)
+- **技术实现(批量替换)**: 8处错误使用replace_all一次性全部修正
+- **参考位置**: [run.bat](run.bat#L125) 等8处
+
+**测试验证**:
+- ✅ PowerShell测试: `[int]([double]"0.123"*1000)` → 正确返回123
+- ✅ 镜像测速: curl获取到time_total后PowerShell正确转换为整数毫秒
+- ✅ 镜像选择: 实际可用的镜像源被正确识别为最快源
+
+##### 3. 🐛 hostc升级后版本号未更新修复 (endlocal作用域Bug)
+**问题描述**:
+- **现象**: hostc检测到新版本v2.1.0，执行`npm install hostc@latest`成功，但升级后版本号仍显示旧值v2.0.3，日志显示"hostc 已升级到最新版: v2.0.3"
+- **根因**: `setlocal disabledelayedexpansion`放在`for`循环外部，`endlocal & set "HOSTC_VER=%%v"`使`endlocal`在`for`循环内部执行，破坏了变量传递——`endlocal`清除了`HOSTC_VER`，而`set`在新的局部作用域中设置变量，主脚本无法访问
+- **影响范围**: [run.bat](run.bat#L333-L336) hostc升级场景
+
+**修复方案**:
+- **技术实现(for内配对)**: 将`setlocal`/`endlocal`都移入`for`循环内部，在循环体内正确配对执行，使变量通过`endlocal`传递回主脚本作用域 [run.bat](run.bat#L334)
+- **参考位置**: [run.bat](run.bat#L333-L337)
+
+**测试验证**:
+- ✅ 升级成功: npm install完成后版本号正确更新为v2.1.0
+- ✅ 日志准确: 输出"hostc 已升级到最新版: v2.1.0"
+
+##### 4. 🛡️ Playwright Chromium浏览器驱动安装 (Connection closed异常)
+**问题描述**:
+- **现象**: Web服务启动后Playwright Chromium浏览器连接失败，日志显示`Connection closed while reading from the driver`，重试4次后终止
+- **根因**: Playwright Chromium浏览器二进制文件不存在（仅安装了playwright Python包但未下载浏览器驱动），`playwright install`未执行
+- **影响范围**: [main.py](main.py#L2559) 所有使用Playwright浏览器的功能
+
+**修复方案**:
+- **技术实现(浏览器安装)**: 执行`playwright install chromium`下载Chromium Headless Shell 136.0.7103.25 (136MB) + Winldd playwright build v1007 [main.py](main.py)
+- **技术实现(路径验证)**: 安装后验证chromium_headless_shell-1169/chrome-win/headless_shell.exe存在
+- **参考位置**: [main.py](main.py)
+
+**测试验证**:
+- ✅ 浏览器启动: `pw.chromium.launch(headless=True)` 成功，无Connection closed异常
+- ✅ 驱动路径: `C:\Users\...\ms-playwright\chromium_headless_shell-1169\chrome-win\headless_shell.exe` 存在
+
+**影响文件**: [main.py](main.py), [run.bat](run.bat)
+
 ### v5.0.9.81 (2026-10-26) - 🛡️ **跨平台防崩溃系统** - Windows cmd.exe 0xc0000005崩溃防护+macOS/Linux SIGHUP/rlimit资源限制+自动内存清理(5分钟)+资源监控线程+增强版看门狗(渐进式处理)+浏览器启动优化(14项参数+5次重试)+Playwright检测bug修复(find替代通配符)+内置守护进程模式(--watchdog)+curl超时修复+IS_MACOS属性名修复+隧道后台异步启动(解决Cloudflare 429限流阻塞uvicorn)
 
 > **Commit**: 7efa1499,5e83b9c1,ca1ea8c7,f0b52f33,16a28490

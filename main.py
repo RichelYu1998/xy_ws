@@ -7902,8 +7902,8 @@ def select_pip_mirror(venv_path: str):
     logger.debug(f"[*] pip配置已写入: {conf_path}")
 
 def check_deps_satisfied(requirements_file="requirements.txt"):
-    def ver_tuple(v):
-        return tuple(int(x) for x in re.split(r'[.\-]', v) if x.isdigit())
+    from packaging.requirements import InvalidRequirement, Requirement
+    from packaging.version import InvalidVersion, Version
 
     try:
         with open(requirements_file, encoding="utf-8") as f:
@@ -7914,24 +7914,23 @@ def check_deps_satisfied(requirements_file="requirements.txt"):
 
     missing = []
     for line in lines:
-        parts = re.split(r"[><=!~\s;]+", line)
-        pkg_name = parts[0].replace("-", "_")
-        req_ver = parts[1] if len(parts) > 1 else None
-
-        installed_ver = None
         try:
-            installed_ver = im.version(parts[0])
-        except im.PackageNotFoundError:
-            pass
-            
-        if installed_ver is None:
+            req = Requirement(line)
+        except InvalidRequirement:
             missing.append(line)
-        elif req_ver:
-            try:
-                if ver_tuple(installed_ver) < ver_tuple(req_ver):
-                    missing.append(line)
-            except (ValueError, IndexError):
-                missing.append(line)
+            continue
+
+        if req.marker is not None and not req.marker.evaluate():
+            continue
+
+        try:
+            installed_ver = Version(im.version(req.name))
+        except (im.PackageNotFoundError, InvalidVersion):
+            missing.append(line)
+            continue
+
+        if req.specifier and installed_ver not in req.specifier:
+            missing.append(line)
 
     if missing:
         logger.debug(f"[!] Missing/outdated: {missing}")

@@ -122,7 +122,7 @@ for /L %%i in (0,1,1) do (
         set "WG_NAME=%%b"
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!WG_URL!" 2^>nul') do set "WG_TIME=%%t"
         if defined WG_TIME if not "!WG_TIME!"=="0" if not "!WG_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!WG_TIME!\'*1000)" 2^>nul') do set "WG_INT=%%m"
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!WG_TIME!*1000)" 2^>nul') do set "WG_INT=%%m"
             if defined WG_INT if !WG_INT! LSS !WG_MIN_TIME! (
                 set "WG_MIN_TIME=!WG_INT!"
                 set "WG_BEST_URL=!WG_URL!"
@@ -156,7 +156,7 @@ for /L %%i in (0,1,1) do (
         set "CCO_NAME=%%b"
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!CCO_URL!" 2^>nul') do set "CCO_TIME=%%t"
         if defined CCO_TIME if not "!CCO_TIME!"=="0" if not "!CCO_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!CCO_TIME!\'*1000)" 2^>nul') do set "CCO_INT=%%m"
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!CCO_TIME!*1000)" 2^>nul') do set "CCO_INT=%%m"
             if defined CCO_INT if !CCO_INT! LSS !CCO_MIN_TIME! (
                 set "CCO_MIN_TIME=!CCO_INT!"
                 set "CCO_BEST_URL=!CCO_URL!"
@@ -240,7 +240,7 @@ for /L %%i in (0,1,2) do (
         set "GM_NAME=%%b"
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!GM_URL!" 2^>nul') do set "GM_TIME=%%t"
         if defined GM_TIME if not "!GM_TIME!"=="0" if not "!GM_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!GM_TIME!\'*1000)" 2^>nul') do set "GM_INT=%%m"
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!GM_TIME!*1000)" 2^>nul') do set "GM_INT=%%m"
             if defined GM_INT if !GM_INT! LSS !GIT_MIN_TIME! (
                 set "GIT_MIN_TIME=!GM_INT!"
                 set "GIT_BEST_URL=!GM_URL!"
@@ -331,8 +331,10 @@ if exist "!HOSTC_BIN!" (
     if errorlevel 1 (
         call :log [*] 检测到新版本，正在自动升级 hostc...
         call :install_hostc
-        setlocal disabledelayedexpansion
-        for /f "delims=" %%v in ('"%HOSTC_BIN%" --version 2^>nul') do endlocal & set "HOSTC_VER=%%v"
+        for /f "delims=" %%v in ('"%HOSTC_BIN%" --version 2^>nul') do (
+            endlocal
+            set "HOSTC_VER=%%v"
+        )
         call :log [*] hostc 已升级到最新版: v!HOSTC_VER!
     ) else (
         call :log [*] hostc v!HOSTC_VER! 已是最新版本
@@ -695,7 +697,7 @@ for /L %%i in (0,1,2) do (
         set "PM_NAME=%%b"
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!PM_URL!" 2^>nul') do set "PM_TIME=%%t"
         if defined PM_TIME if not "!PM_TIME!"=="0" if not "!PM_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!PM_TIME!\'*1000)" 2^>nul') do set "PM_INT=%%m"
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!PM_TIME!*1000)" 2^>nul') do set "PM_INT=%%m"
             if defined PM_INT if !PM_INT! LSS !PY_MIN_TIME! (
                 set "PY_MIN_TIME=!PM_INT!"
                 set "PY_BEST_URL=!PM_URL!"
@@ -823,7 +825,7 @@ for /L %%i in (0,1,2) do (
         set "NM_NAME=%%b"
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!NM_URL!" 2^>nul') do set "NM_TIME=%%t"
         if defined NM_TIME if not "!NM_TIME!"=="0" if not "!NM_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!NM_TIME!\'*1000)" 2^>nul') do set "NM_INT=%%m"
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!NM_TIME!*1000)" 2^>nul') do set "NM_INT=%%m"
             if defined NM_INT if !NM_INT! LSS !ND_MIN_TIME! (
                 set "ND_MIN_TIME=!NM_INT!"
                 set "ND_BEST_URL=!NM_URL!"
@@ -882,7 +884,7 @@ for /L %%i in (0,1,3) do (
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 8 --max-time 15 "!MIRROR_URL!" 2^>nul') do set "TEST_TIME=%%t"
         
         if defined TEST_TIME if not "!TEST_TIME!"=="0" if not "!TEST_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!TEST_TIME!\'*1000)" 2^>nul') do set "PIP_INT_TIME=%%m"
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!TEST_TIME!*1000)" 2^>nul') do set "PIP_INT_TIME=%%m"
             
             if defined PIP_INT_TIME if !PIP_INT_TIME! LSS !MIN_TIME! (
                 set "MIN_TIME=!PIP_INT_TIME!"
@@ -923,7 +925,7 @@ for /L %%i in (0,1,2) do (
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 3 "!H_URL!" 2^>nul') do set "H_TIME=%%t"
         
         if defined H_TIME if not "!H_TIME!"=="0" if not "!H_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!H_TIME!\'*1000)" 2^>nul') do set "H_INT=%%m"
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!H_TIME!*1000)" 2^>nul') do set "H_INT=%%m"
             
             if defined H_INT if !H_INT! LSS 9999 (
                 set "HOSTC_BEST_MIRROR=!H_URL!"
@@ -1130,7 +1132,7 @@ for /L %%i in (0,1,1) do (
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 8 --max-time 15 "!NPM_URL!" 2^>nul') do set "NPM_TEST_TIME=%%t"
         
         if defined NPM_TEST_TIME if not "!NPM_TEST_TIME!"=="0" if not "!NPM_TEST_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]\'!NPM_TEST_TIME!\'*1000)" 2^>nul') do set "NPM_INT_TIME=%%m"
+            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!NPM_TEST_TIME!*1000)" 2^>nul') do set "NPM_INT_TIME=%%m"
             
             if defined NPM_INT_TIME if !NPM_INT_TIME! LSS !NPM_MIN_TIME! (
                 set "NPM_MIN_TIME=!NPM_INT_TIME!"
