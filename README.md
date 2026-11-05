@@ -297,11 +297,177 @@ bandit -r . -f json -o bandit_report.json
 
 ---
 
+## 📐 双启动脚本同步范式 (PY-CORE-032)
+
+> **创建日期**: 2026-11-05 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [run.bat](run.bat) / [run.sh](run.sh)
+
+**`run.bat` 与 `run.sh` 是同一套启动逻辑的两个平台载体，任何逻辑变更必须双端 1:1 同步，禁止单边修改。**
+
+| 规则 | 说明 | 违反后果 |
+|------|------|----------|
+| **🔴 双端同改** | 启动逻辑变更必须同时改 `run.bat` + `run.sh`，且在同一 commit 内提交 | Windows 与 Linux/macOS/Git Bash 行为分叉 |
+| **🔴 常量同值** | `PW_BROWSER_PATTERN`/`PW_PROC_PATTERN`/超时/重试次数必须**逐字一致** | 一端漏杀/误杀，另一端正常 |
+| **🔴 返回码同义** | `0`=已是最新、`1`=需升级、`2`=跳过检查 | 调用方判断错乱，误报"已是最新" |
+| **🔴 日志同文案** | 相同场景输出相同前缀与措辞 | 无法跨平台对照排障 |
+| **🟡 平台差异允许** | 仅允许安装器/系统工具差异（winget/choco ↔ brew/apt；wmic ↔ ps） | — |
+| **🟡 逻辑差异禁止** | 流程顺序、判定条件、清理范围必须等价 | — |
+| **🟡 实跑验证** | 改动后必须 `bash -n` + 实跑 + 端口/进程核对 | 语法通过但运行时崩 |
+
+**同步自检清单**:
+```
+[ ] 双端同改？          git diff --stat run.bat run.sh
+[ ] 常量逐字一致？      PW_BROWSER_PATTERN / PW_PROC_PATTERN / 超时 / 重试次数
+[ ] 返回码同义？        0=最新 1=需升级 2=跳过
+[ ] 无批处理语法残留？  run.sh 不得出现 `::` 注释、`%~dp0`、`errorlevel`
+[ ] 无 Unix 专有命令？  run.sh 不得裸用 pgrep/pkill/lsof
+[ ] 无硬编码 venv 路径？run.sh 不得写死 `$VENV_PATH/bin/python`
+[ ] 实跑验证？          bash -n + curl localhost:8888 = 200
+```
+
+**反模式警告（致命）**:
+- 🔴 **❌ 只改 run.bat 不改 run.sh**: Git Bash / Linux / macOS 用户行为不一致
+- 🔴 **❌ run.sh 裸用 `pgrep`/`pkill`/`lsof`**: Windows Git Bash 不存在 → 启动失败
+- 🔴 **❌ run.sh 硬编码 `$VENV_PATH/bin/activate`**: Windows venv 是 `Scripts/` → `python: command not found`
+- 🔴 **❌ run.sh 残留 `::` 注释或 `errorlevel`**: bash 语法错误
+- 🔴 **❌ 无差别 kill 所有浏览器**: 误杀用户日常浏览器
+- 🟡 ❌ 只改常量不改调用方 / ❌ 只做语法检查不做实跑
+
+> 完整功能域对照表（14 个功能域 bat 标签 ↔ sh 函数映射）请查看 [skill.md](skill.md) 的 `## 📐 双启动脚本同步范式 (PY-CORE-032)` 章节
+
+---
+
 ## 🔄 最新更新
+
+### v5.0.9.83 (2026-11-05) - 🔧 **run.sh与run.bat全量1:1同步+changelog API空值根治+Commit占位符清零** - run.sh进程清理三级过滤/残留3轮重试/版本检查返回码统一/镜像测速工具函数全量对齐run.bat+changelog解析器扩展"说明/核心改进/补充说明"块并统一空值规范化(changes字段100%非空)+全量Commit畸形值清理(ac6add6f.8.90.09等5处→真实8位hash)+skill.docx重新生成
+
+> **Commit**: aba82a29
+
+#### 更新内容:
+1. **run.sh进程清理三级过滤**: 新增`PW_BROWSER_PATTERN`/`PW_PROC_PATTERN`/`PW_BROWSER_NAMES`/`PW_PROC_NAMES`/`PY_PROC_NAMES`/`NODE_PROC_NAMES`/`CFD_PROC_NAMES`全局常量，`_proc_pids_by_pattern()`新增第三参数进程名白名单过滤，与run.bat的WMI进程名过滤规则完全一致，杜绝误杀用户浏览器/其他Python程序 [run.sh](run.sh#L24-L31) [run.sh](run.sh#L1900-L1938)
+2. **残留进程3轮重试**: 新增`while [ "$kill_retry" -lt 3 ]`循环清理main.py与端口监听进程，与run.bat `kill_residual_retry`逻辑完全一致，3轮后仍未释放则明确告警 [run.sh](run.sh#L2052-L2081)
+3. **版本检查返回码统一**: 全部版本检查函数统一返回码约定 `0=已是最新`、`1=需要升级`、`2=跳过检查`，所有调用点改为分支判断，不再使用隐式if/else，与run.bat完全对齐 [run.sh](run.sh#L1051-L1290)
+4. **镜像测速工具函数统一**: 新增通用`test_mirror_latency()`封装`curl -I`+`time_total`+HTTP状态码校验(连接超时5s/总超时8s)，替换pip/npm/hostc三处重复测速逻辑，输出格式与run.bat一致 [run.sh](run.sh#L978-L1050)
+5. **changelog解析器扩展+空值规范化**: 解析器新增"说明/核心改进/补充说明"块识别与`- **键**: 值`宽松匹配，末尾新增统一空值规范化阶段，确保`changes`字段100%非空、`problem`/`solution`/`verification`全字段无空值 [main.py](main.py#L10830-L10900) [main.py](main.py#L11172-L11245)
+6. **Commit畸形值清理**: 5处形如`ac6add6f.8.90.09`的畸形Commit值(版本号误拼入hash)全部修正为真实8位hash，API新增`_sanitize_commit()`仅保留7-10位十六进制token，从根上杜绝非hash与占位符输出 [README.md](README.md#L7215) [main.py](main.py#L11180-L11188)
+7. **三方文档同步**: README.md+skill.md同步v5.0.9.83记录+skill.docx由skill.md重新生成，run.sh/run.bat版本号保持`0.0.0`自动探测(统一从README最新版本读取，未硬编码)
+
+##### 1. 🔧 run.sh进程清理三级过滤 (跨平台误杀防护)
+**问题描述**:
+- **现象**: Windows Git Bash下run.sh清理进程时无差别匹配所有`python`/`node`进程，可能误杀用户自己的Python脚本或Chrome浏览器
+- **根因**: `_proc_pids_by_pattern()`仅按命令行特征串匹配，缺少run.bat中WMI的`name='python.exe'`进程名白名单约束
+- **影响范围**: [run.sh](run.sh) 全部进程清理调用点(启动/退出/重启/看门狗4节点)
+
+**修复方案**:
+- **技术实现(全局常量)**: 顶部新增7个进程名/特征串常量，取值与run.bat逐字对齐 [run.sh](run.sh#L24-L31)
+- **技术实现(白名单参数)**: `_proc_pids_by_pattern(pattern, must_include, name_re)`新增第三参数`name_re`，对进程名做白名单正则过滤 [run.sh](run.sh#L1900-L1938)
+- **技术实现(调用点全量传参)**: main.py/hostc/cloudflared/Playwright浏览器/Playwright驱动5类清理全部传入对应白名单 [run.sh](run.sh#L2005-L2050)
+- **参考位置**: [run.sh](run.sh#L1900-L1938) [run.sh](run.sh#L2005-L2085)
+
+**测试验证**:
+- ✅ Git Bash下执行`kill_all_interfering_processes`，仅清理目标进程，用户Python脚本存活
+- ✅ 与run.bat过滤规则逐项对照，5类进程匹配结果一致
+- ✅ `bash -n run.sh`语法检查通过(Git Bash 2.4x)
+
+##### 2. 🔧 残留进程3轮重试 (启动前彻底释放)
+**问题描述**:
+- **现象**: 单轮清理后偶发仍有main.py/端口监听进程残留，导致新实例端口冲突或旧实例抢占浏览器
+- **根因**: 进程退出存在延迟(尤其Windows taskkill /F后句柄释放)，单轮清理不足以覆盖
+- **影响范围**: [run.sh](run.sh) 启动前清理阶段
+
+**修复方案**:
+- **技术实现(3轮循环)**: `kill_retry`计数循环最多3轮，每轮重新取快照并清理main.py与端口监听进程 [run.sh](run.sh#L2052-L2076)
+- **技术实现(超限告警)**: 3轮仍未完全释放时输出明确告警日志，不静默吞掉 [run.sh](run.sh#L2080-L2081)
+- **参考位置**: [run.sh](run.sh#L2052-L2081)
+
+**测试验证**:
+- ✅ 模拟残留进程场景，3轮内清理干净
+- ✅ 与run.bat `kill_residual_retry`轮次、判定条件、日志文案一致
+
+##### 3. 🔧 版本检查返回码统一 (语义对齐)
+**问题描述**:
+- **现象**: run.sh各版本检查函数返回码语义不一致，部分返回0/1，部分返回布尔字符串，调用点判断方式混乱
+- **根因**: 各函数独立编写，缺少统一返回码约定
+- **影响范围**: [run.sh](run.sh#L1051-L1290) Git/Node.js/Python/cloudflared/hostc五类版本检查
+
+**修复方案**:
+- **技术实现(返回码约定)**: 统一为`0=已是最新`、`1=需要升级`、`2=跳过检查(网络失败/无权限)` [run.sh](run.sh#L1051-L1290)
+- **技术实现(调用点分支)**: 所有调用点显式`case`/`if`判断三个返回码，与run.bat `errorlevel`判断语义一一对应
+- **参考位置**: [run.sh](run.sh#L1051-L1290)
+
+**测试验证**:
+- ✅ 五类工具分别验证最新/可升级/网络失败三种路径返回码正确
+- ✅ 调用点日志与run.bat文案一致(升级成功/已是最新/跳过检查)
+
+##### 4. 🔧 镜像测速工具函数统一 (消除重复逻辑)
+**问题描述**:
+- **现象**: pip/npm/hostc三处测速各自实现，超时阈值、HTTP状态码校验、输出格式不一致
+- **根因**: 历史重复代码未抽象，修改时容易漏改
+- **影响范围**: [run.sh](run.sh) 镜像选择流程
+
+**修复方案**:
+- **技术实现(通用函数)**: 新增`test_mirror_latency(name,url)`，统一`curl -I`+`time_total`+HTTP状态码校验，连接超时5s/总超时8s [run.sh](run.sh#L978-L1050)
+- **技术实现(三处替换)**: `test_pip_mirrors()`/`test_npm_mirrors()`/`test_hostc_mirrors()`全部改为调用该函数，输出格式与run.bat完全一致
+- **参考位置**: [run.sh](run.sh#L978-L1050)
+
+**测试验证**:
+- ✅ 各镜像源测速返回毫秒数与run.bat同源结果同量级
+- ✅ 不可达源正确判定为超时并被排除
+
+##### 5. 🔧 changelog解析器扩展+空值规范化 (changes字段非空根治)
+**问题描述**:
+- **现象**: `/api/changelog` 部分历史版本的`changes`为空数组或字段为空串，前端展示空白
+- **根因**: 解析器只识别`**问题描述**/**修复方案**/**测试验证**`三种块，早期版本使用`**说明**/**核心改进**/**补充说明**`格式，整段被丢弃导致`changes`为空；且`##### 1. 标题`无括号tag时正则不匹配
+- **影响范围**: [main.py](main.py#L10830-L10900) 全部425个版本条目
+
+**修复方案**:
+- **技术实现(块识别扩展)**: `block_header_match`扩展为`问题描述|修复方案|测试验证|说明|核心改进|补充说明`，`说明`类块内容归入`solution.implementation`/`problem.phenomenon` [main.py](main.py#L10866-L10868)
+- **技术实现(宽松匹配)**: `meta_match`支持`>`/`-`前缀与反引号包裹；`##### 1. 标题`的`(tag)`改为可选分组，缺省tag为`📝版本更新` [main.py](main.py#L10832-L10860)
+- **技术实现(键前缀匹配)**: 项目符号键改为`startswith`前缀匹配，兼容`技术实现(性能优化)`等带后缀变体 [main.py](main.py#L10873-L10886)
+- **技术实现(统一规范化)**: 末尾新增规范化阶段，对每个条目/变更项的`tag/title/problem.*/solution.*/verification/meta.*`逐字段兜底填充，确保无空值 [main.py](main.py#L11172-L11245)
+- **参考位置**: [main.py](main.py#L10830-L10900) [main.py](main.py#L11172-L11245)
+
+**测试验证**:
+- ✅ `/api/changelog` 返回425个版本，`empty_changes_versions: 0`、`bad_items: 0`
+- ✅ 全量字段扫描无空串、无`待生成`/`待补充`作为字段值
+- ✅ 服务实跑：`python main.py --web --port 8899` + `curl /api/changelog` → HTTP 200，1.14MB
+
+##### 6. 🔧 Commit畸形值清理 (占位符清零)
+**问题描述**:
+- **现象**: API返回的`meta.commit`存在`ac6add6f.8.90.09`、`[8位commit hash]`等非hash值
+- **根因**: 历史版本条目Commit字段手工录入时把版本号误拼入hash，或保留模板占位文本
+- **影响范围**: README.md/skill.md 5处版本条目
+
+**修复方案**:
+- **技术实现(文档修正)**: `ac6add6f.8.90.09`→`ac6add6f`、`c4b0148b.8.89.20`→`c4b0148b`、`fa75c100.8.89.16`→`fa75c100`、`2fcfaf42.8.89.15`→`2fcfaf42`、`c35e648e.8.89.14`→`c35e648e`，README.md与skill.md各5处 [README.md](README.md#L7215)
+- **技术实现(API兜底)**: 新增`_sanitize_commit()`，仅提取7-10位十六进制token并去重(最多5个)，无法提取时回退真实提交或明确说明来源 [main.py](main.py#L11180-L11188)
+- **参考位置**: [README.md](README.md#L7215-L7840) [main.py](main.py#L11180-L11210)
+
+**测试验证**:
+- ✅ 全量扫描425个版本`non-hash commit entries: 0`
+- ✅ `versions_without_commit: 0`
+- ✅ v5.0.9.82条目Commit由误填`ceebfea8`修正为真实提交`9d0ec7b9`
+
+##### 7. 📝 三方文档同步 (PY-CORE-030)
+**说明**:
+- **内容**: README.md与skill.md同步v5.0.9.83版本记录；skill.docx由skill.md重新生成
+- **日期**: 2026-11-05
+- **Commit**: aba82a29
+
+**测试验证**:
+- ✅ README.md与skill.md版本条目数量一致(425+1)
+- ✅ skill.docx生成成功，大小校验通过
+- ✅ run.sh/run.bat版本号均为`0.0.0`自动探测模式，未硬编码版本
+
+**影响文件**: [run.sh](run.sh), [run.bat](run.bat), [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**更新日期**: 2026-11-05
+**更新类型**: 🔧 双端同步 + 🛡️ API健壮性加固
+**作者**: 小旭二手机（西园路）
+
+----
 
 ### v5.0.9.82 (2026-11-05) - 🔧 **依赖检查逻辑重构+镜像测速修复+hostc升级回显修复+Playwright驱动安装** - check_deps_satisfied()改用packaging库正确解析requirements.txt(含extras如uvicorn[standard])+run.bat 8处PowerShell单引号语法错误修复([double]\'!VAR!\'*1000→[double]!VAR!*1000)+hostc升级后endlocal位置错误导致版本号未更新修复+Playwright Chromium浏览器驱动安装(解决Connection closed异常)
 
-> **Commit**: ceebfea8
+> **Commit**: 9d0ec7b9
 
 #### 更新内容:
 1. **check_deps_satisfied()依赖检查逻辑重构**: 原来使用简单正则分割解析requirements.txt，遇到`uvicorn[standard]>=0.30.0`等带extras和完整版本约束的行会解析错误，导致始终返回缺失。现改用`packaging.requirements.Requirement`和`packaging.version.Version`正确解析，支持extras标识(自动对应到包名uvicorn)和语义化版本约束(=,>=,>等) [main.py](main.py#L7903-L7933)
@@ -7173,7 +7339,7 @@ if exist "README.md" (
 **修复日期**: 2026-08-22
 **修复类型**: Bug修复
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: ac6add6f.8.90.09
+**Commit**: ac6add6f
 **变更统计**: +25行 -5行(v3.8.90.09)
 **作者**: 小旭二手机（西园路）
 
@@ -7622,7 +7788,7 @@ if exist "README.md" (
 **修复日期**: 2026-08-20
 **修复类型**: 架构优化
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: c4b0148b.8.89.20
+**Commit**: c4b0148b
 **变更统计**: +0行 -2807行(v3.8.89.20)
 **作者**: 小旭二手机（西园路）
 
@@ -7711,7 +7877,7 @@ if exist "README.md" (
 **修复日期**: 2026-08-11
 **修复类型**: 文档修复 + 启动Bug
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: fa75c100.8.89.16
+**Commit**: fa75c100
 **变更统计**: +5行 -5行(v3.8.89.16)
 **作者**: 小旭二手机（西园路）
 
@@ -7740,7 +7906,7 @@ if exist "README.md" (
 **修复日期**: 2026-08-11
 **修复类型**: 安全漏洞 + 代码质量 + 隐藏Bug
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: 2fcfaf42.8.89.15
+**Commit**: 2fcfaf42
 **变更统计**: +5行 -5行(v3.8.89.15)
 **作者**: 小旭二手机（西园路）
 
@@ -7798,7 +7964,7 @@ if exist "README.md" (
 **修复日期**: 2026-08-08
 **修复类型**: 功能增强
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: c35e648e.8.89.14
+**Commit**: c35e648e
 **变更统计**: +5行 -5行(v3.8.89.14)
 **作者**: 小旭二手机（西园路）
 
