@@ -21,6 +21,13 @@ fi
 mkdir -p file
 LOG_FILE="$(pwd)/file/web_output.log"
 USE_WATCHDOG_DAEMON="${USE_WATCHDOG_DAEMON:-1}"
+PW_BROWSER_PATTERN="ms-playwright|playwright-core|playwright_chromiumdev_profile|remote-debugging-pipe"
+PW_PROC_PATTERN="ms-playwright|playwright-core|playwright"
+PW_BROWSER_NAMES="chrome|chromium|headless_shell|firefox|msedge|node"
+PW_PROC_NAMES="node|playwright"
+PY_PROC_NAMES="python|python3|pythonw"
+NODE_PROC_NAMES="node"
+CFD_PROC_NAMES="cloudflared"
 > "$LOG_FILE"
 
 log() {
@@ -118,7 +125,11 @@ check_prerequisites() {
         local cur_git_ver=$(git --version 2>/dev/null | awk '{print $3}')
         log "    当前Git版本: v$cur_git_ver"
         
-        if check_git_latest_version "$cur_git_ver"; then
+        check_git_latest_version "$cur_git_ver"
+        local git_vrc=$?
+        if [ "$git_vrc" -eq 2 ]; then
+            log "[*] 已跳过 Git 版本升级检查"
+        elif [ "$git_vrc" -eq 1 ]; then
             log "[提示] 检测到Git有新版本，如需升级请手动执行: 系统包管理器 install git"
         else
             log "[*] Git已是最新版本"
@@ -212,7 +223,11 @@ pre_launch() {
         HOSTC_VER=$("$HOSTC_BIN" --version 2>/dev/null || echo "unknown")
         log "[*] 当前 hostc 版本: v${HOSTC_VER}"
         
-        if check_hostc_latest_version "$HOSTC_VER"; then
+        check_hostc_latest_version "$HOSTC_VER"
+        local hostc_vrc=$?
+        if [ "$hostc_vrc" -eq 2 ]; then
+            log "[*] 已跳过 hostc 版本升级检查"
+        elif [ "$hostc_vrc" -eq 1 ]; then
             log "[*] 检测到新版本，正在自动升级 hostc..."
             install_hostc
             HOSTC_VER=$("$HOSTC_BIN" --version 2>/dev/null || echo "unknown")
@@ -236,7 +251,11 @@ pre_launch() {
         local cur_cfd_ver=$("$CFD_BIN" --version 2>/dev/null | awk '{print $3}')
         log "    当前cloudflared版本: $cur_cfd_ver"
         
-        if check_cloudflared_latest_version "$cur_cfd_ver"; then
+        check_cloudflared_latest_version "$cur_cfd_ver"
+        local cfd_vrc=$?
+        if [ "$cfd_vrc" -eq 2 ]; then
+            log "[*] 已跳过 cloudflared 版本升级检查"
+        elif [ "$cfd_vrc" -eq 1 ]; then
             log "[提示] 检测到cloudflared有新版本，如需升级请手动执行: npm install cloudflared@latest --prefix dist"
         else
             log "[*] cloudflared已是最新版本"
@@ -249,7 +268,7 @@ pre_launch() {
     log_blank
     log "[*] 启动 hostc 隧道（后台运行）..."
     if [ -f "$HOSTC_BIN" ]; then
-        "$HOSTC_BIN" $WEB_PORT --local-host localhost < /dev/null &
+        "$HOSTC_BIN" "127.0.0.1:$WEB_PORT" < /dev/null &
         log "[*] hostc 已在后台启动"
     fi
 
@@ -259,13 +278,42 @@ pre_launch() {
     cleanup_temp_dir playwright-browsers 0
 }
 
+port_listener_pids() {
+    local port="$1"
+    local os_name
+    os_name="$(uname -s)"
+
+    if [[ "$os_name" =~ ^MSYS|^MINGW|^CYGWIN ]]; then
+        netstat -ano 2>/dev/null | tr -d '\r' \
+            | awk -v port="$port" 'tolower($4) == "listening" { n = split($2, a, ":"); if (a[n] == port) print $5 }' \
+            | grep -E '^[0-9]+$' | sort -u
+        return 0
+    fi
+
+    if command -v lsof &> /dev/null; then
+        lsof -t -i :"$port" -sTCP:LISTEN 2>/dev/null
+    elif command -v ss &> /dev/null; then
+        ss -ltnp 2>/dev/null | awk -v p=":$port" '$4 ~ p {print $6}' | grep -oE 'pid=[0-9]+' | cut -d= -f2
+    elif command -v netstat &> /dev/null; then
+        netstat -ltnp 2>/dev/null | awk -v p=":$port" '$4 ~ p {print $7}' | cut -d/ -f1 | grep -E '^[0-9]+$'
+    fi
+    return 0
+}
+
+port_in_use() {
+    local port="$1"
+    local pids
+    pids=$(port_listener_pids "$port")
+    [ -n "$pids" ]
+}
+
 wait_for_port() {
     local port=$1
     local max_wait=$2
     local count=0
     
     while [ $count -lt $max_wait ]; do
-        if ! lsof -i :$port -sTCP:LISTEN &>/dev/null; then
+        if ! port_in_use "$port"; then
             break
         fi
         count=$((count + 1))
@@ -277,7 +325,7 @@ wait_for_port() {
     if [ $count -ge $max_wait ]; then
         printf -v msg "[WARNING] 端口%s等待超时，强制清理..." "$port"
         log "$msg"
-        lsof -t -i :$port -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true
+        kill_pids "$(port_listener_pids "$port")"
         sleep 1
     fi
 }
@@ -318,12 +366,19 @@ detect_python_env() {
     log "[1/6] 检测Python环境..."
 
     PYTHON_CMD=""
-    
-    if command -v python3 &> /dev/null; then
+
+    VENV_PATH="${VENV_PATH:-.venv}"
+    resolve_venv_paths
+    if [ -n "$VENV_PY" ] && [ -f "$VENV_PY" ]; then
+        log "[*] 检测到项目虚拟环境解释器: $VENV_PY"
+        PYTHON_CMD="$VENV_PY"
+    fi
+
+    if [ -z "$PYTHON_CMD" ] && command -v python3 &> /dev/null; then
         PYTHON_CMD="python3"
-    elif command -v python &> /dev/null; then
+    elif [ -z "$PYTHON_CMD" ] && command -v python &> /dev/null; then
         PYTHON_CMD="python"
-    else
+    elif [ -z "$PYTHON_CMD" ]; then
         log "Python未在PATH中，正在尝试查找或自动安装..."
         
         COMMON_PYTHON_PATHS=(
@@ -363,7 +418,11 @@ detect_python_env() {
     if [ -n "$cur_py_ver" ]; then
         log "    当前Python版本: $cur_py_ver"
         
-        if check_python_latest_version "$cur_py_ver"; then
+        check_python_latest_version "$cur_py_ver"
+        local py_vrc=$?
+        if [ "$py_vrc" -eq 2 ]; then
+            log "[*] 已跳过 Python 版本升级检查"
+        elif [ "$py_vrc" -eq 1 ]; then
             log "[提示] 检测到Python有新版本，如需升级请手动执行: 系统包管理器 install python3"
         else
             log "[*] Python已是最新版本"
@@ -755,7 +814,11 @@ detect_node_env() {
         local cur_node_ver=$(node --version 2>/dev/null)
         log "    当前Node.js版本: $cur_node_ver"
         
-        if check_node_latest_version "$cur_node_ver"; then
+        check_node_latest_version "$cur_node_ver"
+        local node_vrc=$?
+        if [ "$node_vrc" -eq 2 ]; then
+            log "[*] 已跳过 Node.js 版本升级检查"
+        elif [ "$node_vrc" -eq 1 ]; then
             log "[提示] 检测到Node.js有新版本，如需升级请手动执行: 系统包管理器 install nodejs"
         else
             log "[*] Node.js v$cur_node_ver 已是最新版本"
@@ -912,6 +975,28 @@ auto_install_node() {
     fi
 }
 
+test_mirror_latency() {
+    local url="$1"
+    local raw code t
+
+    raw=$(curl -s -I -o /dev/null -w "%{http_code}:%{time_total}" --connect-timeout 5 --max-time 8 "$url" 2>/dev/null)
+    [ -n "$raw" ] || return 1
+
+    code="${raw%%:*}"
+    t="${raw#*:}"
+
+    case "$code" in
+        ""|000|0000) return 1 ;;
+    esac
+    [ -n "$t" ] || return 1
+    case "$t" in
+        "0"|"0.000"|"0.000000") return 1 ;;
+    esac
+
+    awk -v v="$t" 'BEGIN { printf "%d", v * 1000 }'
+    return 0
+}
+
 test_pip_mirrors() {
     log "[3/6] 测试PIP加速镜像源..."
 
@@ -934,17 +1019,16 @@ test_pip_mirrors() {
     for mirror_entry in "${MIRRORS[@]}"; do
         IFS='|' read -r MIRROR_URL MIRROR_NAME <<< "$mirror_entry"
         log "    测试 $MIRROR_NAME..."
-        
-        TEST_TIME=$(curl -s -o /dev/null -w "%{time_connect}" --connect-timeout 8 --max-time 15 "$MIRROR_URL" 2>/dev/null)
 
-        if [ -n "$TEST_TIME" ] && [ "$TEST_TIME" != "0.000" ] && [ "$TEST_TIME" != "0" ]; then
-            PIP_INT_TIME=$(echo "$TEST_TIME" | awk '{printf "%d", $1 * 1000}')
-            
-            if [ -n "$PIP_INT_TIME" ] && [ "$PIP_INT_TIME" -lt "$MIN_TIME" ] 2>/dev/null; then
-                MIN_TIME=$PIP_INT_TIME
+        local pip_ms
+        pip_ms=$(test_mirror_latency "$MIRROR_URL")
+
+        if [ -n "$pip_ms" ]; then
+            log "        $MIRROR_NAME: ${pip_ms}ms"
+            if [ "$pip_ms" -lt "$MIN_TIME" ] 2>/dev/null; then
+                MIN_TIME=$pip_ms
                 BEST_MIRROR="$MIRROR_URL"
                 BEST_NAME="$MIRROR_NAME"
-                log "        $MIRROR_NAME: ${TEST_TIME}秒 [${PIP_INT_TIME}ms]"
             fi
         else
             log "        $MIRROR_NAME: 超时/失败"
@@ -970,7 +1054,7 @@ check_node_latest_version() {
     
     if [ -z "$current_ver" ]; then
         log "[WARNING] 无法获取当前 Node.js 版本，跳过版本检查"
-        return 0
+        return 2
     fi
     
     log "[*] 检查 Node.js 最新版本..."
@@ -992,7 +1076,7 @@ check_node_latest_version() {
     
     if [ -z "$latest_ver" ]; then
         log "[WARNING] 无法获取 Node.js 最新版本信息，跳过升级检查"
-        return 0
+        return 2
     fi
     
     log "    当前版本: v$current_ver"
@@ -1011,7 +1095,7 @@ check_python_latest_version() {
     
     if [ -z "$current_ver" ]; then
         log "[WARNING] 无法获取当前 Python 版本，跳过版本检查"
-        return 0
+        return 2
     fi
     
     log "[*] 检查 Python 最新版本..."
@@ -1033,7 +1117,7 @@ check_python_latest_version() {
     
     if [ -z "$latest_ver" ]; then
         log "[WARNING] 无法获取 Python 最新版本信息，跳过升级检查"
-        return 0
+        return 2
     fi
     
     log "    当前版本: $current_ver"
@@ -1052,7 +1136,7 @@ check_git_latest_version() {
     
     if [ -z "$current_ver" ]; then
         log "[WARNING] 无法获取当前 Git 版本，跳过版本检查"
-        return 0
+        return 2
     fi
     
     log "[*] 检查 Git 最新版本..."
@@ -1074,7 +1158,7 @@ check_git_latest_version() {
     
     if [ -z "$latest_ver" ]; then
         log "[WARNING] 无法获取 Git 最新版本信息，跳过升级检查"
-        return 0
+        return 2
     fi
     
     log "    当前版本: v$current_ver"
@@ -1104,7 +1188,7 @@ check_cloudflared_latest_version() {
     
     if [ -z "$current_ver" ]; then
         log "[WARNING] 无法获取当前 cloudflared 版本，跳过版本检查"
-        return 0
+        return 2
     fi
     
     log "[*] 检查 cloudflared 最新版本..."
@@ -1113,7 +1197,7 @@ check_cloudflared_latest_version() {
     
     if [ -z "$latest_ver" ]; then
         log "[WARNING] 无法获取 cloudflared 最新版本信息，跳过升级检查"
-        return 0
+        return 2
     fi
     
     log "    当前版本: $current_ver"
@@ -1136,22 +1220,28 @@ install_hostc() {
     )
 
     HOSTC_BEST_MIRROR="https://registry.npmmirror.com"
+    HOSTC_BEST_NAME="npmmirror淘宝"
+    HOSTC_MIN_TIME=9999
 
     for hostc_mirror_entry in "${HOSTC_MIRRORS[@]}"; do
         IFS='|' read -r H_URL H_NAME <<< "$hostc_mirror_entry"
-        
-        H_TIME=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 3 "$H_URL" 2>/dev/null)
 
-        if [ -n "$H_TIME" ] && [ "$H_TIME" != "0.000" ] && [ "$H_TIME" != "0" ]; then
-            H_INT_TIME=$(echo "$H_TIME" | awk '{printf "%d", $1 * 1000}')
-            
-            if [ -n "$H_INT_TIME" ] && [ "$H_INT_TIME" -lt 9999 ] 2>/dev/null; then
+        local hostc_ms
+        hostc_ms=$(test_mirror_latency "$H_URL")
+
+        if [ -n "$hostc_ms" ]; then
+            log "    测试 $H_NAME: ${hostc_ms}ms"
+            if [ "$hostc_ms" -lt "$HOSTC_MIN_TIME" ] 2>/dev/null; then
+                HOSTC_MIN_TIME=$hostc_ms
                 HOSTC_BEST_MIRROR="$H_URL"
-                log "    测试 $H_NAME: ${H_TIME}秒 [${H_INT_TIME}ms]"
+                HOSTC_BEST_NAME="$H_NAME"
             fi
+        else
+            log "    测试 $H_NAME: 超时/失败"
         fi
     done
 
+    log "[*] 最快hostc镜像: $HOSTC_BEST_NAME [${HOSTC_MIN_TIME}ms]"
     log "[*] 使用最佳镜像安装 hostc..."
     npm install hostc@latest --registry "$HOSTC_BEST_MIRROR" --prefix dist 2>/dev/null
     if [ $? -ne 0 ]; then
@@ -1164,13 +1254,13 @@ install_hostc() {
 
 # 检查 hostc 是否是最新版本
 # 参数: $1 = 当前版本号
-# 返回: 0 = 已是最新, 1 = 需要升级
+# 返回: 0 = 已是最新, 1 = 需要升级, 2 = 跳过检查
 check_hostc_latest_version() {
     local current_ver="$1"
     
     if [ -z "$current_ver" ] || [ "$current_ver" = "unknown" ]; then
         log "[WARNING] 无法获取当前 hostc 版本，跳过版本检查"
-        return 0
+        return 2
     fi
     
     log "[*] 检查 hostc 最新版本..."
@@ -1180,7 +1270,7 @@ check_hostc_latest_version() {
     
     if [ -z "$latest_ver" ]; then
         log "[WARNING] 无法获取 hostc 最新版本信息，跳过升级检查"
-        return 0
+        return 2
     fi
     
     log "    当前版本: v${current_ver}"
@@ -1213,17 +1303,16 @@ test_npm_mirrors() {
     for npm_mirror_entry in "${NPM_MIRRORS[@]}"; do
         IFS='|' read -r NPM_URL NPM_NAME <<< "$npm_mirror_entry"
         log "    测试 $NPM_NAME..."
-        
-        NPM_TEST_TIME=$(curl -s -o /dev/null -w "%{time_total}" --connect-timeout 8 --max-time 15 "$NPM_URL" 2>/dev/null)
 
-        if [ -n "$NPM_TEST_TIME" ] && [ "$NPM_TEST_TIME" != "0.000" ] && [ "$NPM_TEST_TIME" != "0" ]; then
-            NPM_INT_TIME=$(echo "$NPM_TEST_TIME" | awk '{printf "%d", $1 * 1000}')
-            
-            if [ -n "$NPM_INT_TIME" ] && [ "$NPM_INT_TIME" -lt "$NPM_MIN_TIME" ] 2>/dev/null; then
-                NPM_MIN_TIME=$NPM_INT_TIME
+        local npm_ms
+        npm_ms=$(test_mirror_latency "$NPM_URL")
+
+        if [ -n "$npm_ms" ]; then
+            log "        $NPM_NAME: ${npm_ms}ms"
+            if [ "$npm_ms" -lt "$NPM_MIN_TIME" ] 2>/dev/null; then
+                NPM_MIN_TIME=$npm_ms
                 NPM_BEST_MIRROR="$NPM_URL"
                 NPM_BEST_NAME="$NPM_NAME"
-                log "        $NPM_NAME: ${NPM_TEST_TIME}秒 [${NPM_INT_TIME}ms]"
             fi
         else
             log "        $NPM_NAME: 超时/失败"
@@ -1277,17 +1366,75 @@ test_npm_mirrors() {
     fi
 }
 
+resolve_venv_paths() {
+    VENV_PATH="${VENV_PATH:-.venv}"
+    VENV_BIN_DIR=""
+    VENV_PY=""
+    VENV_ACTIVATE=""
+
+    if [ -f "$VENV_PATH/Scripts/python.exe" ]; then
+        VENV_BIN_DIR="$VENV_PATH/Scripts"
+        VENV_PY="$VENV_PATH/Scripts/python.exe"
+        VENV_ACTIVATE="$VENV_PATH/Scripts/activate"
+    elif [ -f "$VENV_PATH/bin/python" ]; then
+        VENV_BIN_DIR="$VENV_PATH/bin"
+        VENV_PY="$VENV_PATH/bin/python"
+        VENV_ACTIVATE="$VENV_PATH/bin/activate"
+    elif [ -f "$VENV_PATH/bin/python3" ]; then
+        VENV_BIN_DIR="$VENV_PATH/bin"
+        VENV_PY="$VENV_PATH/bin/python3"
+        VENV_ACTIVATE="$VENV_PATH/bin/activate"
+    fi
+}
+
+activate_venv() {
+    if [ -z "$VENV_ACTIVATE" ] || [ ! -f "$VENV_ACTIVATE" ]; then
+        resolve_venv_paths
+    fi
+    if [ -n "$VENV_ACTIVATE" ] && [ -f "$VENV_ACTIVATE" ]; then
+        # shellcheck disable=SC1090
+        source "$VENV_ACTIVATE"
+        return 0
+    fi
+    return 1
+}
+
+resolve_python_cmd() {
+    if [ -z "$VENV_PY" ] || [ ! -f "$VENV_PY" ]; then
+        resolve_venv_paths
+    fi
+
+    if [ -n "$VENV_PY" ] && [ -f "$VENV_PY" ]; then
+        printf '%s' "$VENV_PY"
+        return 0
+    fi
+    if command -v python3 &> /dev/null; then
+        command -v python3
+        return 0
+    fi
+    if command -v python &> /dev/null; then
+        command -v python
+        return 0
+    fi
+    if [ -n "$PYTHON_CMD" ] && command -v "$PYTHON_CMD" &> /dev/null; then
+        printf '%s' "$PYTHON_CMD"
+        return 0
+    fi
+    return 1
+}
+
 detect_venv() {
     log "[5/6] 检测Python虚拟环境..."
 
-    if [ -d ".venv" ] && [ -f ".venv/bin/activate" ]; then
-        log "检测到虚拟环境：.venv"
+    VENV_PATH=".venv"
+    resolve_venv_paths
+
+    if [ -n "$VENV_PY" ] && [ -f "$VENV_PY" ]; then
+        log "检测到虚拟环境：.venv (解释器: $VENV_PY)"
         VENV_EXISTS=1
-        VENV_PATH=".venv"
     else
         log "未检测到虚拟环境"
         VENV_EXISTS=0
-        VENV_PATH=".venv"
     fi
 }
 
@@ -1305,7 +1452,8 @@ setup_venv() {
         VENV_EXISTS=1
     fi
 
-    source "$VENV_PATH/bin/activate"
+    resolve_venv_paths
+    activate_venv
 
     if [ -n "$FASTEST_PIP_MIRROR" ]; then
         log "[*] 配置PIP镜像源为: $FASTEST_PIP_MIRROR"
@@ -1358,7 +1506,7 @@ EOF2
     if [ -f "requirements.txt" ]; then
         log "[*] 检查Python依赖是否需要安装..."
         NEED_PIP_INSTALL=1
-        "$VENV_PATH/bin/python" main.py --check-deps > /dev/null 2>&1
+        "$VENV_PY" main.py --check-deps > /dev/null 2>&1
         if [ $? -eq 0 ]; then
             log "[*] 所有Python依赖已满足，跳过安装"
             NEED_PIP_INSTALL=0
@@ -1374,7 +1522,7 @@ EOF2
             
             log "[*] 安装依赖..."
             if [ -n "$FASTEST_PIP_MIRROR" ]; then
-                :: 首次尝试：使用镜像源 + 预编译包（关键优化）
+                # 首次尝试：使用镜像源 + 预编译包（关键优化）
                 pip install -r requirements.txt -i "$FASTEST_PIP_MIRROR" --only-binary :all:
                 if [ $? -ne 0 ]; then
                     log "WARNING: 预编译包安装失败，尝试使用源码编译..."
@@ -1383,7 +1531,7 @@ EOF2
                         log "WARNING: 使用镜像源安装失败，尝试默认源..."
                         pip install -r requirements.txt
                         if [ $? -ne 0 ]; then
-                            log "[ERROR] 依赖安装失败，请查看日志或手动运行: .venv/bin/pip install -r requirements.txt"
+                            log "[ERROR] 依赖安装失败，请查看日志或手动运行: $VENV_BIN_DIR/pip install -r requirements.txt"
                             exit 1
                         fi
                     fi
@@ -1398,7 +1546,7 @@ EOF2
         fi
 
         log "[*] 安装Playwright浏览器..."
-        "$VENV_PATH/bin/python" main.py --install-playwright
+        "$VENV_PY" main.py --install-playwright
         if [ $? -ne 0 ]; then
             log "[ERROR] Playwright浏览器安装失败，部分功能可能不可用"
         else
@@ -1450,14 +1598,15 @@ run_web() {
     log "启动Web服务和隧道..."
     log "========================================"
 
-    source "$VENV_PATH/bin/activate"
+    resolve_venv_paths
+    activate_venv
 
     log_blank
     log "[*] Checking BOM..."
-    "$VENV_PATH/bin/python" main.py --check-bom > /dev/null 2>&1
+    "$VENV_PY" main.py --check-bom > /dev/null 2>&1
     if [ $? -ne 0 ]; then
         log "[WARNING] BOM detected, auto-fixing..."
-        "$VENV_PATH/bin/python" main.py --fix-bom
+        "$VENV_PY" main.py --fix-bom
     fi
     log "[OK] BOM check completed"
     log "Starting Web service..."
@@ -1473,7 +1622,7 @@ run_web() {
     
     if [ "$USE_WATCHDOG_DAEMON" = "1" ]; then
         log "[*] 使用内置守护进程模式启动（防闪退增强版）..."
-        nohup "$VENV_PATH/bin/python" main.py --watchdog --web --port "$WEB_PORT" \
+        nohup "$VENV_PY" main.py --watchdog --web --port "$WEB_PORT" \
             >> "$(pwd)/file/watchdog_daemon.log" 2>&1 &
         PYTHON_PID=$!
         WATCHDOG_PID=$PYTHON_PID
@@ -1481,7 +1630,7 @@ run_web() {
         log "[*] 内置守护进程已启动 (PID: $PYTHON_PID)"
     else
         log "[*] 使用标准模式启动..."
-        nohup "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
+        nohup "$VENV_PY" main.py --web --port "$WEB_PORT" < /dev/null &
         PYTHON_PID=$!
         echo "$PYTHON_PID" > "$(pwd)/file/web.pid"
         log "[*] Web服务已启动 (PID: $PYTHON_PID)"
@@ -1524,7 +1673,7 @@ run_web() {
     fi
 
     if [ -z "$LAN_ADDR" ]; then
-        if command -v ipconfig &>/dev/null; then
+        if [[ "$(uname -s)" == "Darwin" ]] && command -v ipconfig &>/dev/null; then
             LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null)
         elif [ -f "/sbin/ifconfig" ]; then
             LAN_IP=$(/sbin/ifconfig 2>/dev/null | grep -E "inet (192\.168|10\.|172\.(1[6-9]|2[0-9]|3[01]))" | awk '{print $2}' | head -1)
@@ -1605,8 +1754,9 @@ run_web() {
                         sleep $WEB_RESTART_COOLDOWN
 
                         log "[看门狗] 🚀 正在重新启动Web服务..."
-                        source "$VENV_PATH/bin/activate"
-                        "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
+                        resolve_venv_paths
+                        activate_venv
+                        "$VENV_PY" main.py --web --port "$WEB_PORT" < /dev/null &
                         PYTHON_PID=$!
 
                         log "[看门狗] ⏱️  等待Web服务启动..."
@@ -1671,8 +1821,9 @@ run_web() {
             sleep $WEB_RESTART_COOLDOWN
 
             log "[AutoRestart] 正在重新启动Web服务..."
-            source "$VENV_PATH/bin/activate"
-            "$VENV_PATH/bin/python" main.py --web --port "$WEB_PORT" < /dev/null &
+            resolve_venv_paths
+            activate_venv
+            "$VENV_PY" main.py --web --port "$WEB_PORT" < /dev/null &
             PYTHON_PID=$!
 
             log "[AutoRestart] 等待Web服务启动..."
@@ -1719,34 +1870,132 @@ check_temp_size() {
     fi
 }
 
-kill_browser_processes() {
-    local chrome_count=0
+_PROC_SNAPSHOT_CACHE=""
 
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        chrome_count=$(pgrep -f "Google Chrome|Chromium|chrome|chromium" | wc -l)
-        if [ "$chrome_count" -gt 0 ]; then
-            pkill -9 -f "Google Chrome|Chromium|chrome|chromium" 2>/dev/null || true
-            log "    [防护] 已清理 ${chrome_count} 个浏览器僵尸进程 (Chrome/Chromium)"
-        else
-            log "    [防护] 未发现浏览器僵尸进程"
-        fi
+_proc_snapshot_raw() {
+    local os_name
+    os_name="$(uname -s)"
+
+    if [[ "$os_name" =~ ^MSYS|^MINGW|^CYGWIN ]]; then
+        powershell -NoProfile -NonInteractive -Command \
+            "Get-CimInstance Win32_Process | ForEach-Object { '{0}|{1}' -f \$_.ProcessId, \$_.CommandLine }" \
+            2>/dev/null | tr -d '\r'
+        return 0
+    fi
+
+    ps -eo pid=,args= 2>/dev/null | awk '{pid=$1; $1=""; sub(/^ +/, ""); print pid "|" $0}'
+}
+
+_proc_snapshot() {
+    if [ -z "$_PROC_SNAPSHOT_CACHE" ]; then
+        _PROC_SNAPSHOT_CACHE=$(_proc_snapshot_raw)
+    fi
+    printf '%s\n' "$_PROC_SNAPSHOT_CACHE"
+}
+
+_proc_snapshot_invalidate() {
+    _PROC_SNAPSHOT_CACHE=""
+}
+
+_proc_pids_by_pattern() {
+    local match="$1"
+    local require="$2"
+    local name_re="$3"
+    local snapshot
+    snapshot=$(_proc_snapshot)
+
+    [ -n "$snapshot" ] || return 0
+
+    local lines
+    lines=$(printf '%s\n' "$snapshot" | grep -E -- "$match")
+    if [ -n "$require" ] && [ -n "$lines" ]; then
+        lines=$(printf '%s\n' "$lines" | grep -E -- "$require")
+    fi
+    [ -n "$lines" ] || return 0
+
+    if [ -n "$name_re" ]; then
+        lines=$(printf '%s\n' "$lines" | awk -v name_re="$name_re" '
+            {
+                line = $0
+                pid = line
+                sub(/[|].*/, "", pid)
+                sub(/^[^|]*[|]/, "", line)
+                tok = line
+                sub(/ .*/, "", tok)
+                gsub(/"/, "", tok)
+                n = split(tok, parts, /[\/\\]/)
+                base = tolower(parts[n])
+                sub(/\.exe$/, "", base)
+                if (base ~ name_re) print pid
+            }')
+        [ -n "$lines" ] || return 0
+    fi
+
+    printf '%s\n' "$lines" \
+        | awk -F'|' -v self="$$" '{gsub(/^ +/,"",$1); if ($1 ~ /^[0-9]+$/ && $1 != self) print $1}' \
+        | sort -u
+    return 0
+}
+
+kill_pids() {
+    local pids="$1"
+    [ -n "$pids" ] || return 0
+
+    local os_name
+    os_name="$(uname -s)"
+    if [[ "$os_name" =~ ^MSYS|^MINGW|^CYGWIN ]]; then
+        local ids
+        ids=$(printf '%s\n' "$pids" | grep -oE '[0-9]+' | paste -sd, -)
+        [ -n "$ids" ] || return 0
+        powershell -NoProfile -NonInteractive -Command \
+            "Stop-Process -Id $ids -Force -ErrorAction SilentlyContinue" 2>/dev/null
+        return 0
+    fi
+
+    local pid
+    for pid in $pids; do
+        kill -9 "$pid" 2>/dev/null || true
+    done
+}
+
+_proc_kill_by_pattern() {
+    local match="$1"
+    local require="$2"
+    local pids
+    pids=$(_proc_pids_by_pattern "$match" "$require")
+    [ -n "$pids" ] || return 0
+
+    kill_pids "$pids"
+}
+
+kill_browser_processes() {
+    _proc_snapshot_invalidate
+    local pw_pids
+    pw_pids=$(_proc_pids_by_pattern "$PW_BROWSER_PATTERN" "" "$PW_BROWSER_NAMES")
+    local pw_count=0
+    if [ -n "$pw_pids" ]; then
+        pw_count=$(printf '%s\n' "$pw_pids" | grep -cE '^[0-9]+$')
+        kill_pids "$pw_pids"
+    fi
+
+    if [ "$pw_count" -gt 0 ]; then
+        log "    [防护] 已清理 ${pw_count} 个浏览器僵尸进程 (Playwright Chrome/Chromium)"
     else
-        chrome_count=$(pgrep -f "chrome|chromium" | wc -l)
-        if [ "$chrome_count" -gt 0 ]; then
-            pkill -9 -f "chrome|chromium" 2>/dev/null || true
-            log "    [防护] 已清理 ${chrome_count} 个浏览器僵尸进程 (Chrome/Chromium)"
-        else
-            log "    [防护] 未发现浏览器僵尸进程"
-        fi
+        log "    [防护] 未发现浏览器僵尸进程"
     fi
 }
 
 kill_playwright_processes() {
+    _proc_snapshot_invalidate
+    local pw_pids
+    pw_pids=$(_proc_pids_by_pattern "$PW_PROC_PATTERN" "" "$PW_PROC_NAMES")
     local pw_count=0
+    if [ -n "$pw_pids" ]; then
+        pw_count=$(printf '%s\n' "$pw_pids" | grep -cE '^[0-9]+$')
+        kill_pids "$pw_pids"
+    fi
 
-    pw_count=$(pgrep -f "playwright" | wc -l)
     if [ "$pw_count" -gt 0 ]; then
-        pkill -9 -f "playwright" 2>/dev/null || true
         log "    [防护] 已清理 ${pw_count} 个 Playwright 残留进程"
     else
         log "    [防护] 未发现 Playwright 残留进程"
@@ -1756,65 +2005,42 @@ kill_playwright_processes() {
 kill_all_interfering_processes() {
     log "[*] [全面防护] 开始清理所有可能干扰的进程..."
 
+    _proc_snapshot_invalidate
     local total_killed=0
 
-    local py_count=$(pgrep -f "python.*main.py" | wc -l)
-    if [ "$py_count" -gt 0 ]; then
-        pkill -9 -f "python.*main.py" 2>/dev/null || true
-        total_killed=$((total_killed + py_count))
+    local py_pids
+    py_pids=$(_proc_pids_by_pattern "main\.py" "main\.py" "$PY_PROC_NAMES")
+    if [ -n "$py_pids" ]; then
+        total_killed=$((total_killed + $(printf '%s\n' "$py_pids" | grep -cE '^[0-9]+$')))
+        kill_pids "$py_pids"
     fi
 
-    local hostc_count=$(pgrep -f "hostc" | wc -l)
-    if [ "$hostc_count" -gt 0 ]; then
-        pkill -9 -f "hostc" 2>/dev/null || true
-        total_killed=$((total_killed + hostc_count))
+    local hostc_pids
+    hostc_pids=$(_proc_pids_by_pattern "hostc" "" "$NODE_PROC_NAMES")
+    if [ -n "$hostc_pids" ]; then
+        total_killed=$((total_killed + $(printf '%s\n' "$hostc_pids" | grep -cE '^[0-9]+$')))
+        kill_pids "$hostc_pids"
     fi
 
-    local cfd_count=$(pgrep -f "cloudflared" | wc -l)
-    if [ "$cfd_count" -gt 0 ]; then
-        pkill -9 -f "cloudflared" 2>/dev/null || true
-        total_killed=$((total_killed + cfd_count))
+    local cfd_pids
+    cfd_pids=$(_proc_pids_by_pattern "cloudflared" "xy_ws" "$CFD_PROC_NAMES")
+    if [ -n "$cfd_pids" ]; then
+        total_killed=$((total_killed + $(printf '%s\n' "$cfd_pids" | grep -cE '^[0-9]+$')))
+        kill_pids "$cfd_pids"
     fi
 
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        local chrome_count=$(pgrep -f "Google Chrome|Chromium|chrome|chromium" | wc -l)
-        if [ "$chrome_count" -gt 0 ]; then
-            pkill -9 -f "Google Chrome|Chromium|chrome|chromium" 2>/dev/null || true
-            total_killed=$((total_killed + chrome_count))
-        fi
-    else
-        local chrome_count=$(pgrep -f "chrome|chromium" | wc -l)
-        if [ "$chrome_count" -gt 0 ]; then
-            pkill -9 -f "chrome|chromium" 2>/dev/null || true
-            total_killed=$((total_killed + chrome_count))
-        fi
+    local pw_pids
+    pw_pids=$(_proc_pids_by_pattern "$PW_BROWSER_PATTERN" "" "$PW_BROWSER_NAMES")
+    if [ -n "$pw_pids" ]; then
+        total_killed=$((total_killed + $(printf '%s\n' "$pw_pids" | grep -cE '^[0-9]+$')))
+        kill_pids "$pw_pids"
     fi
 
-    local pw_count=$(pgrep -f "playwright" | wc -l)
-    if [ "$pw_count" -gt 0 ]; then
-        pkill -9 -f "playwright" 2>/dev/null || true
-        total_killed=$((total_killed + pw_count))
-    fi
-
-    local firefox_count=$(pgrep -f "firefox" | wc -l)
-    if [ "$firefox_count" -gt 0 ]; then
-        pkill -9 -f "firefox" 2>/dev/null || true
-        total_killed=$((total_killed + firefox_count))
-    fi
-
-    local edge_count=$(pgrep -f "msedge|Microsoft Edge" | wc -l)
-    if [ "$edge_count" -gt 0 ]; then
-        pkill -9 -f "msedge|Microsoft Edge" 2>/dev/null || true
-        total_killed=$((total_killed + edge_count))
-    fi
-
-    if lsof -i :$WEB_PORT -sTCP:LISTEN &>/dev/null; then
-        local port_pids=$(lsof -t -i :$WEB_PORT -sTCP:LISTEN 2>/dev/null)
-        if [ -n "$port_pids" ]; then
-            echo "$port_pids" | xargs kill -9 2>/dev/null || true
-            local port_count=$(echo "$port_pids" | wc -l)
-            total_killed=$((total_killed + port_count))
-        fi
+    local port_pids
+    port_pids=$(port_listener_pids "$WEB_PORT")
+    if [ -n "$port_pids" ]; then
+        total_killed=$((total_killed + $(printf '%s\n' "$port_pids" | grep -cE '^[0-9]+$')))
+        kill_pids "$port_pids"
     fi
 
     if [ "$total_killed" -gt 0 ]; then
@@ -1822,47 +2048,151 @@ kill_all_interfering_processes() {
     else
         log "    [全面防护] ✅ 系统干净，无干扰进程"
     fi
+
+    local kill_retry=0
+    while [ "$kill_retry" -lt 3 ]; do
+        _proc_snapshot_invalidate
+        local residual=0
+
+        local r_py
+        r_py=$(_proc_pids_by_pattern "main\.py" "main\.py" "$PY_PROC_NAMES")
+        if [ -n "$r_py" ]; then
+            residual=$((residual + $(printf '%s\n' "$r_py" | grep -cE '^[0-9]+$')))
+            kill_pids "$r_py"
+        fi
+
+        local r_port
+        r_port=$(port_listener_pids "$WEB_PORT")
+        if [ -n "$r_port" ]; then
+            residual=$((residual + $(printf '%s\n' "$r_port" | grep -cE '^[0-9]+$')))
+            kill_pids "$r_port"
+        fi
+
+        if [ "$residual" -eq 0 ]; then
+            break
+        fi
+
+        total_killed=$((total_killed + residual))
+        kill_retry=$((kill_retry + 1))
+        sleep 1
+    done
+
+    if [ "$kill_retry" -ge 3 ]; then
+        log "    [全面防护] ⚠️  残留进程清理 ${kill_retry} 轮后仍未完全释放"
+    fi
+
+    _proc_snapshot_invalidate
+}
+
+probe_browsers_dir() {
+    local probe_dir="$1"
+    [ -n "$probe_dir" ] || return 1
+    [ -d "$probe_dir" ] || return 1
+
+    local d
+    for d in "$probe_dir"/chromium-*; do
+        [ -d "$d" ] || continue
+        if [ -f "$d/chrome-win/chrome.exe" ] \
+            || [ -f "$d/chrome-win64/chrome.exe" ] \
+            || [ -f "$d/chrome-win/headless_shell.exe" ] \
+            || [ -f "$d/chrome-win64/headless_shell.exe" ] \
+            || [ -f "$d/chrome-linux/chrome" ] \
+            || [ -f "$d/chrome-mac/Chromium.app/Contents/MacOS/Chromium" ]; then
+            printf '%s' "$probe_dir"
+            return 0
+        fi
+    done
+
+    for d in "$probe_dir"/chromium_headless_shell-*; do
+        [ -d "$d" ] || continue
+        if [ -f "$d/chrome-win/headless_shell.exe" ] \
+            || [ -f "$d/chrome-win64/headless_shell.exe" ] \
+            || [ -f "$d/chrome-linux/headless_shell" ]; then
+            printf '%s' "$probe_dir"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+detect_playwright_browsers_path() {
+    PW_FOUND_PATH=""
+
+    if [ -n "$PLAYWRIGHT_BROWSERS_PATH" ]; then
+        PW_FOUND_PATH=$(probe_browsers_dir "$PLAYWRIGHT_BROWSERS_PATH")
+        [ -n "$PW_FOUND_PATH" ] && return 0
+    fi
+
+    PW_FOUND_PATH=$(probe_browsers_dir "$(pwd)/playwright-browsers")
+    [ -n "$PW_FOUND_PATH" ] && return 0
+
+    PW_FOUND_PATH=$(probe_browsers_dir "$HOME/.cache/ms-playwright")
+    [ -n "$PW_FOUND_PATH" ] && return 0
+
+    PW_FOUND_PATH=$(probe_browsers_dir "$HOME/Library/Caches/ms-playwright")
+    [ -n "$PW_FOUND_PATH" ] && return 0
+
+    if [ -n "$LOCALAPPDATA" ]; then
+        PW_FOUND_PATH=$(probe_browsers_dir "$LOCALAPPDATA/ms-playwright")
+        [ -n "$PW_FOUND_PATH" ] && return 0
+    fi
+
+    PW_FOUND_PATH=$(probe_browsers_dir "$USERPROFILE/AppData/Local/ms-playwright")
+    [ -n "$PW_FOUND_PATH" ] && return 0
+
+    return 1
 }
 
 check_chromium_exists() {
     local browsers_path="$1"
-    
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        find "$browsers_path" -path "*/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium" -type f 2>/dev/null | grep -q . && return 0
-    elif [[ "$(uname -s)" == "Linux" ]]; then
-        find "$browsers_path" -path "*/chromium-*/chrome-linux/chrome" -type f 2>/dev/null | grep -q . && return 0
-    elif [[ "$(uname -s)" =~ ^MSYS|^MINGW ]]; then
-        find "$browsers_path" -path "*/chromium-*/chrome-win/chrome.exe" -type f 2>/dev/null | grep -q . && return 0
-    fi
-    
-    return 1
+    [ -n "$browsers_path" ] || return 1
+    [ -d "$browsers_path" ] || return 1
+
+    local found
+    found=$(probe_browsers_dir "$browsers_path")
+    [ -n "$found" ]
 }
 
 check_and_fix_playwright() {
-    PLAYWRIGHT_VER=$("$VENV_PATH/bin/python" -c "import playwright; print(playwright.__version__)" 2>/dev/null)
+    resolve_venv_paths
+
+    PLAYWRIGHT_VER=""
+    if [ -n "$VENV_PY" ] && [ -f "$VENV_PY" ]; then
+        PLAYWRIGHT_VER=$("$VENV_PY" -c "from importlib.metadata import version; print(version('playwright'))" 2>/dev/null)
+    fi
     if [ -z "$PLAYWRIGHT_VER" ]; then
         PLAYWRIGHT_VER="unknown"
     fi
 
-    PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright"
-    fi
-
-    if check_chromium_exists "$PLAYWRIGHT_BROWSERS_PATH"; then
+    if detect_playwright_browsers_path; then
+        PLAYWRIGHT_BROWSERS_PATH="$PW_FOUND_PATH"
+        export PLAYWRIGHT_BROWSERS_PATH
         log "    [Playwright] ✅ Chromium 浏览器驱动正常 (Playwright v${PLAYWRIGHT_VER})"
+        log "    [Playwright]    驱动目录: $PLAYWRIGHT_BROWSERS_PATH"
         return 0
     fi
 
     log "    [Playwright] ⚠️  未检测到 Chromium 浏览器驱动 (Playwright v${PLAYWRIGHT_VER})"
     log "    [Playwright] 🔄 正在自动安装 Playwright 浏览器..."
-    source "$VENV_PATH/bin/activate" > /dev/null 2>&1
-    python -m playwright install chromium 2>&1
 
-    if check_chromium_exists "$PLAYWRIGHT_BROWSERS_PATH"; then
+    local pw_python
+    pw_python=$(resolve_python_cmd)
+    if [ -z "$pw_python" ]; then
+        log "    [Playwright] ❌ 未找到可用的 Python 解释器，请手动执行：python -m playwright install chromium"
+        return 1
+    fi
+
+    activate_venv
+    "$pw_python" -m playwright install chromium 2>&1
+
+    if detect_playwright_browsers_path; then
+        PLAYWRIGHT_BROWSERS_PATH="$PW_FOUND_PATH"
+        export PLAYWRIGHT_BROWSERS_PATH
         log "    [Playwright] ✅ Chromium 浏览器安装成功"
+        log "    [Playwright]    驱动目录: $PLAYWRIGHT_BROWSERS_PATH"
     else
-        log "    [Playwright] ❌ Chromium 浏览器安装失败，请手动执行：python -m playwright install chromium"
+        log "    [Playwright] ❌ Chromium 浏览器安装失败，请手动执行：$pw_python -m playwright install chromium"
     fi
 }
 

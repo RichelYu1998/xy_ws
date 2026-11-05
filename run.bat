@@ -88,13 +88,19 @@ if errorlevel 1 (
 where git >nul 2>&1
 if not errorlevel 1 (
     for /f "delims=" %%v in ('git --version 2^>nul') do set "CUR_GIT_VER=%%v"
-    call :log     当前Git版本: !CUR_GIT_VER!
+    for /f "tokens=3 delims= " %%a in ("!CUR_GIT_VER!") do set "CUR_GIT_NUM=%%a"
+    if defined CUR_GIT_NUM set "CUR_GIT_VER=!CUR_GIT_NUM!"
+    call :log     当前Git版本: v!CUR_GIT_VER!
     
     call :check_git_latest_version
-    if errorlevel 1 (
-        call :log [提示] 检测到Git有新版本，如需升级请手动执行: winget install Git.Git
+    if errorlevel 2 (
+        call :log [*] 已跳过 Git 版本升级检查
     ) else (
-        call :log [*] Git已是最新版本
+        if errorlevel 1 (
+            call :log [提示] 检测到Git有新版本，如需升级请手动执行: winget upgrade Git.Git
+        ) else (
+            call :log [*] Git已是最新版本
+        )
     )
 ) else (
     call :log [*] 未找到 Git，正在自动安装...
@@ -117,17 +123,23 @@ set "WG_MIRRORS[1]=https://github.com/microsoft/winget-cli/releases/latest/downl
 set "WG_BEST_URL="
 set "WG_MIN_TIME=9999"
 for /L %%i in (0,1,1) do (
+    set "WG_TIME="
+    set "WG_INT="
     for /f "tokens=1,2 delims=|" %%a in ("!WG_MIRRORS[%%i]!") do (
         set "WG_URL=%%a"
         set "WG_NAME=%%b"
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!WG_URL!" 2^>nul') do set "WG_TIME=%%t"
         if defined WG_TIME if not "!WG_TIME!"=="0" if not "!WG_TIME!"=="0.000000" (
             for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!WG_TIME!*1000)" 2^>nul') do set "WG_INT=%%m"
-            if defined WG_INT if !WG_INT! LSS !WG_MIN_TIME! (
+        )
+        if defined WG_INT (
+            if !WG_INT! LSS !WG_MIN_TIME! (
                 set "WG_MIN_TIME=!WG_INT!"
                 set "WG_BEST_URL=!WG_URL!"
-                call :log !WG_NAME!: !WG_TIME!s [!WG_INT!ms]
             )
+            call :log     !WG_NAME!: !WG_TIME!s [!WG_INT!ms]
+        ) else (
+            call :log     !WG_NAME!: 超时/失败
         )
     )
 )
@@ -151,17 +163,23 @@ set "CCO_MIRRORS[1]=https://community.chocolatey.org/install.ps1|Chocolatey官�
 set "CCO_BEST_URL=https://community.chocolatey.org/install.ps1"
 set "CCO_MIN_TIME=9999"
 for /L %%i in (0,1,1) do (
+    set "CCO_TIME="
+    set "CCO_INT="
     for /f "tokens=1,2 delims=|" %%a in ("!CCO_MIRRORS[%%i]!") do (
         set "CCO_URL=%%a"
         set "CCO_NAME=%%b"
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!CCO_URL!" 2^>nul') do set "CCO_TIME=%%t"
         if defined CCO_TIME if not "!CCO_TIME!"=="0" if not "!CCO_TIME!"=="0.000000" (
             for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!CCO_TIME!*1000)" 2^>nul') do set "CCO_INT=%%m"
-            if defined CCO_INT if !CCO_INT! LSS !CCO_MIN_TIME! (
+        )
+        if defined CCO_INT (
+            if !CCO_INT! LSS !CCO_MIN_TIME! (
                 set "CCO_MIN_TIME=!CCO_INT!"
                 set "CCO_BEST_URL=!CCO_URL!"
-                call :log !CCO_NAME!: !CCO_TIME!s [!CCO_INT!ms]
             )
+            call :log     !CCO_NAME!: !CCO_TIME!s [!CCO_INT!ms]
+        ) else (
+            call :log     !CCO_NAME!: 超时/失败
         )
     )
 )
@@ -193,30 +211,30 @@ exit /b
 :get_latest_git_version
 set "GIT_LATEST_VERSION="
 
-:: 方法1: npmmirror国内镜像（优先）
-for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://registry.npmmirror.com/-/binary/git-for-windows/git/releases/latest 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json).tag_name } catch {}"') do set "GIT_LATEST_VERSION=%%v"
+:: 方法1: 华为云镜像目录列表（取最新的 v2.x.y.windows.N 标签，跳过 rc 预发布版）
+for /f "delims=" %%v in ('curl.exe -sL --connect-timeout 8 --max-time 20 https://mirrors.huaweicloud.com/git-for-windows/ 2^>nul ^| powershell -NoProfile -Command "$s = ($input | Out-String); $m = [regex]::Matches($s, 'v(2\.\d+\.\d+\.windows\.\d+)/'); $v = $m | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique | Sort-Object { [version]($_ -replace '\.windows\.', '.') } -Descending | Select-Object -First 1; if ($v) { $v }"') do set "GIT_LATEST_VERSION=%%v"
 
-:: 方法2: 华为云镜像
+:: 方法2: npmmirror国内镜像
 if not defined GIT_LATEST_VERSION (
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/git-for-windows/git/releases/latest 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json).tag_name } catch {}"') do set "GIT_LATEST_VERSION=%%v"
+    for /f "delims=" %%v in ('curl.exe -sL --connect-timeout 8 --max-time 20 https://registry.npmmirror.com/-/binary/git-for-windows/ 2^>nul ^| powershell -NoProfile -Command "$s = ($input | Out-String); $m = [regex]::Matches($s, 'v(2\.\d+\.\d+\.windows\.\d+)/'); $v = $m | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique | Sort-Object { [version]($_ -replace '\.windows\.', '.') } -Descending | Select-Object -First 1; if ($v) { $v }"') do set "GIT_LATEST_VERSION=%%v"
 )
 
-:: 方法3: 清华镜像
 if not defined GIT_LATEST_VERSION (
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/git-for-windows/git/releases/latest 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json).tag_name } catch {}"') do set "GIT_LATEST_VERSION=%%v"
+    call :log [WARNING] 所有国内镜像获取失败，跳过Git版本对比
 )
-
-if not defined GIT_LATEST_VERSION set "GIT_LATEST_VERSION=2.49.0"
 exit /b
 
 :auto_install_git
 call :get_latest_git_version
+if not defined GIT_LATEST_VERSION set "GIT_LATEST_VERSION=2.56.0.windows.4"
 call :log 检测到Git最新版本: %GIT_LATEST_VERSION%
 
 where winget >nul 2>&1
 if not errorlevel 1 (
     call :log 使用 Winget 安装 Git...
     winget install Git.Git --accept-package-agreements --accept-source-agreements --silent >nul 2>&1
+    call :refresh_git_path
+    where git >nul 2>&1
     if not errorlevel 1 exit /b 0
 )
 
@@ -224,28 +242,37 @@ where choco >nul 2>&1
 if not errorlevel 1 (
     call :log 使用 Chocolatey 安装 Git...
     choco install git -y >nul 2>&1
+    call :refresh_git_path
+    where git >nul 2>&1
     if not errorlevel 1 exit /b 0
 )
 
 call :log 轮询最快Git镜像源并下载...
-set "GIT_VERSION=%GIT_LATEST_VERSION%"
-set "GIT_MIRRORS[0]=https://mirrors.huaweicloud.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|华为云"
-set "GIT_MIRRORS[1]=https://registry.npmmirror.com/-/binary/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|npmmirror"
-set "GIT_MIRRORS[2]=https://github.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe|GitHub官方"
-set "GIT_BEST_URL=https://github.com/git-for-windows/git/releases/download/v%GIT_VERSION%.windows.1/Git-%GIT_VERSION%-64-bit.exe"
+set "GIT_TAG=%GIT_LATEST_VERSION%"
+set "GIT_ASSET_VER=%GIT_TAG:.windows.=.%"
+set "GIT_MIRRORS[0]=https://mirrors.huaweicloud.com/git-for-windows/v%GIT_TAG%/Git-%GIT_ASSET_VER%-64-bit.exe|华为云"
+set "GIT_MIRRORS[1]=https://registry.npmmirror.com/-/binary/git-for-windows/v%GIT_TAG%/Git-%GIT_ASSET_VER%-64-bit.exe|npmmirror"
+set "GIT_MIRRORS[2]=https://github.com/git-for-windows/git/releases/download/v%GIT_TAG%/Git-%GIT_ASSET_VER%-64-bit.exe|GitHub官方"
+set "GIT_BEST_URL=https://mirrors.huaweicloud.com/git-for-windows/v%GIT_TAG%/Git-%GIT_ASSET_VER%-64-bit.exe"
 set "GIT_MIN_TIME=9999"
 for /L %%i in (0,1,2) do (
     for /f "tokens=1,2 delims=|" %%a in ("!GIT_MIRRORS[%%i]!") do (
         set "GM_URL=%%a"
         set "GM_NAME=%%b"
-        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!GM_URL!" 2^>nul') do set "GM_TIME=%%t"
+        set "GM_TIME="
+        set "GM_INT="
+        for /f "delims=" %%t in ('curl.exe -sIL -o NUL -w "%%{time_connect}" --connect-timeout 3 --max-time 6 "!GM_URL!" 2^>nul') do set "GM_TIME=%%t"
         if defined GM_TIME if not "!GM_TIME!"=="0" if not "!GM_TIME!"=="0.000000" (
             for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!GM_TIME!*1000)" 2^>nul') do set "GM_INT=%%m"
-            if defined GM_INT if !GM_INT! LSS !GIT_MIN_TIME! (
+        )
+        if defined GM_INT (
+            call :log     !GM_NAME!: !GM_TIME!s [!GM_INT!ms]
+            if !GM_INT! LSS !GIT_MIN_TIME! (
                 set "GIT_MIN_TIME=!GM_INT!"
                 set "GIT_BEST_URL=!GM_URL!"
-                call :log !GM_NAME!: !GM_TIME!s [!GM_INT!ms]
             )
+        ) else (
+            call :log     !GM_NAME!: 超时/失败
         )
     )
 )
@@ -255,11 +282,20 @@ if not exist "%TEMP%\git-installer.exe" (
 )
 if exist "%TEMP%\git-installer.exe" (
     "%TEMP%\git-installer.exe" /VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /COMPONENTS="assoc,assoc_sh" /PATHOPTION=NO >nul 2>&1
-    set "PATH=%PATH%;C:\Program Files\Git\cmd"
     del "%TEMP%\git-installer.exe" 2>nul
-    exit /b 0
+    call :refresh_git_path
+    where git >nul 2>&1
+    if not errorlevel 1 exit /b 0
 )
 exit /b 1
+
+:refresh_git_path
+if exist "C:\Program Files\Git\cmd\git.exe" set "PATH=!PATH!;C:\Program Files\Git\cmd"
+if exist "C:\Program Files (x86)\Git\cmd\git.exe" set "PATH=!PATH!;C:\Program Files (x86)\Git\cmd"
+if exist "C:\Program Files\Git\bin\git.exe" set "PATH=!PATH!;C:\Program Files\Git\bin"
+if exist "C:\Program Files (x86)\Git\bin\git.exe" set "PATH=!PATH!;C:\Program Files (x86)\Git\bin"
+if exist "%LOCALAPPDATA%\Programs\Git\cmd\git.exe" set "PATH=!PATH!;%LOCALAPPDATA%\Programs\Git\cmd"
+exit /b 0
 
 :ms_timestamp
 set "TIMESTAMP="
@@ -270,10 +306,11 @@ exit /b
 
 :log
 call :ms_timestamp
-    echo [%TIMESTAMP%] %*
+set "LOGLINE=%*"
+echo [%TIMESTAMP%] !LOGLINE!
 if not "%LOG_FILE%"=="" (
     if exist "!LOG_FILE!" (
-        >> "!LOG_FILE!" echo [%TIMESTAMP%] %* 2>nul
+        >> "!LOG_FILE!" echo([%TIMESTAMP%] !LOGLINE! 2>nul
     )
 )
 exit /b
@@ -317,27 +354,33 @@ call :check_and_fix_playwright
 
 call :log_blank
 call :log [*] 检查 hostc 隧道工具...
-set "HOSTC_BIN=%CD%\dist\node_modules\.bin\hostc.cmd"
-if not exist "!HOSTC_BIN!" (
+set "HOSTC_BIN=%~dp0dist\node_modules\.bin\hostc.cmd"
+set "HOSTC_VER="
+if not exist "%~dp0dist\node_modules\hostc\package.json" set "HOSTC_BIN="
+if not defined HOSTC_BIN (
     call :log [*] 本地未找到 hostc，开始安装...
     call :install_hostc
+    if exist "%~dp0dist\node_modules\.bin\hostc.cmd" set "HOSTC_BIN=%~dp0dist\node_modules\.bin\hostc.cmd"
 )
-if exist "!HOSTC_BIN!" (
-    setlocal disabledelayedexpansion
-    for /f "delims=" %%v in ('"%HOSTC_BIN%" --version 2^>nul') do endlocal & set "HOSTC_VER=%%v"
+if defined HOSTC_BIN (
+    for /f "delims=" %%v in ('"!HOSTC_BIN!" --version 2^>nul') do if not defined HOSTC_VER set "HOSTC_VER=%%v"
+)
+if defined HOSTC_VER (
     call :log [*] 当前 hostc 版本: v!HOSTC_VER!
     
-    call :check_hostc_latest_version !HOSTC_VER!
-    if errorlevel 1 (
-        call :log [*] 检测到新版本，正在自动升级 hostc...
-        call :install_hostc
-        for /f "delims=" %%v in ('"%HOSTC_BIN%" --version 2^>nul') do (
-            endlocal
-            set "HOSTC_VER=%%v"
-        )
-        call :log [*] hostc 已升级到最新版: v!HOSTC_VER!
+    call :check_hostc_latest_version "!HOSTC_VER!"
+    if errorlevel 2 (
+        call :log [*] 已跳过 hostc 版本升级检查
     ) else (
-        call :log [*] hostc v!HOSTC_VER! 已是最新版本
+        if errorlevel 1 (
+            call :log [*] 检测到新版本，正在自动升级 hostc...
+            call :install_hostc
+            set "HOSTC_VER="
+            for /f "delims=" %%v in ('"!HOSTC_BIN!" --version 2^>nul') do if not defined HOSTC_VER set "HOSTC_VER=%%v"
+            call :log [*] hostc 已升级到最新版: v!HOSTC_VER!
+        ) else (
+            call :log [*] hostc v!HOSTC_VER! 已是最新版本
+        )
     )
 ) else (
     call :log [WARNING] hostc 安装失败，隧道将不可用
@@ -345,30 +388,58 @@ if exist "!HOSTC_BIN!" (
 
 call :log_blank
 call :log [*] 检查 cloudflared 隧道工具...
-set "CFD_BIN=%CD%\dist\node_modules\.bin\cloudflared.cmd"
-if not exist "!CFD_BIN!" (
-    where cloudflared >nul 2>&1 && set "CFD_BIN=cloudflared"
+set "CFD_BIN="
+set "CFD_VER="
+set "CFD_FROM_TOOLS="
+if exist "%~dp0tools\cloudflared\windows\cloudflared.exe" (
+    set "CFD_BIN=%~dp0tools\cloudflared\windows\cloudflared.exe"
+    set "CFD_FROM_TOOLS=1"
 )
-if exist "!CFD_BIN!" (
-    setlocal disabledelayedexpansion
-    for /f "delims=" %%v in ('"%CFD_BIN%" --version 2^>nul') do endlocal & set "CFD_VER=%%v"
+if not defined CFD_BIN (
+    if exist "%~dp0dist\node_modules\cloudflared\package.json" (
+        if exist "%~dp0dist\node_modules\.bin\cloudflared.cmd" set "CFD_BIN=%~dp0dist\node_modules\.bin\cloudflared.cmd"
+    )
+)
+if not defined CFD_BIN (
+    for /f "delims=" %%p in ('where cloudflared 2^>nul') do if not defined CFD_BIN set "CFD_BIN=%%p"
+)
+if defined CFD_BIN (
+    for /f "delims=" %%v in ('"!CFD_BIN!" --version 2^>nul') do if not defined CFD_VER set "CFD_VER=%%v"
+)
+if defined CFD_VER (
     call :log     当前cloudflared版本: !CFD_VER!
+    call :log     当前cloudflared路径: !CFD_BIN!
     
-    call :check_cloudflared_latest_version !CFD_VER!
-    if errorlevel 1 (
-        call :log [提示] 检测到cloudflared有新版本，如需升级请手动执行: npm install cloudflared@latest --prefix dist
+    if defined CFD_FROM_TOOLS (
+        call :log [*] cloudflared 由 tools 目录提供，跳过版本对比
     ) else (
-        call :log [*] cloudflared已是最新版本
+        call :check_cloudflared_latest_version
+        if errorlevel 2 (
+            call :log [*] 已跳过 cloudflared 版本升级检查
+        ) else (
+            if errorlevel 1 (
+                call :log [提示] 检测到cloudflared有新版本，如需升级请手动执行: npm install cloudflared@latest --prefix dist
+            ) else (
+                call :log [*] cloudflared已是最新版本
+            )
+        )
     )
 ) else (
-    call :log [*] 未找到cloudflared，正在安装...
+    call :log [*] 未找到可用的cloudflared，正在安装...
     call :install_cloudflared
+    set "CFD_BIN="
+    if exist "%~dp0tools\cloudflared\windows\cloudflared.exe" set "CFD_BIN=%~dp0tools\cloudflared\windows\cloudflared.exe"
+    if not defined CFD_BIN if exist "%~dp0dist\node_modules\.bin\cloudflared.cmd" set "CFD_BIN=%~dp0dist\node_modules\.bin\cloudflared.cmd"
+    if defined CFD_BIN (
+        for /f "delims=" %%v in ('"!CFD_BIN!" --version 2^>nul') do if not defined CFD_VER set "CFD_VER=%%v"
+        if defined CFD_VER call :log     当前cloudflared版本: !CFD_VER!
+    )
 )
 
 call :log_blank
 call :log [*] 启动 hostc 隧道（后台运行）...
 if exist "!HOSTC_BIN!" (
-    start /b cmd /c ""!HOSTC_BIN!" !WEB_PORT! --local-host localhost" < nul
+    start /b cmd /c ""!HOSTC_BIN!" 127.0.0.1:!WEB_PORT!" < nul
     call :log [*] hostc 已在后台启动
 )
 
@@ -383,21 +454,24 @@ goto detect_environments
 set "PROC_NAME=%~1"
 wmic process where "name='%PROC_NAME%'" get processid,commandline 2>nul | findstr /i "xy_ws" >nul 2>&1
 if not errorlevel 1 (
-    for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'%PROC_NAME%\' and commandlike \'%%xy_ws%%\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    for /f "tokens=2 delims=," %%p in ('wmic process where "name='%PROC_NAME%' and commandline like '%%xy_ws%%'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
         taskkill /F /PID %%p >nul 2>&1
         call :log     已终止进程 %%p (%PROC_NAME%)
     )
 )
 exit /b
 
+:kill_playwright_browsers
+set "PW_BROWSER_COUNT=0"
+set "PWB_FILTER=name='chrome.exe' or name='chromium.exe' or name='headless_shell.exe' or name='firefox.exe' or name='msedge.exe' or name='node.exe'"
+set "PWB_MATCH=ms-playwright|playwright-core|playwright_chromiumdev_profile|remote-debugging-pipe"
+for /f "delims=" %%c in ('powershell -NoProfile -Command "$n=0; Get-CimInstance Win32_Process -Filter $env:PWB_FILTER | Where-Object { $_.CommandLine -match $env:PWB_MATCH } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $n++ }; $n" 2^>nul') do set "PW_BROWSER_COUNT=%%c"
+exit /b
+
 :kill_browser_processes
-set "CHROME_COUNT=0"
-for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'chrome.exe\' or name=\'chromium.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
-    taskkill /F /PID %%p >nul 2>&1
-    set /a CHROME_COUNT+=1
-)
-if !CHROME_COUNT! gtr 0 (
-    call :log     [防护] 已清理 !CHROME_COUNT! 个浏览器僵尸进程 (Chrome/Chromium)
+call :kill_playwright_browsers
+if !PW_BROWSER_COUNT! gtr 0 (
+    call :log     [防护] 已清理 !PW_BROWSER_COUNT! 个浏览器僵尸进程 (Playwright Chrome/Chromium)
 ) else (
     call :log     [防护] 未发现浏览器僵尸进程
 )
@@ -405,10 +479,9 @@ exit /b
 
 :kill_playwright_processes
 set "PW_COUNT=0"
-for /f "tokens=2 delims=," %%p in ('wmic process where "commandline like \'%%playwright%%\' or name=\'playwright.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
-    taskkill /F /PID %%p >nul 2>&1
-    set /a PW_COUNT+=1
-)
+set "PWP_FILTER=name='node.exe' or name='playwright.exe'"
+set "PWP_MATCH=ms-playwright|playwright-core|playwright"
+for /f "delims=" %%c in ('powershell -NoProfile -Command "$n=0; Get-CimInstance Win32_Process -Filter $env:PWP_FILTER | Where-Object { $_.CommandLine -match $env:PWP_MATCH } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $n++ }; $n" 2^>nul') do set "PW_COUNT=%%c"
 if !PW_COUNT! gtr 0 (
     call :log     [防护] 已清理 !PW_COUNT! 个 Playwright 残留进程
 ) else (
@@ -421,40 +494,23 @@ call :log [*] [全面防护] 开始清理所有可能干扰的进程...
 
 set "TOTAL_KILLED=0"
 
-for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'python.exe\' and commandlike \'%%main.py%%\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+for /f "tokens=2 delims=," %%p in ('wmic process where "name='python.exe' and commandline like '%%main.py%%'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
     taskkill /F /PID %%p >nul 2>&1
     set /a TOTAL_KILLED+=1
 )
 
-for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'node.exe\' and commandlike \'%%hostc%%\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+for /f "tokens=2 delims=," %%p in ('wmic process where "name='node.exe' and commandline like '%%hostc%%'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
     taskkill /F /PID %%p >nul 2>&1
     set /a TOTAL_KILLED+=1
 )
 
-for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'cloudflared.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+for /f "tokens=2 delims=," %%p in ('wmic process where "name='cloudflared.exe' and commandline like '%%xy_ws%%'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
     taskkill /F /PID %%p >nul 2>&1
     set /a TOTAL_KILLED+=1
 )
 
-for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'chrome.exe\' or name=\'chromium.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
-    taskkill /F /PID %%p >nul 2>&1
-    set /a TOTAL_KILLED+=1
-)
-
-for /f "tokens=2 delims=," %%p in ('wmic process where "commandline like \'%%playwright%%\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
-    taskkill /F /PID %%p >nul 2>&1
-    set /a TOTAL_KILLED+=1
-)
-
-for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'firefox.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
-    taskkill /F /PID %%p >nul 2>&1
-    set /a TOTAL_KILLED+=1
-)
-
-for /f "tokens=2 delims=," %%p in ('wmic process where "name=\'msedge.exe\'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
-    taskkill /F /PID %%p >nul 2>&1
-    set /a TOTAL_KILLED+=1
-)
+call :kill_playwright_browsers
+set /a TOTAL_KILLED+=!PW_BROWSER_COUNT!
 
 netstat -ano | findstr ":!WEB_PORT!.*LISTENING" >nul 2>&1
 if not errorlevel 1 (
@@ -469,15 +525,46 @@ if !TOTAL_KILLED! gtr 0 (
 ) else (
     call :log     [全面防护] ✅ 系统干净，无干扰进程
 )
+
+set "KILL_RETRY=0"
+
+:kill_residual_retry
+set "RESIDUAL_COUNT=0"
+for /f "tokens=2 delims=," %%p in ('wmic process where "name='python.exe' and commandline like '%%main.py%%'" get processid /format:csv 2^>nul ^| findstr /r "[0-9]"') do (
+    taskkill /F /PID %%p >nul 2>&1
+    set /a RESIDUAL_COUNT+=1
+)
+netstat -ano | findstr ":!WEB_PORT!.*LISTENING" >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":!WEB_PORT!.*LISTENING"') do (
+        taskkill /F /PID %%a >nul 2>&1
+        set /a RESIDUAL_COUNT+=1
+    )
+)
+if !RESIDUAL_COUNT! gtr 0 (
+    set /a TOTAL_KILLED+=!RESIDUAL_COUNT!
+    set /a KILL_RETRY+=1
+    if !KILL_RETRY! lss 3 (
+        ping -n 2 127.0.0.1 >nul 2>&1
+        goto kill_residual_retry
+    )
+    call :log     [全面防护] ⚠️  残留进程清理 !KILL_RETRY! 轮后仍未完全释放
+)
 exit /b
 
 :check_and_fix_playwright
-for /f "delims=" %%v in ('python -c "import playwright; print(playwright.__version__)" 2^>nul') do set "PLAYWRIGHT_VER=%%v"
+set "PLAYWRIGHT_VER="
+for /f "delims=" %%v in ('python -c "from importlib.metadata import version; print(version('playwright'))" 2^>nul') do set "PLAYWRIGHT_VER=%%v"
 if not defined PLAYWRIGHT_VER set "PLAYWRIGHT_VER=unknown"
 
-set "PLAYWRIGHT_BROWSERS_PATH=%USERPROFILE%\AppData\Local\ms-playwright"
-if exist "!PLAYWRIGHT_BROWSERS_PATH!\chromium-*\chrome-win\chrome.exe" (
+set "PW_ENV_PATH="
+if defined PLAYWRIGHT_BROWSERS_PATH set "PW_ENV_PATH=!PLAYWRIGHT_BROWSERS_PATH!"
+
+call :detect_playwright_browsers_path
+if defined PW_FOUND_PATH (
+    set "PLAYWRIGHT_BROWSERS_PATH=!PW_FOUND_PATH!"
     call :log     [Playwright] ✅ Chromium 浏览器驱动正常 (Playwright v!PLAYWRIGHT_VER!)
+    call :log     [Playwright]    驱动目录: !PLAYWRIGHT_BROWSERS_PATH!
     exit /b
 )
 
@@ -486,10 +573,49 @@ call :log     [Playwright] 🔄 正在自动安装 Playwright 浏览器...
 call "!VENV_PATH!\Scripts\activate.bat" >nul 2>&1
 python -m playwright install chromium 2>&1
 
-if exist "!PLAYWRIGHT_BROWSERS_PATH!\chromium-*\chrome-win\chrome.exe" (
+call :detect_playwright_browsers_path
+if defined PW_FOUND_PATH (
+    set "PLAYWRIGHT_BROWSERS_PATH=!PW_FOUND_PATH!"
     call :log     [Playwright] ✅ Chromium 浏览器安装成功
+    call :log     [Playwright]    驱动目录: !PLAYWRIGHT_BROWSERS_PATH!
 ) else (
     call :log     [Playwright] ❌ Chromium 浏览器安装失败，请手动执行：python -m playwright install chromium
+)
+exit /b
+
+:detect_playwright_browsers_path
+set "PW_FOUND_PATH="
+call :probe_browsers_dir "!PW_ENV_PATH!"
+if defined PW_FOUND_PATH exit /b
+call :probe_browsers_dir "%~dp0playwright-browsers"
+if defined PW_FOUND_PATH exit /b
+call :probe_browsers_dir "!LOCALAPPDATA!\ms-playwright"
+if defined PW_FOUND_PATH exit /b
+call :probe_browsers_dir "%USERPROFILE%\AppData%\Local\ms-playwright"
+exit /b
+
+:probe_browsers_dir
+set "PW_PROBE_DIR=%~1"
+if not defined PW_PROBE_DIR exit /b
+if not exist "!PW_PROBE_DIR!" exit /b
+for /d %%d in ("!PW_PROBE_DIR!\chromium-*") do (
+    if exist "%%~fd\chrome-win\chrome.exe" (
+        set "PW_FOUND_PATH=!PW_PROBE_DIR!"
+    ) else if exist "%%~fd\chrome-win64\chrome.exe" (
+        set "PW_FOUND_PATH=!PW_PROBE_DIR!"
+    ) else if exist "%%~fd\chrome-win\headless_shell.exe" (
+        set "PW_FOUND_PATH=!PW_PROBE_DIR!"
+    ) else if exist "%%~fd\chrome-win64\headless_shell.exe" (
+        set "PW_FOUND_PATH=!PW_PROBE_DIR!"
+    )
+)
+if defined PW_FOUND_PATH exit /b
+for /d %%d in ("!PW_PROBE_DIR!\chromium_headless_shell-*") do (
+    if exist "%%~fd\chrome-win\headless_shell.exe" (
+        set "PW_FOUND_PATH=!PW_PROBE_DIR!"
+    ) else if exist "%%~fd\chrome-win64\headless_shell.exe" (
+        set "PW_FOUND_PATH=!PW_PROBE_DIR!"
+    )
 )
 exit /b
 
@@ -512,7 +638,7 @@ goto port_wait_loop
 if %WAIT_COUNT% geq %MAX_WAIT% (
     set "MSG=[WARNING] 端口%WAIT_PORT%等待超时，强制清理..."
     call :log %MSG%
-    for /f "tokens=6" %%p in ('netstat -ano ^| findstr ":%WAIT_PORT%.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
+    for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":%WAIT_PORT%.*LISTENING"') do taskkill /F /PID %%p >nul 2>&1
     ping -n 2 127.0.0.1 >nul 2>&1
 )
 exit /b
@@ -521,7 +647,7 @@ exit /b
 set "DIR_NAME=%~1"
 set "MAX_SIZE=%~2"
 if exist "%DIR_NAME%" (
-    for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path \'%DIR_NAME%\' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum" 2^>nul') do set "DIR_SIZE=%%a"
+    for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path '%DIR_NAME%' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum" 2^>nul') do set "DIR_SIZE=%%a"
     if defined DIR_SIZE if !DIR_SIZE! gtr %MAX_SIZE% (
         rd /s /q "%DIR_NAME%" >nul 2>&1
         mkdir "%DIR_NAME%" >nul 2>&1
@@ -595,11 +721,15 @@ if not defined PYTHON_CMD (
     for /f "delims=" %%v in ('"!PYTHON_CMD!" --version 2^>nul') do set "CUR_PY_VER=%%v"
     call :log     当前Python版本: !CUR_PY_VER!
     
-    call :check_python_latest_version !CUR_PY_VER!
-    if errorlevel 1 (
-        call :log [提示] 检测到Python有新版本，如需升级请手动执行: winget install Python.Python.3.12
+    call :check_python_latest_version "!CUR_PY_VER!"
+    if errorlevel 2 (
+        call :log [*] 已跳过 Python 版本升级检查
     ) else (
-        call :log [*] Python已是最新版本
+        if errorlevel 1 (
+            call :log [提示] 检测到Python有新版本，如需升级请手动执行: winget upgrade Python.Python.3
+        ) else (
+            call :log [*] Python已是最新版本
+        )
     )
 )
 
@@ -632,24 +762,20 @@ exit /b 0
 
 :get_latest_python_version
 set "PYTHON_LATEST_VERSION="
+set "PY_VER_PATTERN=3\.(\d+)\.(\d+)/"
 call :log 正在获取Python最新版本（使用国内镜像）...
 
-:: 方法1: npmmirror国内镜像（优先）
-for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://registry.npmmirror.com/-/binary/python/ 2^>nul ^| powershell -NoProfile -Command "$input -split '\n' | Select-String -Pattern 'href=.+python-3\.\d+\.\d+' | Select-Object -Last 1 | ForEach-Object { if ($_ -match 'python-(3\.\d+\.\d+)') { $matches[1] } }"') do set "PYTHON_LATEST_VERSION=%%v"
+:: 方法1: 华为云镜像（目录名即版本号，如 3.16.0/）
+for /f "delims=" %%v in ('curl.exe -sL --connect-timeout 8 --max-time 20 https://mirrors.huaweicloud.com/python/ 2^>nul ^| powershell -NoProfile -Command "$s = ($input | Out-String); $m = [regex]::Matches($s, $env:PY_VER_PATTERN); $v = $m | ForEach-Object { $_.Value.TrimEnd([char]47) } | Sort-Object { [version]$_ } -Descending | Select-Object -First 1; if ($v) { $v }"') do set "PYTHON_LATEST_VERSION=%%v"
 
-:: 方法2: 华为云镜像
+:: 方法2: 清华镜像
 if not defined PYTHON_LATEST_VERSION (
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/python/ 2^>nul ^| powershell -NoProfile -Command "$input -split '\n' | Select-String -Pattern 'href=.+python-3\.\d+\.\d+' | Select-Object -Last 1 | ForEach-Object { if ($_ -match 'python-(3\.\d+\.\d+)') { $matches[1] } }"') do set "PYTHON_LATEST_VERSION=%%v"
-)
-
-:: 方法3: 清华镜像
-if not defined PYTHON_LATEST_VERSION (
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/python/ 2^>nul ^| powershell -NoProfile -Command "$input -split '\n' | Select-String -Pattern 'href=.+python-3\.\d+\.\d+' | Select-Object -Last 1 | ForEach-Object { if ($_ -match 'python-(3\.\d+\.\d+)') { $matches[1] } }"') do set "PYTHON_LATEST_VERSION=%%v"
+    for /f "delims=" %%v in ('curl.exe -sL --connect-timeout 8 --max-time 20 https://mirrors.tuna.tsinghua.edu.cn/python/ 2^>nul ^| powershell -NoProfile -Command "$s = ($input | Out-String); $m = [regex]::Matches($s, $env:PY_VER_PATTERN); $v = $m | ForEach-Object { $_.Value.TrimEnd([char]47) } | Sort-Object { [version]$_ } -Descending | Select-Object -First 1; if ($v) { $v }"') do set "PYTHON_LATEST_VERSION=%%v"
 )
 
 if not defined PYTHON_LATEST_VERSION (
-    call :log [WARNING] 所有国内镜像获取失败，使用安全默认值
-    set "PYTHON_LATEST_VERSION=3.14.0"
+    call :log [WARNING] 所有国内镜像获取失败，跳过Python版本对比
+    exit /b 0
 )
 
 call :log 检测到Python最新版本: %PYTHON_LATEST_VERSION%
@@ -695,14 +821,20 @@ for /L %%i in (0,1,2) do (
     for /f "tokens=1,2 delims=|" %%a in ("!PY_MIRRORS[%%i]!") do (
         set "PM_URL=%%a"
         set "PM_NAME=%%b"
+        set "PM_TIME="
+        set "PM_INT="
         for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 2 --max-time 3 "!PM_URL!" 2^>nul') do set "PM_TIME=%%t"
         if defined PM_TIME if not "!PM_TIME!"=="0" if not "!PM_TIME!"=="0.000000" (
             for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!PM_TIME!*1000)" 2^>nul') do set "PM_INT=%%m"
-            if defined PM_INT if !PM_INT! LSS !PY_MIN_TIME! (
+        )
+        if defined PM_INT (
+            call :log         !PM_NAME!: !PM_TIME!s [!PM_INT!ms]
+            if !PM_INT! LSS !PY_MIN_TIME! (
                 set "PY_MIN_TIME=!PM_INT!"
                 set "PY_BEST_URL=!PM_URL!"
-                call :log         !PM_NAME!: !PM_TIME!s [!PM_INT!ms]
             )
+        ) else (
+            call :log         !PM_NAME!: 超时/失败
         )
     )
 )
@@ -737,10 +869,14 @@ if not errorlevel 1 (
     call :log     当前Node.js版本: !CUR_NODE_VER!
     
     call :check_node_latest_version !CUR_NODE_VER!
-    if errorlevel 1 (
-        call :log [提示] 检测到Node.js有新版本，如需升级请手动执行: winget install OpenJS.NodeJS.LTS
+    if errorlevel 2 (
+        call :log [*] 已跳过 Node.js 版本升级检查
     ) else (
-        call :log [*] Node.js !CUR_NODE_VER! 已是最新版本
+        if errorlevel 1 (
+            call :log [提示] 检测到Node.js有新版本，如需升级请手动执行: winget upgrade OpenJS.NodeJS.LTS
+        ) else (
+            call :log [*] Node.js !CUR_NODE_VER! 已是最新版本
+        )
     )
     
     goto :node_verify_install
@@ -775,22 +911,22 @@ exit /b 0
 set "NODE_LATEST_VERSION="
 call :log 正在获取Node.js最新版本（使用国内镜像）...
 
-:: 方法1: npmmirror国内镜像（优先，直接获取index.json）
-for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://npmmirror.com/mirrors/node/index.json 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json)[0].version } catch {}"') do set "NODE_LATEST_VERSION=%%v"
+:: 方法1: npmmirror国内镜像（优先，取最新的 LTS 稳定版，跳过 alpha/beta 等预发布版）
+for /f "delims=" %%v in ('curl.exe -sL --connect-timeout 8 --max-time 20 https://npmmirror.com/mirrors/node/index.json 2^>nul ^| powershell -NoProfile -Command "try { $j = ($input | Out-String | ConvertFrom-Json); $v = $j | Where-Object { $_.lts -ne $false } | Select-Object -First 1; if ($v) { $v.version } } catch {}"') do set "NODE_LATEST_VERSION=%%v"
 
 :: 方法2: 华为云镜像
 if not defined NODE_LATEST_VERSION (
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/nodejs/index.json 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json)[0].version } catch {}"') do set "NODE_LATEST_VERSION=%%v"
+    for /f "delims=" %%v in ('curl.exe -sL --connect-timeout 8 --max-time 20 https://mirrors.huaweicloud.com/nodejs/index.json 2^>nul ^| powershell -NoProfile -Command "try { $j = ($input | Out-String | ConvertFrom-Json); $v = $j | Where-Object { $_.lts -ne $false } | Select-Object -First 1; if ($v) { $v.version } } catch {}"') do set "NODE_LATEST_VERSION=%%v"
 )
 
 :: 方法3: 清华镜像
 if not defined NODE_LATEST_VERSION (
-    for /f "delims=" %%v in ('curl.exe -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/index.json 2^>nul ^| powershell -NoProfile -Command "try { ($input | ConvertFrom-Json)[0].version } catch {}"') do set "NODE_LATEST_VERSION=%%v"
+    for /f "delims=" %%v in ('curl.exe -sL --connect-timeout 8 --max-time 20 https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/index.json 2^>nul ^| powershell -NoProfile -Command "try { $j = ($input | Out-String | ConvertFrom-Json); $v = $j | Where-Object { $_.lts -ne $false } | Select-Object -First 1; if ($v) { $v.version } } catch {}"') do set "NODE_LATEST_VERSION=%%v"
 )
 
 if not defined NODE_LATEST_VERSION (
-    call :log [WARNING] 所有国内镜像获取失败，使用安全默认值
-    set "NODE_LATEST_VERSION=v20.20.1"
+    call :log [WARNING] 所有国内镜像获取失败，跳过Node.js版本对比
+    exit /b 0
 )
 
 call :log 检测到Node.js最新版本: %NODE_LATEST_VERSION%
@@ -798,6 +934,7 @@ exit /b
 
 :auto_install_node
 call :get_latest_node_version
+if not defined NODE_LATEST_VERSION set "NODE_LATEST_VERSION=v22.11.0"
 call :log     检测到Node.js最新版本: %NODE_LATEST_VERSION%
 
 where winget >nul 2>&1
@@ -879,18 +1016,28 @@ for /L %%i in (0,1,3) do (
     for /f "tokens=1,2 delims=|" %%a in ("!MIRRORS[%%i]!") do (
         set "MIRROR_URL=%%a"
         set "MIRROR_NAME=%%b"
+        set "TEST_TIME="
+        set "PIP_INT_TIME="
+        set "HTTP_CODE="
         call :log     测试 !MIRROR_NAME!...
         
-        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 8 --max-time 15 "!MIRROR_URL!" 2^>nul') do set "TEST_TIME=%%t"
+        for /f "tokens=1,2 delims=:" %%c in ('curl.exe -s -I -o NUL -w "%%{http_code}:%%{time_total}" --connect-timeout 5 --max-time 8 "!MIRROR_URL!" 2^>nul') do (
+            set "HTTP_CODE=%%c"
+            set "TEST_TIME=%%d"
+        )
         
-        if defined TEST_TIME if not "!TEST_TIME!"=="0" if not "!TEST_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!TEST_TIME!*1000)" 2^>nul') do set "PIP_INT_TIME=%%m"
-            
-            if defined PIP_INT_TIME if !PIP_INT_TIME! LSS !MIN_TIME! (
+        if defined HTTP_CODE if not "!HTTP_CODE!"=="000" if not "!HTTP_CODE!"=="0000" if defined TEST_TIME (
+            if not "!TEST_TIME!"=="0" if not "!TEST_TIME!"=="0.000000" (
+                for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!TEST_TIME!*1000)" 2^>nul') do set "PIP_INT_TIME=%%m"
+            )
+        )
+        
+        if defined PIP_INT_TIME (
+            call :log         !MIRROR_NAME!: !TEST_TIME!秒 [!PIP_INT_TIME!ms]
+            if !PIP_INT_TIME! LSS !MIN_TIME! (
                 set "MIN_TIME=!PIP_INT_TIME!"
                 set "BEST_MIRROR=!MIRROR_URL!"
                 set "BEST_NAME=!MIRROR_NAME!"
-                call :log         !MIRROR_NAME!: !TEST_TIME!秒 [!PIP_INT_TIME!ms]
             )
         ) else (
             call :log         !MIRROR_NAME!: 超时/失败
@@ -916,27 +1063,45 @@ set "HOSTC_MIRRORS[1]=https://repo.huaweicloud.com/repository/npm/|华为云"
 set "HOSTC_MIRRORS[2]=https://registry.npmjs.org|官方源"
 
 set "HOSTC_BEST_MIRROR=https://registry.npmmirror.com"
+set "HOSTC_BEST_NAME=npmmirror淘宝"
+set "HOSTC_MIN_TIME=9999"
 
 for /L %%i in (0,1,2) do (
     for /f "tokens=1,2 delims=|" %%a in ("!HOSTC_MIRRORS[%%i]!") do (
         set "H_URL=%%a"
         set "H_NAME=%%b"
+        set "H_TIME="
+        set "H_INT="
+        set "H_CODE="
         
-        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 3 "!H_URL!" 2^>nul') do set "H_TIME=%%t"
+        for /f "tokens=1,2 delims=:" %%c in ('curl.exe -s -I -o NUL -w "%%{http_code}:%%{time_total}" --connect-timeout 5 --max-time 8 "!H_URL!" 2^>nul') do (
+            set "H_CODE=%%c"
+            set "H_TIME=%%d"
+        )
         
-        if defined H_TIME if not "!H_TIME!"=="0" if not "!H_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!H_TIME!*1000)" 2^>nul') do set "H_INT=%%m"
-            
-            if defined H_INT if !H_INT! LSS 9999 (
-                set "HOSTC_BEST_MIRROR=!H_URL!"
-                call :log     测试 !H_NAME!: !H_TIME!秒 [!H_INT!ms]
+        if defined H_CODE if not "!H_CODE!"=="000" if not "!H_CODE!"=="0000" if defined H_TIME (
+            if not "!H_TIME!"=="0" if not "!H_TIME!"=="0.000000" (
+                for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!H_TIME!*1000)" 2^>nul') do set "H_INT=%%m"
             )
+        )
+        
+        if defined H_INT (
+            call :log     测试 !H_NAME!: !H_TIME!秒 [!H_INT!ms]
+            if !H_INT! LSS !HOSTC_MIN_TIME! (
+                set "HOSTC_MIN_TIME=!H_INT!"
+                set "HOSTC_BEST_MIRROR=!H_URL!"
+                set "HOSTC_BEST_NAME=!H_NAME!"
+            )
+        ) else (
+            call :log     测试 !H_NAME!: 超时/失败
         )
     )
 )
 
+call :log [*] 最快hostc镜像: !HOSTC_BEST_NAME! [!HOSTC_MIN_TIME!ms]
+
 call :log [*] 使用最佳镜像安装 hostc...
-npm install hostc@latest --registry "!HOSTC_BEST_MIRROR!" --prefix dist 2>nul
+call npm install hostc@latest --registry "!HOSTC_BEST_MIRROR!" --prefix "%~dp0dist" 2>nul
 if errorlevel 1 (
     call :log [ERROR] hostc 安装失败
 ) else (
@@ -953,25 +1118,38 @@ exit /b %ERRORLEVEL%
 set "CURRENT_VER=%~1"
 if not defined CURRENT_VER (
     call :log [WARNING] 无法获取当前 hostc 版本，跳过版本检查
-    exit /b 0
+    exit /b 2
 )
 
 call :log [*] 检查 hostc 最新版本...
 
 :: 获取最新版本号（使用 npm view 命令）
+set "LATEST_VER="
 for /f "delims=" %%v in ('npm view hostc version 2^>nul') do set "LATEST_VER=%%v"
 
 if not defined LATEST_VER (
     call :log [WARNING] 无法获取 hostc 最新版本信息，跳过升级检查
-    exit /b 0
+    exit /b 2
 )
 
 call :log     当前版本: v!CURRENT_VER!
 call :log     最新版本: v!LATEST_VER!
 
 :: 简单的版本比较（仅比较主版本号.次版本号.修订号）
+set "CUR_MAJOR="
+set "CUR_MINOR="
+set "CUR_PATCH="
+set "LAT_MAJOR="
+set "LAT_MINOR="
+set "LAT_PATCH="
 for /f "tokens=1,2,3 delims=." %%a in ("!CURRENT_VER!") do set "CUR_MAJOR=%%a" & set "CUR_MINOR=%%b" & set "CUR_PATCH=%%c"
 for /f "tokens=1,2,3 delims=." %%a in ("!LATEST_VER!") do set "LAT_MAJOR=%%a" & set "LAT_MINOR=%%b" & set "LAT_PATCH=%%c"
+if not defined CUR_MAJOR set "CUR_MAJOR=0"
+if not defined CUR_MINOR set "CUR_MINOR=0"
+if not defined CUR_PATCH set "CUR_PATCH=0"
+if not defined LAT_MAJOR set "LAT_MAJOR=0"
+if not defined LAT_MINOR set "LAT_MINOR=0"
+if not defined LAT_PATCH set "LAT_PATCH=0"
 
 :: 比较主版本号
 if !CUR_MAJOR! LSS !LAT_MAJOR! (
@@ -1000,16 +1178,24 @@ exit /b 0
 set "CUR_NODE_VER=%~1"
 if not defined CUR_NODE_VER (
     call :log [WARNING] 无法获取当前 Node.js 版本，跳过版本检查
-    exit /b 0
+    exit /b 2
 )
 call :log [*] 检查 Node.js 最新版本...
 call :get_latest_node_version
+if not defined NODE_LATEST_VERSION exit /b 2
 for /f "tokens=1 delims=v" %%a in ("!CUR_NODE_VER!") do set "CUR_NODE_NUM=%%a"
 for /f "tokens=1 delims=v" %%a in ("!NODE_LATEST_VERSION!") do set "LAT_NODE_NUM=%%a"
+if not defined LAT_NODE_NUM set "LAT_NODE_NUM=!NODE_LATEST_VERSION!"
 call :log     当前版本: v!CUR_NODE_NUM!
 call :log     最新版本: !NODE_LATEST_VERSION!
 for /f "tokens=1,2,3 delims=." %%a in ("!CUR_NODE_NUM!") do set "CN_MAJ=%%a" & set "CN_MIN=%%b" & set "CN_PAT=%%c"
 for /f "tokens=1,2,3 delims=." %%a in ("!LAT_NODE_NUM!") do set "LN_MAJ=%%a" & set "LN_MIN=%%b" & set "LN_PAT=%%c"
+if not defined CN_MAJ set "CN_MAJ=0"
+if not defined CN_MIN set "CN_MIN=0"
+if not defined CN_PAT set "CN_PAT=0"
+if not defined LN_MAJ set "LN_MAJ=0"
+if not defined LN_MIN set "LN_MIN=0"
+if not defined LN_PAT set "LN_PAT=0"
 if !CN_MAJ! LSS !LN_MAJ! exit /b 1
 if !CN_MAJ! GTR !LN_MAJ! exit /b 0
 if !CN_MIN! LSS !LN_MIN! exit /b 1
@@ -1021,12 +1207,14 @@ exit /b 0
 set "CUR_PY_VER_STR=%~1"
 if not defined CUR_PY_VER_STR (
     call :log [WARNING] 无法获取当前 Python 版本，跳过版本检查
-    exit /b 0
+    exit /b 2
 )
 call :log [*] 检查 Python 最新版本...
 call :get_latest_python_version
+if not defined PYTHON_LATEST_VERSION exit /b 2
 set "CUR_PY_NUM="
-for /f "delims=" %%a in ('echo !CUR_PY_VER_STR! ^| powershell -NoProfile -Command "if ($input -match '(\d+\.\d+\.\d+)') { $matches[1] } else { $input.Trim() }"') do set "CUR_PY_NUM=%%a"
+set "PY_CUR_PATTERN=(\d+\.\d+\.\d+)"
+for /f "delims=" %%a in ('echo !CUR_PY_VER_STR! ^| powershell -NoProfile -Command "$s = ($input | Out-String).Trim(); if ($s -match $env:PY_CUR_PATTERN) { $matches[1] } else { $s }"') do set "CUR_PY_NUM=%%a"
 if not defined CUR_PY_NUM set "CUR_PY_NUM=!CUR_PY_VER_STR!"
 for /f "tokens=1,2,3 delims=." %%a in ("!CUR_PY_NUM!") do set "CP_MAJ=%%a" & set "CP_MIN=%%b" & set "CP_PAT=%%c"
 for /f "tokens=1,2,3 delims=." %%a in ("!PYTHON_LATEST_VERSION!") do set "LP_MAJ=%%a" & set "LP_MIN=%%b" & set "LP_PAT=%%c"
@@ -1047,27 +1235,57 @@ exit /b 0
 
 :check_git_latest_version
 call :get_latest_git_version
+if not defined GIT_LATEST_VERSION exit /b 2
+set "CUR_GIT_FULL="
 for /f "delims=" %%v in ('git --version 2^>nul') do set "CUR_GIT_FULL=%%v"
 for /f "tokens=3 delims= " %%a in ("!CUR_GIT_FULL!") do set "CUR_GIT_NUM=%%a"
-for /f "tokens=1 delims=v" %%a in ("!GIT_LATEST_VERSION!") do set "LAT_GIT_NUM=%%a"
 if not defined CUR_GIT_NUM (
     call :log [WARNING] 无法获取当前 Git 版本，跳过版本检查
-    exit /b 0
+    exit /b 2
 )
-call :log     当前版本: !CUR_GIT_NUM!
-call :log     最新版本: v!LAT_GIT_NUM!
-for /f "tokens=1,2,3 delims=." %%a in ("!CUR_GIT_NUM!") do set "CG_MAJ=%%a" & set "CG_MIN=%%b" & set "CG_PAT=%%c"
-for /f "tokens=1,2,3 delims=." %%a in ("!LAT_GIT_NUM!") do set "LG_MAJ=%%a" & set "LG_MIN=%%b" & set "LG_PAT=%%c"
+set "CUR_GIT_RAW=!CUR_GIT_NUM!"
+set "LAT_GIT_RAW=!GIT_LATEST_VERSION!"
+set "CUR_GIT_NUM=!CUR_GIT_RAW:.windows.=.!"
+set "LAT_GIT_NUM=!LAT_GIT_RAW:.windows.=.!"
+call :log     当前版本: v!CUR_GIT_RAW!
+call :log     最新版本: v!LAT_GIT_RAW!
+set "CG_MAJ=" & set "CG_MIN=" & set "CG_PAT=" & set "CG_BLD="
+set "LG_MAJ=" & set "LG_MIN=" & set "LG_PAT=" & set "LG_BLD="
+set "CG_HAS_BLD=0"
+for /f "tokens=1,2,3,4 delims=." %%a in ("!CUR_GIT_NUM!") do (
+    set "CG_MAJ=%%a"
+    set "CG_MIN=%%b"
+    set "CG_PAT=%%c"
+    set "CG_BLD=%%d"
+)
+if defined CG_BLD set "CG_HAS_BLD=1"
+for /f "tokens=1,2,3,4 delims=." %%a in ("!LAT_GIT_NUM!") do (
+    set "LG_MAJ=%%a"
+    set "LG_MIN=%%b"
+    set "LG_PAT=%%c"
+    set "LG_BLD=%%d"
+)
+if not defined CG_MAJ set "CG_MAJ=0"
+if not defined CG_MIN set "CG_MIN=0"
+if not defined CG_PAT set "CG_PAT=0"
+if not defined CG_BLD set "CG_BLD=0"
+if not defined LG_MAJ set "LG_MAJ=0"
+if not defined LG_MIN set "LG_MIN=0"
+if not defined LG_PAT set "LG_PAT=0"
+if not defined LG_BLD set "LG_BLD=0"
 if !CG_MAJ! LSS !LG_MAJ! exit /b 1
 if !CG_MAJ! GTR !LG_MAJ! exit /b 0
 if !CG_MIN! LSS !LG_MIN! exit /b 1
 if !CG_MIN! GTR !LG_MIN! exit /b 0
 if !CG_PAT! LSS !LG_PAT! exit /b 1
+if !CG_PAT! GTR !LG_PAT! exit /b 0
+if not "!CG_HAS_BLD!"=="1" exit /b 0
+if !CG_BLD! LSS !LG_BLD! exit /b 1
 exit /b 0
 
 :install_cloudflared
 call :log [*] 安装 cloudflared...
-npm install cloudflared@latest --prefix dist 2>nul
+call npm install cloudflared@latest --prefix "%~dp0dist" 2>nul
 if errorlevel 1 (
     call :log [WARNING] cloudflared 安装失败，Cloudflare隧道将不可用
 ) else (
@@ -1076,22 +1294,20 @@ if errorlevel 1 (
 exit /b 0
 
 :check_cloudflared_latest_version
-set "CUR_CFD_VER=%~1"
-if not defined CUR_CFD_VER (
-    call :log [WARNING] 无法获取当前 cloudflared 版本，跳过版本检查
-    exit /b 0
+set "CUR_CFD_NUM="
+for /f "tokens=2 delims=@" %%v in ('npm ls cloudflared --prefix "%~dp0dist" --depth=0 2^>nul ^| findstr /c:"cloudflared@"') do set "CUR_CFD_NUM=%%v"
+if not defined CUR_CFD_NUM (
+    call :log [WARNING] 未检测到 npm 安装的 cloudflared（系统安装不参与版本对比）
+    exit /b 2
 )
 call :log [*] 检查 cloudflared 最新版本...
 for /f "delims=" %%v in ('npm view cloudflared version 2^>nul') do set "CFD_LATEST_VER=%%v"
 if not defined CFD_LATEST_VER (
     call :log [WARNING] 无法获取 cloudflared 最新版本信息，跳过升级检查
-    exit /b 0
+    exit /b 2
 )
-set "CUR_CFD_NUM="
-for /f "delims=" %%a in ('echo !CUR_CFD_VER! ^| powershell -NoProfile -Command "if ($input -match '(\d+\.\d+\.\d+)') { $matches[1] } else { $input.Trim() }"') do set "CUR_CFD_NUM=%%a"
-if not defined CUR_CFD_NUM set "CUR_CFD_NUM=!CUR_CFD_VER!"
-call :log     当前版本: !CUR_CFD_NUM!
-call :log     最新版本: !CFD_LATEST_VER!
+call :log     当前包版本: !CUR_CFD_NUM!
+call :log     最新包版本: !CFD_LATEST_VER!
 for /f "tokens=1,2,3 delims=." %%a in ("!CUR_CFD_NUM!") do set "CC_MAJ=%%a" & set "CC_MIN=%%b" & set "CC_PAT=%%c"
 for /f "tokens=1,2,3 delims=." %%a in ("!CFD_LATEST_VER!") do set "LC_MAJ=%%a" & set "LC_MIN=%%b" & set "LC_PAT=%%c"
 if not defined CC_MAJ set "CC_MAJ=0"
@@ -1127,18 +1343,28 @@ for /L %%i in (0,1,1) do (
     for /f "tokens=1,2 delims=|" %%a in ("!NPM_MIRRORS[%%i]!") do (
         set "NPM_URL=%%a"
         set "NPM_NAME=%%b"
+        set "NPM_TEST_TIME="
+        set "NPM_INT_TIME="
+        set "NPM_HTTP_CODE="
         call :log     测试 !NPM_NAME!...
         
-        for /f "delims=" %%t in ('curl.exe -s -o NUL -w "%%{time_total}" --connect-timeout 8 --max-time 15 "!NPM_URL!" 2^>nul') do set "NPM_TEST_TIME=%%t"
+        for /f "tokens=1,2 delims=:" %%c in ('curl.exe -s -I -o NUL -w "%%{http_code}:%%{time_total}" --connect-timeout 5 --max-time 8 "!NPM_URL!" 2^>nul') do (
+            set "NPM_HTTP_CODE=%%c"
+            set "NPM_TEST_TIME=%%d"
+        )
         
-        if defined NPM_TEST_TIME if not "!NPM_TEST_TIME!"=="0" if not "!NPM_TEST_TIME!"=="0.000000" (
-            for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!NPM_TEST_TIME!*1000)" 2^>nul') do set "NPM_INT_TIME=%%m"
-            
-            if defined NPM_INT_TIME if !NPM_INT_TIME! LSS !NPM_MIN_TIME! (
+        if defined NPM_HTTP_CODE if not "!NPM_HTTP_CODE!"=="000" if not "!NPM_HTTP_CODE!"=="0000" if defined NPM_TEST_TIME (
+            if not "!NPM_TEST_TIME!"=="0" if not "!NPM_TEST_TIME!"=="0.000000" (
+                for /f "delims=" %%m in ('powershell -NoProfile -Command "[int]([double]!NPM_TEST_TIME!*1000)" 2^>nul') do set "NPM_INT_TIME=%%m"
+            )
+        )
+        
+        if defined NPM_INT_TIME (
+            call :log         !NPM_NAME!: !NPM_TEST_TIME!秒 [!NPM_INT_TIME!ms]
+            if !NPM_INT_TIME! LSS !NPM_MIN_TIME! (
                 set "NPM_MIN_TIME=!NPM_INT_TIME!"
                 set "NPM_BEST_MIRROR=!NPM_URL!"
                 set "NPM_BEST_NAME=!NPM_NAME!"
-                call :log         !NPM_NAME!: !NPM_TEST_TIME!秒 [!NPM_INT_TIME!ms]
             )
         ) else (
             call :log         !NPM_NAME!: 超时/失败
@@ -1149,7 +1375,7 @@ for /L %%i in (0,1,1) do (
 if "!NPM_BEST_MIRROR!"=="" (
     call :log [WARNING] NPM镜像测试失败，强制使用淘宝源（范式规定：禁止官方源）
     set "FASTEST_NPM_MIRROR=https://registry.npmmirror.com"
-    npm config set registry "!FASTEST_NPM_MIRROR!"
+    call npm config set registry "!FASTEST_NPM_MIRROR!"
     call :log [*] NPM镜像已设置为: !FASTEST_NPM_MIRROR!
 
     call :log [*] 持久化NPM镜像到系统环境变量...
@@ -1160,7 +1386,7 @@ if "!NPM_BEST_MIRROR!"=="" (
     call :log_blank
     call :log [*] 最快NPM镜像: !NPM_BEST_NAME! [!NPM_MIN_TIME!毫秒]
     
-    npm config set registry "!NPM_BEST_MIRROR!"
+    call npm config set registry "!NPM_BEST_MIRROR!"
     call :log [*] NPM镜像已设置为: !NPM_BEST_MIRROR!
 
     call :log [*] 持久化NPM镜像到系统环境变量...
@@ -1341,6 +1567,20 @@ for /f "delims=0123456789" %%c in ("!WEB_PORT!") do set "WEB_PORT=8888"
 if !WEB_PORT! lss 1 set "WEB_PORT=8888"
 if !WEB_PORT! gtr 65535 set "WEB_PORT=8888"
 
+netstat -ano | findstr ":!WEB_PORT!.*LISTENING" >nul 2>&1
+if not errorlevel 1 (
+    call :log [WARNING] 端口 !WEB_PORT! 已被占用，正在强制释放...
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":!WEB_PORT!.*LISTENING"') do taskkill /F /PID %%a >nul 2>&1
+    ping -n 4 127.0.0.1 >nul 2>&1
+)
+netstat -ano | findstr ":!WEB_PORT!.*LISTENING" >nul 2>&1
+if not errorlevel 1 (
+    call :log [ERROR] 端口 !WEB_PORT! 仍被其他进程占用，已中止启动以避免端口冲突循环
+    call :log [ERROR] 请手动关闭占用该端口的进程，或设置 WEB_PORT 环境变量使用其他端口
+    pause
+    exit /b 1
+)
+
 call :ms_timestamp
 call :log [!TIMESTAMP!] === Web服务启动 ===
 
@@ -1391,7 +1631,7 @@ for /f "delims=" %%l in ('findstr /C:"局域网地址:" "!LOG_FILE!" 2^>nul') do
 )
 
 if not defined LAN_ADDR (
-    for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch \'^(169\.254|127\.)\' } | Select-Object -First 1 -ExpandProperty IPAddress" 2^>nul') do (
+    for /f "delims=" %%i in ('powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -match '^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' -and $_.InterfaceAlias -notmatch '(vEthernet|WSL|Docker|VMware|VirtualBox|Loopback|Tailscale|ZeroTier)' } | Select-Object -First 1 -ExpandProperty IPAddress" 2^>nul') do (
         set "LAN_ADDR=http://%%i:!WEB_PORT!"
     )
 )

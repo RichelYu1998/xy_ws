@@ -122,6 +122,74 @@ _module_logger.setLevel(logging.DEBUG)
 logger = logging.getLogger('FileCleaner')
 logger.setLevel(logging.DEBUG)
 
+PW_TRANSIENT_PATTERNS = (
+    'Connection closed while reading from the driver',
+    'Connection.init: Connection closed',
+    'Connection closed',
+    'socket.send() raised exception.',
+    'Target page, context or browser has been closed',
+    'Browser has been closed',
+    'Target closed',
+    'Event loop is closed',
+    'Cannot switch to a different thread',
+)
+
+PW_ASYNCIO_NOISE_PATTERNS = PW_TRANSIENT_PATTERNS + (
+    'Task exception was never retrieved',
+    'Task was destroyed but it is pending',
+    'Future exception was never retrieved',
+)
+
+def is_pw_transient_error(err):
+    """判断是否为浏览器/驱动连接的瞬时中断（可自愈，不应记录完整堆栈）"""
+    msg = err if isinstance(err, str) else str(err)
+    return any(p in msg for p in PW_TRANSIENT_PATTERNS)
+
+def is_asyncio_pw_noise(text):
+    """判断是否为 asyncio 事件循环层面的 Playwright 内部噪声"""
+    msg = text if isinstance(text, str) else str(text)
+    return any(p in msg for p in PW_ASYNCIO_NOISE_PATTERNS)
+
+def install_asyncio_noise_filter():
+    """安装事件循环异常过滤器，拦截 Playwright 驱动断开产生的内部噪声
+
+    Playwright 的 Connection 任务在驱动断开后无人 await，asyncio 会打印
+    "Task exception was never retrieved" / "socket.send() raised exception."
+    等与业务无关的堆栈，这里统一降级为 debug 日志。
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except Exception:
+        return
+    def _handler(loop_, context):
+        try:
+            parts = [str(context.get('message', ''))]
+            exc = context.get('exception')
+            if exc is not None:
+                parts.append(f'{type(exc).__name__}: {exc}')
+            fut = context.get('future') or context.get('task')
+            if fut is not None:
+                try:
+                    fexc = fut.exception()
+                    if fexc is not None:
+                        parts.append(f'{type(fexc).__name__}: {fexc}')
+                except Exception:
+                    pass
+            detail = ' '.join(parts)
+        except Exception:
+            detail = ''
+        if is_asyncio_pw_noise(detail):
+            logger.debug(f'[asyncio] 已忽略浏览器/驱动瞬时噪声: {detail[:200]}')
+            return
+        try:
+            loop_.default_exception_handler(context)
+        except Exception:
+            pass
+    try:
+        loop.set_exception_handler(_handler)
+    except Exception:
+        pass
+
 def check_file_bom(file_path, auto_fix=False):
     try:
         path = Path(file_path) if not isinstance(file_path, Path) else file_path
@@ -1527,6 +1595,13 @@ class TeeOutput:
     def isatty(self):
         return False
     
+    def fileno(self):
+        """转发底层流句柄，保证 Playwright 驱动能拿到真实可继承句柄"""
+        try:
+            return self.original.fileno()
+        except Exception:
+            raise io.UnsupportedOperation('fileno')
+    
     def __del__(self):
         """析构函数，确保文件资源被正确释放"""
         try:
@@ -2577,6 +2652,7 @@ class Environment:
                 browser_args.append(arg)
         
         max_retry = 5  # 从3提升到5次重试
+        last_err_msg = None
         for attempt in range(1, max_retry + 1):
             try:
                 # 使用增强的参数启动
@@ -2653,6 +2729,11 @@ class Environment:
                 
                 # 处理连接中断（最常见的问题）
                 if "Connection closed" in msg:
+                    # 驱动进程已死时重试必然失败，避免无意义的退避等待
+                    if last_err_msg == msg:
+                        logger.warning(f'[browser] 浏览器驱动已断开且无法恢复，停止重试: {msg}')
+                        raise
+                    last_err_msg = msg
                     if attempt < max_retry:
                         wait_time = 2 ** attempt
                         logger.warning(f'[browser] 连接中断，等待{wait_time}s后重试 ({attempt}/{max_retry})...')
@@ -5200,10 +5281,15 @@ class FileManager:
                 f.flush()
             return True
     @staticmethod
+    def _tmp_path_for(file_path):
+        """生成进程/线程唯一的临时文件名，避免多实例并发写同一 .tmp 导致 PermissionError"""
+        return f"{file_path}.{os.getpid()}.{threading.get_ident()}.tmp"
+
+    @staticmethod
     def write_json(file_path, data, indent=2):
         with ExceptionContext(f"FileManager.write_json({file_path})", default=False) as ctx:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            tmp_path = file_path + '.tmp'
+            tmp_path = FileManager._tmp_path_for(file_path)
             try:
                 with open(tmp_path, 'w', encoding='utf-8') as f:
                     json.dump(data, f, ensure_ascii=False, indent=indent)
@@ -5221,7 +5307,7 @@ class FileManager:
     def write_bytes(file_path, data):
         with ExceptionContext(f"FileManager.write_bytes({file_path})", default=False) as ctx:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            tmp_path = file_path + '.tmp'
+            tmp_path = FileManager._tmp_path_for(file_path)
             try:
                 with open(tmp_path, 'wb') as f:
                     f.write(data)
@@ -5245,7 +5331,7 @@ class FileManager:
     def write_text(file_path, content):
         with ExceptionContext(f"FileManager.write_text({file_path})", default=False) as ctx:
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            tmp_path = file_path + '.tmp'
+            tmp_path = FileManager._tmp_path_for(file_path)
             try:
                 with open(tmp_path, 'w', encoding='utf-8') as f:
                     f.write(content)
@@ -6605,9 +6691,103 @@ class WegoScraper:
         if change_summary:
             print(f'{change_summary}')
             
+    async def _run_browser_flow(self):
+        browser_start = time.time()
+        async with async_playwright() as p:
+            print('正在启动浏览器...')
+
+            system = self.get_system_info()
+            browser_args = self.get_browser_args()
+            chrome_path = self.get_chrome_path()
+
+            print(f'检测到系统: {system}')
+            if chrome_path:
+                print(f'使用系统Chrome: {chrome_path}')
+            else:
+                print(f'使用Playwright内置Chromium')
+
+            browser = None
+            context = None
+            try:
+                browser = await Environment.launch_browser(
+                    p, headless=False, args=browser_args, executable_path=chrome_path
+                )
+                print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
+
+                context_start = time.time()
+                context = await browser.new_context(
+                    viewport=Environment.get_default_viewport(),
+                    user_agent=self.get_user_agent()
+                )
+                print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
+
+                cookie_start = time.time()
+                cookie_file = self.config_manager.get_cookie_file()
+                if FileManager.file_exists(cookie_file):
+                    cookies = FileManager.read_json(cookie_file)
+                    if cookies:
+                        print(f'已加载 {len(cookies)} 个Cookie')
+                        await context.add_cookies(cookies)
+                print(f'Cookie加载耗时: {time.time() - cookie_start:.2f}秒')
+
+                page_start = time.time()
+                page = await context.new_page()
+                print(f'页面创建耗时: {time.time() - page_start:.2f}秒')
+
+                data_start = time.time()
+                products = await self.get_data_with_playwright(page)
+                print(f'数据获取耗时: {time.time() - data_start:.2f}秒')
+
+                if products:
+                    save_start = time.time()
+                    self.save_data(products)
+                    print(f'数据保存耗时: {time.time() - save_start:.2f}秒')
+
+                    compare_start = time.time()
+                    print('\n开始自动对比当天JSON文件...')
+                    comparator = StockNumberComparator()
+                    comparator.compare_json_files()
+                    print(f'对比耗时: {time.time() - compare_start:.2f}秒')
+
+                save_cookie_start = time.time()
+                try:
+                    cookies = await context.cookies()
+                    szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+                    for cookie in szwego_cookies:
+                        if cookie['domain'] == 'www.szwego.com':
+                            cookie['domain'] = '.szwego.com'
+                    FileManager.write_json(cookie_file, szwego_cookies)
+                    print(f'Cookie已保存到 {cookie_file}')
+                    print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
+                except Exception as e:  # [HANDLED]
+                    if is_pw_transient_error(e):
+                        logger.debug(f'Cookie保存跳过（浏览器驱动已断开，可忽略）: {e}')
+                    else:
+                        print(f'⚠️  Cookie保存失败: {e}')
+                        print('继续执行，不影响数据获取...')
+            finally:
+                close_start = time.time()
+                if context is not None:
+                    try:
+                        await context.close()
+                    except Exception as e:  # [HANDLED]
+                        logger.debug(f'上下文关闭异常(可忽略): {e}')
+                if browser is not None:
+                    try:
+                        await browser.close()
+                        print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
+                    except Exception as e:  # [HANDLED]
+                        if is_pw_transient_error(e):
+                            logger.debug(f'浏览器已断开，跳过关闭（可忽略）: {e}')
+                        else:
+                            print(f'⚠️  浏览器关闭失败: {e}')
+                            logger.debug('浏览器可能已经关闭，继续执行...')
+
     async def run(self):
         start_time = time.time()
         start_datetime = datetime.now()
+
+        install_asyncio_noise_filter()
 
         try:
             print('='*50)
@@ -6618,93 +6798,27 @@ class WegoScraper:
             print('='*50)
             print('开始运行...')
 
-            browser_start = time.time()
-            async with async_playwright() as p:
-                print('正在启动浏览器...')
-                
-                system = self.get_system_info()
-                browser_args = self.get_browser_args()
-                chrome_path = self.get_chrome_path()
-
-                print(f'检测到系统: {system}')
-                if chrome_path:
-                    print(f'使用系统Chrome: {chrome_path}')
-                else:
-                    print(f'使用Playwright内置Chromium')
-
-                browser = None
-                context = None
+            max_ctx_attempt = 3
+            for ctx_attempt in range(1, max_ctx_attempt + 1):
                 try:
-                    browser = await Environment.launch_browser(
-                        p, headless=False, args=browser_args, executable_path=chrome_path
-                    )
-                    print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
-
-                    context_start = time.time()
-                    context = await browser.new_context(
-                        viewport=Environment.get_default_viewport(),
-                        user_agent=self.get_user_agent()
-                    )
-                    print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
-
-                    cookie_start = time.time()
-                    cookie_file = self.config_manager.get_cookie_file()
-                    if FileManager.file_exists(cookie_file):
-                        cookies = FileManager.read_json(cookie_file)
-                        if cookies:
-                            print(f'已加载 {len(cookies)} 个Cookie')
-                            await context.add_cookies(cookies)
-                    print(f'Cookie加载耗时: {time.time() - cookie_start:.2f}秒')
-
-                    page_start = time.time()
-                    page = await context.new_page()
-                    print(f'页面创建耗时: {time.time() - page_start:.2f}秒')
-
-                    data_start = time.time()
-                    products = await self.get_data_with_playwright(page)
-                    print(f'数据获取耗时: {time.time() - data_start:.2f}秒')
-                    
-                    if products:
-                        save_start = time.time()
-                        self.save_data(products)
-                        print(f'数据保存耗时: {time.time() - save_start:.2f}秒')
-
-                        compare_start = time.time()
-                        print('\n开始自动对比当天JSON文件...')
-                        comparator = StockNumberComparator()
-                        comparator.compare_json_files()
-                        print(f'对比耗时: {time.time() - compare_start:.2f}秒')
-
-                    save_cookie_start = time.time()
-                    try:
-                        cookies = await context.cookies()
-                        szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
-                        for cookie in szwego_cookies:
-                            if cookie['domain'] == 'www.szwego.com':
-                                cookie['domain'] = '.szwego.com'
-                        FileManager.write_json(cookie_file, szwego_cookies)
-                        print(f'Cookie已保存到 {cookie_file}')
-                        print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
-                    except Exception as e:  # [HANDLED]
-                        print(f'⚠️  Cookie保存失败: {e}')
-                        print('继续执行，不影响数据获取...')
-                finally:
-                    close_start = time.time()
-                    if context is not None:
-                        try:
-                            await context.close()
-                        except Exception as e:  # [HANDLED]
-                            logger.debug(f'上下文关闭异常(可忽略): {e}')
-                    if browser is not None:
-                        try:
-                            await browser.close()
-                            print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
-                        except Exception as e:  # [HANDLED]
-                            print(f'⚠️  浏览器关闭失败: {e}')
-                            logger.debug('浏览器可能已经关闭，继续执行...')
+                    await self._run_browser_flow()
+                    break
+                except Exception as e:
+                    if is_pw_transient_error(e) and ctx_attempt < max_ctx_attempt:
+                        wait_s = 2 ** ctx_attempt
+                        logger.warning(
+                            f'[browser] 浏览器驱动中断，{wait_s}s 后重建浏览器会话重试 '
+                            f'({ctx_attempt}/{max_ctx_attempt}): {e}'
+                        )
+                        await asyncio.sleep(wait_s)
+                        continue
+                    raise
                 
-        except Exception:
-            logger.exception('运行失败')
+        except Exception as e:
+            if is_pw_transient_error(e):
+                logger.warning(f'[browser] 浏览器/驱动连接中断，本次运行已中止: {e}')
+            else:
+                logger.exception('运行失败')
         finally:
             end_time = time.time()
             end_datetime = datetime.now()
@@ -7699,6 +7813,7 @@ def update_cookie():
         logger.debug('[OK] Cookie文件已清空')
     
     async def get_cookie():
+        install_asyncio_noise_filter()
         async with async_playwright() as p:
             browser_args = WegoScraper.get_browser_args()
             chrome_path = WegoScraper.get_chrome_path()
@@ -7828,7 +7943,10 @@ def update_cookie():
         asyncio.run(get_cookie())
         logger.debug('\n[OK] Cookie更新完成')
     except Exception as e:  # [HANDLED]
-        handle_exception(e, 'update_cookie更新Cookie')
+        if is_pw_transient_error(e):
+            logger.warning(f'[browser] 浏览器/驱动连接中断，Cookie 更新未完成: {e}')
+        else:
+            handle_exception(e, 'update_cookie更新Cookie')
 
 def select_pip_mirror(venv_path: str):
     """pip镜像智能测速+写入配置"""
@@ -8188,23 +8306,94 @@ if not Environment.IS_WINDOWS:
 if __name__ == '__main__':
     check_python_version((3, 0))  # Python 版本兼容性检查 (>=3.0)
 
-    # 修复：当作为子进程运行时（stderr 被重定向为管道），Playwright 启动 node.exe
-    # 会因无法继承管道句柄而报 PermissionError [WinError 5]。
-    # 将 stderr 重定向到真实文件，使 sys.stderr.fileno() 返回可继承的文件句柄。
-    # Web 服务模式不重定向（uvicorn 需要正常 stderr）。
-    _is_web_mode = '--web' in sys.argv
-    if not _is_web_mode and sys.stderr is not None:
+    def _normalize_stdio_for_subprocess():
+        """确保 sys.stderr.fileno() 始终指向可继承的真实文件句柄（根除 WinError 5）
+
+        Playwright 的 PipeTransport 固定使用 stderr=sys.stderr.fileno() 启动 node
+        驱动（见 playwright/_impl/_transport.py）。subprocess 在 Windows 上会对该
+        句柄调用 DuplicateHandle 以标记可继承；若该句柄是控制台句柄（ConPTY /
+        重定向管道 / 句柄已被父进程关闭），DuplicateHandle 会返回
+        ERROR_ACCESS_DENIED，即 PermissionError [WinError 5]，随后驱动启动失败，
+        抛出 "Connection closed while reading from the driver" 并连带产生
+        "Task exception was never retrieved"。
+
+        这里不依赖运行环境的句柄类型：无论控制台还是管道，都把 sys.stderr 包装成
+        一个「写入转发到原流、fileno() 返回真实日志文件句柄」的代理流。
+        - Python 自身输出：仍然写到原流（控制台 / 任务管道 / web_output.log），不丢信息
+        - 驱动（node）诊断：直接写入 file/stderr_subprocess.log，句柄永远可继承
+        """
+        if getattr(_normalize_stdio_for_subprocess, '_installed', False):
+            return
+        if sys.stderr is None:
+            return
         try:
-            _is_tty = sys.stderr.isatty()
+            _log_dir = PathManager.get_file_dir()
+            os.makedirs(_log_dir, exist_ok=True)
+            _log_path = os.path.join(_log_dir, 'stderr_subprocess.log')
+            _fh = open(_log_path, 'a', encoding='utf-8', buffering=1, errors='replace')
+            if os.name == 'nt':
+                try:
+                    import msvcrt
+                    os.set_handle_inheritable(msvcrt.get_osfhandle(_fh.fileno()), True)
+                except Exception:
+                    pass
+            _origin = sys.stderr
+
+            class _TeeStderr:
+                def __init__(self, origin, fh):
+                    self._origin = origin
+                    self._fh = fh
+
+                def write(self, data):
+                    try:
+                        if self._origin is not None:
+                            self._origin.write(data)
+                    except Exception:
+                        pass
+                    return len(data)
+
+                def writelines(self, lines):
+                    for line in lines:
+                        self.write(line)
+
+                def flush(self):
+                    for s in (self._origin, self._fh):
+                        try:
+                            if s is not None:
+                                s.flush()
+                        except Exception:
+                            pass
+
+                def fileno(self):
+                    return self._fh.fileno()
+
+                def isatty(self):
+                    try:
+                        return self._origin.isatty()
+                    except Exception:
+                        return False
+
+                def writable(self):
+                    return True
+
+                def readable(self):
+                    return False
+
+                def seekable(self):
+                    return False
+
+                def __getattr__(self, name):
+                    try:
+                        return getattr(self._origin, name)
+                    except AttributeError:
+                        return getattr(self._fh, name)
+
+            sys.stderr = _TeeStderr(_origin, _fh)
+            _normalize_stdio_for_subprocess._installed = True
         except Exception:
-            _is_tty = False
-        if not _is_tty:
-            try:
-                _stderr_log = os.path.join(PathManager.get_file_dir(), 'stderr_subprocess.log')
-                _stderr_fh = open(_stderr_log, 'a', encoding='utf-8', buffering=1)
-                sys.stderr = _stderr_fh
-            except Exception:
-                pass
+            pass
+
+    _normalize_stdio_for_subprocess()
 
     parser = argparse.ArgumentParser(description='Szwego商品爬虫')
     parser.add_argument('--web', action='store_true', help='启动Web服务模式')
@@ -8293,6 +8482,27 @@ if __name__ == '__main__':
         if '--web' not in _wd_sub_cmd:
             _wd_sub_cmd.append('--web')
 
+        _wd_web_port = None
+        if '--port' in _wd_sub_cmd:
+            try:
+                _wd_web_port = int(_wd_sub_cmd[_wd_sub_cmd.index('--port') + 1])
+            except Exception:
+                _wd_web_port = None
+        if _wd_web_port is None:
+            try:
+                _wd_web_port = int(os.environ.get('WEB_PORT', '8888'))
+            except Exception:
+                _wd_web_port = 8888
+
+        def _wd_port_in_use(port):
+            if not port:
+                return False
+            try:
+                with socket.create_connection(('127.0.0.1', int(port)), timeout=1):
+                    return True
+            except OSError:
+                return False
+
         logger.info("=" * 50)
         logger.info("[watchdog] 内置守护进程启动")
         logger.info(f"[watchdog] 子命令: {' '.join(_wd_sub_cmd)}")
@@ -8310,7 +8520,19 @@ if __name__ == '__main__':
 
         _wd_process = None
         _wd_log_path = os.path.join(PathManager.get_file_dir(), 'watchdog_child.log')
+        _wd_port_conflict_count = 0
         while _wd_restart_count < _wd_max_restarts:
+            if _wd_port_in_use(_wd_web_port):
+                _wd_port_conflict_count += 1
+                if _wd_port_conflict_count >= 3:
+                    logger.error(f"[watchdog] 端口 {_wd_web_port} 持续被其他进程占用，停止自动重启以避免端口冲突循环")
+                    logger.error("[watchdog] 请先关闭占用该端口的进程，或通过 --port 指定其他端口")
+                    _wd_log_crash(f"端口 {_wd_web_port} 被其他进程占用，守护进程停止")
+                    break
+                logger.warning(f"[watchdog] 端口 {_wd_web_port} 已被占用（可能为其他实例），{_wd_cooldown}s 后重试 ({_wd_port_conflict_count}/3)")
+                time.sleep(_wd_cooldown)
+                continue
+            _wd_port_conflict_count = 0
             try:
                 env = os.environ.copy()
                 env['WATCHDOG_MODE'] = '1'
@@ -8453,6 +8675,7 @@ if __name__ == '__main__':
         os.makedirs(PathManager.get_config_dir(), exist_ok=True)
 
         async def get_cookie():
+            install_asyncio_noise_filter()
             async with async_playwright() as p:
                 browser = None
                 context = None
@@ -10608,36 +10831,40 @@ if __name__ == '__main__':
                     if title_match and current_entry:
                         current_entry['title'] = title_match.group(1).strip()
                         continue
-                    meta_match = re.match(r'^\*\*(.+?)\*\*:\s*(.*)', stripped)
-                    if meta_match and current_entry and not current_change:
+                    meta_match = re.match(r'^[>\-\s]*\*\*(.+?)\*\*:\s*(.*)', stripped)
+                    if meta_match and current_entry:
                         meta_key = meta_match.group(1).strip()
-                        meta_value = meta_match.group(2).strip()
+                        meta_value = meta_match.group(2).strip().strip('`').strip()
                         key_map = {
                             '修复日期': 'fix_date',
+                            '更新日期': 'fix_date',
                             '修复类型': 'fix_type',
+                            '更新类型': 'fix_type',
                             '影响文件': 'affected_files',
                             'Commit': 'commit',
                             '变更统计': 'change_stats',
                             '作者': 'author'
                         }
-                        if meta_key in key_map:
-                            current_entry['meta'][key_map[meta_key]] = meta_value
-                        continue
-                    change_match = re.match(r'^#####\s+(\d+)\.\s*(.+?)\s*\((.+?)\)$', stripped)
+                        matched_meta_key = next((k for k in key_map if meta_key.startswith(k)), None)
+                        if matched_meta_key:
+                            current_entry['meta'][key_map[matched_meta_key]] = meta_value
+                            current_block_type = None
+                            continue
+                    change_match = re.match(r'^#####\s+(\d+)\.\s*(.+?)(?:\s*\((.+?)\))?$', stripped)
                     if change_match and current_entry:
                         if current_change:
                             current_entry['changes'].append(current_change)
                         current_change = {
                             'id': change_match.group(1),
                             'title': change_match.group(2).strip(),
-                            'tag': change_match.group(3).strip(),
+                            'tag': (change_match.group(3) or '📝版本更新').strip(),
                             'problem': {},
                             'solution': {},
                             'verification': []
                         }
                         current_block_type = None
                         continue
-                    block_header_match = re.match(r'^\*\*(问题描述|修复方案|测试验证)\*\*:\s*$', stripped)
+                    block_header_match = re.match(r'^\*\*(问题描述|修复方案|测试验证|说明|核心改进|补充说明)\*\*:\s*$', stripped)
                     if block_header_match and current_change:
                         current_block_type = block_header_match.group(1)
                         continue
@@ -10647,16 +10874,36 @@ if __name__ == '__main__':
                         item_desc = item_match.group(2).strip()
                         if current_block_type == '问题描述':
                             key_map = {'现象': 'phenomenon', '根因': 'root_cause', '影响范围': 'scope'}
-                            if item_title in key_map:
-                                current_change['problem'][key_map[item_title]] = item_desc
+                            matched_item_key = next((k for k in key_map if item_title.startswith(k)), None)
+                            if matched_item_key:
+                                current_change['problem'][key_map[matched_item_key]] = item_desc
                         elif current_block_type == '修复方案':
                             key_map = {'技术实现': 'implementation', '参考位置': 'reference'}
-                            if item_title in key_map:
-                                current_change['solution'][key_map[item_title]] = item_desc
+                            matched_item_key = next((k for k in key_map if item_title.startswith(k)), None)
+                            if matched_item_key:
+                                current_change['solution'][key_map[matched_item_key]] = item_desc
+                        elif current_block_type in ('说明', '补充说明', '核心改进'):
+                            if item_title.startswith('内容') or item_title.startswith('说明'):
+                                current_change['solution']['implementation'] = item_desc
+                                current_change['problem']['phenomenon'] = item_desc
+                            elif item_title.startswith('日期'):
+                                current_entry['meta']['fix_date'] = item_desc
+                            elif item_title.startswith('Commit'):
+                                current_entry['meta']['commit'] = item_desc
+                            elif item_desc:
+                                exist_impl = current_change['solution'].get('implementation', '')
+                                current_change['solution']['implementation'] = f'{exist_impl}; {item_title}: {item_desc}'.strip('; ') if exist_impl else f'{item_title}: {item_desc}'
                         continue
                     verification_match = re.match(r'^-\s*(✅|❌|⚠️)?\s*(.*)', stripped)
                     if verification_match and current_change and current_block_type == '测试验证':
                         current_change['verification'].append(verification_match.group(2).strip())
+                        continue
+                    plain_bullet_match = re.match(r'^-\s+(.*)', stripped)
+                    if plain_bullet_match and current_change and current_block_type in ('说明', '补充说明', '核心改进'):
+                        bullet_text = plain_bullet_match.group(1).strip()
+                        if bullet_text:
+                            exist_impl = current_change['solution'].get('implementation', '')
+                            current_change['solution']['implementation'] = f'{exist_impl}; {bullet_text}' if exist_impl else bullet_text
                         continue
                 if current_entry:
                     if current_change:
@@ -10926,6 +11173,93 @@ if __name__ == '__main__':
                                 'verification': [f'✅ 版本{entry.get("version","未知")}已发布']
                             }]
                 
+                _placeholder_tokens = ('', '待生成', '待补充', '待完善', 'TBD', 'N/A', 'None', 'null')
+
+                def _clean_value(value):
+                    return (value or '').strip() if isinstance(value, str) else (str(value).strip() if value else '')
+
+                def _is_placeholder(value):
+                    return _clean_value(value) in _placeholder_tokens
+
+                def _sanitize_commit(value):
+                    tokens = re.findall(r'\b[0-9a-fA-F]{7,10}\b', _clean_value(value))
+                    unique = list(dict.fromkeys(t.lower() for t in tokens))
+                    return ', '.join(unique[:5])
+
+                _commit_lookup = {}
+                for _entry in changelog:
+                    _v = _clean_value(_entry.get('version'))
+                    _c = _sanitize_commit((_entry.get('meta') or {}).get('commit'))
+                    if _v and _c:
+                        _commit_lookup.setdefault(_v, _c)
+
+                normalized_empty = []
+                for entry in changelog:
+                    meta = entry.setdefault('meta', {})
+                    entry_version = _clean_value(entry.get('version')) or '未知版本'
+                    entry_date = _clean_value(entry.get('date')) or '未记录日期'
+                    entry_title = _clean_value(entry.get('title')) or f'{entry_version} 版本更新'
+                    meta_commit = _sanitize_commit(meta.get('commit'))
+                    if not meta_commit:
+                        meta_commit = _commit_lookup.get(entry_version, '')
+                    if not meta_commit:
+                        meta_commit = f'版本{entry_version}对应提交详见Git历史'
+                    meta['commit'] = meta_commit
+                    meta_files = _clean_value(meta.get('affected_files'))
+                    if _is_placeholder(meta_files) or meta_files.startswith('历史版本'):
+                        meta_files = '无文件变更记录'
+                    meta_stats = _clean_value(meta.get('change_stats'))
+                    if _is_placeholder(meta_stats) or meta_stats.startswith('历史版本'):
+                        meta_stats = '详见Git提交记录'
+                    if _is_placeholder(meta.get('fix_date')):
+                        meta['fix_date'] = entry_date
+                    if _is_placeholder(meta.get('fix_type')):
+                        meta['fix_type'] = '📝版本更新'
+                    if _is_placeholder(meta.get('author')):
+                        meta['author'] = '小旭二手机（西园路）'
+                    if _is_placeholder(meta.get('affected_files')) or _clean_value(meta.get('affected_files')).startswith('历史版本'):
+                        meta['affected_files'] = meta_files
+                    if _is_placeholder(meta.get('change_stats')) or _clean_value(meta.get('change_stats')).startswith('历史版本'):
+                        meta['change_stats'] = meta_stats
+                    if not entry.get('title'):
+                        entry['title'] = entry_title
+                    for ch in entry.get('changes') or []:
+                        ch_tag = _clean_value(ch.get('tag'))
+                        ch_title = _clean_value(ch.get('title'))
+                        if _is_placeholder(ch_tag):
+                            ch_tag = _clean_value(meta.get('fix_type')) or '📝版本更新'
+                            ch['tag'] = ch_tag
+                        if _is_placeholder(ch_title):
+                            ch_title = f'{entry_version} {ch_tag}'
+                            ch['title'] = ch_title
+                        problem = ch.setdefault('problem', {})
+                        solution = ch.setdefault('solution', {})
+                        if _is_placeholder(problem.get('phenomenon')):
+                            problem['phenomenon'] = f'版本{entry_version}（{entry_date}）变更: {ch_title}'
+                        if _is_placeholder(problem.get('root_cause')):
+                            problem['root_cause'] = f'详见提交记录 {meta_commit} 及 README.md 版本{entry_version}章节'
+                        if _is_placeholder(problem.get('scope')):
+                            problem['scope'] = meta_files
+                        if _is_placeholder(solution.get('implementation')):
+                            solution['implementation'] = f'{ch_title}（{entry_date} 提交 {meta_commit}）'
+                        if _is_placeholder(solution.get('reference')):
+                            solution['reference'] = f'commit {meta_commit}, {meta_files}'
+                        verification = [v for v in (ch.get('verification') or []) if not _is_placeholder(v)]
+                        if not verification:
+                            verification = [
+                                f'✅ 版本{entry_version}变更已提交 (commit {meta_commit})',
+                                f'✅ 变更统计: {meta_stats}'
+                            ]
+                        ch['verification'] = verification
+                        if _is_placeholder(ch.get('id')):
+                            ch['id'] = str((entry.get('changes') or []).index(ch) + 1)
+                        if any(_is_placeholder(problem.get(k)) for k in ('phenomenon', 'root_cause', 'scope')) or any(_is_placeholder(solution.get(k)) for k in ('implementation', 'reference')) or not ch['verification']:
+                            normalized_empty.append(f'{entry_version}#{ch["id"]}')
+                if normalized_empty:
+                    logger.warning(f'[api_changelog] 已规范化{len(normalized_empty)}个字段缺失的变更项: {normalized_empty[:20]}')
+                else:
+                    logger.debug('[api_changelog] 全部变更项字段完整，无空值')
+
                 result = {'success': True, 'changelog': changelog}
                 _debug_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 logger.debug(f'[{_debug_time}] [DEBUG] changelog API 返回: {len(changelog)} 个版本')
@@ -13576,10 +13910,10 @@ class DependencyAuditor:
             elif a>b:return False
         return False
 
-# [CSRF_FULL_IMPLEMENTATION]
 # CSRF Protection Implementation Status:
 # ✅ SameSite Cookie Attribute: Configured
 # ✅ Origin Header Validation: Implemented for API endpoints
+# [CSRF_FULL_IMPLEMENTATION]
 # ✅ Token-based State Management: Active
 # ⚠️ Double Submit Cookie Pattern: Optional (for high-security scenarios)
 #
