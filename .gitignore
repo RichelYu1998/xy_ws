@@ -53,6 +53,7 @@ config/demo_crypto.py
 # OS files
 .DS_Store
 Thumbs.db
+*.lnk
 
 # Temporary files
 temp/
