@@ -121,9 +121,6 @@ _SUBPROCESS_BASE_DELAY = 0.15
 _SUBPROCESS_RETRY_ERRNOS = frozenset((35, 11, 12))  # EAGAIN / EACCES / ENOMEM on fork_exec
 _USE_POSIX_SPAWN = bool(getattr(subprocess, '_USE_POSIX_SPAWN', False))
 _fork_gate = threading.Semaphore(2)
-_fork_bad_until = 0.0
-_fork_bad_lock = threading.Lock()
-_FORK_BAD_COOLDOWN = 30.0
 
 def _is_retryable_fork_err(exc):
     if isinstance(exc, BlockingIOError):
@@ -194,17 +191,11 @@ def _posix_spawn_popen(args, kwargs):
     except (BlockingIOError, OSError) as exc:
         return _skip("posix_spawn 执行失败 %s(errno=%s)" % (type(exc).__name__, getattr(exc, 'errno', '?')))
 
-def _fork_is_bad():
-    return time.time() < _fork_bad_until
-
-def _mark_fork_bad():
-    global _fork_bad_until
-    with _fork_bad_lock:
-        _fork_bad_until = time.time() + _FORK_BAD_COOLDOWN
-
-def _patched_Popen(*args, **kwargs):
+def _popen_with_retry(args, kwargs, max_retries=None, base_delay=None):
+    retries = _SUBPROCESS_MAX_RETRIES if max_retries is None else max(1, int(max_retries))
+    delay = _SUBPROCESS_BASE_DELAY if base_delay is None else max(0.0, float(base_delay))
     _last = BlockingIOError(35, 'Resource temporarily unavailable')
-    for attempt in range(_SUBPROCESS_MAX_RETRIES):
+    for attempt in range(retries):
         try:
             with _fork_gate:
                 return _orig_subprocess_Popen(*args, **kwargs)
@@ -217,13 +208,16 @@ def _patched_Popen(*args, **kwargs):
             sys.stderr.write("[fork-retry] fork 失败，已改用 posix_spawn 启动成功\n")
             sys.stderr.flush()
             return spawned
-        if attempt >= _SUBPROCESS_MAX_RETRIES - 1:
+        if attempt >= retries - 1:
             break
-        d = min(_SUBPROCESS_BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.15), 2.0)
-        sys.stderr.write(f"[fork-retry] Popen {type(_last).__name__}(errno={getattr(_last,'errno','?')}) attempt {attempt+1}/{_SUBPROCESS_MAX_RETRIES}, wait {d:.2f}s\n")
+        d = min(delay * (2 ** attempt) + random.uniform(0, 0.15), 2.0)
+        sys.stderr.write(f"[fork-retry] Popen {type(_last).__name__}(errno={getattr(_last,'errno','?')}) attempt {attempt+1}/{retries}, wait {d:.2f}s\n")
         sys.stderr.flush()
         time.sleep(d)
     raise _last
+
+def _patched_Popen(*args, **kwargs):
+    return _popen_with_retry(args, kwargs)
 
 subprocess.Popen = _patched_Popen
 
@@ -3988,9 +3982,9 @@ _processes_lock = threading.Lock()
 _tasks_lock = threading.Lock()
 
 def _popen_retry(*args, **kwargs):
-    kwargs.pop('max_retries', None)
-    kwargs.pop('initial_delay', None)
-    return subprocess.Popen(*args, **kwargs)
+    max_retries = kwargs.pop('max_retries', None)
+    initial_delay = kwargs.pop('initial_delay', None)
+    return _popen_with_retry(args, kwargs, max_retries=max_retries, base_delay=initial_delay)
 
 def run_command_background(task_id, command):
     try:

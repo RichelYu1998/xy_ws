@@ -466,13 +466,13 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 
 ## 🔄 最新更新
 
-### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`subprocess.Popen`全局重试与posix_spawn兜底+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.sh 5处`grep -oP`改POSIX `grep -oE`+run.bat删除playwright-browsers危险清理+新增PY-CORE-033终端实时日志范式+skill.docx重新生成
+### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容+子进程重试显式化** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`_popen_with_retry()`核心重试函数与`subprocess.Popen`全局补丁解耦+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.sh 5处`grep -oP`改POSIX `grep -oE`+run.bat删除playwright-browsers危险清理+删除fork冷却死代码+新增PY-CORE-033终端实时日志范式+skill.docx重新生成
 
 > **Commit**: 225b1fae, d123f61f
 
 #### 更新内容:
 1. **Errno 35 根因根治**: `_setup_unix_protection()` 删除硬编码 `RLIMIT_NPROC=100`，改为仅当系统额度低于 2048 时向上修正，杜绝“进程额度瞬间耗尽”导致的 `BlockingIOError: [Errno 35] Resource temporarily unavailable` [main.py](main.py#L3249-L3258)
-2. **子进程启动重试+兜底**: 新增 `_popen_retry()` 全局补丁，`Popen` 遇 EAGAIN/errno 35 自动重试 6 次（指数退避 0.15s 起），仍失败则 fallback `posix_spawn`，并对含 `preexec_fn`/`start_new_session` 等不兼容参数自动降级 [main.py](main.py#L119-L230) [main.py](main.py#L3990-L4010)
+2. **子进程启动重试+兜底**: 新增 `_popen_with_retry()` 核心重试函数，`Popen` 遇 EAGAIN/errno 35 自动重试 6 次（指数退避 0.15s 起），仍失败则 fallback `posix_spawn`，并对含 `preexec_fn`/`start_new_session` 等不兼容参数自动降级；`subprocess.Popen` 全局补丁与 `_popen_retry()` 均委托该核心函数 [main.py](main.py#L119-L225) [main.py](main.py#L3978-L3982)
 3. **终端实时日志接入**: run.sh 守护进程模式新增 `tail -n 0 -f "$LOG_FILE"` 后台跟随，`TAIL_PID` 全局声明 + `wait` 后回收 + `trap cleanup_exit` 二次回收；run.bat 使用 `start /b cmd /c "..." < nul` 继承控制台，天然实时且禁止叠加 tail（避免双份输出） [run.sh](run.sh#L1865-L1880) [run.sh](run.sh#L2265-L2280) [run.bat](run.bat#L1573)
 4. **Playwright 本地化读取**: 浏览器目录探测优先 `tools/playwright/<平台>`（macos/linux/windows），命中后直接 `export PLAYWRIGHT_BROWSERS_PATH`，未命中仅告警不再自动下载，双端文案逐字一致 [run.sh](run.sh#L2200-L2212) [run.bat](run.bat#L587-L594)
 5. **cloudflared 本地化**: 统一 `tools/cloudflared/<平台>` 路径，安装改为 GitHub 官方 release 二进制下载（废弃 npm 安装），run.sh 新增 `get_platform_dir()`/`get_cloudflared_path()` 消除三处重复分支 [run.sh](run.sh#L35-L51) [run.sh](run.sh#L1197-L1249) [run.bat](run.bat#L1287-L1320)
@@ -480,6 +480,7 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 7. **run.bat 危险清理移除**: 删除 `call :cleanup_temp_dir playwright-browsers 0`（会把刚装好的浏览器目录整目录清空），与 run.sh 对齐；`check_and_fix_playwright` 由“自动下载”改为“仅检测本地” [run.bat](run.bat#L447-L451) [run.bat](run.bat#L565-L571)
 8. **范式与文档同步**: skill.md 新增 `PY-CORE-033 终端实时日志接入范式`（输出流向判定表/sh 与 bat 双方案/坑位表/检查清单），README.md 与 skill.md 同步本版本记录，skill.docx 由 skill.md 重新生成；多余 md 文件删除，仅保留 README.md 与 skill.md 两份固定范式文档
 9. **macOS grep 兼容修复**: run.sh 5 处 GNU 专有 `grep -oP`（PCRE）替换为 POSIX `grep -oE` + `sed`，消除 macOS/BSD grep `invalid option -- P` 报错导致 Node/Git 版本探测与局域网地址提取失效 [run.sh](run.sh#L1088-L1100) [run.sh](run.sh#L1170) [run.sh](run.sh#L1739)
+10. **子进程重试显式化重构**: 把重试逻辑抽成 `_popen_with_retry(args, kwargs, max_retries, base_delay)` 核心函数，`_patched_Popen` 与 `_popen_retry()` 都委托它，`_popen_retry()` 不再依赖“`subprocess.Popen` 已被全局替换”的隐式前提；同时删除从未被调用的 `_fork_is_bad()`/`_mark_fork_bad()` 冷却死代码（README 曾据此描述“30s 冷却”，与实际行为不符） [main.py](main.py#L119-L225) [main.py](main.py#L3978-L3982)
 
 ##### 1. 🔧 Errno 35 根因根治 (RLIMIT_NPROC 误设)
 **问题描述**:
@@ -489,8 +490,8 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 
 **修复方案**:
 - **技术实现(限额策略)**: 读取当前 `soft`，仅当 `soft < 2048` 时把 `soft` 抬到 2048，绝不向下压低；`hard` 保持系统默认 [main.py](main.py#L3249-L3258)
-- **技术实现(重试补丁)**: `_popen_retry()` 对 `BlockingIOError` 与 errno 35/11/12 重试 6 次，指数退避；连续失败后进入 30s 冷却并优先走 `posix_spawn` [main.py](main.py#L119-L230)
-- **参考位置**: [main.py](main.py#L3210-L3260) [main.py](main.py#L3990-L4010)
+- **技术实现(重试补丁)**: `_popen_retry()` 对 `BlockingIOError` 与 errno 35/11/12 重试 6 次，指数退避；每次失败后尝试 `posix_spawn` 降级 [main.py](main.py#L119-L225)
+- **参考位置**: [main.py](main.py#L3210-L3260) [main.py](main.py#L3978-L3982)
 
 **测试验证**:
 - ✅ 复现验证：手工将 `RLIMIT_NPROC` 设为 100 后连续 5 次子进程启动全部报 errno 35，与用户现场一致
@@ -561,6 +562,26 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 - ✅ `grep -c "grep -oP" run.sh` 结果为 0，无 GNU 专有语法残留
 - ✅ 服务正常启动，`/api/version` → `5.0.9.84`，`/api/changelog` → HTTP 200
 - ✅ SIGTERM 退出后 `tail -n 0 -f` 无残留、8888 端口已释放
+
+##### 6. ♻️ 子进程重试显式化重构 (_popen_retry 脱离全局补丁)
+**问题描述**:
+- **现象**: `_popen_retry()` 形似重试函数，实现却是“丢弃 `max_retries`/`initial_delay` 后直接调 `subprocess.Popen`”，重试能力完全依赖 `subprocess.Popen = _patched_Popen` 这一全局替换的隐式副作用
+- **风险**: 任何第三方库或后续代码把 `subprocess.Popen` 还原/再次包装，`_popen_retry()` 会静默退化为单次尝试，errno 35 保护失效且无任何提示
+- **附带问题**: `_fork_is_bad()`/`_mark_fork_bad()`/`_FORK_BAD_COOLDOWN` 定义后从未被调用，README 据此描述的“连续失败后进入 30s 冷却”与真实行为不符
+
+**修复方案**:
+- **技术实现(核心抽取)**: 新增 `_popen_with_retry(args, kwargs, max_retries=None, base_delay=None)`，集中承载重试循环、`_fork_gate` 并发闸、指数退避与 `posix_spawn` 降级 [main.py](main.py#L196-L220)
+- **技术实现(双入口委托)**: `_patched_Popen` 仅做 `return _popen_with_retry(args, kwargs)`；`_popen_retry()` 显式解析 `max_retries`/`initial_delay` 后同样委托核心，直接使用 `_orig_subprocess_Popen`，不再受全局替换影响 [main.py](main.py#L222-L225) [main.py](main.py#L3978-L3982)
+- **技术实现(死代码清理)**: 删除 `_fork_bad_until`/`_fork_bad_lock`/`_FORK_BAD_COOLDOWN` 三个变量与 `_fork_is_bad()`/`_mark_fork_bad()` 两个函数，行为零变化（本就无调用点），同时修正 README 中“30s 冷却”的错误描述
+- **参考位置**: [main.py](main.py#L119-L225) [main.py](main.py#L3978-L3982)
+
+**测试验证**:
+- ✅ `python -m py_compile main.py` 通过
+- ✅ 显式重试验证：注入“前 2 次抛 errno 35、第 3 次成功”的假 Popen，`_popen_retry()` 第 3 次成功，实际尝试次数 3、耗时 0.58s
+- ✅ `max_retries=1` 时按预期只尝试 1 次即抛出 errno 35，不重试
+- ✅ 独立性验证：临时将 `subprocess.Popen` 置为 `None` 后 `_popen_retry()` 仍正常启动子进程，证明已脱离全局补丁
+- ✅ 实跑验证：`bash ./run.sh` 服务正常，`/api/version` 200、`/api/changelog` 200，`Errno 35`/`fork-retry`/`Traceback` 计数均为 0
+- ✅ `/api/changelog` 427 版本，`empty_changes: 0`，`v5.0.9.84 changes: 8`
 
 ---
 
