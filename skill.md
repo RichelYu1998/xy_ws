@@ -1,4 +1,4 @@
-#﻿# 微购相册管理系统 (WegoAlbum Manager)
+# 微购相册管理系统 (WegoAlbum Manager)
 
 > **⚙️ 编码标准**: 本项目所有文件（包括源代码、文档、配置文件等）**必须且仅使用 UTF-8 编码**。禁止使用任何其他编码格式（如 GBK、GB2312、Latin-1 等）。
 >
@@ -6,6 +6,31 @@
 > - Git 配置：已设置 `autocrlf=false` 和 `encoding=utf-8`
 > - IDE 设置：确保工作区编码为 UTF-8
 > - 违反此标准将导致乱码问题，影响团队协作和系统稳定性
+
+## 📚 文档导航
+
+> 本导航固定置于文档第一页，点击「位置（点击跳转）」列可直达对应章节。
+
+| 章节 | 说明 |
+|------|------|
+| 📋 项目概述 | 系统定位、核心能力与运行环境概览 |
+| 💻 环境要求 | Python / pip 版本与依赖清单 |
+| 📂 项目结构 | 目录树与关键文件职责 |
+| ⚙️ 配置说明 | config.json 字段、加密与端口配置 |
+| 🔐 安全合规状态 | 加密存储与安全检查项 |
+| 📐 版本更新记录范式规范 (PY-CORE-027) | changelog 结构强制规范 |
+| 📐 双启动脚本同步范式 (PY-CORE-032) | run.sh / run.bat 1:1 同步要求 |
+| 📐 终端实时日志接入范式 (PY-CORE-033) | sh / bat 实时日志双方案 |
+| 🔄 最新更新 | 当前版本变更详情 |
+| 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
+| 🎯 核心原则 | 编码总纲与决策原则 |
+| 🔧 JavaScript 开发规范 (app.js) | 前端编码规范 |
+| 🐍 Python 开发规范 (main.py) - 完整版 | 后端编码规范 |
+| 🚨 常见问题 & 解决方案 (FAQ) | 高频问题与排查路径 |
+| 📄 文档生成方法 (PY-CORE-031: skill.docx生成范式) | docx 生成流程与校验 |
+| 🔄 版本历史 | 历史版本归档索引 |
+
+---
 
 ## 📋 项目概述
 微购相册商品数据采集与分析系统，用于自动化获取闲鱼平台商品信息并进行数据分析。
@@ -465,6 +490,63 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.85 (2026-11-07) - 📚 **DOCX文档导航置顶第一页+16章节可点击跳转+标题BOM修复** - skill.md顶部新增「📚 文档导航」16章节索引表+generate_docx.py新增`_extract_nav_block()`/`_render_nav_block()`将导航块强制渲染到第一页并加分页符+导航表第3列生成16个可点击超链接(全部命中书签)+修复skill.md/README.md首行BOM导致H1标题多出`#`+README.md补齐PY-CORE-033与PY-CORE-031章节+skill.docx重新生成
+
+> **Commit**: 209173d6
+
+#### 更新内容:
+1. **DOCX 文档导航置顶第一页**: `test/generate_docx.py` 新增 `_extract_nav_block()` 识别导航表并连同上方标题/引言整块抽出，`_render_nav_block()` 在第一个 H1 之后立即渲染并追加分页符，导航恒定位于第 1 页、正文从第 2 页开始 [test/generate_docx.py](test/generate_docx.py#L260-L300)
+2. **16 个章节可点击跳转**: skill.md 顶部新增「📚 文档导航」章节含 16 行 `| 章节 | 说明 |` 索引表；生成器自动补第 3 列「位置（点击跳转）」并生成 `w:hyperlink` + `w:anchor`，实测 16 个锚点全部命中 `w:bookmarkStart` [skill.md](skill.md#L10-L35) [test/generate_docx.py](test/generate_docx.py#L390-L405)
+3. **标题 BOM 修复**: skill.md / README.md 首行原为 `#` + U+FEFF + `# 微购...`，BOM 夹在两个 `#` 之间使 `lstrip('#')` 只剥掉第一个，docx 中 H1 显示成 `# 微购相册管理系统`；清除 BOM 后标题恢复正常 [skill.md](skill.md#L1) [README.md](README.md#L1)
+4. **README 章节补齐**: README.md 新增 `PY-CORE-033 终端实时日志接入范式` 与 `PY-CORE-031 文档生成方法` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L335) [README.md](README.md#L17268)
+5. **三方文档同步**: README.md / skill.md / skill.docx 导航章节逐字一致，skill.docx 由 skill.md 重新生成（389.4 KB，含 16 个导航超链接）
+
+##### 1. 📚 DOCX 文档导航置顶第一页 (导航块强制渲染 + 分页符隔离)
+**问题描述**:
+- **现象**: docx 打开后没有任何可点击的章节索引，只能用「视图 → 导航窗格」按标题层级跳转
+- **根因**: `_post_process_navigation_links()` 定义后从未被调用；`w:bookmarkStart` 生成 694 个但 `w:hyperlink` 为 0，书签全部是死书签
+- **次生问题**: skill.md 中不存在 `| 章节 | ... |` 导航表，生成器即使想处理也无数据可转
+
+**修复方案**:
+- **技术实现(数据源)**: skill.md 顶部新增「📚 文档导航」+ 16 行 `| 章节 | 说明 |` 索引表，覆盖项目概述/环境要求/项目结构/配置说明/安全合规/PY-CORE-027/PY-CORE-032/PY-CORE-033/最新更新/企业级规范/核心原则/JS 规范/Python 规范/FAQ/文档生成/版本历史
+- **技术实现(置顶)**: `_extract_nav_block()` 识别导航表并连同上方标题与引言整块抽出；`convert()` 在第一个 H1 处理完后调用 `_render_nav_block()` 渲染导航块并 `add_page_break()`，保证导航恒定在文档第一页、正文从第二页开始
+- **技术实现(超链接)**: 导航表为 2 列时生成器自动补第 3 列「位置（点击跳转）」，`_add_clickable_link()` 以章节名经 `_find_heading_bookmark_id()` 解析为 `w:anchor`，与 H2/H3 的 `w:bookmarkStart` 一一对应
+- **参考位置**: [test/generate_docx.py](test/generate_docx.py#L260-L300) [test/generate_docx.py](test/generate_docx.py#L390-L405) [skill.md](skill.md#L10-L35)
+
+**测试验证**:
+- ✅ docx 第一个表格即导航表，3 列 17 行（表头 `章节 / 说明 / 位置（点击跳转）`）
+- ✅ `w:hyperlink` 16 个、`w:anchor` 16 个，逐一比对 `w:bookmarkStart` 名称全部命中，0 个 MISS
+- ✅ 分页符位置在第一个表格之后，正文从第 2 页开始
+- ✅ 文档前 3 个非空段落依次为 `H1 微购相册管理系统` → `H2 📚 文档导航` → 引言段落
+
+##### 2. 🔤 标题 BOM 修复 (首行 BOM 夹在 `#` 之间导致的标题污染)
+**问题描述**:
+- **现象**: docx 中 H1 渲染为 `# 微购相册管理系统 (WegoAlbum Manager)`，多出一个 `#`
+- **根因**: skill.md 首行原始字节为 `b'#\xef\xbb\xbf# 微购...'`，BOM 夹在两个 `#` 之间；`lstrip('#')` 剥掉第一个 `#` 后遇到 BOM 停止，剩余 `#` 被当作正文
+- **影响**: README.md 首行同样存在该问题
+
+**修复方案**:
+- **技术实现**: 以二进制方式把首行 `#` + BOM + `# ` 前缀替换为 `# `，两份文档同步处理，其余编码策略不变
+- **参考位置**: [skill.md](skill.md#L1) [README.md](README.md#L1)
+
+**测试验证**:
+- ✅ docx 中 H1 文本为 `微购相册管理系统 (WegoAlbum Manager)`，无 `#` 前缀
+- ✅ skill.md / README.md 首行均为 `# 微购相册管理系统 (WegoAlbum Manager)`
+
+##### 3. 📄 README 章节补齐 (导航锚点在 README 同样有效)
+**问题描述**:
+- **现象**: README.md 缺少 `PY-CORE-033 终端实时日志接入范式` 章节，且原 `## 📄 文档生成方法` 无 PY-CORE-031 后缀
+- **影响**: 导航表 16 行在 README 中会出现死锚点，与 skill.md 不一致
+
+**修复方案**:
+- **技术实现**: 从 skill.md 逐字提取两个章节并写入 README.md（PY-CORE-033 插在 PY-CORE-032 之后、最新更新之前；PY-CORE-031 整段替换 README 原「文档生成方法」段）
+- **参考位置**: [README.md](README.md#L335) [README.md](README.md#L17268)
+
+**测试验证**:
+- ✅ README.md 导航 16 行锚点全部命中，未命中为空
+- ✅ skill.md 导航 16 行锚点全部命中，未命中为空
+- ✅ 两份文档导航章节与 PY-CORE-033 章节逐字一致（脚本比对 True）
 
 ### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容+子进程重试显式化** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`_popen_with_retry()`核心重试函数与`subprocess.Popen`全局补丁解耦+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.sh 5处`grep -oP`改POSIX `grep -oE`+run.bat删除playwright-browsers危险清理+删除fork冷却死代码+新增PY-CORE-033终端实时日志范式+skill.docx重新生成
 

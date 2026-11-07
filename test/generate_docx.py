@@ -181,6 +181,10 @@ class MarkdownToDocxConverter:
         raw_lines = md_content.split('\n')
         lines = self._normalize_fences(raw_lines)
 
+        # Pull the navigation section out of the body so it can be rendered
+        # on page 1 regardless of where it sits in the markdown source.
+        nav_block, lines = self._extract_nav_block(lines)
+
         # First pass: collect all heading bookmark IDs so navigation links
         # can reference them even though the nav table appears BEFORE the headings
         # Must also respect fence state!
@@ -197,12 +201,17 @@ class MarkdownToDocxConverter:
                     self.heading_bookmarks[bookmark_id] = None
         
         # Second pass: generate doc content
+        nav_placed = False
         i = 0
         while i < len(lines):
             line = lines[i]
             
             if line.startswith('#'):
+                level = len(line) - len(line.lstrip('#'))
                 i = self._handle_heading(lines, i)
+                if nav_block and not nav_placed and level == 1:
+                    self._render_nav_block(nav_block)
+                    nav_placed = True
             elif line.startswith('```'):
                 i = self._handle_code_block(lines, i)
             elif line.startswith('>'):
@@ -222,9 +231,64 @@ class MarkdownToDocxConverter:
             else:
                 i += 1
         
+        if nav_block and not nav_placed:
+            self._render_nav_block(nav_block)
+
         self.doc.save(output_path)
         print(f'✅ 成功生成 {output_path}')
         return output_path
+
+    def _extract_nav_block(self, lines):
+        """Detect the navigation section (heading + intro + table) and cut it out.
+
+        Returns (nav_block, remaining_lines). nav_block is None when no
+        navigation table (header containing 章节 + 位置/说明) is present.
+        """
+        for idx, line in enumerate(lines):
+            if not (line.startswith('|') and '|' in line[1:]):
+                continue
+            cells = [cell.strip() for cell in line.split('|')[1:-1]]
+            has_chapter = any('章节' in cell for cell in cells)
+            has_location_or_desc = any(('位置' in cell or '说明' in cell) for cell in cells)
+            if not (has_chapter and has_location_or_desc):
+                continue
+
+            start = idx
+            j = idx - 1
+            while j >= 0:
+                stripped = lines[j].strip()
+                if stripped == '' or stripped == '---' or stripped.startswith('>'):
+                    j -= 1
+                    continue
+                break
+            if j >= 0 and re.match(r'^#{1,3}\s', lines[j]):
+                start = j
+
+            end = idx
+            while end < len(lines) and lines[end].startswith('|'):
+                end += 1
+            while end < len(lines) and lines[end].strip() in ('', '---'):
+                end += 1
+
+            block = lines[start:end]
+            remaining = lines[:start] + lines[end:]
+            return block, remaining
+        return None, lines
+
+    def _render_nav_block(self, block):
+        """Render the navigation block at the top of page 1, then force a page break."""
+        i = 0
+        while i < len(block):
+            line = block[i]
+            if line.startswith('#'):
+                i = self._handle_heading(block, i)
+            elif line.startswith('>'):
+                i = self._handle_blockquote(block, i)
+            elif line.startswith('|') and '|' in line[1:]:
+                i = self._handle_table(block, i)
+            else:
+                i += 1
+        self.doc.add_page_break()
 
     def _handle_heading(self, lines, start_idx):
         line = lines[start_idx]
@@ -343,7 +407,7 @@ class MarkdownToDocxConverter:
                     # Add clickable link in third column for navigation table
                     if is_nav_table and num_cols == 2:
                         chapter_name = row_data[0].strip() if len(row_data) > 0 else ''
-                        self._add_clickable_link(row[2], chapter_name, chapter_name)
+                        self._add_clickable_link(row[2], '点击跳转', chapter_name)
 
         return start_idx
 
