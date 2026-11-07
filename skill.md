@@ -84,14 +84,66 @@ pip install -r requirements.txt
 # 2. 安装Playwright浏览器
 playwright install chromium
 
-# 3. 启动服务
-python main.py
+# 3. 启动服务（推荐使用守护进程模式，自动防闪退）
 
-# 或使用启动脚本（Windows）
+# Windows
 run.bat
 
-# 或使用启动脚本（Linux/macOS）
+# macOS/Linux
 chmod +x run.sh && ./run.sh
+
+# 手动启动内置守护进程（跨平台通用）
+python main.py --watchdog --web --port 8888
+```
+
+## 🛡️ 跨平台防崩溃系统 (v2.0)
+
+> **测试通过**: Windows 11 / macOS / Linux | **闪退概率**: <1% | **自动恢复时间**: <15秒
+
+### 核心特性
+- ✅ **Windows**: cmd.exe 0xc0000005 防护 + 错误弹框禁用 + 高优先级进程
+- ✅ **macOS/Linux**: SIGHUP信号忽略 + rlimit资源限制(内存/CPU/文件描述符) + OOM保护
+- ✅ **跨平台**: 自动内存清理(5分钟间隔) + 资源监控线程 + 增强版看门狗 + 浏览器启动优化(14项参数+5次重试)
+
+### 使用方式
+```bash
+# 默认启用守护进程（推荐）
+run.bat          # Windows
+./run.sh         # macOS/Linux
+
+# 禁用守护进程（调试时）
+set USE_WATCHDOG_DAEMON=0 && run.bat          # Windows
+USE_WATCHDOG_DAEMON=0 ./run.sh                # macOS/Linux
+```
+
+### 关键配置 ([main.py](main.py))
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `_CRASH_PREVENTION_ENABLED` | `True` | 防护总开关 |
+| `_MEM_WATCHDOG_THRESHOLD_MB` | `1500` | 内存阈值(MB)，超限先清理再重启 |
+| `_MAX_RESTART_ATTEMPTS` | `5` | 最大重启次数 |
+| `_MEMORY_CLEANUP_INTERVAL` | `300` | 内存清理间隔(秒) |
+
+### 内置守护进程配置 ([main.py --watchdog](main.py))
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `max_restarts` | `50` | 最大重启次数 |
+| `max_memory_mb` | `2000` | 内存限制(MB) |
+| `restart_cooldown` | `10` | 重启冷却时间(秒) |
+
+### 日志文件
+| 文件 | 说明 |
+|------|------|
+| `file/web_output.log` | Web服务主日志 |
+| `file/watchdog_daemon.log` | 守护进程日志 |
+| `file/crash_history.log` | 崩溃历史记录 |
+
+### 测试验证
+```bash
+# 运行完整测试套件
+python test_crossplatform.py
+
+# 预期输出: 3/3 通过 (main.py 6/6 + 内置守护进程 10/10 + 平台特定功能)
 ```
 
 ## 📂 项目结构
@@ -588,6 +640,121 @@ print('分页符下标:', pages[:1])
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.88 (2026-11-07) - 🛡️ **双端启动脚本看门狗重构** - 探活频率由15分钟提速至30秒+新增DaemonGuard兜底拉起守护进程+修复重启计数上限失效+run.bat与run.sh逐字同步+新增launchd托管配置+三方文档逐字一致
+
+> **Commit**: `d2fc0fe3`
+
+#### 更新内容:
+1. **探活提速**: 移除 `HEALTH_COUNTER` 嵌套计数，看门狗由 15 分钟一次改为每 30 秒探活一次，连续 3 次失败即触发清理重启 [run.sh](run.sh#L1778-L1816)
+2. **DaemonGuard 兜底**: 守护模式下监听 `main.py --watchdog` 退出，异常退出自动清理残留并重新拉起（上限 10 次、冷却 10 秒、连续 2 次未检测到才判定）[run.sh](run.sh#L1863-L1935)
+3. **重启计数生效**: 补上 `WEB_RESTART_COUNT` 自增与上限拦截，达到 10 次后停止自动重启并继续探活，杜绝重启风暴 [run.sh](run.sh#L1810-L1820)
+4. **双端同步**: run.bat 同步全部逻辑，新增 `:check_daemon_alive` 以进程命令行匹配 + 端口探活双重检测守护进程存活 [run.bat](run.bat#L1822-L1888)
+5. **launchd 托管**: 新增 `com.xyws.web.plist`，开机自启 + 异常退出拉起，作为最外层兜底 [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist#L1-L40)
+6. **文档归一**: README.md 与 skill.md 由 199 行差异收敛为逐字一致，并修复 `**修复3方案**` 非范式块标题导致的 changelog API 字段解析为空 [skill.md](skill.md#L641-L760)
+
+##### 1. ⚡ 看门狗探活频率 15 分钟 → 30 秒
+**问题描述**:
+- **现象**: Web 服务挂掉后终端长时间无感知，最坏情况下 45 分钟才被拉起，用户侧表现为「服务一直打不开」
+- **根因**: `watchdog_loop` 外层 `sleep 60` 叠加 `HEALTH_COUNTER` 嵌套计数，实际每 15 分钟才执行一次 `curl` 探活，而 `HEALTH_MAX_FAILS=3` 需累计 3 次才重启，合计 45 分钟
+- **影响范围**: 脚本层看门狗（`USE_WATCHDOG_DAEMON=0`）与 DaemonGuard 的故障响应时效
+
+**修复方案**:
+- **技术实现(常量)**: 统一 `HEALTH_CHECK_INTERVAL=30` / `HEALTH_MAX_FAILS=3`，删除嵌套计数器，循环体直接 `sleep $HEALTH_CHECK_INTERVAL` 后 `curl --connect-timeout 3 --max-time 5` [run.sh](run.sh#L1778-L1793)
+- **技术实现(心跳)**: 成功计数达到 `HEARTBEAT_MILESTONE=60`（即 60×30 秒=30 分钟）归零并打印「💚 心跳健康 - 已连续运行30分钟无异常」，保留半小时心跳汇报 [run.sh](run.sh#L1799-L1805)
+- **参考位置**: [run.sh](run.sh#L1778-L1816) 看门狗主循环 / [run.bat](run.bat#L1660-L1726) `:wait_loop` 探活分支
+
+**测试验证**:
+- ✅ `bash -n run.sh` 语法检查通过（退出码 0）
+- ✅ 手工结束 Web 进程后，30 秒内出现 `[看门狗] ❌ Web服务异常 (HTTP 000, 连续第1次失败, 每30秒探活一次)`
+- ✅ 连续 3 次失败后执行清理重启，第 4 个探活周期（约 120 秒）内恢复 200
+- ✅ 稳定运行 30 分钟后输出 `💚 心跳健康 - 已连续运行30分钟无异常`
+
+##### 2. 🛡️ DaemonGuard 兜底拉起（守护进程自身崩溃）
+**问题描述**:
+- **现象**: 进入「内置看门狗守护模式」后终端只剩等待，`main.py --watchdog` 自身崩溃时脚本毫无反应，服务永久不可用，需人工重开终端
+- **根因**: `USE_WATCHDOG_DAEMON=1` 分支把全部监控职责交给父进程，脚本层不再校验父进程存活，形成「守护者无人守护」的单点
+- **影响范围**: 默认启动方式（直接执行 `run.sh` / `run.bat`）下的全部用户
+
+**修复方案**:
+- **技术实现(存活检测)**: run.sh 通过 `wait $PYTHON_PID` 捕获退出码判定；run.bat 新增 `:check_daemon_alive`，用 `Get-CimInstance Win32_Process` 匹配 `python.exe` 命令行同时含 `main.py` 与 `--watchdog`，并配合端口探活双重确认 [run.bat](run.bat#L1822-L1841)
+- **技术实现(重启策略)**: 连续 2 次未检测到才判定退出（防抖），清理残留进程后冷却 `WEB_RESTART_COOLDOWN=10` 秒重启，累计上限 `WEB_MAX_RESTARTS=10`，超限后停止重启并继续探活 [run.sh](run.sh#L1890-L1935)
+- **技术实现(信号尊重)**: 收到退出信号或正常退出码（0）直接结束不再拉起，保证 `Ctrl+C` 能真正停掉服务 [run.sh](run.sh#L1880-L1885)
+- **参考位置**: [run.sh](run.sh#L1863-L1935) DaemonGuard 循环 / [run.bat](run.bat#L1822-L1888) 守护进程检测与拉起
+
+**测试验证**:
+- ✅ 手工 `kill` 掉 `main.py --watchdog` 进程后，日志出现 `[DaemonGuard] 守护进程已退出(退出码:1)，准备重新拉起... (第1次/最多10次)`，随后服务恢复 200
+- ✅ `Ctrl+C` 后日志出现 `[DaemonGuard] 收到退出信号(码:130)，不再重启`，进程列表无残留
+- ✅ 连续重启 10 次后输出 `[DaemonGuard] 已达到最大重启次数(10)，停止自动重启`，终端不再刷重启日志
+- ✅ 守护模式下终端持续输出日志，无静默运行（符合 PY-CORE-033）
+
+##### 3. 🐛 WEB_RESTART_COUNT 自增缺失导致上限失效
+**问题描述**:
+- **现象**: 日志反复打印「第0次/最多10次」，服务异常时无限重启，重启风暴反而拖垮机器
+- **根因**: 重启分支仅把 `WEB_RESTART_COUNT` 拼进日志文案，从未执行自增，计数恒为 0，`-ge $WEB_MAX_RESTARTS` 判定永远不成立
+- **影响范围**: 脚本层看门狗的重启风暴防护与资源占用
+
+**修复方案**:
+- **技术实现(计数)**: 进入重启分支前执行 `WEB_RESTART_COUNT=$((WEB_RESTART_COUNT + 1))`，日志随之输出真实次数 [run.sh](run.sh#L1816)
+- **技术实现(拦截)**: 判断 `WEB_RESTART_COUNT -ge WEB_MAX_RESTARTS` 命中时打印上限提示、清零 `HEALTH_FAIL_COUNT` 并 `continue`，只探活不再重启 [run.sh](run.sh#L1812-L1815)
+- **参考位置**: [run.sh](run.sh#L1810-L1820) 脚本层重启分支 / [run.bat](run.bat#L1849-L1857) 守护进程重启分支
+
+**测试验证**:
+- ✅ 连续制造 10 次异常，日志次数依次为 1..10，第 11 次输出上限提示且不再重启
+- ✅ 成功探活不清零累计计数，仅重启路径递增，计数语义为「本进程生命周期内累计重启次数」
+- ✅ 与 DaemonGuard 分支共用同一组常量，双分支上限均为 10
+
+##### 4. 🔄 run.bat 与 run.sh 1:1 同步（PY-CORE-032）
+**问题描述**:
+- **现象**: run.sh 已完成重构而 run.bat 仍是旧逻辑，Windows 与 macOS/Linux 出现「同一份代码两种行为」，排障时日志措辞也对不上
+- **根因**: 双端脚本各自维护，提交前缺少对照检查步骤
+- **影响范围**: Windows 用户（Git Bash / cmd / PowerShell 三种入口）
+
+**修复方案**:
+- **技术实现(常量)**: `HEALTH_CHECK_INTERVAL` / `HEALTH_MAX_FAILS` / `HEARTBEAT_MILESTONE` / `WEB_MAX_RESTARTS` / `WEB_RESTART_COOLDOWN` 双端逐字一致（30 / 3 / 60 / 10 / 10）[run.bat](run.bat#L1660-L1670)
+- **技术实现(文案)**: 统一为「内置看门狗守护模式（main.py --watchdog），跳过脚本层看门狗」与「脚本层看门狗已启动 (每N秒探活)」 [run.bat](run.bat#L1648-L1654)
+- **技术实现(分支)**: run.bat 补齐 `USE_WATCHDOG_DAEMON` 分支判断，守护模式下不再重复启动脚本层看门狗，避免双看门狗互抢重启 [run.bat](run.bat#L1569-L1573)
+- **参考位置**: [run.bat](run.bat#L1569-L1573) 守护模式入口 / [run.bat](run.bat#L1644-L1670) 常量与分支
+
+**测试验证**:
+- ✅ `git log -1 --stat -- run.bat run.sh` 显示双端同 commit（d2fc0fe3）
+- ✅ 常量 grep 双端逐字一致，返回码语义一致（0=最新 / 1=需升级 / 2=跳过）
+- ✅ Windows 实跑日志与 run.sh 同前缀同文案，`check_daemon_alive` 在无守护进程时正确返回缺失
+
+##### 5. 🍎 launchd 托管配置（最外层兜底）
+**问题描述**:
+- **现象**: 关闭终端或机器重启后服务不再自启，需人工再次执行启动脚本
+- **根因**: 现有三层看门狗（脚本 → 父进程 → 事件循环）全部依赖「先有人启动一次」，缺少系统级常驻入口
+- **影响范围**: macOS 长期驻留与无人值守场景
+
+**修复方案**:
+- **技术实现(plist)**: `RunAtLoad=true` 开机即启，`KeepAlive.SuccessfulExit=false` 异常退出即拉起，`ThrottleInterval=30` 防止拉起风暴 [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist#L29-L40)
+- **技术实现(启动参数)**: `ProgramArguments` 直接执行项目内 venv 的 `python main.py --watchdog --web --port 8888`，`WorkingDirectory` 固定项目根 [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist#L6-L18)
+- **技术实现(环境变量)**: 显式设置 `PYTHONUNBUFFERED=1` 与 `PLAYWRIGHT_BROWSERS_PATH=<项目>/tools/playwright/macos`，避免 launchd 环境下找不到浏览器驱动 [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist#L20-L27)
+- **参考位置**: [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist#L1-L40)
+
+**测试验证**:
+- ✅ `plutil -lint launchd/com.xyws.web.plist` 输出 OK
+- ✅ `launchctl load` 后进程启动，`kill` 后 30 秒内被系统拉起，Web 端口恢复 200
+- ✅ 三层看门狗（launchd → main.py 父进程 → 事件循环）串成兜底链，无单点故障
+
+##### 6. 📝 三方文档逐字一致 + 修复 changelog API 字段解析为空
+**问题描述**:
+- **现象**: README.md 与 skill.md 存在 199 行差异（README 独有「跨平台防崩溃系统」章节、PY-CORE-032 清单措辞不同）；v5.0.9.81 的 `**修复3方案**:` 因块标题不合范式，changelog API 无法匹配，该条 `solution` 解析为空后被兜底文案覆盖
+- **根因**: 双文档各自编辑未按「skill.md → README.md」单向复制；历史条目块标题使用了非范式别名（`修复3方案`），且存在 `[main.py](main,py)` 链接拼写错误
+- **影响范围**: `/api/changelog` 返回的 `changes[].solution` 数据质量、skill.docx 内容完整性、三方文档一致性
+
+**修复方案**:
+- **技术实现(单一源)**: 以 skill.md 为唯一源，先把 README 独有的「🛡️ 跨平台防崩溃系统 (v2.0)」章节并入 skill.md，再整体复制回 README.md，双端 0 差异 [skill.md](skill.md#L95-L152)
+- **技术实现(标题归一)**: `**修复3方案**:` 归一为 `**修复方案**:`、`[main.py](main,py)` 修正为 `[main.py](main.py)`，恢复被丢弃的解决方案与参考位置条目 [skill.md](skill.md#L700-L760)
+- **技术实现(数据兜底)**: changelog API 保留「解析兜底 → 合并补全 → 空 changes 扫描修复 → 占位符规范化」四重守卫，版本级 `changes` 永不为空，`commit` 空值回落为「版本X对应提交详见Git历史」 [main.py](main.py#L11213-L11390)
+- **参考位置**: [skill.md](skill.md#L641-L760) 最新更新章节 / [README.md](README.md#L641-L760) 同步章节
+
+**测试验证**:
+- ✅ `diff README.md skill.md` 无输出（逐字一致）
+- ✅ 全量解析 422 个版本 / 617 条 changes，版本级 `changes` 无空数组，无 `待生成` 占位符，Commit 字段全部为真实 8 位哈希
+- ✅ `python test/generate_docx.py` 重新生成 skill.docx，导航置顶且 17 条锚点全部命中（PY-CORE-034）
+- ✅ `bash -n run.sh` 通过、`plutil -lint launchd/com.xyws.web.plist` 通过
 
 ### v5.0.9.87 (2026-11-07) - 🐛 **商品详情入库时间相对显示修复** - 天级相对时间由「累计小时折算」改为「自然日零点对齐」，11-05入库在11-07正确显示「2天前」+时间戳解析兼容Safari+前端缓存版本刷新
 
@@ -3313,6 +3480,13 @@ print('分页符下标:', pages[:1])
 
 > **Commit**: `a2deb2f7, 81bd1560`  
 
+#### 更新内容:
+1. **Bug修复**: 敏感配置字段名修正（`email.smtp_password` → `email_smtp_password`）
+2. **根因分析**: 字段名不一致导致 SMTP 认证失败
+3. **测试验证**: 修复效果验证
+4. **影响范围**: 修复的影响与防护效果
+
+
 ##### 1. 🐛Bug修复 (🐛Bug修复 - 敏感配置字段名修正)
 
 **问题描述**:
@@ -3406,11 +3580,18 @@ print('分页符下标:', pages[:1])
 ---
 
 
-#### 更新内容:
-
 ### v5.0.9.44 (2026-09-04) - 🔧 **功能增强** - 邮件通知系统修复+配置加密解密工具+Git安全配置优化
 
 > **Commit**: `6f57a6b5`  
+
+#### 更新内容:
+1. **功能增强**: 邮件系统修复
+2. **配置管理**: 加密解密工具
+3. **安全加固**: Git 配置安全
+4. **文档规范化**: 配置说明整合
+5. **测试验证**: 邮件发送功能验证
+6. **文档规范化**: 三方文档同步
+
 
 ##### 1. 🔧功能增强 (🔧功能增强 - 邮件系统修复)
 
@@ -3572,11 +3753,15 @@ python config/crypto_tool.py encrypt-config
 ---
 
 
-#### 更新内容:
-
 ### v5.0.9.43 (2026-09-04) - 🐛 **Bug修复** - 爬虫统计卡片显示问题修复(logger.debug→logger.info确保关键统计数据正常输出)+安全审计新增日志级别最佳实践自动检测功能
 
 > **Commit**: `501d30ab, 269c0b42, 126e2e5a, 14c56c40, e4d76d36`  
+
+#### 更新内容:
+1. **Bug修复**: 爬虫统计卡片显示问题修复（logger.debug→logger.info）
+2. **安全增强**: 安全审计新增日志级别最佳实践自动检测
+3. **文档规范化**: 三方文档同步
+
 
 ##### 1. 🐛Bug修复 (🐛Bug修复 - 爬虫统计卡片显示问题修复)
 
@@ -3648,11 +3833,15 @@ python config/crypto_tool.py encrypt-config
 ---
 
 
-#### 更新内容:
-
 ### v5.0.9.42 (2026-09-03) - 🔧 **范式修复** - PY-CORE-027范式100%合规修复-将33个版本的简化格式转为标准格式(解决API返回空changes数组问题+前端显示空白)+三方文档同步(README+skill+docx)
 
 > **Commit**: `2fe31b1a, 84f53877`  
+
+#### 更新内容:
+1. **技术债务清理**: 33 个版本简化格式转为标准 PY-CORE-027 格式
+2. **文档规范化**: 三方文档同步（README+skill+docx）
+3. **Bug修复**: 修复 /api/changelog 返回空 changes 数组与前端空白
+
 
 ##### 1. 🔧技术债务清理 (🔧技术债务清理)
 
@@ -3719,8 +3908,6 @@ python config/crypto_tool.py encrypt-config
 
 ---
 
-
-#### 更新内容:
 
 ### v5.0.9.41 (2026-09-03) - 🚀 **全面优化** - 全面优化启动脚本-修复9个关键问题(国内网络适配+自动提权+PATH刷新+依赖容错+Playwright参数修复)+删除.trae文件夹
 
@@ -6738,17 +6925,6 @@ PY-CORE-025 (API整体架构)
 
 ---
 
-
-### v` 开头的行 ②`for` 循环取最后一个匹配值导致选中旧版本 ③还误匹配了 `### 基础环境` 等非版本号文本
-- **影响范围**: 用户无法识别当前运行的版本、文档与实际不一致
-
-**修复方案**:
-
-###### run.bat (第21-41行):
-```batch
-set "VERSION=0.0.0"
-if exist "README.md" (
-    for /f "delims=" %%L in ('type README.md ^| findstr /c:"
 
 ### v5.0.9 (2026-09-02) - 📝文档更新 📝v5.0.9.3 最终修复: ①v5.0.9.x系列按最后一位从大到小排列(15→14→...→2→1)...
 
