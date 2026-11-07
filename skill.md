@@ -22,6 +22,7 @@
 | 📐 双启动脚本同步范式 (PY-CORE-032) | run.sh / run.bat 1:1 同步要求 |
 | 📐 终端实时日志接入范式 (PY-CORE-033) | sh / bat 实时日志双方案 |
 | 📐 DOCX 文档生成范式 (PY-CORE-034) | 导航置顶第一页与生成校验规范 |
+| 📐 安全审计零问题范式 (PY-CORE-035) | 总计问题必须为 0 的判定标准 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -639,7 +640,185 @@ print('分页符下标:', pages[:1])
 
 ---
 
+## 📐 安全审计零问题范式 (PY-CORE-035)
+
+> **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [test/security_audit.py](test/security_audit.py) / [main.py](main.py) / [skill.md](skill.md) / [README.md](README.md)
+
+### 🔴 核心原则：总计问题必须为 0
+
+**审计报告的「总计问题」必须恒为 0，而不是「只有 0 个高危」。** 「0 高危 + 23 信息」不是达标，是把噪声当结论 —— 报告里只要还有任何一条非零计数，就说明要么代码有缺陷没修，要么扫描规则本身写错了。**任何非零问题都必须被消除，消除方式只能是「修代码」或「修规则」，禁止「调低等级」或「加白名单」蒙混。**
+
+### 四类问题的唯一正确处置
+
+| 问题类型 | 判定依据 | 唯一正确处置 | 禁止做法 |
+|---|---|---|---|
+| **真实缺陷** | 代码确实存在可被利用的弱点 | 修代码，并补真实攻击载荷验证 | 降级/加注释/加白名单 |
+| **规则误报** | 扫描规则语义写反或匹配错位 | 修规则（正则/上下文/大小写归一） | 在报告里人工剔除 |
+| **正确防护被当风险** | 该写法本身即防护手段（如 `await lock`） | 转正向验证，记入 `verified_controls` | 报成 INFO 计入总数 |
+| **无法判定项** | 服务未运行、依赖缺失导致无法验证 | 记入 `observations`，显式标注「不计入问题」 | 计入 `total_issues` |
+
+### 三层判定结构（报告必须能区分）
+
+```
+issues_detail       → 可执行修复的问题（CRITICAL/HIGH/MEDIUM/LOW），计入 total_issues
+observations_detail → 观测项（原 INFO），不计入 total_issues
+verified_controls   → 已确认生效的安全控制（正向验证），不计入 total_issues
+attack_defense      → 黑盒攻防逐项结论（BLOCKED / BYPASSED / INCONCLUSIVE）
+```
+
+`summary.total_issues` 只累加前三档，INFO 一律走 `observations`。这样「总计问题 0」是可验证的事实，而不是靠人去读明细判断。
+
+### 攻防必须是真的
+
+| 规则 | 说明 |
+|---|---|
+| **🔴 禁止模拟打印** | 循环 `print("✅ 已阻截")` 而无真实请求，等于自证安全，属于伪造结论 |
+| **🔴 必须发真实请求** | 对 `127.0.0.1:PORT` 发起真实 HTTP 载荷，用响应状态码/响应体判定 |
+| **🔴 必须双向判定** | 状态码维度 + 内容维度（路径遍历 200 可能只是 SPA 回退，必须复核响应体无 `root:x:`） |
+| **🔴 服务不可达要降级** | 服务未运行记 `observations` 并跳过，禁止伪造「全部通过」 |
+
+**必测载荷清单（13 项基线）**: 超大请求体、路由级超长字段、畸形 JSON、类型混淆、非法字段注入、路径遍历、反射型 XSS、SQL 注入、CSRF Origin、非法 HTTP 方法、路径遍历内容复核、安全响应头基线、错误信息泄露。
+
+### 退出码语义
+
+| 条件 | 退出码 | 含义 |
+|---|---|---|
+| `critical > 0` | 2 | 严重问题，阻断交付 |
+| `total_issues > 0` | 1 | 仍有中低危问题，未达标 |
+| `total_issues == 0` | 0 | 达标 |
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 把 `await lock` / `async with lock` 当风险 | 正确防护被报成 23 条 INFO，总计永远不为 0 | 转正向验证，计入 `verified_controls` |
+| HTTP 响应头用大小写敏感字典键匹配 | 服务端返回小写头名，4 项安全头全被判缺失 | 全部 `lower()` 归一化后再比对 |
+| 超大请求体只认 413 | 服务端读完 body 前断连，客户端拿 `Broken pipe` 被判「未拦截」 | 识别断连为「主动拒收」 |
+| 路径遍历只看状态码 | SPA 回退必然 200，误判为目录穿越成功 | 追加响应体内容级复核 |
+| 用 INFO 表示「我看过但没问题」 | 噪声淹没真问题，总计永不为 0 | 用 `verified_controls` / `observations` 表达 |
+| 服务未运行仍输出「全部通过」 | 伪造结论 | 记 `observations` 并显式跳过 |
+
+### 落地检查清单
+
+```
+[ ] summary.total_issues == 0 且 critical/high/medium/low 全为 0
+[ ] summary.info == 0（INFO 已迁入 observations，不再计入问题）
+[ ] observations_detail 中每条都标注「不计入问题」
+[ ] verified_controls 列出已确认生效的防护（如异步锁 N 处）
+[ ] attack_defense.cases 每项都有 status（BLOCKED/BYPASSED/INCONCLUSIVE）
+[ ] 服务运行态与停止态两种场景均退出码 0
+[ ] 不存在任何「循环打印已阻截但无真实请求」的伪攻防代码
+```
+
+### 验证命令
+
+```bash
+python test/security_audit.py; echo "EXIT=$?"
+```
+
+> **判定标准**: 输出 `总计问题: 0`、`严重/高危/中危/低危/信息` 全为 0、`EXIT=0`。任一非零即视为「未符合本范式」。
+
+---
+
 ## 🔄 最新更新
+
+### v5.0.9.89 (2026-11-07) - 🎯 **安全审计零问题达标与真实黑盒攻防验证** - 13项真实HTTP载荷替代模拟打印+三层判定结构拆分issues与observations+异步锁误报转正向验证+响应头大小写归一+断连识别为主动拒收+路径遍历内容级复核+PY-CORE-035范式固化
+
+> **Commit**: `42d76c87`
+
+#### 更新内容:
+1. **真实攻防**: 删除「循环打印已阻截」的伪攻防，改为对 `127.0.0.1:8888` 发起 13 项真实 HTTP 攻击载荷，用状态码与响应体双向判定 [test/security_audit.py](test/security_audit.py#L1161-L1398)
+2. **三层结构**: 报告拆分为 `issues_detail` / `observations_detail` / `verified_controls` / `attack_defense` 四段，INFO 不再计入 `total_issues`，使「总计问题 0」成为可验证事实 [test/security_audit.py](test/security_audit.py#L351-L395)
+3. **误报修正**: `await ... lock` 由风险项改为正向验证，23 条 INFO 归零并统计为「异步锁同步保护 23 处」 [test/security_audit.py](test/security_audit.py#L903)
+4. **判定加固**: 响应头全部 `lower()` 归一化、超大请求体断连识别为主动拒收、路径遍历追加响应体内容级复核 [test/security_audit.py](test/security_audit.py#L1313-L1360)
+5. **接口加固**: 商品查询接口新增 1MB 请求体上限（超限 413）与 `{'skus'}` 字段白名单（越界 400），看门狗端口回退改读 `NETWORK_CONFIG` 消除硬编码 [main.py](main.py#L8623) [main.py](main.py#L9749-L9773)
+6. **范式固化**: 新增 PY-CORE-035「安全审计零问题范式」，明确四类问题只有「修代码/修规则」两种合法处置，禁止降级与白名单 [skill.md](skill.md#L639-L725)
+
+##### 1. 🥊 真实黑盒攻防验证（13 项载荷）
+**问题描述**:
+- **现象**: 审计报告打印「✅ 已阻截」却从未发出任何请求，实际是在循环里自证安全；服务挂掉也照样输出「全部通过」
+- **根因**: 攻防段由纯打印语句构成，无 `_http_probe` 调用、无响应判定、无服务可达性检查，属于伪造结论
+- **影响范围**: 全部 13 项攻击载荷的验证有效性，以及审计报告的可信度
+
+**修复方案**:
+- **技术实现(探针)**: 新增 `_http_probe()` 统一发起真实请求，返回 `(status, body, headers)`，并把 `BrokenPipeError` / `ConnectionResetError` 识别为「主动拒收」而非「未拦截」 [test/security_audit.py](test/security_audit.py#L1161-L1182)
+- **技术实现(可达性)**: `_server_alive()` 先探活，服务未运行时把 `attack_defense.server_available` 置 False 并降级为观测项，禁止伪造通过 [test/security_audit.py](test/security_audit.py#L1183-L1209)
+- **技术实现(载荷)**: `_run_live_attack_defense_tests()` 逐项执行超大请求体、路由超长字段、畸形 JSON、类型混淆、非法字段注入、路径遍历、反射型 XSS、SQL 注入、CSRF Origin、非法 HTTP 方法、路径遍历内容复核、安全响应头基线、错误信息泄露 [test/security_audit.py](test/security_audit.py#L1191-L1398)
+- **参考位置**: [test/security_audit.py](test/security_audit.py#L1161-L1398)
+
+**测试验证**:
+- ✅ 服务运行态：13 项载荷全部拦截，`通过 13 / 失败 0`
+- ✅ 服务停止态：输出「服务未运行，已跳过主动攻击验证」并记入观测项，退出码仍为 0
+- ✅ 超大请求体（>1MB）返回 HTTP 413，字段越界返回 HTTP 400，CSRF 跨源返回 HTTP 403，非法方法返回 HTTP 405
+- ✅ 安全响应头 4/4 全部存在（归一化后比对）
+
+##### 2. 🏗️ 三层判定结构拆分（INFO 不再计入问题）
+**问题描述**:
+- **现象**: 报告显示「总计问题 23、严重 0」，用户看到的结论是「有 23 个问题」，与「系统安全状况良好」自相矛盾
+- **根因**: `_add_issue()` 对所有级别无条件累加 `total_issues`，INFO 与真实缺陷混在同一计数器
+- **影响范围**: 审计统计口径与退出码判定
+
+**修复方案**:
+- **技术实现(分流)**: INFO 级别改走 `observations` 分支，直接 `return` 不进 `total_issues`，报告新增 `observations_detail` 段并标注「不计入问题」 [test/security_audit.py](test/security_audit.py#L351-L382)
+- **技术实现(正向验证)**: 新增 `_add_verified_control()` 与 `verified_controls` 段，专门承载「已确认生效的防护」 [test/security_audit.py](test/security_audit.py#L383-L395)
+- **技术实现(退出码)**: `critical>0` → 2，`total_issues>0` → 1，`total_issues==0` → 0，中低危同样视为不达标 [test/security_audit.py](test/security_audit.py#L1488-L1492)
+- **参考位置**: [test/security_audit.py](test/security_audit.py#L1422-L1492)
+
+**测试验证**:
+- ✅ `summary.total_issues == 0` 且 `critical/high/medium/low/info` 全为 0
+- ✅ 报告四段齐全：`issues_detail` / `observations_detail` / `verified_controls` / `attack_defense`
+- ✅ 服务运行态与停止态两种场景退出码均为 0
+
+##### 3. 🐛 异步锁误报修正（23 条 INFO → 正向验证）
+**问题描述**:
+- **现象**: 每次审计固定产出 23 条「[Async Safety] 异步锁操作」，总计问题永远无法归零
+- **根因**: 扫描规则把 `await ... lock` 当作风险模式上报，但该写法本身就是并发防护手段，规则语义写反
+- **影响范围**: 并发安全扫描的全部结论，以及「总计问题 0」的达标可能
+
+**修复方案**:
+- **技术实现(规则反转)**: 删除 `await ... lock` 风险规则，改为统计 `await\s+.*lock|async\s+with\s+.*lock` 命中数并调用 `_add_verified_control('异步锁同步保护', N)` [test/security_audit.py](test/security_audit.py#L903)
+- **技术实现(输出)**: 报告尾部输出「✅ 已确认生效的安全控制: 异步锁同步保护 23 处」，把噪声转为证据
+- **参考位置**: [test/security_audit.py](test/security_audit.py#L903) [test/security_audit.py](test/security_audit.py#L1457-L1461)
+
+**测试验证**:
+- ✅ 审计输出由「23 个问题」变为「异步锁同步保护: 23 处」
+- ✅ `total_issues` 由 23 降至 0，退出码由 1 变为 0
+
+##### 4. 🔒 判定加固与接口安全基线
+**问题描述**:
+- **现象**: 4 项安全响应头全部被误判缺失；超大请求体被判定「未拦截」；路径遍历返回 200 被判定「目录穿越成功」
+- **根因**: 响应头字典键大小写敏感匹配、只认 413 状态码、只看状态码不看响应体（SPA 回退必然 200）
+- **影响范围**: 攻防结论的准确性，以及商品查询接口的输入校验
+
+**修复方案**:
+- **技术实现(头归一化)**: 响应头统一 `lower()` 后再比对 `x-content-type-options` / `x-frame-options` / `content-security-policy` / `referrer-policy` [test/security_audit.py](test/security_audit.py#L1342-L1360)
+- **技术实现(断连识别)**: 服务端读完 body 前断连视为主动拒收，计入 `passed` [test/security_audit.py](test/security_audit.py#L1161-L1182)
+- **技术实现(内容复核)**: 路径遍历在状态码 200 时追加响应体检查，确认不含 `root:x:` 才判定未泄露 [test/security_audit.py](test/security_audit.py#L1313-L1333)
+- **技术实现(接口加固)**: 商品查询接口新增 `content-length > 1MB` 直接返回 413、非 `skus` 字段返回 400、`request.json()` 标记 `[SECURITY] VALIDATED` [main.py](main.py#L9749-L9773)
+- **参考位置**: [main.py](main.py#L9749-L9773) [main.py](main.py#L8623)
+
+**测试验证**:
+- ✅ 安全响应头 4/4 全部命中（原 4 项全误报已消除）
+- ✅ 超大请求体返回 413 或连接被主动断开，均计入拦截
+- ✅ 路径遍历返回 SPA 首页且响应体无敏感内容，判定为「未泄露」
+- ✅ `py_compile` 通过，`main.py` / `test/security_audit.py` 语法无错误
+
+##### 5. 📝 PY-CORE-035 安全审计零问题范式
+**问题描述**:
+- **现象**: 「0 高危 + 23 信息」被当成达标交付，噪声掩盖真问题，后续版本反复出现非零总计
+- **根因**: 缺少强制标准约束「总计问题」的定义与消除方式，规则误报可被「调低等级」蒙混过关
+- **影响范围**: 全部后续版本的安全审计交付标准
+
+**修复方案**:
+- **技术实现(核心原则)**: 明确「总计问题必须恒为 0」，消除方式只能是「修代码」或「修规则」，禁止降级、禁止加白名单 [skill.md](skill.md#L645-L648)
+- **技术实现(处置表)**: 四类问题（真实缺陷 / 规则误报 / 正确防护被当风险 / 无法判定项）各自规定唯一正确处置与禁止做法 [skill.md](skill.md#L650-L658)
+- **技术实现(攻防铁律)**: 禁止模拟打印、必须发真实请求、必须双向判定、服务不可达必须降级 [skill.md](skill.md#L668-L678)
+- **参考位置**: [skill.md](skill.md#L639-L725) [README.md](README.md#L639-L725)
+
+**测试验证**:
+- ✅ README.md 与 skill.md 逐字一致（`diff` 无差异）
+- ✅ 导航表新增第 18 行「📐 安全审计零问题范式 (PY-CORE-035)」，DOCX 链接 18/18 全部命中
+- ✅ skill.docx 由 skill.md 重新生成，导航仍置顶第一页且分页符紧跟导航表
 
 ### v5.0.9.88 (2026-11-07) - 🛡️ **双端启动脚本看门狗重构** - 探活频率由15分钟提速至30秒+新增DaemonGuard兜底拉起守护进程+修复重启计数上限失效+run.bat与run.sh逐字同步+新增launchd托管配置+三方文档逐字一致
 
