@@ -21,6 +21,7 @@
 | 📐 版本更新记录范式规范 (PY-CORE-027) | changelog 结构强制规范 |
 | 📐 双启动脚本同步范式 (PY-CORE-032) | run.sh / run.bat 1:1 同步要求 |
 | 📐 终端实时日志接入范式 (PY-CORE-033) | sh / bat 实时日志双方案 |
+| 📐 DOCX 文档生成范式 (PY-CORE-034) | 导航置顶第一页与生成校验规范 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -489,7 +490,132 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 
 ---
 
+## 📐 DOCX 文档生成范式 (PY-CORE-034)
+
+> **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [skill.md](skill.md) / [README.md](README.md) / skill.docx / [test/generate_docx.py](test/generate_docx.py)
+
+### 🔴 核心原则：导航必须落在第一页
+
+**docx 的第一页固定为「标题 + 文档导航」，正文一律从第二页开始。** 导航不是装饰，是读者的第一入口 —— 一份 2 万行的规范文档，没有可点击索引等于没有目录。本范式与 `PY-CORE-031` 互补：**031 管「用什么生成」，034 管「生成成什么样」**。
+
+| 规则 | 说明 | 违反后果 |
+|------|------|----------|
+| **🔴 唯一生成器** | skill.docx 只能由 `test/generate_docx.py` 从 skill.md 生成 | 断链/样式丢失/代码块错乱 |
+| **🔴 导航置顶** | 导航块恒定位于第 1 页，其后立刻分页 | 读者翻页找目录 |
+| **🔴 整块搬迁** | 标题 + 引言 + 表格三件套一起搬，禁止只搬表格 | 第一页出现无标题孤表，标题掉到第 2 页 |
+| **🔴 锚点零缺失** | 每个导航行的 `w:anchor` 必须命中 `w:bookmarkStart` | 点击无反应，导航变纯文本 |
+| **🔴 首行无 BOM** | md 首行禁止出现 U+FEFF | H1 渲染成 `# 标题`，多出一个井号 |
+| **🔴 改 md 必重生成** | 任何 skill.md 改动后必须重新生成 skill.docx | 三方文档不同步 |
+
+### 五步流程
+
+```
+改 skill.md → 同版本块逐字复制到 README.md → python test/generate_docx.py
+            → 结构校验（锚点/分页/首行）→ 提交
+```
+
+### 生成器内部机制（必须理解的三个函数）
+
+| 函数 | 职责 | 关键约束 |
+|------|------|----------|
+| `_extract_nav_block(lines)` | 从正文中整块切出导航（标题+引言+表格），返回 `(nav_block, remaining)` | 向上回溯必须跨过空行、`---`、`>` 引言，直到命中 H1/H2；向下吞掉表格与尾随空行/分隔线 |
+| `_render_nav_block(block)` | 独立渲染导航块，结尾强制 `add_page_break()` | 只在第一个 H1 渲染完成后调用，与 md 源码位置完全解耦 |
+| `_handle_heading(lines, i)` | 渲染标题并给 H2/H3 打 `w:bookmarkStart` | H4 及以下不建书签，导航行指向 H4 必然断链 |
+
+**导航表识别规则**: 表格首行单元格同时含「章节」+（「位置」或「说明」）即判定为导航表；识别失败时整块留在正文原位置，不会报错，只会静默失去置顶效果。
+
+**锚点生成规则**: 标题文本小写 → 移除非单词字符 → 空格转 `-` → 合并连续 `-`，与 GitHub 风格锚点一致，保证 md 预览与 docx 内跳转指向同一处。
+
+**超链接显示文本**: 第 3 列固定显示 `🔗 点击跳转`，章节名只用于查找锚点，不写进单元格 —— 否则长标题会把列宽撑爆。
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 向上回溯只跳空行，遇到 `>` 引言就停 | 表格被抽走、标题留在原地，第 1 页出现无标题孤表 | 空行/`---`/`>` 一律跳过，直到命中标题 |
+| 回溯不限制层级，一路追到 H3/H4 | 把上一章节的正文一起切进导航块，内容重复 | 只认 `^#{1,2}\s` 的标题作为导航块起点 |
+| 导航表仍为 2 列 | 没有跳转列，读者只能看不能用 | 生成器自动补第 3 列「位置（点击跳转）」 |
+| 第 3 列写章节名 | 单元格过长、列宽失控 | 固定文案 `🔗 点击跳转` |
+| 导航块依赖 md 中的物理位置 | 别人把导航挪到文末，docx 里也跟着沉底 | 提取后在首个 H1 之后强制插入 |
+| 首行 `#` + U+FEFF + `#` | `lstrip('#')` 遇 BOM 停止，标题多一个 `#` | 二进制清除 BOM，首行只留 `# 标题` |
+| 导航行指向 H4/H5 | 无对应书签，点击无效 | 导航只收录 H2/H3 章节 |
+| 只校验「生成成功」不校验锚点 | 断链静默存在，打开才发现点不动 | 必须实跑锚点命中校验脚本 |
+
+### 落地检查清单
+
+```
+[ ] skill.md / README.md 首行均无 BOM
+[ ] 导航块 = H2 标题 + 引言引用 + 表格，三件套完整
+[ ] docx 第一个表格即导航表，行数 = 表头 1 + 条目 N
+[ ] 分页符紧跟在导航表之后（正文从第 2 页开始）
+[ ] w:hyperlink 数 == w:anchor 数 == 命中书签数，未命中为空
+[ ] README.md 导航行锚点同样全部命中
+[ ] 文件大小 > 100KB（正常 350-400KB）
+[ ] 三方文档同版本块逐字一致
+```
+
+### 验证命令
+
+```bash
+python test/generate_docx.py
+```
+
+```python
+import zipfile, os
+from xml.etree import ElementTree as ET
+
+W = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+root = ET.fromstring(zipfile.ZipFile('skill.docx').read('word/document.xml'))
+children = list(root.find(W + 'body'))
+
+bookmarks = {b.get(W + 'name') for b in root.iter(W + 'bookmarkStart')}
+links = [a.get(W + 'anchor') for a in root.iter(W + 'hyperlink') if a.get(W + 'anchor')]
+miss = [a for a in links if a not in bookmarks]
+
+print('大小 %.1f KB | 链接 %d | 命中 %d | 未命中 %s' % (
+    os.path.getsize('skill.docx') / 1024, len(links),
+    len(links) - len(miss), miss or '无'))
+print('第一页:', ' -> '.join(
+    ''.join(t.text or '' for t in e.iter(W + 't'))[:30] for e in children[:5]))
+
+pages = [i for i, e in enumerate(children)
+         if any(br.get(W + 'type') == 'page' for br in e.iter(W + 'br'))]
+print('分页符下标:', pages[:1])
+```
+
+> **判定标准**: 任一导航行点击无反应、或分页符未紧跟导航表、或首行标题带 `#` 前缀，即视为「未符合本范式」。
+
+---
+
 ## 🔄 最新更新
+
+### v5.0.9.86 (2026-11-07) - 📐 **新增PY-CORE-034 DOCX文档生成范式** - 将「导航置顶第一页+整块搬迁+锚点零缺失+首行无BOM+改md必重生成」固化为P0强制规范+导航表扩容16→17行+PY-CORE-031补交叉引用(031管用什么生成/034管生成成什么样)+skill.docx重新生成17链接全命中
+
+> **Commit**: 待提交
+
+#### 更新内容:
+1. **新增 P0 范式章节**: skill.md 与 README.md 逐字新增 `PY-CORE-034 DOCX 文档生成范式`，含六条铁律表、五步流程、生成器三函数机制、8 条坑位表、落地检查清单与可复制的锚点校验脚本 [skill.md](skill.md) [README.md](README.md)
+2. **导航表扩容**: 导航表由 16 行增至 17 行，新增「📐 DOCX 文档生成范式 (PY-CORE-034)」条目，与 PY-CORE-027/032/033 三条范式并列 [skill.md](skill.md#L10-L35)
+3. **交叉引用消歧**: `PY-CORE-031` 补注「生成流程与产出结构以 PY-CORE-034 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L17321)
+4. **skill.docx 重新生成**: 由 skill.md 重新生成，17 个导航超链接全部命中书签，导航仍固定第 1 页、正文从第 2 页开始
+
+##### 1. 📐 新增 PY-CORE-034 DOCX 文档生成范式 (把「导航置顶」从实现细节升格为强制规范)
+**问题描述**:
+- **现象**: 「导航必须在第一页」此前只是 `test/generate_docx.py` 里的实现细节，skill.md 无任何文字约束
+- **风险**: 后续任何人对生成器或 md 结构调整，都可能悄悄把导航挪回原位，且无检查清单可依
+- **次生问题**: `PY-CORE-031` 只写了「唯一生成器 + 特性表」，未定义产出必须满足的结构底线
+
+**修复方案**:
+- **技术实现(规范)**: 新增 `PY-CORE-034` 作为 docx 产出的结构标准，明确六条铁律（唯一生成器/导航置顶/整块搬迁/锚点零缺失/首行无 BOM/改 md 必重生成）
+- **技术实现(机制固化)**: 把 `_extract_nav_block()` 的回溯边界（跨空行、`---`、`>` 引言，只认 H1/H2）与 `_render_nav_block()` 的插入时机（首个 H1 之后 + 强制分页）写成可核对的文字规则
+- **技术实现(校验)**: 提供内联 Python 校验脚本，一次性输出大小/链接数/命中数/未命中列表/第一页顺序/分页符下标，替代「生成成功即通过」的弱校验
+- **参考位置**: [test/generate_docx.py](test/generate_docx.py#L241-L300) [test/generate_docx.py](test/generate_docx.py#L390-L405)
+
+**测试验证**:
+- ✅ 导航表 17 行，第 17 行为 `📐 DOCX 文档生成范式 (PY-CORE-034)`
+- ✅ `w:hyperlink` 17 个 / `w:anchor` 17 个 / 未命中为空
+- ✅ docx 第 1 页顺序：H1 标题 → 📚 文档导航 → 引言 → 导航表 → 分页符
+- ✅ README.md 导航 17 行锚点全部命中，与 skill.md 逐字一致
 
 ### v5.0.9.85 (2026-11-07) - 📚 **DOCX文档导航置顶第一页+16章节可点击跳转+标题BOM修复** - skill.md顶部新增「📚 文档导航」16章节索引表+generate_docx.py新增`_extract_nav_block()`/`_render_nav_block()`将导航块强制渲染到第一页并加分页符+导航表第3列生成16个可点击超链接(全部命中书签)+修复skill.md/README.md首行BOM导致H1标题多出`#`+README.md补齐PY-CORE-033与PY-CORE-031章节+skill.docx重新生成
 
@@ -17325,6 +17451,8 @@ diff README.md skill.docx >/dev/null 2>&1 && echo "✅ 文档已同步" || echo 
 ### 🔴 核心原则：唯一生成器 (Single Generator)
 
 **skill.docx 必须且只能使用 `test/generate_docx.py` 生成，禁止使用pandoc/在线工具/手动Word等其他方式。**
+
+> **产出结构标准**: 生成流程、导航置顶、锚点校验、落地检查清单以本文档 `PY-CORE-034 DOCX 文档生成范式` 为准 —— 031 管「用什么生成」，034 管「生成成什么样」。
 
 | 规则 | 说明 | 违反后果 |
 |------|------|----------|
