@@ -752,7 +752,7 @@ print('分页符下标:', pages[:1])
 
 **测试验证**:
 - ✅ `diff README.md skill.md` 无输出（逐字一致）
-- ✅ 全量解析 422 个版本 / 617 条 changes，版本级 `changes` 无空数组，无 `待生成` 占位符，Commit 字段全部为真实 8 位哈希
+- ✅ 全量解析 426 个版本 / 616 条 changes，API 侧输出 431 个版本 / 1205 条 changes，版本级 `changes` 无空数组（0 个），无 `待生成` 占位符，Commit 字段全部为真实 8 位哈希
 - ✅ `python test/generate_docx.py` 重新生成 skill.docx，导航置顶且 17 条锚点全部命中（PY-CORE-034）
 - ✅ `bash -n run.sh` 通过、`plutil -lint launchd/com.xyws.web.plist` 通过
 
