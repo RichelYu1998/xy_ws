@@ -1085,16 +1085,16 @@ check_node_latest_version() {
     local latest_ver=""
     
     # 方法1: npmmirror国内镜像（优先）
-    latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://npmmirror.com/mirrors/node/index.json 2>/dev/null | grep -oP '"version":\s*"v[^"]*"' | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
+    latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://npmmirror.com/mirrors/node/index.json 2>/dev/null | grep -oE '"version":[[:space:]]*"v[0-9.]+"' | head -1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
     
     # 方法2: 华为云镜像
     if [ -z "$latest_ver" ]; then
-        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/nodejs/index.json 2>/dev/null | grep -oP '"version":\s*"v[^"]*"' | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
+        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.huaweicloud.com/nodejs/index.json 2>/dev/null | grep -oE '"version":[[:space:]]*"v[0-9.]+"' | head -1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
     fi
     
     # 方法3: 清华镜像
     if [ -z "$latest_ver" ]; then
-        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/index.json 2>/dev/null | grep -oP '"version":\s*"v[^"]*"' | head -1 | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
+        latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://mirrors.tuna.tsinghua.edu.cn/nodejs-release/index.json 2>/dev/null | grep -oE '"version":[[:space:]]*"v[0-9.]+"' | head -1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | sed 's/v//')
     fi
     
     if [ -z "$latest_ver" ]; then
@@ -1167,7 +1167,7 @@ check_git_latest_version() {
     local latest_ver=""
     
     # 方法1: npmmirror国内镜像（优先）
-    latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://registry.npmmirror.com/-/binary/git-for-windows/git/releases/latest 2>/dev/null | grep -oP '"tag_name":\s*"[^"]*"' | head -1 | grep -oP '[0-9]+\.[0-9]+\.[0-9]+')
+    latest_ver=$(curl -s --connect-timeout 8 --max-time 15 https://registry.npmmirror.com/-/binary/git-for-windows/git/releases/latest 2>/dev/null | grep -oE '"tag_name":[[:space:]]*"[^"]*"' | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
     
     # 方法2: 华为云镜像
     if [ -z "$latest_ver" ]; then
@@ -1736,7 +1736,7 @@ run_web() {
     LAN_ADDR=""
     
     if [ -f "$LOG_FILE" ]; then
-        LAN_ADDR=$(grep -oP '局域网地址: \Khttp://[0-9.]+' "$LOG_FILE" | tail -1)
+        LAN_ADDR=$(sed -n 's/.*局域网地址: \(http:\/\/[0-9.]*\).*/\1/p' "$LOG_FILE" | tail -1)
     fi
 
     if [ -z "$LAN_ADDR" ]; then

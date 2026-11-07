@@ -466,9 +466,9 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 
 ## 🔄 最新更新
 
-### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`subprocess.Popen`全局重试与posix_spawn兜底+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.bat删除playwright-browsers危险清理+新增PY-CORE-033终端实时日志范式+skill.docx重新生成
+### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`subprocess.Popen`全局重试与posix_spawn兜底+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.sh 5处`grep -oP`改POSIX `grep -oE`+run.bat删除playwright-browsers危险清理+新增PY-CORE-033终端实时日志范式+skill.docx重新生成
 
-> **Commit**: HASH_PLACEHOLDER_V584
+> **Commit**: 225b1fae
 
 #### 更新内容:
 1. **Errno 35 根因根治**: `_setup_unix_protection()` 删除硬编码 `RLIMIT_NPROC=100`，改为仅当系统额度低于 2048 时向上修正，杜绝“进程额度瞬间耗尽”导致的 `BlockingIOError: [Errno 35] Resource temporarily unavailable` [main.py](main.py#L3249-L3258)
@@ -479,6 +479,7 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 6. **run.sh 平台判断语法修复**: 三处 `[ "$(uname -s)" = "MINGW64_NT"* ]` 非法写法改为 `case ... MINGW*|MSYS*|CYGWIN*` 映射，Git Bash 下不再出现条件恒假导致路径取错 [run.sh](run.sh#L35-L43)
 7. **run.bat 危险清理移除**: 删除 `call :cleanup_temp_dir playwright-browsers 0`（会把刚装好的浏览器目录整目录清空），与 run.sh 对齐；`check_and_fix_playwright` 由“自动下载”改为“仅检测本地” [run.bat](run.bat#L447-L451) [run.bat](run.bat#L565-L571)
 8. **范式与文档同步**: skill.md 新增 `PY-CORE-033 终端实时日志接入范式`（输出流向判定表/sh 与 bat 双方案/坑位表/检查清单），README.md 与 skill.md 同步本版本记录，skill.docx 由 skill.md 重新生成；多余 md 文件删除，仅保留 README.md 与 skill.md 两份固定范式文档
+9. **macOS grep 兼容修复**: run.sh 5 处 GNU 专有 `grep -oP`（PCRE）替换为 POSIX `grep -oE` + `sed`，消除 macOS/BSD grep `invalid option -- P` 报错导致 Node/Git 版本探测与局域网地址提取失效 [run.sh](run.sh#L1088-L1100) [run.sh](run.sh#L1170) [run.sh](run.sh#L1739)
 
 ##### 1. 🔧 Errno 35 根因根治 (RLIMIT_NPROC 误设)
 **问题描述**:
@@ -543,6 +544,23 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 - ✅ `bash -n run.sh` 通过；run.bat `(`/`)` 配对无误
 - ✅ 双端返回码语义一致（0=最新 / 1=需升级 / 2=跳过）
 - ✅ `skill.docx` 由 skill.md 生成成功，文件大小正常
+
+##### 5. 🍎 macOS grep 兼容修复 (GNU -oP → POSIX -oE)
+**问题描述**:
+- **现象**: macOS 启动时终端抛出 `grep: invalid option -- P`，Node.js/Git 版本探测静默失败，局域网地址提取为空
+- **根因**: run.sh 使用 GNU grep 专有的 `-oP`（PCRE，含 `\s*` 与 `\K`），macOS 自带 BSD grep 不支持，直接报错退出
+- **影响范围**: [run.sh](run.sh) Node 最新版本探测（3 处镜像）、Git for Windows 版本探测、局域网地址提取
+
+**修复方案**:
+- **技术实现(Node/Git)**: `grep -oP '"version":\s*"v[^"]*"'` → `grep -oE '"version":[[:space:]]*"v[0-9.]+"'`，`\s` 改 `[[:space:]]`，`[^"]*` 收窄为 `[0-9.]+` 更稳 [run.sh](run.sh#L1088-L1100) [run.sh](run.sh#L1170)
+- **技术实现(局域网地址)**: `grep -oP '局域网地址: \Khttp://[0-9.]+'` → `sed -n 's/.*局域网地址: \(http:\/\/[0-9.]*\).*/\1/p'`，用捕获组替代 `\K` [run.sh](run.sh#L1739)
+- **参考位置**: [run.sh](run.sh#L1088-L1100)
+
+**测试验证**:
+- ✅ macOS 实跑：`grep: invalid option -- P` 报错完全消失，Node/Git 版本检查正常输出
+- ✅ `grep -c "grep -oP" run.sh` 结果为 0，无 GNU 专有语法残留
+- ✅ 服务正常启动，`/api/version` → `5.0.9.84`，`/api/changelog` → HTTP 200
+- ✅ SIGTERM 退出后 `tail -n 0 -f` 无残留、8888 端口已释放
 
 ---
 
