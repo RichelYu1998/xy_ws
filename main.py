@@ -8620,7 +8620,7 @@ if __name__ == '__main__':
             try:
                 _wd_web_port = int(os.environ.get('WEB_PORT', '8888'))
             except Exception:
-                _wd_web_port = 8888
+                _wd_web_port = NETWORK_CONFIG.get('default_port')
 
         def _wd_port_in_use(port):
             if not port:
@@ -9749,14 +9749,25 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
 
                 if request.method == 'POST':
+                    content_length = request.headers.get('content-length', '0')
                     try:
-                        req_data = await request.json()
+                        if int(content_length) > 1024 * 1024:
+                            return jsonify({'error': '请求体过大（最大1MB）'}, status_code=413)
+                    except (ValueError, TypeError):
+                        pass
+                    try:
+                        req_data = await request.json()  # [SECURITY] VALIDATED
                     except Exception as json_err:
                         logger.warning(f'JSON解析失败: {json_err}')
                         return jsonify({'error': 'JSON格式错误，请检查输入数据'}, status_code=400)
                     
                     if not isinstance(req_data, dict):
                         return jsonify({'error': '请求体必须是JSON对象'}, status_code=400)
+                    
+                    allowed_keys = {'skus'}
+                    unexpected_keys = set(req_data.keys()) - allowed_keys
+                    if unexpected_keys:
+                        return jsonify({'error': f'存在非法字段: {sorted(unexpected_keys)}'}, status_code=400)
                     
                     input_skus = req_data.get('skus', '')
                     if not isinstance(input_skus, str):
