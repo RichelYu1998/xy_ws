@@ -817,7 +817,7 @@ python test/security_audit.py; echo "EXIT=$?"
 
 **测试验证**:
 - ✅ README.md 与 skill.md 逐字一致（`diff` 无差异）
-- ✅ 导航表新增第 18 行「📐 安全审计零问题范式 (PY-CORE-035)」，DOCX 链接 18/18 全部命中
+- ✅ 导航表新增「📐 安全审计零问题范式 (PY-CORE-035)」条目，DOCX 锚点全部命中（未命中 0 条）
 - ✅ skill.docx 由 skill.md 重新生成，导航仍置顶第一页且分页符紧跟导航表
 
 ### v5.0.9.88 (2026-11-07) - 🛡️ **双端启动脚本看门狗重构** - 探活频率由15分钟提速至30秒+新增DaemonGuard兜底拉起守护进程+修复重启计数上限失效+run.bat与run.sh逐字同步+新增launchd托管配置+三方文档逐字一致
@@ -931,8 +931,8 @@ python test/security_audit.py; echo "EXIT=$?"
 
 **测试验证**:
 - ✅ `diff README.md skill.md` 无输出（逐字一致）
-- ✅ 全量解析 426 个版本 / 616 条 changes，API 侧输出 431 个版本 / 1205 条 changes，版本级 `changes` 无空数组（0 个），无 `待生成` 占位符，Commit 字段全部为真实 8 位哈希
-- ✅ `python test/generate_docx.py` 重新生成 skill.docx，导航置顶且 17 条锚点全部命中（PY-CORE-034）
+- ✅ 全量校验以命令实时输出为准（版本数与 changes 条数随迭代动态增长，不写死具体数字）：`curl -s http://127.0.0.1:8888/api/changelog` 后统计，版本级 `changes` 无空数组（0 个）、无 `待生成` 占位符、Commit 字段全部为真实 8 位哈希
+- ✅ `python test/generate_docx.py` 重新生成 skill.docx，导航置顶且锚点全部命中（未命中 0 条，条数随导航扩容动态变化）
 - ✅ `bash -n run.sh` 通过、`plutil -lint launchd/com.xyws.web.plist` 通过
 
 ### v5.0.9.87 (2026-11-07) - 🐛 **商品详情入库时间相对显示修复** - 天级相对时间由「累计小时折算」改为「自然日零点对齐」，11-05入库在11-07正确显示「2天前」+时间戳解析兼容Safari+前端缓存版本刷新
