@@ -1569,7 +1569,7 @@ call :log [!TIMESTAMP!] === Web服务启动 ===
 if not defined USE_WATCHDOG_DAEMON set "USE_WATCHDOG_DAEMON=1"
 
 if "!USE_WATCHDOG_DAEMON!"=="1" (
-    call :log [*] 使用守护进程模式启动Web服务（防闪退增强版）...
+    call :log [*] 内置看门狗守护模式（main.py --watchdog）启动中...
     start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --watchdog --web --port !WEB_PORT!" < nul
 ) else (
     call :log [*] 使用标准模式启动Web服务...
@@ -1641,6 +1641,19 @@ call :log_blank_console_only
 call :log_console_only 按 Ctrl+C 停止服务
 call :log_blank_console_only
 
+set "HEALTH_CHECK_INTERVAL=30"
+
+if "!USE_WATCHDOG_DAEMON!"=="1" (
+    call :ms_timestamp
+    call :log [!TIMESTAMP!] [*] 内置看门狗守护模式（main.py --watchdog），跳过脚本层看门狗
+    call :ms_timestamp
+    call :log [!TIMESTAMP!] [*] 守护进程模式下运行中... (按 Ctrl+C 停止)
+    call :log_blank
+) else (
+    call :ms_timestamp
+    call :log [!TIMESTAMP!] [*] 脚本层看门狗已启动 (每!HEALTH_CHECK_INTERVAL!秒探活)
+)
+
 :wait_loop_entry
 set "CHECK_INTERVAL=60"
 set "CHECK_COUNTER=0"
@@ -1649,11 +1662,12 @@ set "HEALTH_COUNTER=0"
 set "HEALTH_FAIL_COUNT=0"
 set "HEALTH_MAX_FAILS=3"
 set "HEARTBEAT_SUCCESS_COUNT=0"
-set "HEARTBEAT_WINDOW=1800"
-set "LAST_HEARTBEAT_FAIL_TIME=0"
+set "HEARTBEAT_MILESTONE=60"
+set /a HEARTBEAT_MINUTES=HEARTBEAT_MILESTONE*HEALTH_CHECK_INTERVAL/60
 set "WEB_RESTART_COUNT=0"
 set "WEB_MAX_RESTARTS=10"
 set "WEB_RESTART_COOLDOWN=10"
+set "DAEMON_MISS_COUNT=0"
 
 :wait_loop
 ping -n 2 127.0.0.1 >nul 2>&1
@@ -1665,7 +1679,11 @@ if !CHECK_COUNTER! geq !CHECK_INTERVAL! (
 )
 if !HEALTH_COUNTER! geq !HEALTH_CHECK_INTERVAL! (
     set "HEALTH_COUNTER=0"
-    call :check_web_health_enhanced
+    if "!USE_WATCHDOG_DAEMON!"=="1" (
+        call :check_daemon_alive
+    ) else (
+        call :check_web_health_enhanced
+    )
 )
 goto wait_loop
 
@@ -1681,10 +1699,10 @@ if "!HTTP_CODE!"=="200" (
     )
     set "HEALTH_FAIL_COUNT=0"
     set /a HEARTBEAT_SUCCESS_COUNT+=1
-    if !HEARTBEAT_SUCCESS_COUNT! geq 60 (
+    if !HEARTBEAT_SUCCESS_COUNT! geq !HEARTBEAT_MILESTONE! (
         set "HEARTBEAT_SUCCESS_COUNT=0"
         call :ms_timestamp
-        call :log [!TIMESTAMP!] [看门狗] 💚 心跳健康 - 已连续运行30分钟无异常
+        call :log [!TIMESTAMP!] [看门狗] 💚 心跳健康 - 已连续运行!HEARTBEAT_MINUTES!分钟无异常
     )
     goto :eof
 )
@@ -1696,10 +1714,10 @@ if "!HTTP_CODE!"=="302" (
     )
     set "HEALTH_FAIL_COUNT=0"
     set /a HEARTBEAT_SUCCESS_COUNT+=1
-    if !HEARTBEAT_SUCCESS_COUNT! geq 60 (
+    if !HEARTBEAT_SUCCESS_COUNT! geq !HEARTBEAT_MILESTONE! (
         set "HEARTBEAT_SUCCESS_COUNT=0"
         call :ms_timestamp
-        call :log [!TIMESTAMP!] [看门狗] 💚 心跳健康 - 已连续运行30分钟无异常
+        call :log [!TIMESTAMP!] [看门狗] 💚 心跳健康 - 已连续运行!HEARTBEAT_MINUTES!分钟无异常
     )
     goto :eof
 )
@@ -1707,7 +1725,7 @@ if "!HTTP_CODE!"=="302" (
 set /a HEALTH_FAIL_COUNT+=1
 set "HEARTBEAT_SUCCESS_COUNT=0"
 call :ms_timestamp
-call :log [!TIMESTAMP!] [看门狗] ❌ Web服务异常 (HTTP !HTTP_CODE!, 连续第!HEALTH_FAIL_COUNT!次失败, 30分钟窗口内已重置)
+call :log [!TIMESTAMP!] [看门狗] ❌ Web服务异常 (HTTP !HTTP_CODE!, 连续第!HEALTH_FAIL_COUNT!次失败, 每!HEALTH_CHECK_INTERVAL!秒探活一次)
 
 if !HEALTH_FAIL_COUNT! geq !HEALTH_MAX_FAILS! (
     call :restart_web_server_enhanced
@@ -1752,7 +1770,7 @@ if not "!HTTP_CODE!"=="200" if not "!HTTP_CODE!"=="302" (
     goto restart_wait_loop_enhanced
 )
 call :ms_timestamp
-call :log [!TIMESTAMP!] [看门狗] ✅ Web服务重启成功 (第!WEB_RESTART_COUNT!次重启, 30分钟心跳计数器已重置)
+call :log [!TIMESTAMP!] [看门狗] ✅ Web服务重启成功 (第!WEB_RESTART_COUNT!次重启, 心跳计数器已重置)
 :restart_wait_done_enhanced
 set "HEALTH_FAIL_COUNT=0"
 set "HEARTBEAT_SUCCESS_COUNT=0"
@@ -1799,6 +1817,76 @@ call :ms_timestamp
 call :log [!TIMESTAMP!] [AutoRestart] Web服务重启成功 (第!WEB_RESTART_COUNT!次重启)
 :restart_wait_done
 set "HEALTH_FAIL_COUNT=0"
+goto :eof
+
+:check_daemon_alive
+set "DAEMON_COUNT=0"
+for /f "delims=" %%c in ('powershell -NoProfile -Command "@(Get-CimInstance Win32_Process ^| Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -like '*main.py*' -and $_.CommandLine -like '*--watchdog*' }).Count" 2^>nul') do set "DAEMON_COUNT=%%c"
+if not defined DAEMON_COUNT set "DAEMON_COUNT=0"
+if !DAEMON_COUNT! gtr 0 (
+    set "DAEMON_MISS_COUNT=0"
+    goto :eof
+)
+set "HTTP_CODE="
+for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" --connect-timeout 3 --max-time 5 http://localhost:!WEB_PORT! 2^>nul') do set "HTTP_CODE=%%i"
+if not defined HTTP_CODE set "HTTP_CODE=000"
+if "!HTTP_CODE!"=="200" (
+    set "DAEMON_MISS_COUNT=0"
+    goto :eof
+)
+if "!HTTP_CODE!"=="302" (
+    set "DAEMON_MISS_COUNT=0"
+    goto :eof
+)
+set /a DAEMON_MISS_COUNT+=1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [DaemonGuard] ⚠️  未检测到守护进程 (连续第!DAEMON_MISS_COUNT!次)
+if !DAEMON_MISS_COUNT! lss 2 goto :eof
+call :restart_watchdog_daemon
+goto :eof
+
+:restart_watchdog_daemon
+set "DAEMON_MISS_COUNT=0"
+if !WEB_RESTART_COUNT! geq !WEB_MAX_RESTARTS! (
+    call :ms_timestamp
+    call :log [!TIMESTAMP!] [DaemonGuard] ⚠️  已达到最大重启次数(!WEB_MAX_RESTARTS!)，停止自动重启
+    goto :eof
+)
+set /a WEB_RESTART_COUNT+=1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [DaemonGuard] 🔄 守护进程已退出，准备重新拉起... (第!WEB_RESTART_COUNT!次/最多!WEB_MAX_RESTARTS!次)
+call :kill_all_interfering_processes
+ping -n 3 127.0.0.1 >nul 2>&1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [DaemonGuard] ⏳ 冷却!WEB_RESTART_COOLDOWN!秒后重启...
+ping -n !WEB_RESTART_COOLDOWN! 127.0.0.1 >nul 2>&1
+call :ms_timestamp
+call :log [!TIMESTAMP!] [DaemonGuard] 🚀 正在重新启动守护进程...
+call "!VENV_PATH!\Scripts\activate.bat"
+start /b cmd /c "call "!VENV_PATH!\Scripts\activate.bat" && python main.py --watchdog --web --port !WEB_PORT!" < nul
+call :ms_timestamp
+call :log [!TIMESTAMP!] [DaemonGuard] ⏱️  等待Web服务启动...
+set "RESTART_WAIT=0"
+set "RESTART_MAX_WAIT=60"
+:restart_wait_loop_daemon
+set /a RESTART_WAIT+=1
+if !RESTART_WAIT! gtr !RESTART_MAX_WAIT! (
+    call :ms_timestamp
+    call :log [!TIMESTAMP!] [DaemonGuard] ⚠️  Web服务启动超时，继续监控
+    goto restart_wait_done_daemon
+)
+set "HTTP_CODE="
+for /f "delims=" %%i in ('curl.exe -s -o NUL -w "%%{http_code}" --connect-timeout 3 --max-time 5 http://localhost:!WEB_PORT! 2^>nul') do set "HTTP_CODE=%%i"
+if not defined HTTP_CODE set "HTTP_CODE=000"
+if not "!HTTP_CODE!"=="200" if not "!HTTP_CODE!"=="302" (
+    ping -n 1 127.0.0.1 >nul 2>&1
+    goto restart_wait_loop_daemon
+)
+call :ms_timestamp
+call :log [!TIMESTAMP!] [DaemonGuard] ✅ Web服务已就绪
+:restart_wait_done_daemon
+set "HEALTH_FAIL_COUNT=0"
+set "HEARTBEAT_SUCCESS_COUNT=0"
 goto :eof
 
 :check_temp_size

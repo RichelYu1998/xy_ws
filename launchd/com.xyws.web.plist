@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.xyws.web</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/yu/Downloads/demo/python/xy_ws/.venv/bin/python</string>
+        <string>main.py</string>
+        <string>--watchdog</string>
+        <string>--web</string>
+        <string>--port</string>
+        <string>8888</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/yu/Downloads/demo/python/xy_ws</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+        <key>PLAYWRIGHT_BROWSERS_PATH</key>
+        <string>/Users/yu/Downloads/demo/python/xy_ws/tools/playwright/macos</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/yu/Downloads/demo/python/xy_ws/file/launchd_out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/yu/Downloads/demo/python/xy_ws/file/launchd_err.log</string>
+</dict>
+</plist>

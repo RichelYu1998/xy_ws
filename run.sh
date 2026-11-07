@@ -1688,7 +1688,7 @@ run_web() {
     log "[$(date '+%Y-%m-%d %H:%M:%S')] === Web服务启动 ==="
     
     if [ "$USE_WATCHDOG_DAEMON" = "1" ]; then
-        log "[*] 使用内置守护进程模式启动（防闪退增强版）..."
+        log "[*] 内置看门狗守护模式（main.py --watchdog）启动中..."
         nohup "$VENV_PY" main.py --watchdog --web --port "$WEB_PORT" \
             >> "$(pwd)/file/watchdog_daemon.log" 2>&1 &
         PYTHON_PID=$!
@@ -1776,80 +1776,80 @@ run_web() {
     CLEANUP_PID=$!
 
     HEALTH_CHECK_INTERVAL=30
-    HEALTH_COUNTER=0
     HEALTH_FAIL_COUNT=0
     HEALTH_MAX_FAILS=3
     HEARTBEAT_SUCCESS_COUNT=0
-    HEARTBEAT_WINDOW=1800
+    HEARTBEAT_MILESTONE=60
     WEB_RESTART_COUNT=0
     WEB_MAX_RESTARTS=10
     WEB_RESTART_COOLDOWN=10
 
     watchdog_loop() {
         while true; do
-            sleep 30
-            HEALTH_COUNTER=$((HEALTH_COUNTER + 1))
+            sleep $HEALTH_CHECK_INTERVAL
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "http://localhost:$WEB_PORT" 2>/dev/null)
+            if [ -z "$HTTP_CODE" ]; then
+                HTTP_CODE="000"
+            fi
 
-            if [ $HEALTH_COUNTER -ge $HEALTH_CHECK_INTERVAL ]; then
-                HEALTH_COUNTER=0
-                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "http://localhost:$WEB_PORT" 2>/dev/null)
-                if [ -z "$HTTP_CODE" ]; then
-                    HTTP_CODE="000"
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+                if [ $HEALTH_FAIL_COUNT -gt 0 ]; then
+                    log "[看门狗] ✅ Web服务恢复正常 (此前连续${HEALTH_FAIL_COUNT}次失败)"
                 fi
-
-                if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
-                    if [ $HEALTH_FAIL_COUNT -gt 0 ]; then
-                        log "[看门狗] ✅ Web服务恢复正常 (此前连续${HEALTH_FAIL_COUNT}次失败)"
-                    fi
-                    HEALTH_FAIL_COUNT=0
-                    HEARTBEAT_SUCCESS_COUNT=$((HEARTBEAT_SUCCESS_COUNT + 1))
-                    if [ $HEARTBEAT_SUCCESS_COUNT -ge 60 ]; then
-                        HEARTBEAT_SUCCESS_COUNT=0
-                        log "[看门狗] 💚 心跳健康 - 已连续运行30分钟无异常"
-                    fi
-                else
+                HEALTH_FAIL_COUNT=0
+                HEARTBEAT_SUCCESS_COUNT=$((HEARTBEAT_SUCCESS_COUNT + 1))
+                if [ $HEARTBEAT_SUCCESS_COUNT -ge $HEARTBEAT_MILESTONE ]; then
                     HEARTBEAT_SUCCESS_COUNT=0
-                    HEALTH_FAIL_COUNT=$((HEALTH_FAIL_COUNT + 1))
-                    log "[看门狗] ❌ Web服务异常 (HTTP ${HTTP_CODE}, 连续第${HEALTH_FAIL_COUNT}次失败, 30分钟窗口内已重置)"
+                    log "[看门狗] 💚 心跳健康 - 已连续运行$((HEARTBEAT_MILESTONE * HEALTH_CHECK_INTERVAL / 60))分钟无异常"
+                fi
+            else
+                HEARTBEAT_SUCCESS_COUNT=0
+                HEALTH_FAIL_COUNT=$((HEALTH_FAIL_COUNT + 1))
+                log "[看门狗] ❌ Web服务异常 (HTTP ${HTTP_CODE}, 连续第${HEALTH_FAIL_COUNT}次失败, 每${HEALTH_CHECK_INTERVAL}秒探活一次)"
 
-                    if [ $HEALTH_FAIL_COUNT -ge $HEALTH_MAX_FAILS ]; then
-                        log "[看门狗] 🔄 检测到Web服务异常，执行全面清理并重启... (第${WEB_RESTART_COUNT}次/最多${WEB_MAX_RESTARTS}次)"
-                        kill_all_interfering_processes
-                        sleep 3
-
-                        log "[看门狗] ⏳ 冷却${WEB_RESTART_COOLDOWN}秒后重启..."
-                        sleep $WEB_RESTART_COOLDOWN
-
-                        log "[看门狗] 🚀 正在重新启动Web服务..."
-                        resolve_venv_paths
-                        activate_venv
-                        "$VENV_PY" main.py --web --port "$WEB_PORT" < /dev/null &
-                        PYTHON_PID=$!
-
-                        log "[看门狗] ⏱️  等待Web服务启动..."
-                        RESTART_WAIT=0
-                        RESTART_MAX_WAIT=60
-                        while [ $RESTART_WAIT -lt $RESTART_MAX_WAIT ]; do
-                            if ! kill -0 $PYTHON_PID 2>/dev/null; then
-                                log "[看门狗] ⚠️  Web服务重启后进程已退出"
-                                break 2
-                            fi
-                            RESTART_HTTP=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "http://localhost:$WEB_PORT" 2>/dev/null)
-                            if [ "$RESTART_HTTP" = "200" ] || [ "$RESTART_HTTP" = "302" ]; then
-                                log "[看门狗] ✅ Web服务重启成功 (第${WEB_RESTART_COUNT}次重启, 30分钟心跳计数器已重置)"
-                                break
-                            fi
-                            RESTART_WAIT=$((RESTART_WAIT + 1))
-                            sleep 1
-                        done
-
-                        if [ $RESTART_WAIT -ge $RESTART_MAX_WAIT ]; then
-                            log "[看门狗] ⚠️  Web服务重启后启动超时"
-                        fi
-
+                if [ $HEALTH_FAIL_COUNT -ge $HEALTH_MAX_FAILS ]; then
+                    if [ $WEB_RESTART_COUNT -ge $WEB_MAX_RESTARTS ]; then
+                        log "[看门狗] ⚠️  已达到最大重启次数(${WEB_MAX_RESTARTS})，停止自动重启，继续探活监控"
                         HEALTH_FAIL_COUNT=0
-                        HEARTBEAT_SUCCESS_COUNT=0
+                        continue
                     fi
+                    WEB_RESTART_COUNT=$((WEB_RESTART_COUNT + 1))
+                    log "[看门狗] 🔄 检测到Web服务异常，执行全面清理并重启... (第${WEB_RESTART_COUNT}次/最多${WEB_MAX_RESTARTS}次)"
+                    kill_all_interfering_processes
+                    sleep 3
+
+                    log "[看门狗] ⏳ 冷却${WEB_RESTART_COOLDOWN}秒后重启..."
+                    sleep $WEB_RESTART_COOLDOWN
+
+                    log "[看门狗] 🚀 正在重新启动Web服务..."
+                    resolve_venv_paths
+                    activate_venv
+                    "$VENV_PY" main.py --web --port "$WEB_PORT" < /dev/null &
+                    PYTHON_PID=$!
+
+                    log "[看门狗] ⏱️  等待Web服务启动..."
+                    RESTART_WAIT=0
+                    RESTART_MAX_WAIT=60
+                    while [ $RESTART_WAIT -lt $RESTART_MAX_WAIT ]; do
+                        if ! kill -0 $PYTHON_PID 2>/dev/null; then
+                            log "[看门狗] ⚠️  Web服务重启后进程已退出"
+                            break 2
+                        fi
+                        RESTART_HTTP=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "http://localhost:$WEB_PORT" 2>/dev/null)
+                        if [ "$RESTART_HTTP" = "200" ] || [ "$RESTART_HTTP" = "302" ]; then
+                            log "[看门狗] ✅ Web服务重启成功 (第${WEB_RESTART_COUNT}次重启, 心跳计数器已重置)"
+                            break
+                        fi
+                        RESTART_WAIT=$((RESTART_WAIT + 1))
+                        sleep 1
+                    done
+
+                    if [ $RESTART_WAIT -ge $RESTART_MAX_WAIT ]; then
+                        log "[看门狗] ⚠️  Web服务重启后启动超时"
+                    fi
+
+                    HEALTH_FAIL_COUNT=0
+                    HEARTBEAT_SUCCESS_COUNT=0
                 fi
             fi
         done
@@ -1858,9 +1858,9 @@ run_web() {
     if [ "$USE_WATCHDOG_DAEMON" != "1" ]; then
         watchdog_loop &
         WATCHDOG_PID=$!
-        log "[*] 内置看门狗已启动 (PID: $WATCHDOG_PID)"
+        log "[*] 脚本层看门狗已启动 (PID: $WATCHDOG_PID, 每${HEALTH_CHECK_INTERVAL}秒探活)"
     else
-        log "[*] 使用外部守护进程模式，跳过内置看门狗"
+        log "[*] 内置看门狗守护模式（main.py --watchdog），跳过脚本层看门狗"
     fi
 
     if [ "$USE_WATCHDOG_DAEMON" = "1" ]; then
@@ -1872,7 +1872,67 @@ run_web() {
             tail -n 0 -f "$LOG_FILE" &
             TAIL_PID=$!
         fi
-        wait $PYTHON_PID 2>/dev/null
+        while true; do
+            wait $PYTHON_PID 2>/dev/null
+            EXIT_CODE=$?
+
+            if [ $EXIT_CODE -ge 128 ]; then
+                log "[DaemonGuard] 收到退出信号(码:$EXIT_CODE)，不再重启"
+                break
+            fi
+
+            if [ $EXIT_CODE -eq 0 ]; then
+                log "[DaemonGuard] 守护进程正常退出，不再重启"
+                break
+            fi
+
+            if [ $WEB_RESTART_COUNT -ge $WEB_MAX_RESTARTS ]; then
+                log "[DaemonGuard] 已达到最大重启次数($WEB_MAX_RESTARTS)，停止自动重启"
+                break
+            fi
+
+            WEB_RESTART_COUNT=$((WEB_RESTART_COUNT + 1))
+            log "[DaemonGuard] 守护进程已退出(退出码:$EXIT_CODE)，准备重新拉起... (第${WEB_RESTART_COUNT}次/最多${WEB_MAX_RESTARTS}次)"
+
+            log "[DaemonGuard] 清理残留进程..."
+            kill_all_interfering_processes
+            sleep 3
+
+            log "[DaemonGuard] 冷却${WEB_RESTART_COOLDOWN}秒后重启..."
+            sleep $WEB_RESTART_COOLDOWN
+
+            log "[DaemonGuard] 正在重新启动守护进程..."
+            resolve_venv_paths
+            activate_venv
+            nohup "$VENV_PY" main.py --watchdog --web --port "$WEB_PORT" \
+                >> "$(pwd)/file/watchdog_daemon.log" 2>&1 &
+            PYTHON_PID=$!
+            WATCHDOG_PID=$PYTHON_PID
+            echo "$PYTHON_PID" > "$(pwd)/file/watchdog.pid"
+            log "[DaemonGuard] 守护进程已重新启动 (PID: $PYTHON_PID)"
+
+            log "[DaemonGuard] 等待Web服务启动..."
+            RESTART_WAIT=0
+            RESTART_MAX_WAIT=60
+            while [ $RESTART_WAIT -lt $RESTART_MAX_WAIT ]; do
+                if ! kill -0 $PYTHON_PID 2>/dev/null; then
+                    log "[DaemonGuard] 守护进程重启后已退出"
+                    break
+                fi
+                RESTART_HTTP=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 3 --max-time 5 "http://localhost:$WEB_PORT" 2>/dev/null)
+                if [ "$RESTART_HTTP" = "200" ] || [ "$RESTART_HTTP" = "302" ]; then
+                    log "[DaemonGuard] Web服务已就绪"
+                    break
+                fi
+                RESTART_WAIT=$((RESTART_WAIT + 1))
+                sleep 1
+            done
+
+            if [ $RESTART_WAIT -ge $RESTART_MAX_WAIT ]; then
+                log "[DaemonGuard] Web服务启动超时（等待了${RESTART_MAX_WAIT}秒），继续监控"
+            fi
+        done
+
         [ -n "$TAIL_PID" ] && kill "$TAIL_PID" 2>/dev/null || true
         log_blank
         log "[*] 守护进程已退出"
