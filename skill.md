@@ -468,7 +468,7 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 
 ### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`subprocess.Popen`全局重试与posix_spawn兜底+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.sh 5处`grep -oP`改POSIX `grep -oE`+run.bat删除playwright-browsers危险清理+新增PY-CORE-033终端实时日志范式+skill.docx重新生成
 
-> **Commit**: 225b1fae
+> **Commit**: 225b1fae, d123f61f
 
 #### 更新内容:
 1. **Errno 35 根因根治**: `_setup_unix_protection()` 删除硬编码 `RLIMIT_NPROC=100`，改为仅当系统额度低于 2048 时向上修正，杜绝“进程额度瞬间耗尽”导致的 `BlockingIOError: [Errno 35] Resource temporarily unavailable` [main.py](main.py#L3249-L3258)
