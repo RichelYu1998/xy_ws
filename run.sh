@@ -21,13 +21,34 @@ fi
 mkdir -p file
 LOG_FILE="$(pwd)/file/web_output.log"
 USE_WATCHDOG_DAEMON="${USE_WATCHDOG_DAEMON:-1}"
+TAIL_PID=""
 PW_BROWSER_PATTERN="ms-playwright|playwright-core|playwright_chromiumdev_profile|remote-debugging-pipe"
 PW_PROC_PATTERN="ms-playwright|playwright-core|playwright"
 PW_BROWSER_NAMES="chrome|chromium|headless_shell|firefox|msedge|node"
 PW_PROC_NAMES="node|playwright"
-PY_PROC_NAMES="python|python3|pythonw"
+PY_PROC_NAMES="python|python3"
 NODE_PROC_NAMES="node"
 CFD_PROC_NAMES="cloudflared"
+
+# 统一平台目录名映射: macos / linux / windows
+get_platform_dir() {
+    case "$(uname -s)" in
+        Darwin) echo "macos" ;;
+        Linux) echo "linux" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+        *) echo "linux" ;;
+    esac
+}
+
+get_cloudflared_path() {
+    local plat
+    plat=$(get_platform_dir)
+    if [ "$plat" = "windows" ]; then
+        echo "$(pwd)/tools/cloudflared/windows/cloudflared.exe"
+    else
+        echo "$(pwd)/tools/cloudflared/${plat}/cloudflared"
+    fi
+}
 > "$LOG_FILE"
 
 log() {
@@ -241,9 +262,12 @@ pre_launch() {
 
     log_blank
     log "[*] 检查 cloudflared 隧道工具..."
-    CFD_BIN="$(pwd)/dist/node_modules/.bin/cloudflared"
+    CFD_BIN=$(get_cloudflared_path)
     if [ ! -f "$CFD_BIN" ]; then
-        if command -v cloudflared &> /dev/null; then
+        local _npm_cfd="$(pwd)/dist/node_modules/.bin/cloudflared"
+        if [ -f "$_npm_cfd" ]; then
+            CFD_BIN="$_npm_cfd"
+        elif command -v cloudflared &> /dev/null; then
             CFD_BIN="cloudflared"
         fi
     fi
@@ -256,7 +280,7 @@ pre_launch() {
         if [ "$cfd_vrc" -eq 2 ]; then
             log "[*] 已跳过 cloudflared 版本升级检查"
         elif [ "$cfd_vrc" -eq 1 ]; then
-            log "[提示] 检测到cloudflared有新版本，如需升级请手动执行: npm install cloudflared@latest --prefix dist"
+            log "[提示] 检测到cloudflared有新版本，如需升级请手动执行 install_cloudflared"
         else
             log "[*] cloudflared已是最新版本"
         fi
@@ -275,7 +299,6 @@ pre_launch() {
     log_blank
     log "[*] 清理临时文件..."
     cleanup_temp_dir temp 3072
-    cleanup_temp_dir playwright-browsers 0
 }
 
 port_listener_pids() {
@@ -1171,18 +1194,63 @@ check_git_latest_version() {
     return 0
 }
 
-# 安装 cloudflared
+# 安装/升级 cloudflared (从 GitHub 下载官方二进制)
 install_cloudflared() {
     log "[*] 安装 cloudflared..."
-    npm install cloudflared@latest --prefix dist 2>/dev/null
-    if [ $? -ne 0 ]; then
-        log "[WARNING] cloudflared 安装失败，Cloudflare隧道将不可用"
+    
+    local os_arch=""
+    local os_name=""
+    local plat_dir
+    plat_dir=$(get_platform_dir)
+    if [ "$plat_dir" = "macos" ]; then
+        os_name="darwin"
+        if [ "$(uname -m)" = "arm64" ]; then
+            os_arch="arm64"
+        else
+            os_arch="amd64"
+        fi
+    elif [ "$plat_dir" = "linux" ]; then
+        os_name="linux"
+        if [ "$(uname -m)" = "aarch64" ]; then
+            os_arch="arm64"
+        else
+            os_arch="amd64"
+        fi
+    elif [ "$plat_dir" = "windows" ]; then
+        os_name="windows"
+        os_arch="amd64"
     else
-        log "[*] cloudflared 安装成功"
+        log "[WARNING] 不支持的系统架构，无法自动安装 cloudflared"
+        return 1
+    fi
+    mkdir -p "$(pwd)/tools/cloudflared/${plat_dir}"
+    
+    local latest_tag
+    latest_tag=$(curl -sL "https://api.github.com/repos/cloudflare/cloudflared/releases/latest" 2>/dev/null | grep -o '"tag_name": *"[^"]*"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+    
+    if [ -z "$latest_tag" ]; then
+        log "[WARNING] 无法从 GitHub 获取 cloudflared 最新版本"
+        return 1
+    fi
+    
+    local download_url="https://github.com/cloudflare/cloudflared/releases/download/${latest_tag}/cloudflared-${os_name}-${os_arch}"
+    local target_path
+    if [ "$plat_dir" = "windows" ]; then
+        download_url="${download_url}.exe"
+    fi
+    target_path=$(get_cloudflared_path)
+    
+    log "[*] 下载 cloudflared ${latest_tag} (${os_name}-${os_arch})..."
+    if curl -sL --fail -o "$target_path" "$download_url" 2>/dev/null; then
+        chmod +x "$target_path" 2>/dev/null || true
+        log "[*] cloudflared 安装成功: $("$target_path" --version 2>/dev/null)"
+    else
+        log "[WARNING] cloudflared 下载失败"
+        return 1
     fi
 }
 
-# 检查 cloudflared 是否是最新版本
+# 检查 cloudflared 是否是最新版本 (从 GitHub 获取官方 release)
 check_cloudflared_latest_version() {
     local current_ver="$1"
     
@@ -1193,17 +1261,18 @@ check_cloudflared_latest_version() {
     
     log "[*] 检查 cloudflared 最新版本..."
     
-    local latest_ver=$(npm view cloudflared version 2>/dev/null || echo "")
+    local latest_ver=""
+    latest_ver=$(curl -sL "https://api.github.com/repos/cloudflare/cloudflared/releases/latest" 2>/dev/null | grep -o '"tag_name": *"[^"]*"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' | sed 's/^v//')
     
     if [ -z "$latest_ver" ]; then
-        log "[WARNING] 无法获取 cloudflared 最新版本信息，跳过升级检查"
+        log "[WARNING] 无法从 GitHub 获取 cloudflared 最新版本信息，跳过升级检查"
         return 2
     fi
     
     log "    当前版本: $current_ver"
     log "    最新版本: $latest_ver"
     
-    if [ "$(printf '%s\n' "$current_ver" "$latest_ver" | sort -V | head -n1)" != "$latest_ver" ]; then
+    if [ "$current_ver" != "$latest_ver" ]; then
         return 1
     fi
     
@@ -1545,12 +1614,10 @@ EOF2
             fi
         fi
 
-        log "[*] 安装Playwright浏览器..."
-        "$VENV_PY" main.py --install-playwright
+        log "[*] 检查本地Playwright浏览器（跳过下载）..."
+        check_and_fix_playwright
         if [ $? -ne 0 ]; then
-            log "[ERROR] Playwright浏览器安装失败，部分功能可能不可用"
-        else
-            log "[*] Playwright 浏览器安装成功"
+            log "[ERROR] 未找到本地Playwright浏览器，部分功能可能不可用"
         fi
     fi
 
@@ -1798,7 +1865,16 @@ run_web() {
 
     if [ "$USE_WATCHDOG_DAEMON" = "1" ]; then
         log "[*] 守护进程模式下运行中... (按 Ctrl+C 停止)"
+        log "[*] 实时日志已接入终端，下方持续输出运行情况..."
+        log_blank
+        TAIL_PID=""
+        if [ -f "$LOG_FILE" ]; then
+            tail -n 0 -f "$LOG_FILE" &
+            TAIL_PID=$!
+        fi
         wait $PYTHON_PID 2>/dev/null
+        [ -n "$TAIL_PID" ] && kill "$TAIL_PID" 2>/dev/null || true
+        log_blank
         log "[*] 守护进程已退出"
     else
         while true; do
@@ -2124,6 +2200,18 @@ detect_playwright_browsers_path() {
         [ -n "$PW_FOUND_PATH" ] && return 0
     fi
 
+    PW_FOUND_PATH=$(probe_browsers_dir "$(pwd)/tools/playwright/$(get_platform_dir)")
+    [ -n "$PW_FOUND_PATH" ] && return 0
+
+    PW_FOUND_PATH=$(probe_browsers_dir "$(pwd)/tools/playwright/macos")
+    [ -n "$PW_FOUND_PATH" ] && return 0
+
+    PW_FOUND_PATH=$(probe_browsers_dir "$(pwd)/tools/playwright/windows")
+    [ -n "$PW_FOUND_PATH" ] && return 0
+
+    PW_FOUND_PATH=$(probe_browsers_dir "$(pwd)/tools/playwright/linux")
+    [ -n "$PW_FOUND_PATH" ] && return 0
+
     PW_FOUND_PATH=$(probe_browsers_dir "$(pwd)/playwright-browsers")
     [ -n "$PW_FOUND_PATH" ] && return 0
 
@@ -2173,32 +2261,17 @@ check_and_fix_playwright() {
         return 0
     fi
 
-    log "    [Playwright] ⚠️  未检测到 Chromium 浏览器驱动 (Playwright v${PLAYWRIGHT_VER})"
-    log "    [Playwright] 🔄 正在自动安装 Playwright 浏览器..."
-
-    local pw_python
-    pw_python=$(resolve_python_cmd)
-    if [ -z "$pw_python" ]; then
-        log "    [Playwright] ❌ 未找到可用的 Python 解释器，请手动执行：python -m playwright install chromium"
-        return 1
-    fi
-
-    activate_venv
-    "$pw_python" -m playwright install chromium 2>&1
-
-    if detect_playwright_browsers_path; then
-        PLAYWRIGHT_BROWSERS_PATH="$PW_FOUND_PATH"
-        export PLAYWRIGHT_BROWSERS_PATH
-        log "    [Playwright] ✅ Chromium 浏览器安装成功"
-        log "    [Playwright]    驱动目录: $PLAYWRIGHT_BROWSERS_PATH"
-    else
-        log "    [Playwright] ❌ Chromium 浏览器安装失败，请手动执行：$pw_python -m playwright install chromium"
-    fi
+    log "    [Playwright] ⚠️  未检测到本地 Chromium 浏览器驱动 (Playwright v${PLAYWRIGHT_VER})"
+    log "    [Playwright] ℹ️  已禁用自动下载，请确保本地浏览器目录存在"
+    return 1
 }
 
 cleanup_exit() {
     log_blank
     log "正在清理进程..."
+    if [ -n "$TAIL_PID" ]; then
+        kill "$TAIL_PID" 2>/dev/null || true
+    fi
     kill_all_interfering_processes
     if [ -n "$CLEANUP_PID" ]; then
         kill $CLEANUP_PID 2>/dev/null || true

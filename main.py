@@ -116,6 +116,117 @@ try:
     from starlette.responses import Response
 except ImportError:
     Request = Response = None
+_SUBPROCESS_MAX_RETRIES = 6
+_SUBPROCESS_BASE_DELAY = 0.15
+_SUBPROCESS_RETRY_ERRNOS = frozenset((35, 11, 12))  # EAGAIN / EACCES / ENOMEM on fork_exec
+_USE_POSIX_SPAWN = bool(getattr(subprocess, '_USE_POSIX_SPAWN', False))
+_fork_gate = threading.Semaphore(2)
+_fork_bad_until = 0.0
+_fork_bad_lock = threading.Lock()
+_FORK_BAD_COOLDOWN = 30.0
+
+def _is_retryable_fork_err(exc):
+    if isinstance(exc, BlockingIOError):
+        return True
+    if isinstance(exc, OSError) and getattr(exc, 'errno', None) in _SUBPROCESS_RETRY_ERRNOS:
+        return True
+    return False
+
+_orig_subprocess_Popen = subprocess.Popen
+
+def _posix_spawn_popen(args, kwargs):
+    def _skip(reason):
+        try:
+            sys.stderr.write("[spawn-skip] " + reason + "\n")
+            sys.stderr.flush()
+        except Exception:
+            pass
+        return None
+
+    if not _USE_POSIX_SPAWN:
+        return _skip("posix_spawn 不可用")
+    if kwargs.get('preexec_fn') is not None:
+        return _skip("含 preexec_fn")
+    if kwargs.get('start_new_session'):
+        return _skip("含 start_new_session")
+    if kwargs.get('process_group', -1) != -1:
+        return _skip("含 process_group")
+    if kwargs.get('uid') is not None or kwargs.get('gid') is not None:
+        return _skip("含 uid/gid")
+    if kwargs.get('umask', -1) >= 0:
+        return _skip("含 umask")
+    if kwargs.get('pass_fds'):
+        return _skip("含 pass_fds")
+
+    kw = dict(kwargs)
+    kw.pop('args', None)
+    kw['close_fds'] = False
+
+    argv = args[0] if args else kwargs.get('args')
+    if isinstance(argv, str):
+        return _skip("args 为字符串(需 shell)")
+    if not isinstance(argv, (list, tuple)) or not argv:
+        return _skip("args 非序列或为空")
+    cmd = list(argv)
+    if not all(isinstance(x, str) for x in cmd):
+        return _skip("args 含非字符串元素")
+
+    cwd = kw.pop('cwd', None)
+    exe_override = kw.pop('executable', None)
+
+    if cwd:
+        target = exe_override or cmd[0]
+        cmd = ['/bin/sh', '-c', 'cd "$1" && shift && exec "$@"', 'sh', str(cwd), target] + cmd[1:]
+        kw['executable'] = '/bin/sh'
+    else:
+        exe = exe_override or cmd[0]
+        if not isinstance(exe, str):
+            return _skip("executable 非字符串")
+        if not os.path.dirname(exe):
+            resolved = shutil.which(exe)
+            if not resolved:
+                return _skip("PATH 中找不到 " + exe)
+            exe = resolved
+        kw['executable'] = exe
+
+    try:
+        return _orig_subprocess_Popen(cmd, **kw)
+    except (BlockingIOError, OSError) as exc:
+        return _skip("posix_spawn 执行失败 %s(errno=%s)" % (type(exc).__name__, getattr(exc, 'errno', '?')))
+
+def _fork_is_bad():
+    return time.time() < _fork_bad_until
+
+def _mark_fork_bad():
+    global _fork_bad_until
+    with _fork_bad_lock:
+        _fork_bad_until = time.time() + _FORK_BAD_COOLDOWN
+
+def _patched_Popen(*args, **kwargs):
+    _last = BlockingIOError(35, 'Resource temporarily unavailable')
+    for attempt in range(_SUBPROCESS_MAX_RETRIES):
+        try:
+            with _fork_gate:
+                return _orig_subprocess_Popen(*args, **kwargs)
+        except (BlockingIOError, OSError) as exc:
+            if not _is_retryable_fork_err(exc):
+                raise
+            _last = exc
+        spawned = _posix_spawn_popen(args, kwargs)
+        if spawned is not None:
+            sys.stderr.write("[fork-retry] fork 失败，已改用 posix_spawn 启动成功\n")
+            sys.stderr.flush()
+            return spawned
+        if attempt >= _SUBPROCESS_MAX_RETRIES - 1:
+            break
+        d = min(_SUBPROCESS_BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.15), 2.0)
+        sys.stderr.write(f"[fork-retry] Popen {type(_last).__name__}(errno={getattr(_last,'errno','?')}) attempt {attempt+1}/{_SUBPROCESS_MAX_RETRIES}, wait {d:.2f}s\n")
+        sys.stderr.flush()
+        time.sleep(d)
+    raise _last
+
+subprocess.Popen = _patched_Popen
+
 PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 _module_logger = logging.getLogger('main')
 _module_logger.setLevel(logging.DEBUG)
@@ -2524,6 +2635,13 @@ class Environment:
         env_path = os.environ.get('PLAYWRIGHT_BROWSERS_PATH')
         if env_path and os.path.isdir(env_path):
             return env_path
+        project_dir = os.path.dirname(os.path.abspath(__file__))
+        local_tools = os.path.join(
+            project_dir, 'tools', 'playwright',
+            'windows' if Environment.IS_WINDOWS else ('macos' if Environment.IS_MAC else 'linux')
+        )
+        if os.path.isdir(local_tools):
+            return local_tools
         if Environment.IS_WINDOWS:
             base = os.environ.get('LOCALAPPDATA', '')
         elif Environment.IS_MAC:
@@ -2627,6 +2745,9 @@ class Environment:
         - [新增] 更智能的重试策略：指数退避
         """
         launch_args = args if args is not None else []
+
+        if executable_path is None:
+            executable_path = Environment._find_playwright_chromium()
         
         # 增强版浏览器启动参数（防崩溃优化）
         browser_args = [
@@ -3125,10 +3246,18 @@ def _setup_unix_protection():
         except (ValueError, OSError) as e:
             logger.debug(f"[unix_protection] 设置CPU限制失败: {e}")
         
-        # 5. 设置子进程数限制
+        # 5. 子进程数限制（RLIMIT_NPROC 按真实用户ID全局限额，绝不能调低）
+        # 调低会让所有 fork/posix_spawn 直接返回 EAGAIN(errno 35)，
+        # 因为该额度被同一用户下所有进程共享，调低后必然立即耗尽。
         try:
-            resource.setrlimit(resource.RLIMIT_NPROC, (100, 100))
-            logger.info("[unix_protection] ✅ 子进程数限制已设置: 100")
+            soft, hard = resource.getrlimit(resource.RLIMIT_NPROC)
+            if soft != resource.RLIM_INFINITY and soft < 2048:
+                target = 2048 if hard == resource.RLIM_INFINITY else min(2048, hard)
+                if target > soft:
+                    resource.setrlimit(resource.RLIMIT_NPROC, (target, hard))
+                    logger.info(f"[unix_protection] ✅ 子进程数限制已提升: {soft} -> {target}")
+            else:
+                logger.info(f"[unix_protection] ✅ 子进程数限制保持默认: {soft}")
         except (ValueError, OSError) as e:
             logger.debug(f"[unix_protection] 设置子进程数限制失败: {e}")
             
@@ -3197,7 +3326,7 @@ def _auto_restart_server():
         
         # 使用当前 Python 解释器启动新进程
         python_exe = sys.executable
-        subprocess.Popen([python_exe, script_path] + args, 
+        _popen_retry([python_exe, script_path] + args, 
                         creationflags=subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0,
                         close_fds=True)
         
@@ -3858,6 +3987,11 @@ tasks = {}
 _processes_lock = threading.Lock()
 _tasks_lock = threading.Lock()
 
+def _popen_retry(*args, **kwargs):
+    kwargs.pop('max_retries', None)
+    kwargs.pop('initial_delay', None)
+    return subprocess.Popen(*args, **kwargs)
+
 def run_command_background(task_id, command):
     try:
         with _tasks_lock:
@@ -3871,7 +4005,7 @@ def run_command_background(task_id, command):
         else:
             cmd_list = list(command)
         
-        process = subprocess.Popen(
+        process = _popen_retry(
             cmd_list,
             shell=False,
             stdout=subprocess.PIPE,
@@ -7758,7 +7892,7 @@ def main():
             logger.debug(f'访问地址: http://{host}:{port}')
             logger.debug('按 Ctrl+C 停止服务\n')
 
-            subprocess.Popen([VENV_PYTHON, 'main.py', '--web'])
+            _popen_retry([VENV_PYTHON, 'main.py', '--web'])
         
         actions = {
             '1': lambda: run_scraper() or True,
@@ -8537,12 +8671,12 @@ if __name__ == '__main__':
                 env = os.environ.copy()
                 env['WATCHDOG_MODE'] = '1'
                 if sys.platform == 'win32':
-                    _wd_process = subprocess.Popen(
+                    _wd_process = _popen_retry(
                         _wd_sub_cmd, env=env,
                         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
                     )
                 else:
-                    _wd_process = subprocess.Popen(
+                    _wd_process = _popen_retry(
                         _wd_sub_cmd, env=env, preexec_fn=os.setsid
                     )
                 logger.info(f"[watchdog] 子进程已启动 (PID: {_wd_process.pid})")
@@ -12140,7 +12274,7 @@ if __name__ == '__main__':
                 
                 tunnel_host = os.environ.get('HOST', 'localhost')
 
-                tunnel_process = subprocess.Popen(
+                tunnel_process = _popen_retry(
                     [hostc_bin, str(port), '--local-host', tunnel_host] if hostc_bin != 'npx hostc' else ['npx', 'hostc', str(port), '--local-host', tunnel_host],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -12645,7 +12779,7 @@ ingress:
                     log_print(f"[Cloudflare] 启动 Named Tunnel: {named_config['tunnel_name']}...")
                     cmd = [cf_binary, "tunnel", "run", named_config['tunnel_name'], "--config", named_config['config_yml_path'], "--no-autoupdate"]
 
-                    _proc = subprocess.Popen(
+                    _proc = _popen_retry(
                         cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
@@ -12689,7 +12823,7 @@ ingress:
                     host = os.environ.get('HOST', 'localhost')
                     cmd = [cf_binary, "tunnel", "--url", f"http://{host}:{port}", "--no-autoupdate"]
 
-                    _proc = subprocess.Popen(
+                    _proc = _popen_retry(
                         cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,

@@ -418,7 +418,7 @@ if defined CFD_VER (
             call :log [*] 已跳过 cloudflared 版本升级检查
         ) else (
             if errorlevel 1 (
-                call :log [提示] 检测到cloudflared有新版本，如需升级请手动执行: npm install cloudflared@latest --prefix dist
+                call :log [提示] 检测到cloudflared有新版本，如需升级请手动执行 install_cloudflared
             ) else (
                 call :log [*] cloudflared已是最新版本
             )
@@ -446,7 +446,6 @@ if exist "!HOSTC_BIN!" (
 call :log_blank
 call :log [*] 清理临时文件...
 call :cleanup_temp_dir temp 3145728
-call :cleanup_temp_dir playwright-browsers 0
 
 goto detect_environments
 
@@ -568,24 +567,15 @@ if defined PW_FOUND_PATH (
     exit /b
 )
 
-call :log     [Playwright] ⚠️  未检测到 Chromium 浏览器驱动 (Playwright v!PLAYWRIGHT_VER!)
-call :log     [Playwright] 🔄 正在自动安装 Playwright 浏览器...
-call "!VENV_PATH!\Scripts\activate.bat" >nul 2>&1
-python -m playwright install chromium 2>&1
-
-call :detect_playwright_browsers_path
-if defined PW_FOUND_PATH (
-    set "PLAYWRIGHT_BROWSERS_PATH=!PW_FOUND_PATH!"
-    call :log     [Playwright] ✅ Chromium 浏览器安装成功
-    call :log     [Playwright]    驱动目录: !PLAYWRIGHT_BROWSERS_PATH!
-) else (
-    call :log     [Playwright] ❌ Chromium 浏览器安装失败，请手动执行：python -m playwright install chromium
-)
-exit /b
+call :log     [Playwright] ⚠️  未检测到本地 Chromium 浏览器驱动 (Playwright v!PLAYWRIGHT_VER!)
+call :log     [Playwright] ℹ️  已禁用自动下载，请确保本地浏览器目录存在
+exit /b 1
 
 :detect_playwright_browsers_path
 set "PW_FOUND_PATH="
 call :probe_browsers_dir "!PW_ENV_PATH!"
+if defined PW_FOUND_PATH exit /b
+call :probe_browsers_dir "%~dp0tools\playwright\windows"
 if defined PW_FOUND_PATH exit /b
 call :probe_browsers_dir "%~dp0playwright-browsers"
 if defined PW_FOUND_PATH exit /b
@@ -1285,42 +1275,38 @@ exit /b 0
 
 :install_cloudflared
 call :log [*] 安装 cloudflared...
-call npm install cloudflared@latest --prefix "%~dp0dist" 2>nul
-if errorlevel 1 (
-    call :log [WARNING] cloudflared 安装失败，Cloudflare隧道将不可用
-) else (
-    call :log [*] cloudflared 安装成功
+if not exist "%~dp0tools\cloudflared\windows" mkdir "%~dp0tools\cloudflared\windows"
+set "CFD_TARGET=%~dp0tools\cloudflared\windows\cloudflared.exe"
+set "CFD_TAG="
+for /f "delims=" %%v in ('powershell -NoProfile -Command "(Invoke-RestMethod -Uri 'https://api.github.com/repos/cloudflare/cloudflared/releases/latest' -Headers @{'User-Agent'='xy_ws'}).tag_name" 2^>nul') do if not defined CFD_TAG set "CFD_TAG=%%v"
+if not defined CFD_TAG (
+    call :log [WARNING] 无法从 GitHub 获取 cloudflared 最新版本
+    exit /b 1
 )
+set "CFD_URL=https://github.com/cloudflare/cloudflared/releases/download/!CFD_TAG!/cloudflared-windows-amd64.exe"
+call :log [*] 下载 cloudflared !CFD_TAG! (windows-amd64)...
+powershell -NoProfile -Command "try { Invoke-WebRequest -Uri '!CFD_URL!' -OutFile '!CFD_TARGET!' -UseBasicParsing } catch { exit 1 }" 2>nul
+if errorlevel 1 (
+    call :log [WARNING] cloudflared 下载失败
+    exit /b 1
+)
+set "CFD_DL_VER="
+for /f "delims=" %%v in ('"!CFD_TARGET!" --version 2^>nul') do if not defined CFD_DL_VER set "CFD_DL_VER=%%v"
+call :log [*] cloudflared 安装成功: !CFD_DL_VER!
 exit /b 0
 
 :check_cloudflared_latest_version
-set "CUR_CFD_NUM="
-for /f "tokens=2 delims=@" %%v in ('npm ls cloudflared --prefix "%~dp0dist" --depth=0 2^>nul ^| findstr /c:"cloudflared@"') do set "CUR_CFD_NUM=%%v"
-if not defined CUR_CFD_NUM (
-    call :log [WARNING] 未检测到 npm 安装的 cloudflared（系统安装不参与版本对比）
-    exit /b 2
-)
 call :log [*] 检查 cloudflared 最新版本...
-for /f "delims=" %%v in ('npm view cloudflared version 2^>nul') do set "CFD_LATEST_VER=%%v"
+set "CFD_LATEST_VER="
+for /f "delims=" %%v in ('powershell -NoProfile -Command "(Invoke-RestMethod -Uri 'https://api.github.com/repos/cloudflare/cloudflared/releases/latest' -Headers @{'User-Agent'='xy_ws'}).tag_name" 2^>nul') do if not defined CFD_LATEST_VER set "CFD_LATEST_VER=%%v"
 if not defined CFD_LATEST_VER (
-    call :log [WARNING] 无法获取 cloudflared 最新版本信息，跳过升级检查
+    call :log [WARNING] 无法从 GitHub 获取 cloudflared 最新版本信息，跳过升级检查
     exit /b 2
 )
-call :log     当前包版本: !CUR_CFD_NUM!
-call :log     最新包版本: !CFD_LATEST_VER!
-for /f "tokens=1,2,3 delims=." %%a in ("!CUR_CFD_NUM!") do set "CC_MAJ=%%a" & set "CC_MIN=%%b" & set "CC_PAT=%%c"
-for /f "tokens=1,2,3 delims=." %%a in ("!CFD_LATEST_VER!") do set "LC_MAJ=%%a" & set "LC_MIN=%%b" & set "LC_PAT=%%c"
-if not defined CC_MAJ set "CC_MAJ=0"
-if not defined CC_MIN set "CC_MIN=0"
-if not defined CC_PAT set "CC_PAT=0"
-if not defined LC_MAJ set "LC_MAJ=0"
-if not defined LC_MIN set "LC_MIN=0"
-if not defined LC_PAT set "LC_PAT=0"
-if !CC_MAJ! LSS !LC_MAJ! exit /b 1
-if !CC_MAJ! GTR !LC_MAJ! exit /b 0
-if !CC_MIN! LSS !LC_MIN! exit /b 1
-if !CC_MIN! GTR !LC_MIN! exit /b 0
-if !CC_PAT! LSS !LC_PAT! exit /b 1
+set "CFD_LATEST_VER=!CFD_LATEST_VER:v=!"
+call :log     当前版本: !CFD_VER!
+call :log     最新版本: !CFD_LATEST_VER!
+if not "!CFD_VER!"=="!CFD_LATEST_VER!" exit /b 1
 exit /b 0
 
 :test_npm_mirrors
@@ -1498,13 +1484,8 @@ if exist requirements.txt (
         )
     )
 
-    call :log [*] 安装Playwright浏览器...
-    "!VENV_PATH!\Scripts\python.exe" main.py --install-playwright
-    if errorlevel 1 (
-        call :log [ERROR] Playwright浏览器安装失败，部分功能可能不可用
-    ) else (
-        call :log [*] Playwright 浏览器安装成功
-    )
+    call :log [*] 检测本地 Playwright 浏览器驱动...
+    call :check_and_fix_playwright
 )
 
 call :log Python虚拟环境设置完成

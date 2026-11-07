@@ -338,6 +338,86 @@ bandit -r . -f json -o bandit_report.json
 
 ## 🔄 最新更新
 
+### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`subprocess.Popen`全局重试与posix_spawn兜底+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.bat删除playwright-browsers危险清理+新增PY-CORE-033终端实时日志范式+skill.docx重新生成
+
+> **Commit**: HASH_PLACEHOLDER_V584
+
+#### 更新内容:
+1. **Errno 35 根因根治**: `_setup_unix_protection()` 删除硬编码 `RLIMIT_NPROC=100`，改为仅当系统额度低于 2048 时向上修正，杜绝“进程额度瞬间耗尽”导致的 `BlockingIOError: [Errno 35] Resource temporarily unavailable` [main.py](main.py#L3249-L3258)
+2. **子进程启动重试+兜底**: 新增 `_popen_retry()` 全局补丁，`Popen` 遇 EAGAIN/errno 35 自动重试 6 次（指数退避 0.15s 起），仍失败则 fallback `posix_spawn`，并对含 `preexec_fn`/`start_new_session` 等不兼容参数自动降级 [main.py](main.py#L119-L230) [main.py](main.py#L3990-L4010)
+3. **终端实时日志接入**: run.sh 守护进程模式新增 `tail -n 0 -f "$LOG_FILE"` 后台跟随，`TAIL_PID` 全局声明 + `wait` 后回收 + `trap cleanup_exit` 二次回收；run.bat 使用 `start /b cmd /c "..." < nul` 继承控制台，天然实时且禁止叠加 tail（避免双份输出） [run.sh](run.sh#L1865-L1880) [run.sh](run.sh#L2265-L2280) [run.bat](run.bat#L1573)
+4. **Playwright 本地化读取**: 浏览器目录探测优先 `tools/playwright/<平台>`（macos/linux/windows），命中后直接 `export PLAYWRIGHT_BROWSERS_PATH`，未命中仅告警不再自动下载，双端文案逐字一致 [run.sh](run.sh#L2200-L2212) [run.bat](run.bat#L587-L594)
+5. **cloudflared 本地化**: 统一 `tools/cloudflared/<平台>` 路径，安装改为 GitHub 官方 release 二进制下载（废弃 npm 安装），run.sh 新增 `get_platform_dir()`/`get_cloudflared_path()` 消除三处重复分支 [run.sh](run.sh#L35-L51) [run.sh](run.sh#L1197-L1249) [run.bat](run.bat#L1287-L1320)
+6. **run.sh 平台判断语法修复**: 三处 `[ "$(uname -s)" = "MINGW64_NT"* ]` 非法写法改为 `case ... MINGW*|MSYS*|CYGWIN*` 映射，Git Bash 下不再出现条件恒假导致路径取错 [run.sh](run.sh#L35-L43)
+7. **run.bat 危险清理移除**: 删除 `call :cleanup_temp_dir playwright-browsers 0`（会把刚装好的浏览器目录整目录清空），与 run.sh 对齐；`check_and_fix_playwright` 由“自动下载”改为“仅检测本地” [run.bat](run.bat#L447-L451) [run.bat](run.bat#L565-L571)
+8. **范式与文档同步**: skill.md 新增 `PY-CORE-033 终端实时日志接入范式`（输出流向判定表/sh 与 bat 双方案/坑位表/检查清单），README.md 与 skill.md 同步本版本记录，skill.docx 由 skill.md 重新生成；多余 md 文件删除，仅保留 README.md 与 skill.md 两份固定范式文档
+
+##### 1. 🔧 Errno 35 根因根治 (RLIMIT_NPROC 误设)
+**问题描述**:
+- **现象**: 启动后立即失败并输出 `✗ 错误: [Errno 35] Resource temporarily unavailable`，偶发于子进程创建（浏览器/看门狗/隧道）
+- **根因**: `_setup_unix_protection()` 硬编码 `resource.setrlimit(resource.RLIMIT_NPROC, (100, hard))`，该额度按**真实用户 ID 全局共享**，用户已持有数百进程，设置瞬间把额度打满，此后任何 `fork` 都返回 EAGAIN
+- **影响范围**: [main.py](main.py) 全部 `subprocess.Popen` 调用点（浏览器启动/看门狗/隧道/清理子进程）
+
+**修复方案**:
+- **技术实现(限额策略)**: 读取当前 `soft`，仅当 `soft < 2048` 时把 `soft` 抬到 2048，绝不向下压低；`hard` 保持系统默认 [main.py](main.py#L3249-L3258)
+- **技术实现(重试补丁)**: `_popen_retry()` 对 `BlockingIOError` 与 errno 35/11/12 重试 6 次，指数退避；连续失败后进入 30s 冷却并优先走 `posix_spawn` [main.py](main.py#L119-L230)
+- **参考位置**: [main.py](main.py#L3210-L3260) [main.py](main.py#L3990-L4010)
+
+**测试验证**:
+- ✅ 复现验证：手工将 `RLIMIT_NPROC` 设为 100 后连续 5 次子进程启动全部报 errno 35，与用户现场一致
+- ✅ 修复后连续启动服务 5 次，Playwright 正常拉起 Chromium 136.0.7103.25，无 errno 35
+- ✅ `python -m py_compile main.py` 通过
+
+##### 2. 🖥️ 终端实时日志接入 (sh tail + bat 继承控制台)
+**问题描述**:
+- **现象**: 终端打印“守护进程模式下运行中...”后再无任何输出，用户误判为卡死，只能去翻 `file/web_output.log`
+- **根因**: `nohup ... >> log 2>&1 &` 把 stdout 重定向进日志文件，脚本只 `wait` 不跟随，终端自然静默
+- **影响范围**: [run.sh](run.sh) 守护进程模式启动路径；[run.bat](run.bat) 各 `start /b` 启动路径
+
+**修复方案**:
+- **技术实现(sh)**: `tail -n 0 -f "$LOG_FILE" &` + `TAIL_PID=$!`，`wait $PYTHON_PID` 返回后 `kill "$TAIL_PID"`，`cleanup_exit` 中再回收一次，保证 Ctrl+C 不留孤儿 [run.sh](run.sh#L1865-L1880)
+- **技术实现(bat)**: 保持 `start /b cmd /c "..." < nul`（仅重定向 stdin），stdout 继承控制台天然实时，**禁止**再叠加 `Get-Content -Wait`，否则每行双份 [run.bat](run.bat#L1573)
+- **参考位置**: [skill.md](skill.md) `PY-CORE-033` 章节
+
+**测试验证**:
+- ✅ macOS 实跑：启动后终端持续输出 uvicorn 请求日志，Ctrl+C 后无 tail 残留（`ps aux | grep tail` 为空）
+- ✅ 判定表核对：run.sh（有重定向→tail）、run.bat（继承控制台→不 tail）均符合范式
+- ✅ `bash -n run.sh` 通过
+
+##### 3. 🌐 Playwright/cloudflared 本地化 (tools 目录优先)
+**问题描述**:
+- **现象**: 本地已有完整浏览器仍触发下载；cloudflared 依赖 npm 安装，离线/无网环境隧道不可用
+- **根因**: 探测顺序未覆盖项目内 `tools/` 目录；安装逻辑写死 npm
+- **影响范围**: [run.sh](run.sh) / [run.bat](run.bat) 的 Playwright 与 cloudflared 检查/安装分支
+
+**修复方案**:
+- **技术实现(Playwright)**: 探测顺序 `PLAYWRIGHT_BROWSERS_PATH` → `tools/playwright/<平台>` → `playwright-browsers` → 系统缓存，命中即用；未命中仅告警“已禁用自动下载” [run.sh](run.sh#L2195-L2235)
+- **技术实现(cloudflared)**: 统一 `tools/cloudflared/<平台>`，安装从 GitHub `releases/latest` 下载官方二进制（bat 用 PowerShell `Invoke-WebRequest`），并保留 npm/系统 PATH 作为兜底 [run.sh](run.sh#L1197-L1249) [run.bat](run.bat#L1287-L1320)
+- **参考位置**: [run.sh](run.sh#L35-L51) `get_platform_dir` / `get_cloudflared_path`
+
+**测试验证**:
+- ✅ macOS 实跑命中 `tools/playwright/macos/chromium-1169`，无下载动作
+- ✅ `tools/cloudflared/macos/cloudflared --version` 正常输出
+- ✅ 双端日志文案对照一致（`[Playwright] ✅ / ⚠️ / ℹ️`）
+
+##### 4. 📐 双脚本同步与文档范式 (PY-CORE-032 / PY-CORE-033)
+**问题描述**:
+- **现象**: run.bat 保留 `cleanup_temp_dir playwright-browsers 0` 与 npm 版 cloudflared，与 run.sh 行为分叉
+- **根因**: 上一轮仅单边修改 run.sh，违反 PY-CORE-032 双端同改原则
+- **影响范围**: [run.bat](run.bat) / [run.sh](run.sh) / [README.md](README.md) / [skill.md](skill.md) / [skill.docx](skill.docx)
+
+**修复方案**:
+- **技术实现(双端对齐)**: run.bat 删除危险清理、Playwright 改本地检测、cloudflared 改官方二进制、提示文案与返回码语义对齐 run.sh
+- **技术实现(文档)**: skill.md 新增 PY-CORE-033 实时日志范式；README.md/skill.md 同步 v5.0.9.84；`test/generate_docx.py` 重新生成 skill.docx；删除多余 md 文件（`.trae/skills/**/SKILL.md`），内容合并进 skill.md
+- **参考位置**: [skill.md](skill.md#L248) [skill.md](skill.md) `PY-CORE-033`
+
+**测试验证**:
+- ✅ `bash -n run.sh` 通过；run.bat `(`/`)` 配对无误
+- ✅ 双端返回码语义一致（0=最新 / 1=需升级 / 2=跳过）
+- ✅ `skill.docx` 由 skill.md 生成成功，文件大小正常
+
+---
+
 ### v5.0.9.83 (2026-11-05) - 🔧 **run.sh与run.bat全量1:1同步+changelog API空值根治+Commit占位符清零** - run.sh进程清理三级过滤/残留3轮重试/版本检查返回码统一/镜像测速工具函数全量对齐run.bat+changelog解析器扩展"说明/核心改进/补充说明"块并统一空值规范化(changes字段100%非空)+全量Commit畸形值清理(ac6add6f.8.90.09等5处→真实8位hash)+skill.docx重新生成
 
 > **Commit**: aba82a29
