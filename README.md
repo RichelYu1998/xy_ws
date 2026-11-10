@@ -755,7 +755,7 @@ python test/security_audit.py; echo "EXIT=$?"
 3. **依赖接口**: 新增 `/api/dependencies`，从 requirements.txt 动态解析分类、版本约束与用途，Python 最低版本不再硬编码 [main.py](main.py#L11444-L11507)
 4. **前端渲染**: 依赖表格按分类分组渲染并回填环境要求，功能卡片改为接口非空才清空，保留静态兜底 [dist/app.js](dist/app.js#L1273-L1316)
 5. **依赖瘦身**: 移除 `python-multipart`，Python 版本基线由 3.0+ 校正为 3.9+ [requirements.txt](requirements.txt#L4-L5)
-6. **文档同步**: README.md / skill.md / skill.docx 逐字一致，changelog 全量 432 版本 1213 条 changes 无空值、无占位符、Commit 全为真实哈希 [README.md](README.md#L745-L760)
+6. **文档同步**: README.md / skill.md / skill.docx 逐字一致，changelog 全量字段校验无空值、无占位符、Commit 全为真实哈希 [README.md](README.md#L745-L760)
 
 ##### 1. 🛠️ 功能卡片长文本穿模修复 (🐛Bug修复)
 **问题描述**:
@@ -796,8 +796,8 @@ python test/security_audit.py; echo "EXIT=$?"
 - **参考位置**: [main.py](main.py#L11444-L11507) [requirements.txt](requirements.txt#L1-L12)
 
 **测试验证**:
-- ✅ `curl /api/dependencies` 返回 HTTP 200，11 个依赖按分类分组且用途齐全
-- ✅ `python.min` 为 `3.9+`（由 requirements.txt 注释动态解析）、`python.current` 为 `3.9.6`、`pip` 为 `26.0.1`
+- ✅ `curl /api/dependencies` 返回 HTTP 200，依赖按 requirements.txt 分类分组且用途齐全
+- ✅ `python.min` 由 requirements.txt 注释动态解析得出、`python.current` 为当前运行版本、`pip` 为实际安装版本
 
 ##### 4. 🧩 前端依赖表格渲染与静态兜底 (🐛Bug修复)
 **问题描述**:
@@ -810,8 +810,8 @@ python test/security_audit.py; echo "EXIT=$?"
 - **参考位置**: [dist/app.js](dist/app.js#L1273-L1316) [dist/app.js](dist/app.js#L1418-L1424)
 
 **测试验证**:
-- ✅ 页面实测功能卡片共 11 张（静态 9 张 + 接口补充 2 张），无空白区块
-- ✅ `#deps-tbody` 渲染 11 行，`#env-requirements` 显示「Python 3.9+（当前运行 3.9.6）/ pip 26.0.1」
+- ✅ 页面实测功能卡片 11 张（静态 9 张 + 接口补充 2 张），无空白区块
+- ✅ `#deps-tbody` 渲染依赖表格行数与接口返回条数一致，`#env-requirements` 显示当前运行 Python 与 pip 版本
 
 ##### 5. 🧹 依赖瘦身与 Python 版本基线校正 (🔧Bug修复)
 **问题描述**:
@@ -834,12 +834,12 @@ python test/security_audit.py; echo "EXIT=$?"
 - **影响范围**: 三方文档一致性与 changelog API 数据可信度
 
 **修复方案**:
-- **技术实现**: 以 skill.md 为基准回写 README.md 使两者逐字一致（24250 行完全相同），再由 skill.md 重新生成 skill.docx；changelog 全量校验 432 个版本、1213 条 changes，逐字段检查空值与占位符 [README.md](README.md#L745-L760) [skill.md](skill.md#L745-L760)
+- **技术实现**: 以 skill.md 为基准回写 README.md 使两者逐字一致（行数与内容完全相同，以 `diff` 无输出为准），再由 skill.md 重新生成 skill.docx；changelog 全量逐字段检查空值与占位符，版本数与 changes 条数随迭代动态增长、以命令实时输出为准 [README.md](README.md#L745-L760) [skill.md](skill.md#L745-L760)
 - **参考位置**: [README.md](README.md#L745-L760) [skill.md](skill.md#L745-L760) [skill.docx](skill.docx)
 
 **测试验证**:
 - ✅ `diff README.md skill.md` 无输出，三方文档逐字一致
-- ✅ changelog API：432 版本 / 1213 条 changes，空 `changes` 0 个，空字段 0 个，`待生成` / `待补充` 占位 0 个，Commit 全部为真实 Git 哈希
+- ✅ changelog API：全量条目空 `changes` 0 个、空字段 0 个、`待生成` / `待补充` 占位 0 个，Commit 全部为真实 Git 哈希
 - ✅ run.sh / run.bat 版本号仍由 README.md 动态读取，双端与文档版本统一，未改动脚本
 
 ### v5.0.9.89 (2026-11-07) - 🎯 **安全审计零问题达标与真实黑盒攻防验证** - 13项真实HTTP载荷替代模拟打印+三层判定结构拆分issues与observations+异步锁误报转正向验证+响应头大小写归一+断连识别为主动拒收+路径遍历内容级复核+PY-CORE-035范式固化
