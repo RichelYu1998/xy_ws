@@ -1270,6 +1270,51 @@
                         showToast('版本信息加载失败', 'warning');
                     }
                 });
+            fetch('/api/dependencies')
+                .then(function(response) { return safeParseJson(response); })
+                .then(function(data) {
+                    if (!data.success || !data.dependencies || !data.dependencies.length) {
+                        console.warn('[Dependencies] 无有效数据，保留页面静态清单');
+                        return;
+                    }
+                    var tbody = document.getElementById('deps-tbody');
+                    if (!tbody) return;
+                    var order = [];
+                    var grouped = {};
+                    data.dependencies.forEach(function(dep) {
+                        var key = dep.category || '其他';
+                        if (!grouped[key]) {
+                            grouped[key] = [];
+                            order.push(key);
+                        }
+                        grouped[key].push(dep);
+                    });
+                    tbody.innerHTML = '';
+                    order.forEach(function(cat) {
+                        var items = grouped[cat];
+                        items.forEach(function(dep, idx) {
+                            var tr = document.createElement('tr');
+                            var html = '';
+                            if (idx === 0) {
+                                html += '<td rowspan="' + items.length + '">' + escapeHtml(cat) + '</td>';
+                            }
+                            html += '<td><code>' + escapeHtml(dep.name) + '</code></td>';
+                            html += '<td>' + escapeHtml(dep.spec || '-') + '</td>';
+                            html += '<td>' + escapeHtml(dep.purpose || '-') + '</td>';
+                            tr.innerHTML = html;
+                            tbody.appendChild(tr);
+                        });
+                    });
+                    var envEl = document.getElementById('env-requirements');
+                    if (envEl && data.python) {
+                        envEl.textContent = 'Python ' + data.python.min + '（当前运行 ' + data.python.current + '）'
+                            + ' / pip ' + (data.pip || '-')
+                            + ' / Node.js 仅用于内网穿透工具（Playwright 不需要）';
+                    }
+                })
+                .catch(function(e) {
+                    console.error('Failed to load dependencies:', e);
+                });
             fetch('/api/changelog')
                 .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
@@ -1375,8 +1420,7 @@
                 .then(function(data) {
                     if (!data.success) return;
                     var featuresContainer = document.getElementById('features-container');
-                    if (featuresContainer && data.features) {
-                        featuresContainer.innerHTML = '';
+                    if (featuresContainer && data.features && data.features.length) {
                         data.features.forEach(function(feat, idx) {
                             var iconInfo = featureIcons[idx % featureIcons.length];
                             var descParts = [];

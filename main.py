@@ -69,12 +69,12 @@ except ImportError:
     Fernet = hashes = PBKDF2HMAC = None
 
 try:
-    from fastapi import FastAPI, HTTPException, Query, Header, Depends, File, UploadFile, Form, BackgroundTasks
+    from fastapi import FastAPI, HTTPException, Query, Header, Depends, BackgroundTasks
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, HTMLResponse
     import uvicorn
 except ImportError:
-    FastAPI = HTTPException = Query = Header = Depends = File = UploadFile = Form = BackgroundTasks = None
+    FastAPI = HTTPException = Query = Header = Depends = BackgroundTasks = None
     CORSMiddleware = None
     JSONResponse = FileResponse = StreamingResponse = None
     uvicorn = None
@@ -90,9 +90,9 @@ except ImportError:
     async_playwright = None
 
 try:
-    from prometheus_client import Counter, Histogram, Gauge
+    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 except ImportError:
-    Counter = Histogram = Gauge = None
+    Counter = Histogram = Gauge = generate_latest = CONTENT_TYPE_LATEST = None
 
 try:
     from pydantic import BaseModel, Field, ValidationError, field_validator
@@ -11441,6 +11441,71 @@ if __name__ == '__main__':
                 logger.error(f'[api_changelog_debug] 获取失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({'success': False, 'error': '调试信息获取失败'}, status_code=500)
 
+        @app.get('/api/dependencies')  # [SECURED]
+        def get_dependencies():
+            purposes = {
+                'fastapi': '异步 Web 框架',
+                'uvicorn': 'ASGI 服务器',
+                'pydantic': '数据模型校验',
+                'playwright': '微购相册页面爬取（www.szwego.com）',
+                'openpyxl': 'Excel 文件读写',
+                'pandas': 'Excel 数据分析（货号对比/利润报表）',
+                'psutil': '系统资源监控与进程清理',
+                'prometheus-client': '/metrics 指标采集',
+                'cryptography': '配置加密存储（Fernet）',
+                'packaging': '版本号解析与比较',
+                'python-docx': 'skill.docx 文档生成',
+            }
+            try:
+                req_path = os.path.join(PROJECT_DIR, 'requirements.txt')
+                dependencies = []
+                category = '其他'
+                python_min = ''
+                with open(req_path, 'r', encoding='utf-8') as f:
+                    for raw in f:
+                        line = raw.strip()
+                        if not line:
+                            continue
+                        if line.startswith('#'):
+                            if not python_min:
+                                py_match = re.search(r'Python\s*>=\s*([0-9]+\.[0-9]+)', line)
+                                if py_match:
+                                    python_min = py_match.group(1) + '+'
+                            cat_match = re.match(r'^#\s*=+\s+([^=]+?)\s+=+\s*$', line)
+                            if cat_match:
+                                category = cat_match.group(1).strip()
+                            continue
+                        dep_match = re.match(r'^([A-Za-z0-9_.\-]+(?:\[[^\]]*\])?)\s*([<>=!~,*0-9.]*)', line)
+                        if not dep_match:
+                            continue
+                        name = dep_match.group(1)
+                        spec = dep_match.group(2).strip()
+                        base_name = re.sub(r'\[[^\]]*\]', '', name).strip()
+                        dependencies.append({
+                            'category': category,
+                            'name': name,
+                            'spec': spec,
+                            'purpose': purposes.get(base_name.lower(), ''),
+                        })
+                pip_version = ''
+                try:
+                    pip_version = im.version('pip')
+                except Exception:  # [HANDLED]
+                    pip_version = ''
+                return jsonify({
+                    'success': True,
+                    'source': 'requirements.txt',
+                    'python': {
+                        'min': python_min or '3.9+',
+                        'current': f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}',
+                    },
+                    'pip': pip_version,
+                    'dependencies': dependencies,
+                })
+            except Exception as e:  # [HANDLED]
+                logger.error(f'[api_dependencies] 获取失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '依赖清单读取失败'}, status_code=500)
+
         @app.get('/api/readme-sections')  # [SECURED]
         def get_readme_sections():
             try:
@@ -11458,11 +11523,11 @@ if __name__ == '__main__':
                     if h2_match:
                         if current_h2:
                             key = current_h2
-                            sections[key] = {
-                                'title': current_h2,
-                                'content': '\n'.join(current_lines).strip(),
-                                'subsections': {}
-                            }
+                            sec = sections.setdefault(key, {'title': key, 'content': '', 'subsections': {}})
+                            if current_h3:
+                                sec['subsections'][current_h3] = '\n'.join(current_lines).strip()
+                            else:
+                                sec['content'] = '\n'.join(current_lines).strip()
                         current_h2 = h2_match.group(1).strip()
                         current_h3 = None
                         current_lines = []
@@ -11482,27 +11547,48 @@ if __name__ == '__main__':
                         continue
                     current_lines.append(line)
                 if current_h2:
-                    if current_h2 not in sections:
-                        sections[current_h2] = {
-                            'title': current_h2,
-                            'content': '\n'.join(current_lines).strip(),
-                            'subsections': {}
-                        }
-                    elif current_h3:
-                        sections[current_h2]['subsections'][current_h3] = '\n'.join(current_lines).strip()
+                    sec = sections.setdefault(current_h2, {'title': current_h2, 'content': '', 'subsections': {}})
+                    if current_h3:
+                        sec['subsections'][current_h3] = '\n'.join(current_lines).strip()
+                    else:
+                        sec['content'] = '\n'.join(current_lines).strip()
                 features = []
-                feat_section = sections.get('📋 项目简介', sections.get('功能特性', {}))
+                feat_section = sections.get('📋 项目概述', sections.get('📋 项目简介', sections.get('功能特性', {})))
+
+                def _feature_bullets(text, limit=None):
+                    out = []
+                    for l in text.split('\n'):
+                        s = l.strip()
+                        if not s.startswith('- '):
+                            continue
+                        body = re.sub(r'^[\s\u2705\u274c\u26a0\u2b50\u2714\u2192\u27a1\u2022\ufe0f\U0001F300-\U0001FAFF]+', '', s[2:].strip())
+                        m = re.match(r'\*\*(.+?)\*\*[:：]?\s*(.*)', body)
+                        if m:
+                            out.append({'title': m.group(1).strip(), 'desc': m.group(2).strip()})
+                        elif body:
+                            out.append({'title': body, 'desc': ''})
+                        if limit and len(out) >= limit:
+                            break
+                    return out
+
                 if feat_section:
                     for sub_title, sub_content in feat_section.get('subsections', {}).items():
-                        items = []
-                        for l in sub_content.split('\n'):
-                            m = re.match(r'-\s+\*\*(.+?)\*\*[:：]?\s*(.*)', l.strip())
-                            if m:
-                                items.append({'title': m.group(1), 'desc': m.group(2).strip()})
-                            elif l.strip().startswith('- '):
-                                items.append({'title': l.strip()[2:], 'desc': ''})
+                        items = _feature_bullets(sub_content)
                         clean_title = re.sub(r'^\d+\.\s*', '', sub_title)
                         features.append({'title': clean_title, 'items': items})
+                    if not any(f['items'] for f in features):
+                        items = _feature_bullets(feat_section.get('content', ''))
+                        if items:
+                            features.append({'title': feat_section.get('title', '项目概述'), 'items': items})
+                for extra_h2 in ['🛡️ 跨平台防崩溃系统 (v2.0)', '🔐 安全合规状态']:
+                    sec = sections.get(extra_h2)
+                    if not sec:
+                        continue
+                    items = _feature_bullets(sec.get('content', ''))
+                    for sub_content in sec.get('subsections', {}).values():
+                        items.extend(_feature_bullets(sub_content))
+                    if items:
+                        features.append({'title': extra_h2, 'items': items[:6]})
                 tech_features = []
                 tech_section = sections.get('🔧 核心模块说明', sections.get('技术特点', {}))
                 if tech_section:
@@ -11516,11 +11602,15 @@ if __name__ == '__main__':
                         if m:
                             tech_features.append({'title': m.group(1), 'desc': m.group(2).strip()})
                 usage_steps = []
-                usage_section = sections.get('🚀 快速启动', sections.get('使用方法', {}))
-                if usage_section:
-                    for sub_title, sub_content in usage_section.get('subsections', {}).items():
-                        clean_title = re.sub(r'^方法\d+[：:]\s*', '', sub_title)
-                        usage_steps.append({'title': clean_title, 'content': sub_content})
+                usage_sources = [
+                    ('💻 环境要求', '快速启动'),
+                    ('🛡️ 跨平台防崩溃系统 (v2.0)', '使用方式'),
+                ]
+                for src_h2, src_h3 in usage_sources:
+                    src_sec = sections.get(src_h2) or {}
+                    sub_content = (src_sec.get('subsections') or {}).get(src_h3)
+                    if sub_content:
+                        usage_steps.append({'title': f'{src_h2} · {src_h3}', 'content': sub_content})
                 install_section = sections.get('⚙️ 配置说明', sections.get('安装和配置', {}))
                 install_steps = []
                 if install_section:

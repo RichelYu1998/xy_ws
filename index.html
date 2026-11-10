@@ -62,6 +62,7 @@
             height: 100%;
             padding: 30px 20px;
             text-align: center;
+            overflow: hidden;
         }
         
         .feature-card:hover {
@@ -78,18 +79,29 @@
             justify-content: center;
             margin: 0 auto 20px;
             font-size: 32px;
+            flex: 0 0 auto;
         }
         
         .feature-card h5 {
             color: var(--dark-color);
             margin-bottom: 15px;
             font-weight: 600;
+            overflow-wrap: break-word;
+            word-break: break-word;
         }
         
         .feature-card p {
             color: #666;
             font-size: 14px;
             line-height: 1.8;
+            margin-bottom: 0;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+        
+        #features-container > [class*="col-"] {
+            display: flex;
+            min-width: 0;
         }
         
         .section-title {
@@ -194,6 +206,39 @@
         }
         
         .footer a:hover {
+            color: #fff;
+        }
+        
+        .footer-contact {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(255,255,255,0.7);
+        }
+        
+        .copy-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 12px;
+            font-size: 13px;
+            line-height: 1.7;
+            color: #2f3542;
+            background: #fff;
+            border: 1px solid #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background .2s ease, color .2s ease, border-color .2s ease;
+        }
+        
+        .copy-btn:hover {
+            background: #f1f2f6;
+        }
+        
+        .copy-btn.copied {
+            background: #2ecc71;
+            border-color: #2ecc71;
             color: #fff;
         }
         
@@ -1661,6 +1706,87 @@
                 <div class="underline"></div>
             </div>
             <div class="row" id="features-container">
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="icon-wrapper" style="background: #e8f4fd;">
+                            <i class="fa fa-cloud-download" style="color: #409EFF;"></i>
+                        </div>
+                        <h5>微购相册商品采集</h5>
+                        <p>基于 Playwright 登录 www.szwego.com 抓取商品详情、货号、备注与价格</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="icon-wrapper" style="background: #fef0e6;">
+                            <i class="fa fa-exchange" style="color: #e6a23c;"></i>
+                        </div>
+                        <h5>货号对比</h5>
+                        <p>调用 /api/sku/compare 将采集结果与库存货号清单逐条比对，输出缺失与重复</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="icon-wrapper" style="background: #e6f7e6;">
+                            <i class="fa fa-file-excel-o" style="color: #67c23a;"></i>
+                        </div>
+                        <h5>Excel 平台对比</h5>
+                        <p>调用 /api/sku/compare/excel 按平台（闲鱼 / 小红书）解析 Excel 售价并与 JSON 数据比对</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="icon-wrapper" style="background: #fce8e8;">
+                            <i class="fa fa-bolt" style="color: #f56c6c;"></i>
+                        </div>
+                        <h5>每日利润报表</h5>
+                        <p>调用 /api/daily-profit 按日统计成交价、手续费、成本与利润率</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="icon-wrapper" style="background: #f0e6ff;">
+                            <i class="fa fa-trash" style="color: #9b59b6;"></i>
+                        </div>
+                        <h5>文件清理工具</h5>
+                        <p>调用 /api/clean/list、/api/clean/group、/api/clean/time、/api/clean/png 按条件清理冗余文件</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="icon-wrapper" style="background: #fdf6ec;">
+                            <i class="fa fa-external-link" style="color: #e6a23c;"></i>
+                        </div>
+                        <h5>隧道共享</h5>
+                        <p>调用 /api/tunnel/start 启动内网穿透，把本地服务共享给外网访问</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="icon-wrapper" style="background: #f0e6ff;">
+                            <i class="fa fa-database" style="color: #9b59b6;"></i>
+                        </div>
+                        <h5>商品数据查询</h5>
+                        <p>调用 /api/products、/api/product、/api/product/search 浏览与检索已采集的商品</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="icon-wrapper" style="background: #e6f7e6;">
+                            <i class="fa fa-shield" style="color: #67c23a;"></i>
+                        </div>
+                        <h5>安全合规检查</h5>
+                        <p>调用 /api/security/check 与 /api/security/audit 执行攻防检查与依赖漏洞审计</p>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="feature-card">
+                        <div class="icon-wrapper" style="background: #e8f4fd;">
+                            <i class="fa fa-envelope" style="color: #409EFF;"></i>
+                        </div>
+                        <h5>邮件通知</h5>
+                        <p>调用 /api/email/config 与 /api/email/test 配置并验证 SMTP 通知</p>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -1702,7 +1828,7 @@
                 <div class="col-6 col-md-3">
                     <div class="tech-item">
                         <i class="fa fa-python"></i>
-                        <span>Python 3.0+</span>
+                        <span>Python 3.9+</span>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
@@ -1736,31 +1862,50 @@
                 <div class="col-lg-8 mx-auto">
                     <div class="file-tree">
                         <pre style="background: transparent; color: #333;">
-SzwegoSpider/
-├── main.py                      <span style="color: #909399;"># 主程序文件</span>
-├── run.bat                      <span style="color: #909399;"># Windows启动脚本</span>
-├── run.sh                       <span style="color: #909399;"># Linux/Mac启动脚本</span>
-├── README.md                    <span style="color: #909399;"># 项目说明文档</span>
-├── requirements.txt             <span style="color: #909399;"># Python依赖</span>
-├── config/                      <span style="color: #409EFF;">📁 配置文件目录</span>
-│   ├── config.json              <span style="color: #909399;"># 主配置文件</span>
+xy_ws/
+├── main.py                      <span style="color: #909399;"># 主程序（FastAPI 服务 + Playwright 爬虫）</span>
+├── index.html                   <span style="color: #909399;"># 展示页（当前页面）</span>
+├── run.bat                      <span style="color: #909399;"># Windows 启动脚本</span>
+├── run.sh                       <span style="color: #909399;"># macOS/Linux 启动脚本</span>
+├── requirements.txt             <span style="color: #909399;"># Python 依赖（本页清单来源）</span>
+├── tox.ini                      <span style="color: #909399;"># 多版本兼容性测试配置</span>
+├── README.md                    <span style="color: #909399;"># 项目说明（本页数据来源）</span>
+├── skill.md / skill.docx        <span style="color: #909399;"># 技能文档（md 与 docx 同版本）</span>
+├── config/                      <span style="color: #409EFF;">📁 配置目录</span>
+│   ├── config.json              <span style="color: #909399;"># 主配置（敏感字段加密）</span>
 │   ├── config.json.example      <span style="color: #909399;"># 配置模板（脱敏）</span>
-│   ├── cookies.json             <span style="color: #909399;"># Cookie存储</span>
-│   ├── cookies.json.example     <span style="color: #909399;"># Cookie模板</span>
-│   └── input_stock_numbers.txt  <span style="color: #909399;"># 货号输入文件</span>
-├── file/                        <span style="color: #409EFF;">📁 数据文件目录</span>
-│   ├── output.json              <span style="color: #909399;"># 商品数据输出</span>
-│   ├── duplicate_log.json       <span style="color: #909399;"># 重复序列号日志</span>
-│   └── diff_log_*.json          <span style="color: #909399;"># 差异日志(按日期)</span>
-├── dist/                        <span style="color: #409EFF;">📁 前端构建产物</span>
-│   ├── index.html               <span style="color: #909399;"># Web界面入口</span>
-│   ├── app.js                   <span style="color: #909399;"># 前端主逻辑</span>
-│   └── assets/                  <span style="color: #909399;"># 静态资源</span>
-├── test/                        <span style="color: #409EFF;">📁 测试目录</span>
-│   ├── test_main.py             <span style="color: #909399;"># 主测试文件</span>
-│   └── generate_docx.py         <span style="color: #909399;"># 文档生成脚本</span>
-└── tools/                       <span style="color: #409EFF;">📁 工具目录</span>
-    └── cloudflared/             <span style="color: #909399;"># 内网穿透工具</span></pre>
+│   ├── cookies.json             <span style="color: #909399;"># Cookie 存储</span>
+│   ├── cookies.json.example     <span style="color: #909399;"># Cookie 模板</span>
+│   ├── input_stock_numbers.txt  <span style="color: #909399;"># 货号输入文件</span>
+│   └── staging.json / production.json  <span style="color: #909399;"># 分环境配置</span>
+├── file/                        <span style="color: #409EFF;">📁 数据目录</span>
+│   ├── 20260605微购相册(小旭数码).json  <span style="color: #909399;"># 按日期归档的商品数据</span>
+│   ├── 20260605微购相册(小旭数码)_cache.json  <span style="color: #909399;"># 当日缓存</span>
+│   ├── security_report_*.json   <span style="color: #909399;"># 安全审计报告</span>
+│   ├── web_output.log / app.log <span style="color: #909399;"># 运行日志</span>
+│   └── tunnel_url.txt           <span style="color: #909399;"># 隧道公网地址</span>
+├── dist/                        <span style="color: #409EFF;">📁 前端资源</span>
+│   ├── index.html               <span style="color: #909399;"># 天气时钟看板页</span>
+│   ├── app.js                   <span style="color: #909399;"># 前端主逻辑（调用本页各 API）</span>
+│   ├── manifest.webmanifest    <span style="color: #909399;"># PWA 清单</span>
+│   ├── sw.js / registerSW.js   <span style="color: #909399;"># PWA 离线缓存</span>
+│   ├── workbox-*.js            <span style="color: #909399;"># Workbox 运行时</span>
+│   ├── package.json            <span style="color: #909399;"># Node.js 依赖声明</span>
+│   ├── patches/                <span style="color: #909399;"># patch-package 补丁</span>
+│   ├── assets/                 <span style="color: #909399;"># 静态资源</span>
+│   ├── favicon/ / fonts/       <span style="color: #909399;"># 图标与字体</span>
+│   └── screenshots/ / weather-icons/  <span style="color: #909399;"># 截图与天气图标</span>
+├── test/                        <span style="color: #409EFF;">📁 测试与工具</span>
+│   ├── generate_docx.py         <span style="color: #909399;"># skill.md → skill.docx</span>
+│   ├── security_audit.py        <span style="color: #909399;"># 安全审计脚本</span>
+│   └── salt_crypto_tool.py      <span style="color: #909399;"># 配置加解密工具</span>
+├── tools/                       <span style="color: #409EFF;">📁 本地化工具链</span>
+│   ├── playwright/              <span style="color: #909399;"># 内置 Chromium 浏览器</span>
+│   ├── cloudflared/             <span style="color: #909399;"># Cloudflare 隧道</span>
+│   ├── node/                    <span style="color: #909399;"># Node 运行时（仅隧道工具使用）</span>
+│   └── python/                  <span style="color: #909399;"># 内置 Python 运行时</span>
+└── launchd/                     <span style="color: #409EFF;">📁 守护配置</span>
+    └── com.xyws.web.plist       <span style="color: #909399;"># macOS 开机守护</span></pre>
                     </div>
                 </div>
             </div>
@@ -1777,7 +1922,7 @@ SzwegoSpider/
                 <div class="col-lg-8 mx-auto">
                     <div class="info-box">
                         <i class="fa fa-info-circle"></i>
-                        <strong>环境要求：</strong> Python 3.0+ / pip 23.0+ / Node.js 16+ (Playwright)
+                        <strong>环境要求：</strong> <span id="env-requirements">Python 3.9+ / pip 23.0+ / Node.js 18+（仅内网穿透工具使用，Playwright 不需要）</span>
                     </div>
                     
                     <div class="card mt-3">
@@ -1785,23 +1930,22 @@ SzwegoSpider/
                             <strong><i class="fa fa-cubes"></i> Python 依赖清单</strong>
                         </div>
                         <div class="card-body p-0">
-                            <table class="table table-sm table-striped mb-0" style="font-size: 13px;">
+                            <table class="table table-sm table-striped mb-0" id="deps-table" style="font-size: 13px;">
                                 <thead class="thead-light">
                                     <tr><th>分类</th><th>依赖包</th><th>版本</th><th>用途</th></tr>
                                 </thead>
-                                <tbody>
-                                    <tr><td rowspan="3">Web 框架</td><td><code>fastapi</code></td><td>&gt;=0.115,&lt;0.130</td><td>异步 Web 框架</td></tr>
-                                    <tr><td><code>uvicorn[standard]</code></td><td>&gt;=0.30,&lt;0.40</td><td>ASGI 服务器</td></tr>
-                                    <tr><td><code>python-multipart</code></td><td>&gt;=0.0.12,&lt;0.1</td><td>文件上传支持</td></tr>
-                                    <tr><td>数据验证</td><td><code>pydantic</code></td><td>&gt;=2.7,&lt;2.13</td><td>数据模型校验</td></tr>
-                                    <tr><td>浏览器自动化</td><td><code>playwright</code></td><td>==1.52.0</td><td>闲鱼页面爬取</td></tr>
-                                    <tr><td rowspan="2">数据处理</td><td><code>openpyxl</code></td><td>&gt;=3.1,&lt;3.2</td><td>Excel 读写</td></tr>
-                                    <tr><td><code>pandas</code></td><td>&gt;=2.0,&lt;2.4</td><td>数据分析</td></tr>
-                                    <tr><td rowspan="2">系统监控</td><td><code>psutil</code></td><td>&gt;=5.9,&lt;7.0</td><td>资源监控</td></tr>
-                                    <tr><td><code>prometheus-client</code></td><td>&gt;=0.19,&lt;0.25</td><td>指标采集</td></tr>
-                                    <tr><td>安全加密</td><td><code>cryptography</code></td><td>&gt;=41,&lt;44</td><td>配置加密</td></tr>
-                                    <tr><td>文档生成</td><td><code>python-docx</code></td><td>&gt;=1.0,&lt;2.0</td><td>Word 导出</td></tr>
-                                    <tr><td>工具库</td><td><code>packaging</code></td><td>&gt;=23,&lt;25</td><td>版本解析</td></tr>
+                                <tbody id="deps-tbody">
+                                    <tr><td rowspan="3">核心框架</td><td><code>fastapi</code></td><td>&gt;=0.115.0,&lt;0.130.0</td><td>异步 Web 框架</td></tr>
+                                    <tr><td><code>uvicorn[standard]</code></td><td>&gt;=0.30.0,&lt;0.40.0</td><td>ASGI 服务器</td></tr>
+                                    <tr><td><code>pydantic</code></td><td>&gt;=2.7.0,&lt;2.13.0</td><td>数据模型校验</td></tr>
+                                    <tr><td>浏览器自动化</td><td><code>playwright</code></td><td>==1.52.0</td><td>微购相册页面爬取（www.szwego.com）</td></tr>
+                                    <tr><td rowspan="2">数据处理</td><td><code>openpyxl</code></td><td>&gt;=3.1.0,&lt;3.2.0</td><td>Excel 文件读写</td></tr>
+                                    <tr><td><code>pandas</code></td><td>&gt;=2.0.0,&lt;2.4.0</td><td>Excel 数据分析（货号对比/利润报表）</td></tr>
+                                    <tr><td rowspan="2">系统监控</td><td><code>psutil</code></td><td>&gt;=5.9.0,&lt;7.0.0</td><td>系统资源监控与进程清理</td></tr>
+                                    <tr><td><code>prometheus-client</code></td><td>&gt;=0.19.0,&lt;0.25.0</td><td>/metrics 指标采集</td></tr>
+                                    <tr><td>安全与加密</td><td><code>cryptography</code></td><td>&gt;=41.0.0,&lt;44.0.0</td><td>配置加密存储（Fernet）</td></tr>
+                                    <tr><td>版本解析</td><td><code>packaging</code></td><td>&gt;=23.0,&lt;25.0</td><td>版本号解析与比较</td></tr>
+                                    <tr><td>文档生成</td><td><code>python-docx</code></td><td>&gt;=1.0.0,&lt;2.0.0</td><td>skill.docx 文档生成</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1889,7 +2033,8 @@ SzwegoSpider/
                 <div class="col-md-6 text-md-right">
                     <h5>相关链接</h5>
                     <p><a href="https://github.com/RichelYu1998/xy_ws" target="_blank"><i class="fa fa-github"></i> GitHub</a></p>
-                    <p><i class="fa fa-qq"></i> 联系我们: 980187223</p>
+                    <p><span class="footer-contact"><i class="fa fa-qq"></i> 联系我们: 980187223 <button type="button" class="copy-btn" data-copy="980187223"><i class="fa fa-clone"></i> <span class="copy-label">复制</span></button></span></p>
+                    <p><span class="footer-contact"><i class="fa fa-weixin"></i> 微信: RICHELYU <button type="button" class="copy-btn" data-copy="RICHELYU"><i class="fa fa-clone"></i> <span class="copy-label">复制</span></button></span></p>
                 </div>
             </div>
             <hr style="border-color: rgba(255,255,255,0.1);">
@@ -1898,11 +2043,57 @@ SzwegoSpider/
             </div>
         </div>
     </footer>
+    <script>
+        (function () {
+            var btns = document.querySelectorAll('.copy-btn');
+            Array.prototype.forEach.call(btns, function (btn) {
+                var text = btn.getAttribute('data-copy') || '';
+                var label = btn.querySelector('.copy-label');
+                var timer = null;
+
+                function legacyCopy() {
+                    try {
+                        var input = document.createElement('textarea');
+                        input.value = text;
+                        input.setAttribute('readonly', '');
+                        input.style.position = 'fixed';
+                        input.style.top = '-1000px';
+                        document.body.appendChild(input);
+                        input.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(input);
+                    } catch (e) {}
+                }
+
+                function markCopied() {
+                    btn.classList.add('copied');
+                    label.textContent = '已复制';
+                    clearTimeout(timer);
+                    timer = setTimeout(function () {
+                        btn.classList.remove('copied');
+                        label.textContent = '复制';
+                    }, 1800);
+                }
+
+                btn.addEventListener('click', function () {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(markCopied, function () {
+                            legacyCopy();
+                            markCopied();
+                        });
+                    } else {
+                        legacyCopy();
+                        markCopied();
+                    }
+                });
+            });
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
 
     <!-- 主应用脚本（已提取并优化） -->
-    <script src="./dist/app.js?v=20261107120000"></script>
+    <script src="./dist/app.js?v=20261110170000"></script>
 </body>
 </html>
