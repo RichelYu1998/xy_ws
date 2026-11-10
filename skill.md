@@ -35,7 +35,7 @@
 ---
 
 ## 📋 项目概述
-微购相册商品数据采集与分析系统，用于自动化获取闲鱼平台商品信息并进行数据分析。
+微购相册商品数据采集与分析系统，用于自动化获取微购相册（www.szwego.com）商品信息，并结合闲鱼平台售价与手续费规则进行数据分析。
 
 ---
 
@@ -43,7 +43,7 @@
 ## 💻 环境要求
 
 ### 基础环境
-- **Python**: 3.0+ (推荐 3.10+, 兼容至 3.14)
+- **Python**: 3.9+ (推荐 3.10+, 兼容至 3.14)
 - **pip**: 23.0+ (安装依赖前会自动升级)
 - **操作系统**: Windows 10/11, Linux (Ubuntu 20.04+), macOS 10.15+
 
@@ -53,12 +53,10 @@
 |------|--------|----------|------|
 | **Web 框架** | `fastapi` | `>=0.115.0,<0.130.0` | 异步 Web 框架 |
 | | `uvicorn[standard]` | `>=0.30.0,<0.40.0` | ASGI 服务器 |
-| | `python-multipart` | `>=0.0.12,<0.1.0` | 文件上传支持 |
 | **数据验证** | `pydantic` | `>=2.7.0,<2.13.0` | 数据模型校验 |
-| **浏览器自动化** | `playwright` | `==1.52.0` | 闲鱼页面爬取 |
+| **浏览器自动化** | `playwright` | `==1.52.0` | 微购相册页面爬取（www.szwego.com） |
 | **数据处理** | `openpyxl` | `>=3.1.0,<3.2.0` | Excel 文件读写 |
 | | `pandas` | `>=2.0.0,<2.4.0` | 数据分析处理 |
-| **数据库** | `pymysql` | `>=1.0.0,<1.3.0` | MySQL 连接 |
 | **系统监控** | `psutil` | `>=5.9.0,<7.0.0` | 系统资源监控 |
 | | `prometheus-client` | `>=0.19.0,<0.25.0` | 指标采集暴露 |
 | **安全加密** | `cryptography` | `>=41.0.0,<44.0.0` | 配置加密存储 |
@@ -69,13 +67,14 @@
 # 一键安装所有依赖
 pip install -r requirements.txt
 
-# 安装 Playwright 浏览器（首次必需）
+# 安装 Playwright 浏览器（仅当 tools/playwright 内置浏览器缺失时执行）
 playwright install chromium
 ```
 
-### Node.js 环境（Playwright 依赖）
-- **Node.js**: 16+ (Playwright 浏览器下载需要)
-- **npm**: 8+
+### Node.js 环境（内网穿透工具依赖，Playwright 不需要）
+- **Node.js**: 18+（仅用于 hostc / cloudflared 的 npm 安装与升级）
+- **npm**: 9+
+- **说明**: Playwright Python 版使用预编译浏览器二进制，运行时不需要 Node.js
 
 ### 快速启动
 ```bash
@@ -150,31 +149,55 @@ python test_crossplatform.py
 ## 📂 项目结构
 
 ```
-SzwegoSpider/
-├── main.py                 # 主程序文件
-├── run.bat                 # Windows启动脚本
-├── run.sh                  # Linux/Mac启动脚本
+xy_ws/
+├── main.py                 # 主程序（FastAPI 服务 + 采集/对比/报表逻辑）
+├── index.html              # 项目展示页
+├── requirements.txt        # Python 依赖清单
 ├── README.md               # 项目说明文档
-├── requirements.txt        # Python依赖
-├── config/                 # 配置文件目录
+├── skill.md / skill.docx   # 技能说明文档
+├── run.sh                  # Linux/Mac 启动脚本
+├── run.bat                 # Windows 启动脚本
+├── tox.ini                 # tox 配置
+├── clean_files.log         # 文件清理日志
+├── config/                 # 配置目录
 │   ├── config.json         # 主配置文件
 │   ├── config.json.example # 配置模板（脱敏）
-│   ├── cookies.json        # Cookie存储
-│   ├── cookies.json.example# Cookie模板
-│   └── input_stock_numbers.txt  # 货号输入文件
-├── file/                   # 数据文件目录
-│   ├── output.json         # 商品数据输出
-│   ├── duplicate_log.json  # 重复序列号日志
-│   └── diff_log_*.json     # 差异日志(按日期)
-├── dist/                   # 前端构建产物
-│   ├── index.html          # Web界面入口
+│   ├── cookies.json        # Cookie 存储
+│   ├── cookies.json.example# Cookie 模板
+│   ├── production.json     # 生产环境配置
+│   ├── staging.json        # 预发环境配置
+│   ├── input_stock_numbers.txt  # 货号输入文件
+│   ├── .encryption_key     # 配置加密密钥
+│   └── .salt               # 密钥派生盐值
+├── file/                   # 采集数据目录（按日期命名的微购相册 JSON）
+├── temp/                   # 临时文件目录
+├── test/                   # 辅助脚本目录
+│   ├── generate_docx.py    # skill.docx 文档生成脚本
+│   ├── salt_crypto_tool.py # 加盐加密工具
+│   └── security_audit.py   # 安全审计脚本
+├── launchd/                # macOS 守护进程配置
+│   └── com.xyws.web.plist
+├── dist/                   # 前端资源
+│   ├── index.html          # Web 界面入口
 │   ├── app.js              # 前端主逻辑
-│   └── assets/             # 静态资源
-├── test/                   # 测试目录
-│   ├── test_main.py        # 主测试文件
-│   └── generate_docx.py    # 文档生成脚本
-└── tools/                  # 工具目录
-    └── cloudflared/        # 内网穿透工具
+│   ├── manifest.webmanifest
+│   ├── sw.js               # PWA Service Worker
+│   ├── registerSW.js       # Service Worker 注册
+│   ├── workbox-*.js        # Workbox 运行时
+│   ├── package.json        # Node.js 依赖声明
+│   ├── package-lock.json   # 依赖锁定
+│   ├── patches/            # patch-package 补丁
+│   ├── assets/             # 字体与打包资源
+│   ├── favicon/            # 站点图标
+│   ├── fonts/              # 本地字体
+│   ├── screenshots/        # 页面截图
+│   ├── weather-icons/      # 天气图标
+│   └── node_modules/       # 前端依赖
+└── tools/                  # 内置工具
+    ├── cloudflared/        # 内网穿透工具
+    ├── node/               # Node.js 运行时（供 cloudflared 使用）
+    ├── playwright/         # Playwright 浏览器内核
+    └── python/             # 内置 Python 运行时
 ```
 
 ## ⚙️ 配置说明
@@ -721,6 +744,103 @@ python test/security_audit.py; echo "EXIT=$?"
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.90 (2026-11-10) - 🛠️ **展示页溢出修复与依赖清单接口** - 功能卡片长文本穿模根治+页脚联系方式改复制按钮并移除App唤起+新增/api/dependencies依赖清单接口+前端依赖表格渲染与静态兜底+移除python-multipart并校正Python版本基线至3.9+三方文档逐字一致与changelog字段全量校验
+
+> **Commit**: `ab35073b`
+
+#### 更新内容:
+1. **卡片溢出**: `.feature-card` 补断词规则与 `min-width: 0`，根治长 API 路径顶破卡片边界 [index.html](index.html#L57-L105)
+2. **联系方式**: 页脚 QQ/微信 由唤起 App 改为「复制」按钮，剪贴板不可用时回退 `execCommand` [index.html](index.html#L2036-L2089)
+3. **依赖接口**: 新增 `/api/dependencies`，从 requirements.txt 动态解析分类、版本约束与用途，Python 最低版本不再硬编码 [main.py](main.py#L11444-L11507)
+4. **前端渲染**: 依赖表格按分类分组渲染并回填环境要求，功能卡片改为接口非空才清空，保留静态兜底 [dist/app.js](dist/app.js#L1273-L1316)
+5. **依赖瘦身**: 移除 `python-multipart`，Python 版本基线由 3.0+ 校正为 3.9+ [requirements.txt](requirements.txt#L4-L5)
+6. **文档同步**: README.md / skill.md / skill.docx 逐字一致，changelog 全量 432 版本 1213 条 changes 无空值、无占位符、Commit 全为真实哈希 [README.md](README.md#L745-L760)
+
+##### 1. 🛠️ 功能卡片长文本穿模修复 (🐛Bug修复)
+**问题描述**:
+- **现象**: 展示页「安全合规检查」等卡片内 `调用 /api/security/check 与 /api/security/audit ...` 等长路径文字冲出卡片右边界，压到相邻卡片形成穿模
+- **根因**: `.feature-card` 无任何断词规则，同时 Bootstrap 栅格列默认 `min-width: auto`，列不会因内容超宽而收缩，连续不可断串（API 路径）只能整串顶出
+- **影响范围**: 展示页全部功能特性卡片，窄视口（1280 / 900 / 600）下最明显
+
+**修复方案**:
+- **技术实现**: `.feature-card` 增加 `overflow: hidden` / `flex: 0 0 auto` / `overflow-wrap: break-word` / `word-break: break-word`，`h5` 与 `p` 同步补断词规则，`#features-container > [class*="col-"]` 增加 `display: flex; min-width: 0` 使列可收缩 [index.html](index.html#L57-L105)
+- **参考位置**: [index.html](index.html#L57-L105) [index.html](index.html#L1522-L1542)
+
+**测试验证**:
+- ✅ 1600 / 1280 / 900 / 600 四个视口逐卡测量文字右边界，全部落在卡片内，横向溢出 0 处
+- ✅ 长路径文本按词折行，卡片高度自适应，不再出现跨卡重叠
+
+##### 2. 📋 页脚联系方式改复制按钮（移除 App 唤起） (✨功能增强)
+**问题描述**:
+- **现象**: 页脚 QQ/微信 点击后只能唤起客户端，PC 端停留在添加好友页无法直达会话；移动端自定义 scheme 触发被页面 CSP 拦截
+- **根因**: 网页无法控制客户端内部路由跳转；隐藏 iframe 触发 `tencent://` / `mqqapi://` 会被 `default-src 'self'` 拒绝
+- **影响范围**: 页脚「联系我们」「微信」两处联系方式交互
+
+**修复方案**:
+- **技术实现**: 删除全部 URL Scheme 唤起逻辑，改为「文字 + 白底圆角复制按钮」，点击走 `navigator.clipboard.writeText`，成功变绿显示「已复制」并在 1.8 秒后还原；剪贴板 API 缺失或写入被拒时回退 `document.execCommand('copy')` 临时 textarea 方案 [index.html](index.html#L2036-L2089)
+- **参考位置**: [index.html](index.html#L2036-L2037) [index.html](index.html#L2046-L2089)
+
+**测试验证**:
+- ✅ 点击「复制」后按钮变绿并显示「已复制」，1.8 秒自动还原为「复制」
+- ✅ 页脚 GitHub 链接仍可直接点击跳转，其余联系方式不再触发任何 App 唤起
+
+##### 3. 🔌 新增 /api/dependencies 依赖清单接口 (✨功能增强)
+**问题描述**:
+- **现象**: 展示页依赖清单为手写静态表格，与 requirements.txt 实际内容漂移；Python 版本要求两处硬编码各自为政
+- **根因**: 缺少依赖数据接口，页面只能靠人工同步；`/api/dependencies` 内的 `python.min` 曾是写死常量
+- **影响范围**: 展示页依赖清单表格、环境要求文案与版本基线口径
+
+**修复方案**:
+- **技术实现**: 新增 `@app.get('/api/dependencies')`，逐行解析 requirements.txt 的 `==== 分类 ====` 注释块与包名/版本约束，配合 `purposes` 用途字典输出 `category` / `name` / `spec` / `purpose`，并从注释 `Python >=3.9` 动态提取 `python.min`，同时返回 `python.current` 与 `pip` 版本 [main.py](main.py#L11444-L11507)
+- **参考位置**: [main.py](main.py#L11444-L11507) [requirements.txt](requirements.txt#L1-L12)
+
+**测试验证**:
+- ✅ `curl /api/dependencies` 返回 HTTP 200，11 个依赖按分类分组且用途齐全
+- ✅ `python.min` 为 `3.9+`（由 requirements.txt 注释动态解析）、`python.current` 为 `3.9.6`、`pip` 为 `26.0.1`
+
+##### 4. 🧩 前端依赖表格渲染与静态兜底 (🐛Bug修复)
+**问题描述**:
+- **现象**: 接口返回空数组时 `#features-container` 被无条件清空，展示页功能区块整段空白
+- **根因**: 前端未判断返回数组是否为空即执行 `innerHTML = ''`，把静态兜底卡片一并清除
+- **影响范围**: 展示页功能特性区与依赖清单区
+
+**修复方案**:
+- **技术实现**: 功能卡片改为仅当 `data.features && data.features.length` 为真时才清空并渲染，否则保留静态卡片；新增 `/api/dependencies` 调用，按 `category` 分组渲染 `#deps-tbody`（首行用 `rowspan` 合并分类列），并回填 `#env-requirements` 的运行版本文案 [dist/app.js](dist/app.js#L1273-L1316)
+- **参考位置**: [dist/app.js](dist/app.js#L1273-L1316) [dist/app.js](dist/app.js#L1418-L1424)
+
+**测试验证**:
+- ✅ 页面实测功能卡片共 11 张（静态 9 张 + 接口补充 2 张），无空白区块
+- ✅ `#deps-tbody` 渲染 11 行，`#env-requirements` 显示「Python 3.9+（当前运行 3.9.6）/ pip 26.0.1」
+
+##### 5. 🧹 依赖瘦身与 Python 版本基线校正 (🔧Bug修复)
+**问题描述**:
+- **现象**: requirements.txt 保留已无代码引用的 `python-multipart`，且 Python 版本要求标注为 3.0+，与实际使用的 f-string 与类型注解不匹配
+- **根因**: 文件上传功能移除后未清理依赖；版本基线长期未随运行环境更新
+- **影响范围**: 依赖安装体积、兼容性声明与三方文档版本口径
+
+**修复方案**:
+- **技术实现**: 删除 `python-multipart` 依赖行，技术栈与兼容性注释改为 `Python 3.9+` / `Python >=3.9 (推荐 3.10+，兼容至 3.14)`，README.md 与 skill.md 同步改为 3.9+ [requirements.txt](requirements.txt#L4-L5)
+- **参考位置**: [requirements.txt](requirements.txt#L1-L12) [README.md](README.md#L46)
+
+**测试验证**:
+- ✅ `grep python-multipart requirements.txt` 无命中，接口返回依赖为 11 项
+- ✅ README.md / skill.md / requirements.txt 三处版本基线全部为 3.9+，无残留 3.0+ 表述
+
+##### 6. 📄 三方文档逐字同步与 changelog 字段全量校验 (📝文档更新)
+**问题描述**:
+- **现象**: README.md 与 skill.md 遗留 4 处历史段落差异（旧项目结构 `D:/ws/xy_ws/`、已不存在的测试脚本引用）；changelog API 曾出现空 `changes` 与「待生成」占位 Commit
+- **根因**: 历史版本只改其一未同步；旧版条目靠手工填写 Commit 与变更字段
+- **影响范围**: 三方文档一致性与 changelog API 数据可信度
+
+**修复方案**:
+- **技术实现**: 以 skill.md 为基准回写 README.md 使两者逐字一致（24250 行完全相同），再由 skill.md 重新生成 skill.docx；changelog 全量校验 432 个版本、1213 条 changes，逐字段检查空值与占位符 [README.md](README.md#L745-L760) [skill.md](skill.md#L745-L760)
+- **参考位置**: [README.md](README.md#L745-L760) [skill.md](skill.md#L745-L760) [skill.docx](skill.docx)
+
+**测试验证**:
+- ✅ `diff README.md skill.md` 无输出，三方文档逐字一致
+- ✅ changelog API：432 版本 / 1213 条 changes，空 `changes` 0 个，空字段 0 个，`待生成` / `待补充` 占位 0 个，Commit 全部为真实 Git 哈希
+- ✅ run.sh / run.bat 版本号仍由 README.md 动态读取，双端与文档版本统一，未改动脚本
 
 ### v5.0.9.89 (2026-11-07) - 🎯 **安全审计零问题达标与真实黑盒攻防验证** - 13项真实HTTP载荷替代模拟打印+三层判定结构拆分issues与observations+异步锁误报转正向验证+响应头大小写归一+断连识别为主动拒收+路径遍历内容级复核+PY-CORE-035范式固化
 
@@ -14622,7 +14742,7 @@ PY-CORE-025 (API整体架构)
 |------|-----|
 | **项目名称** | 微购相册管理系统 (WegoAlbum Manager) |
 | **项目类型** | Web服务 + 数据采集 + 自动化分析 |
-| **技术栈** | Python 3.0+ / FastAPI / Playwright / Pydantic |
+| **技术栈** | Python 3.9+ / FastAPI / Playwright / Pydantic |
 | **编码标准** | UTF-8 (强制) |
 | **安全等级** | 生产级 (98% OWASP Top 10合规) |
 
@@ -16516,34 +16636,57 @@ dist/app.js
     └── 全局函数暴露
 
 ### 项目目录结构
-D:/ws/xy_ws/
-├── main.py                 # Python后端主程序
+xy_ws/
+├── main.py                 # Python 后端主程序
+├── index.html              # 项目展示页
 ├── README.md               # 项目说明文档
 ├── skill.md                # 开发技能文档（本文件）
-├── skill.docx              # Word格式文档
-├── run.bat                 # Windows启动脚本
-├── run.sh                  # Linux/Mac启动脚本
-├── test/                  # 测试目录
-│   ├── test_main.py        # 主测试文件
-│   ├── test_edge_cases.py  # 边界测试
-│   ├── stress_test.py      # 压力测试
-│   └── test_security_fixes.py  # 安全测试
-├── dist/                   # 前端构建产物
-│   ├── app.js              # JavaScript主文件
-│   ├── index.html          # HTML入口
-│   ├── package.json        # Node.js依赖
-│   ├── patches/            # patch-package补丁
-│   │   └── hostc+1.3.0.patch
-│   ├── assets/             # 静态资源
-│   │   ├── index-*.js      # 应用代码
-│   │   ├── vendor-*.js     # 第三方库
-│   │   └── index-*.css     # 样式文件
-│   ├── fonts/              # 字体文件
+├── skill.docx              # Word 格式文档（由 skill.md 生成）
+├── requirements.txt        # Python 依赖清单
+├── tox.ini                 # tox 配置
+├── clean_files.log         # 文件清理日志
+├── run.bat                 # Windows 启动脚本
+├── run.sh                  # Linux/Mac 启动脚本
+├── config/                 # 配置目录
+│   ├── config.json         # 主配置文件
+│   ├── config.json.example # 配置模板（脱敏）
+│   ├── cookies.json        # Cookie 存储
+│   ├── cookies.json.example# Cookie 模板
+│   ├── production.json     # 生产环境配置
+│   ├── staging.json        # 预发环境配置
+│   ├── input_stock_numbers.txt  # 货号输入文件
+│   ├── .encryption_key     # 配置加密密钥
+│   └── .salt               # 密钥派生盐值
+├── file/                   # 采集数据目录（按日期命名的微购相册 JSON）
+├── temp/                   # 临时文件目录
+├── test/                   # 辅助脚本目录
+│   ├── generate_docx.py    # skill.md → skill.docx 生成器
+│   ├── salt_crypto_tool.py # 加盐加密工具
+│   └── security_audit.py   # 安全审计脚本
+├── launchd/                # macOS 守护进程配置
+│   └── com.xyws.web.plist
+├── dist/                   # 前端资源
+│   ├── app.js              # 前端主逻辑
+│   ├── index.html          # HTML 入口
+│   ├── manifest.webmanifest
+│   ├── sw.js               # PWA Service Worker
+│   ├── registerSW.js       # Service Worker 注册
+│   ├── workbox-*.js        # Workbox 运行时
+│   ├── package.json        # Node.js 依赖声明
+│   ├── package-lock.json   # 依赖锁定
+│   ├── patches/            # patch-package 补丁
+│   ├── assets/             # 字体与打包资源
+│   ├── favicon/            # 站点图标
+│   ├── fonts/              # 本地字体
+│   ├── screenshots/        # 页面截图
 │   ├── weather-icons/      # 天气图标
-│   └── screenshots/        # 截图
-├── .github/workflows/      # CI/CD配置
-│   └── ci-cd.yml
-└── .venv/                  # Python虚拟环境
+│   └── node_modules/       # 前端依赖
+├── tools/                  # 内置工具链
+│   ├── cloudflared/        # 内网穿透工具
+│   ├── node/               # Node.js 运行时（供 cloudflared 使用）
+│   ├── playwright/         # Playwright 浏览器内核
+│   └── python/             # 内置 Python 运行时
+└── .venv/                  # Python 虚拟环境
 
 ---
 
@@ -18428,7 +18571,7 @@ cd test && python generate_docx.py
 |------|-----|
 | **项目名称** | 微购相册管理系统 (WegoAlbum Manager) |
 | **项目类型** | Web服务 + 数据采集 + 自动化分析 |
-| **技术栈** | Python 3.0+ / FastAPI / Playwright / Pydantic |
+| **技术栈** | Python 3.9+ / FastAPI / Playwright / Pydantic |
 | **编码标准** | UTF-8 (强制) |
 | **安全等级** | 生产级 (98% OWASP Top 10合规) |
 
@@ -20322,34 +20465,57 @@ dist/app.js
     └── 全局函数暴露
 
 ### 项目目录结构
-D:/ws/xy_ws/
-├── main.py                 # Python后端主程序
+xy_ws/
+├── main.py                 # Python 后端主程序
+├── index.html              # 项目展示页
 ├── README.md               # 项目说明文档
 ├── skill.md                # 开发技能文档（本文件）
-├── skill.docx              # Word格式文档
-├── run.bat                 # Windows启动脚本
-├── run.sh                  # Linux/Mac启动脚本
-├── test/                  # 测试目录
-│   ├── test_main.py        # 主测试文件
-│   ├── test_edge_cases.py  # 边界测试
-│   ├── stress_test.py      # 压力测试
-│   └── test_security_fixes.py  # 安全测试
-├── dist/                   # 前端构建产物
-│   ├── app.js              # JavaScript主文件
-│   ├── index.html          # HTML入口
-│   ├── package.json        # Node.js依赖
-│   ├── patches/            # patch-package补丁
-│   │   └── hostc+1.3.0.patch
-│   ├── assets/             # 静态资源
-│   │   ├── index-*.js      # 应用代码
-│   │   ├── vendor-*.js     # 第三方库
-│   │   └── index-*.css     # 样式文件
-│   ├── fonts/              # 字体文件
+├── skill.docx              # Word 格式文档（由 skill.md 生成）
+├── requirements.txt        # Python 依赖清单
+├── tox.ini                 # tox 配置
+├── clean_files.log         # 文件清理日志
+├── run.bat                 # Windows 启动脚本
+├── run.sh                  # Linux/Mac 启动脚本
+├── config/                 # 配置目录
+│   ├── config.json         # 主配置文件
+│   ├── config.json.example # 配置模板（脱敏）
+│   ├── cookies.json        # Cookie 存储
+│   ├── cookies.json.example# Cookie 模板
+│   ├── production.json     # 生产环境配置
+│   ├── staging.json        # 预发环境配置
+│   ├── input_stock_numbers.txt  # 货号输入文件
+│   ├── .encryption_key     # 配置加密密钥
+│   └── .salt               # 密钥派生盐值
+├── file/                   # 采集数据目录（按日期命名的微购相册 JSON）
+├── temp/                   # 临时文件目录
+├── test/                   # 辅助脚本目录
+│   ├── generate_docx.py    # skill.md → skill.docx 生成器
+│   ├── salt_crypto_tool.py # 加盐加密工具
+│   └── security_audit.py   # 安全审计脚本
+├── launchd/                # macOS 守护进程配置
+│   └── com.xyws.web.plist
+├── dist/                   # 前端资源
+│   ├── app.js              # 前端主逻辑
+│   ├── index.html          # HTML 入口
+│   ├── manifest.webmanifest
+│   ├── sw.js               # PWA Service Worker
+│   ├── registerSW.js       # Service Worker 注册
+│   ├── workbox-*.js        # Workbox 运行时
+│   ├── package.json        # Node.js 依赖声明
+│   ├── package-lock.json   # 依赖锁定
+│   ├── patches/            # patch-package 补丁
+│   ├── assets/             # 字体与打包资源
+│   ├── favicon/            # 站点图标
+│   ├── fonts/              # 本地字体
+│   ├── screenshots/        # 页面截图
 │   ├── weather-icons/      # 天气图标
-│   └── screenshots/        # 截图
-├── .github/workflows/      # CI/CD配置
-│   └── ci-cd.yml
-└── .venv/                  # Python虚拟环境
+│   └── node_modules/       # 前端依赖
+├── tools/                  # 内置工具链
+│   ├── cloudflared/        # 内网穿透工具
+│   ├── node/               # Node.js 运行时（供 cloudflared 使用）
+│   ├── playwright/         # Playwright 浏览器内核
+│   └── python/             # 内置 Python 运行时
+└── .venv/                  # Python 虚拟环境
 
 ---
 
@@ -21364,30 +21530,29 @@ registerRoute(
 
 #### requirements.txt结构（与main.py顶部import一一对应）
 核心框架
-fastapi==0.141.1
-uvicorn[standard]==0.52.1
-python-multipart==0.0.32
-pydantic==2.13.4
+fastapi==0.128.8
+uvicorn[standard]==0.39.0
+pydantic==2.11.10
 
 浏览器自动化
-playwright==1.62.0
+playwright==1.52.0
 
 数据处理
 openpyxl==3.1.5
 pandas==2.3.3
 
-数据库
-pymysql==1.2.0
-
 系统监控
-psutil==7.2.2
-prometheus-client==0.26.0
+psutil==6.1.1
+prometheus-client==0.24.1
 
 安全与加密
-cryptography==46.0.0
+cryptography==43.0.3
 
 版本解析
-packaging==26.3
+packaging==24.2
+
+文档生成
+python-docx==1.2.0
 
 #### 依赖检查与安装
 def check_deps_satisfied(requirements_file="requirements.txt"):
@@ -21909,13 +22074,13 @@ class TestExceptionHandling:
 | PY-CORE-014 | 后台任务管理 | main.py | 🔴 核心 |
 | PY-CORE-015 | 隧道高可用 | main.py | 🔴 核心 |
 | PY-CORE-016 | 跨平台启动脚本 | run.bat/run.sh | 🔴 核心 |
-| PY-CORE-017 | CI/CD自动化部署 | .github/workflows/ci-cd.yml | 🟡 重要 |
+| PY-CORE-017 | CI/CD自动化部署 | 范式示例（本仓库未包含该工作流文件） | 🟡 重要 |
 | PY-CORE-018 | PWA离线缓存 | dist/sw.js + registerSW.js | 🟡 重要 |
 | PY-CORE-019 | Python依赖管理 | requirements.txt | 🟡 重要 |
 | PY-CORE-020 | Node.js依赖管理与补丁持久化 | dist/package.json | 🟡 重要 |
-| PY-CORE-021 | API压力测试 | test/stress_test.py | 🟡 重要 |
-| PY-CORE-022 | 边界条件测试 | test/test_edge_cases.py | 🟡 重要 |
-| PY-CORE-023 | 安全修复验证测试 | test/test_security_fixes.py | 🟡 重要 |
+| PY-CORE-021 | API压力测试 | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
+| PY-CORE-022 | 边界条件测试 | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
+| PY-CORE-023 | 安全修复验证测试 | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
 | PY-CORE-024 | 安全漏洞防护范式 | main.py | 🔴 核心 |
 
 **总计: 24个核心范式，覆盖项目中所有关键文件！**
