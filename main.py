@@ -11103,8 +11103,16 @@ if __name__ == '__main__':
                         }
                         for commit_hash, commit_date, commit_msg, commit_files, total_add, total_del in git_commits:
                             short_hash = commit_hash[:8]
+                            owner_version = None
+                            for ver_key, ver_info in readme_version_map.items():
+                                declared = str((ver_info.get('meta') or {}).get('commit') or '')
+                                if short_hash and short_hash in declared:
+                                    owner_version = ver_key
+                                    break
                             ver_in_msg = re.search(r'v([\d.]+)', commit_msg)
-                            if ver_in_msg:
+                            if owner_version:
+                                version_key = owner_version
+                            elif ver_in_msg:
                                 version_key = ver_in_msg.group(1)
                             else:
                                 def find_nearest_version(commit_dt, versions_map):
