@@ -342,7 +342,7 @@ def main() -> int:
 
     if args.command == 'encrypt':
         try:
-            print(tool.encrypt_value(args.plaintext))
+            print(f'{tool.encrypt_value(args.plaintext)}')
             return 0
         except RuntimeError as exc:
             print(f'❌ {exc}')
@@ -350,7 +350,7 @@ def main() -> int:
 
     if args.command == 'decrypt':
         try:
-            print(tool.decrypt_value(args.encrypted))
+            print(f'{tool.decrypt_value(args.encrypted)}')
             return 0
         except RuntimeError as exc:
             print(f'❌ {exc}')
