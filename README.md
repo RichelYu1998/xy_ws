@@ -760,7 +760,7 @@ python test/security_audit.py; echo "EXIT=$?"
 
 ### v5.0.9.91 (2026-11-11) - 🔐 **补全config/crypto_tool.py配置加解密工具** - 文档缺失工具落地(encrypt/decrypt/init/encrypt-config/decrypt-config五子命令)+与main.py密钥体系互通(环境变量主密码与.encryption_key双通道)+无cryptography时TypeError崩溃根治+文档常用操作改为根目录直跑+展示页结构树同步+移出.gitignore可正常提交
 
-> **Commit**: `0c4b8e28`
+> **Commit**: `0c4b8e28, ec3b5ae9`
 
 #### 更新内容:
 1. **工具补全**: 新增 `config/crypto_tool.py`，落地文档中的 5 个子命令，敏感字段清单与 main.py 完全一致 [config/crypto_tool.py](config/crypto_tool.py#L40-L282)
