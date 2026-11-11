@@ -857,6 +857,73 @@ git status --short
 
 ## 🔄 最新更新
 
+### v5.0.9.92 (2026-11-11) - 🔐 **敏感字段全量加密与PY-CORE-036临时脚本范式** - headers.cookie明文加密完成(login.password/headers.cookie/email_smtp_password三字段全部ENC)+main.py解密链路逐字节复核+新增PY-CORE-036大文件小范围修改临时脚本范式(唯一锚点/先备份/最小替换/改后三校验/脚本不入库/改md必重生成)+导航表扩容18行+三方文档逐字一致与docx锚点零缺失
+
+> **Commit**: `fd6e60f2`
+
+#### 更新内容:
+1. **敏感字段清零**: config.json 中最后一个明文敏感字段 `headers.cookie` 已加密，三字段全部为 `ENC(...)` [config/crypto_tool.py](config/crypto_tool.py#L25)
+2. **解密链路复核**: `SecureConfigManager` 解密三字段全部成功，headers.cookie 与加密前明文逐字节一致 [main.py](main.py#L518-L531)
+3. **新范式固化**: 新增 PY-CORE-036，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L760-L856) [skill.md](skill.md#L760-L856)
+4. **导航扩容**: 文档导航表 17 → 18 行，新增 PY-CORE-036 条目，docx 19 个链接全部命中书签 [README.md](README.md#L26)
+5. **三方同步**: README.md 与 skill.md 逐字一致，skill.docx 由 skill.md 重新生成（422.9 KB） [skill.docx](skill.docx)
+
+##### 1. 🔐 headers.cookie 明文加密完成 (🛡️安全加固)
+**问题描述**:
+- **现象**: `python config/crypto_tool.py decrypt-config` 末尾提示「以下字段仍为明文，可执行 encrypt-config 加密: 🔒 headers.cookie」
+- **根因**: v5.0.9.91 新增工具时只验证了解密与幂等，未对现存 config.json 执行一次批量加密；headers.cookie 为 1419 字符的完整登录态，长期以明文落盘
+- **影响范围**: 配置文件中会话凭据的静态存储安全
+
+**修复方案**:
+- **技术实现**: 执行 `python config/crypto_tool.py encrypt-config`，按 `SENSITIVE_FIELDS` 清单批量加密，已是 `ENC(...)` 的字段跳过；本次实际加密 1 个字段 headers.cookie，写盘走临时文件 + `os.replace` 原子替换 [config/crypto_tool.py](config/crypto_tool.py#L187-L221)
+- **参考位置**: [config/crypto_tool.py](config/crypto_tool.py#L25) [config/crypto_tool.py](config/crypto_tool.py#L202-L221)
+
+**测试验证**:
+- ✅ `decrypt-config` 复核：3 个敏感字段全部显示 `ENC(...)` 密文，无「仍为明文」提示
+- ✅ 加密前 config.json 已备份至 /tmp，回滚路径可用
+
+##### 2. 🔗 main.py 解密链路一致性复核 (🛡️安全加固)
+**问题描述**:
+- **现象**: 加密后必须确认服务端仍能读到明文，否则采集登录态与 SMTP 授权码会变空
+- **根因**: 工具与服务端各自持有密钥加载逻辑，需用同一套 Fernet 与 `ENC(...)` 格式端到端验证
+- **影响范围**: 商品采集登录、邮件通知发送
+
+**修复方案**:
+- **技术实现**: 用 `SecureConfigManager.load_config()` 读取后逐个 `decrypt_value()`，把 headers.cookie 解密结果与加密前明文做逐字节比对 [main.py](main.py#L518-L531)
+- **参考位置**: [main.py](main.py#L474) [main.py](main.py#L518-L531)
+
+**测试验证**:
+- ✅ login.password / headers.cookie / email_smtp_password 解密全部成功
+- ✅ headers.cookie 解密后 1419 字符，与加密前明文完全一致
+
+##### 3. 📐 新增 PY-CORE-036 大文件小范围修改临时脚本范式 (📝文档更新)
+**问题描述**:
+- **现象**: main.py 14000+ 行、README.md / skill.md 21000+ 行，直接编辑易误伤重复段落，全量重写会把换行/BOM/缩进差异一并带进 diff
+- **根因**: 缺少「大文件怎么改」的统一规定，历次修改靠人工小心，既无法复用也无法验收
+- **影响范围**: 所有千行级文件的后续维护
+
+**修复方案**:
+- **技术实现**: 新增 PY-CORE-036 范式章节，明确六条铁律（唯一锚点 `assert count == 1` / 先备份 / 最小替换 / 改后三校验 / 临时脚本不入库 / 改 md 必重生成）、五步标准流程、适用场景表、5 条坑位表与落地检查清单；本次章节插入本身即用临时脚本 `test/temp_patch_v50992.py` 按锚点完成，执行后已删除 [README.md](README.md#L760-L856) [skill.md](skill.md#L760-L856)
+- **参考位置**: [README.md](README.md#L760-L856) [README.md](README.md#L26)
+
+**测试验证**:
+- ✅ 临时脚本对导航行与章节锚点分别断言命中 1 次后执行，插入后 `diff` 仅出现预期新增行
+- ✅ 脚本执行完已删除，`git status` 无残留
+
+##### 4. 📚 导航表扩容与 docx 锚点校验 (📝文档更新)
+**问题描述**:
+- **现象**: 新增范式章节若不入导航，docx 第一页索引缺条目，读者无法跳转
+- **根因**: 导航表与范式章节是两处独立维护的内容
+- **影响范围**: skill.docx 第一页导航完整性
+
+**修复方案**:
+- **技术实现**: 导航表新增「📐 大文件小范围修改临时脚本范式 (PY-CORE-036)」一行，由 17 行增至 18 行；按 PY-CORE-034 重新生成 skill.docx 并校验锚点 [README.md](README.md#L26) [test/generate_docx.py](test/generate_docx.py)
+- **参考位置**: [README.md](README.md#L12-L31) [skill.docx](skill.docx)
+
+**测试验证**:
+- ✅ docx 内 19 个 `w:hyperlink` 锚点全部命中 `w:bookmarkStart`（未命中 0）
+- ✅ README.md 与 skill.md 逐字一致（`diff` 无输出）
+
 ### v5.0.9.91 (2026-11-11) - 🔐 **补全config/crypto_tool.py配置加解密工具** - 文档缺失工具落地(encrypt/decrypt/init/encrypt-config/decrypt-config五子命令)+与main.py密钥体系互通(环境变量主密码与.encryption_key双通道)+无cryptography时TypeError崩溃根治+文档常用操作改为根目录直跑+展示页结构树同步+移出.gitignore可正常提交
 
 > **Commit**: `0c4b8e28, ec3b5ae9, 43b748c7`
