@@ -859,7 +859,7 @@ git status --short
 
 ### v5.0.9.92 (2026-11-11) - 🔐 **敏感字段全量加密与PY-CORE-036临时脚本范式** - headers.cookie明文加密完成(login.password/headers.cookie/email_smtp_password三字段全部ENC)+main.py解密链路逐字节复核+新增PY-CORE-036大文件小范围修改临时脚本范式(唯一锚点/先备份/最小替换/改后三校验/脚本不入库/改md必重生成)+导航表扩容18行+三方文档逐字一致与docx锚点零缺失
 
-> **Commit**: `fd6e60f2`
+> **Commit**: `fd6e60f2, 9a933cac`
 
 #### 更新内容:
 1. **敏感字段清零**: config.json 中最后一个明文敏感字段 `headers.cookie` 已加密，三字段全部为 `ENC(...)` [config/crypto_tool.py](config/crypto_tool.py#L25)
