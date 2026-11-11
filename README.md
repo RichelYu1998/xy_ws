@@ -859,7 +859,7 @@ git status --short
 
 ### v5.0.9.92 (2026-11-11) - 🔐 **敏感字段全量加密与PY-CORE-036临时脚本范式** - headers.cookie明文加密完成(login.password/headers.cookie/email_smtp_password三字段全部ENC)+main.py解密链路逐字节复核+新增PY-CORE-036大文件小范围修改临时脚本范式(唯一锚点/先备份/最小替换/改后三校验/脚本不入库/改md必重生成)+导航表扩容18行+三方文档逐字一致与docx锚点零缺失
 
-> **Commit**: `fd6e60f2, 9a933cac`
+> **Commit**: `fd6e60f2, 9a933cac, 54597285`
 
 #### 更新内容:
 1. **敏感字段清零**: config.json 中最后一个明文敏感字段 `headers.cookie` 已加密，三字段全部为 `ENC(...)` [config/crypto_tool.py](config/crypto_tool.py#L25)
@@ -923,6 +923,21 @@ git status --short
 **测试验证**:
 - ✅ docx 内 19 个 `w:hyperlink` 锚点全部命中 `w:bookmarkStart`（未命中 0）
 - ✅ README.md 与 skill.md 逐字一致（`diff` 无输出）
+
+##### 5. 🧩 changelog 版本归属规则修正 (🐛Bug修复)
+**问题描述**:
+- **现象**: `/api/changelog` 中 v5.0.9.92 的 Commit 显示 `fd6e60f2, 9a933cac, 43b748c7`，且 changes 中混入了 v5.0.9.91 的「crypto_tool.py 业务输出统一 f-string 规范化」条目
+- **根因**: 无版本号的提交走「日期最近版本」兜底（≤30 天），43b748c7 与 v5.0.9.92 同为 2026-11-11，被重复归入新版本
+- **影响范围**: changelog 版本归属准确性、前端版本详情展示
+
+**修复方案**:
+- **技术实现**: 在版本归属判定前，先用 `readme_version_map` 各版本的 `Commit` 字段反查提交短哈希，命中则直接归属该版本；未命中才回落到 commit message 版本号与日期兜底 [main.py](main.py#L11106-L11117)
+- **参考位置**: [main.py](main.py#L11106-L11117)
+
+**测试验证**:
+- ✅ 重启服务后 `/api/changelog`：v5.0.9.92 changes 由 7 → 6，f-string 条目消失；v5.0.9.91 仍保留该条目
+- ✅ 版本总数 435 → 434（消失的是日期兜底生成的 hash 型伪版本），changes 总数保持 1238 未丢内容
+- ✅ `python -m py_compile main.py` 通过，改动 +9 / -1 行
 
 ### v5.0.9.91 (2026-11-11) - 🔐 **补全config/crypto_tool.py配置加解密工具** - 文档缺失工具落地(encrypt/decrypt/init/encrypt-config/decrypt-config五子命令)+与main.py密钥体系互通(环境变量主密码与.encryption_key双通道)+无cryptography时TypeError崩溃根治+文档常用操作改为根目录直跑+展示页结构树同步+移出.gitignore可正常提交
 
