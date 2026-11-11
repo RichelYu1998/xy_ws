@@ -23,6 +23,7 @@
 | 📐 终端实时日志接入范式 (PY-CORE-033) | sh / bat 实时日志双方案 |
 | 📐 DOCX 文档生成范式 (PY-CORE-034) | 导航置顶第一页与生成校验规范 |
 | 📐 安全审计零问题范式 (PY-CORE-035) | 总计问题必须为 0 的判定标准 |
+| 📐 大文件小范围修改临时脚本范式 (PY-CORE-036) | 大文件禁用全量重写，锚点式最小替换 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -753,6 +754,104 @@ python test/security_audit.py; echo "EXIT=$?"
 ```
 
 > **判定标准**: 输出 `总计问题: 0`、`严重/高危/中危/低危/信息` 全为 0、`EXIT=0`。任一非零即视为「未符合本范式」。
+
+---
+
+## 📐 大文件小范围修改临时脚本范式 (PY-CORE-036)
+
+> **创建日期**: 2026-11-11 | **最后更新**: 2026-11-11 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) / [README.md](README.md) / [skill.md](skill.md) / [dist/app.js](dist/app.js) 等千行级文件
+
+### 🔴 核心原则：大文件禁止全量重写，只做锚点式最小替换
+
+**行数超过 1000 的文件（main.py 14000+ 行、README.md / skill.md 21000+ 行、dist/app.js 数千行），禁止「读全文 → 改 → 整体写回」，也禁止「大段 `old_string` 替换」。** 全量重写会把不可见差异（换行、BOM、缩进、同段重复内容）一并带进 diff，一次手滑就毁掉整个文件。**唯一合法做法：写一次性临时脚本，用唯一锚点定位，只替换目标片段，执行完即删。**
+
+### 六条铁律
+
+| 铁律 | 要求 | 违反后果 |
+|---|---|---|
+| **🔴 唯一锚点** | 替换前 `assert content.count(old) == 1`，>1 立即中止 | 误伤同段重复内容，静默改错 |
+| **🔴 先备份后改** | 改前 `cp file /tmp/file.bak.$(date +%H%M%S)` | 改坏无法回滚 |
+| **🔴 最小替换** | 只替换目标片段，其余字节不动 | 全文重排导致 diff 爆炸、无法 review |
+| **🔴 改后三校验** | 语法校验（`py_compile`）+ 结构校验（`diff` / 行数 / 锚点计数）+ 功能回归 | 「改完就跑」把回归带上线 |
+| **🔴 临时脚本不入库** | 统一命名 `test/temp_patch_<版本>.py`，执行完删除 | 仓库堆满一次性垃圾脚本 |
+| **🔴 文档改完必重生成** | 改 md 后按 PY-CORE-034 重生成 skill.docx | 三方文档不一致、锚点断链 |
+
+### 标准流程（五步）
+
+```bash
+# 1. 备份
+cp README.md /tmp/README.md.bak.$(date +%H%M%S)
+
+# 2. 写临时脚本（唯一锚点 + 计数断言 + 最小替换）
+cat > test/temp_patch_vX.py <<'PY'
+from pathlib import Path
+
+TARGET = Path('README.md')
+content = TARGET.read_text(encoding='utf-8')
+
+OLD = '| 📐 安全审计零问题范式 (PY-CORE-035) | 总计问题必须为 0 的判定标准 |'
+assert content.count(OLD) == 1, f'锚点命中 {content.count(OLD)} 次，中止'
+
+NEW = OLD + '\n| 📐 大文件小范围修改临时脚本范式 (PY-CORE-036) | 大文件禁用全量重写 |'
+content = content.replace(OLD, NEW, 1)
+TARGET.write_text(content, encoding='utf-8')
+print('OK')
+PY
+
+# 3. 执行
+python test/temp_patch_vX.py
+
+# 4. 三校验
+python -m py_compile main.py && diff README.md skill.md && echo "文档一致"
+python test/generate_docx.py
+
+# 5. 删除临时脚本并提交
+rm test/temp_patch_vX.py
+git add -A && git commit -m "docs: ..."
+```
+
+### 适用 / 不适用
+
+| 场景 | 做法 |
+|---|---|
+| 千行级文件改 1~5 行（清单加一项、导航加一行、锚点替换） | ✅ 临时脚本 + 唯一锚点 |
+| 结构化数据批量改（如 config.json 敏感字段加密） | ✅ 用工具/脚本改，禁止手工逐行改 |
+| 新增整章文档（> 200 行） | ✅ 临时脚本按锚点插入整块，避免手写缩进漂移 |
+| 文件 < 200 行的小改 | ⚠️ 可直接编辑，但同样要求改后三校验 |
+| 需要重构大段逻辑 | ❌ 不属本范式场景，应拆分为独立提交分步进行 |
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 用 `json.load` + `json.dump` 全量重写 config.json | 键顺序、缩进、中文转义全变，diff 看不出真实改动 | 只改目标字段，或用 crypto_tool 的原子写入 |
+| 用行号定位（`lines[1234] = ...`） | 文件一改行号就漂移，改到隔壁行 | 用文本锚点，不用行号 |
+| 锚点取太短（如 `print(`） | 命中几十次，`replace` 全改 | 锚点必须带上下文，并配合计数断言 |
+| 临时脚本留在仓库 | 下次误跑导致重复插入 | 执行完 `rm`，仓库只保留范式描述 |
+| 改完不重生成 docx | 三方文档不一致、导航锚点断链 | 按 PY-CORE-034 重新生成并校验 |
+
+### 落地检查清单
+
+```
+[ ] 目标文件已备份到 /tmp
+[ ] 每个替换锚点 assert count == 1
+[ ] 只替换目标片段，未整体重写文件
+[ ] py_compile / 语法校验通过
+[ ] diff 只出现预期改动行
+[ ] README.md 与 skill.md 逐字一致
+[ ] skill.docx 已按 PY-CORE-034 重新生成
+[ ] 临时脚本已删除，git status 无残留
+```
+
+### 验证命令
+
+```bash
+python -m py_compile main.py; echo "EXIT=$?"
+diff README.md skill.md && echo "文档逐字一致"
+git status --short
+```
+
+> **判定标准**: 上述命令全部退出码 0、`diff` 无输出、`git status` 无临时脚本残留。任一不满足即视为「未符合本范式」。
 
 ---
 
