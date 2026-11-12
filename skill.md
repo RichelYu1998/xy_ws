@@ -961,7 +961,7 @@ git status --short
 
 ### v5.0.9.93 (2026-11-12) - 📝 **Excel读取范式固化与死代码清理** - 新增PY-CORE-037(Excel货号E列读取范式)与PY-CORE-038(每日利润表读取范式)+每日利润报表由首文件break改为多文件全量聚合去重拼接+删除无调用点死代码load_excel_data(48行)+对比记录新增excel_files全量清单(兼容保留excel_file)+导航表扩容20行+changelog接口changes非空与commit零占位全量复核
 
-> **Commit**: `6078990c`
+> **Commit**: `6078990c, 8d1798da`
 
 #### 更新内容:
 1. **新范式固化**: 新增 PY-CORE-037「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L860-L909) [skill.md](skill.md#L860-L909)
