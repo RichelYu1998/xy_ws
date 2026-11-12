@@ -3644,13 +3644,14 @@ def get_excel_files_with_report():
     
     excel_files_list = list(dict.fromkeys(os.path.abspath(f) for f in excel_files_list))
     
-    daily_profit_report = None
+    daily_profit_reports = []
     for excel_file in excel_files_list:
         if os.path.exists(excel_file):
-            if daily_profit_report is None:
-                daily_profit_report = get_daily_profit_report_from_excel(excel_file)
-            break
+            report_text = get_daily_profit_report_from_excel(excel_file)
+            if report_text and report_text not in daily_profit_reports:
+                daily_profit_reports.append(report_text)
     
+    daily_profit_report = '\n\n'.join(daily_profit_reports) if daily_profit_reports else None
     return excel_files_list, daily_profit_report
 
 @app.exception_handler(Exception)
@@ -7004,55 +7005,6 @@ class StockNumberComparator:
         numbers = re.split(r'[,，\s;；\n\t]+', cleaned)
         return [num.strip() for num in numbers if num.strip()]
 
-    def load_excel_data(self, excel_file=None, remove_duplicates=True):
-        if excel_file is None:
-            excel_file = self.excel_file
-        
-        if not excel_file:
-            return None
-        
-        temp_file = None
-        try:
-            if not FileManager.file_exists(excel_file):
-                return None
-            
-            temp_dir = os.path.join(PROJECT_DIR, 'temp')
-            os.makedirs(temp_dir, exist_ok=True)
-            temp_file = os.path.join(temp_dir, f'_temp_excel_{uuid.uuid4().hex}.xlsx')
-            shutil.copy2(excel_file, temp_file)
-            
-            logger.debug(f'正在读取Excel文件: {excel_file}')
-            workbook = openpyxl.load_workbook(temp_file, read_only=True, data_only=True)
-            
-            sheet = next((workbook[sheet_name] for sheet_name in workbook.sheetnames if '闲鱼' in sheet_name), None)
-            
-            if sheet is None:
-                logger.debug('未找到"闲鱼"工作表，使用第一个工作表')
-                sheet = workbook.active
-            else:
-                logger.debug(f'使用工作表: {sheet.title}')
-            
-            stock_numbers = []
-            for row in sheet.iter_rows(min_col=5, max_col=5, values_only=True):
-                cell_value = row[0]
-                if cell_value:
-                    cell_str = str(cell_value).strip()
-                    number_match = re.match(r'^([A-Za-z0-9]{3,10})$', cell_str)
-                    if number_match:
-                        stock_numbers.append(cell_str)
-            
-            stock_numbers = list(set(stock_numbers)) if remove_duplicates else stock_numbers
-            logger.debug(f'从Excel文件的E列中读取到 {len(stock_numbers)} 个货号')
-            workbook.close()
-            return stock_numbers
-        except Exception as e:  # [HANDLED]
-                handle_exception(e, 'load_excel_data读取Excel')
-                return None
-        finally:
-            if temp_file and os.path.exists(temp_file):
-                safe_execute_func(lambda: os.remove(temp_file), context='load_excel_data清理临时文件')
-            auto_clean_temp_dir()
-
     def load_all_excel_data(self, remove_duplicates=True, platform='闲鱼'):
         all_stock_numbers = []
         excel_files = self.config_manager.get_all_excel_files()
@@ -7412,6 +7364,7 @@ class StockNumberComparator:
                 'date': date_str,
                 'json_file': os.path.basename(latest_json_file),
                 'excel_file': os.path.basename(self.excel_file) if self.excel_file else 'None',
+                'excel_files': [os.path.basename(f) for f in self.config_manager.get_all_excel_files()],
                 'comparison': {
                     'missing_description': '微购相册比本地表格多出的序列号仅供参考',
                     'existing_description': '本地表格比微购相册上多的序列号，请仔细核对后删除多出的地方',
@@ -7503,6 +7456,7 @@ class StockNumberComparator:
             'date': diff_data['date'],
             'json_file': diff_data['json_file'],
             'excel_file': diff_data['excel_file'],
+            'excel_files': diff_data.get('excel_files', []),
             'comparison_type': 'Excel与JSON对比',
             'missing_count': diff_data['comparison']['missing_count'],
             'extra_in_json_count': diff_data['comparison']['extra_in_json_count'],
