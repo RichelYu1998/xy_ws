@@ -28,7 +28,7 @@
 | 📐 范式编号规则范式 (PY-CORE-034) | 前缀+三位数字、A-Z 位次累加与区间表 |
 | 📐 安全审计零问题范式 (PY-CORE-040) | 总计问题必须为 0 的判定标准 |
 | 📐 终端实时日志接入范式 (PY-CORE-043) | sh / bat 实时日志双方案 |
-| 📐 文档内引用编号升序范式 (PY-CORE-046) | 全文档编号必须小号在前、大号在后 |
+| 📐 文档内引用编号升序范式 (Within-Document Reference Ascending Order) (PY-CORE-046) | 全文档编号必须小号在前、大号在后 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -3718,7 +3718,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 ---
 
-**文档版本**: v5.0.9.97  
+**文档版本**: v5.0.9.98  
 **最后更新**: 2026-11-12  
 **下次审查**: 2026-12-12  
 **维护者**: 小旭数码开发团队
@@ -3726,6 +3726,65 @@ assert not viol and not bad and nums == sorted(nums)
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.98 (2026-11-12) - 🔢 **列表块编号全量升序 + PY-CORE-034 区间表补齐 w 位 + 新增 PY-CORE-046 文档内引用编号升序范式** - 8 处列表块跨行非升序重排(含「更新内容」有序列表按升序重编号)+`022/019` 行内引用升序+五类出现点全扫全改+汇总表扩容 46 行+导航表新增 1 行
+
+> **Commit**: `bcce341c`
+
+#### 更新内容: 把「编号升序」从「章节有序即可」升级为「全文档所有出现点有序」，修正 8 处跨行列表块乱序（`011→045→012`、`022→019→022`、`018→011→016`、`012→011`、`045→011`、`010→039→011`），并把规则固化为 PY-CORE-046
+
+**修复日期**: 2026-11-12
+**修复类型**: 📝文档归一
+**影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: bcce341c
+**变更统计**: 重排 8 处列表块 + 1 处行内引用 + 新增 1 条范式 + 汇总表 46 行
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🔢 8 处跨行列表块按编号升序重排 (📝文档归一)
+**问题描述**:
+- **现象**: 「相关范式」列表为 `011 → 045 → 012`，变更记录「更新内容」有序列表为 `022 → 019 → 022`，另有 6 处「测试验证」与「相关范式」块出现 `012 → 011`、`045 → 011`、`010 → 039 → 011` 等大号在前的排列
+- **根因**: 升序规则此前只覆盖「范式正文章节 / 导航表 / 汇总表 / 单行多编号」四类出现点，跨行列表块不在校验口径内，故新增内容按叙述先后书写后长期未被拦截
+- **影响范围**: 全文档 8 处列表块（含 2 处有序列表），共 22 条条目次序
+
+**修复方案**:
+- **技术实现**: 以「连续列表块」为单位整体排序，排序键取每条行内首个 `PY-CORE-\d{3}`；无编号条目按「继承前一条编号键」规则填充后再做稳定排序；有序列表排序后按 `1. 2. 3. …` 重新编号
+- **参考位置**: [PY-CORE-046 文档内引用编号升序范式](README.md#L3574-L3662)
+
+**测试验证**:
+- ✅ 8 处列表块排序后编号序列全部非降序（`011→012→045`、`019→无编号→022…`、`011→016→无编号→018`、`011→…→012`、`011→012→012`、`011→无编号→045`、`010→011→039`）
+- ✅ 有序列表重编号后 `1. 2. 3. 4. 5. 6. 7.` 连续，无跳号无重复
+
+##### 2. 🔗 行内多编号引用升序 (📝文档归一)
+**问题描述**:
+- **现象**: v5.0.9.93 变更记录「导航扩容」条目写作「新增 022/019 两条」，大号在前
+- **根因**: 该处编号未加 `PY-CORE-` 前缀，逃过了「单行多编号」正则校验
+- **影响范围**: 1 处行内引用
+
+**修复方案**:
+- **技术实现**: 改写为「新增 019/022 两条」，并在 PY-CORE-046 中把「前缀后数字部分」明确纳入单行校验口径，避免再次漏检
+- **参考位置**: [README.md](README.md#L3766)
+
+**测试验证**:
+- ✅ 全文「单行含 ≥2 个 `PY-CORE-` 编号」非升序行数为 0
+
+##### 3. 📐 新增 PY-CORE-046 文档内引用编号升序范式 (📝范式定义)
+**问题描述**:
+- **现象**: 「编号必须从小到大」只以零散约定存在于各版本变更记录，缺少一条可执行、可校验的独立范式，导致同类乱序反复出现
+- **根因**: 规则未固化，每次修完章节排序即认为完成，未定义「跨行列表块 / 有序列表 / 行内引用」的判定口径
+- **影响范围**: 全文档编号一致性，后续所有新增内容
+
+**修复方案**:
+- **技术实现**: 按 PY-CORE-034 规则取标题英文名首字母 `w` 落号 046（紧随 045 的 `v` 段之后，零跳号），新增 [文档内引用编号升序范式 (PY-CORE-046)](README.md#L3574-L3662)，含六类出现点判定表、三步排序算法（取键/填键/稳定排序）、无编号条目填充示例、可复制校验脚本、6 条坑位表与 6 项落地检查清单
+- **参考位置**: [PY-CORE-034 区间表](README.md#L2846-L2857)、[PY-CORE-046 文档内引用编号升序范式](README.md#L3574-L3662)
+
+**测试验证**:
+- ✅ 范式章节序列升序：`… 040 → 043 → 046`，25 个带号 `##` 标题严格升序
+- ✅ 汇总表扩容至 46 行（001~046 连续、零跳号、零重号），导航表新增 1 行后仍升序（`011 … 043 → 046`）
+- ✅ PY-CORE-034 区间表补齐 `w | 046-046 | 046 | 满`，队列长度 45 → 46、剩余号位 55 → 54
+
+---
 
 ### v5.0.9.97 (2026-11-12) - 🔢 **PY-CORE 范式与引用全量升序归一** 范式章节重排 + 导航表/汇总表升序 + 变更记录引用升序 + 三方文档同步
 
@@ -3750,7 +3809,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 以 `##` 二级标题切块，按标题内 `PY-CORE-\d{3}` 编号升序整体重排 24 个范式章节，`PY-CORE-011` 的三段同源内容（快速参考 + 完整范式 + 示例段）合并为单一章节后归位到 011 位置
-- **参考位置**: [README.md](README.md#L375-L3568)
+- **参考位置**: [README.md](README.md#L376-L3570)
 
 **测试验证**:
 - ✅ 24 个范式章节编号序列为 002/008/009/010/011/012/013/016/017/018/019/021/022/025/030/031/032/033/034/037/038/039/040/043，严格升序
@@ -3822,8 +3881,8 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: 范式编号唯一性、导航表 `(PY-CORE-011)` 引用、汇总表 011 行
 
 **修复方案**:
-- **技术实现**: 回退该章节标题的编号后缀，恢复为未编号的完整范式章节（由 [快速参考章节 (PY-CORE-011)](README.md#L373-L404) 指向），使 `PY-CORE-011` 的正文范式定义保持唯一
-- **参考位置**: [README.md](README.md#L373-L404)、[main.py](main.py#L10888-L10902)
+- **技术实现**: 回退该章节标题的编号后缀，恢复为未编号的完整范式章节（由 [快速参考章节 (PY-CORE-011)](README.md#L374-L405) 指向），使 `PY-CORE-011` 的正文范式定义保持唯一
+- **参考位置**: [README.md](README.md#L374-L405)、[main.py](main.py#L10888-L10902)
 
 **测试验证**:
 - ✅ 范式编号扫描 `PY-CORE-001` ~ `PY-CORE-045` 连续，跳号 0 个、重号 0 个
@@ -3845,7 +3904,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 ##### 4. 🔗 锚点行号重算 + 三方文档同步 (📝文档同步)
 **问题描述**:
-- **现象**: 删除重复块后，历史变更记录中的 `README.md#L2986-L3036`、`README.md#L3041-L22469` 两处行号锚点整体偏移 3 行，指向内容错位
+- **现象**: 删除重复块后，历史变更记录中的 `README.md#L2986-L3038`、`README.md#L3041-L22470` 两处行号锚点整体偏移 3 行，指向内容错位
 - **根因**: 行号锚点随文档增删线性漂移，删块后未同步重算
 - **影响范围**: v5.0.9.95 变更记录中的参考位置、skill.docx 导航书签
 
@@ -3866,7 +3925,7 @@ assert not viol and not bad and nums == sorted(nums)
 #### 更新内容:
 1. **全量重排**: 44 个既有范式按「标题英文名首字母 A-Z + 同字母内原相对次序」稳定排序，重排为 `PY-CORE-001` ~ `PY-CORE-045`（含新增 1 条编号规则范式，共 45 条），零跳号、零重号、零遗漏 [README.md](README.md)
 2. **重号修正**: 历史遗留重号共 3 处——编码处理最佳实践 → 新号 023（字母 e）、Git 历史维护 → 新号 026（字母 g）、subprocess 超时配置 → 新号 041（字母 s），并复核旧号 007/008 双占项最终落号为 014、025、008、013
-3. **规则固化**: 新增 [范式编号规则范式 (PY-CORE-034)](README.md#L2800-L2892)，明确「前缀不可变、数字可累加、字母原生固定、按 A-Z 位次整体重排、区间表、硬上限 100」
+3. **规则固化**: 新增 [范式编号规则范式 (PY-CORE-034)](README.md#L2801-L2894)，明确「前缀不可变、数字可累加、字母原生固定、按 A-Z 位次整体重排、区间表、硬上限 100」
 4. **汇总表扩容**: 完整代码范式汇总表由 24 行扩容至 45 行，新增「首字母」列用于逐行校验 A-Z 位次，总计口径同步更新
 5. **导航同步**: 文档导航表新增「范式编号规则范式 (PY-CORE-034)」1 行，其余 8 行导航项的编号随全量重排自动同步
 6. **三方文档**: README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成，书签与导航锚点零缺失
@@ -3880,7 +3939,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 按 `(英文名首字母, 同字母内原相对次序)` 稳定排序生成 44 项队列，逐项落号 `001~044`，再将编号规则自身作为第 `034` 位（字母 `p`）插入；全文档以「旧号 → 新号」映射一次性替换，重号段按行区间隔离替换后再落号
-- **参考位置**: [README.md](README.md#L2800-L2892)
+- **参考位置**: [README.md](README.md#L2801-L2894)
 
 **测试验证**:
 - ✅ 编号扫描：`PY-CORE-001` ~ `PY-CORE-045` 连续，跳号 0 个、重号 0 个
@@ -3909,7 +3968,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 新增独立范式章节，含核心原则表、三步编号算法、a-z 区间表、新增范式标准动作、6 条坑位表、本轮重排实录与判定标准
-- **参考位置**: [范式编号规则范式 (PY-CORE-034)](README.md#L2800-L2892)
+- **参考位置**: [范式编号规则范式 (PY-CORE-034)](README.md#L2801-L2894)
 
 **测试验证**:
 - ✅ 区间表与实际占用逐字母核对一致（45 条 / 剩余 55 位 / 上限 100）
@@ -3968,7 +4027,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: `git reset --hard 6078990c` 将全部代码回退到 v5.0.9.93，并保留 `backup-before-revert-20261112` 备份分支用于追溯被撤销的提交 [main.py](main.py)
-- **参考位置**: [README.md](README.md#L2802-L2869)
+- **参考位置**: [README.md](README.md#L2803-L2870)
 
 **测试验证**:
 - ✅ `git log -n 1` 显示 HEAD 为 `6078990c`
@@ -4013,8 +4072,8 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: 文档一致性、更新日志页面展示完整性
 
 **修复方案**:
-- **技术实现**: 从备份分支恢复 README.md 与 skill.md（含 v5.0.9.93 与 PY-CORE-022/038），剔除回退后已不存在的「解析器加固」条目，新增本版本 v5.0.9.94 记录；skill.md 与 README.md 逐字节同步，skill.docx 由 skill.md 重新生成 [README.md](README.md#L2802-L3704)
-- **参考位置**: [README.md](README.md#L2227-L3704) [skill.md](skill.md#L2227-L3704)
+- **技术实现**: 从备份分支恢复 README.md 与 skill.md（含 v5.0.9.93 与 PY-CORE-022/038），剔除回退后已不存在的「解析器加固」条目，新增本版本 v5.0.9.94 记录；skill.md 与 README.md 逐字节同步，skill.docx 由 skill.md 重新生成 [README.md](README.md#L2803-L3705)
+- **参考位置**: [README.md](README.md#L2228-L3705) [skill.md](skill.md#L2228-L3705)
 
 **测试验证**:
 - ✅ README.md 与 skill.md `cmp` 无差异，逐字节一致
@@ -4026,9 +4085,9 @@ assert not viol and not bad and nums == sorted(nums)
 > **Commit**: `6078990c, 8d1798da`
 
 #### 更新内容:
-1. **新范式固化**: 新增 PY-CORE-019「每日利润表读取范式」，工作表固定「每日利润」，列位固定 A-F，第 1 行为表头，报表文本仅取 A 列以「截止」开头的行，多文件去重后拼接 [README.md](README.md#L2223-L2442) [skill.md](skill.md#L2223-L2442)
+1. **新范式固化**: 新增 PY-CORE-019「每日利润表读取范式」，工作表固定「每日利润」，列位固定 A-F，第 1 行为表头，报表文本仅取 A 列以「截止」开头的行，多文件去重后拼接 [README.md](README.md#L2224-L2444) [skill.md](skill.md#L2224-L2444)
 2. **报表聚合修复**: `get_excel_files_with_report` 原「命中第一个文件即 break」导致多 Excel 时只取首个文件报表，改为遍历全部文件、文本去重后以空行拼接 [main.py](main.py#L3644-L3656)
-3. **新范式固化**: 新增 PY-CORE-022「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L2441-L2634) [skill.md](skill.md#L2441-L2634)
+3. **新范式固化**: 新增 PY-CORE-022「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L2442-L2636) [skill.md](skill.md#L2442-L2636)
 4. **死代码清理**: 删除 `StockNumberComparator.load_excel_data`（48 行），该方法零调用点，且与 PY-CORE-022「多文件全量聚合」口径冲突，属误导性死代码 [main.py](main.py#L7005)
 5. **字段扩展**: 对比记录与「小计」记录新增 `excel_files` 全量清单字段，原 `excel_file` 字段保留，历史记录解析不受影响 [main.py](main.py#L7364-L7367) [main.py](main.py#L7456-L7459)
 6. **导航扩容**: 文档导航表 18 → 20 行，新增 019/022 两条；skill.docx 由 skill.md 重新生成，锚点全部命中
@@ -4070,7 +4129,7 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: 后续任何 Excel 读取改造的评审与回归
 
 **修复方案**:
-- **技术实现**: 在 README.md 与 skill.md 逐字插入 PY-CORE-019（A-F 列位契约 / 报表文本规则 / 回落边界 + 检查清单 + 判定标准）与 PY-CORE-022（工作表选择 / 列范围 / 值清洗 / 货号正则 / 多文件聚合 / 去重策略 / 临时副本 + 坑位表 + 检查清单 + 判定标准），导航表同步扩容至 20 行 [README.md](README.md#L2177-L2442)
+- **技术实现**: 在 README.md 与 skill.md 逐字插入 PY-CORE-019（A-F 列位契约 / 报表文本规则 / 回落边界 + 检查清单 + 判定标准）与 PY-CORE-022（工作表选择 / 列范围 / 值清洗 / 货号正则 / 多文件聚合 / 去重策略 / 临时副本 + 坑位表 + 检查清单 + 判定标准），导航表同步扩容至 20 行 [README.md](README.md#L2178-L2444)
 - **参考位置**: [README.md](README.md#L27-L28) [skill.md](skill.md#L27-L28)
 
 **测试验证**:
@@ -4084,7 +4143,7 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: 更新日志页面的展示完整性与版本可追溯性
 
 **修复方案**:
-- **技术实现**: 逐条复核 API 返回的 434 个版本：`changes` 为空条目 0 个（解析器对无子项条目自动按 commit message 生成兜底条目），`meta` 各字段占位符 0 处，`commit` 全部为真实 Git 哈希；本次新条目按「1 标题 + 7 子项 + 5 个 `#####` 详情」格式写入，杜绝空 changes [README.md](README.md#L2802-L2870)
+- **技术实现**: 逐条复核 API 返回的 434 个版本：`changes` 为空条目 0 个（解析器对无子项条目自动按 commit message 生成兜底条目），`meta` 各字段占位符 0 处，`commit` 全部为真实 Git 哈希；本次新条目按「1 标题 + 7 子项 + 5 个 `#####` 详情」格式写入，杜绝空 changes [README.md](README.md#L2803-L2871)
 - **参考位置**: [main.py](main.py#L10870-L11376) [dist/app.js](dist/app.js#L1331-L1345)
 
 **测试验证**:
@@ -4113,7 +4172,7 @@ assert not viol and not bad and nums == sorted(nums)
 #### 更新内容:
 1. **敏感字段清零**: config.json 中最后一个明文敏感字段 `headers.cookie` 已加密，三字段全部为 `ENC(...)` [config/crypto_tool.py](config/crypto_tool.py#L25)
 2. **解密链路复核**: `SecureConfigManager` 解密三字段全部成功，headers.cookie 与加密前明文逐字节一致 [main.py](main.py#L518-L531)
-3. **新范式固化**: 新增 PY-CORE-030，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L2631-L3437) [skill.md](skill.md#L2631-L3437)
+3. **新范式固化**: 新增 PY-CORE-030，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L2632-L3438) [skill.md](skill.md#L2632-L3438)
 4. **导航扩容**: 文档导航表 17 → 18 行，新增 PY-CORE-030 条目，docx 19 个链接全部命中书签 [README.md](README.md#L26)
 5. **三方同步**: README.md 与 skill.md 逐字一致，skill.docx 由 skill.md 重新生成（422.9 KB） [skill.docx](skill.docx)
 
@@ -4152,8 +4211,8 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: 所有千行级文件的后续维护
 
 **修复方案**:
-- **技术实现**: 新增 PY-CORE-030 范式章节，明确六条铁律（唯一锚点 `assert count == 1` / 先备份 / 最小替换 / 改后三校验 / 临时脚本不入库 / 改 md 必重生成）、五步标准流程、适用场景表、5 条坑位表与落地检查清单；本次章节插入本身即用临时脚本 `test/temp_patch_v50992.py` 按锚点完成，执行后已删除 [README.md](README.md#L2631-L3437) [skill.md](skill.md#L2631-L3437)
-- **参考位置**: [README.md](README.md#L2631-L3437) [README.md](README.md#L26)
+- **技术实现**: 新增 PY-CORE-030 范式章节，明确六条铁律（唯一锚点 `assert count == 1` / 先备份 / 最小替换 / 改后三校验 / 临时脚本不入库 / 改 md 必重生成）、五步标准流程、适用场景表、5 条坑位表与落地检查清单；本次章节插入本身即用临时脚本 `test/temp_patch_v50992.py` 按锚点完成，执行后已删除 [README.md](README.md#L2632-L3438) [skill.md](skill.md#L2632-L3438)
+- **参考位置**: [README.md](README.md#L2632-L3438) [README.md](README.md#L26)
 
 **测试验证**:
 - ✅ 临时脚本对导航行与章节锚点分别断言命中 1 次后执行，插入后 `diff` 仅出现预期新增行
@@ -4309,7 +4368,7 @@ assert not viol and not bad and nums == sorted(nums)
 3. **依赖接口**: 新增 `/api/dependencies`，从 requirements.txt 动态解析分类、版本约束与用途，Python 最低版本不再硬编码 [main.py](main.py#L11444-L11507)
 4. **前端渲染**: 依赖表格按分类分组渲染并回填环境要求，功能卡片改为接口非空才清空，保留静态兜底 [dist/app.js](dist/app.js#L1273-L1316)
 5. **依赖瘦身**: 移除 `python-multipart`，Python 版本基线由 3.0+ 校正为 3.9+ [requirements.txt](requirements.txt#L4-L5)
-6. **文档同步**: README.md / skill.md / skill.docx 逐字一致，changelog 全量字段校验无空值、无占位符、Commit 全为真实哈希 [README.md](README.md#L3422-L3437)
+6. **文档同步**: README.md / skill.md / skill.docx 逐字一致，changelog 全量字段校验无空值、无占位符、Commit 全为真实哈希 [README.md](README.md#L3422-L3438)
 
 ##### 1. 🛠️ 功能卡片长文本穿模修复 (🐛Bug修复)
 **问题描述**:
@@ -4375,7 +4434,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 删除 `python-multipart` 依赖行，技术栈与兼容性注释改为 `Python 3.9+` / `Python >=3.9 (推荐 3.10+，兼容至 3.14)`，README.md 与 skill.md 同步改为 3.9+ [requirements.txt](requirements.txt#L4-L5)
-- **参考位置**: [requirements.txt](requirements.txt#L1-L12) [README.md](README.md#L47)
+- **参考位置**: [requirements.txt](requirements.txt#L1-L12) [README.md](README.md#L48)
 
 **测试验证**:
 - ✅ `grep python-multipart requirements.txt` 无命中，接口返回依赖为 11 项
@@ -4388,8 +4447,8 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: 三方文档一致性与 changelog API 数据可信度
 
 **修复方案**:
-- **技术实现**: 以 skill.md 为基准回写 README.md 使两者逐字一致（行数与内容完全相同，以 `diff` 无输出为准），再由 skill.md 重新生成 skill.docx；changelog 全量逐字段检查空值与占位符，版本数与 changes 条数随迭代动态增长、以命令实时输出为准 [README.md](README.md#L3422-L3437) [skill.md](skill.md#L3422-L3437)
-- **参考位置**: [README.md](README.md#L3422-L3437) [skill.md](skill.md#L3422-L3437) [skill.docx](skill.docx)
+- **技术实现**: 以 skill.md 为基准回写 README.md 使两者逐字一致（行数与内容完全相同，以 `diff` 无输出为准），再由 skill.md 重新生成 skill.docx；changelog 全量逐字段检查空值与占位符，版本数与 changes 条数随迭代动态增长、以命令实时输出为准 [README.md](README.md#L3422-L3438) [skill.md](skill.md#L3422-L3438)
+- **参考位置**: [README.md](README.md#L3422-L3438) [skill.md](skill.md#L3422-L3438) [skill.docx](skill.docx)
 
 **测试验证**:
 - ✅ `diff README.md skill.md` 无输出，三方文档逐字一致
@@ -4406,7 +4465,7 @@ assert not viol and not bad and nums == sorted(nums)
 3. **误报修正**: `await ... lock` 由风险项改为正向验证，23 条 INFO 归零并统计为「异步锁同步保护 23 处」 [test/security_audit.py](test/security_audit.py#L903)
 4. **判定加固**: 响应头全部 `lower()` 归一化、超大请求体断连识别为主动拒收、路径遍历追加响应体内容级复核 [test/security_audit.py](test/security_audit.py#L1313-L1360)
 5. **接口加固**: 商品查询接口新增 1MB 请求体上限（超限 413）与 `{'skus'}` 字段白名单（越界 400），看门狗端口回退改读 `NETWORK_CONFIG` 消除硬编码 [main.py](main.py#L8623) [main.py](main.py#L9749-L9773)
-6. **范式固化**: 新增 PY-CORE-040「安全审计零问题范式」，明确四类问题只有「修代码/修规则」两种合法处置，禁止降级与白名单 [skill.md](skill.md#L2133-L3402)
+6. **范式固化**: 新增 PY-CORE-040「安全审计零问题范式」，明确四类问题只有「修代码/修规则」两种合法处置，禁止降级与白名单 [skill.md](skill.md#L2134-L3403)
 
 ##### 1. 🥊 真实黑盒攻防验证（13 项载荷）
 **问题描述**:
@@ -4485,9 +4544,9 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现(核心原则)**: 明确「总计问题必须恒为 0」，消除方式只能是「修代码」或「修规则」，禁止降级、禁止加白名单 [skill.md](skill.md#L2139-L2142)
-- **技术实现(处置表)**: 四类问题（真实缺陷 / 规则误报 / 正确防护被当风险 / 无法判定项）各自规定唯一正确处置与禁止做法 [skill.md](skill.md#L2144-L2152)
-- **技术实现(攻防铁律)**: 禁止模拟打印、必须发真实请求、必须双向判定、服务不可达必须降级 [skill.md](skill.md#L2162-L2172)
-- **参考位置**: [skill.md](skill.md#L2133-L3402) [README.md](README.md#L2133-L3402)
+- **技术实现(处置表)**: 四类问题（真实缺陷 / 规则误报 / 正确防护被当风险 / 无法判定项）各自规定唯一正确处置与禁止做法 [skill.md](skill.md#L2145-L2153)
+- **技术实现(攻防铁律)**: 禁止模拟打印、必须发真实请求、必须双向判定、服务不可达必须降级 [skill.md](skill.md#L2163-L2174)
+- **参考位置**: [skill.md](skill.md#L2134-L3403) [README.md](README.md#L2134-L3403)
 
 **测试验证**:
 - ✅ README.md 与 skill.md 逐字一致（`diff` 无差异）
@@ -4504,7 +4563,7 @@ assert not viol and not bad and nums == sorted(nums)
 3. **重启计数生效**: 补上 `WEB_RESTART_COUNT` 自增与上限拦截，达到 10 次后停止自动重启并继续探活，杜绝重启风暴 [run.sh](run.sh#L1810-L1820)
 4. **双端同步**: run.bat 同步全部逻辑，新增 `:check_daemon_alive` 以进程命令行匹配 + 端口探活双重检测守护进程存活 [run.bat](run.bat#L1822-L1888)
 5. **launchd 托管**: 新增 `com.xyws.web.plist`，开机自启 + 异常退出拉起，作为最外层兜底 [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist#L1-L40)
-6. **文档归一**: README.md 与 skill.md 由 199 行差异收敛为逐字一致，并修复 `**修复3方案**` 非范式块标题导致的 changelog API 字段解析为空 [skill.md](skill.md#L2135-L3437)
+6. **文档归一**: README.md 与 skill.md 由 199 行差异收敛为逐字一致，并修复 `**修复3方案**` 非范式块标题导致的 changelog API 字段解析为空 [skill.md](skill.md#L2135-L3438)
 
 ##### 1. ⚡ 看门狗探活频率 15 分钟 → 30 秒
 **问题描述**:
@@ -4598,10 +4657,10 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: `/api/changelog` 返回的 `changes[].solution` 数据质量、skill.docx 内容完整性、三方文档一致性
 
 **修复方案**:
-- **技术实现(单一源)**: 以 skill.md 为唯一源，先把 README 独有的「🛡️ 跨平台防崩溃系统 (v2.0)」章节并入 skill.md，再整体复制回 README.md，双端 0 差异 [skill.md](skill.md#L96-L152)
-- **技术实现(标题归一)**: `**修复3方案**:` 归一为 `**修复方案**:`、`[main.py](main,py)` 修正为 `[main.py](main.py)`，恢复被丢弃的解决方案与参考位置条目 [skill.md](skill.md#L3377-L3437)
+- **技术实现(单一源)**: 以 skill.md 为唯一源，先把 README 独有的「🛡️ 跨平台防崩溃系统 (v2.0)」章节并入 skill.md，再整体复制回 README.md，双端 0 差异 [skill.md](skill.md#L97-L154)
+- **技术实现(标题归一)**: `**修复3方案**:` 归一为 `**修复方案**:`、`[main.py](main,py)` 修正为 `[main.py](main.py)`，恢复被丢弃的解决方案与参考位置条目 [skill.md](skill.md#L3377-L3438)
 - **技术实现(数据兜底)**: changelog API 保留「解析兜底 → 合并补全 → 空 changes 扫描修复 → 占位符规范化」四重守卫，版本级 `changes` 永不为空，`commit` 空值回落为「版本X对应提交详见Git历史」 [main.py](main.py#L11213-L11390)
-- **参考位置**: [skill.md](skill.md#L2135-L3437) 最新更新章节 / [README.md](README.md#L2135-L3437) 同步章节
+- **参考位置**: [skill.md](skill.md#L2135-L3438) 最新更新章节 / [README.md](README.md#L2135-L3438) 同步章节
 
 **测试验证**:
 - ✅ `diff README.md skill.md` 无输出（逐字一致）
@@ -4670,7 +4729,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 #### 更新内容:
 1. **导航表扩容**: 导航表由 16 行增至 17 行，新增「📐 DOCX 文档生成范式」条目，与 PY-CORE-011/032/033 三条范式并列 [skill.md](skill.md#L10-L35)
-2. **交叉引用消歧**: `PY-CORE-016` 补注「生成流程与产出结构以 PY-CORE-018 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L19956)
+2. **交叉引用消歧**: `PY-CORE-016` 补注「生成流程与产出结构以 PY-CORE-018 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L20015)
 3. **skill.docx 重新生成**: 由 skill.md 重新生成，17 个导航超链接全部命中书签，导航仍固定第 1 页、正文从第 2 页开始
 4. **新增 P0 范式章节**: skill.md 与 README.md 逐字新增 `PY-CORE-018 DOCX 文档生成范式`，含六条铁律表、五步流程、生成器三函数机制、8 条坑位表、落地检查清单与可复制的锚点校验脚本 [skill.md](skill.md) [README.md](README.md)
 
@@ -4700,7 +4759,7 @@ assert not viol and not bad and nums == sorted(nums)
 1. **DOCX 文档导航置顶第一页**: `test/generate_docx.py` 新增 `_extract_nav_block()` 识别导航表并连同上方标题/引言整块抽出，`_render_nav_block()` 在第一个 H1 之后立即渲染并追加分页符，导航恒定位于第 1 页、正文从第 2 页开始 [test/generate_docx.py](test/generate_docx.py#L260-L300)
 2. **16 个章节可点击跳转**: skill.md 顶部新增「📚 文档导航」章节含 16 行 `| 章节 | 说明 |` 索引表；生成器自动补第 3 列「位置（点击跳转）」并生成 `w:hyperlink` + `w:anchor`，实测 16 个锚点全部命中 `w:bookmarkStart` [skill.md](skill.md#L10-L35) [test/generate_docx.py](test/generate_docx.py#L390-L405)
 3. **标题 BOM 修复**: skill.md / README.md 首行原为 `#` + U+FEFF + `# 微购...`，BOM 夹在两个 `#` 之间使 `lstrip('#')` 只剥掉第一个，docx 中 H1 显示成 `# 微购相册管理系统`；清除 BOM 后标题恢复正常 [skill.md](skill.md#L1) [README.md](README.md#L1)
-4. **README 章节补齐**: README.md 新增 `PY-CORE-016 文档生成方法` 与 `PY-CORE-043 终端实时日志接入范式` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L801) [README.md](README.md#L19903)
+4. **README 章节补齐**: README.md 新增 `PY-CORE-016 文档生成方法` 与 `PY-CORE-043 终端实时日志接入范式` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L802) [README.md](README.md#L19962)
 5. **三方文档同步**: README.md / skill.md / skill.docx 导航章节逐字一致，skill.docx 由 skill.md 重新生成（389.4 KB，含 16 个导航超链接）
 
 ##### 1. 📚 DOCX 文档导航置顶第一页 (导航块强制渲染 + 分页符隔离)
@@ -4742,7 +4801,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 从 skill.md 逐字提取两个章节并写入 README.md（PY-CORE-016 整段替换 README 原「文档生成方法」段；PY-CORE-017 之后、最新更新之前插入 PY-CORE-043）
-- **参考位置**: [README.md](README.md#L801) [README.md](README.md#L19903)
+- **参考位置**: [README.md](README.md#L802) [README.md](README.md#L19962)
 
 **测试验证**:
 - ✅ README.md 导航 16 行锚点全部命中，未命中为空
@@ -4822,7 +4881,7 @@ assert not viol and not bad and nums == sorted(nums)
 **修复方案**:
 - **技术实现(双端对齐)**: run.bat 删除危险清理、Playwright 改本地检测、cloudflared 改官方二进制、提示文案与返回码语义对齐 run.sh
 - **技术实现(文档)**: skill.md 新增 PY-CORE-043 实时日志范式；README.md/skill.md 同步 v5.0.9.84；`test/generate_docx.py` 重新生成 skill.docx；删除多余 md 文件（`.trae/skills/**/SKILL.md`），内容合并进 skill.md
-- **参考位置**: [skill.md](skill.md#L249) [skill.md](skill.md) `PY-CORE-043`
+- **参考位置**: [skill.md](skill.md#L250) [skill.md](skill.md) `PY-CORE-043`
 
 **测试验证**:
 - ✅ `bash -n run.sh` 通过；run.bat `(`/`)` 配对无误
@@ -4878,7 +4937,7 @@ assert not viol and not bad and nums == sorted(nums)
 3. **版本检查返回码统一**: 全部版本检查函数统一返回码约定 `0=已是最新`、`1=需要升级`、`2=跳过检查`，所有调用点改为分支判断，不再使用隐式if/else，与run.bat完全对齐 [run.sh](run.sh#L1051-L1290)
 4. **镜像测速工具函数统一**: 新增通用`test_mirror_latency()`封装`curl -I`+`time_total`+HTTP状态码校验(连接超时5s/总超时8s)，替换pip/npm/hostc三处重复测速逻辑，输出格式与run.bat一致 [run.sh](run.sh#L978-L1050)
 5. **changelog解析器扩展+空值规范化**: 解析器新增"说明/核心改进/补充说明"块识别与`- **键**: 值`宽松匹配，末尾新增统一空值规范化阶段，确保`changes`字段100%非空、`problem`/`solution`/`verification`全字段无空值 [main.py](main.py#L10830-L10900) [main.py](main.py#L11172-L11245)
-6. **Commit畸形值清理**: 5处形如`ac6add6f.8.90.09`的畸形Commit值(版本号误拼入hash)全部修正为真实8位hash，API新增`_sanitize_commit()`仅保留7-10位十六进制token，从根上杜绝非hash与占位符输出 [README.md](README.md#L9851) [main.py](main.py#L11180-L11188)
+6. **Commit畸形值清理**: 5处形如`ac6add6f.8.90.09`的畸形Commit值(版本号误拼入hash)全部修正为真实8位hash，API新增`_sanitize_commit()`仅保留7-10位十六进制token，从根上杜绝非hash与占位符输出 [README.md](README.md#L9911) [main.py](main.py#L11180-L11188)
 7. **三方文档同步**: README.md+skill.md同步v5.0.9.83记录+skill.docx由skill.md重新生成，run.sh/run.bat版本号保持`0.0.0`自动探测(统一从README最新版本读取，未硬编码)
 
 ##### 1. 🔧 run.sh进程清理三级过滤 (跨平台误杀防护)
@@ -4968,9 +5027,9 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: README.md/skill.md 5处版本条目
 
 **修复方案**:
-- **技术实现(文档修正)**: `ac6add6f.8.90.09`→`ac6add6f`、`c4b0148b.8.89.20`→`c4b0148b`、`fa75c100.8.89.16`→`fa75c100`、`2fcfaf42.8.89.15`→`2fcfaf42`、`c35e648e.8.89.14`→`c35e648e`，README.md与skill.md各5处 [README.md](README.md#L9851)
+- **技术实现(文档修正)**: `ac6add6f.8.90.09`→`ac6add6f`、`c4b0148b.8.89.20`→`c4b0148b`、`fa75c100.8.89.16`→`fa75c100`、`2fcfaf42.8.89.15`→`2fcfaf42`、`c35e648e.8.89.14`→`c35e648e`，README.md与skill.md各5处 [README.md](README.md#L9911)
 - **技术实现(API兜底)**: 新增`_sanitize_commit()`，仅提取7-10位十六进制token并去重(最多5个)，无法提取时回退真实提交或明确说明来源 [main.py](main.py#L11180-L11188)
-- **参考位置**: [README.md](README.md#L9851-L10475) [main.py](main.py#L11180-L11210)
+- **参考位置**: [README.md](README.md#L9911-L10535) [main.py](main.py#L11180-L11210)
 
 **测试验证**:
 - ✅ 全量扫描425个版本`non-hash commit entries: 0`
@@ -6749,7 +6808,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现(Docx生成)**: 运行generate_docx.py从skill.md重新生成skill.docx [generate_docx.py](generate_docx.py)
-- **技术实现(Hash更新)**: 将Commit字段从94d0b79e更新为5c5746c1 [README.md#L242](README.md#L242), [skill.md#L94](skill.md#L94)
+- **技术实现(Hash更新)**: 将Commit字段从94d0b79e更新为5c5746c1 [README.md#L243](README.md#L243), [skill.md#L94](skill.md#L94)
 - **技术实现(作者更正)**: 将作者从"AI Assistant"更正为"小旭二手机（西园路）"
 
 **测试验证**:
@@ -7506,7 +7565,7 @@ python config/crypto_tool.py encrypt-config
 
 **解决方案**:
 - **技术实现**: ①更新.gitignore第24-40行:在现有"Sensitive config files"分组下新增3行忽略规则(config/crypto_tool.py/config/update_password.py/config/demo_crypto.py);②格式化config.config.json.example:使用Python json.dump(config, f, indent=2, ensure_ascii=False)生成标准格式化JSON(从1行压缩格式变为52行易读格式),所有敏感值替换为YOUR_前缀占位符(YOUR_QQ_PHONE_NUMBER/YOUR_PASSWORD/YOUR_SMTP_AUTH_CODE_16CHARS/YOUR_WEB_API_KEY_OR_AUTO_GENERATE等);③删除config/README_CONFIG.md(292行详细文档):避免文档碎片化,将配置说明整合到根目录README.md的"⚙️ 配置说明"章节(第53-82行);④在README.md添加完整配置说明:包含"首次配置(必读)"3步骤(copy example→编辑→启动)/"配置文件安全"表格(5个文件及其Git状态)/"常用操作"3个命令示例(decrypt-config show/encrypt/encrypt-config)/指向config.json.example的链接;⑤验证Git忽略规则:运行`git check-ignore -v`确认所有敏感文件均被正确忽略(输出对应.gitignore行号)
-- **参考位置**: [.gitignore#L24-L40](.gitignore#L24-L40) (更新的忽略规则), [config/config.json.example#L1-52](config/config.json.example#L1-52) (格式化脱敏模板), [README.md#L54-L82](README.md#L54-L82) (新增配置说明章节)
+- **参考位置**: [.gitignore#L24-L40](.gitignore#L24-L40) (更新的忽略规则), [config/config.json.example#L1-52](config/config.json.example#L1-52) (格式化脱敏模板), [README.md#L55-L84](README.md#L55-L84) (新增配置说明章节)
 
 **安全配置矩阵**:
 | 文件路径 | 内容 | Git状态 | 风险等级 | 忽略规则位置 |
@@ -7534,7 +7593,7 @@ python config/crypto_tool.py encrypt-config
 
 **解决方案**:
 - **技术实现**: ①删除config/README_CONFIG.md(292行,包含加密机制说明/SMTP配置/常见问题等8个章节);②在README.md第53-82行插入"## ⚙️ 配置说明"章节(30行精简版):包含"### 首次配置(必读)"(3步快速开始+代码注释说明字段含义)、"### 配置文件安全"(5行表格列出文件/Git状态/风险等级)、"### 常用操作"(3个代码块展示decrypt-config show/encrypt/encrypt-config命令)、指向config.json.example的超链接;③保持skill.md与README.md同步更新(后续步骤生成skill.docx时自动一致);④确保根目录文档结构清晰:仅有README.md(项目主文档+配置说明)和skill.md(开发规范文档)两个MD文件
-- **参考位置**: [README.md#L54-L82](README.md#L54-L82) (新增配置说明章节), [config/config.json.example](config/config.json.example) (脱敏模板作为详细参考)
+- **参考位置**: [README.md#L55-L84](README.md#L55-L84) (新增配置说明章节), [config/config.json.example](config/config.json.example) (脱敏模板作为详细参考)
 
 **文档架构对比**:
 ```
@@ -7598,7 +7657,7 @@ python config/crypto_tool.py encrypt-config
 
 **更新日期**: 2026-09-04
 **更新类型**: 🔧功能增强 + 🔒安全加固 + 📝文档规范化 + 🔐配置管理
-**影响文件**: [config/config.json](config/config.json#L47), [config/config.json.example](config/config.json.example), [config/crypto_tool.py](config/crypto_tool.py), [.gitignore](.gitignore#L24-L40), [README.md](README.md#L54-L82), [skill.md](skill.md), [skill.docx](skill.docx)
+**影响文件**: [config/config.json](config/config.json#L47), [config/config.json.example](config/config.json.example), [config/crypto_tool.py](config/crypto_tool.py), [.gitignore](.gitignore#L24-L40), [README.md](README.md#L55-L84), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 6f57a6b5
 **变更统计**: +287行 -12行 (+275行净增)
 **作者**: 小旭二手机（西园路）**
@@ -7705,7 +7764,7 @@ python config/crypto_tool.py encrypt-config
 
 **修复方案**:
 - **技术实现**: 编写Python脚本test/fix_changelog_format.py和test/sync_skill_md.py,使用正则表达式匹配`^####\s+更新内容:.*①.*②`模式识别所有简化格式版本,解析①②③④⑤⑥⑦⑧编号拆分为独立项,为每项生成标准的`##### N. 🏷️标签 (🏷️标签)`结构并填充问题描述/修复方案/测试验证三要素
-- **参考位置**: [README.md#L128-L210](README.md#L128-L210) (v5.0.9.41修复示例), [skill.md#L1-L60](skill.md#L1-L60) (v5.0.9.37修复示例)
+- **参考位置**: [README.md#L128-L211](README.md#L128-L211) (v5.0.9.41修复示例), [skill.md#L1-L60](skill.md#L1-L60) (v5.0.9.37修复示例)
 
 **测试验证**:
 - ✅ README.md: 19个简化格式版本全部转换为标准格式(新增851个#####子项)
@@ -9505,7 +9564,7 @@ python config/crypto_tool.py encrypt-config
 
 **修复方案**:
 - **技术实现**: ①清除README中12行污染数据恢复为secrets.token_urlsafe描述 ②showToast的message添加escapeHtml()转义 ③systemInfo/cookie_name/expires/hours_remaining均添加escapeHtml/escapeAttr转义 ④video URL添加escapeAttr属性转义 ⑤所有修复点添加[ XSS_SAFE]标记
-- **参考位置**: [README.md#L83](README.md#L83), [dist/app.js#L4231](dist/app.js#L4231), [dist/app.js#L1300](dist/app.js#L1300), [dist/app.js#L949](dist/app.js#L949)
+- **参考位置**: [README.md#L84](README.md#L84), [dist/app.js#L4231](dist/app.js#L4231), [dist/app.js#L1300](dist/app.js#L1300), [dist/app.js#L949](dist/app.js#L949)
 
 **测试验证**:
 - ✅ README.md中无污染数据(secretsversion已清除)
