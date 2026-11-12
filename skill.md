@@ -20,13 +20,13 @@
 | 🔐 安全合规状态 | 加密存储与安全检查项 |
 | 📐 版本更新记录范式规范 (PY-CORE-011) | changelog 结构强制规范 |
 | 📐 双启动脚本同步范式 (PY-CORE-017) | run.sh / run.bat 1:1 同步要求 |
-| 📐 终端实时日志接入范式 (PY-CORE-040) | sh / bat 实时日志双方案 |
+| 📐 终端实时日志接入范式 (PY-CORE-043) | sh / bat 实时日志双方案 |
 | 📐 DOCX 文档生成范式 (PY-CORE-018) | 导航置顶第一页与生成校验规范 |
-| 📐 安全审计零问题范式 (PY-CORE-038) | 总计问题必须为 0 的判定标准 |
-| 📐 大文件小范围修改临时脚本范式 (PY-CORE-028) | 大文件禁用全量重写，锚点式最小替换 |
+| 📐 安全审计零问题范式 (PY-CORE-040) | 总计问题必须为 0 的判定标准 |
+| 📐 大文件小范围修改临时脚本范式 (PY-CORE-030) | 大文件禁用全量重写，锚点式最小替换 |
 | 📐 Excel 货号 E 列读取范式 (PY-CORE-022) | 平台子表仅读 E 列，货号正则 3-10 位 |
 | 📐 每日利润表读取范式 (PY-CORE-019) | 每日利润子表 A-F 列布局与聚合规则 |
-| 📐 范式编号规则范式 (PY-CORE-032) | 前缀+三位数字、A-Z 位次累加与区间表 |
+| 📐 范式编号规则范式 (PY-CORE-034) | 前缀+三位数字、A-Z 位次累加与区间表 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -451,7 +451,7 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \
 
 ---
 
-## 📐 终端实时日志接入范式 (PY-CORE-040)
+## 📐 终端实时日志接入范式 (PY-CORE-043)
 
 > **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [run.bat](run.bat) / [run.sh](run.sh)
 
@@ -680,7 +680,7 @@ print('分页符下标:', pages[:1])
 
 ---
 
-## 📐 安全审计零问题范式 (PY-CORE-038)
+## 📐 安全审计零问题范式 (PY-CORE-040)
 
 > **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [test/security_audit.py](test/security_audit.py) / [main.py](main.py) / [skill.md](skill.md) / [README.md](README.md)
 
@@ -760,7 +760,7 @@ python test/security_audit.py; echo "EXIT=$?"
 
 ---
 
-## 📐 大文件小范围修改临时脚本范式 (PY-CORE-028)
+## 📐 大文件小范围修改临时脚本范式 (PY-CORE-030)
 
 > **创建日期**: 2026-11-11 | **最后更新**: 2026-11-11 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) / [README.md](README.md) / [skill.md](skill.md) / [dist/app.js](dist/app.js) 等千行级文件
 
@@ -792,10 +792,10 @@ from pathlib import Path
 TARGET = Path('README.md')
 content = TARGET.read_text(encoding='utf-8')
 
-OLD = '| 📐 安全审计零问题范式 (PY-CORE-038) | 总计问题必须为 0 的判定标准 |'
+OLD = '| 📐 安全审计零问题范式 (PY-CORE-040) | 总计问题必须为 0 的判定标准 |'
 assert content.count(OLD) == 1, f'锚点命中 {content.count(OLD)} 次，中止'
 
-NEW = OLD + '\n| 📐 大文件小范围修改临时脚本范式 (PY-CORE-028) | 大文件禁用全量重写 |'
+NEW = OLD + '\n| 📐 大文件小范围修改临时脚本范式 (PY-CORE-030) | 大文件禁用全量重写 |'
 content = content.replace(OLD, NEW, 1)
 TARGET.write_text(content, encoding='utf-8')
 print('OK')
@@ -958,7 +958,7 @@ git status --short
 
 ---
 
-## 📐 范式编号规则范式 (PY-CORE-032)
+## 📐 范式编号规则范式 (PY-CORE-034)
 
 > **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: README.md / skill.md / skill.docx 中全部 PY-CORE 范式编号与引用
 
@@ -990,26 +990,26 @@ git status --short
 | b | 003-004 | 003-004 | 满 |
 | c | 005-013 | 005-013 | 满 |
 | d | 014-019 | 014-019 | 满 |
-| e | 020-022 | 020-022 | 满 |
-| f | 023-024 | 023-024 | 满 |
-| g | — | — | ✅ 空 |
-| h | 025-025 | 025 | 满 |
-| i | 026-027 | 026-027 | 满 |
+| e | 020-023 | 020-023 | 满 |
+| f | 024-025 | 024-025 | 满 |
+| g | 026-026 | 026 | 满 |
+| h | 027-027 | 027 | 满 |
+| i | 028-029 | 028-029 | 满 |
 | j / k | — | — | ✅ 空 |
-| l | 028-028 | 028 | 满 |
+| l | 030-030 | 030 | 满 |
 | m | — | — | ✅ 空 |
-| n | 029-029 | 029 | 满 |
+| n | 031-031 | 031 | 满 |
 | o | — | — | ✅ 空 |
-| p | 030-032 | 030-032 | 满 |
+| p | 032-034 | 032-034 | 满 |
 | q | — | — | ✅ 空 |
-| r | 033-033 | 033 | 满 |
-| s | 034-038 | 034-038 | 满 |
-| t | 039-040 | 039-040 | 满 |
-| u | 041-041 | 041 | 满 |
-| v | 042-042 | 042 | 满 |
+| r | 035-035 | 035 | 满 |
+| s | 036-041 | 036-041 | 满 |
+| t | 042-043 | 042-043 | 满 |
+| u | 044-044 | 044 | 满 |
+| v | 045-045 | 045 | 满 |
 | w / x / y / z | — | — | ✅ 空 |
 
-> 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 g 字母范式，则 025 起全部 +1，h 段变为 026）。当前队列长度 42，剩余可用号位 58（硬上限 100）。
+> 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 030 起全部 +1）。当前队列长度 45，剩余可用号位 55（硬上限 100）。
 
 ### 新增范式标准动作（顺序不可颠倒）
 
@@ -1037,15 +1037,18 @@ git status --short
 
 | 代表范式 | 旧号 | 新号 | 首字母 |
 |---|---|---|---|
-| 统一异常处理 | 旧号 001 | 新号 041 | u |
+| 统一异常处理 | 旧号 001 | 新号 044 | u |
 | 文件清理自动化 | 旧号 013 | 新号 001 | a |
 | 浏览器自动化爬虫 | 旧号 006 | 新号 003 | b |
 | 数据对比分析 | 旧号 007 | 新号 014 | d |
 | Changelog版本变更详情完整结构 | 旧号 027 | 新号 011 | c |
 | 每日利润表读取 | 旧号 038 | 新号 019 | d |
-| 版本号一致性保障 | 旧号 028 | 新号 042 | v |
-| 字段名兼容性（原重号） | 旧号 007 | 新号 024 | f |
+| 版本号一致性保障 | 旧号 028 | 新号 045 | v |
+| 字段名兼容性（原重号） | 旧号 007 | 新号 025 | f |
 | 代码库卫生维护（原重号） | 旧号 008 | 新号 013 | c |
+| 编码处理最佳实践（原重号） | 旧号 029 | 新号 023 | e |
+| Git历史维护（原重号） | 旧号 002 | 新号 026 | g |
+| subprocess超时配置（原重号） | 旧号 031 | 新号 041 | s |
 
 > **判定标准**: 出现「编号跳号 / 重号 / 与标题首字母位次不符 / 引用未同步 / 字母被改动」中任意一条，即视为「未符合本范式」。
 
@@ -1053,16 +1056,16 @@ git status --short
 
 ## 🔄 最新更新
 
-### v5.0.9.95 (2026-11-12) - 📐 **PY-CORE 编号按 A-Z 全量重排 + 编号规则范式固化** - 41个现有范式按标题英文首字母A-Z位次重排为PY-CORE-001~042(零跳号零重号零遗漏)+修正2处历史重号(字段名兼容性→024/代码库卫生维护→013)+新增PY-CORE-032范式编号规则范式(前缀固定+三位数字+字母原生固定+A-Z位次累加+区间表+硬上限100)+汇总表扩容至42行并新增首字母列+导航表新增1行+README与skill.md逐字节一致+docx重生成锚点零缺失
+### v5.0.9.95 (2026-11-12) - 📐 **PY-CORE 编号按 A-Z 全量重排 + 编号规则范式固化** - 44个既有范式按标题英文首字母A-Z位次重排为PY-CORE-001~045(零跳号零重号零遗漏)+修正3处历史重号(编码处理最佳实践→023/Git历史维护→026/subprocess超时配置→041)+新增PY-CORE-034范式编号规则范式(前缀固定+三位数字+字母原生固定+A-Z位次累加+区间表+硬上限100)+汇总表扩容至45行并新增首字母列+导航表新增1行+README与skill.md逐字节一致+docx重生成锚点零缺失
 
 > **Commit**: `4e40e2b6`
 
 #### 更新内容:
-1. **全量重排**: 41 个现有范式按「标题英文名首字母 A-Z + 同字母内原相对次序」稳定排序，重排为 `PY-CORE-001` ~ `PY-CORE-042`（新增 1 条编号规则范式后共 42 条），零跳号、零重号、零遗漏 [README.md](README.md)
-2. **重号修正**: 历史遗留的旧号 007 双占（数据对比分析 / 字段名兼容性）、旧号 008 双占（跨平台启动脚本 / 代码库卫生维护），按字母位次重落为新号 014、024、008、013
-3. **规则固化**: 新增 [范式编号规则范式 (PY-CORE-032)](README.md#L961-L1053)，明确「前缀不可变、数字可累加、字母原生固定、按 A-Z 位次整体重排、区间表、硬上限 100」
-4. **汇总表扩容**: 完整代码范式汇总表由 24 行扩容至 42 行，新增「首字母」列用于逐行校验 A-Z 位次，总计口径同步更新
-5. **导航同步**: 文档导航表新增「范式编号规则范式 (PY-CORE-032)」1 行，其余 8 行导航项的编号随全量重排自动同步
+1. **全量重排**: 44 个既有范式按「标题英文名首字母 A-Z + 同字母内原相对次序」稳定排序，重排为 `PY-CORE-001` ~ `PY-CORE-045`（含新增 1 条编号规则范式，共 45 条），零跳号、零重号、零遗漏 [README.md](README.md)
+2. **重号修正**: 历史遗留重号共 3 处——编码处理最佳实践 → 新号 023（字母 e）、Git 历史维护 → 新号 026（字母 g）、subprocess 超时配置 → 新号 041（字母 s），并复核旧号 007/008 双占项最终落号为 014、025、008、013
+3. **规则固化**: 新增 [范式编号规则范式 (PY-CORE-034)](README.md#L961-L1053)，明确「前缀不可变、数字可累加、字母原生固定、按 A-Z 位次整体重排、区间表、硬上限 100」
+4. **汇总表扩容**: 完整代码范式汇总表由 24 行扩容至 45 行，新增「首字母」列用于逐行校验 A-Z 位次，总计口径同步更新
+5. **导航同步**: 文档导航表新增「范式编号规则范式 (PY-CORE-034)」1 行，其余 8 行导航项的编号随全量重排自动同步
 6. **三方文档**: README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成，书签与导航锚点零缺失
 7. **接口校验**: `/api/changelog` 复核 `changes` 空条目 0 个、`commit` 占位 0 处，版本号统一由 README.md 动态读取
 
@@ -1073,29 +1076,29 @@ git status --short
 - **影响范围**: 全部范式标题、导航表、汇总表、正文交叉引用与历史版本记录
 
 **修复方案**:
-- **技术实现**: 按 `(英文名首字母, 同字母内原相对次序)` 稳定排序生成 41 项队列，逐项落号 `001~041`，再将编号规则自身作为第 `032` 位（字母 `p`）插入；全文档以「旧号 → 新号」映射一次性替换，重号段按行区间隔离替换后再落号
+- **技术实现**: 按 `(英文名首字母, 同字母内原相对次序)` 稳定排序生成 44 项队列，逐项落号 `001~044`，再将编号规则自身作为第 `034` 位（字母 `p`）插入；全文档以「旧号 → 新号」映射一次性替换，重号段按行区间隔离替换后再落号
 - **参考位置**: [README.md](README.md#L961-L1053)
 
 **测试验证**:
-- ✅ 编号扫描：`PY-CORE-001` ~ `PY-CORE-042` 连续，跳号 0 个、重号 0 个
+- ✅ 编号扫描：`PY-CORE-001` ~ `PY-CORE-045` 连续，跳号 0 个、重号 0 个
 - ✅ 位次校验：每行编号的首字母与「首字母」列逐行一致（a→b→c→…→v 单调不减）
 - ✅ 引用校验：正文/导航/汇总表/历史记录内无残留旧号语义错位
 
-##### 2. 🔧 修正 2 处历史编号重号 (🐛编号冲突)
+##### 2. 🔧 修正历史编号重号（3 处新增 + 2 处复核）(🐛编号冲突)
 **问题描述**:
-- **现象**: 旧号 007 同时被「数据对比分析」与「字段名兼容性」占用；旧号 008 同时被「跨平台启动脚本」与「代码库卫生维护」占用
-- **根因**: 早期范式附录迁移时沿用旧号，未与新号段比对
+- **现象**: 旧号 007 同时被「数据对比分析」与「字段名兼容性」占用；旧号 008 同时被「跨平台启动脚本」与「代码库卫生维护」占用；另有 3 条范式（编码处理最佳实践 / Git 历史维护 / subprocess 超时配置）位次与字母键不符
+- **根因**: 早期范式附录迁移时沿用旧号，未与新号段比对；新增范式时未按字母位次插入
 - **影响范围**: 汇总表与正文引用指向二义
 
 **修复方案**:
-- **技术实现**: 按字母位次重新落号：数据对比分析 → 新号 014（字母 d）、字段名兼容性 → 新号 024（字母 f）、跨平台启动脚本 → 新号 008（字母 c）、代码库卫生维护 → 新号 013（字母 c）
-- **参考位置**: [README.md](README.md#L22848-L23154)
+- **技术实现**: 按字母位次重新落号：数据对比分析 → 新号 014（字母 d）、字段名兼容性 → 新号 025（字母 f）、跨平台启动脚本 → 新号 008（字母 c）、代码库卫生维护 → 新号 013（字母 c）；编码处理最佳实践 → 新号 023（字母 e）、Git 历史维护 → 新号 026（字母 g）、subprocess 超时配置 → 新号 041（字母 s）
+- **参考位置**: [README.md](README.md#L20831-L20881)、[README.md](README.md#L20892-L21196)
 
 **测试验证**:
 - ✅ 同一编号在全文仅对应一个范式标题
-- ✅ 两处范式正文内自引用编号与标题编号一致
+- ✅ 各范式正文内自引用编号与标题编号一致
 
-##### 3. 📐 新增范式编号规则范式 PY-CORE-032 (📝范式定义)
+##### 3. 📐 新增范式编号规则范式 PY-CORE-034 (📝范式定义)
 **问题描述**:
 - **现象**: 编号规则此前只散落在各版本变更记录中，缺少独立范式条目，新增范式时仍易退化为「末尾 +1」
 - **根因**: 规则未升格为 P0 范式，无判定标准与检查清单
@@ -1103,10 +1106,10 @@ git status --short
 
 **修复方案**:
 - **技术实现**: 新增独立范式章节，含核心原则表、三步编号算法、a-z 区间表、新增范式标准动作、6 条坑位表、本轮重排实录与判定标准
-- **参考位置**: [范式编号规则范式 (PY-CORE-032)](README.md#L961-L1053)
+- **参考位置**: [范式编号规则范式 (PY-CORE-034)](README.md#L961-L1053)
 
 **测试验证**:
-- ✅ 区间表与实际占用逐字母核对一致（42 条 / 剩余 58 位 / 上限 100）
+- ✅ 区间表与实际占用逐字母核对一致（45 条 / 剩余 55 位 / 上限 100）
 - ✅ 重排实录 9 组「旧号 → 新号」抽样与全文实际一致
 
 ##### 4. 📊 汇总表与导航表同步扩容 (📝文档同步)
@@ -1116,11 +1119,11 @@ git status --short
 - **影响范围**: 范式检索与 A-Z 位次校验
 
 **修复方案**:
-- **技术实现**: 汇总表按新编号 `001~042` 升序重写 42 行并新增「首字母」列；导航表在「每日利润表读取范式」后插入编号规则范式 1 行
-- **参考位置**: [README.md](README.md#L21-L37)、[README.md](README.md#L22790-L22837)
+- **技术实现**: 汇总表按新编号 `001~045` 升序重写 45 行并新增「首字母」列；导航表在「每日利润表读取范式」后插入编号规则范式 1 行
+- **参考位置**: [README.md](README.md#L21-L37)、[README.md](README.md#L20831-L20881)
 
 **测试验证**:
-- ✅ 汇总表行数 42，与正文 `## 🔴/🟡/📐 PY-CORE-xxx` 定义条目数一致
+- ✅ 汇总表行数 45，与正文范式定义条目数一致
 - ✅ 导航表 21 行，全部锚点可跳转
 
 ##### 5. 📝 三方文档同步与接口校验 (🔧验证)
@@ -1285,15 +1288,15 @@ git status --short
 - ✅ `GET /api/changelog` 解析成功，`changes` 为空 0 条、占位符 0 处
 - ✅ 前端「最新更新 (v5.0.9.93)」渲染 4 个变更卡片，问题描述 / 修复方案 / 测试验证三块均有内容
 
-### v5.0.9.92 (2026-11-11) - 🔐 **敏感字段全量加密与PY-CORE-028临时脚本范式** - headers.cookie明文加密完成(login.password/headers.cookie/email_smtp_password三字段全部ENC)+main.py解密链路逐字节复核+新增PY-CORE-028大文件小范围修改临时脚本范式(唯一锚点/先备份/最小替换/改后三校验/脚本不入库/改md必重生成)+导航表扩容18行+三方文档逐字一致与docx锚点零缺失
+### v5.0.9.92 (2026-11-11) - 🔐 **敏感字段全量加密与PY-CORE-030临时脚本范式** - headers.cookie明文加密完成(login.password/headers.cookie/email_smtp_password三字段全部ENC)+main.py解密链路逐字节复核+新增PY-CORE-030大文件小范围修改临时脚本范式(唯一锚点/先备份/最小替换/改后三校验/脚本不入库/改md必重生成)+导航表扩容18行+三方文档逐字一致与docx锚点零缺失
 
 > **Commit**: `fd6e60f2, 9a933cac, 54597285`
 
 #### 更新内容:
 1. **敏感字段清零**: config.json 中最后一个明文敏感字段 `headers.cookie` 已加密，三字段全部为 `ENC(...)` [config/crypto_tool.py](config/crypto_tool.py#L25)
 2. **解密链路复核**: `SecureConfigManager` 解密三字段全部成功，headers.cookie 与加密前明文逐字节一致 [main.py](main.py#L518-L531)
-3. **新范式固化**: 新增 PY-CORE-028，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L760-L856) [skill.md](skill.md#L760-L856)
-4. **导航扩容**: 文档导航表 17 → 18 行，新增 PY-CORE-028 条目，docx 19 个链接全部命中书签 [README.md](README.md#L26)
+3. **新范式固化**: 新增 PY-CORE-030，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L760-L856) [skill.md](skill.md#L760-L856)
+4. **导航扩容**: 文档导航表 17 → 18 行，新增 PY-CORE-030 条目，docx 19 个链接全部命中书签 [README.md](README.md#L26)
 5. **三方同步**: README.md 与 skill.md 逐字一致，skill.docx 由 skill.md 重新生成（422.9 KB） [skill.docx](skill.docx)
 
 ##### 1. 🔐 headers.cookie 明文加密完成 (🛡️安全加固)
@@ -1324,14 +1327,14 @@ git status --short
 - ✅ login.password / headers.cookie / email_smtp_password 解密全部成功
 - ✅ headers.cookie 解密后 1419 字符，与加密前明文完全一致
 
-##### 3. 📐 新增 PY-CORE-028 大文件小范围修改临时脚本范式 (📝文档更新)
+##### 3. 📐 新增 PY-CORE-030 大文件小范围修改临时脚本范式 (📝文档更新)
 **问题描述**:
 - **现象**: main.py 14000+ 行、README.md / skill.md 21000+ 行，直接编辑易误伤重复段落，全量重写会把换行/BOM/缩进差异一并带进 diff
 - **根因**: 缺少「大文件怎么改」的统一规定，历次修改靠人工小心，既无法复用也无法验收
 - **影响范围**: 所有千行级文件的后续维护
 
 **修复方案**:
-- **技术实现**: 新增 PY-CORE-028 范式章节，明确六条铁律（唯一锚点 `assert count == 1` / 先备份 / 最小替换 / 改后三校验 / 临时脚本不入库 / 改 md 必重生成）、五步标准流程、适用场景表、5 条坑位表与落地检查清单；本次章节插入本身即用临时脚本 `test/temp_patch_v50992.py` 按锚点完成，执行后已删除 [README.md](README.md#L760-L856) [skill.md](skill.md#L760-L856)
+- **技术实现**: 新增 PY-CORE-030 范式章节，明确六条铁律（唯一锚点 `assert count == 1` / 先备份 / 最小替换 / 改后三校验 / 临时脚本不入库 / 改 md 必重生成）、五步标准流程、适用场景表、5 条坑位表与落地检查清单；本次章节插入本身即用临时脚本 `test/temp_patch_v50992.py` 按锚点完成，执行后已删除 [README.md](README.md#L760-L856) [skill.md](skill.md#L760-L856)
 - **参考位置**: [README.md](README.md#L760-L856) [README.md](README.md#L26)
 
 **测试验证**:
@@ -1345,7 +1348,7 @@ git status --short
 - **影响范围**: skill.docx 第一页导航完整性
 
 **修复方案**:
-- **技术实现**: 导航表新增「📐 大文件小范围修改临时脚本范式 (PY-CORE-028)」一行，由 17 行增至 18 行；按 PY-CORE-018 重新生成 skill.docx 并校验锚点 [README.md](README.md#L26) [test/generate_docx.py](test/generate_docx.py)
+- **技术实现**: 导航表新增「📐 大文件小范围修改临时脚本范式 (PY-CORE-030)」一行，由 17 行增至 18 行；按 PY-CORE-018 重新生成 skill.docx 并校验锚点 [README.md](README.md#L26) [test/generate_docx.py](test/generate_docx.py)
 - **参考位置**: [README.md](README.md#L12-L31) [skill.docx](skill.docx)
 
 **测试验证**:
@@ -1468,7 +1471,7 @@ git status --short
 **问题描述**:
 - **现象**: `python test/security_audit.py` 报 2 条 MEDIUM（HiddenBug），均指向 `print(tool.encrypt_value(...))` 与 `print(tool.decrypt_value(...))` 两行
 - **根因**: 审计规则把非字面量 `print(` 判为「生产环境print调试残留」，白名单只放行 `print('...')` / `print(f'...')` 形式，而 CLI 直接打印函数返回值未套 f-string
-- **影响范围**: 安全审计总计问题不为 0，违反 PY-CORE-038「零问题」范式判定标准
+- **影响范围**: 安全审计总计问题不为 0，违反 PY-CORE-040「零问题」范式判定标准
 
 **修复方案**:
 - **技术实现**: 两处输出统一改为 `print(f'{...}')`，与文件内其余业务输出（如 `print(f'✅ {message}')`）风格一致，行为不变 [config/crypto_tool.py](config/crypto_tool.py#L343-L357)
@@ -1575,7 +1578,7 @@ git status --short
 - ✅ changelog API：全量条目空 `changes` 0 个、空字段 0 个、`待生成` / `待补充` 占位 0 个，Commit 全部为真实 Git 哈希
 - ✅ run.sh / run.bat 版本号仍由 README.md 动态读取，双端与文档版本统一，未改动脚本
 
-### v5.0.9.89 (2026-11-07) - 🎯 **安全审计零问题达标与真实黑盒攻防验证** - 13项真实HTTP载荷替代模拟打印+三层判定结构拆分issues与observations+异步锁误报转正向验证+响应头大小写归一+断连识别为主动拒收+路径遍历内容级复核+PY-CORE-038范式固化
+### v5.0.9.89 (2026-11-07) - 🎯 **安全审计零问题达标与真实黑盒攻防验证** - 13项真实HTTP载荷替代模拟打印+三层判定结构拆分issues与observations+异步锁误报转正向验证+响应头大小写归一+断连识别为主动拒收+路径遍历内容级复核+PY-CORE-040范式固化
 
 > **Commit**: `42d76c87`
 
@@ -1585,7 +1588,7 @@ git status --short
 3. **误报修正**: `await ... lock` 由风险项改为正向验证，23 条 INFO 归零并统计为「异步锁同步保护 23 处」 [test/security_audit.py](test/security_audit.py#L903)
 4. **判定加固**: 响应头全部 `lower()` 归一化、超大请求体断连识别为主动拒收、路径遍历追加响应体内容级复核 [test/security_audit.py](test/security_audit.py#L1313-L1360)
 5. **接口加固**: 商品查询接口新增 1MB 请求体上限（超限 413）与 `{'skus'}` 字段白名单（越界 400），看门狗端口回退改读 `NETWORK_CONFIG` 消除硬编码 [main.py](main.py#L8623) [main.py](main.py#L9749-L9773)
-6. **范式固化**: 新增 PY-CORE-038「安全审计零问题范式」，明确四类问题只有「修代码/修规则」两种合法处置，禁止降级与白名单 [skill.md](skill.md#L639-L725)
+6. **范式固化**: 新增 PY-CORE-040「安全审计零问题范式」，明确四类问题只有「修代码/修规则」两种合法处置，禁止降级与白名单 [skill.md](skill.md#L639-L725)
 
 ##### 1. 🥊 真实黑盒攻防验证（13 项载荷）
 **问题描述**:
@@ -1656,7 +1659,7 @@ git status --short
 - ✅ 路径遍历返回 SPA 首页且响应体无敏感内容，判定为「未泄露」
 - ✅ `py_compile` 通过，`main.py` / `test/security_audit.py` 语法无错误
 
-##### 5. 📝 PY-CORE-038 安全审计零问题范式
+##### 5. 📝 PY-CORE-040 安全审计零问题范式
 **问题描述**:
 - **现象**: 「0 高危 + 23 信息」被当成达标交付，噪声掩盖真问题，后续版本反复出现非零总计
 - **根因**: 缺少强制标准约束「总计问题」的定义与消除方式，规则误报可被「调低等级」蒙混过关
@@ -1670,7 +1673,7 @@ git status --short
 
 **测试验证**:
 - ✅ README.md 与 skill.md 逐字一致（`diff` 无差异）
-- ✅ 导航表新增「📐 安全审计零问题范式 (PY-CORE-038)」条目，DOCX 锚点全部命中（未命中 0 条）
+- ✅ 导航表新增「📐 安全审计零问题范式 (PY-CORE-040)」条目，DOCX 锚点全部命中（未命中 0 条）
 - ✅ skill.docx 由 skill.md 重新生成，导航仍置顶第一页且分页符紧跟导航表
 
 ### v5.0.9.88 (2026-11-07) - 🛡️ **双端启动脚本看门狗重构** - 探活频率由15分钟提速至30秒+新增DaemonGuard兜底拉起守护进程+修复重启计数上限失效+run.bat与run.sh逐字同步+新增launchd托管配置+三方文档逐字一致
@@ -1718,7 +1721,7 @@ git status --short
 - ✅ 手工 `kill` 掉 `main.py --watchdog` 进程后，日志出现 `[DaemonGuard] 守护进程已退出(退出码:1)，准备重新拉起... (第1次/最多10次)`，随后服务恢复 200
 - ✅ `Ctrl+C` 后日志出现 `[DaemonGuard] 收到退出信号(码:130)，不再重启`，进程列表无残留
 - ✅ 连续重启 10 次后输出 `[DaemonGuard] 已达到最大重启次数(10)，停止自动重启`，终端不再刷重启日志
-- ✅ 守护模式下终端持续输出日志，无静默运行（符合 PY-CORE-040）
+- ✅ 守护模式下终端持续输出日志，无静默运行（符合 PY-CORE-043）
 
 ##### 3. 🐛 WEB_RESTART_COUNT 自增缺失导致上限失效
 **问题描述**:
@@ -1871,7 +1874,7 @@ git status --short
 - ✅ docx 第 1 页顺序：H1 标题 → 📚 文档导航 → 引言 → 导航表 → 分页符
 - ✅ README.md 导航 17 行锚点全部命中，与 skill.md 逐字一致
 
-### v5.0.9.85 (2026-11-07) - 📚 **DOCX文档导航置顶第一页+16章节可点击跳转+标题BOM修复** - skill.md顶部新增「📚 文档导航」16章节索引表+generate_docx.py新增`_extract_nav_block()`/`_render_nav_block()`将导航块强制渲染到第一页并加分页符+导航表第3列生成16个可点击超链接(全部命中书签)+修复skill.md/README.md首行BOM导致H1标题多出`#`+README.md补齐PY-CORE-040与PY-CORE-016章节+skill.docx重新生成
+### v5.0.9.85 (2026-11-07) - 📚 **DOCX文档导航置顶第一页+16章节可点击跳转+标题BOM修复** - skill.md顶部新增「📚 文档导航」16章节索引表+generate_docx.py新增`_extract_nav_block()`/`_render_nav_block()`将导航块强制渲染到第一页并加分页符+导航表第3列生成16个可点击超链接(全部命中书签)+修复skill.md/README.md首行BOM导致H1标题多出`#`+README.md补齐PY-CORE-043与PY-CORE-016章节+skill.docx重新生成
 
 > **Commit**: 209173d6, 2c94f548
 
@@ -1879,7 +1882,7 @@ git status --short
 1. **DOCX 文档导航置顶第一页**: `test/generate_docx.py` 新增 `_extract_nav_block()` 识别导航表并连同上方标题/引言整块抽出，`_render_nav_block()` 在第一个 H1 之后立即渲染并追加分页符，导航恒定位于第 1 页、正文从第 2 页开始 [test/generate_docx.py](test/generate_docx.py#L260-L300)
 2. **16 个章节可点击跳转**: skill.md 顶部新增「📚 文档导航」章节含 16 行 `| 章节 | 说明 |` 索引表；生成器自动补第 3 列「位置（点击跳转）」并生成 `w:hyperlink` + `w:anchor`，实测 16 个锚点全部命中 `w:bookmarkStart` [skill.md](skill.md#L10-L35) [test/generate_docx.py](test/generate_docx.py#L390-L405)
 3. **标题 BOM 修复**: skill.md / README.md 首行原为 `#` + U+FEFF + `# 微购...`，BOM 夹在两个 `#` 之间使 `lstrip('#')` 只剥掉第一个，docx 中 H1 显示成 `# 微购相册管理系统`；清除 BOM 后标题恢复正常 [skill.md](skill.md#L1) [README.md](README.md#L1)
-4. **README 章节补齐**: README.md 新增 `PY-CORE-040 终端实时日志接入范式` 与 `PY-CORE-016 文档生成方法` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L335) [README.md](README.md#L17268)
+4. **README 章节补齐**: README.md 新增 `PY-CORE-043 终端实时日志接入范式` 与 `PY-CORE-016 文档生成方法` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L335) [README.md](README.md#L17268)
 5. **三方文档同步**: README.md / skill.md / skill.docx 导航章节逐字一致，skill.docx 由 skill.md 重新生成（389.4 KB，含 16 个导航超链接）
 
 ##### 1. 📚 DOCX 文档导航置顶第一页 (导航块强制渲染 + 分页符隔离)
@@ -1889,7 +1892,7 @@ git status --short
 - **次生问题**: skill.md 中不存在 `| 章节 | ... |` 导航表，生成器即使想处理也无数据可转
 
 **修复方案**:
-- **技术实现(数据源)**: skill.md 顶部新增「📚 文档导航」+ 16 行 `| 章节 | 说明 |` 索引表，覆盖项目概述/环境要求/项目结构/配置说明/安全合规/PY-CORE-011/PY-CORE-017/PY-CORE-040/最新更新/企业级规范/核心原则/JS 规范/Python 规范/FAQ/文档生成/版本历史
+- **技术实现(数据源)**: skill.md 顶部新增「📚 文档导航」+ 16 行 `| 章节 | 说明 |` 索引表，覆盖项目概述/环境要求/项目结构/配置说明/安全合规/PY-CORE-011/PY-CORE-017/PY-CORE-043/最新更新/企业级规范/核心原则/JS 规范/Python 规范/FAQ/文档生成/版本历史
 - **技术实现(置顶)**: `_extract_nav_block()` 识别导航表并连同上方标题与引言整块抽出；`convert()` 在第一个 H1 处理完后调用 `_render_nav_block()` 渲染导航块并 `add_page_break()`，保证导航恒定在文档第一页、正文从第二页开始
 - **技术实现(超链接)**: 导航表为 2 列时生成器自动补第 3 列「位置（点击跳转）」，`_add_clickable_link()` 以章节名经 `_find_heading_bookmark_id()` 解析为 `w:anchor`，与 H2/H3 的 `w:bookmarkStart` 一一对应
 - **参考位置**: [test/generate_docx.py](test/generate_docx.py#L260-L300) [test/generate_docx.py](test/generate_docx.py#L390-L405) [skill.md](skill.md#L10-L35)
@@ -1916,19 +1919,19 @@ git status --short
 
 ##### 3. 📄 README 章节补齐 (导航锚点在 README 同样有效)
 **问题描述**:
-- **现象**: README.md 缺少 `PY-CORE-040 终端实时日志接入范式` 章节，且原 `## 📄 文档生成方法` 无 PY-CORE-016 后缀
+- **现象**: README.md 缺少 `PY-CORE-043 终端实时日志接入范式` 章节，且原 `## 📄 文档生成方法` 无 PY-CORE-016 后缀
 - **影响**: 导航表 16 行在 README 中会出现死锚点，与 skill.md 不一致
 
 **修复方案**:
-- **技术实现**: 从 skill.md 逐字提取两个章节并写入 README.md（PY-CORE-040 插在 PY-CORE-017 之后、最新更新之前；PY-CORE-016 整段替换 README 原「文档生成方法」段）
+- **技术实现**: 从 skill.md 逐字提取两个章节并写入 README.md（PY-CORE-043 插在 PY-CORE-017 之后、最新更新之前；PY-CORE-016 整段替换 README 原「文档生成方法」段）
 - **参考位置**: [README.md](README.md#L335) [README.md](README.md#L17268)
 
 **测试验证**:
 - ✅ README.md 导航 16 行锚点全部命中，未命中为空
 - ✅ skill.md 导航 16 行锚点全部命中，未命中为空
-- ✅ 两份文档导航章节与 PY-CORE-040 章节逐字一致（脚本比对 True）
+- ✅ 两份文档导航章节与 PY-CORE-043 章节逐字一致（脚本比对 True）
 
-### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容+子进程重试显式化** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`_popen_with_retry()`核心重试函数与`subprocess.Popen`全局补丁解耦+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.sh 5处`grep -oP`改POSIX `grep -oE`+run.bat删除playwright-browsers危险清理+删除fork冷却死代码+新增PY-CORE-040终端实时日志范式+skill.docx重新生成
+### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容+子进程重试显式化** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`_popen_with_retry()`核心重试函数与`subprocess.Popen`全局补丁解耦+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.sh 5处`grep -oP`改POSIX `grep -oE`+run.bat删除playwright-browsers危险清理+删除fork冷却死代码+新增PY-CORE-043终端实时日志范式+skill.docx重新生成
 
 > **Commit**: 225b1fae, d123f61f, 209173d6
 
@@ -1940,7 +1943,7 @@ git status --short
 5. **cloudflared 本地化**: 统一 `tools/cloudflared/<平台>` 路径，安装改为 GitHub 官方 release 二进制下载（废弃 npm 安装），run.sh 新增 `get_platform_dir()`/`get_cloudflared_path()` 消除三处重复分支 [run.sh](run.sh#L35-L51) [run.sh](run.sh#L1197-L1249) [run.bat](run.bat#L1287-L1320)
 6. **run.sh 平台判断语法修复**: 三处 `[ "$(uname -s)" = "MINGW64_NT"* ]` 非法写法改为 `case ... MINGW*|MSYS*|CYGWIN*` 映射，Git Bash 下不再出现条件恒假导致路径取错 [run.sh](run.sh#L35-L43)
 7. **run.bat 危险清理移除**: 删除 `call :cleanup_temp_dir playwright-browsers 0`（会把刚装好的浏览器目录整目录清空），与 run.sh 对齐；`check_and_fix_playwright` 由“自动下载”改为“仅检测本地” [run.bat](run.bat#L447-L451) [run.bat](run.bat#L565-L571)
-8. **范式与文档同步**: skill.md 新增 `PY-CORE-040 终端实时日志接入范式`（输出流向判定表/sh 与 bat 双方案/坑位表/检查清单），README.md 与 skill.md 同步本版本记录，skill.docx 由 skill.md 重新生成；多余 md 文件删除，仅保留 README.md 与 skill.md 两份固定范式文档
+8. **范式与文档同步**: skill.md 新增 `PY-CORE-043 终端实时日志接入范式`（输出流向判定表/sh 与 bat 双方案/坑位表/检查清单），README.md 与 skill.md 同步本版本记录，skill.docx 由 skill.md 重新生成；多余 md 文件删除，仅保留 README.md 与 skill.md 两份固定范式文档
 9. **macOS grep 兼容修复**: run.sh 5 处 GNU 专有 `grep -oP`（PCRE）替换为 POSIX `grep -oE` + `sed`，消除 macOS/BSD grep `invalid option -- P` 报错导致 Node/Git 版本探测与局域网地址提取失效 [run.sh](run.sh#L1088-L1100) [run.sh](run.sh#L1170) [run.sh](run.sh#L1739)
 10. **子进程重试显式化重构**: 把重试逻辑抽成 `_popen_with_retry(args, kwargs, max_retries, base_delay)` 核心函数，`_patched_Popen` 与 `_popen_retry()` 都委托它，`_popen_retry()` 不再依赖“`subprocess.Popen` 已被全局替换”的隐式前提；同时删除从未被调用的 `_fork_is_bad()`/`_mark_fork_bad()` 冷却死代码（README 曾据此描述“30s 冷却”，与实际行为不符） [main.py](main.py#L119-L225) [main.py](main.py#L3978-L3982)
 
@@ -1969,7 +1972,7 @@ git status --short
 **修复方案**:
 - **技术实现(sh)**: `tail -n 0 -f "$LOG_FILE" &` + `TAIL_PID=$!`，`wait $PYTHON_PID` 返回后 `kill "$TAIL_PID"`，`cleanup_exit` 中再回收一次，保证 Ctrl+C 不留孤儿 [run.sh](run.sh#L1865-L1880)
 - **技术实现(bat)**: 保持 `start /b cmd /c "..." < nul`（仅重定向 stdin），stdout 继承控制台天然实时，**禁止**再叠加 `Get-Content -Wait`，否则每行双份 [run.bat](run.bat#L1573)
-- **参考位置**: [skill.md](skill.md) `PY-CORE-040` 章节
+- **参考位置**: [skill.md](skill.md) `PY-CORE-043` 章节
 
 **测试验证**:
 - ✅ macOS 实跑：启动后终端持续输出 uvicorn 请求日志，Ctrl+C 后无 tail 残留（`ps aux | grep tail` 为空）
@@ -1992,7 +1995,7 @@ git status --short
 - ✅ `tools/cloudflared/macos/cloudflared --version` 正常输出
 - ✅ 双端日志文案对照一致（`[Playwright] ✅ / ⚠️ / ℹ️`）
 
-##### 4. 📐 双脚本同步与文档范式 (PY-CORE-017 / PY-CORE-040)
+##### 4. 📐 双脚本同步与文档范式 (PY-CORE-017 / PY-CORE-043)
 **问题描述**:
 - **现象**: run.bat 保留 `cleanup_temp_dir playwright-browsers 0` 与 npm 版 cloudflared，与 run.sh 行为分叉
 - **根因**: 上一轮仅单边修改 run.sh，违反 PY-CORE-017 双端同改原则
@@ -2000,8 +2003,8 @@ git status --short
 
 **修复方案**:
 - **技术实现(双端对齐)**: run.bat 删除危险清理、Playwright 改本地检测、cloudflared 改官方二进制、提示文案与返回码语义对齐 run.sh
-- **技术实现(文档)**: skill.md 新增 PY-CORE-040 实时日志范式；README.md/skill.md 同步 v5.0.9.84；`test/generate_docx.py` 重新生成 skill.docx；删除多余 md 文件（`.trae/skills/**/SKILL.md`），内容合并进 skill.md
-- **参考位置**: [skill.md](skill.md#L248) [skill.md](skill.md) `PY-CORE-040`
+- **技术实现(文档)**: skill.md 新增 PY-CORE-043 实时日志范式；README.md/skill.md 同步 v5.0.9.84；`test/generate_docx.py` 重新生成 skill.docx；删除多余 md 文件（`.trae/skills/**/SKILL.md`），内容合并进 skill.md
+- **参考位置**: [skill.md](skill.md#L248) [skill.md](skill.md) `PY-CORE-043`
 
 **测试验证**:
 - ✅ `bash -n run.sh` 通过；run.bat `(`/`)` 配对无误
@@ -2156,7 +2159,7 @@ git status --short
 - ✅ `versions_without_commit: 0`
 - ✅ v5.0.9.82条目Commit由误填`ceebfea8`修正为真实提交`9d0ec7b9`
 
-##### 7. 📝 三方文档同步 (PY-CORE-039)
+##### 7. 📝 三方文档同步 (PY-CORE-042)
 **说明**:
 - **内容**: README.md与skill.md同步v5.0.9.83版本记录；skill.docx由skill.md重新生成
 - **日期**: 2026-11-05
@@ -3206,7 +3209,7 @@ git status --short
 - ✅ 资源测试: 连续切换搜索类型50次，浏览器内存稳定无增长(Task Manager监控)
 - ✅ 审计结果: 总计问题0，CRITICAL 0，HIGH 0，MEDIUM 0，LOW 0，INFO 0
 - ✅ 安全评级: A+ (优秀)，符合OWASP Top 10防护标准
-- ✅ 代码规范: 符合PY-CORE-011/PY-CORE-042/PY-CORE-039范式体系
+- ✅ 代码规范: 符合PY-CORE-011/PY-CORE-045/PY-CORE-042范式体系
 
 ##### 5. 🐛 紧急修复：恢复7个数据卡片显示 (解析逻辑缩进错误)
 **问题描述**:
@@ -3372,7 +3375,7 @@ git status --short
 6. **🔐 新增salt_crypto_tool.py加密解密管理工具**: 支持init/status/encrypt/decrypt/reencrypt命令，用于管理config/.salt文件和QQ邮件授权码等敏感字段的加解密
 7. **🛡️ security_audit.py升级至v1.2**: 新增第9项"加密系统安全审计"(Salt文件检查/Key验证/明文字段检测/权限审计)，扫描项从8项增至9项
 8. **🔧 修复Windows下Salt文件权限误报**: 跨平台权限检查优化(Linux/Mac用Unix权限+Windows用NTFS ACL+pywin32可选依赖)，审计问题从MEDIUM 1个降至0个
-9. **📐 新增PY-CORE-039三方文档互证范式**: 定义README.md/skill.md/Git历史100%一致标准，配套check_versions.py自动化验证脚本
+9. **📐 新增PY-CORE-042三方文档互证范式**: 定义README.md/skill.md/Git历史100%一致标准，配套check_versions.py自动化验证脚本
 10. **📁 test目录整理**: 将check_versions.py和check_git_versions.py从项目根目录移至test/统一管理
 
 ##### 1. 🎨 移动端按钮布局优化 (大小一致+自动换行+响应式改进)
@@ -3447,18 +3450,18 @@ git status --short
 - ✅ 性能影响: 扫描耗时从5.02s增至7.32s（+2.3s，主要来自Windows ACL检查），仍在可接受范围
 - ✅ 9项扫描全部通过: 隐藏Bug/OWASP/注入/敏感数据/日志/性能/内存/并发/加密系统
 
-##### 4. 📐 三方文档互证体系建立 (PY-CORE-039范式 + 工具链)
+##### 4. 📐 三方文档互证体系建立 (PY-CORE-042范式 + 工具链)
 **问题描述**:
 - **现象**: README.md、skill.md、Git提交历史三者的版本记录可能不同步（如之前skill.md出现v5.0.9.62重复3次、缺失v5.0.9.50等问题），缺乏自动化验证机制
 - **根因**: 手动维护多个文档容易出错，没有强制一致性约束和快速检测工具
 - **影响范围**: 项目文档可信度、团队协作效率、审计合规性
 
 **修复方案**:
-- **技术实现(范式定义)**: 在[skill.md](skill.md#L51-L147)新增PY-CORE-039范式，定义三源一致性原则（版本数量/内容/时序完全相同）
+- **技术实现(范式定义)**: 在[skill.md](skill.md#L51-L147)新增PY-CORE-042范式，定义三源一致性原则（版本数量/内容/时序完全相同）
 - **技术实现(验证工具)**: 创建[test/check_versions.py](test/check_versions.py) (~60行)，自动化对比README.md/skill.md/Git历史的版本号集合，输出差异报告
 - **技术实现(历史修复)**: 删除skill.md中9466行重复内容（v5.0.9.62出现3次→1次/v5.0.9.61出现2次→1次），补齐缺失的v5.0.9.50版本记录
 - **技术实现(工作流集成)**: 定义发布新版本6步流程（代码提交→更新README→更新skill→生成docx→验证一致性→推送Git）
-- **参考位置**: commit b218bea8 (清理重复), commit 6f82f6fb (路径更新), [skill.md](skill.md) PY-CORE-039章节
+- **参考位置**: commit b218bea8 (清理重复), commit 6f82f6fb (路径更新), [skill.md](skill.md) PY-CORE-042章节
 
 **测试验证**:
 - ✅ 一致性验证: `cd test && py check_versions.py` 输出 "PERFECT MATCH: All three sources are 100% consistent!"
@@ -6915,11 +6918,11 @@ python config/crypto_tool.py encrypt-config
 
 ---
 
-### v5.0.9.23 (2026-09-02) - 🔧 **版本一致性修复** PY-CORE-042范式+空白changes补全+commit 48901a28真实数据替换
+### v5.0.9.23 (2026-09-02) - 🔧 **版本一致性修复** PY-CORE-045范式+空白changes补全+commit 48901a28真实数据替换
 
 > **Commit**: `57206dc9, fa29c2d6, 5a6158c8`  
 
-#### 更新内容: 新增PY-CORE-042版本号一致性保障范式，补全所有空白changes，将占位符替换为真实Git数据(commit 48901a28/425ecd5f/75f403af)
+#### 更新内容: 新增PY-CORE-045版本号一致性保障范式，补全所有空白changes，将占位符替换为真实Git数据(commit 48901a28/425ecd5f/75f403af)
 
 **修复日期**: 2026-09-02
 **修复类型**: 🔧Bug修复 + 📝范式定义
@@ -6930,7 +6933,7 @@ python config/crypto_tool.py encrypt-config
 
 ---
 
-##### 1. 🔧 PY-CORE-042版本号一致性保障范式 (📝范式定义)
+##### 1. 🔧 PY-CORE-045版本号一致性保障范式 (📝范式定义)
 
 **问题描述**:
 - **现象**: 启动脚本显示v5.0.9.16，Web界面显示v5.0.9.22，版本号不一致
@@ -6938,12 +6941,12 @@ python config/crypto_tool.py encrypt-config
 - **影响范围**: run.bat, run.sh, main.py, /api/version, /api/changelog, 前端Web界面
 
 **修复方案**:
-- **技术实现**: ①在skill.md新增PY-CORE-042版本号一致性保障范式 ②定义6个版本号获取点必须返回相同值 ③制定发布前检查清单和紧急修复流程 ④统一版本号获取策略
-- **参考位置**: skill.md PY-CORE-042, README.md#L141
+- **技术实现**: ①在skill.md新增PY-CORE-045版本号一致性保障范式 ②定义6个版本号获取点必须返回相同值 ③制定发布前检查清单和紧急修复流程 ④统一版本号获取策略
+- **参考位置**: skill.md PY-CORE-045, README.md#L141
 
 **测试验证**:
 - ✅ run.bat/run.sh/main.py/API/Web界面五点版本号一致
-- ✅ PY-CORE-042范式已写入skill.md
+- ✅ PY-CORE-045范式已写入skill.md
 - ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 
 ---
@@ -6990,15 +6993,15 @@ python config/crypto_tool.py encrypt-config
 - **影响范围**: README.md, skill.md, /api/changelog端点, 前端Web界面, 启动脚本输出
 
 **修复方案**:
-- **技术实现**: ①在README.md"最新更新"部分插入v5.0.9.17~v5.0.9.22版本记录 ②为所有空白changes的版本补全标准化的变更详情结构（问题描述/修复方案/测试验证）③创建auto_fix_changelog.py自动化脚本实现未来自动修复 ④在skill.md中新增PY-CORE-042版本号一致性保障范式
-- **参考位置**: commit b5768a8a, auto_fix_changelog.py, skill.md PY-CORE-042, README.md#L141-L206
+- **技术实现**: ①在README.md"最新更新"部分插入v5.0.9.17~v5.0.9.22版本记录 ②为所有空白changes的版本补全标准化的变更详情结构（问题描述/修复方案/测试验证）③创建auto_fix_changelog.py自动化脚本实现未来自动修复 ④在skill.md中新增PY-CORE-045版本号一致性保障范式
+- **参考位置**: commit b5768a8a, auto_fix_changelog.py, skill.md PY-CORE-045, README.md#L141-L206
 
 **测试验证**:
 - ✅ run.bat/run.sh/main.py/API/Web界面五点版本号一致（全部显示v5.0.9.22）
 - ✅ /api/changelog返回的changes数组不再为空
 - ✅ 所有新增版本包含完整的问题描述、修复方案、测试验证三要素
 - ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
-- ✅ 符合PY-CORE-042 版本号一致性保障范式
+- ✅ 符合PY-CORE-045 版本号一致性保障范式
 
 ---
 
@@ -7267,7 +7270,7 @@ python config/crypto_tool.py encrypt-config
 
 **修复日期**: 2026-09-02
 **修复类型**: 🧠功能增强 + 智能算法
-**影响文件**: [main.py](main.py#L8970-L8993), [skill.md](skill.md#PY-CORE-037)
+**影响文件**: [main.py](main.py#L8970-L8993), [skill.md](skill.md#PY-CORE-039)
 **Commit**: da8351ed
 **变更统计**: +23行 -1行
 **作者**: 小旭二手机（西园路）**
@@ -7284,7 +7287,7 @@ python config/crypto_tool.py encrypt-config
 **修复方案**:
 - **技术实现**: 三级降级策略 - Level1: 从commit message直接提取 → Level2: 智能日期匹配（30天阈值）→ Level3: 显示hash兜底
 - **算法核心**: 计算commit日期与所有README版本的日期差值，选择差值最小且≤30天的版本号
-- **参考位置**: commit 6c09b2b3, main.py:8970-8993, skill.md PY-CORE-037
+- **参考位置**: commit 6c09b2b3, main.py:8970-8993, skill.md PY-CORE-039
 
 **测试验证**:
 - ✅ 提交6c09b2b3已合并至master分支
@@ -7306,7 +7309,7 @@ python config/crypto_tool.py encrypt-config
   "meta": {
     "fix_date": "2026-09-02",
     "fix_type": "🧠功能增强 + 智能算法",
-    "affected_files": "[main.py](main.py#L8970-L8993), [skill.md](skill.md#PY-CORE-037)",
+    "affected_files": "[main.py](main.py#L8970-L8993), [skill.md](skill.md#PY-CORE-039)",
     "commit": "6c09b2b3",
     "change_stats": "+23行 -1行",
     "author": "小旭二手机（西园路）"
@@ -7448,13 +7451,13 @@ if missing:
 ### 相关范式
 
 - **PY-CORE-010**: Changelog API数据结构与Git历史集成范式（定义API整体架构）
-- **PY-CORE-037**: 智能版本号匹配算法（定义版本号获取策略）
+- **PY-CORE-039**: 智能版本号匹配算法（定义版本号获取策略）
 - **PY-CORE-011**: **本文档**（定义单个版本的changes详细结构）
 
 三者关系：
 \\\
 PY-CORE-010 (API整体架构)
-├── PY-CORE-037 (版本号如何获取)
+├── PY-CORE-039 (版本号如何获取)
 └── PY-CORE-011 (每个版本包含什么内容) ← 当前文档
 \\\
 
@@ -15747,7 +15750,7 @@ DEBUG - 速率限制存储清理: 12000 -> 8500 条目
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-026: Import 语句规范 (Import Statement Standard)
+🔴 PY-CORE-028: Import 语句规范 (Import Statement Standard)
 
 **范式描述**
 强制要求所有 import 语句必须位于文件开头，禁止在函数/方法内部使用内联 import。
@@ -15835,7 +15838,7 @@ echo "✅ Import 规范检查通过"
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-041: 统一异常处理范式 (Unified Exception Handling)
+🔴 PY-CORE-044: 统一异常处理范式 (Unified Exception Handling)
 
 范式描述
 建立分层异常处理机制，实现异常的统一捕获、分类、记录和转换。
@@ -16126,7 +16129,7 @@ key_file = PROJECT_DIR / 'config' / '.encryption_key'  # TypeError: unsupported 
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-027: 智能缓存管理范式 (Intelligent Caching)
+🔴 PY-CORE-029: 智能缓存管理范式 (Intelligent Caching)
 
 范式描述
 通过FileCacheManager实现文件级TTL缓存，减少IO操作，提升性能。
@@ -16186,7 +16189,7 @@ json_cache = FileCacheManager(ttl_seconds=30)
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-034: 安全邮件通知范式 (Secure Email Notification)
+🔴 PY-CORE-036: 安全邮件通知范式 (Secure Email Notification)
 
 范式描述
 通过EmailNotifier实现结构化邮件发送，支持HTML富文本、事件分类、连接超时控制。
@@ -16523,7 +16526,7 @@ class StockNumberComparator:
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-033: API速率限制与输入验证范式 (Rate Limiting & Input Validation)
+🔴 PY-CORE-035: API速率限制与输入验证范式 (Rate Limiting & Input Validation)
 
 范式描述
 通过RateLimiter和Pydantic模型实现API层面的安全和性能保护。
@@ -16622,7 +16625,7 @@ def rate_limit(limiter, endpoint_name='API'):
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-023: 前端安全防护范式 (Frontend Security)
+🔴 PY-CORE-024: 前端安全防护范式 (Frontend Security)
 
 范式描述
 在JavaScript前端实现XSS防护、URL验证、设备检测等安全机制。
@@ -17122,7 +17125,7 @@ async def kill_task(task_id: str):
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-025: 隧道高可用范式 (High-Availability Tunnel)
+🔴 PY-CORE-027: 隧道高可用范式 (High-Availability Tunnel)
 
 范式描述
 实现hostc + Cloudflare双隧道互备方案，包含心跳检测、故障转移、自动重启等机制。
@@ -17422,8 +17425,6 @@ xy_ws/
 └── .venv/                  # Python 虚拟环境
 
 ---
-
- (v3.8.90.11)
 
 ## 📐 版本更新记录范式规范
 
@@ -19094,7 +19095,7 @@ cd test && python generate_docx.py
 - **v3.8.90.02** (2026-08-21) 🔄兼容性 — v3.8.90.02 (2026-08-21) - 🐍 Python版本兼容性全面升级 — requirements.txt适配Python 3.9+全系列版本（影响文件: README.md, md_to_docx.py, requirements.txt, skill.docx, skill.md; 提交: 3个; Commit: 821cfdf0, 5f8c6f69, b7ee0ecb）
 - **v3.8.90.03** (2026-08-21) ✨功能增强 — v3.8.90.03 (2026-08-21) - 🐍 Python版本兼容性验证系统 + 文档管理范式 — 新增版本检查/测试/Tox配置，合并多余MD文件（影响文件: README.md, check_python_version.py, requirements.txt, skill.docx, skill.md 等8个; 提交: 2个; Commit: 583e136d, eb72274d）
 - **v3.8.90.04** (2026-08-21) 🏗️架构优化 — v3.8.90.04 (2026-08-21) - 🐍 版本检查功能集成到main.py — 删除独立check_python_version.py，遵循单文件架构（影响文件: README.md, check_python_version.py, main.py, skill.docx, skill.md 等7个; 提交: 2个; Commit: c347c3ca, ac43c5c4）
-- **v3.8.90.05** (2026-08-21) 🏗️架构优化 — v3.8.90.05 (2026-08-21) - 🗑️ 删除md_to_docx.py + 📐 建立Import语句规范(PY-CORE-026) — 清理3处内联import，强化单文件架构（影响文件: README.md, main.py, md_to_docx.py, skill.md; 提交: 2个; Commit: 73a3b5a3, 4bc486c0）
+- **v3.8.90.05** (2026-08-21) 🏗️架构优化 — v3.8.90.05 (2026-08-21) - 🗑️ 删除md_to_docx.py + 📐 建立Import语句规范(PY-CORE-028) — 清理3处内联import，强化单文件架构（影响文件: README.md, main.py, md_to_docx.py, skill.md; 提交: 2个; Commit: 73a3b5a3, 4bc486c0）
 - **v3.8.90.06** (2026-08-22) 🐛Bug修复 — v3.8.90.06 - Python 3.14兼容性修复 + 启动脚本pip强制升级 + run.bat BOM修复 + 日志文件锁修复（影响文件: README.md, requirements.txt, run.bat, run.sh, skill.docx 等6个; 提交: 1个; Commit: 4c54b03b）
 - **v3.8.90.07** (2026-08-22) 🐛Bug修复 — v3.8.90.07: 跨平台零硬編碼重構 + Playwright自動安裝兜底 - Environment EXE_SUFFIX/動態路徑檢測/三層防護/cloudflared動態掃描/allowed_exe動態生成（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 2个; Commit: d5b6f61e, 96f38cb5）
 - **v3.8.90.08** (2026-08-22) 🐛Bug修复 — fix: Playwright多镜像源安装+系统Chrome回退兜底 v3.8.90.08（影响文件: README.md, _fix_cdn_test.py, dist/app.js, main.py, requirements.txt 等9个; 提交: 9个; Commit: 9d46298d, a7bf4d70, be142f5d, 4f3ad572, da43b24f, 876c29f3, f5c57406, 5f114387, 03a6d29e）
@@ -19139,7 +19140,7 @@ cd test && python generate_docx.py
 | v3.8.90.08 | 2026-08-22 | 小旭二手机（西园路） | 🔧 Playwright多镜像源安装+系统Chrome回退兜底(URL双斜杠修复/多镜像源自动切换/安装失败回退系统Chrome/四层防护) |
 | v3.8.90.07 | 2026-08-22 | 小旭二手机（西园路） | 🔧 跨平台零硬编码重构+Playwright自动安装兜底(Environment EXE_SUFFIX/动态路径检测/三层防护/cloudflared动态扫描/allowed_exe动态生成) |
 | v3.8.90.06 | 2026-08-22 | 小旭二手机（西园路） | 🐍 Python 3.14兼容性修复+启动脚本pip强制升级+run.bat BOM修复+日志文件锁修复(pydantic<2.13.0/pip upgrade/UTF-8无BOM/先杀进程再初始化日志) |
-| v3.8.90.05 | 2026-08-21 | 小旭二手机（西园路） | 🗑️ 删除md_to_docx.py+📐 建立Import语句规范(PY-CORE-026) — 清理3处内联import，强化单文件架构 |
+| v3.8.90.05 | 2026-08-21 | 小旭二手机（西园路） | 🗑️ 删除md_to_docx.py+📐 建立Import语句规范(PY-CORE-028) — 清理3处内联import，强化单文件架构 |
 | v3.8.90.04 | 2026-08-21 | 小旭二手机（西园路） | 🐍 版本检查功能集成到main.py — 删除独立check_python_version.py，遵循单文件架构 |
 | v3.8.90.03 | 2026-08-21 | 小旭二手机（西园路） | 🐍 Python版本兼容性验证系统+文档管理范式 — 新增版本检查/测试/Tox配置，合并多余MD文件 |
 | v3.8.90.02 | 2026-08-21 | 小旭二手机（西园路） | 🐍 Python版本兼容性全面升级 — requirements.txt适配Python 3.0+全系列版本 |
@@ -19293,1966 +19294,6 @@ cd test && python generate_docx.py
 5. **代码审查**: 文档完整性是代码审查的必要条件
 
 ---
-
-## 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards)
-
-> **来源**: 原 `.trae/skills/xy-ws-manager/SKILL.md` (已整合至本文件，2026-08-26)
-
-### 📌 项目概述
-
-| 属性 | 值 |
-|------|-----|
-| **项目名称** | 微购相册管理系统 (WegoAlbum Manager) |
-| **项目类型** | Web服务 + 数据采集 + 自动化分析 |
-| **技术栈** | Python 3.9+ / FastAPI / Playwright / Pydantic |
-| **编码标准** | UTF-8 (强制) |
-| **安全等级** | 生产级 (98% OWASP Top 10合规) |
-
----
-
-### 🔐 核心防御性编程规范
-
-#### PY-SEC-001: Import语句管理 (强制)
-
-**规则**: 所有import必须位于 `main.py` 文件顶部，按类别分组
-
-**分组顺序**:
-1. **标准库** (Python内置模块)
-2. **第三方库** (pip安装的包)
-3. **条件导入** (可选依赖，使用try/except)
-4. **本地导入** (项目内部模块)
-
-**违规检测**: 
-```bash
-grep -n "^\s*import\|^\s*from.*import" main.py | awk -F: '$1 > 150 {print}'
-```
-
-#### PY-SEC-002: 异常处理规范 (强制)
-
-**规则**: 必须使用统一的异常处理机制
-
-**层级结构**:
-```
-AppException (自定义基类)
-├── SecurityException (安全相关)
-├── ValidationException (验证失败)
-├── NetworkException (网络错误)
-└── FileOperationException (文件操作)
-```
-
-**禁止事项**:
-- ❌ 禁止空的`except:`块（至少记录日志）
-- ❌ 禁止在except块中返回敏感信息给前端
-- ❌ 禁止捕获过于宽泛的异常类型（如BaseException）
-
-#### PY-SEC-003: 输入验证与清理 (强制)
-
-**规则**: 所有用户输入必须经过验证和清理
-
-**验证工具函数**:
-
-| 函数名 | 用途 | 使用场景 |
-|--------|------|----------|
-| [`sanitize_log_input()`](main.py#L597-L622) | 清理日志输入 | 防止日志注入 |
-| [`safe_log()`](main.py#L625-L650) | 安全日志记录 | 替代直接logger调用 |
-| [`timing_safe_compare()`](main.py#L652-L677) | 时间安全比较 | 密码/Token比较 |
-| [`validate_path_traversal()`](main.py#L679-L708) | 路径遍历防护 | 文件操作 |
-| [`rate_limit_check()`](main.py#L710-L744) | 速率限制 | API频率控制 |
-| [`input_validation_decorator()`](main.py#L746-L787) | 输入验证装饰器 | 函数参数验证 |
-
-#### PY-SEC-004: 线程安全管理 (强制)
-
-**规则**: 全局共享变量必须使用锁保护
-
-**已实现的线程安全锁**:
-
-| 锁名称 | 保护对象 | 用途 |
-|--------|----------|------|
-| `_tunnel_state_lock` | tunnel进程状态变量 | 防止并发修改 |
-| `_cf_state_lock` | Cloudflare状态变量 | CF配置同步 |
-| `_rate_limit_lock` | 速率限制存储 | 并发访问控制 |
-| `email_send_lock` | 邮件发送状态 | 防重复发送 |
-
-**死锁预防**:
-- 统一锁获取顺序 (字母序)
-- 使用`timeout`参数避免无限等待
-- 最小化临界区范围
-
-#### PY-SEC-005: 资源管理规范 (强制)
-
-**规则**: 所有资源必须正确释放，避免泄漏
-
-**资源类型清单**:
-1. **文件句柄**: 使用with上下文管理器
-2. **HTTP连接**: 使用`safe_urlopen()`封装函数
-3. **子进程**: try-finally确保清理 + terminate()
-4. **浏览器实例**: async context manager + finally关闭
-
-**内存监控**:
-- 定期清理速率限制存储 (`cleanup_rate_limit_store()`)
-- 监控字典大小增长 (阈值: 10000条目)
-- 后台线程每60秒执行一次清理
-
----
-
-### 🛡️ 安全检查清单
-
-#### 开发阶段必检项
-
-- [ ] **PY-SEC-001**: 所有import在main.py顶部
-- [ ] **PY-SEC-002**: 无裸异常捕获，使用ExceptionHandler
-- [ ] **PY-SEC-003**: 用户输入经过sanitize_log_input/safe_log处理
-- [ ] **PY-SEC-004**: 全局变量有锁保护
-- [ ] **PY-SEC-005**: 资源使用with/finally确保释放
-
-#### 代码审查重点
-
-##### 注入攻击防护
-- [x] SQL注入: ✅ 本项目使用JSON存储，无SQL查询
-- [x] 命令注入: `shell=False` + 参数列表传递
-- [x] XSS攻击: `html.escape()`转义用户输出
-- [x] 日志注入: 使用`safe_log()`替代直接拼接
-
-##### 认证与授权
-- [x] API Key认证: `secrets.token_urlsafe()`生成
-- [x] 密码比较: `timing_safe_compare()`时间安全比较
-- [x] CSRF防护: Origin/Referer白名单验证
-- [x] 速率限制: `rate_limit_check()`多层限流
-
-##### 数据保护
-- [x] 敏感信息: 不记录到日志 (password/token/api_key)
-- [x] 配置加密: `SecureConfigManager` Fernet加密
-- [x] 路径安全: `validate_path_traversal()`防止遍历
-- [x] SSRF防护: 私有IP黑名单 + 云元数据阻止
-
----
-
-### 📊 代码质量指标
-
-#### 目标值
-
-| 指标 | 最低要求 | 当前状态 | 达标情况 |
-|------|----------|----------|----------|
-| 语法错误数 | 0 | 0 | ✅ |
-| Import合规率 | 100% | 100% | ✅ |
-| 异常处理覆盖率 | ≥90% | ~95% | ✅ |
-| 线程安全评分 | ≥8/10 | 9/10 | ✅ |
-| 安全评分 | ≥9/10 | 9.8/10 | ✅ |
-| 代码重复度 | ≤5% | <2% | ✅ |
-
-#### 测试要求
-
-**单元测试覆盖**:
-- 核心工具函数: 100%
-- API端点: ≥80%
-- 异常路径: ≥90%
-
-**集成测试场景**:
-1. 正常请求流程
-2. 异常输入处理
-3. 并发压力测试
-4. 资源泄漏检测
-5. 安全漏洞扫描
-
----
-
-### 🚀 Git提交规范
-
-#### Commit Message格式
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-**Type类型**:
-- `feat`: 新功能
-- `fix`: Bug修复
-- `sec`: 安全修复/增强
-- `refactor`: 重构 (不改变行为)
-- `perf`: 性能优化
-- `docs`: 文档更新
-- `test`: 测试相关
-- `chore`: 构建/工具链
-
-**示例**:
-```
-sec(main): 修复日志注入漏洞 + 增强速率限制
-
-- 新增sanitize_log_input()清理用户输入
-- 新增safe_log()安全日志记录
-- 实现rate_limit_check()内存限流
-- 添加cleanup_rate_limit_store()定期清理
-
-Closes: #123
-Security: CVE-2024-XXXXX
-```
-
-#### 提交前检查清单
-
-- [ ] 代码通过语法检查 (`python3 -m py_compile main.py`)
-- [ ] 单元测试全部通过 (`pytest test/ -v`)
-- [ ] 安全扫描无高危问题 (`bandit -r main.py`)
-- [ ] 符合PY-SEC-*所有规范
-- [ ] 更新CHANGELOG (如涉及功能变更)
-- [ ] 无硬编码密钥或敏感信息
-
----
-
-### 🆘 常见问题
-
-#### Q1: 如何添加新的防御工具函数?
-
-在`main.py`的**工具函数区域** (约L560-L800) 添加：
-
-```python
-def your_security_function(param):
-    """
-    功能描述
-    
-    Args:
-        param: 参数说明
-        
-    Returns:
-        返回值说明
-        
-    Raises:
-        ValueError: 参数无效时
-        
-    Example:
-        >>> result = your_security_function('test')
-    """
-    # 实现逻辑...
-    pass
-```
-
-然后在需要的地方调用即可。
-
-#### Q2: 如何处理新的第三方依赖?
-
-在`main.py`顶部的**条件导入区**添加：
-
-```python
-try:
-    from new_library import something
-except ImportError:
-    something = None  # 或提供fallback实现
-```
-
-并在代码中使用前检查：
-```python
-if something is not None:
-    something.do_something()
-else:
-    logger.warning('new_library未安装，跳过该功能')
-```
-
-#### Q3: 内存增长如何监控?
-
-项目已实现自动清理机制：
-- 速率限制存储超过10000条目时触发清理
-- 后台线程每60分钟执行一次全面清理
-- 清理策略：删除1小时无活动的条目
-
-可通过日志查看清理情况：
-```
-DEBUG - 速率限制存储清理: 12000 -> 8500 条目
-```
-
----
-
-> ⚠️ **重要提示**: 本规范是项目代码质量的基石。任何违反规范的代码都不得合并到主分支。如有疑问，请先讨论再实施。
-> 
-> **文档版本**: v2.0.0 | **最后更新**: 2026-08-26 | **审核状态**: ✅ 已通过生产环境验证
-
----
-
-📚 完整项目范式体系 (Project Paradigm System)
-
-基于项目代码深度分析，以下是微购相册项目的完整技术范式和最佳实践。
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-026: Import 语句规范 (Import Statement Standard)
-
-**范式描述**
-强制要求所有 import 语句必须位于文件开头，禁止在函数/方法内部使用内联 import。
-
-**核心原则**
-
-1. **Import 位置**: 所有 import 必须在文件顶部（main.py 的 L1-L117 区域）
-2. **禁止内联 import**: ❌ 严禁在函数、方法、类内部使用 `import` 或 `from...import`
-3. **异常处理**: 可选依赖使用 `try-except` 包裹（仍在文件开头）
-4. **分组规范**:
-   - 标准库模块
-   - 第三方库模块（按字母排序）
-   - 本地模块
-
-**正确示例 ✅**
-```python
-# 文件开头 (L1-L117)
-# 标准库
-import sys
-import os
-import json
-from pathlib import Path
-from datetime import datetime
-
-# 第三方库（可选依赖用 try-except）
-try:
-    import psutil
-except ImportError:
-    psutil = None
-
-try:
-    from fastapi import FastAPI
-except ImportError:
-    FastAPI = None
-
-# 使用时直接调用（无需再次 import）
-def some_function():
-    if psutil:
-        return psutil.cpu_percent()
-```
-
-**错误示例 ❌**
-```python
-# ❌ 错误：函数内部的内联 import
-def _is_private_ip(ip_str):
-    try:
-        import ipaddress  # 禁止！应该在文件开头导入
-        return ipaddress.ip_address(ip_str) in (...)
-
-# ❌ 错误：重复导入已在开头导入的模块
-def initialize_encryption(cls, password=None):
-    import base64  # 禁止！base64 已在 L5 导入
-```
-
-**实施案例 (v3.8.90.05)**
-
-✅ **清理的内联 import** (已修复):
-| 位置 | 原代码 | 修复方式 |
-|------|--------|---------|
-| L1974 | `import ipaddress` | ❌ 删除（ipaddress 已在 L11 导入） |
-| L10382 | `import base64` | ❌ 删除（base64 已在 L5 导入） |
-| L10450 | `import base64` | ❌ 删除（base64 已在 L5 导入） |
-
-**自动化检查脚本**:
-```bash
-# 检查是否存在内联 import（应在 Git hooks 中执行）
-INLINE_IMPORTS=$(grep -n "^\s*import \|\s*from .*import" main.py | grep -v "^1-\|^2-\|^3-" | head -20)
-if [ -n "$INLINE_IMPORTS" ]; then
-    echo "❌ 错误: 发现内联 import（非文件开头）:"
-    echo "$INLINE_IMPORTS"
-    exit 1
-fi
-echo "✅ Import 规范检查通过"
-```
-
-**核心价值**
-- ✅ **性能优化**: 避免运行时重复导入开销
-- ✅ **依赖清晰**: 一目了然看到所有依赖关系
-- ✅ **符合 PEP8**: 遵循 Python 官方编码规范
-- ✅ **IDE 支持**: 更好的代码补全和静态分析
-- ✅ **避免错误**: 防止循环导入和命名冲突
-
-**记住这条铁律**:
-> **"所有的 import 都要在文件开头，禁止函数内部内联 import"**
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-041: 统一异常处理范式 (Unified Exception Handling)
-
-范式描述
-建立分层异常处理机制，实现异常的统一捕获、分类、记录和转换。
-
-核心实现
-
-1. 自定义异常基类 - `AppException`
-class AppException(Exception):
-    """统一异常类 - 所有业务异常都使用此类"""
-    
-    CATEGORY_FILE = 'FILE'
-    CATEGORY_NETWORK = 'NETWORK'
-    CATEGORY_AUTH = 'AUTH'
-    CATEGORY_BROWSER = 'BROWSER'
-    CATEGORY_PARSE = 'PARSE'
-    CATEGORY_CONFIG = 'CONFIG'
-    CATEGORY_EXCEL = 'EXCEL'
-    CATEGORY_EMAIL = 'EMAIL'
-    
-    def __init__(self, message: str, category: str = None, code: str = None, details: Any = None):
-        self.message = message
-        self.category = category or 'APP'
-        self.code = code or self._CATEGORY_CODES.get(self.category, 'APP_ERROR')
-        self.details = details or {}
-        
-    @classmethod
-    def file_error(cls, message, file_path=None, operation=None):
-        """工厂方法：创建文件操作异常"""
-        return cls(message, category=cls.CATEGORY_FILE, 
-                  details={'file_path': file_path, 'operation': operation})
-    
-    @classmethod
-    def network_error(cls, message, url=None, status_code=None):
-        """工厂方法：创建网络请求异常"""
-        return cls(message, category=cls.CATEGORY_NETWORK,
-                  details={'url': url, 'status_code': status_code})
-
-关键特性:
-- ✅ 13种异常类别覆盖（FILE/NETWORK/AUTH/BROWSER/PARSE等）
-- ✅ 工厂方法模式简化异常创建
-- ✅ 结构化错误详情（details字典）
-- ✅ 自动错误码生成
-
-2. 单例异常处理器 - `ExceptionHandler`
-class ExceptionHandler:
-    """统一异常处理器（单例模式）"""
-    
-    _instance = None
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
-    
-    def handle(self, error: Exception, context: str = '') -> str:
-        """处理异常并返回格式化错误信息"""
-        error_type = type(error).__name__
-        error_msg = str(error)
-        
-        # 记录错误统计
-        self._error_counts[error_type] = self._error_counts.get(error_type, 0) + 1
-        
-        # 记录错误历史
-        self._error_history.append({
-            'timestamp': datetime.now().isoformat(),
-            'type': error_type,
-            'message': error_msg,
-            'context': context
-        })
-        
-        return f"[{error_type}] {error_msg}"
-    
-    def try_execute(self, func: Callable, default: Any = None, context: str = '') -> Any:
-        """安全执行函数，失败时返回默认值"""
-        try:
-            return func()
-        except Exception as e:
-            self.handle(e, context)
-            return default
-    
-    def retry_on_exception(self, func, max_retries=3, delay=1.0, context=''):
-        """带重试机制的异常处理"""
-        for attempt in range(max_retries):
-            try:
-                return func()
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    time.sleep(delay * (attempt + 1))
-        raise last_error
-
-核心能力:
-- ✅ 单例模式确保全局唯一实例
-- ✅ 错误统计和历史记录
-- ✅ 重复错误抑制（避免日志爆炸）
-- ✅ 重试机制支持
-
-3. 上下文管理器 - `ExceptionContext`
-class ExceptionContext:
-    """异常处理上下文管理器（with语句语法糖）"""
-    
-    def __init__(self, context='', default=None, show_traceback=True):
-        self.context = context
-        self.default = default
-        
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None:
-            self.error = self.handler.handle(exc_val, self.context)
-            self.result = self.default
-            return True  # 吞掉异常
-        return False
-    
-    def get_result(self) -> Tuple[Any, str]:
-        """获取结果和错误信息"""
-        return self.result, self.error
-
-使用示例:
-# 方式1：使用上下文管理器
-with ExceptionContext("读取配置文件", default={}) as ctx:
-    config = json.load(open('config.json'))
-result, error = ctx.get_result()
-
-# 方式2：使用装饰器
-@exception_handler(context="处理用户请求", default={"error": "系统繁忙"})
-def process_request(data):
-    return complex_operation(data)
-
-# 方式3：使用安全调用
-data = safe_call(lambda: json.load(f), default={}, context='读取JSON')
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-020: 环境自适应范式 (Environment-Aware Design) — 零硬编码
-
-范式描述
-通过Environment静态类实现跨平台兼容性，自动适配Windows/Mac/Linux系统差异。**所有路径和可执行文件名必须动态获取，禁止硬编码平台特定值（如.exe后缀、C:\路径等）**。
-
-核心实现
-class Environment:
-    """统一环境检测和管理 — 零硬编码"""
-    
-    SYSTEM = platform.system()
-    IS_WINDOWS = SYSTEM == 'Windows'
-    IS_MAC = SYSTEM == 'Darwin'
-    IS_LINUX = SYSTEM == 'Linux'
-    
-    EXE_SUFFIX = '.exe' if IS_WINDOWS else ''
-    NODE_PROCESS_NAME = 'node' + EXE_SUFFIX
-    HOSTC_PROCESS_NAME = 'node' + EXE_SUFFIX if IS_WINDOWS else 'hostc'
-    
-    @staticmethod
-    def _get_playwright_browsers_dir():
-        """获取Playwright浏览器缓存目录，优先读PLAYWRIGHT_BROWSERS_PATH环境变量"""
-        env_path = os.environ.get('PLAYWRIGHT_BROWSERS_PATH')
-        if env_path and os.path.isdir(env_path):
-            return env_path
-        # 按平台动态计算默认路径
-        ...
-    
-    @staticmethod
-    def _find_playwright_chromium():
-        """在缓存目录中os.walk()递归搜索Chromium，不硬编码子目录名"""
-        ...
-    
-    @staticmethod
-    def _find_system_chrome():
-        """搜索系统Chrome，优先读CHROME_PATH环境变量"""
-        ...
-    
-    @staticmethod
-    def get_chrome_path():
-        """三层防护: Playwright内置→系统Chrome→None(由launch try-except兜底)"""
-        if Environment._find_playwright_chromium():
-            return None
-        return Environment._find_system_chrome()
-    
-    @staticmethod
-    def get_venv_python():
-        """获取虚拟环境Python路径 — 动态获取可执行文件名"""
-        venv_dir = os.path.join(PROJECT_DIR, '.venv')
-        scripts_dir = os.path.join(venv_dir, 'Scripts' if Environment.IS_WINDOWS else 'bin')
-        python_name = os.path.basename(sys.executable) if sys.executable else ('python' + Environment.EXE_SUFFIX)
-        return os.path.join(scripts_dir, python_name)
-
-零硬编码铁律:
-- ❌ **禁止**: `'chrome.exe'`, `'python.exe'`, `'node.exe'`, `r"C:\Program Files\..."`, `'/usr/bin/...'`
-- ❌ **禁止**: 硬编码端口号`8888`、`5000`、`8080`（必须使用`WEB_PORT`环境变量）
-- ✅ **正确**: `'chrome' + Environment.EXE_SUFFIX`, `os.environ.get('PROGRAMFILES')`, `os.environ.get('CHROME_PATH')`
-- ✅ **正确**: `os.path.basename(sys.executable)` 动态获取Python名
-- ✅ **正确**: `os.walk()` 递归搜索可执行文件，不硬编码子目录结构
-- ✅ **正确**: `int(os.environ.get('WEB_PORT', '8888'))` 动态获取端口
-
-支持的环境变量:
-| 环境变量 | 用途 | 示例 |
-|---------|------|------|
-| `WEB_PORT` | Web服务监听端口（默认8888） | `8080` |
-| `PLAYWRIGHT_BROWSERS_PATH` | 自定义Playwright浏览器目录 | `/data/browsers` |
-| `CHROME_PATH` | 直接指定Chrome路径 | `/opt/google/chrome/chrome` |
-| `CHROME_LINUX_DIR` | Linux Chrome目录 | `/my-chrome-dir` |
-
-关键特性:
-- ✅ 系统类型自动检测（IS_WINDOWS/IS_MAC/IS_LINUX）
-- ✅ EXE_SUFFIX统一.exe后缀处理
-- ✅ 路径分隔符自动处理
-- ✅ 进程管理命令跨平台适配
-- ✅ 浏览器参数差异化配置
-- ✅ 动态UA防反爬检测
-- ✅ 环境变量覆盖所有硬编码路径
-- ✅ WEB_PORT环境变量覆盖硬编码端口 (v3.8.90.09)
-- ✅ Playwright三层防护（路径预检→系统Chrome→自动安装兜底）
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-005: 统一路径管理范式 (Centralized Path Management)
-
-范式描述
-通过PathManager集中管理所有文件路径，避免硬编码，实现路径的统一维护和跨平台兼容。
-
-核心实现
-class PathManager:
-    """路径管理类 - 统一处理跨系统路径问题"""
-    
-    @staticmethod
-    def get_config_dir():
-        return os.path.join(PROJECT_DIR, 'config')
-    
-    @staticmethod
-    def get_file_dir():
-        return os.path.join(PROJECT_DIR, 'file')
-    
-    @staticmethod
-    def get_config_file():
-        return os.path.join(PathManager.get_config_dir(), 'config.json')
-    
-    @staticmethod
-    def get_cookie_file():
-        return os.path.join(PathManager.get_config_dir(), 'cookies.json')
-    
-    @staticmethod
-    def get_json_filename(date_str):
-        """动态生成JSON文件名"""
-        return f"{date_str}微购相册(小旭数码).json"
-    
-    @staticmethod
-    def get_cache_filename(date_str):
-        """动态生成缓存文件名"""
-        return f"{date_str}微购相册(小旭数码)_cache.json"
-    
-    @staticmethod
-    def get_public_url_from_web_log(skip_validation=False, quiet=False):
-        """
-        获取公网地址（统一入口）
-        
-        数据流向：
-        hostc → tunnel_url.txt (权威源) → web_output.log (镜像) → 前端显示
-        
-        策略：
-        1. 优先从 tunnel_url.txt 读取（权威源）
-        2. 如果不可用，尝试 web_output.log
-        3. 两个都失败则返回 None
-        """
-        # 实现多源URL获取逻辑...
-
-设计原则:
-- ✅ 所有路径集中定义，一处修改全局生效
-- ✅ 使用os.path.join()确保跨平台兼容
-- ✅ 动态文件名生成（日期前缀）
-- ✅ 多源数据获取策略（权威源+备用源）
-
-**⚠️ 重要：PROJECT_DIR 类型规范 (v3.8.90.12 修复)**
-
-`PROJECT_DIR` 必须为 `Path` 对象（非字符串），以支持 `/` 运算符路径拼接：
-
-```python
-# ✅ 正确：PROJECT_DIR 为 Path 对象
-PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
-key_file = PROJECT_DIR / 'config' / '.encryption_key'  # Path / 运算符
-
-# ❌ 错误：PROJECT_DIR 为字符串，/ 运算符会抛 TypeError
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))  # 返回 str
-key_file = PROJECT_DIR / 'config' / '.encryption_key'  # TypeError: unsupported operand type(s) for /: 'str' and 'str'
-```
-
-**v3.8.90.12 修复案例**: 原代码 `PROJECT_DIR` 为字符串，但 SecureConfigManager 等11处使用 `/` 运算符，导致每次启动输出 `[SecureConfig] ⚠️ 自动加密失败: unsupported operand type(s) for /: 'str' and 'str'`，配置加密功能完全失效。修复方式：将 `PROJECT_DIR` 改为 `Path` 对象，`/` 运算符原生支持，同时兼容 `os.path.join()` 和 f-string。
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-027: 智能缓存管理范式 (Intelligent Caching)
-
-范式描述
-通过FileCacheManager实现文件级TTL缓存，减少IO操作，提升性能。
-
-核心实现
-class FileCacheManager:
-    """JSON文件缓存管理器"""
-    
-    def __init__(self, ttl_seconds=30):
-        self._cache = {}
-        self._ttl = ttl_seconds
-        self._lock = threading.Lock()
-    
-    def read_json(self, file_path, default=None):
-        """带缓存的JSON文件读取"""
-        current_time = time.time()
-        
-        with self._lock:
-            # 检查缓存是否有效
-            if file_path in self._cache:
-                cached_data, cache_time = self._cache[file_path]
-                
-                # 检查TTL是否过期
-                if current_time - cache_time < self._ttl:
-                    # 二次验证：检查文件修改时间
-                    if os.path.exists(file_path):
-                        if os.path.getmtime(file_path) <= cache_time:
-                            return cached_data  # 缓存命中
-                    
-                    del self._cache[file_path]  # 文件已更新，清除缓存
-        
-        # 缓存未命中或已过期，重新读取
-        data = safe_read_json(file_path, default)
-        
-        with self._lock:
-            self._cache[file_path] = (data, current_time)
-        
-        return data
-    
-    def invalidate(self, file_path=None):
-        """手动清除缓存"""
-        with self._lock:
-            if file_path:
-                self._cache.pop(file_path, None)
-            else:
-                self._cache.clear()
-
-# 全局单例
-json_cache = FileCacheManager(ttl_seconds=30)
-
-高级特性:
-- ✅ TTL（Time-To-Live）过期机制
-- ✅ 文件修改时间二次验证
-- ✅ 线程安全（threading.Lock）
-- ✅ 支持批量清除和单个文件清除
-- ✅ 缓存命中率统计
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-034: 安全邮件通知范式 (Secure Email Notification)
-
-范式描述
-通过EmailNotifier实现结构化邮件发送，支持HTML富文本、事件分类、连接超时控制。
-
-核心实现
-class EmailNotifier:
-    """邮件通知类"""
-    
-    def send_tunnel_notification(self, tunnel_url, event_type='new'):
-        """
-        发送隧道URL变化通知邮件
-        
-        事件类型：
-        - new: 新公网地址
-        - available: 公网地址可用
-        - unavailable: 公网地址不可用
-        - restarted: 隧道已重启
-        - fallback_available: 备用地址可用
-        """
-        event_titles = {
-            'new': '✅ 新公网地址',
-            'unavailable': '🚨 公网地址不可用',
-            'restarted': '🔄 隧道已重启',
-            'fallback_available': '🔄 备用公网地址可用'
-        }
-        
-        # 构建MIME多部分邮件（纯文本 + HTML）
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = Header(f'【{event_title}】{时间}', charset='utf-8')
-        
-        # 纯文本版本
-        body = f"""{event_title}
-时间: {current_time}
-公网地址: {tunnel_url}
-{status_note}"""
-        
-        # HTML富文本版本（响应式布局）
-        html_body = f"""
-<html>
-<body style="font-family: -apple-system, BlinkMacSystemFont, ...">
-<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-            color: white; padding: 30px; border-radius: 12px;">
-    <h1>{event_title}</h1>
-</div>
-<div style="background-color: #ffffff; border: 1px solid #e0e0e0; 
-            border-radius: 8px; padding: 25px;">
-    <table style="width: 100%;">
-        <tr><td><strong>时间:</strong></td><td>{current_time}</td></tr>
-        <tr><td><strong>公网地址:</strong></td>
-            <td><a href="{tunnel_url}">{tunnel_url}</a>
-                <button onclick="window.open('{tunnel_url}')">点击访问</button>
-            </td>
-        </tr>
-    </table>
-</div>
-</body>
-</html>"""
-        
-        msg.attach(MIMEText(body, 'plain', 'utf-8'))
-        msg.attach(MIMEText(html_body, 'html', 'utf-8'))
-        
-        # 发送邮件（带超时控制）
-        timeout = 30
-        server = smtplib.SMTP(host, port, timeout=timeout)
-        server.starttls()
-        server.login(user, password)
-        server.sendmail(from_addr, to_addr, msg.as_string())
-        server.quit()
-
-安全特性:
-- ✅ SMTP连接超时控制（30秒）
-- ✅ SSL/TLS加密传输
-- ✅ HTML转义防止XSS
-- ✅ 结构化事件分类
-- ✅ 详细的时间戳日志
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-003: 浏览器自动化爬虫范式 (Browser Automation Scraping)
-
-范式描述
-通过WegoScraper实现Playwright异步爬虫，包含智能滚动、弹窗关闭、并发处理、API回退等高级功能。
-
-核心实现
-class WegoScraper:
-    """爬虫核心类"""
-    
-    async def scroll_to_load_all(self, page):
-        """智能滚动加载所有商品（动态调整策略）"""
-        
-        config = self.config_manager.get('scroll_config', {
-            'max_attempts': 30,
-            'same_height_limit': 8,
-            'scroll_wait_time': 0.8,
-            'dynamic_adjust': True
-        })
-        
-        last_height = 0
-        no_change_count = 0
-        height_history = []
-        
-        for scroll_attempts in range(config['max_attempts']):
-            current_height = await page.evaluate('document.body.scrollHeight')
-            
-            # 检测页面是否到底部
-            if current_height == last_height:
-                no_change_count += 1
-                if no_change_count >= config['same_height_limit']:
-                    print(f'页面已滚动到底部（连续{config["same_height_limit"]}次不变）')
-                    break
-            else:
-                no_change_count = 0
-            
-            # 动态调整滚动距离
-            scroll_distance = current_height * 0.3 if scroll_attempts < 10 else current_height
-            await page.evaluate(f'window.scrollBy(0, {scroll_distance})')
-            
-            await asyncio.sleep(config['scroll_wait_time'])
-            
-            # 动态调整等待时间（基于页面加载速度）
-            if config['dynamic_adjust'] and len(height_history) >= 5:
-                avg_change = sum(height_changes) / len(height_changes)
-                
-                if avg_change < 50 and config['scroll_wait_time'] < 2.0:
-                    config['scroll_wait_time'] += 0.1  # 页面慢，增加等待
-                elif avg_change > 300 and config['scroll_wait_time'] > 0.5:
-                    config['scroll_wait_time'] -= 0.1  # 页面快，减少等待
-            
-            # 定期关闭弹窗
-            if (scroll_attempts + 1) % 5 == 0:
-                await self.close_popups(page)
-    
-    async def close_popups(self, page, close_limit=3, wait_time=0.3):
-        """智能关闭弹窗（多种选择器）"""
-        popup_selectors = [
-            '[class*="close"]',
-            '[class*="modal-close"]',
-            'button:has-text("关闭")',
-            '.ant-modal-close',
-            '.el-dialog__close'
-        ]
-        
-        for selector in popup_selectors[:close_limit]:
-            safe_execute_func(
-                lambda: self._close_popup_impl(page, selector, wait_time),
-                context=f'close_popups({selector})'
-            )
-    
-    async def process_elements_concurrently(self, page, elements):
-        """并发处理商品元素（ThreadPoolExecutor）"""
-        
-        elements_data = []
-        
-        # 第一阶段：收集元素数据
-        for element in elements:
-            try:
-                text = await asyncio.wait_for(element.text_content(), timeout=2.0)
-                html = await asyncio.wait_for(element.inner_html(), timeout=2.0)
-                elements_data.append((text, html, element_id))
-            except asyncio.TimeoutError:
-                continue
-        
-        # 第二阶段：并发提取商品信息
-        products = []
-        with ThreadPoolExecutor(max_workers=15) as executor:
-            futures = [executor.submit(self.extract_product_info, text, html) 
-                      for text, html, _ in elements_data]
-            
-            for future in futures:
-                try:
-                    result = future.result(timeout=2)
-                    if result:
-                        products.append(result)
-                except Exception:
-                    pass
-        
-        # 第三阶段：API回退获取缺失数据
-        products_need_api = [p for p in products if not p.get('拿货价')]
-        if products_need_api:
-            await self.fetch_cost_prices_via_api(page, products_need_api, products)
-        
-        return products
-    
-    @staticmethod
-    def extract_product_info(element_text, html_content):
-        """提取商品信息（正则表达式解析）"""
-        
-        stock_match = re.search(r'货号[：:]\s*(\d+)', element_text)
-        price_match = re.search(r'售价[：:]\s*¥?\s*([\d,]+)', element_text)
-        cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', element_text)
-        
-        name = WegoScraper.clean_product_name(element_text[:cut_pos])
-        
-        return {
-            '商品名称': name,
-            '售价': price,
-            '拿货价': cost_price,
-            '货号': stock_number,
-            '备注': remark,
-            '员工': employee,
-            '图片': ''
-        }
-
-高级特性:
-- ✅ 动态滚动策略（速度自适应）
-- ✅ 弹窗智能识别与关闭
-- ✅ 并发数据处理（15线程池）
-- ✅ API回退机制（缺失数据补充）
-- ✅ 超时保护（每步2秒超时）
-- ✅ 商品去重（seen_products集合）
-
-**⚠️ 重要：集中式浏览器启动器 (v3.8.90.12 新增)**
-
-所有浏览器启动必须通过 `Environment.launch_browser()` 集中式方法，禁止散落的 `p.chromium.launch()` + try-except：
-
-```python
-# ✅ 正确：使用集中式启动器
-browser = await Environment.launch_browser(
-    p, headless=False, args=browser_args, executable_path=chrome_path
-)
-
-# ❌ 错误：散落的 try-except 启动代码（已废弃）
-try:
-    browser = await p.chromium.launch(headless=False, args=browser_args, executable_path=chrome_path)
-except Exception as launch_err:
-    # ... 重复的兜底逻辑 ...
-```
-
-**launch_browser() 内置三层防护**:
-1. **Connection closed 自动重试**: 捕获 `"Connection closed"` 瞬时连接错误，最多重试3次，递增等待(1s/2s/3s)
-2. **Executable 不存在自动安装**: 捕获 `"Executable doesn't exist"`，调用 `install_playwright_cdn()` 安装后重试
-3. **系统Chrome回退**: Playwright内置Chromium仍不可用时，回退到系统Chrome
-
-**get_chrome_path() 版本匹配策略**:
-- 检测到 Playwright 缓存有 Chromium 时返回 `None`（让 Playwright 自选匹配版本）
-- 仅当缓存无 Chromium 时回退到系统 Chrome
-- 避免驱动与缓存版本不匹配导致 `Connection closed while reading from the driver`
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-014: 数据对比分析范式 (Data Comparison & Analysis)
-
-范式描述
-通过StockNumberComparator实现Excel/JSON数据对比，支持高价商品筛选、重复检测、差异报告。
-
-核心实现
-class StockNumberComparator:
-    """数据对比核心类"""
-    
-    @staticmethod
-    def compare_stock_numbers(json_stock_numbers, input_stock_numbers, 
-                             high_price_stock_numbers=None):
-        """对比两组货号数据"""
-        json_set = set(json_stock_numbers)
-        input_set = set(input_stock_numbers)
-        
-        result = {
-            'missing': sorted(list(input_set - json_set)),      # 缺失的
-            'existing': sorted(list(input_set & json_set)),     # 已存在的
-            'extra_in_json': sorted(list(json_set - input_set)), # 多余的
-            'total_input': len(input_set),
-            'total_json': len(json_set),
-            'missing_count': len(input_set - json_set),
-            'existing_count': len(input_set & json_set),
-            'extra_in_json_count': len(json_set - input_set)
-        }
-        
-        # 高价商品特殊处理
-        if high_price_stock_numbers:
-            result['high_price_stock_numbers'] = sorted(set(high_price_stock_numbers))
-            result['high_price_count'] = len(result['high_price_stock_numbers'])
-        
-        return result
-    
-    def compare_json_files(self):
-        """对比当天最新的两个JSON文件"""
-        
-        latest_file, second_file = FileManager.get_today_json_files()
-        
-        latest_data = FileManager.read_json(latest_file)
-        second_data = FileManager.read_json(second_file)
-        
-        latest_products = latest_data.get('商品列表', [])
-        second_products = second_data.get('商品列表', [])
-        
-        # 提取货号集合
-        latest_stocks = {p.get('货号') for p in latest_products if p.get('货号')}
-        second_stocks = {p.get('货号') for p in second_products if p.get('货号')}
-        
-        # 计算差异
-        added = latest_stocks - second_stocks
-        removed = second_stocks - latest_stocks
-        
-        # 高价商品筛选（售价>=599）
-        high_price_added = [
-            p.get('货号') for p in latest_products 
-            if WegoScraper.parse_price(p.get('售价')) >= 599 
-            and p.get('货号') in added
-        ]
-        
-        # 生成差异报告
-        diff_data = {
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'added_count': len(added),
-            'removed_count': len(removed),
-            'high_price_added': sorted(high_price_added),
-            'high_price_description': '新增的售价>=599的商品'
-        }
-        
-        # 追加到"小计"字段（保留历史记录）
-        if '小计' not in latest_data:
-            latest_data['小计'] = []
-        latest_data['小计'].append(diff_data)
-        latest_data['小计'].sort(key=lambda x: x['timestamp'])
-        
-        FileManager.write_json(latest_file, latest_data)
-    
-    @staticmethod
-    def find_duplicate_stock_numbers(stock_numbers):
-        """检测重复货号"""
-        seen = {}
-        for num in stock_numbers:
-            seen[num] = seen.get(num, 0) + 1
-        
-        return [{'货号': num, 'count': count} 
-                for num, count in seen.items() if count > 1]
-
-数据分析能力:
-- ✅ 集合运算高效对比（O(n)复杂度）
-- ✅ 高价商品自动筛选（价格阈值可配置）
-- ✅ 重复数据检测与统计
-- ✅ 增量差异追踪（历史记录）
-- ✅ 多源数据融合（Excel+JSON）
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-033: API速率限制与输入验证范式 (Rate Limiting & Input Validation)
-
-范式描述
-通过RateLimiter和Pydantic模型实现API层面的安全和性能保护。
-
-核心实现
-
-1. IP级别速率限制器
-class RateLimiter:
-    """IP级别速率限制器"""
-    
-    def __init__(self, max_requests=100, window_seconds=60):
-        self.max_requests = max_requests
-        self.window_seconds = window_seconds
-        self.requests = {}
-        self._lock = threading.Lock()
-    
-    def is_allowed(self, client_ip):
-        """检查是否允许请求（滑动窗口算法）"""
-        current_time = time.time()
-        
-        with self._lock:
-            if client_ip not in self.requests:
-                self.requests[client_ip] = []
-            
-            # 清理过期请求记录
-            self.requests[client_ip] = [
-                t for t in self.requests[client_ip]
-                if current_time - t < self.window_seconds
-            ]
-            
-            if len(self.requests[client_ip]) >= self.max_requests:
-                return False
-            
-            self.requests[client_ip].append(current_time)
-            return True
-    
-    def get_retry_after(self, client_ip):
-        """获取重试等待时间"""
-        oldest = min(self.requests[client_ip])
-        return max(0, int(self.window_seconds - (time.time() - oldest)) + 1)
-
-# 全局实例
-api_rate_limiter = RateLimiter(max_requests=200, window_seconds=60)
-upload_rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
-
-2. Pydantic输入验证模型
-class RunCommandRequest(BaseModel):
-    command: str = Field(..., min_length=1, max_length=10000)
-    
-    @field_validator('command')
-    def validate_command_safe(cls, v):
-        """危险命令黑名单检测"""
-        dangerous = [
-            'rm -rf /', 'mkfs', 'shutdown', 'reboot',
-            'dd if=', '> /dev/sd', ':(){ :|:& };:',  # fork bomb
-            'wget http', 'curl http', 'nc -l', 'nc -e',
-            'python -c', 'eval ', 'exec ',
-            'crontab -r', 'systemctl stop',
-            'reg delete', 'reg add'
-        ]
-        v_lower = v.lower()
-        for pattern in dangerous:
-            if pattern.lower() in v_lower:
-                raise ValueError(f'检测到危险命令: {pattern}')
-        return v.strip()
-
-class TaskInputRequest(BaseModel):
-    task_id: str = Field(..., min_length=1, max_length=50)
-    user_input: str = Field('', max_length=10000)
-
-3. 速率限制装饰器
-def rate_limit(limiter, endpoint_name='API'):
-    """速率限制装饰器"""
-    def decorator(f):
-        async def decorated(request: Request, *args, **kwargs):
-            client_ip = request.client.host
-            
-            if not limiter.is_allowed(client_ip):
-                retry_after = limiter.get_retry_after(client_ip)
-                raise HTTPException(
-                    status_code=429,
-                    detail={'error': '请求过于频繁', 'retry_after': retry_after},
-                    headers={'Retry-After': str(retry_after)}
-                )
-            
-            return await f(request, *args, **kwargs)
-        return decorated
-    return decorator
-
-安全特性:
-- ✅ 滑动窗口限流算法
-- ✅ 危险命令黑名单（30+规则）
-- ✅ 输入长度限制
-- ✅ 429状态码 + Retry-After头
-- ✅ 分端点独立限流
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-023: 前端安全防护范式 (Frontend Security)
-
-范式描述
-在JavaScript前端实现XSS防护、URL验证、设备检测等安全机制。
-
-核心实现
-
-1. XSS防护函数
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function escapeAttr(text) {
-    if (!text) return '';
-    return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-}
-
-function safeUrl(url) {
-    return isValidUrl(url) ? escapeAttr(url) : '#invalid-url';
-}
-
-function isValidUrl(url) {
-    if (!url) return false;
-    try {
-        const parsed = new URL(url);
-        return ['http:', 'https:'].includes(parsed.protocol);
-    } catch {
-        return false;
-    }
-}
-
-2. 设备检测与响应式适配
-function detectDevice() {
-    const ua = navigator.userAgent.toLowerCase();
-    const width = window.innerWidth;
-    
-    let deviceType = 'desktop';
-    
-    // 屏幕宽度判断
-    if (width < 576) deviceType = 'phone';
-    else if (width < 768) deviceType = 'tablet';
-    else if (width < 992) deviceType = 'laptop';
-    else if (width < 1200) deviceType = 'desktop';
-    else deviceType = 'large-desktop';
-    
-    // 浏览器检测
-    const mobileDevices = {
-        wechat: /micromessenger/i.test(ua),
-        weibo: /weibo/i.test(ua),
-        qq: /qq\//i.test(ua),
-        iphone: /iphone|ipad|ipod/i.test(ua),
-        android: /android/i.test(ua)
-    };
-    
-    return {
-        type: deviceType,
-        isMobile: width < 768,
-        width: width,
-        height: height,
-        pixelRatio: window.devicePixelRatio || 1
-    };
-}
-
-function applyDeviceStyles() {
-    const device = detectDevice();
-    document.body.classList.remove('is-phone', 'is-tablet', 'is-desktop');
-    document.body.classList.add('is-' + device.type);
-}
-
-// 监听窗口大小变化（防抖）
-window.addEventListener('resize', function() {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(applyDeviceStyles, 250);
-});
-
-3. 安全的API响应解析
-async function safeParseJson(response) {
-    const contentType = response.headers.get('content-type') || '';
-    
-    if (!contentType.includes('application/json')) {
-        const text = await response.text();
-        let errorMsg = '服务器返回了非JSON响应';
-        
-        // 错误类型智能识别
-        if (response.status === 401 || text.includes('登录')) {
-            errorMsg = '登录已过期，请重新获取Cookie';
-        } else if (response.status === 404) {
-            errorMsg = '接口不存在 (404)';
-        } else if (response.status >= 500) {
-            errorMsg = `服务器内部错误 (${response.status})`;
-        }
-        
-        throw new Error(errorMsg);
-    }
-    
-    return response.json();
-}
-
-安全措施:
-- ✅ DOM-based XSS防护（escapeHtml/escapeAttr）
-- ✅ URL白名单协议验证（http/https only）
-- ✅ Content-Type强制校验
-- ✅ 设备指纹识别
-- ✅ 响应式断点系统（5个层级）
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-015: 双输出日志系统范式 (Dual-Output Logging)
-
-范式描述
-通过TeeOutput类实现同时输出到控制台和文件的日志系统，支持自动时间戳、文件锁定恢复。
-
-核心实现
-class TeeOutput:
-    """同时输出到控制台和文件"""
-    
-    def __init__(self, original, log_file_path=None):
-        self.original = original
-        self.log_file_path = log_file_path
-        self.file = None
-        if log_file_path:
-            self._init_log_file(log_file_path)
-    
-    def _init_log_file(self, log_file_path, retry_count=0):
-        """初始化日志文件（带重试和锁定恢复）"""
-        max_retries = 3
-        
-        try:
-            # 检查文件是否被锁定
-            if os.path.exists(log_file_path):
-                test_fd = os.open(log_file_path, os.O_WRONLY | os.O_APPEND)
-                os.close(test_fd)
-            
-            self.file = open(log_file_path, 'a', encoding='utf-8')
-            
-        except OSError as e:
-            if retry_count < max_retries:
-                # 锁定文件备份
-                backup_path = f"{log_file_path}.locked_{time.strftime('%H%M%S')}"
-                os.rename(log_file_path, backup_path)
-                time.sleep(0.5 * (retry_count + 1))
-                return self._init_log_file(log_file_path, retry_count + 1)
-            else:
-                self.file = None  # 降级为仅控制台输出
-    
-    def write(self, text):
-        _output_text = text
-        
-        # 自动添加时间戳
-        if text.strip():
-            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            
-            if not text.strip().startswith(f'[{timestamp[:10]}'):
-                lines = text.split('\n')
-                timestamped_lines = [
-                    f"[{timestamp}] {line}" if line.strip() else line
-                    for line in lines
-                ]
-                _output_text = '\n'.join(timestamped_lines)
-        
-        # 双输出
-        self.original.write(_output_text)
-        
-        if self.file:
-            safe_execute_func(
-                lambda: (self.file.write(_output_text), self.file.flush()),
-                context='TeeOutput写入'
-            )
-
-# 全局初始化
-def setup_web_logging():
-    global web_log_file
-    web_log_file = PathManager.get_web_output_file()
-    sys.stdout = TeeOutput(sys.stdout, web_log_file)
-    sys.stderr = TeeOutput(sys.stderr, web_log_file)
-
-高级特性:
-- ✅ 100%时间戳覆盖率（毫秒精度）
-- ✅ 文件锁定自动恢复（备份+重试）
-- ✅ Flask访问日志特殊处理
-- ✅ 降级容错（文件不可用时仅控制台）
-- ✅ 自动flush保证实时性
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-006: 配置管理范式 (Configuration Management)
-
-范式描述
-通过ConfigManager实现JSON配置文件的读写、默认值、热更新等功能。
-
-核心实现
-class ConfigManager:
-    """配置管理器（懒加载+缓存）"""
-    
-    def __init__(self, config_path=None):
-        self.config_path = config_path or PathManager.get_config_file()
-        self._config = None  # 懒加载
-    
-    @property
-    def config(self):
-        if self._config is None:
-            self._config = self._load_config()
-        return self._config
-    
-    def _load_config(self):
-        try:
-            with open(self.config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            return {}  # 默认空配置
-        except json.JSONDecodeError as e:
-            raise AppException.config_error(f"配置文件格式错误: {e}")
-    
-    def save_config(self):
-        if self._config:
-            with open(self.config_path, 'w', encoding='utf-8') as f:
-                json.dump(self._config, f, ensure_ascii=False, indent=2)
-    
-    def get(self, key, default=None):
-        return self.config.get(key, default)
-    
-    def set(self, key, value):
-        if self._config is not None:
-            self._config[key] = value
-            self.save_config()  # 自动持久化
-    
-    def get_excel_files(self):
-        """获取Excel文件列表（路径展开+存在性检查）"""
-        excel_files = self.config.get('excel_files', [])
-        existing_files = []
-        for path in excel_files:
-            expanded = os.path.expanduser(path)
-            if FileManager.file_exists(expanded):
-                existing_files.append(expanded)
-        return existing_files
-
-设计特点:
-- ✅ 懒加载（首次访问时才加载）
-- ✅ 内存缓存（避免重复IO）
-- ✅ 自动持久化（set即保存）
-- ✅ 路径展开（~ → 用户主目录）
-- ✅ 存在性预检
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-007: Cookie验证与管理范式 (Cookie Validation & Management)
-
-范式描述
-通过CookieValidator实现Cookie的有效性验证、友好提示、自动更新引导。
-
-核心实现
-class CookieValidator:
-    """Cookie验证器"""
-    
-    @staticmethod
-    def validate_and_prompt(cookie_file):
-        """验证cookie并给出友好提示"""
-        
-        # 1. 检查文件是否存在
-        if not os.path.exists(cookie_file):
-            CookieValidator._show_prompt(
-                title='Cookie文件不存在',
-                reasons=['首次使用程序', 'Cookie被误删除', '路径错误'],
-                solutions=['选择"更新Cookie"功能', '浏览器将自动打开登录页'],
-                tip='Cookie有效期为30天，建议定期更新'
-            )
-            return False, None
-        
-        # 2. 检查文件格式
-        try:
-            cookies = json.load(open(cookie_file))
-        except json.JSONDecodeError:
-            CookieValidator._show_prompt(
-                title='Cookie文件格式错误',
-                reasons=['文件被意外修改', '保存出错'],
-                solutions=['删除当前Cookie', '重新获取']
-            )
-            return False, None
-        
-        # 3. 检查Cookie有效期
-        expiry_time = CookieValidator._check_expiry(cookies)
-        if expiry_time and expiry_time < datetime.now():
-            remaining_days = (expiry_time - datetime.now()).days
-            if remaining_days < 7:
-                CookieValidator._show_warning(
-                    f'Cookie将在{remaining_days}天后过期',
-                    action='建议立即更新'
-                )
-        
-        return True, cookies
-    
-    @staticmethod
-    def _show_prompt(title, reasons, solutions, tip=''):
-        """显示结构化的友好提示"""
-        print_separator()
-        print(f'⚠️ {title}')
-        print('\n可能的原因:')
-        for i, reason in enumerate(reasons, 1):
-            print(f'  {i}. {reason}')
-        print('\n解决方案:')
-        for i, solution in enumerate(solutions, 1):
-            print(f'  ✓ {solution}')
-        if tip:
-            print(f'\n💡 提示: {tip}')
-        print_separator()
-
-用户体验优化:
-- ✅ 分步骤验证（存在性→格式→有效性）
-- ✅ 结构化错误提示（原因+解决方案+提示）
-- ✅ 过期预警（提前7天提醒）
-- ✅ 引导式修复流程
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-001: 文件清理自动化范式 (Automated File Cleanup)
-
-范式描述
-实现智能文件清理策略，按组保留最新、按时间删除旧文件、支持测试模式。
-
-核心实现
-def clean_old_files(directory, dry_run=False):
-    """
-    清理旧文件策略：
-    - 按'_'前缀分组（如 image_001.jpg, image_002.jpg 为一组）
-    - 每组只保留最新的一个文件
-    - 删除其他组的所有文件
-    """
-    
-    matched_files = []
-    
-    # 扫描媒体文件
-    for file in directory.iterdir():
-        if file.is_file() and file.suffix.lower() in MEDIA_EXTENSIONS:
-            stat = file.stat()
-            name_without_ext = file.stem
-            group_key = name_without_ext.split('_')[0] if '_' in name_without_ext else name_without_ext
-            
-            matched_files.append({
-                'file': file,
-                'group_key': group_key,
-                'mtime': stat.st_mtime,
-                'size': stat.st_size
-            })
-    
-    # 按修改时间排序（从新到旧）
-    matched_files.sort(key=lambda x: x['mtime'], reverse=True)
-    
-    # 分组
-    groups = {}
-    for file_info in matched_files:
-        key = file_info['group_key']
-        if key not in groups:
-            groups[key] = []
-        groups[key].append(file_info)
-    
-    # 找到最新的一组
-    sorted_groups = sorted(groups.keys(), 
-                          key=lambda k: max(f['mtime'] for f in groups[k]),
-                          reverse=True)
-    latest_group = sorted_groups[0]
-    
-    # 删除除最新组以外的所有文件
-    files_to_delete = [f for f in matched_files if f['group_key'] != latest_group]
-    
-    for file_info in files_to_delete:
-        file_info['file'].unlink()
-    
-    print(f"清理完成: 保留{len(groups[latest_group])}个, 删除{len(files_to_delete)}个")
-
-def auto_clean_temp_dir():
-    """自动清理temp目录（超过3MB时全清）"""
-    temp_dir = os.path.join(PROJECT_DIR, 'temp')
-    total_size = sum(f.stat().st_size for f in temp_dir.iterdir() if f.is_file())
-    
-    if total_size > 3 * 1024 * 1024:  # 3MB阈值
-        for f in temp_dir.iterdir():
-            if f.is_file():
-                f.unlink()
-        print(f"[Clean] temp目录超过3MB，已清理")
-
-清理策略:
-- ✅ 智能分组（按文件名前缀）
-- ✅ 保留最新（每组保留最新文件）
-- ✅ 大小监控（3MB自动清理）
-- ✅ 测试模式（dry_run预览）
-- ✅ 类型过滤（图片/视频/文档）
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-004: 后台任务管理范式 (Background Task Management)
-
-范式描述
-实现后台任务的生命周期管理，包括启动、监控、输出收集、终止等。
-
-核心实现
-processes = {}  # 进程字典
-tasks = {}      # 任务状态字典
-_processes_lock = threading.Lock()
-_tasks_lock = threading.Lock()
-
-def run_command_background(task_id, command):
-    """后台运行命令（线程+子进程）"""
-    
-    with _tasks_lock:
-        tasks[task_id] = {
-            'status': 'running',
-            'output': '',
-            'start_time': time.time()
-        }
-    
-    env = os.environ.copy()
-    env['PYTHONIOENCODING'] = 'utf-8'
-    
-    # 启动子进程
-    process = subprocess.Popen(
-        command,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        cwd=PROJECT_DIR,
-        text=True,
-        bufsize=1,
-        env=env
-    )
-    
-    with _processes_lock:
-        processes[task_id] = process
-    
-    # 实时收集输出
-    stdout_lines = []
-    while True:
-        if process.poll() is not None:
-            remaining = process.stdout.read()
-            if remaining:
-                stdout_lines.append(remaining)
-            break
-        
-        try:
-            if Environment.IS_WINDOWS:
-                time.sleep(0.1)
-                line = process.stdout.readline()
-            else:
-                readable, _, _ = select.select([process.stdout], [], [], 0.1)
-                if readable:
-                    line = process.stdout.readline()
-            
-            if line:
-                stdout_lines.append(line)
-                
-                # 实时更新任务状态
-                with _tasks_lock:
-                    tasks[task_id]['output'] = ''.join(stdout_lines)
-                    
-        except Exception as e:
-            handle_exception(e, 'run_command_background')
-    
-    process.wait()
-    
-    with _tasks_lock:
-        tasks[task_id]['returncode'] = process.returncode
-        tasks[task_id]['output'] = ''.join(stdout_lines)
-        tasks[task_id]['status'] = 'completed'
-
-@app.post("/api/task/{task_id}/kill")
-async def kill_task(task_id: str):
-    """终止任务API"""
-    with _processes_lock:
-        if task_id in processes:
-            process = processes[task_id]
-            process.terminate()
-            try:
-                process.wait(timeout=TIMEOUT_CONFIG['subprocess_kill'])
-            except subprocess.TimeoutExpired:
-                process.kill()  # 强制杀死
-            
-            del processes[task_id]
-            
-    with _tasks_lock:
-        if task_id in tasks:
-            tasks[task_id]['status'] = 'killed'
-    
-    return {"success": True, "message": f"任务 {task_id} 已终止"}
-
-任务管理能力:
-- ✅ 实时输出流式收集
-- ✅ 优雅终止（terminate→wait→kill）
-- ✅ 线程安全锁保护
-- ✅ 任务状态机（running/completed/error/killed）
-- ✅ 跨平台兼容（Windows select vs Unix select）
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-025: 隧道高可用范式 (High-Availability Tunnel)
-
-范式描述
-实现hostc + Cloudflare双隧道互备方案，包含心跳检测、故障转移、自动重启等机制。
-
-架构设计
-┌─────────────┐     ┌─────────────────┐     ┌──────────────┐
-│   hostc      │     │ Cloudflare       │     │   前端展示    │
-│   隧道       │ ── │ Tunnel           │ ── │              │
-│ (Plan A)    │     │ (Plan B)         │     │              │
-└─────────────┘     └─────────────────┘     └──────────────┘
-       │                     │                      │
-       └──────────┬──────────┘                      │
-                  ▼                                 │
-          ┌──────────────┐                         │
-          │ 心跳守护进程  │ ◄───────────────────────┘
-          │ (Heartbeat)  │    定期验证URL可用性
-          └──────────────┘
-                  │
-         ┌────────┴────────┐
-         ▼                 ▼
-  Plan A可用         Plan A不可用
-  (使用hostc)       (切换到CF)
-         │                 │
-         ▼                 ▼
-  发送stable邮件    发送fallback邮件
-
-核心实现
-def verify_url(url, timeout=5, method='GET'):
-    """URL可用性验证（多方式尝试）"""
-    
-    validation_methods = [
-        ('GET', lambda u: urllib.request.urlopen(u, timeout=timeout)),
-        ('HEAD', lambda u: urllib.request.urlopen(urllib.request.Request(u, method='HEAD'), timeout=timeout)),
-        ('TCP', lambda u: socket.create_connection((u.hostname, 443), timeout=timeout))
-    ]
-    
-    for method_name, method_func in validation_methods:
-        try:
-            result = method_func(url)
-            return True, None
-        except Exception as e:
-            last_error = f"{method_name}: {e}"
-    
-    return False, last_error
-
-def send_heartbeat():
-    """心跳检测循环"""
-    
-    while True:
-        url = PathManager.get_public_url_from_web_log()
-        
-        if url:
-            is_valid, error = verify_url(url)
-            
-            if is_valid:
-                stable_confirm_count += 1
-                
-                if stable_confirm_count >= 3:  # 连续3次成功
-                    if not was_stable:
-                        email_notifier.send_tunnel_notification(url, 'stable_available')
-                        was_stable = True
-            else:
-                stable_confirm_count = 0
-                was_stable = False
-                
-                fail_count += 1
-                
-                if fail_count >= 2:  # 连续2次失败
-                    email_notifier.send_tunnel_notification(url, 'unavailable')
-                    restart_tunnel()  # 触发重启
-                    fail_count = 0
-        
-        time.sleep(30)  # 30秒间隔
-
-def restart_tunnel():
-    """隧道重启（双隧道切换逻辑）"""
-    
-    if use_cloudflare_tunnel:
-        start_cloudflare_tunnel()
-    else:
-        start_hostc_tunnel()
-    
-    new_url = wait_for_tunnel_url(timeout=30)
-    
-    if new_url:
-        PathManager._sync_url_to_tunnel_file(new_url)
-        email_notifier.send_tunnel_notification(new_url, 'restarted')
-
-高可用特性:
-- ✅ 双隧道互备（hostc + CF）
-- ✅ 多方式验证（GET/HEAD/TCP）
-- ✅ 连续失败计数（阈值触发）
-- ✅ 稳定性确认（连续成功N次）
-- ✅ 自动故障转移
-- ✅ 邮件通知分级（new/stable/unavailable/restarted/fallback）
-
-──────────────────────────────────────────────────
-
-📊 代码质量指标 (Code Quality Metrics)
-
-命名规范
-- 类名: PascalCase（AppException, ExceptionHandler）
-- 函数名: snake_case（send_heartbeat, validate_cookie）
-- 常量: UPPER_SNAKE_CASE（TIMEOUT_CONFIG, PROJECT_DIR）
-- 私有属性: 下划线前缀（_config, _lock）
-- 布尔变量: is_/has_/can_前缀（is_valid, has_cache）
-
-注释规范
-- 类注释: 功能说明 + 使用示例
-- 函数注释: Args/Returns/Raises + 类型标注
-- 复杂逻辑: 行内注释说明意图
-- TODO/FIXME: 标记待办事项
-
-错误处理等级
-1. 致命错误: 抛出AppException，终止流程
-2. 可恢复错误: ExceptionContext吞掉，返回默认值
-3. 警告: 日志记录，继续执行
-4. 静默异常: debug级别日志，不影响流程
-
-性能要求
-- API响应时间: < 500ms（P95）
-- 文件缓存TTL: 30秒
-- 速率限制: 200请求/分钟/IP
-- 子进程超时: 3-30秒（按场景）
-- 爬虫并发: 15线程
-
-──────────────────────────────────────────────────
-
-🔧 开发工作流 (Development Workflow)
-
-新功能开发流程
-1. 设计阶段
-   - 确定所属模块（异常/日志/业务/API）
-   - 选择合适的设计模式（单例/工厂/策略）
-   - 定义接口和数据结构
-
-2. 编码阶段
-   - 遵循命名规范和注释规范
-   - 使用safe_call/ExceptionContext处理异常
-   - 通过PathManager管理路径
-   - 使用ConfigManager读写配置
-
-3. 测试阶段
-   - 单元测试覆盖核心逻辑
-   - 集成测试验证流程
-   - 性能测试满足指标
-
-4. 文档阶段
-   - 更新README.md版本记录
-   - 更新skill.md范式文档
-   - 重新生成skill.docx
-
-Git提交规范
-docs: 文档更新
-feat: 新功能
-fix: Bug修复
-refactor: 代码重构
-perf: 性能优化
-test: 测试相关
-chore: 构建/工具
-security: 安全修复
-
-──────────────────────────────────────────────────
-
-📈 项目演进路线图 (Evolution Roadmap)
-
-v3.8.x - 企业级稳定版 (当前)
-- ✅ FastAPI全面迁移完成
-- ✅ 双隧道高可用方案
-- ✅ 企业级安全加固
-- ✅ 移动端完美适配
-- ✅ 完整的监控告警
-
-v3.9.x - 智能化增强版 (规划)
-- 🔲 AI辅助商品定价
-- 🔲 智能库存预测
-- 🔲 自动化报表生成
-- 🔲 多店铺管理
-- 🔲 分布式爬虫集群
-
-v4.0.x - 云原生架构 (远期)
-- 🔲 Kubernetes部署
-- 🔲 微服务拆分
-- 🔲 PostgreSQL迁移
-- 🔲 Redis缓存层
-- 🔲 消息队列集成
-
-──────────────────────────────────────────────────
-
-🎯 总结
-
-本项目实现了15大核心技术范式：
-
-1. ✅ 统一异常处理 - 分层捕获、分类、转换
-2. ✅ 环境自适应 - 跨平台无缝兼容
-3. ✅ 路径集中管理 - 避免硬编码、易维护
-4. ✅ 智能缓存机制 - TTL + 文件变更检测
-5. ✅ 安全邮件通知 - HTML富文本 + 事件分类
-6. ✅ 浏览器自动化 - Playwright + 智能滚动
-7. ✅ 数据对比分析 - 集合运算 + 高价筛选
-8. ✅ API安全防护 - 速率限制 + 输入验证
-9. ✅ 前端XSS防护 - 转义 + 白名单
-10. ✅ 双输出日志 - 控制台 + 文件同步
-11. ✅ 配置管理 - 懒加载 + 自动持久化
-12. ✅ Cookie生命周期 - 验证 + 过期提醒
-13. ✅ 文件清理自动化 - 分组保留 + 大小监控
-14. ✅ 后台任务管理 - 流式输出 + 优雅终止
-15. ✅ 隧道高可用 - 双活 + 心跳 + 故障转移
-
-这些范式构成了企业级Python Web应用的最佳实践集，可直接应用于类似项目。
-│   └── WegoScraper - 微购爬虫类
-└── API路由层
-    ├── FastAPI应用实例
-    ├── RESTful API端点
-    └── 请求验证与响应
-
-#### JavaScript前端模块 (dist/app.js)
-dist/app.js
-├── 安全工具函数
-│   ├── escapeHtml() - HTML转义
-│   ├── escapeAttr() - 属性转义
-│   ├── isValidUrl() - URL验证
-│   └── safeUrl() - 安全URL生成
-├── 设备检测系统
-│   ├── detectDevice() - 设备类型检测
-│   └── applyDeviceStyles() - 响应式样式应用
-├── 数据解析引擎
-│   ├── 日志解析 - Python输出解析
-│   ├── 正则表达式优化 - 多格式兼容
-│   └── 数据验证 - 容错机制
-├── UI渲染系统
-│   ├── 统计数据显示
-│   ├── 列表数据展示
-│   └── SKU标签渲染
-├── WebSocket通信
-│   ├── safeCloseWebSocket() - 安全关闭
-│   └── 状态感知关闭机制
-├── API客户端
-│   ├── safeParseJson() - 安全JSON解析
-│   └── 错误处理机制
-└── 事件绑定系统
-    ├── bindAllButtons() - 按钮绑定
-    ├── bindSkuTagEvents() - SKU标签事件
-    └── 全局函数暴露
-
-### 项目目录结构
-xy_ws/
-├── main.py                 # Python 后端主程序
-├── index.html              # 项目展示页
-├── README.md               # 项目说明文档
-├── skill.md                # 开发技能文档（本文件）
-├── skill.docx              # Word 格式文档（由 skill.md 生成）
-├── requirements.txt        # Python 依赖清单
-├── tox.ini                 # tox 配置
-├── clean_files.log         # 文件清理日志
-├── run.bat                 # Windows 启动脚本
-├── run.sh                  # Linux/Mac 启动脚本
-├── config/                 # 配置目录
-│   ├── config.json         # 主配置文件
-│   ├── config.json.example # 配置模板（脱敏）
-│   ├── cookies.json        # Cookie 存储
-│   ├── cookies.json.example# Cookie 模板
-│   ├── production.json     # 生产环境配置
-│   ├── staging.json        # 预发环境配置
-│   ├── input_stock_numbers.txt  # 货号输入文件
-│   ├── .encryption_key     # 配置加密密钥
-│   └── .salt               # 密钥派生盐值
-├── file/                   # 采集数据目录（按日期命名的微购相册 JSON）
-├── temp/                   # 临时文件目录
-├── test/                   # 辅助脚本目录
-│   ├── generate_docx.py    # skill.md → skill.docx 生成器
-│   ├── salt_crypto_tool.py # 加盐加密工具
-│   └── security_audit.py   # 安全审计脚本
-├── launchd/                # macOS 守护进程配置
-│   └── com.xyws.web.plist
-├── dist/                   # 前端资源
-│   ├── app.js              # 前端主逻辑
-│   ├── index.html          # HTML 入口
-│   ├── manifest.webmanifest
-│   ├── sw.js               # PWA Service Worker
-│   ├── registerSW.js       # Service Worker 注册
-│   ├── workbox-*.js        # Workbox 运行时
-│   ├── package.json        # Node.js 依赖声明
-│   ├── package-lock.json   # 依赖锁定
-│   ├── patches/            # patch-package 补丁
-│   ├── assets/             # 字体与打包资源
-│   ├── favicon/            # 站点图标
-│   ├── fonts/              # 本地字体
-│   ├── screenshots/        # 页面截图
-│   ├── weather-icons/      # 天气图标
-│   └── node_modules/       # 前端依赖
-├── tools/                  # 内置工具链
-│   ├── cloudflared/        # 内网穿透工具
-│   ├── node/               # Node.js 运行时（供 cloudflared 使用）
-│   ├── playwright/         # Playwright 浏览器内核
-│   └── python/             # 内置 Python 运行时
-└── .venv/                  # Python 虚拟环境
-
----
-
- (v3.8.90.11)
 
 ### v3.8.89.12.5 (2026-07-31) - 🐛Bug修复 修复商品字段解析逻辑 - 支持多行JSON对象
 
@@ -22206,7 +20247,7 @@ jobs:
 
 ---
 
-## 🔴 PY-CORE-030: PWA离线缓存范式 (Progressive Web App)
+## 🔴 PY-CORE-032: PWA离线缓存范式 (Progressive Web App)
 
 ### 范式描述
 使用Workbox实现PWA离线缓存，提升用户体验：
@@ -22254,7 +20295,7 @@ registerRoute(
 
 ---
 
-## 🟡 PY-CORE-031: Python依赖管理范式 (Python Dependency Management)
+## 🟡 PY-CORE-033: Python依赖管理范式 (Python Dependency Management)
 
 ### 范式描述
 标准化的Python依赖管理，确保可重复构建：
@@ -22325,7 +20366,7 @@ def install_playwright_cdn():
 
 ---
 
-## 🟡 PY-CORE-029: Node.js依赖管理与补丁持久化范式 (Node.js Dependency & Patch Management)
+## 🟡 PY-CORE-031: Node.js依赖管理与补丁持久化范式 (Node.js Dependency & Patch Management)
 
 ### 范式描述
 Node.js依赖管理，包含patch-package实现补丁持久化：
@@ -22611,7 +20652,7 @@ class TestMemoryAndResourceLimits:
 
 ---
 
-## 🟡 PY-CORE-035: 安全修复验证测试范式 (Security Fix Verification Testing)
+## 🟡 PY-CORE-037: 安全修复验证测试范式 (Security Fix Verification Testing)
 
 ### 范式描述
 针对已知安全漏洞的回归测试套件，确保修复不反弹：
@@ -22813,28 +20854,31 @@ class TestExceptionHandling:
 | PY-CORE-020 | E | 环境自适应 (Environment-Aware Design) | main.py | 🔴 核心 |
 | PY-CORE-021 | E | 边界条件测试 (Edge Case Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
 | PY-CORE-022 | E | Excel货号E列读取 (Excel SKU Column-E Read) | main.py | 🔴 核心 |
-| PY-CORE-023 | F | 前端安全防护 (Frontend Security) | dist/app.js | 🔴 核心 |
-| PY-CORE-024 | F | 字段名兼容性 (Field Name Compatibility) | main.py | 🔴 核心 |
-| PY-CORE-025 | H | 隧道高可用 (High-Availability Tunnel) | main.py | 🔴 核心 |
-| PY-CORE-026 | I | Import语句规范 (Import Statement Standard) | 全仓库 | 🔴 核心 |
-| PY-CORE-027 | I | 智能缓存管理 (Intelligent Caching) | main.py | 🔴 核心 |
-| PY-CORE-028 | L | 大文件小范围修改临时脚本 (Large-File Minimal-Edit Script) | 全仓库大文件 | 🔴 核心 |
-| PY-CORE-029 | N | Node.js依赖管理与补丁持久化 | dist/package.json | 🟡 重要 |
-| PY-CORE-030 | P | PWA离线缓存 (Progressive Web App) | dist/sw.js + registerSW.js | 🟡 重要 |
-| PY-CORE-031 | P | Python依赖管理 (Python Dependency Management) | requirements.txt | 🟡 重要 |
-| PY-CORE-032 | P | 范式编号规则 (Paradigm Numbering Rule) | 全仓库文档 | 🔴 核心 |
-| PY-CORE-033 | R | API速率限制与输入验证 (Rate Limiting & Input Validation) | main.py | 🔴 核心 |
-| PY-CORE-034 | S | 安全邮件通知 (Secure Email Notification) | main.py | 🔴 核心 |
-| PY-CORE-035 | S | 安全修复验证测试 (Security Fix Verification Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
-| PY-CORE-036 | S | 安全漏洞防护 (Security Vulnerability Protection) | main.py | 🔴 核心 |
-| PY-CORE-037 | S | 智能版本号匹配算法 (Smart Version Matching) | main.py | 🔴 核心 |
-| PY-CORE-038 | S | 安全审计零问题 (Security Audit Zero-Issue) | test/security_audit.py | 🔴 核心 |
-| PY-CORE-039 | T | 三方文档互证 (Three-Document Mutual Verification) | README.md / skill.md / skill.docx | 🔴 核心 |
-| PY-CORE-040 | T | 终端实时日志接入 (Terminal Real-Time Log Integration) | run.bat / run.sh | 🔴 核心 |
-| PY-CORE-041 | U | 统一异常处理 (Unified Exception Handling) | main.py | 🔴 核心 |
-| PY-CORE-042 | V | 版本号一致性保障 (Version Consistency Guarantee) | main.py / README.md | 🔴 核心 |
+| PY-CORE-023 | E | 编码处理最佳实践 (Encoding Best Practices) | main.py | 🔴 核心 |
+| PY-CORE-024 | F | 前端安全防护 (Frontend Security) | dist/app.js | 🔴 核心 |
+| PY-CORE-025 | F | 字段名兼容性 (Field Name Compatibility) | main.py | 🔴 核心 |
+| PY-CORE-026 | G | Git历史维护 (Git History Maintenance) | 全仓库 | 🟡 重要 |
+| PY-CORE-027 | H | 隧道高可用 (High-Availability Tunnel) | main.py | 🔴 核心 |
+| PY-CORE-028 | I | Import语句规范 (Import Statement Standard) | 全仓库 | 🔴 核心 |
+| PY-CORE-029 | I | 智能缓存管理 (Intelligent Caching) | main.py | 🔴 核心 |
+| PY-CORE-030 | L | 大文件小范围修改临时脚本 (Large-File Minimal-Edit Script) | 全仓库大文件 | 🔴 核心 |
+| PY-CORE-031 | N | Node.js依赖管理与补丁持久化 | dist/package.json | 🟡 重要 |
+| PY-CORE-032 | P | PWA离线缓存 (Progressive Web App) | dist/sw.js + registerSW.js | 🟡 重要 |
+| PY-CORE-033 | P | Python依赖管理 (Python Dependency Management) | requirements.txt | 🟡 重要 |
+| PY-CORE-034 | P | 范式编号规则 (Paradigm Numbering Rule) | 全仓库文档 | 🔴 核心 |
+| PY-CORE-035 | R | API速率限制与输入验证 (Rate Limiting & Input Validation) | main.py | 🔴 核心 |
+| PY-CORE-036 | S | 安全邮件通知 (Secure Email Notification) | main.py | 🔴 核心 |
+| PY-CORE-037 | S | 安全修复验证测试 (Security Fix Verification Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
+| PY-CORE-038 | S | 安全漏洞防护 (Security Vulnerability Protection) | main.py | 🔴 核心 |
+| PY-CORE-039 | S | 智能版本号匹配算法 (Smart Version Matching) | main.py | 🔴 核心 |
+| PY-CORE-040 | S | 安全审计零问题 (Security Audit Zero-Issue) | test/security_audit.py | 🔴 核心 |
+| PY-CORE-041 | S | subprocess超时配置 (Subprocess Timeout Configuration) | main.py | 🟡 重要 |
+| PY-CORE-042 | T | 三方文档互证 (Three-Document Mutual Verification) | README.md / skill.md / skill.docx | 🔴 核心 |
+| PY-CORE-043 | T | 终端实时日志接入 (Terminal Real-Time Log Integration) | run.bat / run.sh | 🔴 核心 |
+| PY-CORE-044 | U | 统一异常处理 (Unified Exception Handling) | main.py | 🔴 核心 |
+| PY-CORE-045 | V | 版本号一致性保障 (Version Consistency Guarantee) | main.py / README.md | 🔴 核心 |
 
-**总计: 42个核心范式（PY-CORE-001 ~ PY-CORE-042，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
+**总计: 45个核心范式（PY-CORE-001 ~ PY-CORE-045，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
 
 ---
 
@@ -22845,7 +20889,7 @@ class TestExceptionHandling:
 
 ---
 
-## 🔴 PY-CORE-024: 字段名兼容性范式 (Field Name Compatibility)
+## 🔴 PY-CORE-025: 字段名兼容性范式 (Field Name Compatibility)
 
 ### 范式描述
 由于JSON数据同时存储中文字段名和英文字段名（如 `商品描述`/`name`, `售价`/`price`），所有数据提取和解析代码必须实现**多重字段名兼容**，确保数据的完整性和向后兼容性。
@@ -23036,7 +21080,7 @@ Closes #123
 
 #### 后端代码 (Python)
 - [ ] 异常处理是否使用了 `ExceptionContext` 或 `safe_call()`?
-- [ ] 字段提取是否遵循 PY-CORE-024 字段兼容性范式?
+- [ ] 字段提取是否遵循 PY-CORE-025 字段兼容性范式?
 - [ ] 日志是否使用了 `logger.info/warning/error` 而非 `print()`?
 - [ ] 路径管理是否通过 `PathManager` 统一处理?
 - [ ] 是否有对应的单元测试?
@@ -23112,7 +21156,7 @@ prettier --write dist/app.js
 4. 查看浏览器控制台的 `[对比卡片]` 日志确认解析结果
 
 **解决方案**:
-- 更新 `get_product_detail()` 使用多字段名兼容（PY-CORE-024）
+- 更新 `get_product_detail()` 使用多字段名兼容（PY-CORE-025）
 - 增强前端正则支持多模式匹配
 
 ### Q2: 为什么PC端看不到对比卡片？
@@ -23265,7 +21309,7 @@ class CleanupChecklist:
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-031: subprocess 超时配置范式 (Subprocess Timeout Configuration)
+🔴 PY-CORE-041: subprocess 超时配置范式 (Subprocess Timeout Configuration)
 
 范式描述
 建立统一的 subprocess 调用超时管理机制，避免硬编码超时值，提升系统稳定性和可维护性。
@@ -23401,7 +21445,7 @@ if Environment.IS_WINDOWS:
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-029: 编码处理最佳实践范式 (Encoding Best Practices)
+🔴 PY-CORE-023: 编码处理最佳实践范式 (Encoding Best Practices)
 
 范式描述
 建立跨平台编码处理标准，确保中文等多字节字符在 Windows/Linux/macOS 上都能正确显示。
@@ -23576,7 +21620,7 @@ def setup_logger():
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-002: Git 历史维护范式 (Git History Maintenance)
+🔴 PY-CORE-026: Git 历史维护范式 (Git History Maintenance)
 
 范式描述
 建立规范的 Git 提交历史管理机制，保持历史整洁、可追溯、易于理解。
@@ -24524,7 +22568,7 @@ class ProductTableManager {
 ### 概述
 基于抖音SSRF攻击视频，实现了完整的服务器端请求伪造(SSRF)防御机制。
 
-## 🔴 PY-CORE-036: 安全漏洞防护范式 (Security Vulnerability Protection)
+## 🔴 PY-CORE-038: 安全漏洞防护范式 (Security Vulnerability Protection)
 
 ### 范式描述
 针对Web应用常见的安全漏洞（路径遍历、弱随机数、不安全SSL/TLS、内联导入、命令注入），实施**纵深防御**策略，确保每个攻击向量都有对应的防护措施。
@@ -24846,7 +22890,7 @@ if stripped.startswith('## ') and in_changelog:
 ---
 
 ---
-## 🔴 PY-CORE-037: 智能版本号匹配算法 (Smart Version Number Matching Algorithm)
+## 🔴 PY-CORE-039: 智能版本号匹配算法 (Smart Version Number Matching Algorithm)
 
 > **创建日期**: 2026-09-02 | **最后更新**: 2026-09-02 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 - commit message无版本号时的降级策略 | **参考基准**: v5.0.9.4
 
@@ -25093,7 +23137,7 @@ git filter-branch --msg-filter 'sed "s/fix:/v5.0.7/"'
 ### 相关范式
 
 - **PY-CORE-011**: Changelog版本变更详情完整结构范式
-- **PY-CORE-042**: 版本号一致性保障范式
+- **PY-CORE-045**: 版本号一致性保障范式
 - **PY-CORE-012**: **本文档**（CMD窗口输出与web_output.log一致性范式）← 当前文档
 ---
 ---

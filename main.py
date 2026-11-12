@@ -10885,6 +10885,24 @@ if __name__ == '__main__':
                     if not in_changelog:
                         continue
                     stripped = line.strip()
+                    if stripped.startswith('## ') and not stripped.startswith('### ') and not re.match(r'##\s+v[\d.]+', stripped):
+                        if current_entry:
+                            if current_change:
+                                current_entry['changes'].append(current_change)
+                                current_change = None
+                            if not current_entry['changes']:
+                                current_entry['changes'] = [{
+                                    'id': '1',
+                                    'title': current_entry.get('title', '版本更新'),
+                                    'tag': '📝版本更新',
+                                    'problem': {},
+                                    'solution': {},
+                                    'verification': []
+                                }]
+                            changelog.append(current_entry)
+                            current_entry = None
+                        current_block_type = None
+                        continue
                     version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
                     if not version_match:
                         version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.split(' - ')[0].strip())
