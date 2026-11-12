@@ -19,21 +19,21 @@
 | ⚙️ 配置说明 | config.json 字段、加密与端口配置 |
 | 🔐 安全合规状态 | 加密存储与安全检查项 |
 | 📐 版本更新记录范式规范 (PY-CORE-011) | changelog 结构强制规范 |
+| 📄 文档生成方法 (PY-CORE-016: skill.docx生成范式) | docx 生成流程与校验 |
 | 📐 双启动脚本同步范式 (PY-CORE-017) | run.sh / run.bat 1:1 同步要求 |
-| 📐 终端实时日志接入范式 (PY-CORE-043) | sh / bat 实时日志双方案 |
 | 📐 DOCX 文档生成范式 (PY-CORE-018) | 导航置顶第一页与生成校验规范 |
-| 📐 安全审计零问题范式 (PY-CORE-040) | 总计问题必须为 0 的判定标准 |
-| 📐 大文件小范围修改临时脚本范式 (PY-CORE-030) | 大文件禁用全量重写，锚点式最小替换 |
-| 📐 Excel 货号 E 列读取范式 (PY-CORE-022) | 平台子表仅读 E 列，货号正则 3-10 位 |
 | 📐 每日利润表读取范式 (PY-CORE-019) | 每日利润子表 A-F 列布局与聚合规则 |
+| 📐 Excel 货号 E 列读取范式 (PY-CORE-022) | 平台子表仅读 E 列，货号正则 3-10 位 |
+| 📐 大文件小范围修改临时脚本范式 (PY-CORE-030) | 大文件禁用全量重写，锚点式最小替换 |
 | 📐 范式编号规则范式 (PY-CORE-034) | 前缀+三位数字、A-Z 位次累加与区间表 |
+| 📐 安全审计零问题范式 (PY-CORE-040) | 总计问题必须为 0 的判定标准 |
+| 📐 终端实时日志接入范式 (PY-CORE-043) | sh / bat 实时日志双方案 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
 | 🔧 JavaScript 开发规范 (app.js) | 前端编码规范 |
 | 🐍 Python 开发规范 (main.py) - 完整版 | 后端编码规范 |
 | 🚨 常见问题 & 解决方案 (FAQ) | 高频问题与排查路径 |
-| 📄 文档生成方法 (PY-CORE-016: skill.docx生成范式) | docx 生成流程与校验 |
 | 🔄 版本历史 | 历史版本归档索引 |
 
 ---
@@ -331,6 +331,474 @@ bandit -r . -f json -o bandit_report.json
 
 ---
 
+## ⚙️ 动态编码规范 (Dynamic Coding Standard) - **强制遵守**
+
+> **📌 核心原则**: 除明确例外情况外,项目所有代码必须实现**100%动态化配置**,禁止硬编码魔法数字/字符串。
+
+### 规则速查表
+
+| 代码类型 | 是否需要动态化 | 动态化方式 |
+|---------|--------------|-----------|
+| **main.py** (非隧道) | ✅ **必须** | `os.environ.get()` + 默认值 |
+| **dist/app.js** | ✅ **必须** | 配置对象/API获取 |
+| **run.bat / run.sh** | ✅ **必须** | 环境变量/配置文件 |
+| **config/*.json** | ✅ **必须** | 运行时读取+加密 |
+| **其他.py/.js文件** | ✅ **必须** | 配置注入/参数传递 |
+| **test/*.py** | ❌ **不需要** | 允许硬编码 |
+| **CF/Hostc隧道相关** | ❌ **不需要** | 固定值 |
+
+### 关键规则
+
+1. **✅ 必须动态化**: 超时时间、重试次数、端口、地址、间隔等所有可配置参数
+2. **✅ 实现方式**: Python用`os.environ.get('KEY', 'default')`，JS用`CONFIG`对象集中管理
+3. **✅ 允许例外**: test/目录、CF/Hostc隧道参数、UI像素常量（需注释说明原因）
+4. **❌ 禁止行为**: 裸露魔法数字、硬编码路径/URL、散落的超时值
+
+### 快速示例
+
+```python
+# ✅ 正确 - 动态配置
+TIMEOUT_CONFIG = {
+    'http_request': int(os.environ.get('TIMEOUT_HTTP_REQUEST', '10')),
+}
+
+# ❌ 错误 - 硬编码（禁止）
+TIMEOUT = 10
+```
+
+**📖 完整规范**: 详见 [skill.md - 动态编码规范章节](skill.md#动态编码规范-dynamic-coding-standard-强制遵守)
+
+**📌 生效版本**: v5.0.9.51 (2026-09-07) 起
+
+---
+
+## 🟡 PY-CORE-002: API压力测试范式 (API Stress Testing)
+
+### 范式描述
+标准化的API压力测试工具，用于性能评估和瓶颈发现：
+
+### 核心实现
+#!/usr/bin/env python3
+"""
+Szwego商品爬虫 - API压力测试工具
+
+用法:
+    python stress_test.py --target http://localhost:5000 --concurrent 100 --requests 1000
+"""
+
+def make_request(url, method='GET', data=None, timeout=10):
+    """发送HTTP请求并记录指标"""
+    start = time.time()
+    try:
+        headers = {'Content-Type': 'application/json'}
+        req = Request(url, data=data.encode('utf-8') if data else None, 
+                     headers=headers, method=method)
+        resp = urlopen(req, timeout=timeout)
+        status = resp.getcode()
+        body = resp.read().decode('utf-8', errors='replace')
+        elapsed = time.time() - start
+        return {'status': status, 'time': elapsed, 'error': None, 'size': len(body)}
+    except HTTPError as e:
+        return {'status': e.code, 'time': time.time() - start, 'error': str(e), 'size': 0}
+    except Exception as e:
+        return {'status': 0, 'time': time.time() - start, 'error': str(e), 'size': 0}
+
+def run_stress_test(target, concurrent, total_requests, endpoints):
+    """执行压力测试"""
+    results = []
+
+    with ThreadPoolExecutor(max_workers=concurrent) as executor:
+        futures = []
+        for i in range(total_requests):
+            ep = endpoints[i % len(endpoints)]
+            futures.append(executor.submit(worker, ep))
+
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                results.append(result)
+
+    # 统计分析
+    success = [r for r in results if 200 <= r['status'] < 400]
+    times = [r['time'] for r in results]
+
+    print(f"成功率: {len(success)/len(results)*100:.2f}%")
+    print(f"平均响应时间: {statistics.mean(times)*1000:.2f}ms")
+    print(f"P99响应时间: {sorted(times)[int(len(times)*0.99)]*1000:.2f}ms")
+
+使用示例
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Szwego API压力测试工具')
+    parser.add_argument('--target', default='http://localhost:5000')
+    parser.add_argument('--concurrent', type=int, default=100)
+    parser.add_argument('--requests', type=int, default=1000)
+    args = parser.parse_args()
+
+    run_stress_test(args.target, args.concurrent, args.requests, [])
+
+### 关键指标
+| 指标 | 说明 | 目标值 |
+|------|------|--------|
+| **成功率** | HTTP 200-399比例 | > 95% |
+| **平均延迟** | 响应时间均值 | < 200ms |
+| **P99延迟** | 99分位响应时间 | < 1000ms |
+| **QPS** | 每秒请求数 | > 500 |
+
+---
+
+## 🔴 PY-CORE-008: 跨平台启动脚本范式 (Cross-Platform Startup Script)
+
+### 范式描述
+统一的跨平台启动脚本，支持Windows (.bat) 和Linux/macOS (.sh)，实现：
+- 环境自动检测与安装
+- Python/Node.js依赖管理
+- 镜像源自动选择
+- 进程清理与端口管理
+- 统一日志输出
+
+### 核心实现
+
+#### Windows启动脚本 (run.bat)
+@echo off
+setlocal enabledelayedexpansion
+chcp 65001 > nul 2>&1
+cd /d "%~dp0"
+set PYTHONIOENCODING=utf-8
+
+:: 版本自动读取
+set "VERSION=0.0.0"
+for /f "delims=" %%i in ('py -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2^>nul') do set "VERSION=%%i"
+
+:: 统一日志函数（毫秒级时间戳）
+:ms_timestamp
+set "TIMESTAMP="
+if defined _TS_PYTHON (
+    for /f "delims=" %%t in ('"!_TS_PYTHON!" -c "from datetime import datetime; d=datetime.now(); print(d.strftime(\"%%Y-%%m-%%d %%H:%%M:%%S.\")+f\"{d.microsecond//1000:03d}\")" 2^>nul') do set "TIMESTAMP=%%t"
+)
+if not defined TIMESTAMP set "TIMESTAMP=%date% %time: =0%"
+exit /b
+
+:log
+call :ms_timestamp
+echo [%TIMESTAMP%] %*
+if not "%LOG_FILE%"=="" (
+    if exist "!LOG_FILE!" (
+        >> "!LOG_FILE!" echo [%TIMESTAMP%] %* 2>nul
+    )
+)
+exit /b
+
+:: 环境检测（6步流程）
+:detect_environments
+call :detect_python_env    :: [1/6] 检测Python环境
+call :detect_node_env      :: [2/6] 检测Node.js环境  
+call :test_pip_mirrors     :: [3/6] 测试PIP加速镜像源
+call :test_npm_mirrors     :: [4/6] 测试NPM加速镜像源
+call :detect_venv          :: [5/6] 检测Python虚拟环境
+call :setup_venv           :: [6/6] 设置虚拟环境并安装依赖
+
+:: 镜像源自动选择（以延迟最低为最优）
+:test_pip_mirrors
+set "MIRRORS[0]=https://pypi.tuna.tsinghua.edu.cn/simple|清华源"
+set "MIRRORS[1]=https://mirrors.aliyun.com/pypi/simple/|阿里云"
+set "MIRRORS[2]=https://pypi.douban.com/simple/|豆瓣"
+
+:: 测试每个镜像源的连接时间
+for /L %%i in (0,1,3) do (
+    for /f "tokens=1,2 delims=|" %%a in ("!MIRRORS[%%i]!") do (
+        curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 1.5 "!MIRROR_URL!"
+        :: 选择延迟最低的镜像源
+    )
+)
+
+#### Linux/macOS启动脚本 (run.sh)
+#!/bin/bash
+cd "$(dirname "$0")"
+
+版本自动读取
+VERSION="0.0.0"
+for cmd in python3 python; do
+    if command -v "$cmd" &>/dev/null; then
+        VERSION=$("$cmd" -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')") && break
+    fi
+done
+
+统一日志函数（兼容GNU date和BSD date）
+_ms_timestamp() {
+    if date '+%3N' 2>/dev/null | grep -qE '^[0-9]{3}$'; then
+        date '+%Y-%m-%d %H:%M:%S.%3N'  # GNU date
+    else
+        local ms=$(python3 -c "from datetime import datetime; print(datetime.now().microsecond//1000)" 2>/dev/null || echo "000")
+        printf '%s.%03d' "$(date '+%Y-%m-%d %H:%M:%S')" "${ms:-000}"  # BSD date fallback
+    fi
+}
+
+log() {
+    TIMESTAMP="$(_ms_timestamp)"
+    echo "[$TIMESTAMP] $*"
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE" 2>/dev/null
+}
+
+环境检测（6步流程）
+pre_launch() {
+    detect_python_env   # [1/6]
+    detect_node_env     # [2/6]
+    test_pip_mirrors    # [3/6]
+    test_npm_mirrors    # [4/6]
+    detect_venv         # [5/6]
+    setup_venv          # [6/6]
+}
+
+### 关键特性
+1. **版本自动解析**: 从README.md正则提取版本号
+2. **毫秒级日志**: 支持Windows和Unix的高精度时间戳
+3. **镜像源智能选择**: 自动测试并选择最快镜像
+4. **进程管理**: 启动前分层清理残留进程（精准+兜底），端口冲突检测
+5. **环境自愈**: 自动安装缺失的Python/Node.js环境
+
+### 残留进程分层清理策略 (v3.8.89.30+)
+
+启动脚本在主流程开始前执行分层进程清理，从源头消除Playwright驱动残留node进程导致的 `Connection closed while reading from the driver` 错误：
+
+**清理顺序（精准→兜底）**:
+
+| 顺序 | 目标 | Windows (run.bat) | Linux/macOS (run.sh) |
+|------|------|-------------------|----------------------|
+| 1 | Playwright驱动node进程 | `wmic` 查命令行含playwright的node.exe → `taskkill /PID` | `pkill -9 -f "playwright"` |
+| 2 | hostc隧道进程 | `taskkill /F /IM hostc.exe` | `pkill -9 -f "hostc"` |
+| 3 | python主进程 | `taskkill /F /IM python.exe` | `pkill -9 -f "python.*main.py"` |
+| 4 | 所有剩余node进程（兜底） | `taskkill /F /IM node.exe` | `pkill -9 node` |
+
+**设计要点**:
+- **精准优先**: 先用命令行特征匹配杀Playwright驱动node进程，避免误杀其他node应用
+- **兜底保障**: 再用进程名通配杀所有node进程，防止遗漏的驱动残留
+- **跨平台对齐**: run.bat与run.sh清理逻辑保持一致，仅命令语法不同
+- **端口冲突检测**: 清理后检测8888端口占用，超时则强制清理占用PID
+
+---
+
+## 🔴 PY-CORE-009: CI/CD自动化部署范式 (CI/CD Automation)
+
+### 范式描述
+GitHub Actions工作流，实现：
+- 多操作系统测试矩阵
+- 自动化构建与部署
+- 安全扫描与质量检查
+- 通知与报告生成
+
+### 核心实现
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.0', '3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pytest pytest-cov
+
+    - name: Run tests
+      run: |
+        pytest test/ -v --cov=. --cov-report=xml
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run Bandit Security Scan
+      run: |
+        pip install bandit
+        bandit -r main.py -ll
+
+  deploy:
+    needs: [test, security-scan]
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to production
+      run: |
+        echo "部署到生产环境"
+
+---
+
+## 🔴 PY-CORE-010: Changelog API数据结构与Git历史集成范式 (Changelog API & Git History Integration)
+
+> **创建日期**: 2026-08-31 | **最后更新**: 2026-08-31 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 + 前端更新日志展示 | **参考基准**: v5.0.9
+
+### 范式描述
+`/api/changelog` 端点必须集成 **README.md 结构化解析** 与 **Git提交历史**，确保所有Git提交（无论多少次）都展示在API中。前后端必须使用统一的数据结构字段名，避免字段名不匹配导致Web展示空白。
+
+### 核心原则
+
+#### 1. 后端数据结构标准 (唯一合法格式)
+```python
+# ✅ 正确：changelog API返回的数据结构
+{
+    "success": True,
+    "changelog": [
+        {
+            "version": "5.0.9",           # 版本号或commit short hash
+            "date": "2026-08-31",        # 日期 YYYY-MM-DD
+            "title": "更新标题",          # 简短描述
+            "meta": {
+                "fix_date": "2026-08-31",
+                "fix_type": "🐛Bug修复",  # Emoji标签类型
+                "affected_files": "[main.py](main.py)",  # 带文件链接
+                "commit": "d9f7a9af",     # commit short hash
+                "change_stats": "+72行",
+                "author": "小旭二手机（西园路）"
+            },
+            "changes": [                  # ⚠️ 字段名必须是 changes（不是 items）
+                {
+                    "id": "1",
+                    "title": "变更标题",
+                    "tag": "🐛Bug修复",   # ⚠️ 字段名必须是 tag（不是 type）
+                    "problem": {
+                        "phenomenon": "现象描述",
+                        "root_cause": "根因分析",
+                        "scope": "影响范围"
+                    },
+                    "solution": {
+                        "implementation": "技术实现",
+                        "reference": "参考位置"
+                    },
+                    "verification": ["✅ 验证项1", "✅ 验证项2"]
+                }
+            ]
+        }
+    ]
+}
+```
+
+#### 2. 前端字段名兼容性 (必须实现)
+```javascript
+// ✅ 正确：兼容新旧数据结构
+var changes = latest.changes || latest.items || [];  // 优先 changes，降级 items
+
+// ❌ 错误：只访问单一字段名（导致Web展示空白）
+if (latest.items && latest.items.length) { ... }  // latest.items 为 undefined
+```
+
+**字段名映射表**:
+| 新字段 (v5.0.8+) | 旧字段 (v4.3及之前) | 说明 |
+|------------------|---------------------|------|
+| `changes` | `items` | 变更列表 |
+| `tag` | `type` | 变更类型标签 |
+| `problem` | - | 问题描述块 |
+| `solution` | - | 修复方案块 |
+| `verification` | - | 测试验证列表 |
+
+#### 3. Git提交历史集成逻辑
+```python
+# 合并策略：每个git提交都创建一个changelog条目（不去重）
+readme_version_map = {entry['version']: entry for entry in changelog}
+readme_versions_used = set()
+merged_changelog = []
+
+git_log_output = subprocess.check_output(
+    ['git', 'log', '--pretty=format:%H|%ad|%s', '--date=short'],
+    cwd=PROJECT_DIR, text=True, encoding='utf-8', stderr=subprocess.DEVNULL
+).strip()
+
+for log_line in git_log_output.split('\n'):
+    commit_hash, commit_date, commit_msg = parts
+    short_hash = commit_hash[:8]
+    version_key = re.search(r'v([\d.]+)', commit_msg)  # 从message提取版本号
+
+    if version_key in readme_version_map and version_key not in readme_versions_used:
+        # 首次匹配到README版本：使用完整结构化数据
+        readme_versions_used.add(version_key)
+        merged_changelog.append(readme_version_map[version_key])
+    else:
+        # 其余提交：从commit message生成基本条目
+        merged_changelog.append({
+            'version': version_key,
+            'date': commit_date,
+            'changes': [{'tag': '📝代码提交', 'problem': {...}, 'solution': {...}}]
+        })
+
+# README独有版本追加到末尾
+for entry in changelog:
+    if entry['version'] not in readme_versions_used:
+        merged_changelog.append(entry)
+```
+
+#### 4. 前端渲染规范
+```javascript
+// ✅ 正确：渲染问题描述/修复方案/测试验证三个块
+if (item.problem && Object.keys(item.problem).length) {
+    // 渲染：现象/根因/影响范围
+}
+if (item.solution && Object.keys(item.solution).length) {
+    // 渲染：技术实现/参考位置
+}
+if (item.verification && item.verification.length) {
+    // 渲染：✅ 验证项列表
+}
+```
+
+### 应用场景
+
+| 场景 | 文件位置 | 说明 |
+|------|----------|------|
+| **后端API端点** | `main.py` `/api/changelog` | 解析README.md + 集成git log |
+| **前端展示** | `dist/app.js:1070+` | 渲染changelog到Web界面 |
+| **版本检测** | `main.py` `get_version_from_readme()` | 从README提取最大版本号 |
+
+### 最佳实践清单
+
+- [ ] **后端字段名**：变更列表必须用 `changes`，类型标签必须用 `tag`
+- [ ] **前端兼容性**：使用 `latest.changes || latest.items || []` 兼容新旧结构
+- [ ] **Git历史集成**：每个git提交都创建独立条目，不去重
+- [ ] **版本号提取**：从commit message用 `re.search(r'v([\d.]+)')` 提取
+- [ ] **Emoji标签识别**：从commit message开头识别emoji自动分类
+- [ ] **字段补全**：自动补全commit hash、修复日期、作者字段
+- [ ] **异常处理**：git log失败时降级为仅返回README解析结果
+
+### 反面案例（避免）
+
+❌ 错误示例1：前端只访问旧字段名
+```javascript
+if (latest.items && latest.items.length) { ... }  // latest.items = undefined → 空白
+```
+
+❌ 错误示例2：按版本号去重git提交
+```python
+if version_key in seen_versions: continue  # 丢失同版本的多次提交
+```
+
+❌ 错误示例3：解析器遇到##就break
+```python
+if stripped.startswith('## ') and in_changelog:
+    break  # 只返回最新更新区，丢失历史版本
+```
+
+---
+
+---
 ## 📐 版本更新记录范式规范 (PY-CORE-011)
 
 > **创建日期**: 2026-09-08 | **最后更新**: 2026-09-08 | **优先级**: 🔴 P0 强制规范 | **适用范围**: README.md / skill.md / skill.docx
@@ -363,6 +831,1164 @@ bandit -r . -f json -o bandit_report.json
 > 完整范式模板和示例请查看 [skill.md](skill.md) 的 `## 📐 版本更新记录范式规范` 章节
 
 ---
+
+
+### 范式描述
+
+定义README.md中每个版本记录的**标准化变更详情结构**，确保changelog API返回的changes数组不为空，且包含完整的问题描述、修复方案和测试验证信息。
+
+### 优先级：🔴 **P0 - 必须遵守**
+
+所有版本记录（包括历史版本）必须遵循此结构，否则会导致：
+- API返回 changes: [] 空数组
+- 前端展示缺少关键信息
+- 用户无法了解具体修复内容
+- **禁止占位符**：所有字段必须填写真实数据，严禁使用"待补充"占位符。Commit必须用git log按版本号匹配的真实hash，变更统计必须用git diff --shortstat获取真实行数
+
+---
+
+### 标准结构模板
+
+每个版本必须包含以下层级结构：
+
+\\\markdown
+### vX.X.X (YYYY-MM-DD) - [emoji] **[类型]** [标题]
+
+#### 更新内容: [一句话描述本次更新的核心价值]
+
+**修复日期**: YYYY-MM-DD
+**修复类型**: [类型标签]
+**影响文件**: [文件链接列表]
+**Commit**: [8位commit hash]
+**变更统计**: [+X行 -Y行]
+**作者**: [作者名称]**
+
+---
+
+##### 1. [具体变更标题] ([类型标签])
+
+**问题描述**:
+- **现象**: [用户可见的问题或错误表现]
+- **根因**: [技术层面的根本原因分析]
+- **影响范围**: [受影响的模块/文件/功能]
+
+**修复方案**:
+- **技术实现**: [具体的代码/配置/架构修改方法]
+- **参考位置**: [commit hash, 文件路径#行号, 范式文档链接]
+
+**测试验证**:
+- ✅ [验证项1：可复现的测试结果]
+- ✅ [验证项2：自动化测试通过]
+- ✅ [验证项3：人工验收确认]
+\\\
+
+---
+
+### 字段规范详解
+
+#### 1. 版本头部信息（#### 层级）
+
+| 字段 | 格式要求 | 示例 | 必填 |
+|------|----------|------|------|
+| **更新内容** | 一句话概括核心价值 | "实现智能版本号匹配算法" | ✅ 是 |
+| **修复日期** | YYYY-MM-DD | "2026-09-02" | ✅ 是 |
+| **修复类型** | emoji + 类型标签 | "🧠功能增强", "🐛Bug修复" | ✅ 是 |
+| **影响文件** | Markdown链接格式 | "[main.py](main.py), [skill.md](skill.md)" | ✅ 是 |
+| **Commit** | 8位短hash | "6c09b2b3" | ✅ 是 |
+| **变更统计** | Git numstat格式 | "+23行 -1行"（必须真实，禁止"待补充"） | ✅ 是 |
+| **作者** | 统一格式 | "小旭二手机（西园路）" | ✅ 是 |
+
+#### 2. 变更详情块（##### 层级）
+
+每个版本至少包含**一个**变更详情块，结构如下：
+
+##### **标题行**
+\\\
+##### N. [标题] ([类型标签])
+\\\
+- **N**: 序号，从1开始递增
+- **标题**: 具体描述本次变更的内容（20-50字）
+- **类型标签**: 与修复类型一致
+
+##### **问题描述区块**
+\\\
+**问题描述**:
+- **现象**: [用户视角的问题描述]
+- **根因**: [开发者视角的原因分析]
+- **影响范围**: [受影响的文件/模块/API]
+\\\
+
+**填写原则**：
+- **现象**：用户能看到、能复现的问题（如"页面显示空白"、"API返回500"）
+- **根因**：技术层面的根本原因（如"正则表达式未转义"、"数据库连接池耗尽"）
+- **影响范围**：明确列出受影响的文件路径和功能模块
+
+##### **修复方案区块**
+\\\
+**修复方案**:
+- **技术实现**: [具体的修改方法]
+- **参考位置**: [可点击的链接]
+\\\
+
+**填写原则**：
+- **技术实现**：说明"做了什么"，而不是"做了什么好"
+  - ✅ 正确："使用re.escape()对用户输入进行转义"
+  - ❌ 错误："优化了安全性"
+- **参考位置**：提供可追溯的定位信息
+  - commit hash（用于Git blame）
+  - 文件路径+行号（用于IDE跳转）
+  - 范式文档编号（用于查阅开发规范）
+
+##### **测试验证区块**
+\\\
+**测试验证**:
+- ✅ [验证项1]
+- ✅ [验证项2]
+\\\
+
+**填写原则**：
+- 每个验证项必须**具体、可复现**
+- 使用✅符号表示已通过
+- 至少包含2个验证项：
+  1. 功能性验证（如"API正常返回200"）
+  2. 数据完整性验证（如"changes数组非空"）
+
+---
+
+### 类型标签对照表
+
+| 标签 | 适用场景 | 示例 |
+|------|----------|------|
+| 🐛Bug修复 | 修复已知问题 | "run.bat编码问题根治" |
+| ✨功能增强 | 新增或改进功能 | "changelog API集成Git历史" |
+| 📝文档更新 | 更新文档/注释/规范 | "skill.md新增PY-CORE-010" |
+| 🏗️架构优化 | 重构/解耦/性能优化 | "单文件架构确认" |
+| 🔒安全加固 | 安全漏洞修复 | "CSRF同源校验" |
+| ⚡性能优化 | 响应速度/资源占用优化 | "减少等待时间" |
+| 🗑️清理 | 删除无用代码/文件 | "删除临时脚本" |
+| 🧠智能升级 | AI/算法相关改进 | "智能版本号匹配算法" |
+| ⚙️配置管理 | 配置文件/环境变量调整 | "滚动参数可配置化" |
+
+---
+
+### 完整示例（v5.0.9.16）
+
+\\\markdown
+
+#### 核心开发范式
+1. **隧道管理范式**: tunnel_url.txt作为权威数据源
+2. **邮件通知范式**: 独立发送，防重复机制
+3. **心跳验证范式**: 每个隧道独立验证
+4. **跨平台兼容范式**: 动态路径检测
+5. **错误处理范式**: 统一异常捕获和日志
+6. **配置管理范式**: 环境变量优先
+7. **测试范式**: 单元测试覆盖核心逻辑
+```
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **范式文档完整性** | 缺失 ❌ | 完整 ✅ |
+| **新手上手难度** | 高 ❌ | 低 ✅ |
+| **代码规范性** | 低 ❌ | 高 ✅ |
+
+**技术细节**: 补全7项核心开发范式文档，包括隧道管理、邮件通知、心跳验证等关键范式
+
+#### 移动端适配范式
+1. **响应式布局**: 使用CSS Flexbox和Grid
+2. **触摸优化**: 按钮最小尺寸44x44px
+3. **字体适配**: 使用rem单位
+4. **图片优化**: 使用WebP格式，懒加载
+5. **性能优化**: 减少HTTP请求，使用CDN
+```
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **移动端适配规范** | 无 ❌ | 完整 ✅ |
+| **开发效率** | 低 ❌ | 高 ✅ |
+| **用户体验** | 差 ❌ | 好 ✅ |
+
+**技术细节**: 将移动端适配经验文档化，形成可复用的开发范式
+
+#### 版本历史
+- v3.8.11: 完整历史记录恢复与文档更新
+- v3.8.10: 更新文档：README.md + skill.md + skill.docx 同步代码规范
+- v3.8.9: 强制URL去重机制
+- ...（恢复所有历史版本）
+```
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **历史记录完整性** | 不完整 ❌ | 完整 ✅ |
+| **文档准确性** | 过时 ❌ | 最新 ✅ |
+| **可追溯性** | 差 ❌ | 好 ✅ |
+
+**技术细节**: 恢复完整历史记录，更新文档确保与最新代码同步
+
+#### 文档体系
+1. **README.md**: 项目概述和快速开始
+2. **skill.md**: 开发技能文档（**含动态编码规范**）
+3. **skill.docx**: Word格式文档
+4. **API文档**: 接口文档
+5. **开发规范**: 代码规范和最佳实践
+
+---
+
+```
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **文档完整性** | 不完整 ❌ | 完整 ✅ |
+| **文档体系** | 缺失 ❌ | 完善 ✅ |
+| **开发者体验** | 差 ❌ | 好 ✅ |
+
+**技术细节**: 全面升级文档系统，建立完整的文档体系，包括README.md、skill.md、skill.docx、API文档等
+
+---
+
+
+所有版本更新记录**必须**遵循以下范式，确保问题可追溯、根因可定位、修复可验证：
+
+```markdown
+### vX.Y.Z (YYYY-MM-DD) - <emoji> <简述>
+
+#### 问题: <一句话描述问题>
+**现象**: <用户可感知的具体表现，包含错误信息、日志输出、界面异常等>
+
+**根本原因**:
+1. **<模块/函数>缺陷**: <技术层面的根因分析，说明为什么会产生这个问题>
+2. **<关联模块>缺陷**: <如有多个根因，逐一列出>
+
+**修复方案**:
+```<language>
+// ❌ 修复前：<简述旧逻辑的问题>
+<旧代码>
+
+// ✅ 修复后：<简述新逻辑的改进>
+<新代码>
+```
+
+**修复效果**:
+| 指标 | 修复前 | 修复后 |
+|------|--------|--------|
+| **<指标1>** | <错误状态> ❌ | <正确状态> ✅ |
+| **<指标2>** | <错误状态> ❌ | <正确状态> ✅ |
+
+**技术细节**:
+- <技术原理说明1>
+- <技术原理说明2>
+- <注意事项或边界条件>
+```
+
+**范式要素说明**:
+
+| 要素 | 必填 | 说明 |
+|------|------|------|
+| **问题** | ✅ | 一句话概括问题本质 |
+| **现象** | ✅ | 用户可感知的具体表现，附错误信息/日志 |
+| **根本原因** | ✅ | 技术层面的根因，编号列出，关联到具体模块/函数 |
+| **修复方案** | ✅ | 修复前❌ + 修复后✅ 的代码对比 |
+| **修复效果** | ✅ | 量化对比表，含❌/✅标记 |
+| **技术细节** | ✅ | 原理说明、注意事项、边界条件 |
+| **持久化保护** | 条件必填 | 涉及patch-package/配置变更时必填 |
+
+**Emoji对照表**: 🐛Bug修复 🔧功能优化 ✨新功能 🔒安全修复 🎯精准修复 📝文档更新 ♻️重构
+
+## 🖥️ PY-CORE-012: CMD窗口输出与web_output.log一致性范式 (Console-Log Consistency Paradigm)
+
+> **创建日期**: 2026-09-03 | **最后更新**: 2026-09-03 | **优先级**: 🔴 P0 强制规范 | **适用范围**: run.bat / run.sh / web_output.log / CMD窗口 / 终端窗口 | **参考基准**: v5.0.9.34 启动输出
+
+### 范式描述
+
+确保**CMD/终端窗口显示的输出**与**web_output.log文件内容**完全一致，用户在窗口中看到的每一行都与日志文件中记录的每一行一一对应，无多余噪音信息。
+
+### 核心原则
+
+#### 1. 禁止出现的窗口噪音输出
+
+| 序号 | 禁止输出类型 | 示例 | 原因 |
+|------|-------------|------|------|
+| 1 | **命令回显** | `D:\ws\xy_ws>set "PYTHONIOENCODING=utf-8"` | 内部变量设置，用户无需知晓 |
+| 2 | **子程序调用** | `D:\ws\xy_ws>call :check_admin_rights` | 内部流程控制，用户无需知晓 |
+| 3 | **条件判断** | `D:\ws\xy_ws>if errorlevel 1 (` | 逻辑分支，用户无需知晓 |
+| 4 | **循环展开** | `D:\ws\xy_ws>(for /F "tokens=2 delims=v " %v in (...) do ...)` | 版本检测内部过程，用户无需知晓 |
+| 5 | **WMIC输出** | `for /F "tokens=2 delims==" %I in ('wmic os get localdatetime /value') do set "datetime=%I"` | 时间戳获取内部过程，用户无需知晓 |
+| 6 | **编码设置回显** | `chcp 65001 1>nul 2>&1` | 编码切换细节，用户无需知晓 |
+| 7 | **BOM错误** | `'@echo' 不是内部或外部命令` | UTF-8 BOM导致的噪音错误 |
+
+#### 2. 标准输出格式（与web_output.log完全一致）
+
+每一行输出**必须**遵循格式：`[YYYY-MM-DD HH:MM:SS.mmm] 消息内容`
+
+完整启动输出示例（web_output.log标准格式）：
+
+```
+[2026-09-03 10:08:20.392] ======================================== 
+[2026-09-03 10:08:20.493] Szwego商品爬虫和货号对比工具 - v5.0.9.34 
+[2026-09-03 10:08:20.624] ======================================== 
+
+[2026-09-03 10:08:20.751] [*] 清理残留进程... 
+[2026-09-03 10:08:22.712] [*] 残留进程清理完成 
+
+[2026-09-03 10:08:22.814] [*] 检查 hostc 隧道工具... 
+[2026-09-03 10:08:23.121] [*] hostc v1.3.0 已就绪 
+
+[2026-09-03 10:08:23.230] [*] 启动 hostc 隧道（后台运行）... 
+[2026-09-03 10:08:23.348] [*] hostc 已在后台启动 
+
+[2026-09-03 10:08:23.452] [*] 清理临时文件... 
+[2026-09-03 10:08:25.230] [*] playwright-browsers目录不存在，跳过 
+
+[2026-09-03 10:08:25.394] ======================================== 
+[2026-09-03 10:08:25.485] 综合环境检测与配置 
+[2026-09-03 10:08:25.577] ======================================== 
+[2026-09-03 10:08:25.662] [1/6] 检测Python环境... 
+
+[2026-09-03 10:08:25.796] Python版本： 
+[2026-09-03 10:08:27.623] Python 3.14.3 
+[2026-09-03 10:08:27.711] [*] 检测虚拟环境状态... 
+[2026-09-03 10:08:27.840] 未在虚拟环境中 
+[2026-09-03 10:08:28.043] [2/6] 检测Node.js环境... 
+
+[2026-09-03 10:08:28.320] Node.js版本: 
+[2026-09-03 10:08:28.613] Node v20.20.1 
+[2026-09-03 10:08:29.950] NPM 10.8.2 
+[2026-09-03 10:08:30.040] [3/6] 测试PIP加速镜像源... 
+[2026-09-03 10:08:30.194] 测试 清华源... 
+[2026-09-03 10:08:32.998] 测试 阿里云... 
+[2026-09-03 10:08:36.967] 测试 豆瓣... 
+[2026-09-03 10:08:39.684] 测试 中科大... 
+[2026-09-03 10:08:41.882] [WARNING] 所有镜像测试失败，使用默认PyPI源 
+[2026-09-03 10:08:42.005] [4/6] 测试NPM加速镜像源... 
+[2026-09-03 10:08:42.147] 测试 npmmirror淘宝... 
+[2026-09-03 10:08:44.107] 测试 官方源... 
+[2026-09-03 10:08:46.930] [WARNING] NPM镜像测试失败 
+[2026-09-03 10:08:47.070] [5/6] 检测Python虚拟环境... 
+[2026-09-03 10:08:47.175] 检测到虚拟环境：.venv 
+[2026-09-03 10:08:47.270] [6/6] 设置Python虚拟环境并安装依赖... 
+[2026-09-03 10:08:47.490] [*] 配置PIP镜像源为: https://pypi.org/simple/ 
+[2026-09-03 10:08:47.593] [*] 检查Python依赖是否需要安装... 
+```
+
+#### 3. 技术实现规范
+
+**run.bat 实现要点**：
+1. `@echo off` 必须在脚本第一行
+2. `chcp 65001 > nul 2>&1` 重定向到nul
+3. 所有输出必须通过 `:log` / `:log_blank` 函数
+4. `:log` 函数同时写入控制台和日志文件
+5. 时间戳格式统一：`YYYY-MM-DD HH:MM:SS.mmm`（毫秒精度）
+6. 子程序内部逻辑禁止回显
+
+**run.sh 实现要点**：
+1. 所有输出必须通过 `log()` / `log_blank()` 函数
+2. `log()` 函数同时写入控制台和日志文件
+3. 子程序内部逻辑禁止输出
+
+#### 4. 消息前缀规范
+
+| 前缀 | 含义 | 示例 |
+|------|------|------|
+| `[*]` | 进度/状态信息 | `[*] 清理残留进程...` |
+| `[1/N]` | 步骤编号 | `[1/6] 检测Python环境...` |
+| `[WARNING]` | 警告（非致命） | `[WARNING] 所有镜像测试失败` |
+| `[ERROR]` | 错误（致命） | `[ERROR] 需要管理员权限` |
+| 无前缀 | 详细信息/子步骤 | `Python 3.14.3` |
+
+#### 5. 一致性验证检查清单
+
+- [ ] CMD窗口输出与web_output.log逐行一致
+- [ ] 窗口中无 `D:\ws\xy_ws>` 前缀的命令回显行
+- [ ] 窗口中无 `call :` / `goto` / `if errorlevel` 等批处理内部逻辑显示
+- [ ] 窗口中无 `for /F` / `wmic` / `set` 等内部命令回显
+- [ ] 窗口中无 BOM 错误信息
+- [ ] 每一行都有 `[YYYY-MM-DD HH:MM:SS.mmm]` 时间戳前缀（空行除外）
+- [ ] 时间戳精度为毫秒级（3位小数）
+
+### 最佳实践
+
+| 实践项 | 优先级 | 说明 |
+|--------|--------|------|
+| **@echo off 首行** | 🔴 P0 | 脚本第一行必须是 `@echo off` |
+| **统一使用 :log 函数** | 🔴 P0 | 所有用户可见输出必须通过 `:log` 函数 |
+| **禁止直接 echo** | 🔴 P0 | 除 `:log` 函数内部外，禁止直接 `echo` 输出 |
+| **子程序静默** | 🔴 P0 | 内部子程序的所有中间步骤必须重定向到 nul |
+| **双写一致性** | 🔴 P0 | `:log` 函数必须同时写控制台和日志文件 |
+| **时间戳统一** | 🟡 P1 | 控制台和日志使用同一个时间戳变量 |
+| **前缀规范** | 🟡 P1 | 遵循消息前缀规范表 |
+
+### 相关范式
+
+- **PY-CORE-011**: Changelog版本变更详情完整结构范式
+- **PY-CORE-045**: 版本号一致性保障范式
+- **PY-CORE-012**: **本文档**（CMD窗口输出与web_output.log一致性范式）← 当前文档
+---
+---
+## 🔴 PY-CORE-013: 代码库卫生维护范式 (Codebase Hygiene Maintenance)
+
+### 范式描述
+建立定期清理机制，及时移除临时文件、测试工具和废弃脚本，保持代码库整洁和可维护性。
+
+### 核心原则
+
+#### 1. 文件生命周期管理
+class FileLifecycleManager:
+    """文件生命周期管理器"""
+
+    TEMP_FILE_PATTERNS = [
+        'test_*.html',      # 测试工具
+        'test_*.py',        # 测试脚本
+        'generate_*.py',    # 生成器脚本
+        'fix_*.py',         # 临时修复脚本
+        'debug_*.log',      # 调试日志
+        '*.tmp',            # 临时文件
+        '~$*'               # Office锁文件
+    ]
+
+    @classmethod
+    def should_cleanup(cls, file_path):
+        """
+        判断文件是否应该被清理
+
+        清理标准：
+        1. 匹配临时文件模式
+        2. 已完成历史使命（功能已验证/整合）
+        3. 不影响核心功能
+        4. 可通过Git历史恢复
+        """
+        import fnmatch
+
+        filename = os.path.basename(file_path)
+
+        for pattern in cls.TEMP_FILE_PATTERNS:
+            if fnmatch.fnmatch(filename, pattern):
+                return True
+
+        return False
+
+    @classmethod
+    def cleanup_temp_files(cls, project_dir, dry_run=False):
+        """
+        清理临时文件
+
+        Args:
+            project_dir: 项目根目录
+            dry_run: 如果为True，只显示要删除的文件，不实际删除
+        """
+        removed_files = []
+
+        for root, dirs, files in os.walk(project_dir):
+            # 跳过 .git、.venv 等目录
+            dirs[:] = [d for d in dirs if d not in ['.git', '.venv', 'node_modules', '__pycache__']]
+
+            for file in files:
+                file_path = os.path.join(root, file)
+
+                if cls.should_cleanup(file_path):
+                    if dry_run:
+                        print(f'[DRY-RUN] 将删除: {file_path}')
+                        removed_files.append(file_path)
+                    else:
+                        try:
+                            os.remove(file_path)
+                            print(f'✓ 已删除: {file_path}')
+                            removed_files.append(file_path)
+                        except Exception as e:
+                            print(f'✗ 删除失败: {file_path} - {e}')
+
+        return removed_files
+
+#### 2. 清理决策清单
+class CleanupChecklist:
+    """清理前检查清单"""
+
+    @staticmethod
+    def pre_cleanup_checks(file_path):
+        """
+        删除前的安全检查
+
+        Returns:
+            (can_delete, reason) 元组
+        """
+        checks = {
+            '核心功能依赖': not is_core_dependency(file_path),
+            '文档已独立维护': is_documentation_independent(file_path),
+            'Git历史可恢复': is_in_git_history(file_path),
+            '无运行时依赖': not has_runtime_dependency(file_path),
+            '测试已完成': is_testing_completed(file_path)
+        }
+
+        all_pass = all(checks.values())
+        failed = [k for k, v in checks.items() if not v]
+
+        return all_pass, failed if not all_pass else None
+
+    @staticmethod
+    def generate_recovery_instructions(removed_files):
+        """
+        生成恢复说明文档
+
+        Args:
+            removed_files: 已删除的文件列表
+
+        Returns:
+            Markdown格式的恢复指南
+        """
+        pass  # 实现略
+
+──────────────────────────────────────────────────
+
+🔴 PY-CORE-041: subprocess 超时配置范式 (Subprocess Timeout Configuration)
+
+范式描述
+建立统一的 subprocess 调用超时管理机制，避免硬编码超时值，提升系统稳定性和可维护性。
+
+核心原则
+
+1. 全局超时配置
+# config.py 或 main.py 顶部
+TIMEOUT_CONFIG = {
+    'subprocess_kill': 10,      # 进程终止等待时间（秒）
+    'subprocess_check': 10,     # 进程检查超时（秒）
+    'http_request': 30,         # HTTP请求超时
+    'browser_wait': 30,         # 浏览器操作超时
+}
+
+2. subprocess 调用规范
+import subprocess
+from typing import Optional, Tuple
+
+class SubprocessManager:
+    """subprocess 统一管理器"""
+
+    @staticmethod
+    def run_command(
+        command: str,
+        timeout_key: str = 'subprocess_check',
+        capture_output: bool = True,
+        **kwargs
+    ) -> Tuple[int, str, str]:
+        """
+        执行命令并统一处理超时
+
+        Args:
+            command: 要执行的命令
+            timeout_key: TIMEOUT_CONFIG中的键名
+            capture_output: 是否捕获输出
+            **kwargs: subprocess.run 的其他参数
+
+        Returns:
+            (returncode, stdout, stderr) 元组
+
+        Raises:
+            subprocess.TimeoutExpired: 超时时抛出（由调用方决定如何处理）
+        """
+        timeout = TIMEOUT_CONFIG.get(timeout_key, 10)
+
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=capture_output,
+                text=True,
+                timeout=timeout,
+                encoding='utf-8',
+                errors='replace',
+                **kwargs
+            )
+            return result.returncode, result.stdout, result.stderr
+
+        except subprocess.TimeoutExpired as e:
+            # 记录详细超时信息
+            logger.warning(
+                f'命令执行超时 ({timeout}秒): {command[:100]}...'
+                f'\n超时类型: {timeout_key}'
+            )
+            raise  # 由调用方决定是否重试或降级
+
+# ✅ 正确使用示例
+class ProcessMonitor:
+    @staticmethod
+    def check_process_running(process_name: str) -> bool:
+        """检查进程是否运行"""
+        try:
+            returncode, stdout, _ = SubprocessManager.run_command(
+                f'tasklist /FI "IMAGENAME eq {process_name}"',
+                timeout_key='subprocess_check'
+            )
+            return process_name in stdout
+
+        except subprocess.TimeoutExpired as e:
+            print(f"⚠️ 检查进程运行状态超时: {e}")
+            return False  # 超时时返回默认值，不级联故障
+
+        except Exception as e:
+            print(f"⚠️ 检查进程运行状态失败: {e}")
+            return False
+
+3. 异常分层处理
+# ❌ 错误：所有异常混在一起处理
+except Exception as e:
+    logger.error(f'错误: {e}')
+    return False
+
+# ✅ 正确：按严重程度分层处理
+except subprocess.TimeoutExpired as e:
+    # 第一层：超时（可预期的 transient 错误）
+    logger.warning(f'操作超时（{timeout}秒），可能系统负载较高')
+    return fallback_value  # 返回安全默认值
+
+except subprocess.SubprocessError as e:
+    # 第二层：subprocess 特定错误
+    logger.error(f'subprocess错误: {e}')
+    raise AppException.subprocess_error(str(e))
+
+except OSError as e:
+    # 第三层：系统级错误（权限、文件不存在等）
+    logger.critical(f'系统错误: {e}')
+    raise AppException.system_error(str(e))
+
+4. Windows 特殊处理
+if Environment.IS_WINDOWS:
+    # Windows 下 tasklist/pgrep 命令响应较慢
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
+        cwd=PROJECT_DIR,
+        text=True,
+        encoding='utf-8',      # 强制UTF-8编码
+        errors='replace',       # 编码容错
+        bufsize=1,              # 行缓冲
+        env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}  # 环境变量
+    )
+
+最佳实践清单
+- ✅ 所有超时值使用 TIMEOUT_CONFIG 全局配置，禁止硬编码
+- ✅ TimeoutExpired 异常单独捕获，返回安全默认值而非抛出
+- ✅ Windows 平台使用 encoding='utf-8' + errors='replace'
+- ✅ 超时信息包含实际时长和配置键名，便于调试
+- ✅ 长时间运行的任务使用 Popen + 非阻塞读取，避免死锁
+
+──────────────────────────────────────────────────
+
+🔴 PY-CORE-023: 编码处理最佳实践范式 (Encoding Best Practices)
+
+范式描述
+建立跨平台编码处理标准，确保中文等多字节字符在 Windows/Linux/macOS 上都能正确显示。
+
+核心原则
+
+0. **BOM 字符检测与防范规范（v4.1 新增）** ⚠️ 重要
+
+> **问题背景**: UTF-8 BOM (Byte Order Mark, U+FEFF/EF BB BF) 字符会导致 JavaScript 语法错误 (`SyntaxError: Illegal character`)，影响前端页面加载。Python 虽然能容忍 BOM，但不符合 PEP 8 规范。
+
+**强制要求:**
+- ✅ 所有源代码文件必须使用 **UTF-8 without BOM** 编码
+- ✅ 项目启动时自动检测关键文件的 BOM 状态
+- ✅ 发现 BOM 必须立即修复，不得带 BOM 提交到 Git
+- ✅ 使用 `.gitattributes` 文件强制团队编码规范
+
+**检测方法:**
+
+```python
+# 方法1: main.py 内置功能（推荐）
+python main.py --check-bom    # 仅扫描
+python main.py --fix-bom      # 扫描并修复
+
+# 方法2: 使用独立工具
+py fix_bom.py                # 扫描项目
+py fix_bom.py --fix          # 自动修复
+
+# 方法3: 启动脚本（已集成）
+run.bat / run.sh             # 启动前自动检测
+```
+
+**代码示例:**
+
+```python
+# 检查单个文件
+from main import check_file_bom
+result = check_file_bom('dist/app.js')
+if result['has_bom']:
+    print(f"发现BOM: {result['file_path']}")
+
+# 自动修复
+result = check_file_bom('dist/app.js', auto_fix=True)
+print(f"已修复: {result['fixed']}")
+
+# 扫描整个项目
+from main import scan_project_bom
+result = scan_project_bom(auto_fix=True)
+print(f"修复了 {result['fixed_count']} 个文件")
+
+# 启动前验证（已集成到 main.py）
+from main import validate_critical_files_bom
+if not validate_critical_files_bom():
+    sys.exit(1)  # 关键文件有BOM，拒绝启动
+```
+
+**预防措施:**
+- 编辑器设置: PyCharm/VS Code → File Encodings → UTF-8 (取消勾选 "with BOM")
+- Git 配置: 项目根目录包含 `.gitattributes` 文件
+- IDE 配置: `Editor → File Encodings → Create UTF-8 files with BOM` ☐ 不勾选
+- 团队规范: Code Review 时检查文件编码，CI/CD 流水线集成 BOM 检测
+
+**排除目录:** `.git/`, `__pycache__/`, `node_modules/`, `.venv/`, `.idea/`, `dist/assets/`
+
+---
+
+1. 文件读写编码规范
+# ✅ 正确：始终显式指定 UTF-8
+with open(file_path, 'r', encoding='utf-8') as f:
+    data = f.read()
+
+# 容错模式（处理损坏文件）
+with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+    data = f.read()
+
+# ❌ 错误：依赖系统默认编码（Windows下可能是GBK）
+with open(file_path, 'r') as f:  # 危险！
+    data = f.read()
+
+2. subprocess 编码保障
+def run_command_safely(command):
+    """安全执行命令，确保输出无乱码"""
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+
+    process = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding='utf-8',
+        errors='replace',     # 替换无法解码的字符
+        bufsize=1,
+        env=env,
+        cwd=PROJECT_DIR
+    )
+
+    for line in iter(process.stdout.readline, ''):
+        yield line  # 生成器模式，实时输出
+
+    process.wait()
+
+3. JSON 数据编码一致性
+def save_json(data, file_path):
+    """保存JSON数据，确保中文不乱码"""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(
+            data,
+            f,
+            ensure_ascii=False,   # ✅ 关键：保留中文字符
+            indent=2,
+            separators=(',', ': ')
+        )
+
+def load_json(file_path):
+    """加载JSON数据"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+4. Base64 编解码处理URL
+import base64
+
+def encode_url(url: str) -> str:
+    """URL转Base64（用于存储到JSON）"""
+    return base64.b64encode(url.encode('utf-8')).decode('ascii')
+
+def decode_url(b64_str: str) -> str:
+    """Base64转URL"""
+    try:
+        return base64.b64decode(b64_str).decode('utf-8')
+    except Exception:
+        return b64_str  # 解码失败时返回原始值
+
+5. 日志系统编码配置
+import logging
+
+def setup_logger():
+    """配置日志系统，确保中文正常写入"""
+    log_file = 'app.log'
+
+    # 文件处理器：强制UTF-8
+    file_handler = logging.FileHandler(
+        log_file,
+        mode='a',
+        encoding='utf-8'  # ✅ 关键
+    )
+    file_handler.setFormatter(
+        logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    )
+
+    # 控制台处理器
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(
+        logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    )
+
+    logger = logging.getLogger(__name__)
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    logger.setLevel(logging.INFO)
+
+    return logger
+
+编码问题诊断清单
+遇到乱码时的排查步骤：
+1. ✅ 确认文件保存为 UTF-8 with BOM 或 UTF-8 without BOM
+2. ✅ 检查所有 open() 调用是否有 encoding='utf-8'
+3. ✅ 确认 Python 文件头部有 # -*- coding: utf-8 -*-
+4. ✅ 检查 subprocess 调用的 encoding 参数
+5. ✅ 确认环境变量 PYTHONIOENCODING=utf-8
+6. ✅ 使用 Git 恢复已知良好的版本作为基准
+
+──────────────────────────────────────────────────
+
+🔴 PY-CORE-026: Git 历史维护范式 (Git History Maintenance)
+
+范式描述
+建立规范的 Git 提交历史管理机制，保持历史整洁、可追溯、易于理解。
+
+核心原则
+
+1. 提交频率与粒度
+# ✅ 合理的提交粒度
+git commit -m "fix: 修复subprocess超时问题"           # 单一功能点
+git commit -m "docs: 更新README.md版本记录"             # 仅文档更新
+git commit -m "refactor: 重构异常处理逻辑"             # 重构提交
+
+# ❌ 不好的提交（太大或太碎）
+git commit -m "update"                                 # 信息不足
+git commit -m "fix bug + update doc + add test"        # 多个无关变更
+
+2. 提交历史整理流程
+# 场景：合并最近N个零散提交
+git log --oneline -10                    # 查看最近提交
+git reset --soft <target-commit>         # 软重置到目标提交
+git status                               # 查看待提交的更改
+git commit -m "chore: 合并多个小修复"     # 重新提交
+
+# 场景：修改最近的提交信息（未推送）
+git commit --amend -m "new message"
+
+# 场景：交互式变基整理历史
+git rebase -i HEAD~5                     # 最近5个提交
+# 在编辑器中选择 pick/squash/fixup/reword
+
+3. Force Push 安全策略
+# ⚠️ 危险操作：仅在必要时使用
+
+# ❌ 极其危险：强制覆盖远程（可能丢失他人工作）
+git push --force origin master
+
+# ✅ 相对安全：检查后再强制推送
+git push --force-with-lease origin master
+# 如果远程有新的提交会拒绝推送，保护他人工作
+
+# 最佳实践：
+# 1. 先通知团队成员暂停推送
+# 2. 确认本地是最新的
+# 3. 使用 --force-with-lease
+# 4. 推送后通知团队重新拉取
+
+4. 分支管理规范
+# 功能开发
+git checkout -b feature/subprocess-timeout-fix
+# ... 开发和测试 ...
+git checkout master
+git merge feature/subprocess-timeout-fix
+git branch -d feature/subprocess-timeout-fix
+
+# 紧急修复（从主分支直接修复）
+git checkout -b hotfix/encoding-issue
+# ... 快速修复 ...
+git checkout master
+git merge hotfix/encoding-issue
+git tag -a v3.8.89.17 -m "修复编码问题"
+
+5. 提交信息格式规范
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+
+Type 类型:
+- fix: Bug修复
+- feat: 新功能
+- docs: 文档更新
+- style: 代码格式（不影响功能）
+- refactor: 重构（非新功能非Bug修复）
+- perf: 性能优化
+- test: 测试相关
+- chore: 构建/工具/辅助工具变动
+- revert: 回滚提交
+
+示例:
+fix(main): 优化subprocess超时配置
+
+将check_process_running()的超时时间从硬编码3秒改为
+使用全局TIMEOUT_CONFIG配置的10秒，并新增专门的
+TimeoutExpired异常处理。
+
+Closes #123
+
+Git 维护检查清单
+- ✅ 提交前运行测试确保功能正常
+- ✅ 提交信息清晰描述变更内容和原因
+- ✅ 单次提交聚焦单一关注点
+- ✅ 定期整理过细的提交（使用 reset --soft）
+- ✅ Force push 前 always 使用 --force-with-lease
+- ✅ 重要版本打 tag（如 v3.8.89.17）
+- ✅ 敏感信息（密码、密钥）绝不提交到仓库
+
+──────────────────────────────────────────────────
+        """
+        instructions = ["## 📁 文件恢复指南\n"]
+        instructions.append("以下文件已被清理，如需恢复请使用对应的命令：\n")
+
+        for file_path in removed_files:
+            relative_path = os.path.relpath(file_path)
+            instructions.append(f"### {relative_path}")
+            instructions.append(f"\\\`bash")
+            instructions.append(f"git show HEAD~1:{relative_path} > {relative_path}")
+            instructions.append(f"\\\`\n")
+
+        return '\n'.join(instructions)
+
+#### 3. 自动化清理流程
+在 CI/CD 或 pre-commit 钩子中使用
+def automated_cleanup_pipeline():
+    """自动化清理流水线"""
+
+    print('🧹 开始代码库卫生检查...\n')
+
+    # Step 1: 识别候选文件
+    candidates = FileLifecycleManager.cleanup_temp_files(
+        project_dir=PROJECT_DIR,
+        dry_run=True  # 先预览
+    )
+
+    if not candidates:
+        print('✅ 代码库整洁，无需清理')
+        return
+
+    print(f'\n📋 发现 {len(candidates)} 个候选文件：')
+    for f in candidates:
+        print(f'  - {os.path.relpath(f)}')
+
+    # Step 2: 安全检查
+    safe_to_remove = []
+    for file_path in candidates:
+        can_delete, reasons = CleanupChecklist.pre_cleanup_checks(file_path)
+        if can_delete:
+            safe_to_remove.append(file_path)
+        else:
+            print(f'⚠️  跳过: {os.path.relpath(file_path)}')
+            print(f'   原因: {", ".join(reasons)}')
+
+    # Step 3: 执行清理
+    if safe_to_remove:
+        print(f'\n🗑️  准备删除 {len(safe_to_remove)} 个文件...')
+        removed = FileLifecycleManager.cleanup_temp_files(
+            project_dir=PROJECT_DIR,
+            dry_run=False
+        )
+
+        # Step 4: 生成恢复指南
+        recovery_guide = CleanupChecklist.generate_recovery_instructions(removed)
+        with open('RECOVERY_GUIDE.md', 'w', encoding='utf-8') as f:
+            f.write(recovery_guide)
+
+        print(f'\n✅ 清理完成！已删除 {len(removed)} 个文件')
+        print(f'📝 恢复指南已保存到 RECOVERY_GUIDE.md')
+
+### 实施规范
+
+#### 清理时机
+| 触发条件 | 操作 | 说明 |
+|----------|------|------|
+| **版本发布前** | 必须清理 | 确保发布包干净 |
+| **功能验证后** | 建议清理 | 测试工具完成使命 |
+| **每周例行** | 推荐执行 | 保持代码库健康 |
+| **合并PR前** | 检查提醒 | 避免引入临时文件 |
+
+#### 文件分类标准
+应该删除的文件
+must_remove:
+  - pattern: "test_*.html"
+    reason: "临时测试工具"
+    lifecycle: "功能验证后即可删除"
+
+  - pattern: "generate_*.py"
+    reason: "一次性生成脚本"
+    lifecycle: "文档生成完成后删除"
+
+不应该删除的文件
+never_remove:
+  - pattern: "*.md"
+    reason: "项目文档"
+    exception: "README.md, skill.md, CHANGELOG.md"
+
+  - pattern: "config/*.json"
+    reason: "配置文件"
+    exception: null
+
+  - pattern: "dist/**"
+    reason: "构建产物"
+    exception: "由CI/CD管理"
+
+#### Git 提交规范
+清理操作的提交信息格式
+git add -A
+git commit -m "chore: 代码清理 - 删除临时测试文件和生成脚本 (v3.8.89.13)
+
+删除的文件:
+- test_sku_parsing.html (SKU解析测试工具)
+- generate_*.py (文档生成脚本系列)
+
+清理原因:
+- 测试工具已完成历史使命
+- 生成脚本已整合到开发流程
+- 保持代码库整洁
+
+影响范围: 无（核心功能不受影响）
+恢复方法: git show HEAD~1:<filename> > <filename>"
+
+### 最佳实践
+
+#### ✅ 推荐做法
+1. **先预览再删除**: 使用 `dry_run=True` 先查看将要删除的文件
+2. **批量操作**: 一次性清理所有临时文件，避免多次提交
+3. **记录清晰**: 在提交信息中详细说明删除原因和恢复方法
+4. **更新文档**: 同步更新 README.md 和 CHANGELOG.md
+5. **团队同步**: 清理前通知团队成员，避免工作丢失
+
+#### ❌ 避免做法
+1. **不要强制删除**: 使用 `-f` 参数前务必确认
+2. **不要忽略.gitignore**: 确保临时文件已在 .gitignore 中
+3. **不要删除未跟踪的新文件**: 可能是同事正在开发的代码
+4. **不要在生产环境清理**: 只在开发分支执行
+5. **不要忘记备份**: 虽然有Git历史，但养成好习惯
+
+### 工具集成
+
+#### VS Code 设置
+// .vscode/settings.json
+{
+  "files.exclude": {
+    "**/test_*.html": true,
+    "**/generate_*.py": true,
+    "**/fix_*.py": true,
+    "**/*.tmp": true,
+    "**/~$*": true
+  },
+  "files.watcherExclude": {
+    "**/test_*": true,
+    "**/generate_*": true
+  }
+}
+
+#### Pre-commit Hook
+.pre-commit-config.yaml
+repos:
+  - repo: local
+    hooks:
+      - id: cleanup-temp-files
+        name: 清理临时文件
+        entry: python -c "
+from file_lifecycle import FileLifecycleManager
+import sys
+sys.exit(0 if FileLifecycleManager.cleanup_temp_files('.', dry_run=True) else 1)
+"
+        language: system
+        pass_filenames: false
+        always_run: true
+        verbose: true
+
+**技术细节**:
+- **安全第一**: 所有删除操作都经过多重安全检查
+- **可追溯性**: Git历史完整保留所有文件的完整记录
+- **可恢复性**: 提供一键恢复命令和详细指南
+- **自动化**: 支持CI/CD集成和pre-commit钩子
+- **团队友好**: 干运行模式和详细日志避免误删
+
+**适用场景**:
+- ✅ 版本发布前的代码库整理
+- ✅ 功能完成后的测试工具清理
+- ✅ 项目交接时的代码库瘦身
+
+---
+
+## 📄 文档生成方法 (PY-CORE-016: skill.docx生成范式)
+
+> **创建日期**: 2026-10-26 | **最后更新**: 2026-10-26 | **优先级**: 🔴 P0 强制规范 | **适用范围**: skill.docx / test/generate_docx.py / skill.md
+
+### 🔴 核心原则：唯一生成器 (Single Generator)
+
+**skill.docx 必须且只能使用 `test/generate_docx.py` 生成，禁止使用pandoc/在线工具/手动Word等其他方式。**
+
+> **产出结构标准**: 生成流程、导航置顶、锚点校验、落地检查清单以本文档 `PY-CORE-018 DOCX 文档生成范式` 为准 —— 031 管「用什么生成」，034 管「生成成什么样」。
+
+| 规则 | 说明 | 违反后果 |
+|------|------|----------|
+| **🔴 唯一生成器** | skill.docx 只能由 `test/generate_docx.py` 从 skill.md 生成 | 导航链接失效/样式不一致/代码块丢失 |
+| **🔴 源文件唯一** | 生成源文件只能是 skill.md，不能从 README.md 生成 | 内容与skill.md不一致 |
+| **🔴 每次同步** | 修改 skill.md 后必须重新生成 skill.docx | 三方文档不同步 |
+| **🟡 验证大小** | 生成后验证文件大小 > 100KB | 生成失败/内容缺失 |
+
+### 生成命令
+
+```bash
+# 从项目根目录运行
+python test/generate_docx.py
+
+# 或从test目录运行
+cd test && python generate_docx.py
+```
+
+### 生成器特性 (test/generate_docx.py)
+
+| 特性 | 说明 |
+|------|------|
+| **Markdown完整解析** | 标题/代码块/表格/引用/列表/分隔线/行内格式(粗体/斜体/代码) |
+| **导航书签链接** | H2/H3标题自动生成Word书签，导航表格第3列可点击跳转 |
+| **代码块样式** | Consolas字体+深蓝色+灰色背景缩进 |
+| **表格样式** | Table Grid居中对齐，导航表格自动添加第3列跳转链接 |
+| **中文字体** | Microsoft YaHei全局字体，1.5倍行距 |
+| **标题层级颜色** | H1深蓝(0,51,102)→H2(0,76,153)→H3(0,102,153)→H4(51,102,153) |
+| **Fence归一化** | 自动修复未闭合代码块，heading处自动关闭 |
+
+### 验证生成结果
+
+生成后检查以下内容：
+- [ ] 文件大小 > 100KB（正常约350-400KB）
+- [ ] 导航表格第3列显示🔗且可点击跳转
+- [ ] 代码块显示Consolas字体+灰色背景
+- [ ] 中文字符无乱码
+- [ ] 文档版本号与skill.md一致
+- [ ] 三方文档同步：README.md ↔ skill.md ↔ skill.docx
+
+### 禁止使用的方法
+
+| 方法 | 原因 |
+|------|------|
+| ❌ pandoc | 不支持导航书签链接，样式不可控 |
+| ❌ 在线工具(cloudconvert等) | 隐私泄露风险，不支持自定义样式 |
+| ❌ 手动Microsoft Word | 无法自动化，容易遗忘同步 |
+| ❌ 简易python-docx脚本 | 不支持导航链接/代码块样式/表格格式 |
+
+
+---
+
 
 ## 📐 双启动脚本同步范式 (PY-CORE-017)
 
@@ -448,6 +2074,1366 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \
 ```
 
 > **判定标准**: 任一功能域在双端语义不等价即为"未同步"，必须在提交前补齐。
+
+---
+
+## 📐 DOCX 文档生成范式 (PY-CORE-018)
+
+> **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [skill.md](skill.md) / [README.md](README.md) / skill.docx / [test/generate_docx.py](test/generate_docx.py)
+
+### 🔴 核心原则：导航必须落在第一页
+
+**docx 的第一页固定为「标题 + 文档导航」，正文一律从第二页开始。** 导航不是装饰，是读者的第一入口 —— 一份 2 万行的规范文档，没有可点击索引等于没有目录。本范式与 `PY-CORE-016` 互补：**031 管「用什么生成」，034 管「生成成什么样」**。
+
+| 规则 | 说明 | 违反后果 |
+|------|------|----------|
+| **🔴 唯一生成器** | skill.docx 只能由 `test/generate_docx.py` 从 skill.md 生成 | 断链/样式丢失/代码块错乱 |
+| **🔴 导航置顶** | 导航块恒定位于第 1 页，其后立刻分页 | 读者翻页找目录 |
+| **🔴 整块搬迁** | 标题 + 引言 + 表格三件套一起搬，禁止只搬表格 | 第一页出现无标题孤表，标题掉到第 2 页 |
+| **🔴 锚点零缺失** | 每个导航行的 `w:anchor` 必须命中 `w:bookmarkStart` | 点击无反应，导航变纯文本 |
+| **🔴 首行无 BOM** | md 首行禁止出现 U+FEFF | H1 渲染成 `# 标题`，多出一个井号 |
+| **🔴 改 md 必重生成** | 任何 skill.md 改动后必须重新生成 skill.docx | 三方文档不同步 |
+
+### 五步流程
+
+```
+改 skill.md → 同版本块逐字复制到 README.md → python test/generate_docx.py
+            → 结构校验（锚点/分页/首行）→ 提交
+```
+
+### 生成器内部机制（必须理解的三个函数）
+
+| 函数 | 职责 | 关键约束 |
+|------|------|----------|
+| `_extract_nav_block(lines)` | 从正文中整块切出导航（标题+引言+表格），返回 `(nav_block, remaining)` | 向上回溯必须跨过空行、`---`、`>` 引言，直到命中 H1/H2；向下吞掉表格与尾随空行/分隔线 |
+| `_render_nav_block(block)` | 独立渲染导航块，结尾强制 `add_page_break()` | 只在第一个 H1 渲染完成后调用，与 md 源码位置完全解耦 |
+| `_handle_heading(lines, i)` | 渲染标题并给 H2/H3 打 `w:bookmarkStart` | H4 及以下不建书签，导航行指向 H4 必然断链 |
+
+**导航表识别规则**: 表格首行单元格同时含「章节」+（「位置」或「说明」）即判定为导航表；识别失败时整块留在正文原位置，不会报错，只会静默失去置顶效果。
+
+**锚点生成规则**: 标题文本小写 → 移除非单词字符 → 空格转 `-` → 合并连续 `-`，与 GitHub 风格锚点一致，保证 md 预览与 docx 内跳转指向同一处。
+
+**超链接显示文本**: 第 3 列固定显示 `🔗 点击跳转`，章节名只用于查找锚点，不写进单元格 —— 否则长标题会把列宽撑爆。
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 向上回溯只跳空行，遇到 `>` 引言就停 | 表格被抽走、标题留在原地，第 1 页出现无标题孤表 | 空行/`---`/`>` 一律跳过，直到命中标题 |
+| 回溯不限制层级，一路追到 H3/H4 | 把上一章节的正文一起切进导航块，内容重复 | 只认 `^#{1,2}\s` 的标题作为导航块起点 |
+| 导航表仍为 2 列 | 没有跳转列，读者只能看不能用 | 生成器自动补第 3 列「位置（点击跳转）」 |
+| 第 3 列写章节名 | 单元格过长、列宽失控 | 固定文案 `🔗 点击跳转` |
+| 导航块依赖 md 中的物理位置 | 别人把导航挪到文末，docx 里也跟着沉底 | 提取后在首个 H1 之后强制插入 |
+| 首行 `#` + U+FEFF + `#` | `lstrip('#')` 遇 BOM 停止，标题多一个 `#` | 二进制清除 BOM，首行只留 `# 标题` |
+| 导航行指向 H4/H5 | 无对应书签，点击无效 | 导航只收录 H2/H3 章节 |
+| 只校验「生成成功」不校验锚点 | 断链静默存在，打开才发现点不动 | 必须实跑锚点命中校验脚本 |
+
+### 落地检查清单
+
+```
+[ ] skill.md / README.md 首行均无 BOM
+[ ] 导航块 = H2 标题 + 引言引用 + 表格，三件套完整
+[ ] docx 第一个表格即导航表，行数 = 表头 1 + 条目 N
+[ ] 分页符紧跟在导航表之后（正文从第 2 页开始）
+[ ] w:hyperlink 数 == w:anchor 数 == 命中书签数，未命中为空
+[ ] README.md 导航行锚点同样全部命中
+[ ] 文件大小 > 100KB（正常 350-400KB）
+[ ] 三方文档同版本块逐字一致
+```
+
+### 验证命令
+
+```bash
+python test/generate_docx.py
+```
+
+```python
+import zipfile, os
+from xml.etree import ElementTree as ET
+
+W = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
+root = ET.fromstring(zipfile.ZipFile('skill.docx').read('word/document.xml'))
+children = list(root.find(W + 'body'))
+
+bookmarks = {b.get(W + 'name') for b in root.iter(W + 'bookmarkStart')}
+links = [a.get(W + 'anchor') for a in root.iter(W + 'hyperlink') if a.get(W + 'anchor')]
+miss = [a for a in links if a not in bookmarks]
+
+print('大小 %.1f KB | 链接 %d | 命中 %d | 未命中 %s' % (
+    os.path.getsize('skill.docx') / 1024, len(links),
+    len(links) - len(miss), miss or '无'))
+print('第一页:', ' -> '.join(
+    ''.join(t.text or '' for t in e.iter(W + 't'))[:30] for e in children[:5]))
+
+pages = [i for i, e in enumerate(children)
+         if any(br.get(W + 'type') == 'page' for br in e.iter(W + 'br'))]
+print('分页符下标:', pages[:1])
+```
+
+> **判定标准**: 任一导航行点击无反应、或分页符未紧跟导航表、或首行标题带 `#` 前缀，即视为「未符合本范式」。
+
+---
+
+## 📐 每日利润表读取范式 (PY-CORE-019)
+
+> **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) 每日利润相关函数与 `/api/daily-profit`
+
+### 🔴 核心原则：「每日利润」子表按固定列位读取，报表文本只认 A 列的「截止」行
+
+**每日利润数据只从工作表「每日利润」读取，列位固定为 A=项目、B=金额、C=成本、D=纯利、E=日期、F=备注；第 1 行为表头，数据从第 2 行开始。**
+
+### 列位契约（不可变）
+
+| 列 | 索引 | 字段 | 解析规则 |
+|---|---|---|---|
+| A | 0 | 项目 | 原样保留，用于汇总分组 |
+| B | 1 | 金额 | 去 `¥` 与 `,` 后转 float，空值记 0 |
+| C | 2 | 成本 | 同上 |
+| D | 3 | 纯利 | 同上 |
+| E | 4 | 日期 | datetime 直接格式化；字符串按 7 种格式解析；数字按 Excel 序列号（1899-12-30 基准）换算 |
+| F | 5 | 备注 | 越界时置空串 |
+
+### 报表文本规则
+
+| 规则 | 要求 |
+|---|---|
+| 定位 | `get_daily_profit_report_from_excel` 在 A 列扫描首个以「截止」开头的字符串 |
+| 缺失 | 无该工作表或无「截止」行时返回 `None`，不抛异常 |
+| 多文件 | `get_excel_files_with_report` 遍历全部文件，收集报表文本去重后以空行拼接 |
+
+### 工作表回落与已知边界
+
+| 场景 | 现状行为 | 说明 |
+|---|---|---|
+| 无「每日利润」工作表 | 回落 `wb.active` | 仍按 A-F 列位强解析，可能产生脏记录，需在日志中可见 |
+| 表格展示 `table_data` | 命中第一个存在文件后 `break` | 避免多文件重复表头与回落污染 |
+| 首行 | `row_idx > 0` 才解析为记录 | 表头不计入 `all_records` |
+
+### 落地检查清单
+
+```
+[ ] 工作表名固定「每日利润」，缺失时日志可查
+[ ] 列位严格 A-F，不按表头名定位
+[ ] 第 1 行表头跳过，数据从第 2 行起
+[ ] 金额去 ¥ 与逗号；日期三类取值全覆盖
+[ ] 报表文本只取「截止」开头行，缺失返回 None
+[ ] 多文件报表文本去重后拼接
+```
+
+> **判定标准**: 任一环节出现「列位偏移」「按表头名定位」「表头计入数据」「无截止行时报错」中任意一条，即视为「未符合本范式」。
+
+---
+
+## 🟡 PY-CORE-021: 边界条件测试范式 (Edge Case Testing)
+
+### 范式描述
+系统性的边界条件和极端情况测试，确保系统健壮性：
+
+### 核心实现
+class TestBoundaryConditions:
+    """边界条件测试类"""
+
+    def test_empty_string_input(self):
+        """空字符串输入处理"""
+        client = app.test_client()
+        response = client.post('/api/run', 
+                              data=json.dumps({'command': ''}),
+                              content_type='application/json')
+        assert response.status_code in [400, 200]
+
+    def test_very_long_command(self):
+        """超长命令字符串（10000+字符）"""
+        long_command = 'echo "' + 'a' * 10000 + '"'
+        response = client.post('/api/run',
+                              data=json.dumps({'command': long_command}),
+                              content_type='application/json')
+        assert response.status_code in [200, 413]  # OK或Payload Too Large
+
+    def test_special_characters_in_command(self):
+        """包含特殊字符的命令"""
+        special_commands = [
+            {'command': 'echo "hello world"'},
+            {"command": "echo 'single quotes'"},
+            {'command': 'echo $HOME'},
+            {'command': 'echo ; malicious command'},
+            {'command': 'echo && another'},
+            {'command': 'echo | pipe'},
+        ]
+
+        for cmd in special_commands:
+            response = client.post('/api/run',
+                                  data=json.dumps(cmd),
+                                  content_type='application/json')
+            assert response.status_code != 500, f"崩溃于特殊字符: {cmd['command'][:50]}"
+
+    def test_unicode_input(self):
+        """Unicode字符输入"""
+        unicode_commands = [
+            {'command': 'echo 中文测试'},
+            {'command': 'echo 日本语テスト'},
+            {'command': 'echo 🎉🚀emoji测试'},
+            {'command': 'echo العربية'},
+        ]
+
+        for cmd in unicode_commands:
+            response = client.post('/api/run',
+                                  data=json.dumps(cmd, ensure_ascii=False),
+                                  content_type='application/json; charset=utf-8')
+            assert response.status_code != 500
+
+
+class TestConcurrencyEdgeCases:
+    """并发边界情况测试"""
+
+    def test_burst_traffic(self):
+        """突发流量模式：瞬间大量请求后静默"""
+        threads = []
+        results = []
+
+        def make_request(i):
+            resp = client.post('/api/run',
+                              data=json.dumps({'command': f'burst_{i}'}),
+                              content_type='application/json')
+            results.append(resp.status_code)
+
+        # 瞬间启动50个线程
+        for i in range(50):
+            t = threading.Thread(target=make_request, args=(i,))
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join(timeout=10)
+
+        success_count = sum(1 for s in results if s == 200)
+        rate_limited_count = sum(1 for s in results if s == 429)
+
+        print(f"\n突发流量结果: 成功={success_count}, 被限流={rate_limited_count}")
+        assert success_count > 0  # 至少有一些成功
+
+
+class TestFilesystemEdgeCases:
+    """文件系统边界情况"""
+
+    def test_very_large_json_file(self):
+        """超大JSON文件处理"""
+        large_data = {'items': [f'item_{i}' for i in range(10000)]}
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(large_data, f)
+            temp_path = f.name
+
+        try:
+            start = time.time()
+            result = safe_read_json(temp_path)
+            duration = time.time() - start
+
+            assert result is not None
+            assert len(result.get('items', [])) == 10000
+            print(f"\n大文件读取: {duration*1000:.2f}ms, 10000条记录")
+        finally:
+            os.unlink(temp_path)
+
+    def test_malformed_json_variants(self):
+        """各种畸形JSON格式"""
+        malformed_cases = [
+            ('', '空文件'),
+            ('{', '不完整的对象'),
+            ('[', '不完整的数组'),
+            ('{"key": }', '缺失值'),
+            ('null', '仅null'),
+            ('  \n\t  ', '空白字符'),
+        ]
+
+        for content, description in malformed_cases:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                f.write(content)
+                temp_path = f.name
+
+            try:
+                result = safe_read_json(temp_path)
+                assert result is not None, f"崩溃于: {description}"
+            finally:
+                os.unlink(temp_path)
+
+
+class TestMemoryAndResourceLimits:
+    """内存和资源限制测试"""
+
+    def test_many_consecutive_cache_reads(self):
+        """连续多次缓存读取（检测内存泄漏）"""
+        cache = FileCacheManager(ttl_seconds=5)
+
+        initial_memory = None
+        for i in range(1000):
+            data = cache.read_json(temp_path)
+
+            if i == 0:
+                process = psutil.Process()
+                initial_memory = process.memory_info().rss
+
+            if i == 999:
+                final_memory = psutil.Process().memory_info().rss
+                memory_growth_mb = (final_memory - initial_memory) / (1024*1024)
+
+                # 内存增长不应该超过10MB
+                assert memory_growth_mb < 10, f"可能的内存泄漏: {memory_growth_mb:.2f}MB"
+
+### 测试覆盖范围
+| 类别 | 测试场景 | 数量 |
+|------|---------|------|
+| **输入边界** | 空字符串、超长输入、特殊字符、Unicode | 15+ |
+| **并发边界** | 突发流量、多端点并发、快速连续请求 | 5+ |
+| **文件系统** | 大文件、畸形JSON、权限不足 | 8+ |
+| **内存限制** | 缓存泄漏检测、资源耗尽 | 3+ |
+| **网络弹性** | 连接超时、连接拒绝、DNS失败 | 4+ |
+
+---
+
+## 📐 Excel 货号 E 列读取范式 (PY-CORE-022)
+
+> **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) 中所有 Excel 货号读取链路
+
+### 🔴 核心原则：货号只从「平台子表」的 E 列读取，一列不多、一列不少
+
+**无论后续如何重构，货号读取必须恒定满足：每个 Excel 文件只读平台子表（工作表名包含平台名，如「闲鱼」「小红书」）的第 5 列（E 列）。禁止读取其他列、禁止按表头名称定位列、禁止只读第一个文件。**
+
+### 两条生效链路（必须同步遵守）
+
+| 链路 | 函数 | 读取方式 |
+|---|---|---|
+| CLI / 对比主流程 | `load_all_excel_data` | openpyxl `iter_rows(min_col=5, max_col=5, values_only=True)` |
+| Web API `/api/compare` | `_read_excel_skus` | pandas `temp_df.iloc[:, 4].dropna()` |
+
+### 硬性规则
+
+| 规则 | 要求 |
+|---|---|
+| 工作表选择 | `platform in sheet_name` 即命中，多命中取第一个 |
+| 列范围 | 仅 E 列（索引 4 / 第 5 列），不读 A-D，不读 F 及其后 |
+| 值清洗 | `str(value).strip()`，空值与 `nan` 丢弃 |
+| 货号正则 | `^[A-Za-z0-9]{3,10}$`，不匹配即丢弃 |
+| 多文件聚合 | 遍历 `config.excel_files` 中所有存在的文件，逐个 `extend` 合并 |
+| 去重策略 | `load_all_excel_data` 默认 `remove_duplicates=True`；对比主流程传 `False` 以保留重复计数 |
+| 临时副本 | 先 `shutil.copy2` 到 `temp/` 再解析，读完 `close()` 并在 `finally` 清理 |
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 改成「读取整表所有列」 | 引入无关列，货号被污染 | 恒定 `min_col=5, max_col=5` / `iloc[:, 4]` |
+| 用表头名（如「货号」）定位列 | 用户改表头即失效 | 位置定位，E 列固定 |
+| 不同平台改用不同列 | 多表结构不一致，聚合出错 | 所有平台统一 E 列 |
+| 未命中平台子表时静默回落 `active` | 可能读到别的平台的货号 | 现状保留回落，但日志必须打印「未找到 xx 工作表」 |
+
+### 落地检查清单
+
+```
+[ ] 只读 E 列（min_col=5/max_col=5 或 iloc[:, 4]）
+[ ] 货号正则 ^[A-Za-z0-9]{3,10}$
+[ ] 多文件全部遍历并聚合，单文件失败不中断
+[ ] 先复制到 temp/ 再解析，finally 清理
+[ ] 未命中平台子表时有明确日志
+```
+
+> **判定标准**: 任一读取链路出现「读 E 列以外的列」「用表头名定位列」「只读第一个文件」中任意一条，即视为「未符合本范式」。
+
+---
+
+## 🔴 PY-CORE-025: 字段名兼容性范式 (Field Name Compatibility)
+
+### 范式描述
+由于JSON数据同时存储中文字段名和英文字段名（如 `商品描述`/`name`, `售价`/`price`），所有数据提取和解析代码必须实现**多重字段名兼容**，确保数据的完整性和向后兼容性。
+
+### 核心原则
+
+#### 1. 后端字段提取 - 多重回退策略
+def get_product_detail(item):
+    """
+    提取商品详情（字段名兼容性设计）
+
+    优先级：
+    1. 主字段名（中文，如"商品描述"）
+    2. 英文别名（如"name"）
+    3. 备用中文名（如"商品名称"，兼容旧版本）
+    """
+    return {
+        "商品描述": item.get('商品描述', '') or item.get('name', '') or item.get('商品名称', ''),
+        "售价": item.get('售价', '') or item.get('price', ''),
+        "货号": item.get('货号', '') or item.get('stock_number', ''),
+        "备注": item.get('备注', '') or item.get('remark', ''),
+        "员工": item.get('员工', '') or item.get('staff', '')
+    }
+
+**关键特性**:
+- ✅ 使用 `or` 链式调用，返回第一个非空值
+- ✅ 优先使用主字段名，降级到英文别名，最后尝试备用名
+- ✅ 确保即使JSON结构变化也能取到有效数据
+
+#### 2. 前端正则匹配 - 多模式兼容
+// ❌ 错误：只匹配单一字段名
+const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/);
+
+// ✅ 正确：多模式兼容匹配
+const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/) 
+               || line.match(/"商品名称":\s*"([^"]+)"/) 
+               || line.match(/"name":\s*"([^"]+)"/);
+const priceMatch = line.match(/"售价":\s*"([^"]+)"/) 
+                 || line.match(/"price":\s*"([^"]+)"/);
+
+**匹配优先级**:
+1. 主字段名（中文）：`商品描述`, `售价`
+2. 备用中文名：`商品名称`（旧版兼容）
+3. 英文字段名：`name`, `price`（国际化支持）
+
+#### 3. 数据流完整性验证
+数据源 (JSON)
+    ↓
+analyze_data_changes() [后端对比]
+    ↓ get_product_detail() [字段提取]
+    ↓ format_json_array() [格式化输出]
+    ↓ 前端正则解析 [app.js:1527]
+    ↓ 表格渲染 [UI展示]
+
+**每个环节都必须**:
+- ✅ 兼容多种字段名格式
+- ✅ 对空值提供默认显示（如 `-`）
+- ✅ 记录日志便于调试（`console.log('[对比卡片] ✓ ...')`）
+
+### 应用场景
+
+| 场景 | 文件位置 | 说明 |
+|------|----------|------|
+| **删除商品对比** | `main.py:4520-4529` | 从旧数据中提取被删除商品的详细信息 |
+| **新增商品对比** | `main.py:4520-4529` | 从新数据中提取新增商品的详细信息 |
+| **前端表格渲染** | `dist/app.js:1527-1540` | 解析后端输出的JSON字符串并渲染为表格 |
+| **API响应处理** | `dist/app.js:6947+` | 处理 `/api/products` 返回的商品列表 |
+
+### 最佳实践清单
+
+- [ ] **后端提取时**：始终使用 `or` 链式调用，不要依赖单一字段名
+- [ ] **前端解析时**：使用 `\|\|` 操作符连接多个正则表达式
+- [ ] **默认值处理**：空值统一显示为 `-`，保持界面整洁
+- [ ] **日志记录**：每个关键字段提取都记录日志，方便问题排查
+- [ ] **单元测试覆盖**：测试用例必须包含多种字段名格式的测试数据
+- [ ] **文档同步**：字段映射关系必须在 README.md 和 SKILL.md 中同步更新
+
+### 反面案例（避免）
+
+❌ 错误示例：硬编码单一字段名
+def bad_extract(item):
+    return {
+        "name": item['商品名称'],  # 如果数据中是'商品描述'会抛KeyError
+        "price": item['售价']      # 如果数据中是'price'会抛KeyError
+    }
+
+❌ 错误示例：不处理空值
+def bad_extract2(item):
+    name = item.get('商品描述')  # 可能为None或空字符串
+    return {"name": name}         # 前端显示空白而非"-"
+
+---
+
+## 📐 大文件小范围修改临时脚本范式 (PY-CORE-030)
+
+> **创建日期**: 2026-11-11 | **最后更新**: 2026-11-11 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) / [README.md](README.md) / [skill.md](skill.md) / [dist/app.js](dist/app.js) 等千行级文件
+
+### 🔴 核心原则：大文件禁止全量重写，只做锚点式最小替换
+
+**行数超过 1000 的文件（main.py 14000+ 行、README.md / skill.md 21000+ 行、dist/app.js 数千行），禁止「读全文 → 改 → 整体写回」，也禁止「大段 `old_string` 替换」。** 全量重写会把不可见差异（换行、BOM、缩进、同段重复内容）一并带进 diff，一次手滑就毁掉整个文件。**唯一合法做法：写一次性临时脚本，用唯一锚点定位，只替换目标片段，执行完即删。**
+
+### 六条铁律
+
+| 铁律 | 要求 | 违反后果 |
+|---|---|---|
+| **🔴 唯一锚点** | 替换前 `assert content.count(old) == 1`，>1 立即中止 | 误伤同段重复内容，静默改错 |
+| **🔴 先备份后改** | 改前 `cp file /tmp/file.bak.$(date +%H%M%S)` | 改坏无法回滚 |
+| **🔴 最小替换** | 只替换目标片段，其余字节不动 | 全文重排导致 diff 爆炸、无法 review |
+| **🔴 改后三校验** | 语法校验（`py_compile`）+ 结构校验（`diff` / 行数 / 锚点计数）+ 功能回归 | 「改完就跑」把回归带上线 |
+| **🔴 临时脚本不入库** | 统一命名 `test/temp_patch_<版本>.py`，执行完删除 | 仓库堆满一次性垃圾脚本 |
+| **🔴 文档改完必重生成** | 改 md 后按 PY-CORE-018 重生成 skill.docx | 三方文档不一致、锚点断链 |
+
+### 标准流程（五步）
+
+```bash
+# 1. 备份
+cp README.md /tmp/README.md.bak.$(date +%H%M%S)
+
+# 2. 写临时脚本（唯一锚点 + 计数断言 + 最小替换）
+cat > test/temp_patch_vX.py <<'PY'
+from pathlib import Path
+
+TARGET = Path('README.md')
+content = TARGET.read_text(encoding='utf-8')
+
+OLD = '| 📐 安全审计零问题范式 (PY-CORE-040) | 总计问题必须为 0 的判定标准 |'
+assert content.count(OLD) == 1, f'锚点命中 {content.count(OLD)} 次，中止'
+
+NEW = OLD + '\n| 📐 大文件小范围修改临时脚本范式 (PY-CORE-030) | 大文件禁用全量重写 |'
+content = content.replace(OLD, NEW, 1)
+TARGET.write_text(content, encoding='utf-8')
+print('OK')
+PY
+
+# 3. 执行
+python test/temp_patch_vX.py
+
+# 4. 三校验
+python -m py_compile main.py && diff README.md skill.md && echo "文档一致"
+python test/generate_docx.py
+
+# 5. 删除临时脚本并提交
+rm test/temp_patch_vX.py
+git add -A && git commit -m "docs: ..."
+```
+
+### 适用 / 不适用
+
+| 场景 | 做法 |
+|---|---|
+| 千行级文件改 1~5 行（清单加一项、导航加一行、锚点替换） | ✅ 临时脚本 + 唯一锚点 |
+| 结构化数据批量改（如 config.json 敏感字段加密） | ✅ 用工具/脚本改，禁止手工逐行改 |
+| 新增整章文档（> 200 行） | ✅ 临时脚本按锚点插入整块，避免手写缩进漂移 |
+| 文件 < 200 行的小改 | ⚠️ 可直接编辑，但同样要求改后三校验 |
+| 需要重构大段逻辑 | ❌ 不属本范式场景，应拆分为独立提交分步进行 |
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 用 `json.load` + `json.dump` 全量重写 config.json | 键顺序、缩进、中文转义全变，diff 看不出真实改动 | 只改目标字段，或用 crypto_tool 的原子写入 |
+| 用行号定位（`lines[1234] = ...`） | 文件一改行号就漂移，改到隔壁行 | 用文本锚点，不用行号 |
+| 锚点取太短（如 `print(`） | 命中几十次，`replace` 全改 | 锚点必须带上下文，并配合计数断言 |
+| 临时脚本留在仓库 | 下次误跑导致重复插入 | 执行完 `rm`，仓库只保留范式描述 |
+| 改完不重生成 docx | 三方文档不一致、导航锚点断链 | 按 PY-CORE-018 重新生成并校验 |
+
+### 落地检查清单
+
+```
+[ ] 目标文件已备份到 /tmp
+[ ] 每个替换锚点 assert count == 1
+[ ] 只替换目标片段，未整体重写文件
+[ ] py_compile / 语法校验通过
+[ ] diff 只出现预期改动行
+[ ] README.md 与 skill.md 逐字一致
+[ ] skill.docx 已按 PY-CORE-018 重新生成
+[ ] 临时脚本已删除，git status 无残留
+```
+
+### 验证命令
+
+```bash
+python -m py_compile main.py; echo "EXIT=$?"
+diff README.md skill.md && echo "文档逐字一致"
+git status --short
+```
+
+> **判定标准**: 上述命令全部退出码 0、`diff` 无输出、`git status` 无临时脚本残留。任一不满足即视为「未符合本范式」。
+
+---
+
+## 🟡 PY-CORE-031: Node.js依赖管理与补丁持久化范式 (Node.js Dependency & Patch Management)
+
+### 范式描述
+Node.js依赖管理，包含patch-package实现补丁持久化：
+
+### 核心实现
+
+#### package.json配置
+{
+  "name": "xy_ws-dist",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "patch-package"
+  },
+  "dependencies": {
+    "hostc": "^1.3.0",
+    "patch-package": "^8.0.0"
+  }
+}
+
+#### 补丁文件示例 (patches/hostc+1.3.0.patch)
+diff --git a/dist/lib/tunnel.js b/dist/lib/tunnel.js
+index xxxxxxx..yyyyyyy 100644
+--- a/dist/lib/tunnel.js
++++ b/dist/lib/tunnel.js
+@@ -142,6 +142,10 @@ function safeCloseWebSocket2(socket, code, reason) {
+   if (!socket) return;
+   try {
++    if (socket.readyState === WebSocket.CONNECTING) {
++      socket.once("error", () => {});
++      socket.terminate();
++    } else {
+       socket.close(normalizeWebSocketCloseCode(code), normalizeWebSocketCloseReason(reason));
++    }
+   } catch {
+     try { socket.terminate(); } catch {}
+   }
+
+### 工作原理
+1. `npm install` 时自动运行 `postinstall` 脚本
+2. `patch-package` 应用 `patches/` 目录下的所有补丁
+3. 确保第三方库的修复不会因依赖更新而丢失
+
+---
+
+## 🔴 PY-CORE-032: PWA离线缓存范式 (Progressive Web App)
+
+### 范式描述
+使用Workbox实现PWA离线缓存，提升用户体验：
+- Service Worker注册与管理
+- 静态资源预缓存
+- 离线回退策略
+- 缓存更新机制
+
+### 核心实现
+
+#### Service Worker注册 (registerSW.js)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { scope: './' })
+            .then(registration => {
+                console.log('SW registered:', registration.scope);
+            })
+            .catch(error => {
+                console.log('SW registration failed:', error);
+            });
+    });
+}
+
+#### Service Worker配置 (sw.js)
+importScripts('./workbox-9c191d2f.js');
+
+const { precacheAndRoute, cleanupOutdatedCaches, registerRoute, NavigationRoute } = workbox;
+
+// 预缓存静态资源
+precacheAndRoute([
+    { url: 'index.html', revision: 'f0ffca7cb...' },
+    { url: 'assets/index-CLgEPqQj.js', revision: null },
+    { url: 'assets/vendor-J3N2YKMO.js', revision: null },
+]);
+
+// 清理过期缓存
+cleanupOutdatedCaches();
+
+// 导航请求回退到index.html（SPA支持）
+registerRoute(
+    new NavigationRoute(
+        createHandlerBoundToURL('index.html')
+    )
+);
+
+---
+
+## 🟡 PY-CORE-033: Python依赖管理范式 (Python Dependency Management)
+
+### 范式描述
+标准化的Python依赖管理，确保可重复构建：
+
+### 核心实现
+
+#### requirements.txt结构（与main.py顶部import一一对应）
+核心框架
+fastapi==0.128.8
+uvicorn[standard]==0.39.0
+pydantic==2.11.10
+
+浏览器自动化
+playwright==1.52.0
+
+数据处理
+openpyxl==3.1.5
+pandas==2.3.3
+
+系统监控
+psutil==6.1.1
+prometheus-client==0.24.1
+
+安全与加密
+cryptography==43.0.3
+
+版本解析
+packaging==24.2
+
+文档生成
+python-docx==1.2.0
+
+#### 依赖检查与安装
+def check_deps_satisfied(requirements_file="requirements.txt"):
+    """检查依赖是否满足"""
+    import pkg_resources
+
+    with open(requirements_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+
+            try:
+                pkg_resources.require(line)
+            except (pkg_resources.DistributionNotFound, pkg_resources.VersionConflict):
+                return False
+
+    return True
+
+def install_playwright_cdn():
+    """使用CDN镜像安装Playwright浏览器"""
+    mirrors = [
+        ("https://npmmirror.com/mirrors/playwright", "淘宝镜像"),
+        ("https://registry.npmmirror.com/-/binary/playwright", "npmmirror"),
+    ]
+
+    for mirror_url, mirror_name in mirrors:
+        try:
+            os.environ['PLAYWRIGHT_DOWNLOAD_HOST'] = mirror_url
+            subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], 
+                         check=True, capture_output=True)
+            return True
+        except subprocess.CalledProcessError:
+            continue
+
+    return False
+
+---
+
+## 📐 范式编号规则范式 (PY-CORE-034)
+
+> **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: README.md / skill.md / skill.docx 中全部 PY-CORE 范式编号与引用
+
+### 🔴 核心原则：编号 = 固定前缀 + 三位数字；数字由标题英文首字母 A-Z 位次决定，字母一旦定下永不变
+
+标准字段形如 `PY-CORE-001`：
+
+| 组成 | 取值 | 可变性 |
+|---|---|---|
+| 前缀 | `PY-CORE` | **不可变**，不得改写、缩写、加字 |
+| 数字 | `001` ~ `100` 三位补零 | **可累加**，但只能按 A-Z 位次整体重排，不得随意「往后 +1」 |
+| 字母（分组键） | 标题英文名首字母 a-z | **原生固定**，范式标题确定后永久不变 |
+
+**关键点**：数字不是创建时间顺序，而是「按标题英文名首字母 A-Z 排序后的队列位次」。新增或删除任一范式，其字母分组之后的**所有范式数字整体 +1 / -1**，属于全量重排，不是只在末尾追加。
+
+### 编号生成算法（三步，缺一不可）
+
+| 步骤 | 动作 | 说明 |
+|---|---|---|
+| ① 取键 | 取范式标题英文名首字母小写化，作为分组键 | 中文标题以括号内英文名为准：`文件清理自动化 (Automated File Cleanup)` → `a` |
+| ② 排序 | 按 `(字母, 同字母内原相对次序)` 升序排成单一队列 | 同字母内**稳定排序**，保持原有相对次序，禁止按创建日期重排 |
+| ③ 落号 | 队列第 n 项即 `PY-CORE-` + 三位补零的 n | n 从 `001` 起连续累加，中间不得留空 |
+
+### 编号区间表（a-z 分组，硬上限 100）
+
+| 字母 | 区间 | 占用范式 | 状态 |
+|---|---|---|---|
+| a | 001-002 | 001-002 | 满 |
+| b | 003-004 | 003-004 | 满 |
+| c | 005-013 | 005-013 | 满 |
+| d | 014-019 | 014-019 | 满 |
+| e | 020-023 | 020-023 | 满 |
+| f | 024-025 | 024-025 | 满 |
+| g | 026-026 | 026 | 满 |
+| h | 027-027 | 027 | 满 |
+| i | 028-029 | 028-029 | 满 |
+| j / k | — | — | ✅ 空 |
+| l | 030-030 | 030 | 满 |
+| m | — | — | ✅ 空 |
+| n | 031-031 | 031 | 满 |
+| o | — | — | ✅ 空 |
+| p | 032-034 | 032-034 | 满 |
+| q | — | — | ✅ 空 |
+| r | 035-035 | 035 | 满 |
+| s | 036-041 | 036-041 | 满 |
+| t | 042-043 | 042-043 | 满 |
+| u | 044-044 | 044 | 满 |
+| v | 045-045 | 045 | 满 |
+| w / x / y / z | — | — | ✅ 空 |
+
+> 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 030 起全部 +1）。当前队列长度 45，剩余可用号位 55（硬上限 100）。
+
+### 新增范式标准动作（顺序不可颠倒）
+
+```
+[ ] 1. 定标题：中文名 + 括号内英文名，英文名首字母即分组键
+[ ] 2. 定位次：找到该字母在区间表中的位置，插到同字母段末尾（或按语义位次）
+[ ] 3. 全量重排：生成「旧号 → 新号」完整映射表，覆盖 001 到当前最大号
+[ ] 4. 全文档替换：正文标题、导航表、汇总表、交叉引用、历史版本记录一次性同步
+[ ] 5. 三校验：零跳号（001~最大号连续）、零重号（每个号仅一个范式）、零遗漏（映射表全覆盖）
+[ ] 6. 双文档同步：README.md 与 skill.md 逐字节一致，再重新生成 skill.docx 并校验锚点
+```
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 只在末尾追加 `最大号+1` | 违反 A-Z 位次，编号与字母顺序错乱 | 按字母插入，其后整体 +1 |
+| 只改标题不改引用 | 导航表/汇总表/正文指向错误范式 | 同一次提交内全量替换 |
+| 改标题英文名首字母 | 字母分组漂移，全表连锁重排 | 字母原生固定，标题英文名不可随意改 |
+| 同字母内按创建日期重排 | 历史范式相对次序被打乱 | 稳定排序，保持原相对次序 |
+| 为省事跳号或复号 | 破坏「一号一范式」唯一性 | 连续累加、零跳号零重号 |
+| 编号突破 100 | 三位数字溢出，格式失效 | 先合并/拆分范式，保持在 001-100 内 |
+
+### 本轮重排实录（v5.0.9.95，全量生效）
+
+| 代表范式 | 旧号 | 新号 | 首字母 |
+|---|---|---|---|
+| 统一异常处理 | 旧号 001 | 新号 044 | u |
+| 文件清理自动化 | 旧号 013 | 新号 001 | a |
+| 浏览器自动化爬虫 | 旧号 006 | 新号 003 | b |
+| 数据对比分析 | 旧号 007 | 新号 014 | d |
+| Changelog版本变更详情完整结构 | 旧号 027 | 新号 011 | c |
+| 每日利润表读取 | 旧号 038 | 新号 019 | d |
+| 版本号一致性保障 | 旧号 028 | 新号 045 | v |
+| 字段名兼容性（原重号） | 旧号 007 | 新号 025 | f |
+| 代码库卫生维护（原重号） | 旧号 008 | 新号 013 | c |
+| 编码处理最佳实践（原重号） | 旧号 029 | 新号 023 | e |
+| Git历史维护（原重号） | 旧号 002 | 新号 026 | g |
+| subprocess超时配置（原重号） | 旧号 031 | 新号 041 | s |
+
+> **判定标准**: 出现「编号跳号 / 重号 / 与标题首字母位次不符 / 引用未同步 / 字母被改动」中任意一条，即视为「未符合本范式」。
+
+---
+
+## 🟡 PY-CORE-037: 安全修复验证测试范式 (Security Fix Verification Testing)
+
+### 范式描述
+针对已知安全漏洞的回归测试套件，确保修复不反弹：
+
+### 核心实现
+class TestAPIInputValidation:
+    """测试1: API输入验证 - Bug #1修复验证"""
+
+    def test_empty_post_body_returns_400(self):
+        """空请求体应返回400"""
+        client = app.test_client()
+        response = client.post('/run', data='', content_type='application/json')
+
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert 'error' in data
+        assert '不能为空' in data['error']
+
+    def test_invalid_json_returns_400(self):
+        """无效JSON应返回400"""
+        client = app.test_client()
+        response = client.post('/run', data='not valid json', 
+                              content_type='application/json')
+        assert response.status_code == 400
+
+
+class TestJSONParsingSafety:
+    """测试2: JSON解析安全性 - Bug #2修复验证"""
+
+    def test_empty_logs_array_no_index_error(self):
+        """空的logs数组不应导致IndexError"""
+        test_data = {'logs': []}
+
+        logs = test_data.get('logs', [])
+        if isinstance(logs, list) and len(logs) > 0:
+            last_log = logs[-1]
+            added = last_log.get('added', [])
+        else:
+            added = []
+
+        assert added == []
+
+    def test_corrupted_json_handled_gracefully(self):
+        """损坏的JSON文件应被优雅处理"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            f.write('{invalid json content}')
+            temp_path = f.name
+
+        try:
+            result = safe_read_json(temp_path)
+            assert result == {} or result is None
+        finally:
+            os.unlink(temp_path)
+
+
+class TestTypeSafety:
+    """测试3: 类型安全 - Bug #3修复验证"""
+
+    def test_xiaoji_records_type_validation(self):
+        """xiaoji_records必须是list类型"""
+        test_cases = [
+            ({'小计': []}, []),
+            ({'小计': ['item1', 'item2']}, ['item1', 'item2']),
+            ({}, []),
+            ({'小计': 'not_a_list'}, []),  # 错误类型
+            ({'小计': None}, []),          # None值
+        ]
+
+        for input_data, expected in test_cases:
+            result = (
+                input_data.get('小计', []) 
+                if isinstance(input_data, dict) and isinstance(input_data.get('小计'), list) 
+                else []
+            )
+            assert result == expected, f"Failed for input: {input_data}"
+
+
+class TestThreadSafety:
+    """测试4: 线程安全 - Bug #4修复验证"""
+
+    def test_processes_dict_protected_by_lock(self):
+        """processes字典应该被锁保护"""
+        errors = []
+
+        def write_to_dict():
+            try:
+                with _processes_lock:
+                    processes[f'test_{threading.current_thread().ident}'] = 'value'
+            except Exception as e:
+                errors.append(e)
+
+        def read_from_dict():
+            try:
+                with _processes_lock:
+                    _ = len(processes)
+            except Exception as e:
+                errors.append(e)
+
+        # 启动多个线程并发访问
+        threads = []
+        for i in range(10):
+            t = threading.Thread(target=write_to_dict if i % 2 == 0 else read_from_dict)
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join(timeout=5)
+
+        assert len(errors) == 0, f"线程安全错误: {errors}"
+
+
+class TestRateLimiting:
+    """测试5: 速率限制功能"""
+
+    def test_rate_limiter_blocks_excessive_requests(self):
+        """速率限制器应阻止过多请求"""
+        limiter = RateLimiter(max_requests=3, window_seconds=60)
+        test_ip = '192.168.1.100'
+
+        # 前3次应该允许
+        for i in range(3):
+            assert limiter.is_allowed(test_ip) is True
+
+        # 第4次应该被阻止
+        assert limiter.is_allowed(test_ip) is False
+
+    def test_rate_limiter_different_ips_independent(self):
+        """不同IP应有独立的速率限制计数"""
+        limiter = RateLimiter(max_requests=2, window_seconds=60)
+
+        # IP1达到限制
+        limiter.is_allowed('192.168.1.1')
+        limiter.is_allowed('192.168.1.1')
+        assert limiter.is_allowed('192.168.1.1') is False
+
+        # IP2应该不受影响
+        assert limiter.is_allowed('192.168.1.2') is True
+
+
+class TestExceptionHandling:
+    """测试7: 异常处理的健壮性"""
+
+    def test_socket_cleanup_on_exception(self):
+        """socket应在异常时正确关闭"""
+        mock_socket = Mock()
+        mock_socket.close = Mock()
+
+        s = None
+        try:
+            s = mock_socket
+            raise socket.error("Connection failed")
+        except socket.error:
+            pass
+        finally:
+            if s:
+                try:
+                    s.close()
+                except Exception:
+                    pass
+
+        # 验证close被调用
+        mock_socket.close.assert_called_once()
+
+### 安全测试清单
+| Bug编号 | 漏洞类型 | 测试方法 | 验证点 |
+|--------|---------|---------|--------|
+| #1 | API输入验证 | `test_empty_post_body_returns_400` | 返回400而非500 |
+| #2 | JSON解析安全 | `test_corrupted_json_handled_gracefully` | 不崩溃，返回默认值 |
+| #3 | 类型安全 | `test_xiaoji_records_type_validation` | 类型检查防IndexError |
+| #4 | 线程安全 | `test_processes_dict_protected_by_lock` | 无竞态条件 |
+| #5 | 速率限制 | `test_rate_limiter_blocks_excessive_requests` | 正确限流 |
+| #7 | 异常处理 | `test_socket_cleanup_on_exception` | 资源正确释放 |
+
+---
+
+## 🔴 PY-CORE-038: 安全漏洞防护范式 (Security Vulnerability Protection)
+
+### 范式描述
+针对Web应用常见的安全漏洞（路径遍历、弱随机数、不安全SSL/TLS、内联导入、命令注入），实施**纵深防御**策略，确保每个攻击向量都有对应的防护措施。
+
+### 安全规范
+
+#### 1. 路径遍历防护 (Path Traversal Protection)
+所有用户输入的文件路径必须通过 `sec_sp()` 函数验证，防止 `../` 遍历攻击。
+
+```python
+def sec_sp(base_dir, user_path):
+    """Secure path join - prevent path traversal attacks."""
+    safe_base = os.path.realpath(base_dir)
+    target = os.path.realpath(os.path.join(safe_base, user_path))
+    if not target.startswith(safe_base + os.sep) and target != safe_base:
+        return None, f"Path traversal blocked: {user_path}"
+    return target, None
+
+# 使用示例
+@app.get('/dist/{filename:path}')
+async def dist_files(filename: str, request: Request):
+    safe_path, err = sec_sp(os.path.join(PROJECT_DIR, 'dist'), filename)
+    if not safe_path:
+        raise HTTPException(status_code=403, detail=f"Path traversal blocked: {err}")
+    file_path = safe_path
+```
+
+#### 2. 密码学安全随机数 (Cryptographically Secure Random)
+涉及安全场景（如User-Agent生成、Token生成）的随机数必须使用 `secrets` 模块，禁止使用 `random`。
+
+```python
+# ❌ 禁止：random.choice 不是密码学安全的
+chrome_version = random.choice(chrome_versions)
+
+# ✅ 正确：使用 secrets.choice
+chrome_version = secrets.choice(chrome_versions)
+```
+
+#### 3. SSL/TLS 证书验证 (SSL Certificate Validation)
+所有HTTPS请求必须启用证书验证，禁止使用 `CERT_NONE` 或 `check_hostname=False`。
+
+```python
+# ✅ 正确：使用默认安全上下文
+ctx = ssl.create_default_context()
+
+# ❌ 禁止：以下配置会禁用证书验证
+# ctx.check_hostname = False
+# ctx.verify_mode = ssl.CERT_NONE
+```
+
+#### 4. Import 规范 (Import Standards) — 🔴 强制范式
+
+**核心原则：import 只可以出现在文件开头，并且保证唯一性。**
+
+##### 规则 4.1：位置唯一性 — import 只能在文件顶部
+- 所有 `import` 语句必须集中在文件顶部（标准库 → 第三方库 → 本地模块的顺序）
+- **严禁**在函数体、类方法、条件分支、循环体内出现 `import` 语句
+- **严禁**在文件中下部（如 `if __name__ == '__main__':` 块内）出现 `import` 语句
+- **唯一例外**：`try/except ImportError` 块用于导入可选依赖（第三方库可能未安装），且该块必须在文件顶部区域
+
+##### 规则 4.2：声明唯一性 — 同一模块禁止重复导入
+- 同一模块在整个文件中只能 `import` 一次，禁止重复声明
+- 如需在多处使用，只需在顶部导入一次，全局可用
+- `try/except ImportError` 块中已导入的模块，不得在其他地方再次导入
+
+##### 规则 4.3：禁止别名混淆
+- 禁止使用下划线前缀别名混淆安全模块（如 `import re as _secre`）
+- 标准库模块应使用标准名称，确保代码可审计性
+
+##### 规则 4.4：验证方法
+每次修改 main.py 后，必须运行以下检查确保 import 合规：
+
+```python
+# 验证脚本：检查 import 唯一性和位置
+import ast, re
+
+with open('main.py', 'r', encoding='utf-8-sig') as f:
+    source = f.read()
+    lines = source.splitlines()
+
+# 检查1：函数内部不得有 import（try/except ImportError 除外）
+tree = ast.parse(source)
+violations = []
+for node in ast.walk(tree):
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        for child in ast.walk(node):
+            if isinstance(child, (ast.Import, ast.ImportFrom)):
+                # 检查是否在 try/except ImportError 块内
+                violations.append((node.name, child.lineno))
+
+# 检查2：同一模块不得重复 import
+import_lines = [l.strip() for l in lines if l.strip().startswith(('import ', 'from '))]
+# 去重检查...
+```
+
+##### 代码示例
+
+```python
+# ✅ 正确：所有 import 在文件顶部，按标准库→第三方→本地排序
+import os
+import re
+import secrets
+import socket
+import ssl
+import urllib.request
+from html import escape
+from pathlib import Path
+
+# ✅ 正确：可选依赖用 try/except ImportError（仍在文件顶部区域）
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+# ❌ 禁止：函数内部内联导入
+def some_function():
+    import os          # 违反规则 4.1！
+    import traceback   # 违反规则 4.1！
+    pass
+
+# ❌ 禁止：文件下部 if __name__ 块内导入
+if __name__ == '__main__':
+    import uvicorn     # 违反规则 4.1！已在顶部导入过
+    uvicorn.run(app)
+
+# ❌ 禁止：重复导入（违反规则 4.2）
+import logging         # 顶部已导入
+# ... 5000行后 ...
+def __init__(self):
+    import logging     # 违反规则 4.2！重复声明
+
+# ❌ 禁止：别名混淆（违反规则 4.3）
+import re as _secre    # 违反规则 4.3！
+```
+
+#### 5. 命令注入防护 (Command Injection Prevention)
+所有用户输入的命令必须通过 `validate_command_safe()` 验证，阻止危险命令模式。
+
+```python
+class RunCommandRequest(BaseModel):
+    command: str
+
+    @classmethod
+    def validate_command_safe(cls, command: str) -> tuple[bool, str]:
+        """验证命令安全性，阻止危险命令"""
+        dangerous_patterns = [
+            r'rm\s+-rf', r':\(\)\s*\{', r'mkfs',
+            r'dd\s+if=', r'>\s*/dev/sd',
+            # ... 30+ 种危险模式
+        ]
+        for pattern in dangerous_patterns:
+            if re.search(pattern, command, re.IGNORECASE):
+                return False, f"危险命令被阻止: {pattern}"
+        return True, ""
+```
+
+### 验证清单
+- [x] 路径遍历防护：sec_sp() 函数已实现并应用于 /dist 端点
+- [x] 密码学安全随机数：secrets.choice 替换 random.choice
+- [x] SSL证书验证：清理 CERT_NONE 配置，使用 create_default_context()
+- [x] Import规范：所有import在文件顶部，无内联导入
+- [x] 命令注入防护：validate_command_safe() 验证30+种危险模式
+- [x] 语法验证：py_compile + ast.parse 双重验证通过
+
+---
+
+## 🔴 PY-CORE-039: 智能版本号匹配算法 (Smart Version Number Matching Algorithm)
+
+> **创建日期**: 2026-09-02 | **最后更新**: 2026-09-02 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 - commit message无版本号时的降级策略 | **参考基准**: v5.0.9.4
+
+### 范式描述
+当Git提交的commit message中**不包含标准版本号格式**（如5.0.9）时，系统必须**智能匹配**最接近该提交日期的README版本号，而不是直接显示commit hash（如77117492）。
+
+### 核心原则
+
+#### 1. 版本号提取优先级（三级降级策略）
+`python
+# ✅ 正确：三级降级策略
+for commit_hash, commit_date, commit_msg, ... in git_commits:
+    short_hash = commit_hash[:8]
+    
+    # Level 1: 从commit message直接提取（最高优先级）
+    ver_in_msg = re.search(r'v([\\d.]+)', commit_msg)
+    if ver_in_msg:
+        version_key = ver_in_msg.group(1)  # 例如: "5.0.9"
+    
+    # Level 2: 智能日期匹配（中等优先级）
+    else:
+        def find_nearest_version(commit_dt, versions_map):
+            from datetime import datetime
+            try:
+                commit_datetime = datetime.strptime(commit_dt, '%Y-%m-%d')
+                min_diff = float('inf')
+                nearest_ver = short_hash
+                
+                for ver, info in versions_map.items():
+                    if 'date' in info and info['date'] != '\\u5f85\\u8865\\u5145':
+                        try:
+                            ver_datetime = datetime.strptime(info['date'], '%Y-%m-%d')
+                            diff = abs((commit_datetime - ver_datetime).days)
+                            
+                            # ⚠️ 关键：只接受30天内的匹配（避免错误归因）
+                            if diff < min_diff:
+                                min_diff = diff
+                                nearest_ver = ver
+                        except:
+                            continue
+                
+                # 返回结果：30天内返回版本号，否则返回hash
+                return nearest_ver if min_diff <= 30 else short_hash
+            except:
+                return short_hash
+        
+        version_key = find_nearest_version(commit_date, readme_version_map)
+`
+
+#### 2. 匹配算法详解
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| **输入** | commit日期 + README所有版本的日期映射 | {"2026-07-05": "5.0.7", "2026-09-02": "5.0.9"} |
+| **计算** | 计算每个版本与commit日期的**绝对天数差** | bs(2026-07-05 - 2026-07-05) = 0天 |
+| **阈值** | **最大允许差值：30天** | 超过30天视为不匹配 |
+| **输出** | 差值最小的版本号或原始hash | "5.0.7" 或 "77117492" |
+
+#### 3. 实际案例演示
+`python
+# 案例1: commit message有版本号 → 直接提取
+commit_msg = "🔧v5.0.9.1 关键修复: run.bat编码问题"
+# 结果: version_key = "5.0.9.1"
+
+# 案例2: commit message无版本号但日期接近 → 智能匹配
+commit_date = "2026-07-05"
+readme_versions = {
+    "5.0.7": {"date": "2026-07-05"},   # ← 差值: 0天 ✅
+    "5.0.8": {"date": "2026-08-31"},   # ← 差值: 57天 ❌ 超过阈值
+}
+# 结果: version_key = "5.0.7" (因为0天 < 30天)
+
+# 案例3: 日期差距太大 → 显示hash
+commit_date = "2026-01-01"
+readme_versions = {
+    "5.0.7": {"date": "2026-07-05"},   # ← 差值: 185天 ❌
+}
+# 结果: version_key = "abc12345" (超过30天阈值)
+`
+
+### 应用场景
+
+| 场景 | 文件位置 | 说明 |
+|------|----------|------|
+| **历史提交兼容** | main.py:8970-8993 | 处理使用ix:/eat:前缀的旧提交 |
+| **README版本映射** | 
+eadme_version_map 字典 | 提供版本→日期的查找表 |
+| **API响应优化** | /api/changelog JSON输出 | 确保所有条目都有语义化版本号 |
+
+### 最佳实践清单
+
+- [ ] **三级降级**：必须实现 message提取 → 日期匹配 → hash兜底 的完整链路
+- [ ] **30天阈值**：日期差值上限严格限制为30天（可配置但需文档说明）
+- [ ] **异常处理**：日期解析失败时必须降级为hash，不能抛异常导致API 500
+- [ ] **性能优化**：ind_nearest_version函数不应在循环内重复定义（考虑提取到外层）
+- [ ] **日志记录**：当触发智能匹配时建议记录debug日志便于排查
+
+### 反面案例（避免）
+
+❌ 错误示例1：无降级策略直接显示hash
+`python
+ver_in_msg = re.search(r'v([\\d.]+)', commit_msg)
+version_key = ver_in_msg.group(1) if ver_in_msg else short_hash  # 直接fallback
+# 问题：用户看到 "version": "77117492" 而不是 "5.0.7"
+`
+
+❌ 错误示例2：无阈值限制的暴力匹配
+`python
+nearest_ver = min(versions_map.keys(), key=lambda v: abs(date_diff(v, commit_date)))
+# 问题：2026年1月的commit可能被错误匹配到2026年12月的版本
+`
+
+❌ 错误示例3：修改Git历史（禁止）
+`ash
+git filter-branch --msg-filter 'sed "s/fix:/v5.0.7/"'
+# 问题：破坏Git历史完整性，导致 collaborators 需要force pull
+`
+
+
+------
+
+## 📐 安全审计零问题范式 (PY-CORE-040)
+
+> **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [test/security_audit.py](test/security_audit.py) / [main.py](main.py) / [skill.md](skill.md) / [README.md](README.md)
+
+### 🔴 核心原则：总计问题必须为 0
+
+**审计报告的「总计问题」必须恒为 0，而不是「只有 0 个高危」。** 「0 高危 + 23 信息」不是达标，是把噪声当结论 —— 报告里只要还有任何一条非零计数，就说明要么代码有缺陷没修，要么扫描规则本身写错了。**任何非零问题都必须被消除，消除方式只能是「修代码」或「修规则」，禁止「调低等级」或「加白名单」蒙混。**
+
+### 四类问题的唯一正确处置
+
+| 问题类型 | 判定依据 | 唯一正确处置 | 禁止做法 |
+|---|---|---|---|
+| **真实缺陷** | 代码确实存在可被利用的弱点 | 修代码，并补真实攻击载荷验证 | 降级/加注释/加白名单 |
+| **规则误报** | 扫描规则语义写反或匹配错位 | 修规则（正则/上下文/大小写归一） | 在报告里人工剔除 |
+| **正确防护被当风险** | 该写法本身即防护手段（如 `await lock`） | 转正向验证，记入 `verified_controls` | 报成 INFO 计入总数 |
+| **无法判定项** | 服务未运行、依赖缺失导致无法验证 | 记入 `observations`，显式标注「不计入问题」 | 计入 `total_issues` |
+
+### 三层判定结构（报告必须能区分）
+
+```
+issues_detail       → 可执行修复的问题（CRITICAL/HIGH/MEDIUM/LOW），计入 total_issues
+observations_detail → 观测项（原 INFO），不计入 total_issues
+verified_controls   → 已确认生效的安全控制（正向验证），不计入 total_issues
+attack_defense      → 黑盒攻防逐项结论（BLOCKED / BYPASSED / INCONCLUSIVE）
+```
+
+`summary.total_issues` 只累加前三档，INFO 一律走 `observations`。这样「总计问题 0」是可验证的事实，而不是靠人去读明细判断。
+
+### 攻防必须是真的
+
+| 规则 | 说明 |
+|---|---|
+| **🔴 禁止模拟打印** | 循环 `print("✅ 已阻截")` 而无真实请求，等于自证安全，属于伪造结论 |
+| **🔴 必须发真实请求** | 对 `127.0.0.1:PORT` 发起真实 HTTP 载荷，用响应状态码/响应体判定 |
+| **🔴 必须双向判定** | 状态码维度 + 内容维度（路径遍历 200 可能只是 SPA 回退，必须复核响应体无 `root:x:`） |
+| **🔴 服务不可达要降级** | 服务未运行记 `observations` 并跳过，禁止伪造「全部通过」 |
+
+**必测载荷清单（13 项基线）**: 超大请求体、路由级超长字段、畸形 JSON、类型混淆、非法字段注入、路径遍历、反射型 XSS、SQL 注入、CSRF Origin、非法 HTTP 方法、路径遍历内容复核、安全响应头基线、错误信息泄露。
+
+### 退出码语义
+
+| 条件 | 退出码 | 含义 |
+|---|---|---|
+| `critical > 0` | 2 | 严重问题，阻断交付 |
+| `total_issues > 0` | 1 | 仍有中低危问题，未达标 |
+| `total_issues == 0` | 0 | 达标 |
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 把 `await lock` / `async with lock` 当风险 | 正确防护被报成 23 条 INFO，总计永远不为 0 | 转正向验证，计入 `verified_controls` |
+| HTTP 响应头用大小写敏感字典键匹配 | 服务端返回小写头名，4 项安全头全被判缺失 | 全部 `lower()` 归一化后再比对 |
+| 超大请求体只认 413 | 服务端读完 body 前断连，客户端拿 `Broken pipe` 被判「未拦截」 | 识别断连为「主动拒收」 |
+| 路径遍历只看状态码 | SPA 回退必然 200，误判为目录穿越成功 | 追加响应体内容级复核 |
+| 用 INFO 表示「我看过但没问题」 | 噪声淹没真问题，总计永不为 0 | 用 `verified_controls` / `observations` 表达 |
+| 服务未运行仍输出「全部通过」 | 伪造结论 | 记 `observations` 并显式跳过 |
+
+### 落地检查清单
+
+```
+[ ] summary.total_issues == 0 且 critical/high/medium/low 全为 0
+[ ] summary.info == 0（INFO 已迁入 observations，不再计入问题）
+[ ] observations_detail 中每条都标注「不计入问题」
+[ ] verified_controls 列出已确认生效的防护（如异步锁 N 处）
+[ ] attack_defense.cases 每项都有 status（BLOCKED/BYPASSED/INCONCLUSIVE）
+[ ] 服务运行态与停止态两种场景均退出码 0
+[ ] 不存在任何「循环打印已阻截但无真实请求」的伪攻防代码
+```
+
+### 验证命令
+
+```bash
+python test/security_audit.py; echo "EXIT=$?"
+```
+
+> **判定标准**: 输出 `总计问题: 0`、`严重/高危/中危/低危/信息` 全为 0、`EXIT=0`。任一非零即视为「未符合本范式」。
 
 ---
 
@@ -583,474 +3569,64 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 
 ---
 
-## 📐 DOCX 文档生成范式 (PY-CORE-018)
+## 📊 完整代码范式汇总表
 
-> **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [skill.md](skill.md) / [README.md](README.md) / skill.docx / [test/generate_docx.py](test/generate_docx.py)
+| 范式编号 | 首字母 | 名称 | 覆盖文件 | 优先级 |
+|---------|-------|------|---------|--------|
+| PY-CORE-001 | A | 文件清理自动化 (Automated File Cleanup) | main.py | 🔴 核心 |
+| PY-CORE-002 | A | API压力测试 (API Stress Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
+| PY-CORE-003 | B | 浏览器自动化爬虫 (Browser Automation Scraping) | main.py | 🔴 核心 |
+| PY-CORE-004 | B | 后台任务管理 (Background Task Management) | main.py | 🔴 核心 |
+| PY-CORE-005 | C | 统一路径管理 (Centralized Path Management) | main.py | 🔴 核心 |
+| PY-CORE-006 | C | 配置管理 (Configuration Management) | main.py | 🔴 核心 |
+| PY-CORE-007 | C | Cookie验证与管理 (Cookie Validation & Management) | main.py | 🔴 核心 |
+| PY-CORE-008 | C | 跨平台启动脚本 (Cross-Platform Startup Script) | run.bat/run.sh | 🔴 核心 |
+| PY-CORE-009 | C | CI/CD自动化部署 (CI/CD Automation) | 范式示例（本仓库未包含该工作流文件） | 🟡 重要 |
+| PY-CORE-010 | C | Changelog API数据结构与Git历史集成 | main.py | 🔴 核心 |
+| PY-CORE-011 | C | Changelog版本变更详情完整结构 | README.md / skill.md | 🔴 核心 |
+| PY-CORE-012 | C | CMD窗口输出与web_output.log一致性 | run.bat / run.sh | 🔴 核心 |
+| PY-CORE-013 | C | 代码库卫生维护 (Codebase Hygiene Maintenance) | 全仓库 | 🔴 核心 |
+| PY-CORE-014 | D | 数据对比分析 (Data Comparison & Analysis) | main.py | 🔴 核心 |
+| PY-CORE-015 | D | 双输出日志系统 (Dual-Output Logging) | main.py | 🔴 核心 |
+| PY-CORE-016 | D | skill.docx生成范式 (Skill Docx Generation) | test/generate_docx.py | 🔴 核心 |
+| PY-CORE-017 | D | 双启动脚本同步 (Dual Startup Script Sync) | run.bat / run.sh | 🔴 核心 |
+| PY-CORE-018 | D | DOCX文档生成 (DOCX Document Generation) | test/generate_docx.py | 🔴 核心 |
+| PY-CORE-019 | D | 每日利润表读取 (Daily Profit Report Read) | main.py / /api/daily-profit | 🔴 核心 |
+| PY-CORE-020 | E | 环境自适应 (Environment-Aware Design) | main.py | 🔴 核心 |
+| PY-CORE-021 | E | 边界条件测试 (Edge Case Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
+| PY-CORE-022 | E | Excel货号E列读取 (Excel SKU Column-E Read) | main.py | 🔴 核心 |
+| PY-CORE-023 | E | 编码处理最佳实践 (Encoding Best Practices) | main.py | 🔴 核心 |
+| PY-CORE-024 | F | 前端安全防护 (Frontend Security) | dist/app.js | 🔴 核心 |
+| PY-CORE-025 | F | 字段名兼容性 (Field Name Compatibility) | main.py | 🔴 核心 |
+| PY-CORE-026 | G | Git历史维护 (Git History Maintenance) | 全仓库 | 🟡 重要 |
+| PY-CORE-027 | H | 隧道高可用 (High-Availability Tunnel) | main.py | 🔴 核心 |
+| PY-CORE-028 | I | Import语句规范 (Import Statement Standard) | 全仓库 | 🔴 核心 |
+| PY-CORE-029 | I | 智能缓存管理 (Intelligent Caching) | main.py | 🔴 核心 |
+| PY-CORE-030 | L | 大文件小范围修改临时脚本 (Large-File Minimal-Edit Script) | 全仓库大文件 | 🔴 核心 |
+| PY-CORE-031 | N | Node.js依赖管理与补丁持久化 | dist/package.json | 🟡 重要 |
+| PY-CORE-032 | P | PWA离线缓存 (Progressive Web App) | dist/sw.js + registerSW.js | 🟡 重要 |
+| PY-CORE-033 | P | Python依赖管理 (Python Dependency Management) | requirements.txt | 🟡 重要 |
+| PY-CORE-034 | P | 范式编号规则 (Paradigm Numbering Rule) | 全仓库文档 | 🔴 核心 |
+| PY-CORE-035 | R | API速率限制与输入验证 (Rate Limiting & Input Validation) | main.py | 🔴 核心 |
+| PY-CORE-036 | S | 安全邮件通知 (Secure Email Notification) | main.py | 🔴 核心 |
+| PY-CORE-037 | S | 安全修复验证测试 (Security Fix Verification Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
+| PY-CORE-038 | S | 安全漏洞防护 (Security Vulnerability Protection) | main.py | 🔴 核心 |
+| PY-CORE-039 | S | 智能版本号匹配算法 (Smart Version Matching) | main.py | 🔴 核心 |
+| PY-CORE-040 | S | 安全审计零问题 (Security Audit Zero-Issue) | test/security_audit.py | 🔴 核心 |
+| PY-CORE-041 | S | subprocess超时配置 (Subprocess Timeout Configuration) | main.py | 🟡 重要 |
+| PY-CORE-042 | T | 三方文档互证 (Three-Document Mutual Verification) | README.md / skill.md / skill.docx | 🔴 核心 |
+| PY-CORE-043 | T | 终端实时日志接入 (Terminal Real-Time Log Integration) | run.bat / run.sh | 🔴 核心 |
+| PY-CORE-044 | U | 统一异常处理 (Unified Exception Handling) | main.py | 🔴 核心 |
+| PY-CORE-045 | V | 版本号一致性保障 (Version Consistency Guarantee) | main.py / README.md | 🔴 核心 |
 
-### 🔴 核心原则：导航必须落在第一页
-
-**docx 的第一页固定为「标题 + 文档导航」，正文一律从第二页开始。** 导航不是装饰，是读者的第一入口 —— 一份 2 万行的规范文档，没有可点击索引等于没有目录。本范式与 `PY-CORE-016` 互补：**031 管「用什么生成」，034 管「生成成什么样」**。
-
-| 规则 | 说明 | 违反后果 |
-|------|------|----------|
-| **🔴 唯一生成器** | skill.docx 只能由 `test/generate_docx.py` 从 skill.md 生成 | 断链/样式丢失/代码块错乱 |
-| **🔴 导航置顶** | 导航块恒定位于第 1 页，其后立刻分页 | 读者翻页找目录 |
-| **🔴 整块搬迁** | 标题 + 引言 + 表格三件套一起搬，禁止只搬表格 | 第一页出现无标题孤表，标题掉到第 2 页 |
-| **🔴 锚点零缺失** | 每个导航行的 `w:anchor` 必须命中 `w:bookmarkStart` | 点击无反应，导航变纯文本 |
-| **🔴 首行无 BOM** | md 首行禁止出现 U+FEFF | H1 渲染成 `# 标题`，多出一个井号 |
-| **🔴 改 md 必重生成** | 任何 skill.md 改动后必须重新生成 skill.docx | 三方文档不同步 |
-
-### 五步流程
-
-```
-改 skill.md → 同版本块逐字复制到 README.md → python test/generate_docx.py
-            → 结构校验（锚点/分页/首行）→ 提交
-```
-
-### 生成器内部机制（必须理解的三个函数）
-
-| 函数 | 职责 | 关键约束 |
-|------|------|----------|
-| `_extract_nav_block(lines)` | 从正文中整块切出导航（标题+引言+表格），返回 `(nav_block, remaining)` | 向上回溯必须跨过空行、`---`、`>` 引言，直到命中 H1/H2；向下吞掉表格与尾随空行/分隔线 |
-| `_render_nav_block(block)` | 独立渲染导航块，结尾强制 `add_page_break()` | 只在第一个 H1 渲染完成后调用，与 md 源码位置完全解耦 |
-| `_handle_heading(lines, i)` | 渲染标题并给 H2/H3 打 `w:bookmarkStart` | H4 及以下不建书签，导航行指向 H4 必然断链 |
-
-**导航表识别规则**: 表格首行单元格同时含「章节」+（「位置」或「说明」）即判定为导航表；识别失败时整块留在正文原位置，不会报错，只会静默失去置顶效果。
-
-**锚点生成规则**: 标题文本小写 → 移除非单词字符 → 空格转 `-` → 合并连续 `-`，与 GitHub 风格锚点一致，保证 md 预览与 docx 内跳转指向同一处。
-
-**超链接显示文本**: 第 3 列固定显示 `🔗 点击跳转`，章节名只用于查找锚点，不写进单元格 —— 否则长标题会把列宽撑爆。
-
-### 必须避开的坑
-
-| 坑 | 后果 | 正确做法 |
-|---|---|---|
-| 向上回溯只跳空行，遇到 `>` 引言就停 | 表格被抽走、标题留在原地，第 1 页出现无标题孤表 | 空行/`---`/`>` 一律跳过，直到命中标题 |
-| 回溯不限制层级，一路追到 H3/H4 | 把上一章节的正文一起切进导航块，内容重复 | 只认 `^#{1,2}\s` 的标题作为导航块起点 |
-| 导航表仍为 2 列 | 没有跳转列，读者只能看不能用 | 生成器自动补第 3 列「位置（点击跳转）」 |
-| 第 3 列写章节名 | 单元格过长、列宽失控 | 固定文案 `🔗 点击跳转` |
-| 导航块依赖 md 中的物理位置 | 别人把导航挪到文末，docx 里也跟着沉底 | 提取后在首个 H1 之后强制插入 |
-| 首行 `#` + U+FEFF + `#` | `lstrip('#')` 遇 BOM 停止，标题多一个 `#` | 二进制清除 BOM，首行只留 `# 标题` |
-| 导航行指向 H4/H5 | 无对应书签，点击无效 | 导航只收录 H2/H3 章节 |
-| 只校验「生成成功」不校验锚点 | 断链静默存在，打开才发现点不动 | 必须实跑锚点命中校验脚本 |
-
-### 落地检查清单
-
-```
-[ ] skill.md / README.md 首行均无 BOM
-[ ] 导航块 = H2 标题 + 引言引用 + 表格，三件套完整
-[ ] docx 第一个表格即导航表，行数 = 表头 1 + 条目 N
-[ ] 分页符紧跟在导航表之后（正文从第 2 页开始）
-[ ] w:hyperlink 数 == w:anchor 数 == 命中书签数，未命中为空
-[ ] README.md 导航行锚点同样全部命中
-[ ] 文件大小 > 100KB（正常 350-400KB）
-[ ] 三方文档同版本块逐字一致
-```
-
-### 验证命令
-
-```bash
-python test/generate_docx.py
-```
-
-```python
-import zipfile, os
-from xml.etree import ElementTree as ET
-
-W = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}'
-root = ET.fromstring(zipfile.ZipFile('skill.docx').read('word/document.xml'))
-children = list(root.find(W + 'body'))
-
-bookmarks = {b.get(W + 'name') for b in root.iter(W + 'bookmarkStart')}
-links = [a.get(W + 'anchor') for a in root.iter(W + 'hyperlink') if a.get(W + 'anchor')]
-miss = [a for a in links if a not in bookmarks]
-
-print('大小 %.1f KB | 链接 %d | 命中 %d | 未命中 %s' % (
-    os.path.getsize('skill.docx') / 1024, len(links),
-    len(links) - len(miss), miss or '无'))
-print('第一页:', ' -> '.join(
-    ''.join(t.text or '' for t in e.iter(W + 't'))[:30] for e in children[:5]))
-
-pages = [i for i, e in enumerate(children)
-         if any(br.get(W + 'type') == 'page' for br in e.iter(W + 'br'))]
-print('分页符下标:', pages[:1])
-```
-
-> **判定标准**: 任一导航行点击无反应、或分页符未紧跟导航表、或首行标题带 `#` 前缀，即视为「未符合本范式」。
+**总计: 45个核心范式（PY-CORE-001 ~ PY-CORE-045，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
 
 ---
 
-## 📐 安全审计零问题范式 (PY-CORE-040)
-
-> **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [test/security_audit.py](test/security_audit.py) / [main.py](main.py) / [skill.md](skill.md) / [README.md](README.md)
-
-### 🔴 核心原则：总计问题必须为 0
-
-**审计报告的「总计问题」必须恒为 0，而不是「只有 0 个高危」。** 「0 高危 + 23 信息」不是达标，是把噪声当结论 —— 报告里只要还有任何一条非零计数，就说明要么代码有缺陷没修，要么扫描规则本身写错了。**任何非零问题都必须被消除，消除方式只能是「修代码」或「修规则」，禁止「调低等级」或「加白名单」蒙混。**
-
-### 四类问题的唯一正确处置
-
-| 问题类型 | 判定依据 | 唯一正确处置 | 禁止做法 |
-|---|---|---|---|
-| **真实缺陷** | 代码确实存在可被利用的弱点 | 修代码，并补真实攻击载荷验证 | 降级/加注释/加白名单 |
-| **规则误报** | 扫描规则语义写反或匹配错位 | 修规则（正则/上下文/大小写归一） | 在报告里人工剔除 |
-| **正确防护被当风险** | 该写法本身即防护手段（如 `await lock`） | 转正向验证，记入 `verified_controls` | 报成 INFO 计入总数 |
-| **无法判定项** | 服务未运行、依赖缺失导致无法验证 | 记入 `observations`，显式标注「不计入问题」 | 计入 `total_issues` |
-
-### 三层判定结构（报告必须能区分）
-
-```
-issues_detail       → 可执行修复的问题（CRITICAL/HIGH/MEDIUM/LOW），计入 total_issues
-observations_detail → 观测项（原 INFO），不计入 total_issues
-verified_controls   → 已确认生效的安全控制（正向验证），不计入 total_issues
-attack_defense      → 黑盒攻防逐项结论（BLOCKED / BYPASSED / INCONCLUSIVE）
-```
-
-`summary.total_issues` 只累加前三档，INFO 一律走 `observations`。这样「总计问题 0」是可验证的事实，而不是靠人去读明细判断。
-
-### 攻防必须是真的
-
-| 规则 | 说明 |
-|---|---|
-| **🔴 禁止模拟打印** | 循环 `print("✅ 已阻截")` 而无真实请求，等于自证安全，属于伪造结论 |
-| **🔴 必须发真实请求** | 对 `127.0.0.1:PORT` 发起真实 HTTP 载荷，用响应状态码/响应体判定 |
-| **🔴 必须双向判定** | 状态码维度 + 内容维度（路径遍历 200 可能只是 SPA 回退，必须复核响应体无 `root:x:`） |
-| **🔴 服务不可达要降级** | 服务未运行记 `observations` 并跳过，禁止伪造「全部通过」 |
-
-**必测载荷清单（13 项基线）**: 超大请求体、路由级超长字段、畸形 JSON、类型混淆、非法字段注入、路径遍历、反射型 XSS、SQL 注入、CSRF Origin、非法 HTTP 方法、路径遍历内容复核、安全响应头基线、错误信息泄露。
-
-### 退出码语义
-
-| 条件 | 退出码 | 含义 |
-|---|---|---|
-| `critical > 0` | 2 | 严重问题，阻断交付 |
-| `total_issues > 0` | 1 | 仍有中低危问题，未达标 |
-| `total_issues == 0` | 0 | 达标 |
-
-### 必须避开的坑
-
-| 坑 | 后果 | 正确做法 |
-|---|---|---|
-| 把 `await lock` / `async with lock` 当风险 | 正确防护被报成 23 条 INFO，总计永远不为 0 | 转正向验证，计入 `verified_controls` |
-| HTTP 响应头用大小写敏感字典键匹配 | 服务端返回小写头名，4 项安全头全被判缺失 | 全部 `lower()` 归一化后再比对 |
-| 超大请求体只认 413 | 服务端读完 body 前断连，客户端拿 `Broken pipe` 被判「未拦截」 | 识别断连为「主动拒收」 |
-| 路径遍历只看状态码 | SPA 回退必然 200，误判为目录穿越成功 | 追加响应体内容级复核 |
-| 用 INFO 表示「我看过但没问题」 | 噪声淹没真问题，总计永不为 0 | 用 `verified_controls` / `observations` 表达 |
-| 服务未运行仍输出「全部通过」 | 伪造结论 | 记 `observations` 并显式跳过 |
-
-### 落地检查清单
-
-```
-[ ] summary.total_issues == 0 且 critical/high/medium/low 全为 0
-[ ] summary.info == 0（INFO 已迁入 observations，不再计入问题）
-[ ] observations_detail 中每条都标注「不计入问题」
-[ ] verified_controls 列出已确认生效的防护（如异步锁 N 处）
-[ ] attack_defense.cases 每项都有 status（BLOCKED/BYPASSED/INCONCLUSIVE）
-[ ] 服务运行态与停止态两种场景均退出码 0
-[ ] 不存在任何「循环打印已阻截但无真实请求」的伪攻防代码
-```
-
-### 验证命令
-
-```bash
-python test/security_audit.py; echo "EXIT=$?"
-```
-
-> **判定标准**: 输出 `总计问题: 0`、`严重/高危/中危/低危/信息` 全为 0、`EXIT=0`。任一非零即视为「未符合本范式」。
-
----
-
-## 📐 大文件小范围修改临时脚本范式 (PY-CORE-030)
-
-> **创建日期**: 2026-11-11 | **最后更新**: 2026-11-11 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) / [README.md](README.md) / [skill.md](skill.md) / [dist/app.js](dist/app.js) 等千行级文件
-
-### 🔴 核心原则：大文件禁止全量重写，只做锚点式最小替换
-
-**行数超过 1000 的文件（main.py 14000+ 行、README.md / skill.md 21000+ 行、dist/app.js 数千行），禁止「读全文 → 改 → 整体写回」，也禁止「大段 `old_string` 替换」。** 全量重写会把不可见差异（换行、BOM、缩进、同段重复内容）一并带进 diff，一次手滑就毁掉整个文件。**唯一合法做法：写一次性临时脚本，用唯一锚点定位，只替换目标片段，执行完即删。**
-
-### 六条铁律
-
-| 铁律 | 要求 | 违反后果 |
-|---|---|---|
-| **🔴 唯一锚点** | 替换前 `assert content.count(old) == 1`，>1 立即中止 | 误伤同段重复内容，静默改错 |
-| **🔴 先备份后改** | 改前 `cp file /tmp/file.bak.$(date +%H%M%S)` | 改坏无法回滚 |
-| **🔴 最小替换** | 只替换目标片段，其余字节不动 | 全文重排导致 diff 爆炸、无法 review |
-| **🔴 改后三校验** | 语法校验（`py_compile`）+ 结构校验（`diff` / 行数 / 锚点计数）+ 功能回归 | 「改完就跑」把回归带上线 |
-| **🔴 临时脚本不入库** | 统一命名 `test/temp_patch_<版本>.py`，执行完删除 | 仓库堆满一次性垃圾脚本 |
-| **🔴 文档改完必重生成** | 改 md 后按 PY-CORE-018 重生成 skill.docx | 三方文档不一致、锚点断链 |
-
-### 标准流程（五步）
-
-```bash
-# 1. 备份
-cp README.md /tmp/README.md.bak.$(date +%H%M%S)
-
-# 2. 写临时脚本（唯一锚点 + 计数断言 + 最小替换）
-cat > test/temp_patch_vX.py <<'PY'
-from pathlib import Path
-
-TARGET = Path('README.md')
-content = TARGET.read_text(encoding='utf-8')
-
-OLD = '| 📐 安全审计零问题范式 (PY-CORE-040) | 总计问题必须为 0 的判定标准 |'
-assert content.count(OLD) == 1, f'锚点命中 {content.count(OLD)} 次，中止'
-
-NEW = OLD + '\n| 📐 大文件小范围修改临时脚本范式 (PY-CORE-030) | 大文件禁用全量重写 |'
-content = content.replace(OLD, NEW, 1)
-TARGET.write_text(content, encoding='utf-8')
-print('OK')
-PY
-
-# 3. 执行
-python test/temp_patch_vX.py
-
-# 4. 三校验
-python -m py_compile main.py && diff README.md skill.md && echo "文档一致"
-python test/generate_docx.py
-
-# 5. 删除临时脚本并提交
-rm test/temp_patch_vX.py
-git add -A && git commit -m "docs: ..."
-```
-
-### 适用 / 不适用
-
-| 场景 | 做法 |
-|---|---|
-| 千行级文件改 1~5 行（清单加一项、导航加一行、锚点替换） | ✅ 临时脚本 + 唯一锚点 |
-| 结构化数据批量改（如 config.json 敏感字段加密） | ✅ 用工具/脚本改，禁止手工逐行改 |
-| 新增整章文档（> 200 行） | ✅ 临时脚本按锚点插入整块，避免手写缩进漂移 |
-| 文件 < 200 行的小改 | ⚠️ 可直接编辑，但同样要求改后三校验 |
-| 需要重构大段逻辑 | ❌ 不属本范式场景，应拆分为独立提交分步进行 |
-
-### 必须避开的坑
-
-| 坑 | 后果 | 正确做法 |
-|---|---|---|
-| 用 `json.load` + `json.dump` 全量重写 config.json | 键顺序、缩进、中文转义全变，diff 看不出真实改动 | 只改目标字段，或用 crypto_tool 的原子写入 |
-| 用行号定位（`lines[1234] = ...`） | 文件一改行号就漂移，改到隔壁行 | 用文本锚点，不用行号 |
-| 锚点取太短（如 `print(`） | 命中几十次，`replace` 全改 | 锚点必须带上下文，并配合计数断言 |
-| 临时脚本留在仓库 | 下次误跑导致重复插入 | 执行完 `rm`，仓库只保留范式描述 |
-| 改完不重生成 docx | 三方文档不一致、导航锚点断链 | 按 PY-CORE-018 重新生成并校验 |
-
-### 落地检查清单
-
-```
-[ ] 目标文件已备份到 /tmp
-[ ] 每个替换锚点 assert count == 1
-[ ] 只替换目标片段，未整体重写文件
-[ ] py_compile / 语法校验通过
-[ ] diff 只出现预期改动行
-[ ] README.md 与 skill.md 逐字一致
-[ ] skill.docx 已按 PY-CORE-018 重新生成
-[ ] 临时脚本已删除，git status 无残留
-```
-
-### 验证命令
-
-```bash
-python -m py_compile main.py; echo "EXIT=$?"
-diff README.md skill.md && echo "文档逐字一致"
-git status --short
-```
-
-> **判定标准**: 上述命令全部退出码 0、`diff` 无输出、`git status` 无临时脚本残留。任一不满足即视为「未符合本范式」。
-
----
-
-## 📐 Excel 货号 E 列读取范式 (PY-CORE-022)
-
-> **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) 中所有 Excel 货号读取链路
-
-### 🔴 核心原则：货号只从「平台子表」的 E 列读取，一列不多、一列不少
-
-**无论后续如何重构，货号读取必须恒定满足：每个 Excel 文件只读平台子表（工作表名包含平台名，如「闲鱼」「小红书」）的第 5 列（E 列）。禁止读取其他列、禁止按表头名称定位列、禁止只读第一个文件。**
-
-### 两条生效链路（必须同步遵守）
-
-| 链路 | 函数 | 读取方式 |
-|---|---|---|
-| CLI / 对比主流程 | `load_all_excel_data` | openpyxl `iter_rows(min_col=5, max_col=5, values_only=True)` |
-| Web API `/api/compare` | `_read_excel_skus` | pandas `temp_df.iloc[:, 4].dropna()` |
-
-### 硬性规则
-
-| 规则 | 要求 |
-|---|---|
-| 工作表选择 | `platform in sheet_name` 即命中，多命中取第一个 |
-| 列范围 | 仅 E 列（索引 4 / 第 5 列），不读 A-D，不读 F 及其后 |
-| 值清洗 | `str(value).strip()`，空值与 `nan` 丢弃 |
-| 货号正则 | `^[A-Za-z0-9]{3,10}$`，不匹配即丢弃 |
-| 多文件聚合 | 遍历 `config.excel_files` 中所有存在的文件，逐个 `extend` 合并 |
-| 去重策略 | `load_all_excel_data` 默认 `remove_duplicates=True`；对比主流程传 `False` 以保留重复计数 |
-| 临时副本 | 先 `shutil.copy2` 到 `temp/` 再解析，读完 `close()` 并在 `finally` 清理 |
-
-### 必须避开的坑
-
-| 坑 | 后果 | 正确做法 |
-|---|---|---|
-| 改成「读取整表所有列」 | 引入无关列，货号被污染 | 恒定 `min_col=5, max_col=5` / `iloc[:, 4]` |
-| 用表头名（如「货号」）定位列 | 用户改表头即失效 | 位置定位，E 列固定 |
-| 不同平台改用不同列 | 多表结构不一致，聚合出错 | 所有平台统一 E 列 |
-| 未命中平台子表时静默回落 `active` | 可能读到别的平台的货号 | 现状保留回落，但日志必须打印「未找到 xx 工作表」 |
-
-### 落地检查清单
-
-```
-[ ] 只读 E 列（min_col=5/max_col=5 或 iloc[:, 4]）
-[ ] 货号正则 ^[A-Za-z0-9]{3,10}$
-[ ] 多文件全部遍历并聚合，单文件失败不中断
-[ ] 先复制到 temp/ 再解析，finally 清理
-[ ] 未命中平台子表时有明确日志
-```
-
-> **判定标准**: 任一读取链路出现「读 E 列以外的列」「用表头名定位列」「只读第一个文件」中任意一条，即视为「未符合本范式」。
-
----
-
-## 📐 每日利润表读取范式 (PY-CORE-019)
-
-> **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) 每日利润相关函数与 `/api/daily-profit`
-
-### 🔴 核心原则：「每日利润」子表按固定列位读取，报表文本只认 A 列的「截止」行
-
-**每日利润数据只从工作表「每日利润」读取，列位固定为 A=项目、B=金额、C=成本、D=纯利、E=日期、F=备注；第 1 行为表头，数据从第 2 行开始。**
-
-### 列位契约（不可变）
-
-| 列 | 索引 | 字段 | 解析规则 |
-|---|---|---|---|
-| A | 0 | 项目 | 原样保留，用于汇总分组 |
-| B | 1 | 金额 | 去 `¥` 与 `,` 后转 float，空值记 0 |
-| C | 2 | 成本 | 同上 |
-| D | 3 | 纯利 | 同上 |
-| E | 4 | 日期 | datetime 直接格式化；字符串按 7 种格式解析；数字按 Excel 序列号（1899-12-30 基准）换算 |
-| F | 5 | 备注 | 越界时置空串 |
-
-### 报表文本规则
-
-| 规则 | 要求 |
-|---|---|
-| 定位 | `get_daily_profit_report_from_excel` 在 A 列扫描首个以「截止」开头的字符串 |
-| 缺失 | 无该工作表或无「截止」行时返回 `None`，不抛异常 |
-| 多文件 | `get_excel_files_with_report` 遍历全部文件，收集报表文本去重后以空行拼接 |
-
-### 工作表回落与已知边界
-
-| 场景 | 现状行为 | 说明 |
-|---|---|---|
-| 无「每日利润」工作表 | 回落 `wb.active` | 仍按 A-F 列位强解析，可能产生脏记录，需在日志中可见 |
-| 表格展示 `table_data` | 命中第一个存在文件后 `break` | 避免多文件重复表头与回落污染 |
-| 首行 | `row_idx > 0` 才解析为记录 | 表头不计入 `all_records` |
-
-### 落地检查清单
-
-```
-[ ] 工作表名固定「每日利润」，缺失时日志可查
-[ ] 列位严格 A-F，不按表头名定位
-[ ] 第 1 行表头跳过，数据从第 2 行起
-[ ] 金额去 ¥ 与逗号；日期三类取值全覆盖
-[ ] 报表文本只取「截止」开头行，缺失返回 None
-[ ] 多文件报表文本去重后拼接
-```
-
-> **判定标准**: 任一环节出现「列位偏移」「按表头名定位」「表头计入数据」「无截止行时报错」中任意一条，即视为「未符合本范式」。
-
----
-
-## 📐 范式编号规则范式 (PY-CORE-034)
-
-> **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: README.md / skill.md / skill.docx 中全部 PY-CORE 范式编号与引用
-
-### 🔴 核心原则：编号 = 固定前缀 + 三位数字；数字由标题英文首字母 A-Z 位次决定，字母一旦定下永不变
-
-标准字段形如 `PY-CORE-001`：
-
-| 组成 | 取值 | 可变性 |
-|---|---|---|
-| 前缀 | `PY-CORE` | **不可变**，不得改写、缩写、加字 |
-| 数字 | `001` ~ `100` 三位补零 | **可累加**，但只能按 A-Z 位次整体重排，不得随意「往后 +1」 |
-| 字母（分组键） | 标题英文名首字母 a-z | **原生固定**，范式标题确定后永久不变 |
-
-**关键点**：数字不是创建时间顺序，而是「按标题英文名首字母 A-Z 排序后的队列位次」。新增或删除任一范式，其字母分组之后的**所有范式数字整体 +1 / -1**，属于全量重排，不是只在末尾追加。
-
-### 编号生成算法（三步，缺一不可）
-
-| 步骤 | 动作 | 说明 |
-|---|---|---|
-| ① 取键 | 取范式标题英文名首字母小写化，作为分组键 | 中文标题以括号内英文名为准：`文件清理自动化 (Automated File Cleanup)` → `a` |
-| ② 排序 | 按 `(字母, 同字母内原相对次序)` 升序排成单一队列 | 同字母内**稳定排序**，保持原有相对次序，禁止按创建日期重排 |
-| ③ 落号 | 队列第 n 项即 `PY-CORE-` + 三位补零的 n | n 从 `001` 起连续累加，中间不得留空 |
-
-### 编号区间表（a-z 分组，硬上限 100）
-
-| 字母 | 区间 | 占用范式 | 状态 |
-|---|---|---|---|
-| a | 001-002 | 001-002 | 满 |
-| b | 003-004 | 003-004 | 满 |
-| c | 005-013 | 005-013 | 满 |
-| d | 014-019 | 014-019 | 满 |
-| e | 020-023 | 020-023 | 满 |
-| f | 024-025 | 024-025 | 满 |
-| g | 026-026 | 026 | 满 |
-| h | 027-027 | 027 | 满 |
-| i | 028-029 | 028-029 | 满 |
-| j / k | — | — | ✅ 空 |
-| l | 030-030 | 030 | 满 |
-| m | — | — | ✅ 空 |
-| n | 031-031 | 031 | 满 |
-| o | — | — | ✅ 空 |
-| p | 032-034 | 032-034 | 满 |
-| q | — | — | ✅ 空 |
-| r | 035-035 | 035 | 满 |
-| s | 036-041 | 036-041 | 满 |
-| t | 042-043 | 042-043 | 满 |
-| u | 044-044 | 044 | 满 |
-| v | 045-045 | 045 | 满 |
-| w / x / y / z | — | — | ✅ 空 |
-
-> 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 030 起全部 +1）。当前队列长度 45，剩余可用号位 55（硬上限 100）。
-
-### 新增范式标准动作（顺序不可颠倒）
-
-```
-[ ] 1. 定标题：中文名 + 括号内英文名，英文名首字母即分组键
-[ ] 2. 定位次：找到该字母在区间表中的位置，插到同字母段末尾（或按语义位次）
-[ ] 3. 全量重排：生成「旧号 → 新号」完整映射表，覆盖 001 到当前最大号
-[ ] 4. 全文档替换：正文标题、导航表、汇总表、交叉引用、历史版本记录一次性同步
-[ ] 5. 三校验：零跳号（001~最大号连续）、零重号（每个号仅一个范式）、零遗漏（映射表全覆盖）
-[ ] 6. 双文档同步：README.md 与 skill.md 逐字节一致，再重新生成 skill.docx 并校验锚点
-```
-
-### 必须避开的坑
-
-| 坑 | 后果 | 正确做法 |
-|---|---|---|
-| 只在末尾追加 `最大号+1` | 违反 A-Z 位次，编号与字母顺序错乱 | 按字母插入，其后整体 +1 |
-| 只改标题不改引用 | 导航表/汇总表/正文指向错误范式 | 同一次提交内全量替换 |
-| 改标题英文名首字母 | 字母分组漂移，全表连锁重排 | 字母原生固定，标题英文名不可随意改 |
-| 同字母内按创建日期重排 | 历史范式相对次序被打乱 | 稳定排序，保持原相对次序 |
-| 为省事跳号或复号 | 破坏「一号一范式」唯一性 | 连续累加、零跳号零重号 |
-| 编号突破 100 | 三位数字溢出，格式失效 | 先合并/拆分范式，保持在 001-100 内 |
-
-### 本轮重排实录（v5.0.9.95，全量生效）
-
-| 代表范式 | 旧号 | 新号 | 首字母 |
-|---|---|---|---|
-| 统一异常处理 | 旧号 001 | 新号 044 | u |
-| 文件清理自动化 | 旧号 013 | 新号 001 | a |
-| 浏览器自动化爬虫 | 旧号 006 | 新号 003 | b |
-| 数据对比分析 | 旧号 007 | 新号 014 | d |
-| Changelog版本变更详情完整结构 | 旧号 027 | 新号 011 | c |
-| 每日利润表读取 | 旧号 038 | 新号 019 | d |
-| 版本号一致性保障 | 旧号 028 | 新号 045 | v |
-| 字段名兼容性（原重号） | 旧号 007 | 新号 025 | f |
-| 代码库卫生维护（原重号） | 旧号 008 | 新号 013 | c |
-| 编码处理最佳实践（原重号） | 旧号 029 | 新号 023 | e |
-| Git历史维护（原重号） | 旧号 002 | 新号 026 | g |
-| subprocess超时配置（原重号） | 旧号 031 | 新号 041 | s |
-
-> **判定标准**: 出现「编号跳号 / 重号 / 与标题首字母位次不符 / 引用未同步 / 字母被改动」中任意一条，即视为「未符合本范式」。
+**文档版本**: v5.0.9.96  
+**最后更新**: 2026-11-12  
+**下次审查**: 2026-12-12  
+**维护者**: 小旭数码开发团队
 
 ---
 
@@ -1092,8 +3668,8 @@ git status --short
 - **影响范围**: 范式编号唯一性、导航表 `(PY-CORE-011)` 引用、汇总表 011 行
 
 **修复方案**:
-- **技术实现**: 回退该章节标题的编号后缀，恢复为未编号的完整范式章节（由 [快速参考章节 (PY-CORE-011)](README.md#L334-L366) 指向），使 `PY-CORE-011` 的正文范式定义保持唯一
-- **参考位置**: [README.md](README.md#L334-L366)、[main.py](main.py#L10888-L10902)
+- **技术实现**: 回退该章节标题的编号后缀，恢复为未编号的完整范式章节（由 [快速参考章节 (PY-CORE-011)](README.md#L372-L404) 指向），使 `PY-CORE-011` 的正文范式定义保持唯一
+- **参考位置**: [README.md](README.md#L372-L404)、[main.py](main.py#L10888-L10902)
 
 **测试验证**:
 - ✅ 范式编号扫描 `PY-CORE-001` ~ `PY-CORE-045` 连续，跳号 0 个、重号 0 个
@@ -1115,13 +3691,13 @@ git status --short
 
 ##### 4. 🔗 锚点行号重算 + 三方文档同步 (📝文档同步)
 **问题描述**:
-- **现象**: 删除重复块后，历史变更记录中的 `README.md#L20833-L20883`、`README.md#L20888-L21194` 两处行号锚点整体偏移 3 行，指向内容错位
+- **现象**: 删除重复块后，历史变更记录中的 `README.md#L2986-L3036`、`README.md#L3041-L22469` 两处行号锚点整体偏移 3 行，指向内容错位
 - **根因**: 行号锚点随文档增删线性漂移，删块后未同步重算
 - **影响范围**: v5.0.9.95 变更记录中的参考位置、skill.docx 导航书签
 
 **修复方案**:
 - **技术实现**: 按删除后的实际行号重算为 `#L20904-L20954`（完整代码范式汇总表）、`#L20965-L21269`（PY-CORE-025 字段名兼容性范式）；随后 README.md 全量复制到 skill.md，再执行 `python test/generate_docx.py` 重生成 skill.docx
-- **参考位置**: [README.md](README.md#L20904-L20954)、[test/generate_docx.py](test/generate_docx.py#L464-L470)
+- **参考位置**: [README.md](README.md#L3057-L3607)、[test/generate_docx.py](test/generate_docx.py#L464-L470)
 
 **测试验证**:
 - ✅ `md5 README.md skill.md` 两文件一致（23142 行逐字节相同）
@@ -1136,7 +3712,7 @@ git status --short
 #### 更新内容:
 1. **全量重排**: 44 个既有范式按「标题英文名首字母 A-Z + 同字母内原相对次序」稳定排序，重排为 `PY-CORE-001` ~ `PY-CORE-045`（含新增 1 条编号规则范式，共 45 条），零跳号、零重号、零遗漏 [README.md](README.md)
 2. **重号修正**: 历史遗留重号共 3 处——编码处理最佳实践 → 新号 023（字母 e）、Git 历史维护 → 新号 026（字母 g）、subprocess 超时配置 → 新号 041（字母 s），并复核旧号 007/008 双占项最终落号为 014、025、008、013
-3. **规则固化**: 新增 [范式编号规则范式 (PY-CORE-034)](README.md#L961-L1053)，明确「前缀不可变、数字可累加、字母原生固定、按 A-Z 位次整体重排、区间表、硬上限 100」
+3. **规则固化**: 新增 [范式编号规则范式 (PY-CORE-034)](README.md#L2800-L2892)，明确「前缀不可变、数字可累加、字母原生固定、按 A-Z 位次整体重排、区间表、硬上限 100」
 4. **汇总表扩容**: 完整代码范式汇总表由 24 行扩容至 45 行，新增「首字母」列用于逐行校验 A-Z 位次，总计口径同步更新
 5. **导航同步**: 文档导航表新增「范式编号规则范式 (PY-CORE-034)」1 行，其余 8 行导航项的编号随全量重排自动同步
 6. **三方文档**: README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成，书签与导航锚点零缺失
@@ -1150,7 +3726,7 @@ git status --short
 
 **修复方案**:
 - **技术实现**: 按 `(英文名首字母, 同字母内原相对次序)` 稳定排序生成 44 项队列，逐项落号 `001~044`，再将编号规则自身作为第 `034` 位（字母 `p`）插入；全文档以「旧号 → 新号」映射一次性替换，重号段按行区间隔离替换后再落号
-- **参考位置**: [README.md](README.md#L961-L1053)
+- **参考位置**: [README.md](README.md#L2800-L2892)
 
 **测试验证**:
 - ✅ 编号扫描：`PY-CORE-001` ~ `PY-CORE-045` 连续，跳号 0 个、重号 0 个
@@ -1165,7 +3741,7 @@ git status --short
 
 **修复方案**:
 - **技术实现**: 按字母位次重新落号：数据对比分析 → 新号 014（字母 d）、字段名兼容性 → 新号 025（字母 f）、跨平台启动脚本 → 新号 008（字母 c）、代码库卫生维护 → 新号 013（字母 c）；编码处理最佳实践 → 新号 023（字母 e）、Git 历史维护 → 新号 026（字母 g）、subprocess 超时配置 → 新号 041（字母 s）
-- **参考位置**: [README.md](README.md#L20904-L20954)、[README.md](README.md#L20965-L21269)
+- **参考位置**: [README.md](README.md#L3057-L3607)、[README.md](README.md#L3618-L22544)
 
 **测试验证**:
 - ✅ 同一编号在全文仅对应一个范式标题
@@ -1179,7 +3755,7 @@ git status --short
 
 **修复方案**:
 - **技术实现**: 新增独立范式章节，含核心原则表、三步编号算法、a-z 区间表、新增范式标准动作、6 条坑位表、本轮重排实录与判定标准
-- **参考位置**: [范式编号规则范式 (PY-CORE-034)](README.md#L961-L1053)
+- **参考位置**: [范式编号规则范式 (PY-CORE-034)](README.md#L2800-L2892)
 
 **测试验证**:
 - ✅ 区间表与实际占用逐字母核对一致（45 条 / 剩余 55 位 / 上限 100）
@@ -1193,7 +3769,7 @@ git status --short
 
 **修复方案**:
 - **技术实现**: 汇总表按新编号 `001~045` 升序重写 45 行并新增「首字母」列；导航表在「每日利润表读取范式」后插入编号规则范式 1 行
-- **参考位置**: [README.md](README.md#L21-L37)、[README.md](README.md#L20904-L20954)
+- **参考位置**: [README.md](README.md#L21-L37)、[README.md](README.md#L3057-L3607)
 
 **测试验证**:
 - ✅ 汇总表行数 45，与正文范式定义条目数一致
@@ -1238,7 +3814,7 @@ git status --short
 
 **修复方案**:
 - **技术实现**: `git reset --hard 6078990c` 将全部代码回退到 v5.0.9.93，并保留 `backup-before-revert-20261112` 备份分支用于追溯被撤销的提交 [main.py](main.py)
-- **参考位置**: [README.md](README.md#L962-L1030)
+- **参考位置**: [README.md](README.md#L2801-L2869)
 
 **测试验证**:
 - ✅ `git log -n 1` 显示 HEAD 为 `6078990c`
@@ -1283,25 +3859,25 @@ git status --short
 - **影响范围**: 文档一致性、更新日志页面展示完整性
 
 **修复方案**:
-- **技术实现**: 从备份分支恢复 README.md 与 skill.md（含 v5.0.9.93 与 PY-CORE-022/038），剔除回退后已不存在的「解析器加固」条目，新增本版本 v5.0.9.94 记录；skill.md 与 README.md 逐字节同步，skill.docx 由 skill.md 重新生成 [README.md](README.md#L962-L1128)
-- **参考位置**: [README.md](README.md#L960-L1128) [skill.md](skill.md#L960-L1128)
+- **技术实现**: 从备份分支恢复 README.md 与 skill.md（含 v5.0.9.93 与 PY-CORE-022/038），剔除回退后已不存在的「解析器加固」条目，新增本版本 v5.0.9.94 记录；skill.md 与 README.md 逐字节同步，skill.docx 由 skill.md 重新生成 [README.md](README.md#L2801-L3704)
+- **参考位置**: [README.md](README.md#L2226-L3704) [skill.md](skill.md#L2226-L3704)
 
 **测试验证**:
 - ✅ README.md 与 skill.md `cmp` 无差异，逐字节一致
 - ✅ skill.docx 由 skill.md 生成，导航锚点全部命中
 - ✅ `GET /api/changelog`：`changes` 为空 0 条、`commit` 占位 0 处、`meta` 字段缺失 0 条
 
-### v5.0.9.93 (2026-11-12) - 📝 **Excel读取范式固化与死代码清理** - 新增PY-CORE-022(Excel货号E列读取范式)与PY-CORE-019(每日利润表读取范式)+每日利润报表由首文件break改为多文件全量聚合去重拼接+删除无调用点死代码load_excel_data(48行)+对比记录新增excel_files全量清单(兼容保留excel_file)+导航表扩容20行+changelog接口changes非空与commit零占位全量复核
+### v5.0.9.93 (2026-11-12) - 📝 **Excel读取范式固化与死代码清理** - 新增PY-CORE-019(每日利润表读取范式)与PY-CORE-022(Excel货号E列读取范式)+每日利润报表由首文件break改为多文件全量聚合去重拼接+删除无调用点死代码load_excel_data(48行)+对比记录新增excel_files全量清单(兼容保留excel_file)+导航表扩容20行+changelog接口changes非空与commit零占位全量复核
 
-> **Commit**: `6078990c`
+> **Commit**: `6078990c, 8d1798da`
 
 #### 更新内容:
-1. **新范式固化**: 新增 PY-CORE-022「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L860-L909) [skill.md](skill.md#L860-L909)
-2. **新范式固化**: 新增 PY-CORE-019「每日利润表读取范式」，工作表固定「每日利润」，列位固定 A-F，第 1 行为表头，报表文本仅取 A 列以「截止」开头的行，多文件去重后拼接 [README.md](README.md#L910-L957) [skill.md](skill.md#L910-L957)
+1. **新范式固化**: 新增 PY-CORE-022「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L2441-L2634) [skill.md](skill.md#L2441-L2634)
+2. **新范式固化**: 新增 PY-CORE-019「每日利润表读取范式」，工作表固定「每日利润」，列位固定 A-F，第 1 行为表头，报表文本仅取 A 列以「截止」开头的行，多文件去重后拼接 [README.md](README.md#L2223-L2442) [skill.md](skill.md#L2223-L2442)
 3. **报表聚合修复**: `get_excel_files_with_report` 原「命中第一个文件即 break」导致多 Excel 时只取首个文件报表，改为遍历全部文件、文本去重后以空行拼接 [main.py](main.py#L3644-L3656)
 4. **死代码清理**: 删除 `StockNumberComparator.load_excel_data`（48 行），该方法零调用点，且与 PY-CORE-022「多文件全量聚合」口径冲突，属误导性死代码 [main.py](main.py#L7005)
 5. **字段扩展**: 对比记录与「小计」记录新增 `excel_files` 全量清单字段，原 `excel_file` 字段保留，历史记录解析不受影响 [main.py](main.py#L7364-L7367) [main.py](main.py#L7456-L7459)
-6. **导航扩容**: 文档导航表 18 → 20 行，新增 037/038 两条；skill.docx 由 skill.md 重新生成，锚点全部命中
+6. **导航扩容**: 文档导航表 18 → 20 行，新增 022/019 两条；skill.docx 由 skill.md 重新生成，锚点全部命中
 7. **接口校验**: `/api/changelog` 全量复核：`changes` 为空条目 0 个，`commit` 字段「待生成/待补充」占位 0 处，全部为真实 Git 哈希
 
 ##### 1. 📊 每日利润报表多文件聚合 (🔧功能优化)
@@ -1340,7 +3916,7 @@ git status --short
 - **影响范围**: 后续任何 Excel 读取改造的评审与回归
 
 **修复方案**:
-- **技术实现**: 在 README.md 与 skill.md 逐字插入 PY-CORE-022（工作表选择 / 列范围 / 值清洗 / 货号正则 / 多文件聚合 / 去重策略 / 临时副本 + 坑位表 + 检查清单 + 判定标准）与 PY-CORE-019（A-F 列位契约 / 报表文本规则 / 回落边界 + 检查清单 + 判定标准），导航表同步扩容至 20 行 [README.md](README.md#L860-L957)
+- **技术实现**: 在 README.md 与 skill.md 逐字插入 PY-CORE-019（A-F 列位契约 / 报表文本规则 / 回落边界 + 检查清单 + 判定标准）与 PY-CORE-022（工作表选择 / 列范围 / 值清洗 / 货号正则 / 多文件聚合 / 去重策略 / 临时副本 + 坑位表 + 检查清单 + 判定标准），导航表同步扩容至 20 行 [README.md](README.md#L2177-L2442)
 - **参考位置**: [README.md](README.md#L27-L28) [skill.md](skill.md#L27-L28)
 
 **测试验证**:
@@ -1354,12 +3930,27 @@ git status --short
 - **影响范围**: 更新日志页面的展示完整性与版本可追溯性
 
 **修复方案**:
-- **技术实现**: 逐条复核 API 返回的 434 个版本：`changes` 为空条目 0 个（解析器对无子项条目自动按 commit message 生成兜底条目），`meta` 各字段占位符 0 处，`commit` 全部为真实 Git 哈希；本次新条目按「1 标题 + 7 子项 + 4 个 `#####` 详情」格式写入，杜绝空 changes [README.md](README.md#L962-L1031)
+- **技术实现**: 逐条复核 API 返回的 434 个版本：`changes` 为空条目 0 个（解析器对无子项条目自动按 commit message 生成兜底条目），`meta` 各字段占位符 0 处，`commit` 全部为真实 Git 哈希；本次新条目按「1 标题 + 7 子项 + 5 个 `#####` 详情」格式写入，杜绝空 changes [README.md](README.md#L2801-L2870)
 - **参考位置**: [main.py](main.py#L10870-L11376) [dist/app.js](dist/app.js#L1331-L1345)
 
 **测试验证**:
 - ✅ `GET /api/changelog` 解析成功，`changes` 为空 0 条、占位符 0 处
 - ✅ 前端「最新更新 (v5.0.9.93)」渲染 4 个变更卡片，问题描述 / 修复方案 / 测试验证三块均有内容
+
+##### 5. 🧾 changelog 解析器伪版本与模板污染根治 (🐛Bug修复)
+**问题描述**:
+- **现象**: `/api/changelog` 条目中出现 `vX.X.X` 伪版本；最末一个手写版本标题被 PY-CORE-027 模板行污染为「[一句话描述本次更新的核心价值]」「[文件链接列表]」；手写版本条目尾部混入与正文重复的自动 commit 摘要，变更卡片数量虚高
+- **根因**: 版本标题以宽松正则 `v([\d.]+)` 匹配，模板占位标题同样命中；条目仅在下一个版本标题处闭合，跨 `##` 章节后继续吞并后续模板段落与元数据行；合并阶段对同版本无条件追加 Git 摘要变更
+- **影响范围**: `/api/changelog` 条目数量与内容准确性、前端「最新更新」卡片展示
+
+**修复方案**:
+- **技术实现**: 版本号正则统一收敛为数字白名单 `([0-9]+(?:\.[0-9]+)*)`（README 标题与 commit message 两处同步），模板 `### vX.X.X` 不再命中；新增 `_close_entry()`，遇到任意 `#`/`##` 章节标题立即闭合当前条目并落库，模板段落不再污染相邻版本；合并完成后剔除 `root_cause` 为自动摘要标记的重复变更，仅保留手写完整条目并按序重排 `id` [main.py](main.py#L10881-L10945) [main.py](main.py#L11260-L11276)
+- **参考位置**: [main.py](main.py#L11067) [main.py](main.py#L11264-L11272)
+
+**测试验证**:
+- ✅ 解析结果 434 个版本：伪版本 0 个、非数字版本 0 个、`commit` 非真实哈希 0 个
+- ✅ `changes` 为空 0 个；`v5.0.9.93` 卡片由 5 个（含重复摘要）收敛为 4 个手写条目，与 README `#####` 手写条目一一对应
+- ✅ `py_compile main.py` 通过，`GET /api/changelog` 返回 `success: true`，`meta.commit` 全部为 7-10 位真实 Git 哈希
 
 ### v5.0.9.92 (2026-11-11) - 🔐 **敏感字段全量加密与PY-CORE-030临时脚本范式** - headers.cookie明文加密完成(login.password/headers.cookie/email_smtp_password三字段全部ENC)+main.py解密链路逐字节复核+新增PY-CORE-030大文件小范围修改临时脚本范式(唯一锚点/先备份/最小替换/改后三校验/脚本不入库/改md必重生成)+导航表扩容18行+三方文档逐字一致与docx锚点零缺失
 
@@ -1368,7 +3959,7 @@ git status --short
 #### 更新内容:
 1. **敏感字段清零**: config.json 中最后一个明文敏感字段 `headers.cookie` 已加密，三字段全部为 `ENC(...)` [config/crypto_tool.py](config/crypto_tool.py#L25)
 2. **解密链路复核**: `SecureConfigManager` 解密三字段全部成功，headers.cookie 与加密前明文逐字节一致 [main.py](main.py#L518-L531)
-3. **新范式固化**: 新增 PY-CORE-030，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L760-L856) [skill.md](skill.md#L760-L856)
+3. **新范式固化**: 新增 PY-CORE-030，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L2630-L3437) [skill.md](skill.md#L2630-L3437)
 4. **导航扩容**: 文档导航表 17 → 18 行，新增 PY-CORE-030 条目，docx 19 个链接全部命中书签 [README.md](README.md#L26)
 5. **三方同步**: README.md 与 skill.md 逐字一致，skill.docx 由 skill.md 重新生成（422.9 KB） [skill.docx](skill.docx)
 
@@ -1407,8 +3998,8 @@ git status --short
 - **影响范围**: 所有千行级文件的后续维护
 
 **修复方案**:
-- **技术实现**: 新增 PY-CORE-030 范式章节，明确六条铁律（唯一锚点 `assert count == 1` / 先备份 / 最小替换 / 改后三校验 / 临时脚本不入库 / 改 md 必重生成）、五步标准流程、适用场景表、5 条坑位表与落地检查清单；本次章节插入本身即用临时脚本 `test/temp_patch_v50992.py` 按锚点完成，执行后已删除 [README.md](README.md#L760-L856) [skill.md](skill.md#L760-L856)
-- **参考位置**: [README.md](README.md#L760-L856) [README.md](README.md#L26)
+- **技术实现**: 新增 PY-CORE-030 范式章节，明确六条铁律（唯一锚点 `assert count == 1` / 先备份 / 最小替换 / 改后三校验 / 临时脚本不入库 / 改 md 必重生成）、五步标准流程、适用场景表、5 条坑位表与落地检查清单；本次章节插入本身即用临时脚本 `test/temp_patch_v50992.py` 按锚点完成，执行后已删除 [README.md](README.md#L2630-L3437) [skill.md](skill.md#L2630-L3437)
+- **参考位置**: [README.md](README.md#L2630-L3437) [README.md](README.md#L26)
 
 **测试验证**:
 - ✅ 临时脚本对导航行与章节锚点分别断言命中 1 次后执行，插入后 `diff` 仅出现预期新增行
@@ -1421,7 +4012,7 @@ git status --short
 - **影响范围**: skill.docx 第一页导航完整性
 
 **修复方案**:
-- **技术实现**: 导航表新增「📐 大文件小范围修改临时脚本范式 (PY-CORE-030)」一行，由 17 行增至 18 行；按 PY-CORE-018 重新生成 skill.docx 并校验锚点 [README.md](README.md#L26) [test/generate_docx.py](test/generate_docx.py)
+- **技术实现**: 按 PY-CORE-018 重新生成 skill.docx 并校验锚点 [README.md](README.md#L26) [test/generate_docx.py](test/generate_docx.py)；导航表新增「📐 大文件小范围修改临时脚本范式 (PY-CORE-030)」一行，由 17 行增至 18 行
 - **参考位置**: [README.md](README.md#L12-L31) [skill.docx](skill.docx)
 
 **测试验证**:
@@ -1564,7 +4155,7 @@ git status --short
 3. **依赖接口**: 新增 `/api/dependencies`，从 requirements.txt 动态解析分类、版本约束与用途，Python 最低版本不再硬编码 [main.py](main.py#L11444-L11507)
 4. **前端渲染**: 依赖表格按分类分组渲染并回填环境要求，功能卡片改为接口非空才清空，保留静态兜底 [dist/app.js](dist/app.js#L1273-L1316)
 5. **依赖瘦身**: 移除 `python-multipart`，Python 版本基线由 3.0+ 校正为 3.9+ [requirements.txt](requirements.txt#L4-L5)
-6. **文档同步**: README.md / skill.md / skill.docx 逐字一致，changelog 全量字段校验无空值、无占位符、Commit 全为真实哈希 [README.md](README.md#L745-L760)
+6. **文档同步**: README.md / skill.md / skill.docx 逐字一致，changelog 全量字段校验无空值、无占位符、Commit 全为真实哈希 [README.md](README.md#L3422-L3437)
 
 ##### 1. 🛠️ 功能卡片长文本穿模修复 (🐛Bug修复)
 **问题描述**:
@@ -1643,8 +4234,8 @@ git status --short
 - **影响范围**: 三方文档一致性与 changelog API 数据可信度
 
 **修复方案**:
-- **技术实现**: 以 skill.md 为基准回写 README.md 使两者逐字一致（行数与内容完全相同，以 `diff` 无输出为准），再由 skill.md 重新生成 skill.docx；changelog 全量逐字段检查空值与占位符，版本数与 changes 条数随迭代动态增长、以命令实时输出为准 [README.md](README.md#L745-L760) [skill.md](skill.md#L745-L760)
-- **参考位置**: [README.md](README.md#L745-L760) [skill.md](skill.md#L745-L760) [skill.docx](skill.docx)
+- **技术实现**: 以 skill.md 为基准回写 README.md 使两者逐字一致（行数与内容完全相同，以 `diff` 无输出为准），再由 skill.md 重新生成 skill.docx；changelog 全量逐字段检查空值与占位符，版本数与 changes 条数随迭代动态增长、以命令实时输出为准 [README.md](README.md#L3422-L3437) [skill.md](skill.md#L3422-L3437)
+- **参考位置**: [README.md](README.md#L3422-L3437) [skill.md](skill.md#L3422-L3437) [skill.docx](skill.docx)
 
 **测试验证**:
 - ✅ `diff README.md skill.md` 无输出，三方文档逐字一致
@@ -1661,7 +4252,7 @@ git status --short
 3. **误报修正**: `await ... lock` 由风险项改为正向验证，23 条 INFO 归零并统计为「异步锁同步保护 23 处」 [test/security_audit.py](test/security_audit.py#L903)
 4. **判定加固**: 响应头全部 `lower()` 归一化、超大请求体断连识别为主动拒收、路径遍历追加响应体内容级复核 [test/security_audit.py](test/security_audit.py#L1313-L1360)
 5. **接口加固**: 商品查询接口新增 1MB 请求体上限（超限 413）与 `{'skus'}` 字段白名单（越界 400），看门狗端口回退改读 `NETWORK_CONFIG` 消除硬编码 [main.py](main.py#L8623) [main.py](main.py#L9749-L9773)
-6. **范式固化**: 新增 PY-CORE-040「安全审计零问题范式」，明确四类问题只有「修代码/修规则」两种合法处置，禁止降级与白名单 [skill.md](skill.md#L639-L725)
+6. **范式固化**: 新增 PY-CORE-040「安全审计零问题范式」，明确四类问题只有「修代码/修规则」两种合法处置，禁止降级与白名单 [skill.md](skill.md#L2133-L3402)
 
 ##### 1. 🥊 真实黑盒攻防验证（13 项载荷）
 **问题描述**:
@@ -1739,10 +4330,10 @@ git status --short
 - **影响范围**: 全部后续版本的安全审计交付标准
 
 **修复方案**:
-- **技术实现(核心原则)**: 明确「总计问题必须恒为 0」，消除方式只能是「修代码」或「修规则」，禁止降级、禁止加白名单 [skill.md](skill.md#L645-L648)
-- **技术实现(处置表)**: 四类问题（真实缺陷 / 规则误报 / 正确防护被当风险 / 无法判定项）各自规定唯一正确处置与禁止做法 [skill.md](skill.md#L650-L658)
-- **技术实现(攻防铁律)**: 禁止模拟打印、必须发真实请求、必须双向判定、服务不可达必须降级 [skill.md](skill.md#L668-L678)
-- **参考位置**: [skill.md](skill.md#L639-L725) [README.md](README.md#L639-L725)
+- **技术实现(核心原则)**: 明确「总计问题必须恒为 0」，消除方式只能是「修代码」或「修规则」，禁止降级、禁止加白名单 [skill.md](skill.md#L2139-L2142)
+- **技术实现(处置表)**: 四类问题（真实缺陷 / 规则误报 / 正确防护被当风险 / 无法判定项）各自规定唯一正确处置与禁止做法 [skill.md](skill.md#L2144-L2152)
+- **技术实现(攻防铁律)**: 禁止模拟打印、必须发真实请求、必须双向判定、服务不可达必须降级 [skill.md](skill.md#L2162-L2172)
+- **参考位置**: [skill.md](skill.md#L2133-L3402) [README.md](README.md#L2133-L3402)
 
 **测试验证**:
 - ✅ README.md 与 skill.md 逐字一致（`diff` 无差异）
@@ -1759,7 +4350,7 @@ git status --short
 3. **重启计数生效**: 补上 `WEB_RESTART_COUNT` 自增与上限拦截，达到 10 次后停止自动重启并继续探活，杜绝重启风暴 [run.sh](run.sh#L1810-L1820)
 4. **双端同步**: run.bat 同步全部逻辑，新增 `:check_daemon_alive` 以进程命令行匹配 + 端口探活双重检测守护进程存活 [run.bat](run.bat#L1822-L1888)
 5. **launchd 托管**: 新增 `com.xyws.web.plist`，开机自启 + 异常退出拉起，作为最外层兜底 [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist#L1-L40)
-6. **文档归一**: README.md 与 skill.md 由 199 行差异收敛为逐字一致，并修复 `**修复3方案**` 非范式块标题导致的 changelog API 字段解析为空 [skill.md](skill.md#L641-L760)
+6. **文档归一**: README.md 与 skill.md 由 199 行差异收敛为逐字一致，并修复 `**修复3方案**` 非范式块标题导致的 changelog API 字段解析为空 [skill.md](skill.md#L2135-L3437)
 
 ##### 1. ⚡ 看门狗探活频率 15 分钟 → 30 秒
 **问题描述**:
@@ -1854,9 +4445,9 @@ git status --short
 
 **修复方案**:
 - **技术实现(单一源)**: 以 skill.md 为唯一源，先把 README 独有的「🛡️ 跨平台防崩溃系统 (v2.0)」章节并入 skill.md，再整体复制回 README.md，双端 0 差异 [skill.md](skill.md#L95-L152)
-- **技术实现(标题归一)**: `**修复3方案**:` 归一为 `**修复方案**:`、`[main.py](main,py)` 修正为 `[main.py](main.py)`，恢复被丢弃的解决方案与参考位置条目 [skill.md](skill.md#L700-L760)
+- **技术实现(标题归一)**: `**修复3方案**:` 归一为 `**修复方案**:`、`[main.py](main,py)` 修正为 `[main.py](main.py)`，恢复被丢弃的解决方案与参考位置条目 [skill.md](skill.md#L3377-L3437)
 - **技术实现(数据兜底)**: changelog API 保留「解析兜底 → 合并补全 → 空 changes 扫描修复 → 占位符规范化」四重守卫，版本级 `changes` 永不为空，`commit` 空值回落为「版本X对应提交详见Git历史」 [main.py](main.py#L11213-L11390)
-- **参考位置**: [skill.md](skill.md#L641-L760) 最新更新章节 / [README.md](README.md#L641-L760) 同步章节
+- **参考位置**: [skill.md](skill.md#L2135-L3437) 最新更新章节 / [README.md](README.md#L2135-L3437) 同步章节
 
 **测试验证**:
 - ✅ `diff README.md skill.md` 无输出（逐字一致）
@@ -1919,14 +4510,14 @@ git status --short
 **测试验证**:
 - ✅ 刷新页面后 Network 面板加载 `app.js?v=20261107120000`，入库时间按自然日口径显示
 
-### v5.0.9.86 (2026-11-07) - 📐 **新增PY-CORE-018 DOCX文档生成范式** - 将「导航置顶第一页+整块搬迁+锚点零缺失+首行无BOM+改md必重生成」固化为P0强制规范+导航表扩容16→17行+PY-CORE-016补交叉引用(031管用什么生成/034管生成成什么样)+skill.docx重新生成17链接全命中
+### v5.0.9.86 (2026-11-07) - 📐 **PY-CORE-016交叉引用补注与DOCX文档生成范式(PY-CORE-018)新增** - 将「导航置顶第一页+整块搬迁+锚点零缺失+首行无BOM+改md必重生成」固化为P0强制规范+导航表扩容16→17行+交叉引用补注(031管用什么生成/034管生成成什么样)+skill.docx重新生成17链接全命中
 
 > **Commit**: 0674f24c
 
 #### 更新内容:
 1. **新增 P0 范式章节**: skill.md 与 README.md 逐字新增 `PY-CORE-018 DOCX 文档生成范式`，含六条铁律表、五步流程、生成器三函数机制、8 条坑位表、落地检查清单与可复制的锚点校验脚本 [skill.md](skill.md) [README.md](README.md)
-2. **导航表扩容**: 导航表由 16 行增至 17 行，新增「📐 DOCX 文档生成范式 (PY-CORE-018)」条目，与 PY-CORE-011/032/033 三条范式并列 [skill.md](skill.md#L10-L35)
-3. **交叉引用消歧**: `PY-CORE-016` 补注「生成流程与产出结构以 PY-CORE-018 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L17321)
+2. **导航表扩容**: 导航表由 16 行增至 17 行，新增「📐 DOCX 文档生成范式」条目，与 PY-CORE-011/032/033 三条范式并列 [skill.md](skill.md#L10-L35)
+3. **交叉引用消歧**: `PY-CORE-016` 补注「生成流程与产出结构以 PY-CORE-018 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L19897)
 4. **skill.docx 重新生成**: 由 skill.md 重新生成，17 个导航超链接全部命中书签，导航仍固定第 1 页、正文从第 2 页开始
 
 ##### 1. 📐 新增 PY-CORE-018 DOCX 文档生成范式 (把「导航置顶」从实现细节升格为强制规范)
@@ -1947,7 +4538,7 @@ git status --short
 - ✅ docx 第 1 页顺序：H1 标题 → 📚 文档导航 → 引言 → 导航表 → 分页符
 - ✅ README.md 导航 17 行锚点全部命中，与 skill.md 逐字一致
 
-### v5.0.9.85 (2026-11-07) - 📚 **DOCX文档导航置顶第一页+16章节可点击跳转+标题BOM修复** - skill.md顶部新增「📚 文档导航」16章节索引表+generate_docx.py新增`_extract_nav_block()`/`_render_nav_block()`将导航块强制渲染到第一页并加分页符+导航表第3列生成16个可点击超链接(全部命中书签)+修复skill.md/README.md首行BOM导致H1标题多出`#`+README.md补齐PY-CORE-043与PY-CORE-016章节+skill.docx重新生成
+### v5.0.9.85 (2026-11-07) - 📚 **DOCX文档导航置顶第一页+16章节可点击跳转+标题BOM修复** - skill.md顶部新增「📚 文档导航」16章节索引表+generate_docx.py新增`_extract_nav_block()`/`_render_nav_block()`将导航块强制渲染到第一页并加分页符+导航表第3列生成16个可点击超链接(全部命中书签)+修复skill.md/README.md首行BOM导致H1标题多出`#`+README.md补齐PY-CORE-016与PY-CORE-043章节+skill.docx重新生成
 
 > **Commit**: 209173d6, 2c94f548
 
@@ -1955,7 +4546,7 @@ git status --short
 1. **DOCX 文档导航置顶第一页**: `test/generate_docx.py` 新增 `_extract_nav_block()` 识别导航表并连同上方标题/引言整块抽出，`_render_nav_block()` 在第一个 H1 之后立即渲染并追加分页符，导航恒定位于第 1 页、正文从第 2 页开始 [test/generate_docx.py](test/generate_docx.py#L260-L300)
 2. **16 个章节可点击跳转**: skill.md 顶部新增「📚 文档导航」章节含 16 行 `| 章节 | 说明 |` 索引表；生成器自动补第 3 列「位置（点击跳转）」并生成 `w:hyperlink` + `w:anchor`，实测 16 个锚点全部命中 `w:bookmarkStart` [skill.md](skill.md#L10-L35) [test/generate_docx.py](test/generate_docx.py#L390-L405)
 3. **标题 BOM 修复**: skill.md / README.md 首行原为 `#` + U+FEFF + `# 微购...`，BOM 夹在两个 `#` 之间使 `lstrip('#')` 只剥掉第一个，docx 中 H1 显示成 `# 微购相册管理系统`；清除 BOM 后标题恢复正常 [skill.md](skill.md#L1) [README.md](README.md#L1)
-4. **README 章节补齐**: README.md 新增 `PY-CORE-043 终端实时日志接入范式` 与 `PY-CORE-016 文档生成方法` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L335) [README.md](README.md#L17268)
+4. **README 章节补齐**: README.md 新增 `PY-CORE-016 文档生成方法` 与 `PY-CORE-043 终端实时日志接入范式` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L800) [README.md](README.md#L19844)
 5. **三方文档同步**: README.md / skill.md / skill.docx 导航章节逐字一致，skill.docx 由 skill.md 重新生成（389.4 KB，含 16 个导航超链接）
 
 ##### 1. 📚 DOCX 文档导航置顶第一页 (导航块强制渲染 + 分页符隔离)
@@ -1992,12 +4583,12 @@ git status --short
 
 ##### 3. 📄 README 章节补齐 (导航锚点在 README 同样有效)
 **问题描述**:
-- **现象**: README.md 缺少 `PY-CORE-043 终端实时日志接入范式` 章节，且原 `## 📄 文档生成方法` 无 PY-CORE-016 后缀
+- **现象**: README.md 原 `## 📄 文档生成方法` 无 PY-CORE-016 后缀，且缺少 `PY-CORE-043 终端实时日志接入范式` 章节
 - **影响**: 导航表 16 行在 README 中会出现死锚点，与 skill.md 不一致
 
 **修复方案**:
-- **技术实现**: 从 skill.md 逐字提取两个章节并写入 README.md（PY-CORE-043 插在 PY-CORE-017 之后、最新更新之前；PY-CORE-016 整段替换 README 原「文档生成方法」段）
-- **参考位置**: [README.md](README.md#L335) [README.md](README.md#L17268)
+- **技术实现**: 从 skill.md 逐字提取两个章节并写入 README.md（PY-CORE-016 整段替换 README 原「文档生成方法」段；PY-CORE-017 之后、最新更新之前插入 PY-CORE-043）
+- **参考位置**: [README.md](README.md#L800) [README.md](README.md#L19844)
 
 **测试验证**:
 - ✅ README.md 导航 16 行锚点全部命中，未命中为空
@@ -2133,7 +4724,7 @@ git status --short
 3. **版本检查返回码统一**: 全部版本检查函数统一返回码约定 `0=已是最新`、`1=需要升级`、`2=跳过检查`，所有调用点改为分支判断，不再使用隐式if/else，与run.bat完全对齐 [run.sh](run.sh#L1051-L1290)
 4. **镜像测速工具函数统一**: 新增通用`test_mirror_latency()`封装`curl -I`+`time_total`+HTTP状态码校验(连接超时5s/总超时8s)，替换pip/npm/hostc三处重复测速逻辑，输出格式与run.bat一致 [run.sh](run.sh#L978-L1050)
 5. **changelog解析器扩展+空值规范化**: 解析器新增"说明/核心改进/补充说明"块识别与`- **键**: 值`宽松匹配，末尾新增统一空值规范化阶段，确保`changes`字段100%非空、`problem`/`solution`/`verification`全字段无空值 [main.py](main.py#L10830-L10900) [main.py](main.py#L11172-L11245)
-6. **Commit畸形值清理**: 5处形如`ac6add6f.8.90.09`的畸形Commit值(版本号误拼入hash)全部修正为真实8位hash，API新增`_sanitize_commit()`仅保留7-10位十六进制token，从根上杜绝非hash与占位符输出 [README.md](README.md#L7215) [main.py](main.py#L11180-L11188)
+6. **Commit畸形值清理**: 5处形如`ac6add6f.8.90.09`的畸形Commit值(版本号误拼入hash)全部修正为真实8位hash，API新增`_sanitize_commit()`仅保留7-10位十六进制token，从根上杜绝非hash与占位符输出 [README.md](README.md#L9791) [main.py](main.py#L11180-L11188)
 7. **三方文档同步**: README.md+skill.md同步v5.0.9.83记录+skill.docx由skill.md重新生成，run.sh/run.bat版本号保持`0.0.0`自动探测(统一从README最新版本读取，未硬编码)
 
 ##### 1. 🔧 run.sh进程清理三级过滤 (跨平台误杀防护)
@@ -2223,9 +4814,9 @@ git status --short
 - **影响范围**: README.md/skill.md 5处版本条目
 
 **修复方案**:
-- **技术实现(文档修正)**: `ac6add6f.8.90.09`→`ac6add6f`、`c4b0148b.8.89.20`→`c4b0148b`、`fa75c100.8.89.16`→`fa75c100`、`2fcfaf42.8.89.15`→`2fcfaf42`、`c35e648e.8.89.14`→`c35e648e`，README.md与skill.md各5处 [README.md](README.md#L7215)
+- **技术实现(文档修正)**: `ac6add6f.8.90.09`→`ac6add6f`、`c4b0148b.8.89.20`→`c4b0148b`、`fa75c100.8.89.16`→`fa75c100`、`2fcfaf42.8.89.15`→`2fcfaf42`、`c35e648e.8.89.14`→`c35e648e`，README.md与skill.md各5处 [README.md](README.md#L9791)
 - **技术实现(API兜底)**: 新增`_sanitize_commit()`，仅提取7-10位十六进制token并去重(最多5个)，无法提取时回退真实提交或明确说明来源 [main.py](main.py#L11180-L11188)
-- **参考位置**: [README.md](README.md#L7215-L7840) [main.py](main.py#L11180-L11210)
+- **参考位置**: [README.md](README.md#L9791-L10416) [main.py](main.py#L11180-L11210)
 
 **测试验证**:
 - ✅ 全量扫描425个版本`non-hash commit entries: 0`
@@ -3282,7 +5873,7 @@ git status --short
 - ✅ 资源测试: 连续切换搜索类型50次，浏览器内存稳定无增长(Task Manager监控)
 - ✅ 审计结果: 总计问题0，CRITICAL 0，HIGH 0，MEDIUM 0，LOW 0，INFO 0
 - ✅ 安全评级: A+ (优秀)，符合OWASP Top 10防护标准
-- ✅ 代码规范: 符合PY-CORE-011/PY-CORE-045/PY-CORE-042范式体系
+- ✅ 代码规范: 符合PY-CORE-011/PY-CORE-042/PY-CORE-045范式体系
 
 ##### 5. 🐛 紧急修复：恢复7个数据卡片显示 (解析逻辑缩进错误)
 **问题描述**:
@@ -7102,7 +9693,7 @@ python config/crypto_tool.py encrypt-config
 
 **修复方案**:
 - **技术实现**: 从README.md提取所有版本记录，按PY-CORE-011范式格式化后批量插入skill.md对应位置，确保两个文档达到100%版本一致性
-- **参考位置**: commit 21bb6d95, skill.md#L1-L23000
+- **参考位置**: commit 21bb6d95, skill.md#L1-L3258
 
 **测试验证**:
 - ✅ skill.md版本数量从42个增至350个，与README.md完全一致
@@ -7343,7 +9934,7 @@ python config/crypto_tool.py encrypt-config
 
 **修复日期**: 2026-09-02
 **修复类型**: 🧠功能增强 + 智能算法
-**影响文件**: [main.py](main.py#L8970-L8993), [skill.md](skill.md#PY-CORE-039)
+**影响文件**: [main.py](main.py#L8970-L8993), [skill.md](skill.md#py-core-039-智能版本号匹配算法-smart-version-number-matching-algorithm)
 **Commit**: da8351ed
 **变更统计**: +23行 -1行
 **作者**: 小旭二手机（西园路）**
@@ -7382,7 +9973,7 @@ python config/crypto_tool.py encrypt-config
   "meta": {
     "fix_date": "2026-09-02",
     "fix_type": "🧠功能增强 + 智能算法",
-    "affected_files": "[main.py](main.py#L8970-L8993), [skill.md](skill.md#PY-CORE-039)",
+    "affected_files": "[main.py](main.py#L8970-L8993), [skill.md](skill.md#py-core-039-智能版本号匹配算法-smart-version-number-matching-algorithm)",
     "commit": "6c09b2b3",
     "change_stats": "+23行 -1行",
     "author": "小旭二手机（西园路）"
@@ -17499,57 +20090,6 @@ xy_ws/
 
 ---
 
-## 📐 版本更新记录范式规范
-
-所有版本更新记录**必须**遵循以下范式，确保问题可追溯、根因可定位、修复可验证：
-
-```markdown
-### vX.Y.Z (YYYY-MM-DD) - <emoji> <简述>
-
-#### 问题: <一句话描述问题>
-**现象**: <用户可感知的具体表现，包含错误信息、日志输出、界面异常等>
-
-**根本原因**:
-1. **<模块/函数>缺陷**: <技术层面的根因分析，说明为什么会产生这个问题>
-2. **<关联模块>缺陷**: <如有多个根因，逐一列出>
-
-**修复方案**:
-```<language>
-// ❌ 修复前：<简述旧逻辑的问题>
-<旧代码>
-
-// ✅ 修复后：<简述新逻辑的改进>
-<新代码>
-```
-
-**修复效果**:
-| 指标 | 修复前 | 修复后 |
-|------|--------|--------|
-| **<指标1>** | <错误状态> ❌ | <正确状态> ✅ |
-| **<指标2>** | <错误状态> ❌ | <正确状态> ✅ |
-
-**技术细节**:
-- <技术原理说明1>
-- <技术原理说明2>
-- <注意事项或边界条件>
-```
-
-**范式要素说明**:
-
-| 要素 | 必填 | 说明 |
-|------|------|------|
-| **问题** | ✅ | 一句话概括问题本质 |
-| **现象** | ✅ | 用户可感知的具体表现，附错误信息/日志 |
-| **根本原因** | ✅ | 技术层面的根因，编号列出，关联到具体模块/函数 |
-| **修复方案** | ✅ | 修复前❌ + 修复后✅ 的代码对比 |
-| **修复效果** | ✅ | 量化对比表，含❌/✅标记 |
-| **技术细节** | ✅ | 原理说明、注意事项、边界条件 |
-| **持久化保护** | 条件必填 | 涉及patch-package/配置变更时必填 |
-
-**Emoji对照表**: 🐛Bug修复 🔧功能优化 ✨新功能 🔒安全修复 🎯精准修复 📝文档更新 ♻️重构
-
----
-
 ## 📚 早期版本历史记录 (v1.4.2 - v2.1.7)
 
 ## 🔄 历史更新 (v3.8.90.06)
@@ -18804,68 +21344,6 @@ diff README.md skill.docx >/dev/null 2>&1 && echo "✅ 文档已同步" || echo 
 
 ---
 
-## 📄 文档生成方法 (PY-CORE-016: skill.docx生成范式)
-
-> **创建日期**: 2026-10-26 | **最后更新**: 2026-10-26 | **优先级**: 🔴 P0 强制规范 | **适用范围**: skill.docx / test/generate_docx.py / skill.md
-
-### 🔴 核心原则：唯一生成器 (Single Generator)
-
-**skill.docx 必须且只能使用 `test/generate_docx.py` 生成，禁止使用pandoc/在线工具/手动Word等其他方式。**
-
-> **产出结构标准**: 生成流程、导航置顶、锚点校验、落地检查清单以本文档 `PY-CORE-018 DOCX 文档生成范式` 为准 —— 031 管「用什么生成」，034 管「生成成什么样」。
-
-| 规则 | 说明 | 违反后果 |
-|------|------|----------|
-| **🔴 唯一生成器** | skill.docx 只能由 `test/generate_docx.py` 从 skill.md 生成 | 导航链接失效/样式不一致/代码块丢失 |
-| **🔴 源文件唯一** | 生成源文件只能是 skill.md，不能从 README.md 生成 | 内容与skill.md不一致 |
-| **🔴 每次同步** | 修改 skill.md 后必须重新生成 skill.docx | 三方文档不同步 |
-| **🟡 验证大小** | 生成后验证文件大小 > 100KB | 生成失败/内容缺失 |
-
-### 生成命令
-
-```bash
-# 从项目根目录运行
-python test/generate_docx.py
-
-# 或从test目录运行
-cd test && python generate_docx.py
-```
-
-### 生成器特性 (test/generate_docx.py)
-
-| 特性 | 说明 |
-|------|------|
-| **Markdown完整解析** | 标题/代码块/表格/引用/列表/分隔线/行内格式(粗体/斜体/代码) |
-| **导航书签链接** | H2/H3标题自动生成Word书签，导航表格第3列可点击跳转 |
-| **代码块样式** | Consolas字体+深蓝色+灰色背景缩进 |
-| **表格样式** | Table Grid居中对齐，导航表格自动添加第3列跳转链接 |
-| **中文字体** | Microsoft YaHei全局字体，1.5倍行距 |
-| **标题层级颜色** | H1深蓝(0,51,102)→H2(0,76,153)→H3(0,102,153)→H4(51,102,153) |
-| **Fence归一化** | 自动修复未闭合代码块，heading处自动关闭 |
-
-### 验证生成结果
-
-生成后检查以下内容：
-- [ ] 文件大小 > 100KB（正常约350-400KB）
-- [ ] 导航表格第3列显示🔗且可点击跳转
-- [ ] 代码块显示Consolas字体+灰色背景
-- [ ] 中文字符无乱码
-- [ ] 文档版本号与skill.md一致
-- [ ] 三方文档同步：README.md ↔ skill.md ↔ skill.docx
-
-### 禁止使用的方法
-
-| 方法 | 原因 |
-|------|------|
-| ❌ pandoc | 不支持导航书签链接，样式不可控 |
-| ❌ 在线工具(cloudconvert等) | 隐私泄露风险，不支持自定义样式 |
-| ❌ 手动Microsoft Word | 无法自动化，容易遗忘同步 |
-| ❌ 简易python-docx脚本 | 不支持导航链接/代码块样式/表格格式 |
-
-
----
-
-
 ## 📋 完整Git提交历史摘要 (按DOC-CORE-002范式精简格式)
 
 > **生成日期**: 2026-08-31 | **总提交数**: 715 | **版本分组数**: 321
@@ -19868,1194 +22346,6 @@ Files: 6 files changed, 747 insertions(+), 13 deletions(-)
 
 > **生成日期**: 2026-08-31 | **总提交数**: 715 | **版本分组数**: 321 | **时间跨度**: 2026-04-03 ~ 2026-08-31
 
-## 🔴 PY-CORE-011: Changelog版本变更详情完整结构范式 (Complete Changelog Changes Structure Standard)
-
-### 范式描述
-
-定义README.md中每个版本记录的**标准化变更详情结构**，确保changelog API返回的changes数组不为空，且包含完整的问题描述、修复方案和测试验证信息。
-
-### 优先级：🔴 **P0 - 必须遵守**
-
-所有版本记录（包括历史版本）必须遵循此结构，否则会导致：
-- API返回 changes: [] 空数组
-- 前端展示缺少关键信息
-- 用户无法了解具体修复内容
-- **禁止占位符**：所有字段必须填写真实数据，严禁使用"待补充"占位符。Commit必须用git log按版本号匹配的真实hash，变更统计必须用git diff --shortstat获取真实行数
-
----
-
-### 标准结构模板
-
-每个版本必须包含以下层级结构：
-
-\\\markdown
-### vX.X.X (YYYY-MM-DD) - [emoji] **[类型]** [标题]
-
-#### 更新内容: [一句话描述本次更新的核心价值]
-
-**修复日期**: YYYY-MM-DD
-**修复类型**: [类型标签]
-**影响文件**: [文件链接列表]
-**Commit**: [8位commit hash]
-**变更统计**: [+X行 -Y行]
-**作者**: [作者名称]**
-
----
-
-##### 1. [具体变更标题] ([类型标签])
-
-**问题描述**:
-- **现象**: [用户可见的问题或错误表现]
-- **根因**: [技术层面的根本原因分析]
-- **影响范围**: [受影响的模块/文件/功能]
-
-**修复方案**:
-- **技术实现**: [具体的代码/配置/架构修改方法]
-- **参考位置**: [commit hash, 文件路径#行号, 范式文档链接]
-
-**测试验证**:
-- ✅ [验证项1：可复现的测试结果]
-- ✅ [验证项2：自动化测试通过]
-- ✅ [验证项3：人工验收确认]
-\\\
-
----
-
-### 字段规范详解
-
-#### 1. 版本头部信息（#### 层级）
-
-| 字段 | 格式要求 | 示例 | 必填 |
-|------|----------|------|------|
-| **更新内容** | 一句话概括核心价值 | "实现智能版本号匹配算法" | ✅ 是 |
-| **修复日期** | YYYY-MM-DD | "2026-09-02" | ✅ 是 |
-| **修复类型** | emoji + 类型标签 | "🧠功能增强", "🐛Bug修复" | ✅ 是 |
-| **影响文件** | Markdown链接格式 | "[main.py](main.py), [skill.md](skill.md)" | ✅ 是 |
-| **Commit** | 8位短hash | "6c09b2b3" | ✅ 是 |
-| **变更统计** | Git numstat格式 | "+23行 -1行"（必须真实，禁止"待补充"） | ✅ 是 |
-| **作者** | 统一格式 | "小旭二手机（西园路）" | ✅ 是 |
-
-#### 2. 变更详情块（##### 层级）
-
-每个版本至少包含**一个**变更详情块，结构如下：
-
-##### **标题行**
-\\\
-##### N. [标题] ([类型标签])
-\\\
-- **N**: 序号，从1开始递增
-- **标题**: 具体描述本次变更的内容（20-50字）
-- **类型标签**: 与修复类型一致
-
-##### **问题描述区块**
-\\\
-**问题描述**:
-- **现象**: [用户视角的问题描述]
-- **根因**: [开发者视角的原因分析]
-- **影响范围**: [受影响的文件/模块/API]
-\\\
-
-**填写原则**：
-- **现象**：用户能看到、能复现的问题（如"页面显示空白"、"API返回500"）
-- **根因**：技术层面的根本原因（如"正则表达式未转义"、"数据库连接池耗尽"）
-- **影响范围**：明确列出受影响的文件路径和功能模块
-
-##### **修复方案区块**
-\\\
-**修复方案**:
-- **技术实现**: [具体的修改方法]
-- **参考位置**: [可点击的链接]
-\\\
-
-**填写原则**：
-- **技术实现**：说明"做了什么"，而不是"做了什么好"
-  - ✅ 正确："使用re.escape()对用户输入进行转义"
-  - ❌ 错误："优化了安全性"
-- **参考位置**：提供可追溯的定位信息
-  - commit hash（用于Git blame）
-  - 文件路径+行号（用于IDE跳转）
-  - 范式文档编号（用于查阅开发规范）
-
-##### **测试验证区块**
-\\\
-**测试验证**:
-- ✅ [验证项1]
-- ✅ [验证项2]
-\\\
-
-**填写原则**：
-- 每个验证项必须**具体、可复现**
-- 使用✅符号表示已通过
-- 至少包含2个验证项：
-  1. 功能性验证（如"API正常返回200"）
-  2. 数据完整性验证（如"changes数组非空"）
-
----
-
-### 类型标签对照表
-
-| 标签 | 适用场景 | 示例 |
-|------|----------|------|
-| 🐛Bug修复 | 修复已知问题 | "run.bat编码问题根治" |
-| ✨功能增强 | 新增或改进功能 | "changelog API集成Git历史" |
-| 📝文档更新 | 更新文档/注释/规范 | "skill.md新增PY-CORE-010" |
-| 🏗️架构优化 | 重构/解耦/性能优化 | "单文件架构确认" |
-| 🔒安全加固 | 安全漏洞修复 | "CSRF同源校验" |
-| ⚡性能优化 | 响应速度/资源占用优化 | "减少等待时间" |
-| 🗑️清理 | 删除无用代码/文件 | "删除临时脚本" |
-| 🧠智能升级 | AI/算法相关改进 | "智能版本号匹配算法" |
-| ⚙️配置管理 | 配置文件/环境变量调整 | "滚动参数可配置化" |
-
----
-
-### 完整示例（v5.0.9.16）
-
-\\\markdown
-
-## 核心开发范式
-1. **隧道管理范式**: tunnel_url.txt作为权威数据源
-2. **邮件通知范式**: 独立发送，防重复机制
-3. **心跳验证范式**: 每个隧道独立验证
-4. **跨平台兼容范式**: 动态路径检测
-5. **错误处理范式**: 统一异常捕获和日志
-6. **配置管理范式**: 环境变量优先
-7. **测试范式**: 单元测试覆盖核心逻辑
-```
-
-**修复效果**:
-| 指标 | 修复前 | 修复后 |
-|------|--------|--------|
-| **范式文档完整性** | 缺失 ❌ | 完整 ✅ |
-| **新手上手难度** | 高 ❌ | 低 ✅ |
-| **代码规范性** | 低 ❌ | 高 ✅ |
-
-**技术细节**: 补全7项核心开发范式文档，包括隧道管理、邮件通知、心跳验证等关键范式
-
-## 移动端适配范式
-1. **响应式布局**: 使用CSS Flexbox和Grid
-2. **触摸优化**: 按钮最小尺寸44x44px
-3. **字体适配**: 使用rem单位
-4. **图片优化**: 使用WebP格式，懒加载
-5. **性能优化**: 减少HTTP请求，使用CDN
-```
-
-**修复效果**:
-| 指标 | 修复前 | 修复后 |
-|------|--------|--------|
-| **移动端适配规范** | 无 ❌ | 完整 ✅ |
-| **开发效率** | 低 ❌ | 高 ✅ |
-| **用户体验** | 差 ❌ | 好 ✅ |
-
-**技术细节**: 将移动端适配经验文档化，形成可复用的开发范式
-
-## 版本历史
-- v3.8.11: 完整历史记录恢复与文档更新
-- v3.8.10: 更新文档：README.md + skill.md + skill.docx 同步代码规范
-- v3.8.9: 强制URL去重机制
-- ...（恢复所有历史版本）
-```
-
-**修复效果**:
-| 指标 | 修复前 | 修复后 |
-|------|--------|--------|
-| **历史记录完整性** | 不完整 ❌ | 完整 ✅ |
-| **文档准确性** | 过时 ❌ | 最新 ✅ |
-| **可追溯性** | 差 ❌ | 好 ✅ |
-
-**技术细节**: 恢复完整历史记录，更新文档确保与最新代码同步
-
-## 文档体系
-1. **README.md**: 项目概述和快速开始
-2. **skill.md**: 开发技能文档（**含动态编码规范**）
-3. **skill.docx**: Word格式文档
-4. **API文档**: 接口文档
-5. **开发规范**: 代码规范和最佳实践
-
----
-
-## ⚙️ 动态编码规范 (Dynamic Coding Standard) - **强制遵守**
-
-> **📌 核心原则**: 除明确例外情况外,项目所有代码必须实现**100%动态化配置**,禁止硬编码魔法数字/字符串。
-
-### 规则速查表
-
-| 代码类型 | 是否需要动态化 | 动态化方式 |
-|---------|--------------|-----------|
-| **main.py** (非隧道) | ✅ **必须** | `os.environ.get()` + 默认值 |
-| **dist/app.js** | ✅ **必须** | 配置对象/API获取 |
-| **run.bat / run.sh** | ✅ **必须** | 环境变量/配置文件 |
-| **config/*.json** | ✅ **必须** | 运行时读取+加密 |
-| **其他.py/.js文件** | ✅ **必须** | 配置注入/参数传递 |
-| **test/*.py** | ❌ **不需要** | 允许硬编码 |
-| **CF/Hostc隧道相关** | ❌ **不需要** | 固定值 |
-
-### 关键规则
-
-1. **✅ 必须动态化**: 超时时间、重试次数、端口、地址、间隔等所有可配置参数
-2. **✅ 实现方式**: Python用`os.environ.get('KEY', 'default')`，JS用`CONFIG`对象集中管理
-3. **✅ 允许例外**: test/目录、CF/Hostc隧道参数、UI像素常量（需注释说明原因）
-4. **❌ 禁止行为**: 裸露魔法数字、硬编码路径/URL、散落的超时值
-
-### 快速示例
-
-```python
-# ✅ 正确 - 动态配置
-TIMEOUT_CONFIG = {
-    'http_request': int(os.environ.get('TIMEOUT_HTTP_REQUEST', '10')),
-}
-
-# ❌ 错误 - 硬编码（禁止）
-TIMEOUT = 10
-```
-
-**📖 完整规范**: 详见 [skill.md - 动态编码规范章节](skill.md#-动态编码规范-dynamic-coding-standard---强制遵守)
-
-**📌 生效版本**: v5.0.9.51 (2026-09-07) 起
-```
-
-**修复效果**:
-| 指标 | 修复前 | 修复后 |
-|------|--------|--------|
-| **文档完整性** | 不完整 ❌ | 完整 ✅ |
-| **文档体系** | 缺失 ❌ | 完善 ✅ |
-| **开发者体验** | 差 ❌ | 好 ✅ |
-
-**技术细节**: 全面升级文档系统，建立完整的文档体系，包括README.md、skill.md、skill.docx、API文档等
-
-## 🔴 PY-CORE-008: 跨平台启动脚本范式 (Cross-Platform Startup Script)
-
-### 范式描述
-统一的跨平台启动脚本，支持Windows (.bat) 和Linux/macOS (.sh)，实现：
-- 环境自动检测与安装
-- Python/Node.js依赖管理
-- 镜像源自动选择
-- 进程清理与端口管理
-- 统一日志输出
-
-### 核心实现
-
-#### Windows启动脚本 (run.bat)
-@echo off
-setlocal enabledelayedexpansion
-chcp 65001 > nul 2>&1
-cd /d "%~dp0"
-set PYTHONIOENCODING=utf-8
-
-:: 版本自动读取
-set "VERSION=0.0.0"
-for /f "delims=" %%i in ('py -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')" 2^>nul') do set "VERSION=%%i"
-
-:: 统一日志函数（毫秒级时间戳）
-:ms_timestamp
-set "TIMESTAMP="
-if defined _TS_PYTHON (
-    for /f "delims=" %%t in ('"!_TS_PYTHON!" -c "from datetime import datetime; d=datetime.now(); print(d.strftime(\"%%Y-%%m-%%d %%H:%%M:%%S.\")+f\"{d.microsecond//1000:03d}\")" 2^>nul') do set "TIMESTAMP=%%t"
-)
-if not defined TIMESTAMP set "TIMESTAMP=%date% %time: =0%"
-exit /b
-
-:log
-call :ms_timestamp
-echo [%TIMESTAMP%] %*
-if not "%LOG_FILE%"=="" (
-    if exist "!LOG_FILE!" (
-        >> "!LOG_FILE!" echo [%TIMESTAMP%] %* 2>nul
-    )
-)
-exit /b
-
-:: 环境检测（6步流程）
-:detect_environments
-call :detect_python_env    :: [1/6] 检测Python环境
-call :detect_node_env      :: [2/6] 检测Node.js环境  
-call :test_pip_mirrors     :: [3/6] 测试PIP加速镜像源
-call :test_npm_mirrors     :: [4/6] 测试NPM加速镜像源
-call :detect_venv          :: [5/6] 检测Python虚拟环境
-call :setup_venv           :: [6/6] 设置虚拟环境并安装依赖
-
-:: 镜像源自动选择（以延迟最低为最优）
-:test_pip_mirrors
-set "MIRRORS[0]=https://pypi.tuna.tsinghua.edu.cn/simple|清华源"
-set "MIRRORS[1]=https://mirrors.aliyun.com/pypi/simple/|阿里云"
-set "MIRRORS[2]=https://pypi.douban.com/simple/|豆瓣"
-
-:: 测试每个镜像源的连接时间
-for /L %%i in (0,1,3) do (
-    for /f "tokens=1,2 delims=|" %%a in ("!MIRRORS[%%i]!") do (
-        curl.exe -s -o NUL -w "%%{time_connect}" --connect-timeout 1.5 "!MIRROR_URL!"
-        :: 选择延迟最低的镜像源
-    )
-)
-
-#### Linux/macOS启动脚本 (run.sh)
-#!/bin/bash
-cd "$(dirname "$0")"
-
-版本自动读取
-VERSION="0.0.0"
-for cmd in python3 python; do
-    if command -v "$cmd" &>/dev/null; then
-        VERSION=$("$cmd" -c "import re; m=re.search(r'###\s+v([\d.]+)', open('README.md', encoding='utf-8').read()); print(m.group(1) if m else '0.0.0')") && break
-    fi
-done
-
-统一日志函数（兼容GNU date和BSD date）
-_ms_timestamp() {
-    if date '+%3N' 2>/dev/null | grep -qE '^[0-9]{3}$'; then
-        date '+%Y-%m-%d %H:%M:%S.%3N'  # GNU date
-    else
-        local ms=$(python3 -c "from datetime import datetime; print(datetime.now().microsecond//1000)" 2>/dev/null || echo "000")
-        printf '%s.%03d' "$(date '+%Y-%m-%d %H:%M:%S')" "${ms:-000}"  # BSD date fallback
-    fi
-}
-
-log() {
-    TIMESTAMP="$(_ms_timestamp)"
-    echo "[$TIMESTAMP] $*"
-    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && echo "[$TIMESTAMP] $*" >> "$LOG_FILE" 2>/dev/null
-}
-
-环境检测（6步流程）
-pre_launch() {
-    detect_python_env   # [1/6]
-    detect_node_env     # [2/6]
-    test_pip_mirrors    # [3/6]
-    test_npm_mirrors    # [4/6]
-    detect_venv         # [5/6]
-    setup_venv          # [6/6]
-}
-
-### 关键特性
-1. **版本自动解析**: 从README.md正则提取版本号
-2. **毫秒级日志**: 支持Windows和Unix的高精度时间戳
-3. **镜像源智能选择**: 自动测试并选择最快镜像
-4. **进程管理**: 启动前分层清理残留进程（精准+兜底），端口冲突检测
-5. **环境自愈**: 自动安装缺失的Python/Node.js环境
-
-### 残留进程分层清理策略 (v3.8.89.30+)
-
-启动脚本在主流程开始前执行分层进程清理，从源头消除Playwright驱动残留node进程导致的 `Connection closed while reading from the driver` 错误：
-
-**清理顺序（精准→兜底）**:
-
-| 顺序 | 目标 | Windows (run.bat) | Linux/macOS (run.sh) |
-|------|------|-------------------|----------------------|
-| 1 | Playwright驱动node进程 | `wmic` 查命令行含playwright的node.exe → `taskkill /PID` | `pkill -9 -f "playwright"` |
-| 2 | hostc隧道进程 | `taskkill /F /IM hostc.exe` | `pkill -9 -f "hostc"` |
-| 3 | python主进程 | `taskkill /F /IM python.exe` | `pkill -9 -f "python.*main.py"` |
-| 4 | 所有剩余node进程（兜底） | `taskkill /F /IM node.exe` | `pkill -9 node` |
-
-**设计要点**:
-- **精准优先**: 先用命令行特征匹配杀Playwright驱动node进程，避免误杀其他node应用
-- **兜底保障**: 再用进程名通配杀所有node进程，防止遗漏的驱动残留
-- **跨平台对齐**: run.bat与run.sh清理逻辑保持一致，仅命令语法不同
-- **端口冲突检测**: 清理后检测8888端口占用，超时则强制清理占用PID
-
----
-
-## 🔴 PY-CORE-009: CI/CD自动化部署范式 (CI/CD Automation)
-
-### 范式描述
-GitHub Actions工作流，实现：
-- 多操作系统测试矩阵
-- 自动化构建与部署
-- 安全扫描与质量检查
-- 通知与报告生成
-
-### 核心实现
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
-
-jobs:
-  test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.0', '3.9', '3.10', '3.11', '3.12']
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install dependencies
-      run: |
-        pip install -r requirements.txt
-        pip install pytest pytest-cov
-
-    - name: Run tests
-      run: |
-        pytest test/ -v --cov=. --cov-report=xml
-
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-
-  security-scan:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Run Bandit Security Scan
-      run: |
-        pip install bandit
-        bandit -r main.py -ll
-
-  deploy:
-    needs: [test, security-scan]
-    if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Deploy to production
-      run: |
-        echo "部署到生产环境"
-
----
-
-## 🔴 PY-CORE-032: PWA离线缓存范式 (Progressive Web App)
-
-### 范式描述
-使用Workbox实现PWA离线缓存，提升用户体验：
-- Service Worker注册与管理
-- 静态资源预缓存
-- 离线回退策略
-- 缓存更新机制
-
-### 核心实现
-
-#### Service Worker注册 (registerSW.js)
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' })
-            .then(registration => {
-                console.log('SW registered:', registration.scope);
-            })
-            .catch(error => {
-                console.log('SW registration failed:', error);
-            });
-    });
-}
-
-#### Service Worker配置 (sw.js)
-importScripts('./workbox-9c191d2f.js');
-
-const { precacheAndRoute, cleanupOutdatedCaches, registerRoute, NavigationRoute } = workbox;
-
-// 预缓存静态资源
-precacheAndRoute([
-    { url: 'index.html', revision: 'f0ffca7cb...' },
-    { url: 'assets/index-CLgEPqQj.js', revision: null },
-    { url: 'assets/vendor-J3N2YKMO.js', revision: null },
-]);
-
-// 清理过期缓存
-cleanupOutdatedCaches();
-
-// 导航请求回退到index.html（SPA支持）
-registerRoute(
-    new NavigationRoute(
-        createHandlerBoundToURL('index.html')
-    )
-);
-
----
-
-## 🟡 PY-CORE-033: Python依赖管理范式 (Python Dependency Management)
-
-### 范式描述
-标准化的Python依赖管理，确保可重复构建：
-
-### 核心实现
-
-#### requirements.txt结构（与main.py顶部import一一对应）
-核心框架
-fastapi==0.128.8
-uvicorn[standard]==0.39.0
-pydantic==2.11.10
-
-浏览器自动化
-playwright==1.52.0
-
-数据处理
-openpyxl==3.1.5
-pandas==2.3.3
-
-系统监控
-psutil==6.1.1
-prometheus-client==0.24.1
-
-安全与加密
-cryptography==43.0.3
-
-版本解析
-packaging==24.2
-
-文档生成
-python-docx==1.2.0
-
-#### 依赖检查与安装
-def check_deps_satisfied(requirements_file="requirements.txt"):
-    """检查依赖是否满足"""
-    import pkg_resources
-
-    with open(requirements_file, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-
-            try:
-                pkg_resources.require(line)
-            except (pkg_resources.DistributionNotFound, pkg_resources.VersionConflict):
-                return False
-
-    return True
-
-def install_playwright_cdn():
-    """使用CDN镜像安装Playwright浏览器"""
-    mirrors = [
-        ("https://npmmirror.com/mirrors/playwright", "淘宝镜像"),
-        ("https://registry.npmmirror.com/-/binary/playwright", "npmmirror"),
-    ]
-
-    for mirror_url, mirror_name in mirrors:
-        try:
-            os.environ['PLAYWRIGHT_DOWNLOAD_HOST'] = mirror_url
-            subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], 
-                         check=True, capture_output=True)
-            return True
-        except subprocess.CalledProcessError:
-            continue
-
-    return False
-
----
-
-## 🟡 PY-CORE-031: Node.js依赖管理与补丁持久化范式 (Node.js Dependency & Patch Management)
-
-### 范式描述
-Node.js依赖管理，包含patch-package实现补丁持久化：
-
-### 核心实现
-
-#### package.json配置
-{
-  "name": "xy_ws-dist",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "postinstall": "patch-package"
-  },
-  "dependencies": {
-    "hostc": "^1.3.0",
-    "patch-package": "^8.0.0"
-  }
-}
-
-#### 补丁文件示例 (patches/hostc+1.3.0.patch)
-diff --git a/dist/lib/tunnel.js b/dist/lib/tunnel.js
-index xxxxxxx..yyyyyyy 100644
---- a/dist/lib/tunnel.js
-+++ b/dist/lib/tunnel.js
-@@ -142,6 +142,10 @@ function safeCloseWebSocket2(socket, code, reason) {
-   if (!socket) return;
-   try {
-+    if (socket.readyState === WebSocket.CONNECTING) {
-+      socket.once("error", () => {});
-+      socket.terminate();
-+    } else {
-       socket.close(normalizeWebSocketCloseCode(code), normalizeWebSocketCloseReason(reason));
-+    }
-   } catch {
-     try { socket.terminate(); } catch {}
-   }
-
-### 工作原理
-1. `npm install` 时自动运行 `postinstall` 脚本
-2. `patch-package` 应用 `patches/` 目录下的所有补丁
-3. 确保第三方库的修复不会因依赖更新而丢失
-
----
-
-## 🟡 PY-CORE-002: API压力测试范式 (API Stress Testing)
-
-### 范式描述
-标准化的API压力测试工具，用于性能评估和瓶颈发现：
-
-### 核心实现
-#!/usr/bin/env python3
-"""
-Szwego商品爬虫 - API压力测试工具
-
-用法:
-    python stress_test.py --target http://localhost:5000 --concurrent 100 --requests 1000
-"""
-
-def make_request(url, method='GET', data=None, timeout=10):
-    """发送HTTP请求并记录指标"""
-    start = time.time()
-    try:
-        headers = {'Content-Type': 'application/json'}
-        req = Request(url, data=data.encode('utf-8') if data else None, 
-                     headers=headers, method=method)
-        resp = urlopen(req, timeout=timeout)
-        status = resp.getcode()
-        body = resp.read().decode('utf-8', errors='replace')
-        elapsed = time.time() - start
-        return {'status': status, 'time': elapsed, 'error': None, 'size': len(body)}
-    except HTTPError as e:
-        return {'status': e.code, 'time': time.time() - start, 'error': str(e), 'size': 0}
-    except Exception as e:
-        return {'status': 0, 'time': time.time() - start, 'error': str(e), 'size': 0}
-
-def run_stress_test(target, concurrent, total_requests, endpoints):
-    """执行压力测试"""
-    results = []
-
-    with ThreadPoolExecutor(max_workers=concurrent) as executor:
-        futures = []
-        for i in range(total_requests):
-            ep = endpoints[i % len(endpoints)]
-            futures.append(executor.submit(worker, ep))
-
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                results.append(result)
-
-    # 统计分析
-    success = [r for r in results if 200 <= r['status'] < 400]
-    times = [r['time'] for r in results]
-
-    print(f"成功率: {len(success)/len(results)*100:.2f}%")
-    print(f"平均响应时间: {statistics.mean(times)*1000:.2f}ms")
-    print(f"P99响应时间: {sorted(times)[int(len(times)*0.99)]*1000:.2f}ms")
-
-使用示例
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Szwego API压力测试工具')
-    parser.add_argument('--target', default='http://localhost:5000')
-    parser.add_argument('--concurrent', type=int, default=100)
-    parser.add_argument('--requests', type=int, default=1000)
-    args = parser.parse_args()
-
-    run_stress_test(args.target, args.concurrent, args.requests, [])
-
-### 关键指标
-| 指标 | 说明 | 目标值 |
-|------|------|--------|
-| **成功率** | HTTP 200-399比例 | > 95% |
-| **平均延迟** | 响应时间均值 | < 200ms |
-| **P99延迟** | 99分位响应时间 | < 1000ms |
-| **QPS** | 每秒请求数 | > 500 |
-
----
-
-## 🟡 PY-CORE-021: 边界条件测试范式 (Edge Case Testing)
-
-### 范式描述
-系统性的边界条件和极端情况测试，确保系统健壮性：
-
-### 核心实现
-class TestBoundaryConditions:
-    """边界条件测试类"""
-
-    def test_empty_string_input(self):
-        """空字符串输入处理"""
-        client = app.test_client()
-        response = client.post('/api/run', 
-                              data=json.dumps({'command': ''}),
-                              content_type='application/json')
-        assert response.status_code in [400, 200]
-
-    def test_very_long_command(self):
-        """超长命令字符串（10000+字符）"""
-        long_command = 'echo "' + 'a' * 10000 + '"'
-        response = client.post('/api/run',
-                              data=json.dumps({'command': long_command}),
-                              content_type='application/json')
-        assert response.status_code in [200, 413]  # OK或Payload Too Large
-
-    def test_special_characters_in_command(self):
-        """包含特殊字符的命令"""
-        special_commands = [
-            {'command': 'echo "hello world"'},
-            {"command": "echo 'single quotes'"},
-            {'command': 'echo $HOME'},
-            {'command': 'echo ; malicious command'},
-            {'command': 'echo && another'},
-            {'command': 'echo | pipe'},
-        ]
-
-        for cmd in special_commands:
-            response = client.post('/api/run',
-                                  data=json.dumps(cmd),
-                                  content_type='application/json')
-            assert response.status_code != 500, f"崩溃于特殊字符: {cmd['command'][:50]}"
-
-    def test_unicode_input(self):
-        """Unicode字符输入"""
-        unicode_commands = [
-            {'command': 'echo 中文测试'},
-            {'command': 'echo 日本语テスト'},
-            {'command': 'echo 🎉🚀emoji测试'},
-            {'command': 'echo العربية'},
-        ]
-
-        for cmd in unicode_commands:
-            response = client.post('/api/run',
-                                  data=json.dumps(cmd, ensure_ascii=False),
-                                  content_type='application/json; charset=utf-8')
-            assert response.status_code != 500
-
-
-class TestConcurrencyEdgeCases:
-    """并发边界情况测试"""
-
-    def test_burst_traffic(self):
-        """突发流量模式：瞬间大量请求后静默"""
-        threads = []
-        results = []
-
-        def make_request(i):
-            resp = client.post('/api/run',
-                              data=json.dumps({'command': f'burst_{i}'}),
-                              content_type='application/json')
-            results.append(resp.status_code)
-
-        # 瞬间启动50个线程
-        for i in range(50):
-            t = threading.Thread(target=make_request, args=(i,))
-            threads.append(t)
-            t.start()
-
-        for t in threads:
-            t.join(timeout=10)
-
-        success_count = sum(1 for s in results if s == 200)
-        rate_limited_count = sum(1 for s in results if s == 429)
-
-        print(f"\n突发流量结果: 成功={success_count}, 被限流={rate_limited_count}")
-        assert success_count > 0  # 至少有一些成功
-
-
-class TestFilesystemEdgeCases:
-    """文件系统边界情况"""
-
-    def test_very_large_json_file(self):
-        """超大JSON文件处理"""
-        large_data = {'items': [f'item_{i}' for i in range(10000)]}
-
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(large_data, f)
-            temp_path = f.name
-
-        try:
-            start = time.time()
-            result = safe_read_json(temp_path)
-            duration = time.time() - start
-
-            assert result is not None
-            assert len(result.get('items', [])) == 10000
-            print(f"\n大文件读取: {duration*1000:.2f}ms, 10000条记录")
-        finally:
-            os.unlink(temp_path)
-
-    def test_malformed_json_variants(self):
-        """各种畸形JSON格式"""
-        malformed_cases = [
-            ('', '空文件'),
-            ('{', '不完整的对象'),
-            ('[', '不完整的数组'),
-            ('{"key": }', '缺失值'),
-            ('null', '仅null'),
-            ('  \n\t  ', '空白字符'),
-        ]
-
-        for content, description in malformed_cases:
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-                f.write(content)
-                temp_path = f.name
-
-            try:
-                result = safe_read_json(temp_path)
-                assert result is not None, f"崩溃于: {description}"
-            finally:
-                os.unlink(temp_path)
-
-
-class TestMemoryAndResourceLimits:
-    """内存和资源限制测试"""
-
-    def test_many_consecutive_cache_reads(self):
-        """连续多次缓存读取（检测内存泄漏）"""
-        cache = FileCacheManager(ttl_seconds=5)
-
-        initial_memory = None
-        for i in range(1000):
-            data = cache.read_json(temp_path)
-
-            if i == 0:
-                process = psutil.Process()
-                initial_memory = process.memory_info().rss
-
-            if i == 999:
-                final_memory = psutil.Process().memory_info().rss
-                memory_growth_mb = (final_memory - initial_memory) / (1024*1024)
-
-                # 内存增长不应该超过10MB
-                assert memory_growth_mb < 10, f"可能的内存泄漏: {memory_growth_mb:.2f}MB"
-
-### 测试覆盖范围
-| 类别 | 测试场景 | 数量 |
-|------|---------|------|
-| **输入边界** | 空字符串、超长输入、特殊字符、Unicode | 15+ |
-| **并发边界** | 突发流量、多端点并发、快速连续请求 | 5+ |
-| **文件系统** | 大文件、畸形JSON、权限不足 | 8+ |
-| **内存限制** | 缓存泄漏检测、资源耗尽 | 3+ |
-| **网络弹性** | 连接超时、连接拒绝、DNS失败 | 4+ |
-
----
-
-## 🟡 PY-CORE-037: 安全修复验证测试范式 (Security Fix Verification Testing)
-
-### 范式描述
-针对已知安全漏洞的回归测试套件，确保修复不反弹：
-
-### 核心实现
-class TestAPIInputValidation:
-    """测试1: API输入验证 - Bug #1修复验证"""
-
-    def test_empty_post_body_returns_400(self):
-        """空请求体应返回400"""
-        client = app.test_client()
-        response = client.post('/run', data='', content_type='application/json')
-
-        assert response.status_code == 400
-        data = json.loads(response.data)
-        assert 'error' in data
-        assert '不能为空' in data['error']
-
-    def test_invalid_json_returns_400(self):
-        """无效JSON应返回400"""
-        client = app.test_client()
-        response = client.post('/run', data='not valid json', 
-                              content_type='application/json')
-        assert response.status_code == 400
-
-
-class TestJSONParsingSafety:
-    """测试2: JSON解析安全性 - Bug #2修复验证"""
-
-    def test_empty_logs_array_no_index_error(self):
-        """空的logs数组不应导致IndexError"""
-        test_data = {'logs': []}
-
-        logs = test_data.get('logs', [])
-        if isinstance(logs, list) and len(logs) > 0:
-            last_log = logs[-1]
-            added = last_log.get('added', [])
-        else:
-            added = []
-
-        assert added == []
-
-    def test_corrupted_json_handled_gracefully(self):
-        """损坏的JSON文件应被优雅处理"""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            f.write('{invalid json content}')
-            temp_path = f.name
-
-        try:
-            result = safe_read_json(temp_path)
-            assert result == {} or result is None
-        finally:
-            os.unlink(temp_path)
-
-
-class TestTypeSafety:
-    """测试3: 类型安全 - Bug #3修复验证"""
-
-    def test_xiaoji_records_type_validation(self):
-        """xiaoji_records必须是list类型"""
-        test_cases = [
-            ({'小计': []}, []),
-            ({'小计': ['item1', 'item2']}, ['item1', 'item2']),
-            ({}, []),
-            ({'小计': 'not_a_list'}, []),  # 错误类型
-            ({'小计': None}, []),          # None值
-        ]
-
-        for input_data, expected in test_cases:
-            result = (
-                input_data.get('小计', []) 
-                if isinstance(input_data, dict) and isinstance(input_data.get('小计'), list) 
-                else []
-            )
-            assert result == expected, f"Failed for input: {input_data}"
-
-
-class TestThreadSafety:
-    """测试4: 线程安全 - Bug #4修复验证"""
-
-    def test_processes_dict_protected_by_lock(self):
-        """processes字典应该被锁保护"""
-        errors = []
-
-        def write_to_dict():
-            try:
-                with _processes_lock:
-                    processes[f'test_{threading.current_thread().ident}'] = 'value'
-            except Exception as e:
-                errors.append(e)
-
-        def read_from_dict():
-            try:
-                with _processes_lock:
-                    _ = len(processes)
-            except Exception as e:
-                errors.append(e)
-
-        # 启动多个线程并发访问
-        threads = []
-        for i in range(10):
-            t = threading.Thread(target=write_to_dict if i % 2 == 0 else read_from_dict)
-            threads.append(t)
-            t.start()
-
-        for t in threads:
-            t.join(timeout=5)
-
-        assert len(errors) == 0, f"线程安全错误: {errors}"
-
-
-class TestRateLimiting:
-    """测试5: 速率限制功能"""
-
-    def test_rate_limiter_blocks_excessive_requests(self):
-        """速率限制器应阻止过多请求"""
-        limiter = RateLimiter(max_requests=3, window_seconds=60)
-        test_ip = '192.168.1.100'
-
-        # 前3次应该允许
-        for i in range(3):
-            assert limiter.is_allowed(test_ip) is True
-
-        # 第4次应该被阻止
-        assert limiter.is_allowed(test_ip) is False
-
-    def test_rate_limiter_different_ips_independent(self):
-        """不同IP应有独立的速率限制计数"""
-        limiter = RateLimiter(max_requests=2, window_seconds=60)
-
-        # IP1达到限制
-        limiter.is_allowed('192.168.1.1')
-        limiter.is_allowed('192.168.1.1')
-        assert limiter.is_allowed('192.168.1.1') is False
-
-        # IP2应该不受影响
-        assert limiter.is_allowed('192.168.1.2') is True
-
-
-class TestExceptionHandling:
-    """测试7: 异常处理的健壮性"""
-
-    def test_socket_cleanup_on_exception(self):
-        """socket应在异常时正确关闭"""
-        mock_socket = Mock()
-        mock_socket.close = Mock()
-
-        s = None
-        try:
-            s = mock_socket
-            raise socket.error("Connection failed")
-        except socket.error:
-            pass
-        finally:
-            if s:
-                try:
-                    s.close()
-                except Exception:
-                    pass
-
-        # 验证close被调用
-        mock_socket.close.assert_called_once()
-
-### 安全测试清单
-| Bug编号 | 漏洞类型 | 测试方法 | 验证点 |
-|--------|---------|---------|--------|
-| #1 | API输入验证 | `test_empty_post_body_returns_400` | 返回400而非500 |
-| #2 | JSON解析安全 | `test_corrupted_json_handled_gracefully` | 不崩溃，返回默认值 |
-| #3 | 类型安全 | `test_xiaoji_records_type_validation` | 类型检查防IndexError |
-| #4 | 线程安全 | `test_processes_dict_protected_by_lock` | 无竞态条件 |
-| #5 | 速率限制 | `test_rate_limiter_blocks_excessive_requests` | 正确限流 |
-| #7 | 异常处理 | `test_socket_cleanup_on_exception` | 资源正确释放 |
-
----
-
-## 📊 完整代码范式汇总表
-
-| 范式编号 | 首字母 | 名称 | 覆盖文件 | 优先级 |
-|---------|-------|------|---------|--------|
-| PY-CORE-001 | A | 文件清理自动化 (Automated File Cleanup) | main.py | 🔴 核心 |
-| PY-CORE-002 | A | API压力测试 (API Stress Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
-| PY-CORE-003 | B | 浏览器自动化爬虫 (Browser Automation Scraping) | main.py | 🔴 核心 |
-| PY-CORE-004 | B | 后台任务管理 (Background Task Management) | main.py | 🔴 核心 |
-| PY-CORE-005 | C | 统一路径管理 (Centralized Path Management) | main.py | 🔴 核心 |
-| PY-CORE-006 | C | 配置管理 (Configuration Management) | main.py | 🔴 核心 |
-| PY-CORE-007 | C | Cookie验证与管理 (Cookie Validation & Management) | main.py | 🔴 核心 |
-| PY-CORE-008 | C | 跨平台启动脚本 (Cross-Platform Startup Script) | run.bat/run.sh | 🔴 核心 |
-| PY-CORE-009 | C | CI/CD自动化部署 (CI/CD Automation) | 范式示例（本仓库未包含该工作流文件） | 🟡 重要 |
-| PY-CORE-010 | C | Changelog API数据结构与Git历史集成 | main.py | 🔴 核心 |
-| PY-CORE-011 | C | Changelog版本变更详情完整结构 | README.md / skill.md | 🔴 核心 |
-| PY-CORE-012 | C | CMD窗口输出与web_output.log一致性 | run.bat / run.sh | 🔴 核心 |
-| PY-CORE-013 | C | 代码库卫生维护 (Codebase Hygiene Maintenance) | 全仓库 | 🔴 核心 |
-| PY-CORE-014 | D | 数据对比分析 (Data Comparison & Analysis) | main.py | 🔴 核心 |
-| PY-CORE-015 | D | 双输出日志系统 (Dual-Output Logging) | main.py | 🔴 核心 |
-| PY-CORE-016 | D | skill.docx生成范式 (Skill Docx Generation) | test/generate_docx.py | 🔴 核心 |
-| PY-CORE-017 | D | 双启动脚本同步 (Dual Startup Script Sync) | run.bat / run.sh | 🔴 核心 |
-| PY-CORE-018 | D | DOCX文档生成 (DOCX Document Generation) | test/generate_docx.py | 🔴 核心 |
-| PY-CORE-019 | D | 每日利润表读取 (Daily Profit Report Read) | main.py / /api/daily-profit | 🔴 核心 |
-| PY-CORE-020 | E | 环境自适应 (Environment-Aware Design) | main.py | 🔴 核心 |
-| PY-CORE-021 | E | 边界条件测试 (Edge Case Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
-| PY-CORE-022 | E | Excel货号E列读取 (Excel SKU Column-E Read) | main.py | 🔴 核心 |
-| PY-CORE-023 | E | 编码处理最佳实践 (Encoding Best Practices) | main.py | 🔴 核心 |
-| PY-CORE-024 | F | 前端安全防护 (Frontend Security) | dist/app.js | 🔴 核心 |
-| PY-CORE-025 | F | 字段名兼容性 (Field Name Compatibility) | main.py | 🔴 核心 |
-| PY-CORE-026 | G | Git历史维护 (Git History Maintenance) | 全仓库 | 🟡 重要 |
-| PY-CORE-027 | H | 隧道高可用 (High-Availability Tunnel) | main.py | 🔴 核心 |
-| PY-CORE-028 | I | Import语句规范 (Import Statement Standard) | 全仓库 | 🔴 核心 |
-| PY-CORE-029 | I | 智能缓存管理 (Intelligent Caching) | main.py | 🔴 核心 |
-| PY-CORE-030 | L | 大文件小范围修改临时脚本 (Large-File Minimal-Edit Script) | 全仓库大文件 | 🔴 核心 |
-| PY-CORE-031 | N | Node.js依赖管理与补丁持久化 | dist/package.json | 🟡 重要 |
-| PY-CORE-032 | P | PWA离线缓存 (Progressive Web App) | dist/sw.js + registerSW.js | 🟡 重要 |
-| PY-CORE-033 | P | Python依赖管理 (Python Dependency Management) | requirements.txt | 🟡 重要 |
-| PY-CORE-034 | P | 范式编号规则 (Paradigm Numbering Rule) | 全仓库文档 | 🔴 核心 |
-| PY-CORE-035 | R | API速率限制与输入验证 (Rate Limiting & Input Validation) | main.py | 🔴 核心 |
-| PY-CORE-036 | S | 安全邮件通知 (Secure Email Notification) | main.py | 🔴 核心 |
-| PY-CORE-037 | S | 安全修复验证测试 (Security Fix Verification Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
-| PY-CORE-038 | S | 安全漏洞防护 (Security Vulnerability Protection) | main.py | 🔴 核心 |
-| PY-CORE-039 | S | 智能版本号匹配算法 (Smart Version Matching) | main.py | 🔴 核心 |
-| PY-CORE-040 | S | 安全审计零问题 (Security Audit Zero-Issue) | test/security_audit.py | 🔴 核心 |
-| PY-CORE-041 | S | subprocess超时配置 (Subprocess Timeout Configuration) | main.py | 🟡 重要 |
-| PY-CORE-042 | T | 三方文档互证 (Three-Document Mutual Verification) | README.md / skill.md / skill.docx | 🔴 核心 |
-| PY-CORE-043 | T | 终端实时日志接入 (Terminal Real-Time Log Integration) | run.bat / run.sh | 🔴 核心 |
-| PY-CORE-044 | U | 统一异常处理 (Unified Exception Handling) | main.py | 🔴 核心 |
-| PY-CORE-045 | V | 版本号一致性保障 (Version Consistency Guarantee) | main.py / README.md | 🔴 核心 |
-
-**总计: 45个核心范式（PY-CORE-001 ~ PY-CORE-045，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
-
----
-
-**文档版本**: v5.0.9.96  
-**最后更新**: 2026-11-12  
-**下次审查**: 2026-12-12  
-**维护者**: 小旭数码开发团队
-
----
-
-## 🔴 PY-CORE-025: 字段名兼容性范式 (Field Name Compatibility)
-
-### 范式描述
-由于JSON数据同时存储中文字段名和英文字段名（如 `商品描述`/`name`, `售价`/`price`），所有数据提取和解析代码必须实现**多重字段名兼容**，确保数据的完整性和向后兼容性。
-
-### 核心原则
-
-#### 1. 后端字段提取 - 多重回退策略
-def get_product_detail(item):
-    """
-    提取商品详情（字段名兼容性设计）
-
-    优先级：
-    1. 主字段名（中文，如"商品描述"）
-    2. 英文别名（如"name"）
-    3. 备用中文名（如"商品名称"，兼容旧版本）
-    """
-    return {
-        "商品描述": item.get('商品描述', '') or item.get('name', '') or item.get('商品名称', ''),
-        "售价": item.get('售价', '') or item.get('price', ''),
-        "货号": item.get('货号', '') or item.get('stock_number', ''),
-        "备注": item.get('备注', '') or item.get('remark', ''),
-        "员工": item.get('员工', '') or item.get('staff', '')
-    }
-
-**关键特性**:
-- ✅ 使用 `or` 链式调用，返回第一个非空值
-- ✅ 优先使用主字段名，降级到英文别名，最后尝试备用名
-- ✅ 确保即使JSON结构变化也能取到有效数据
-
-#### 2. 前端正则匹配 - 多模式兼容
-// ❌ 错误：只匹配单一字段名
-const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/);
-
-// ✅ 正确：多模式兼容匹配
-const nameMatch = line.match(/"商品描述":\s*"([^"]+)"/) 
-               || line.match(/"商品名称":\s*"([^"]+)"/) 
-               || line.match(/"name":\s*"([^"]+)"/);
-const priceMatch = line.match(/"售价":\s*"([^"]+)"/) 
-                 || line.match(/"price":\s*"([^"]+)"/);
-
-**匹配优先级**:
-1. 主字段名（中文）：`商品描述`, `售价`
-2. 备用中文名：`商品名称`（旧版兼容）
-3. 英文字段名：`name`, `price`（国际化支持）
-
-#### 3. 数据流完整性验证
-数据源 (JSON)
-    ↓
-analyze_data_changes() [后端对比]
-    ↓ get_product_detail() [字段提取]
-    ↓ format_json_array() [格式化输出]
-    ↓ 前端正则解析 [app.js:1527]
-    ↓ 表格渲染 [UI展示]
-
-**每个环节都必须**:
-- ✅ 兼容多种字段名格式
-- ✅ 对空值提供默认显示（如 `-`）
-- ✅ 记录日志便于调试（`console.log('[对比卡片] ✓ ...')`）
-
-### 应用场景
-
-| 场景 | 文件位置 | 说明 |
-|------|----------|------|
-| **删除商品对比** | `main.py:4520-4529` | 从旧数据中提取被删除商品的详细信息 |
-| **新增商品对比** | `main.py:4520-4529` | 从新数据中提取新增商品的详细信息 |
-| **前端表格渲染** | `dist/app.js:1527-1540` | 解析后端输出的JSON字符串并渲染为表格 |
-| **API响应处理** | `dist/app.js:6947+` | 处理 `/api/products` 返回的商品列表 |
-
-### 最佳实践清单
-
-- [ ] **后端提取时**：始终使用 `or` 链式调用，不要依赖单一字段名
-- [ ] **前端解析时**：使用 `\|\|` 操作符连接多个正则表达式
-- [ ] **默认值处理**：空值统一显示为 `-`，保持界面整洁
-- [ ] **日志记录**：每个关键字段提取都记录日志，方便问题排查
-- [ ] **单元测试覆盖**：测试用例必须包含多种字段名格式的测试数据
-- [ ] **文档同步**：字段映射关系必须在 README.md 和 SKILL.md 中同步更新
-
-### 反面案例（避免）
-
-❌ 错误示例：硬编码单一字段名
-def bad_extract(item):
-    return {
-        "name": item['商品名称'],  # 如果数据中是'商品描述'会抛KeyError
-        "price": item['售价']      # 如果数据中是'price'会抛KeyError
-    }
-
-❌ 错误示例：不处理空值
-def bad_extract2(item):
-    name = item.get('商品描述')  # 可能为None或空字符串
-    return {"name": name}         # 前端显示空白而非"-"
-
----
-
 ## 🔴 JS-FRONT-001: 响应式体验一致性范式 (Responsive Experience Consistency)
 
 ### 范式描述
@@ -21265,707 +22555,6 @@ prettier --write dist/app.js
 - 所有三种格式都能正确提取字段值
 - 表格中不会出现 `-`（除非原始数据确实为空）
 - 控制台显示 `[对比卡片] ✓` 成功日志
-
----
-
-## 🔴 PY-CORE-013: 代码库卫生维护范式 (Codebase Hygiene Maintenance)
-
-### 范式描述
-建立定期清理机制，及时移除临时文件、测试工具和废弃脚本，保持代码库整洁和可维护性。
-
-### 核心原则
-
-#### 1. 文件生命周期管理
-class FileLifecycleManager:
-    """文件生命周期管理器"""
-
-    TEMP_FILE_PATTERNS = [
-        'test_*.html',      # 测试工具
-        'test_*.py',        # 测试脚本
-        'generate_*.py',    # 生成器脚本
-        'fix_*.py',         # 临时修复脚本
-        'debug_*.log',      # 调试日志
-        '*.tmp',            # 临时文件
-        '~$*'               # Office锁文件
-    ]
-
-    @classmethod
-    def should_cleanup(cls, file_path):
-        """
-        判断文件是否应该被清理
-
-        清理标准：
-        1. 匹配临时文件模式
-        2. 已完成历史使命（功能已验证/整合）
-        3. 不影响核心功能
-        4. 可通过Git历史恢复
-        """
-        import fnmatch
-
-        filename = os.path.basename(file_path)
-
-        for pattern in cls.TEMP_FILE_PATTERNS:
-            if fnmatch.fnmatch(filename, pattern):
-                return True
-
-        return False
-
-    @classmethod
-    def cleanup_temp_files(cls, project_dir, dry_run=False):
-        """
-        清理临时文件
-
-        Args:
-            project_dir: 项目根目录
-            dry_run: 如果为True，只显示要删除的文件，不实际删除
-        """
-        removed_files = []
-
-        for root, dirs, files in os.walk(project_dir):
-            # 跳过 .git、.venv 等目录
-            dirs[:] = [d for d in dirs if d not in ['.git', '.venv', 'node_modules', '__pycache__']]
-
-            for file in files:
-                file_path = os.path.join(root, file)
-
-                if cls.should_cleanup(file_path):
-                    if dry_run:
-                        print(f'[DRY-RUN] 将删除: {file_path}')
-                        removed_files.append(file_path)
-                    else:
-                        try:
-                            os.remove(file_path)
-                            print(f'✓ 已删除: {file_path}')
-                            removed_files.append(file_path)
-                        except Exception as e:
-                            print(f'✗ 删除失败: {file_path} - {e}')
-
-        return removed_files
-
-#### 2. 清理决策清单
-class CleanupChecklist:
-    """清理前检查清单"""
-
-    @staticmethod
-    def pre_cleanup_checks(file_path):
-        """
-        删除前的安全检查
-
-        Returns:
-            (can_delete, reason) 元组
-        """
-        checks = {
-            '核心功能依赖': not is_core_dependency(file_path),
-            '文档已独立维护': is_documentation_independent(file_path),
-            'Git历史可恢复': is_in_git_history(file_path),
-            '无运行时依赖': not has_runtime_dependency(file_path),
-            '测试已完成': is_testing_completed(file_path)
-        }
-
-        all_pass = all(checks.values())
-        failed = [k for k, v in checks.items() if not v]
-
-        return all_pass, failed if not all_pass else None
-
-    @staticmethod
-    def generate_recovery_instructions(removed_files):
-        """
-        生成恢复说明文档
-
-        Args:
-            removed_files: 已删除的文件列表
-
-        Returns:
-            Markdown格式的恢复指南
-        """
-        pass  # 实现略
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-041: subprocess 超时配置范式 (Subprocess Timeout Configuration)
-
-范式描述
-建立统一的 subprocess 调用超时管理机制，避免硬编码超时值，提升系统稳定性和可维护性。
-
-核心原则
-
-1. 全局超时配置
-# config.py 或 main.py 顶部
-TIMEOUT_CONFIG = {
-    'subprocess_kill': 10,      # 进程终止等待时间（秒）
-    'subprocess_check': 10,     # 进程检查超时（秒）
-    'http_request': 30,         # HTTP请求超时
-    'browser_wait': 30,         # 浏览器操作超时
-}
-
-2. subprocess 调用规范
-import subprocess
-from typing import Optional, Tuple
-
-class SubprocessManager:
-    """subprocess 统一管理器"""
-
-    @staticmethod
-    def run_command(
-        command: str,
-        timeout_key: str = 'subprocess_check',
-        capture_output: bool = True,
-        **kwargs
-    ) -> Tuple[int, str, str]:
-        """
-        执行命令并统一处理超时
-
-        Args:
-            command: 要执行的命令
-            timeout_key: TIMEOUT_CONFIG中的键名
-            capture_output: 是否捕获输出
-            **kwargs: subprocess.run 的其他参数
-
-        Returns:
-            (returncode, stdout, stderr) 元组
-
-        Raises:
-            subprocess.TimeoutExpired: 超时时抛出（由调用方决定如何处理）
-        """
-        timeout = TIMEOUT_CONFIG.get(timeout_key, 10)
-
-        try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=capture_output,
-                text=True,
-                timeout=timeout,
-                encoding='utf-8',
-                errors='replace',
-                **kwargs
-            )
-            return result.returncode, result.stdout, result.stderr
-
-        except subprocess.TimeoutExpired as e:
-            # 记录详细超时信息
-            logger.warning(
-                f'命令执行超时 ({timeout}秒): {command[:100]}...'
-                f'\n超时类型: {timeout_key}'
-            )
-            raise  # 由调用方决定是否重试或降级
-
-# ✅ 正确使用示例
-class ProcessMonitor:
-    @staticmethod
-    def check_process_running(process_name: str) -> bool:
-        """检查进程是否运行"""
-        try:
-            returncode, stdout, _ = SubprocessManager.run_command(
-                f'tasklist /FI "IMAGENAME eq {process_name}"',
-                timeout_key='subprocess_check'
-            )
-            return process_name in stdout
-
-        except subprocess.TimeoutExpired as e:
-            print(f"⚠️ 检查进程运行状态超时: {e}")
-            return False  # 超时时返回默认值，不级联故障
-
-        except Exception as e:
-            print(f"⚠️ 检查进程运行状态失败: {e}")
-            return False
-
-3. 异常分层处理
-# ❌ 错误：所有异常混在一起处理
-except Exception as e:
-    logger.error(f'错误: {e}')
-    return False
-
-# ✅ 正确：按严重程度分层处理
-except subprocess.TimeoutExpired as e:
-    # 第一层：超时（可预期的 transient 错误）
-    logger.warning(f'操作超时（{timeout}秒），可能系统负载较高')
-    return fallback_value  # 返回安全默认值
-
-except subprocess.SubprocessError as e:
-    # 第二层：subprocess 特定错误
-    logger.error(f'subprocess错误: {e}')
-    raise AppException.subprocess_error(str(e))
-
-except OSError as e:
-    # 第三层：系统级错误（权限、文件不存在等）
-    logger.critical(f'系统错误: {e}')
-    raise AppException.system_error(str(e))
-
-4. Windows 特殊处理
-if Environment.IS_WINDOWS:
-    # Windows 下 tasklist/pgrep 命令响应较慢
-    process = subprocess.Popen(
-        command,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        stdin=subprocess.DEVNULL,
-        cwd=PROJECT_DIR,
-        text=True,
-        encoding='utf-8',      # 强制UTF-8编码
-        errors='replace',       # 编码容错
-        bufsize=1,              # 行缓冲
-        env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}  # 环境变量
-    )
-
-最佳实践清单
-- ✅ 所有超时值使用 TIMEOUT_CONFIG 全局配置，禁止硬编码
-- ✅ TimeoutExpired 异常单独捕获，返回安全默认值而非抛出
-- ✅ Windows 平台使用 encoding='utf-8' + errors='replace'
-- ✅ 超时信息包含实际时长和配置键名，便于调试
-- ✅ 长时间运行的任务使用 Popen + 非阻塞读取，避免死锁
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-023: 编码处理最佳实践范式 (Encoding Best Practices)
-
-范式描述
-建立跨平台编码处理标准，确保中文等多字节字符在 Windows/Linux/macOS 上都能正确显示。
-
-核心原则
-
-0. **BOM 字符检测与防范规范（v4.1 新增）** ⚠️ 重要
-
-> **问题背景**: UTF-8 BOM (Byte Order Mark, U+FEFF/EF BB BF) 字符会导致 JavaScript 语法错误 (`SyntaxError: Illegal character`)，影响前端页面加载。Python 虽然能容忍 BOM，但不符合 PEP 8 规范。
-
-**强制要求:**
-- ✅ 所有源代码文件必须使用 **UTF-8 without BOM** 编码
-- ✅ 项目启动时自动检测关键文件的 BOM 状态
-- ✅ 发现 BOM 必须立即修复，不得带 BOM 提交到 Git
-- ✅ 使用 `.gitattributes` 文件强制团队编码规范
-
-**检测方法:**
-
-```python
-# 方法1: main.py 内置功能（推荐）
-python main.py --check-bom    # 仅扫描
-python main.py --fix-bom      # 扫描并修复
-
-# 方法2: 使用独立工具
-py fix_bom.py                # 扫描项目
-py fix_bom.py --fix          # 自动修复
-
-# 方法3: 启动脚本（已集成）
-run.bat / run.sh             # 启动前自动检测
-```
-
-**代码示例:**
-
-```python
-# 检查单个文件
-from main import check_file_bom
-result = check_file_bom('dist/app.js')
-if result['has_bom']:
-    print(f"发现BOM: {result['file_path']}")
-
-# 自动修复
-result = check_file_bom('dist/app.js', auto_fix=True)
-print(f"已修复: {result['fixed']}")
-
-# 扫描整个项目
-from main import scan_project_bom
-result = scan_project_bom(auto_fix=True)
-print(f"修复了 {result['fixed_count']} 个文件")
-
-# 启动前验证（已集成到 main.py）
-from main import validate_critical_files_bom
-if not validate_critical_files_bom():
-    sys.exit(1)  # 关键文件有BOM，拒绝启动
-```
-
-**预防措施:**
-- 编辑器设置: PyCharm/VS Code → File Encodings → UTF-8 (取消勾选 "with BOM")
-- Git 配置: 项目根目录包含 `.gitattributes` 文件
-- IDE 配置: `Editor → File Encodings → Create UTF-8 files with BOM` ☐ 不勾选
-- 团队规范: Code Review 时检查文件编码，CI/CD 流水线集成 BOM 检测
-
-**排除目录:** `.git/`, `__pycache__/`, `node_modules/`, `.venv/`, `.idea/`, `dist/assets/`
-
----
-
-1. 文件读写编码规范
-# ✅ 正确：始终显式指定 UTF-8
-with open(file_path, 'r', encoding='utf-8') as f:
-    data = f.read()
-
-# 容错模式（处理损坏文件）
-with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
-    data = f.read()
-
-# ❌ 错误：依赖系统默认编码（Windows下可能是GBK）
-with open(file_path, 'r') as f:  # 危险！
-    data = f.read()
-
-2. subprocess 编码保障
-def run_command_safely(command):
-    """安全执行命令，确保输出无乱码"""
-    env = os.environ.copy()
-    env['PYTHONIOENCODING'] = 'utf-8'
-
-    process = subprocess.Popen(
-        command,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding='utf-8',
-        errors='replace',     # 替换无法解码的字符
-        bufsize=1,
-        env=env,
-        cwd=PROJECT_DIR
-    )
-
-    for line in iter(process.stdout.readline, ''):
-        yield line  # 生成器模式，实时输出
-
-    process.wait()
-
-3. JSON 数据编码一致性
-def save_json(data, file_path):
-    """保存JSON数据，确保中文不乱码"""
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(
-            data,
-            f,
-            ensure_ascii=False,   # ✅ 关键：保留中文字符
-            indent=2,
-            separators=(',', ': ')
-        )
-
-def load_json(file_path):
-    """加载JSON数据"""
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-4. Base64 编解码处理URL
-import base64
-
-def encode_url(url: str) -> str:
-    """URL转Base64（用于存储到JSON）"""
-    return base64.b64encode(url.encode('utf-8')).decode('ascii')
-
-def decode_url(b64_str: str) -> str:
-    """Base64转URL"""
-    try:
-        return base64.b64decode(b64_str).decode('utf-8')
-    except Exception:
-        return b64_str  # 解码失败时返回原始值
-
-5. 日志系统编码配置
-import logging
-
-def setup_logger():
-    """配置日志系统，确保中文正常写入"""
-    log_file = 'app.log'
-
-    # 文件处理器：强制UTF-8
-    file_handler = logging.FileHandler(
-        log_file,
-        mode='a',
-        encoding='utf-8'  # ✅ 关键
-    )
-    file_handler.setFormatter(
-        logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    )
-
-    # 控制台处理器
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(
-        logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    )
-
-    logger = logging.getLogger(__name__)
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-    logger.setLevel(logging.INFO)
-
-    return logger
-
-编码问题诊断清单
-遇到乱码时的排查步骤：
-1. ✅ 确认文件保存为 UTF-8 with BOM 或 UTF-8 without BOM
-2. ✅ 检查所有 open() 调用是否有 encoding='utf-8'
-3. ✅ 确认 Python 文件头部有 # -*- coding: utf-8 -*-
-4. ✅ 检查 subprocess 调用的 encoding 参数
-5. ✅ 确认环境变量 PYTHONIOENCODING=utf-8
-6. ✅ 使用 Git 恢复已知良好的版本作为基准
-
-──────────────────────────────────────────────────
-
-🔴 PY-CORE-026: Git 历史维护范式 (Git History Maintenance)
-
-范式描述
-建立规范的 Git 提交历史管理机制，保持历史整洁、可追溯、易于理解。
-
-核心原则
-
-1. 提交频率与粒度
-# ✅ 合理的提交粒度
-git commit -m "fix: 修复subprocess超时问题"           # 单一功能点
-git commit -m "docs: 更新README.md版本记录"             # 仅文档更新
-git commit -m "refactor: 重构异常处理逻辑"             # 重构提交
-
-# ❌ 不好的提交（太大或太碎）
-git commit -m "update"                                 # 信息不足
-git commit -m "fix bug + update doc + add test"        # 多个无关变更
-
-2. 提交历史整理流程
-# 场景：合并最近N个零散提交
-git log --oneline -10                    # 查看最近提交
-git reset --soft <target-commit>         # 软重置到目标提交
-git status                               # 查看待提交的更改
-git commit -m "chore: 合并多个小修复"     # 重新提交
-
-# 场景：修改最近的提交信息（未推送）
-git commit --amend -m "new message"
-
-# 场景：交互式变基整理历史
-git rebase -i HEAD~5                     # 最近5个提交
-# 在编辑器中选择 pick/squash/fixup/reword
-
-3. Force Push 安全策略
-# ⚠️ 危险操作：仅在必要时使用
-
-# ❌ 极其危险：强制覆盖远程（可能丢失他人工作）
-git push --force origin master
-
-# ✅ 相对安全：检查后再强制推送
-git push --force-with-lease origin master
-# 如果远程有新的提交会拒绝推送，保护他人工作
-
-# 最佳实践：
-# 1. 先通知团队成员暂停推送
-# 2. 确认本地是最新的
-# 3. 使用 --force-with-lease
-# 4. 推送后通知团队重新拉取
-
-4. 分支管理规范
-# 功能开发
-git checkout -b feature/subprocess-timeout-fix
-# ... 开发和测试 ...
-git checkout master
-git merge feature/subprocess-timeout-fix
-git branch -d feature/subprocess-timeout-fix
-
-# 紧急修复（从主分支直接修复）
-git checkout -b hotfix/encoding-issue
-# ... 快速修复 ...
-git checkout master
-git merge hotfix/encoding-issue
-git tag -a v3.8.89.17 -m "修复编码问题"
-
-5. 提交信息格式规范
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-
-Type 类型:
-- fix: Bug修复
-- feat: 新功能
-- docs: 文档更新
-- style: 代码格式（不影响功能）
-- refactor: 重构（非新功能非Bug修复）
-- perf: 性能优化
-- test: 测试相关
-- chore: 构建/工具/辅助工具变动
-- revert: 回滚提交
-
-示例:
-fix(main): 优化subprocess超时配置
-
-将check_process_running()的超时时间从硬编码3秒改为
-使用全局TIMEOUT_CONFIG配置的10秒，并新增专门的
-TimeoutExpired异常处理。
-
-Closes #123
-
-Git 维护检查清单
-- ✅ 提交前运行测试确保功能正常
-- ✅ 提交信息清晰描述变更内容和原因
-- ✅ 单次提交聚焦单一关注点
-- ✅ 定期整理过细的提交（使用 reset --soft）
-- ✅ Force push 前 always 使用 --force-with-lease
-- ✅ 重要版本打 tag（如 v3.8.89.17）
-- ✅ 敏感信息（密码、密钥）绝不提交到仓库
-
-──────────────────────────────────────────────────
-        """
-        instructions = ["## 📁 文件恢复指南\n"]
-        instructions.append("以下文件已被清理，如需恢复请使用对应的命令：\n")
-
-        for file_path in removed_files:
-            relative_path = os.path.relpath(file_path)
-            instructions.append(f"### {relative_path}")
-            instructions.append(f"\\\`bash")
-            instructions.append(f"git show HEAD~1:{relative_path} > {relative_path}")
-            instructions.append(f"\\\`\n")
-
-        return '\n'.join(instructions)
-
-#### 3. 自动化清理流程
-在 CI/CD 或 pre-commit 钩子中使用
-def automated_cleanup_pipeline():
-    """自动化清理流水线"""
-
-    print('🧹 开始代码库卫生检查...\n')
-
-    # Step 1: 识别候选文件
-    candidates = FileLifecycleManager.cleanup_temp_files(
-        project_dir=PROJECT_DIR,
-        dry_run=True  # 先预览
-    )
-
-    if not candidates:
-        print('✅ 代码库整洁，无需清理')
-        return
-
-    print(f'\n📋 发现 {len(candidates)} 个候选文件：')
-    for f in candidates:
-        print(f'  - {os.path.relpath(f)}')
-
-    # Step 2: 安全检查
-    safe_to_remove = []
-    for file_path in candidates:
-        can_delete, reasons = CleanupChecklist.pre_cleanup_checks(file_path)
-        if can_delete:
-            safe_to_remove.append(file_path)
-        else:
-            print(f'⚠️  跳过: {os.path.relpath(file_path)}')
-            print(f'   原因: {", ".join(reasons)}')
-
-    # Step 3: 执行清理
-    if safe_to_remove:
-        print(f'\n🗑️  准备删除 {len(safe_to_remove)} 个文件...')
-        removed = FileLifecycleManager.cleanup_temp_files(
-            project_dir=PROJECT_DIR,
-            dry_run=False
-        )
-
-        # Step 4: 生成恢复指南
-        recovery_guide = CleanupChecklist.generate_recovery_instructions(removed)
-        with open('RECOVERY_GUIDE.md', 'w', encoding='utf-8') as f:
-            f.write(recovery_guide)
-
-        print(f'\n✅ 清理完成！已删除 {len(removed)} 个文件')
-        print(f'📝 恢复指南已保存到 RECOVERY_GUIDE.md')
-
-### 实施规范
-
-#### 清理时机
-| 触发条件 | 操作 | 说明 |
-|----------|------|------|
-| **版本发布前** | 必须清理 | 确保发布包干净 |
-| **功能验证后** | 建议清理 | 测试工具完成使命 |
-| **每周例行** | 推荐执行 | 保持代码库健康 |
-| **合并PR前** | 检查提醒 | 避免引入临时文件 |
-
-#### 文件分类标准
-应该删除的文件
-must_remove:
-  - pattern: "test_*.html"
-    reason: "临时测试工具"
-    lifecycle: "功能验证后即可删除"
-
-  - pattern: "generate_*.py"
-    reason: "一次性生成脚本"
-    lifecycle: "文档生成完成后删除"
-
-不应该删除的文件
-never_remove:
-  - pattern: "*.md"
-    reason: "项目文档"
-    exception: "README.md, skill.md, CHANGELOG.md"
-
-  - pattern: "config/*.json"
-    reason: "配置文件"
-    exception: null
-
-  - pattern: "dist/**"
-    reason: "构建产物"
-    exception: "由CI/CD管理"
-
-#### Git 提交规范
-清理操作的提交信息格式
-git add -A
-git commit -m "chore: 代码清理 - 删除临时测试文件和生成脚本 (v3.8.89.13)
-
-删除的文件:
-- test_sku_parsing.html (SKU解析测试工具)
-- generate_*.py (文档生成脚本系列)
-
-清理原因:
-- 测试工具已完成历史使命
-- 生成脚本已整合到开发流程
-- 保持代码库整洁
-
-影响范围: 无（核心功能不受影响）
-恢复方法: git show HEAD~1:<filename> > <filename>"
-
-### 最佳实践
-
-#### ✅ 推荐做法
-1. **先预览再删除**: 使用 `dry_run=True` 先查看将要删除的文件
-2. **批量操作**: 一次性清理所有临时文件，避免多次提交
-3. **记录清晰**: 在提交信息中详细说明删除原因和恢复方法
-4. **更新文档**: 同步更新 README.md 和 CHANGELOG.md
-5. **团队同步**: 清理前通知团队成员，避免工作丢失
-
-#### ❌ 避免做法
-1. **不要强制删除**: 使用 `-f` 参数前务必确认
-2. **不要忽略.gitignore**: 确保临时文件已在 .gitignore 中
-3. **不要删除未跟踪的新文件**: 可能是同事正在开发的代码
-4. **不要在生产环境清理**: 只在开发分支执行
-5. **不要忘记备份**: 虽然有Git历史，但养成好习惯
-
-### 工具集成
-
-#### VS Code 设置
-// .vscode/settings.json
-{
-  "files.exclude": {
-    "**/test_*.html": true,
-    "**/generate_*.py": true,
-    "**/fix_*.py": true,
-    "**/*.tmp": true,
-    "**/~$*": true
-  },
-  "files.watcherExclude": {
-    "**/test_*": true,
-    "**/generate_*": true
-  }
-}
-
-#### Pre-commit Hook
-.pre-commit-config.yaml
-repos:
-  - repo: local
-    hooks:
-      - id: cleanup-temp-files
-        name: 清理临时文件
-        entry: python -c "
-from file_lifecycle import FileLifecycleManager
-import sys
-sys.exit(0 if FileLifecycleManager.cleanup_temp_files('.', dry_run=True) else 1)
-"
-        language: system
-        pass_filenames: false
-        always_run: true
-        verbose: true
-
-**技术细节**:
-- **安全第一**: 所有删除操作都经过多重安全检查
-- **可追溯性**: Git历史完整保留所有文件的完整记录
-- **可恢复性**: 提供一键恢复命令和详细指南
-- **自动化**: 支持CI/CD集成和pre-commit钩子
-- **团队友好**: 干运行模式和详细日志避免误删
-
-**适用场景**:
-- ✅ 版本发布前的代码库整理
-- ✅ 功能完成后的测试工具清理
-- ✅ 项目交接时的代码库瘦身
 
 ---
 
@@ -22640,577 +23229,3 @@ class ProductTableManager {
 
 ### 概述
 基于抖音SSRF攻击视频，实现了完整的服务器端请求伪造(SSRF)防御机制。
-
-## 🔴 PY-CORE-038: 安全漏洞防护范式 (Security Vulnerability Protection)
-
-### 范式描述
-针对Web应用常见的安全漏洞（路径遍历、弱随机数、不安全SSL/TLS、内联导入、命令注入），实施**纵深防御**策略，确保每个攻击向量都有对应的防护措施。
-
-### 安全规范
-
-#### 1. 路径遍历防护 (Path Traversal Protection)
-所有用户输入的文件路径必须通过 `sec_sp()` 函数验证，防止 `../` 遍历攻击。
-
-```python
-def sec_sp(base_dir, user_path):
-    """Secure path join - prevent path traversal attacks."""
-    safe_base = os.path.realpath(base_dir)
-    target = os.path.realpath(os.path.join(safe_base, user_path))
-    if not target.startswith(safe_base + os.sep) and target != safe_base:
-        return None, f"Path traversal blocked: {user_path}"
-    return target, None
-
-# 使用示例
-@app.get('/dist/{filename:path}')
-async def dist_files(filename: str, request: Request):
-    safe_path, err = sec_sp(os.path.join(PROJECT_DIR, 'dist'), filename)
-    if not safe_path:
-        raise HTTPException(status_code=403, detail=f"Path traversal blocked: {err}")
-    file_path = safe_path
-```
-
-#### 2. 密码学安全随机数 (Cryptographically Secure Random)
-涉及安全场景（如User-Agent生成、Token生成）的随机数必须使用 `secrets` 模块，禁止使用 `random`。
-
-```python
-# ❌ 禁止：random.choice 不是密码学安全的
-chrome_version = random.choice(chrome_versions)
-
-# ✅ 正确：使用 secrets.choice
-chrome_version = secrets.choice(chrome_versions)
-```
-
-#### 3. SSL/TLS 证书验证 (SSL Certificate Validation)
-所有HTTPS请求必须启用证书验证，禁止使用 `CERT_NONE` 或 `check_hostname=False`。
-
-```python
-# ✅ 正确：使用默认安全上下文
-ctx = ssl.create_default_context()
-
-# ❌ 禁止：以下配置会禁用证书验证
-# ctx.check_hostname = False
-# ctx.verify_mode = ssl.CERT_NONE
-```
-
-#### 4. Import 规范 (Import Standards) — 🔴 强制范式
-
-**核心原则：import 只可以出现在文件开头，并且保证唯一性。**
-
-##### 规则 4.1：位置唯一性 — import 只能在文件顶部
-- 所有 `import` 语句必须集中在文件顶部（标准库 → 第三方库 → 本地模块的顺序）
-- **严禁**在函数体、类方法、条件分支、循环体内出现 `import` 语句
-- **严禁**在文件中下部（如 `if __name__ == '__main__':` 块内）出现 `import` 语句
-- **唯一例外**：`try/except ImportError` 块用于导入可选依赖（第三方库可能未安装），且该块必须在文件顶部区域
-
-##### 规则 4.2：声明唯一性 — 同一模块禁止重复导入
-- 同一模块在整个文件中只能 `import` 一次，禁止重复声明
-- 如需在多处使用，只需在顶部导入一次，全局可用
-- `try/except ImportError` 块中已导入的模块，不得在其他地方再次导入
-
-##### 规则 4.3：禁止别名混淆
-- 禁止使用下划线前缀别名混淆安全模块（如 `import re as _secre`）
-- 标准库模块应使用标准名称，确保代码可审计性
-
-##### 规则 4.4：验证方法
-每次修改 main.py 后，必须运行以下检查确保 import 合规：
-
-```python
-# 验证脚本：检查 import 唯一性和位置
-import ast, re
-
-with open('main.py', 'r', encoding='utf-8-sig') as f:
-    source = f.read()
-    lines = source.splitlines()
-
-# 检查1：函数内部不得有 import（try/except ImportError 除外）
-tree = ast.parse(source)
-violations = []
-for node in ast.walk(tree):
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        for child in ast.walk(node):
-            if isinstance(child, (ast.Import, ast.ImportFrom)):
-                # 检查是否在 try/except ImportError 块内
-                violations.append((node.name, child.lineno))
-
-# 检查2：同一模块不得重复 import
-import_lines = [l.strip() for l in lines if l.strip().startswith(('import ', 'from '))]
-# 去重检查...
-```
-
-##### 代码示例
-
-```python
-# ✅ 正确：所有 import 在文件顶部，按标准库→第三方→本地排序
-import os
-import re
-import secrets
-import socket
-import ssl
-import urllib.request
-from html import escape
-from pathlib import Path
-
-# ✅ 正确：可选依赖用 try/except ImportError（仍在文件顶部区域）
-try:
-    import psutil
-except ImportError:
-    psutil = None
-
-# ❌ 禁止：函数内部内联导入
-def some_function():
-    import os          # 违反规则 4.1！
-    import traceback   # 违反规则 4.1！
-    pass
-
-# ❌ 禁止：文件下部 if __name__ 块内导入
-if __name__ == '__main__':
-    import uvicorn     # 违反规则 4.1！已在顶部导入过
-    uvicorn.run(app)
-
-# ❌ 禁止：重复导入（违反规则 4.2）
-import logging         # 顶部已导入
-# ... 5000行后 ...
-def __init__(self):
-    import logging     # 违反规则 4.2！重复声明
-
-# ❌ 禁止：别名混淆（违反规则 4.3）
-import re as _secre    # 违反规则 4.3！
-```
-
-#### 5. 命令注入防护 (Command Injection Prevention)
-所有用户输入的命令必须通过 `validate_command_safe()` 验证，阻止危险命令模式。
-
-```python
-class RunCommandRequest(BaseModel):
-    command: str
-
-    @classmethod
-    def validate_command_safe(cls, command: str) -> tuple[bool, str]:
-        """验证命令安全性，阻止危险命令"""
-        dangerous_patterns = [
-            r'rm\s+-rf', r':\(\)\s*\{', r'mkfs',
-            r'dd\s+if=', r'>\s*/dev/sd',
-            # ... 30+ 种危险模式
-        ]
-        for pattern in dangerous_patterns:
-            if re.search(pattern, command, re.IGNORECASE):
-                return False, f"危险命令被阻止: {pattern}"
-        return True, ""
-```
-
-### 验证清单
-- [x] 路径遍历防护：sec_sp() 函数已实现并应用于 /dist 端点
-- [x] 密码学安全随机数：secrets.choice 替换 random.choice
-- [x] SSL证书验证：清理 CERT_NONE 配置，使用 create_default_context()
-- [x] Import规范：所有import在文件顶部，无内联导入
-- [x] 命令注入防护：validate_command_safe() 验证30+种危险模式
-- [x] 语法验证：py_compile + ast.parse 双重验证通过
-
----
-
-## 🔴 PY-CORE-010: Changelog API数据结构与Git历史集成范式 (Changelog API & Git History Integration)
-
-> **创建日期**: 2026-08-31 | **最后更新**: 2026-08-31 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 + 前端更新日志展示 | **参考基准**: v5.0.9
-
-### 范式描述
-`/api/changelog` 端点必须集成 **README.md 结构化解析** 与 **Git提交历史**，确保所有Git提交（无论多少次）都展示在API中。前后端必须使用统一的数据结构字段名，避免字段名不匹配导致Web展示空白。
-
-### 核心原则
-
-#### 1. 后端数据结构标准 (唯一合法格式)
-```python
-# ✅ 正确：changelog API返回的数据结构
-{
-    "success": True,
-    "changelog": [
-        {
-            "version": "5.0.9",           # 版本号或commit short hash
-            "date": "2026-08-31",        # 日期 YYYY-MM-DD
-            "title": "更新标题",          # 简短描述
-            "meta": {
-                "fix_date": "2026-08-31",
-                "fix_type": "🐛Bug修复",  # Emoji标签类型
-                "affected_files": "[main.py](main.py)",  # 带文件链接
-                "commit": "d9f7a9af",     # commit short hash
-                "change_stats": "+72行",
-                "author": "小旭二手机（西园路）"
-            },
-            "changes": [                  # ⚠️ 字段名必须是 changes（不是 items）
-                {
-                    "id": "1",
-                    "title": "变更标题",
-                    "tag": "🐛Bug修复",   # ⚠️ 字段名必须是 tag（不是 type）
-                    "problem": {
-                        "phenomenon": "现象描述",
-                        "root_cause": "根因分析",
-                        "scope": "影响范围"
-                    },
-                    "solution": {
-                        "implementation": "技术实现",
-                        "reference": "参考位置"
-                    },
-                    "verification": ["✅ 验证项1", "✅ 验证项2"]
-                }
-            ]
-        }
-    ]
-}
-```
-
-#### 2. 前端字段名兼容性 (必须实现)
-```javascript
-// ✅ 正确：兼容新旧数据结构
-var changes = latest.changes || latest.items || [];  // 优先 changes，降级 items
-
-// ❌ 错误：只访问单一字段名（导致Web展示空白）
-if (latest.items && latest.items.length) { ... }  // latest.items 为 undefined
-```
-
-**字段名映射表**:
-| 新字段 (v5.0.8+) | 旧字段 (v4.3及之前) | 说明 |
-|------------------|---------------------|------|
-| `changes` | `items` | 变更列表 |
-| `tag` | `type` | 变更类型标签 |
-| `problem` | - | 问题描述块 |
-| `solution` | - | 修复方案块 |
-| `verification` | - | 测试验证列表 |
-
-#### 3. Git提交历史集成逻辑
-```python
-# 合并策略：每个git提交都创建一个changelog条目（不去重）
-readme_version_map = {entry['version']: entry for entry in changelog}
-readme_versions_used = set()
-merged_changelog = []
-
-git_log_output = subprocess.check_output(
-    ['git', 'log', '--pretty=format:%H|%ad|%s', '--date=short'],
-    cwd=PROJECT_DIR, text=True, encoding='utf-8', stderr=subprocess.DEVNULL
-).strip()
-
-for log_line in git_log_output.split('\n'):
-    commit_hash, commit_date, commit_msg = parts
-    short_hash = commit_hash[:8]
-    version_key = re.search(r'v([\d.]+)', commit_msg)  # 从message提取版本号
-
-    if version_key in readme_version_map and version_key not in readme_versions_used:
-        # 首次匹配到README版本：使用完整结构化数据
-        readme_versions_used.add(version_key)
-        merged_changelog.append(readme_version_map[version_key])
-    else:
-        # 其余提交：从commit message生成基本条目
-        merged_changelog.append({
-            'version': version_key,
-            'date': commit_date,
-            'changes': [{'tag': '📝代码提交', 'problem': {...}, 'solution': {...}}]
-        })
-
-# README独有版本追加到末尾
-for entry in changelog:
-    if entry['version'] not in readme_versions_used:
-        merged_changelog.append(entry)
-```
-
-#### 4. 前端渲染规范
-```javascript
-// ✅ 正确：渲染问题描述/修复方案/测试验证三个块
-if (item.problem && Object.keys(item.problem).length) {
-    // 渲染：现象/根因/影响范围
-}
-if (item.solution && Object.keys(item.solution).length) {
-    // 渲染：技术实现/参考位置
-}
-if (item.verification && item.verification.length) {
-    // 渲染：✅ 验证项列表
-}
-```
-
-### 应用场景
-
-| 场景 | 文件位置 | 说明 |
-|------|----------|------|
-| **后端API端点** | `main.py` `/api/changelog` | 解析README.md + 集成git log |
-| **前端展示** | `dist/app.js:1070+` | 渲染changelog到Web界面 |
-| **版本检测** | `main.py` `get_version_from_readme()` | 从README提取最大版本号 |
-
-### 最佳实践清单
-
-- [ ] **后端字段名**：变更列表必须用 `changes`，类型标签必须用 `tag`
-- [ ] **前端兼容性**：使用 `latest.changes || latest.items || []` 兼容新旧结构
-- [ ] **Git历史集成**：每个git提交都创建独立条目，不去重
-- [ ] **版本号提取**：从commit message用 `re.search(r'v([\d.]+)')` 提取
-- [ ] **Emoji标签识别**：从commit message开头识别emoji自动分类
-- [ ] **字段补全**：自动补全commit hash、修复日期、作者字段
-- [ ] **异常处理**：git log失败时降级为仅返回README解析结果
-
-### 反面案例（避免）
-
-❌ 错误示例1：前端只访问旧字段名
-```javascript
-if (latest.items && latest.items.length) { ... }  // latest.items = undefined → 空白
-```
-
-❌ 错误示例2：按版本号去重git提交
-```python
-if version_key in seen_versions: continue  # 丢失同版本的多次提交
-```
-
-❌ 错误示例3：解析器遇到##就break
-```python
-if stripped.startswith('## ') and in_changelog:
-    break  # 只返回最新更新区，丢失历史版本
-```
-
----
-
----
-## 🔴 PY-CORE-039: 智能版本号匹配算法 (Smart Version Number Matching Algorithm)
-
-> **创建日期**: 2026-09-02 | **最后更新**: 2026-09-02 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 - commit message无版本号时的降级策略 | **参考基准**: v5.0.9.4
-
-### 范式描述
-当Git提交的commit message中**不包含标准版本号格式**（如5.0.9）时，系统必须**智能匹配**最接近该提交日期的README版本号，而不是直接显示commit hash（如77117492）。
-
-### 核心原则
-
-#### 1. 版本号提取优先级（三级降级策略）
-`python
-# ✅ 正确：三级降级策略
-for commit_hash, commit_date, commit_msg, ... in git_commits:
-    short_hash = commit_hash[:8]
-    
-    # Level 1: 从commit message直接提取（最高优先级）
-    ver_in_msg = re.search(r'v([\\d.]+)', commit_msg)
-    if ver_in_msg:
-        version_key = ver_in_msg.group(1)  # 例如: "5.0.9"
-    
-    # Level 2: 智能日期匹配（中等优先级）
-    else:
-        def find_nearest_version(commit_dt, versions_map):
-            from datetime import datetime
-            try:
-                commit_datetime = datetime.strptime(commit_dt, '%Y-%m-%d')
-                min_diff = float('inf')
-                nearest_ver = short_hash
-                
-                for ver, info in versions_map.items():
-                    if 'date' in info and info['date'] != '\\u5f85\\u8865\\u5145':
-                        try:
-                            ver_datetime = datetime.strptime(info['date'], '%Y-%m-%d')
-                            diff = abs((commit_datetime - ver_datetime).days)
-                            
-                            # ⚠️ 关键：只接受30天内的匹配（避免错误归因）
-                            if diff < min_diff:
-                                min_diff = diff
-                                nearest_ver = ver
-                        except:
-                            continue
-                
-                # 返回结果：30天内返回版本号，否则返回hash
-                return nearest_ver if min_diff <= 30 else short_hash
-            except:
-                return short_hash
-        
-        version_key = find_nearest_version(commit_date, readme_version_map)
-`
-
-#### 2. 匹配算法详解
-| 参数 | 说明 | 示例 |
-|------|------|------|
-| **输入** | commit日期 + README所有版本的日期映射 | {"2026-07-05": "5.0.7", "2026-09-02": "5.0.9"} |
-| **计算** | 计算每个版本与commit日期的**绝对天数差** | bs(2026-07-05 - 2026-07-05) = 0天 |
-| **阈值** | **最大允许差值：30天** | 超过30天视为不匹配 |
-| **输出** | 差值最小的版本号或原始hash | "5.0.7" 或 "77117492" |
-
-#### 3. 实际案例演示
-`python
-# 案例1: commit message有版本号 → 直接提取
-commit_msg = "🔧v5.0.9.1 关键修复: run.bat编码问题"
-# 结果: version_key = "5.0.9.1"
-
-# 案例2: commit message无版本号但日期接近 → 智能匹配
-commit_date = "2026-07-05"
-readme_versions = {
-    "5.0.7": {"date": "2026-07-05"},   # ← 差值: 0天 ✅
-    "5.0.8": {"date": "2026-08-31"},   # ← 差值: 57天 ❌ 超过阈值
-}
-# 结果: version_key = "5.0.7" (因为0天 < 30天)
-
-# 案例3: 日期差距太大 → 显示hash
-commit_date = "2026-01-01"
-readme_versions = {
-    "5.0.7": {"date": "2026-07-05"},   # ← 差值: 185天 ❌
-}
-# 结果: version_key = "abc12345" (超过30天阈值)
-`
-
-### 应用场景
-
-| 场景 | 文件位置 | 说明 |
-|------|----------|------|
-| **历史提交兼容** | main.py:8970-8993 | 处理使用ix:/eat:前缀的旧提交 |
-| **README版本映射** | 
-eadme_version_map 字典 | 提供版本→日期的查找表 |
-| **API响应优化** | /api/changelog JSON输出 | 确保所有条目都有语义化版本号 |
-
-### 最佳实践清单
-
-- [ ] **三级降级**：必须实现 message提取 → 日期匹配 → hash兜底 的完整链路
-- [ ] **30天阈值**：日期差值上限严格限制为30天（可配置但需文档说明）
-- [ ] **异常处理**：日期解析失败时必须降级为hash，不能抛异常导致API 500
-- [ ] **性能优化**：ind_nearest_version函数不应在循环内重复定义（考虑提取到外层）
-- [ ] **日志记录**：当触发智能匹配时建议记录debug日志便于排查
-
-### 反面案例（避免）
-
-❌ 错误示例1：无降级策略直接显示hash
-`python
-ver_in_msg = re.search(r'v([\\d.]+)', commit_msg)
-version_key = ver_in_msg.group(1) if ver_in_msg else short_hash  # 直接fallback
-# 问题：用户看到 "version": "77117492" 而不是 "5.0.7"
-`
-
-❌ 错误示例2：无阈值限制的暴力匹配
-`python
-nearest_ver = min(versions_map.keys(), key=lambda v: abs(date_diff(v, commit_date)))
-# 问题：2026年1月的commit可能被错误匹配到2026年12月的版本
-`
-
-❌ 错误示例3：修改Git历史（禁止）
-`ash
-git filter-branch --msg-filter 'sed "s/fix:/v5.0.7/"'
-# 问题：破坏Git历史完整性，导致 collaborators 需要force pull
-`
-
-
-------
-
-## 🖥️ PY-CORE-012: CMD窗口输出与web_output.log一致性范式 (Console-Log Consistency Paradigm)
-
-> **创建日期**: 2026-09-03 | **最后更新**: 2026-09-03 | **优先级**: 🔴 P0 强制规范 | **适用范围**: run.bat / run.sh / web_output.log / CMD窗口 / 终端窗口 | **参考基准**: v5.0.9.34 启动输出
-
-### 范式描述
-
-确保**CMD/终端窗口显示的输出**与**web_output.log文件内容**完全一致，用户在窗口中看到的每一行都与日志文件中记录的每一行一一对应，无多余噪音信息。
-
-### 核心原则
-
-#### 1. 禁止出现的窗口噪音输出
-
-| 序号 | 禁止输出类型 | 示例 | 原因 |
-|------|-------------|------|------|
-| 1 | **命令回显** | `D:\ws\xy_ws>set "PYTHONIOENCODING=utf-8"` | 内部变量设置，用户无需知晓 |
-| 2 | **子程序调用** | `D:\ws\xy_ws>call :check_admin_rights` | 内部流程控制，用户无需知晓 |
-| 3 | **条件判断** | `D:\ws\xy_ws>if errorlevel 1 (` | 逻辑分支，用户无需知晓 |
-| 4 | **循环展开** | `D:\ws\xy_ws>(for /F "tokens=2 delims=v " %v in (...) do ...)` | 版本检测内部过程，用户无需知晓 |
-| 5 | **WMIC输出** | `for /F "tokens=2 delims==" %I in ('wmic os get localdatetime /value') do set "datetime=%I"` | 时间戳获取内部过程，用户无需知晓 |
-| 6 | **编码设置回显** | `chcp 65001 1>nul 2>&1` | 编码切换细节，用户无需知晓 |
-| 7 | **BOM错误** | `'@echo' 不是内部或外部命令` | UTF-8 BOM导致的噪音错误 |
-
-#### 2. 标准输出格式（与web_output.log完全一致）
-
-每一行输出**必须**遵循格式：`[YYYY-MM-DD HH:MM:SS.mmm] 消息内容`
-
-完整启动输出示例（web_output.log标准格式）：
-
-```
-[2026-09-03 10:08:20.392] ======================================== 
-[2026-09-03 10:08:20.493] Szwego商品爬虫和货号对比工具 - v5.0.9.34 
-[2026-09-03 10:08:20.624] ======================================== 
-
-[2026-09-03 10:08:20.751] [*] 清理残留进程... 
-[2026-09-03 10:08:22.712] [*] 残留进程清理完成 
-
-[2026-09-03 10:08:22.814] [*] 检查 hostc 隧道工具... 
-[2026-09-03 10:08:23.121] [*] hostc v1.3.0 已就绪 
-
-[2026-09-03 10:08:23.230] [*] 启动 hostc 隧道（后台运行）... 
-[2026-09-03 10:08:23.348] [*] hostc 已在后台启动 
-
-[2026-09-03 10:08:23.452] [*] 清理临时文件... 
-[2026-09-03 10:08:25.230] [*] playwright-browsers目录不存在，跳过 
-
-[2026-09-03 10:08:25.394] ======================================== 
-[2026-09-03 10:08:25.485] 综合环境检测与配置 
-[2026-09-03 10:08:25.577] ======================================== 
-[2026-09-03 10:08:25.662] [1/6] 检测Python环境... 
-
-[2026-09-03 10:08:25.796] Python版本： 
-[2026-09-03 10:08:27.623] Python 3.14.3 
-[2026-09-03 10:08:27.711] [*] 检测虚拟环境状态... 
-[2026-09-03 10:08:27.840] 未在虚拟环境中 
-[2026-09-03 10:08:28.043] [2/6] 检测Node.js环境... 
-
-[2026-09-03 10:08:28.320] Node.js版本: 
-[2026-09-03 10:08:28.613] Node v20.20.1 
-[2026-09-03 10:08:29.950] NPM 10.8.2 
-[2026-09-03 10:08:30.040] [3/6] 测试PIP加速镜像源... 
-[2026-09-03 10:08:30.194] 测试 清华源... 
-[2026-09-03 10:08:32.998] 测试 阿里云... 
-[2026-09-03 10:08:36.967] 测试 豆瓣... 
-[2026-09-03 10:08:39.684] 测试 中科大... 
-[2026-09-03 10:08:41.882] [WARNING] 所有镜像测试失败，使用默认PyPI源 
-[2026-09-03 10:08:42.005] [4/6] 测试NPM加速镜像源... 
-[2026-09-03 10:08:42.147] 测试 npmmirror淘宝... 
-[2026-09-03 10:08:44.107] 测试 官方源... 
-[2026-09-03 10:08:46.930] [WARNING] NPM镜像测试失败 
-[2026-09-03 10:08:47.070] [5/6] 检测Python虚拟环境... 
-[2026-09-03 10:08:47.175] 检测到虚拟环境：.venv 
-[2026-09-03 10:08:47.270] [6/6] 设置Python虚拟环境并安装依赖... 
-[2026-09-03 10:08:47.490] [*] 配置PIP镜像源为: https://pypi.org/simple/ 
-[2026-09-03 10:08:47.593] [*] 检查Python依赖是否需要安装... 
-```
-
-#### 3. 技术实现规范
-
-**run.bat 实现要点**：
-1. `@echo off` 必须在脚本第一行
-2. `chcp 65001 > nul 2>&1` 重定向到nul
-3. 所有输出必须通过 `:log` / `:log_blank` 函数
-4. `:log` 函数同时写入控制台和日志文件
-5. 时间戳格式统一：`YYYY-MM-DD HH:MM:SS.mmm`（毫秒精度）
-6. 子程序内部逻辑禁止回显
-
-**run.sh 实现要点**：
-1. 所有输出必须通过 `log()` / `log_blank()` 函数
-2. `log()` 函数同时写入控制台和日志文件
-3. 子程序内部逻辑禁止输出
-
-#### 4. 消息前缀规范
-
-| 前缀 | 含义 | 示例 |
-|------|------|------|
-| `[*]` | 进度/状态信息 | `[*] 清理残留进程...` |
-| `[1/N]` | 步骤编号 | `[1/6] 检测Python环境...` |
-| `[WARNING]` | 警告（非致命） | `[WARNING] 所有镜像测试失败` |
-| `[ERROR]` | 错误（致命） | `[ERROR] 需要管理员权限` |
-| 无前缀 | 详细信息/子步骤 | `Python 3.14.3` |
-
-#### 5. 一致性验证检查清单
-
-- [ ] CMD窗口输出与web_output.log逐行一致
-- [ ] 窗口中无 `D:\ws\xy_ws>` 前缀的命令回显行
-- [ ] 窗口中无 `call :` / `goto` / `if errorlevel` 等批处理内部逻辑显示
-- [ ] 窗口中无 `for /F` / `wmic` / `set` 等内部命令回显
-- [ ] 窗口中无 BOM 错误信息
-- [ ] 每一行都有 `[YYYY-MM-DD HH:MM:SS.mmm]` 时间戳前缀（空行除外）
-- [ ] 时间戳精度为毫秒级（3位小数）
-
-### 最佳实践
-
-| 实践项 | 优先级 | 说明 |
-|--------|--------|------|
-| **@echo off 首行** | 🔴 P0 | 脚本第一行必须是 `@echo off` |
-| **统一使用 :log 函数** | 🔴 P0 | 所有用户可见输出必须通过 `:log` 函数 |
-| **禁止直接 echo** | 🔴 P0 | 除 `:log` 函数内部外，禁止直接 `echo` 输出 |
-| **子程序静默** | 🔴 P0 | 内部子程序的所有中间步骤必须重定向到 nul |
-| **双写一致性** | 🔴 P0 | `:log` 函数必须同时写控制台和日志文件 |
-| **时间戳统一** | 🟡 P1 | 控制台和日志使用同一个时间戳变量 |
-| **前缀规范** | 🟡 P1 | 遵循消息前缀规范表 |
-
-### 相关范式
-
-- **PY-CORE-011**: Changelog版本变更详情完整结构范式
-- **PY-CORE-045**: 版本号一致性保障范式
-- **PY-CORE-012**: **本文档**（CMD窗口输出与web_output.log一致性范式）← 当前文档
----
----
