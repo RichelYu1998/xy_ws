@@ -10878,6 +10878,28 @@ if __name__ == '__main__':
                 current_change = None
                 current_block_type = None
                 in_changelog = False
+                ver_num = r'([0-9]+(?:\.[0-9]+)*)'
+
+                def _close_entry():
+                    nonlocal current_entry, current_change, current_block_type
+                    if not current_entry:
+                        return
+                    if current_change:
+                        current_entry['changes'].append(current_change)
+                    if not current_entry['changes']:
+                        current_entry['changes'] = [{
+                            'id': '1',
+                            'title': current_entry.get('title', '版本更新'),
+                            'tag': '📝版本更新',
+                            'problem': {},
+                            'solution': {},
+                            'verification': []
+                        }]
+                    changelog.append(current_entry)
+                    current_entry = None
+                    current_change = None
+                    current_block_type = None
+
                 for line in lines:
                     if '最新更新' in line.strip() and line.strip().startswith('##'):
                         in_changelog = True
@@ -10885,49 +10907,19 @@ if __name__ == '__main__':
                     if not in_changelog:
                         continue
                     stripped = line.strip()
-                    if stripped.startswith('## ') and not stripped.startswith('### ') and not re.match(r'##\s+v[\d.]+', stripped):
-                        if current_entry:
-                            if current_change:
-                                current_entry['changes'].append(current_change)
-                                current_change = None
-                            if not current_entry['changes']:
-                                current_entry['changes'] = [{
-                                    'id': '1',
-                                    'title': current_entry.get('title', '版本更新'),
-                                    'tag': '📝版本更新',
-                                    'problem': {},
-                                    'solution': {},
-                                    'verification': []
-                                }]
-                            changelog.append(current_entry)
-                            current_entry = None
-                        current_block_type = None
-                        continue
-                    version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
+                    version_match = re.match(r'###\s+v' + ver_num + r'\s+\(([^)]+)\)', stripped)
                     if not version_match:
-                        version_match = re.match(r'###\s+v([\d.]+)\s+\(([^)]+)\)', line.split(' - ')[0].strip())
+                        version_match = re.match(r'###\s+v' + ver_num + r'\s+\(([^)]+)\)', line.split(' - ')[0].strip())
                     if not version_match:
-                        version_match = re.match(r'##\s+v([\d.]+)\s+\(([^)]+)\)', stripped)
+                        version_match = re.match(r'##\s+v' + ver_num + r'\s+\(([^)]+)\)', stripped)
                     if not version_match:
-                        version_match = re.match(r'##\s+v([\d.]+)\s+\(([^)]+)\)', line.split(' - ')[0].strip())
+                        version_match = re.match(r'##\s+v' + ver_num + r'\s+\(([^)]+)\)', line.split(' - ')[0].strip())
                     if not version_match:
-                        m_no_date = re.match(r'(?:###|##)\s+v([\d.]+)\s+', stripped)
+                        m_no_date = re.match(r'(?:###|##)\s+v' + ver_num + r'\s+', stripped)
                         if m_no_date:
                             version_match = type('VM', (), {'group': lambda self, n: m_no_date.group(n) if n <= m_no_date.lastindex else ''})()
                     if version_match:
-                        if current_entry:
-                            if current_change:
-                                current_entry['changes'].append(current_change)
-                            if not current_entry['changes']:
-                                current_entry['changes'] = [{
-                                    'id': '1',
-                                    'title': current_entry.get('title', '版本更新'),
-                                    'tag': '📝版本更新',
-                                    'problem': {},
-                                    'solution': {},
-                                    'verification': []
-                                }]
-                            changelog.append(current_entry)
+                        _close_entry()
                         current_entry = {
                             'version': version_match.group(1),
                             'date': version_match.group(2),
@@ -10937,6 +10929,9 @@ if __name__ == '__main__':
                         }
                         current_change = None
                         current_block_type = None
+                        continue
+                    if current_entry and re.match(r'^(?:#|##)\s+', stripped):
+                        _close_entry()
                         continue
                     title_match = re.match(r'^####\s+更新内容:\s*(.*)', stripped)
                     if title_match and current_entry:
@@ -11016,19 +11011,7 @@ if __name__ == '__main__':
                             exist_impl = current_change['solution'].get('implementation', '')
                             current_change['solution']['implementation'] = f'{exist_impl}; {bullet_text}' if exist_impl else bullet_text
                         continue
-                if current_entry:
-                    if current_change:
-                        current_entry['changes'].append(current_change)
-                    if not current_entry['changes']:
-                        current_entry['changes'] = [{
-                            'id': '1',
-                            'title': current_entry.get('title', '版本更新'),
-                            'tag': '📝版本更新',
-                            'problem': {},
-                            'solution': {},
-                            'verification': []
-                        }]
-                    changelog.append(current_entry)
+                _close_entry()
                 readme_version_map = {entry['version']: entry for entry in changelog}
                 readme_versions_used = set()
                 merged_changelog = []
@@ -11081,7 +11064,7 @@ if __name__ == '__main__':
                                 if short_hash and short_hash in declared:
                                     owner_version = ver_key
                                     break
-                            ver_in_msg = re.search(r'v([\d.]+)', commit_msg)
+                            ver_in_msg = re.search(r'v([0-9]+(?:\.[0-9]+)*)', commit_msg)
                             if owner_version:
                                 version_key = owner_version
                             elif ver_in_msg:
@@ -11277,6 +11260,21 @@ if __name__ == '__main__':
                         if unique_files:
                             existing.setdefault('meta', {})['affected_files'] = ', '.join(unique_files[:10])
                 changelog = list(version_merge_map.values())
+                
+                _auto_root_cause = '详见Git提交记录及commit message'
+                for entry in changelog:
+                    _chs = entry.get('changes') or []
+                    _manual = [
+                        c for c in _chs
+                        if (c.get('problem') or {}).get('root_cause') != _auto_root_cause
+                        and (c.get('problem') or {}).get('phenomenon')
+                        and (c.get('solution') or {}).get('implementation')
+                        and c.get('verification')
+                    ]
+                    if _manual and len(_manual) < len(_chs):
+                        for _idx, _c in enumerate(_manual, 1):
+                            _c['id'] = str(_idx)
+                        entry['changes'] = _manual
                 
                 empty_changes_versions = [e.get('version','?') for e in changelog if not e.get('changes') or len(e['changes']) == 0]
                 if empty_changes_versions:
