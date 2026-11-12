@@ -28,6 +28,7 @@
 | 📐 范式编号规则范式 (PY-CORE-034) | 前缀+三位数字、A-Z 位次累加与区间表 |
 | 📐 安全审计零问题范式 (PY-CORE-040) | 总计问题必须为 0 的判定标准 |
 | 📐 终端实时日志接入范式 (PY-CORE-043) | sh / bat 实时日志双方案 |
+| 📐 文档内引用编号升序范式 (PY-CORE-046) | 全文档编号必须小号在前、大号在后 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -1223,8 +1224,8 @@ if stripped.startswith('## ') and in_changelog:
 ### 相关范式
 
 - **PY-CORE-011**: Changelog版本变更详情完整结构范式
-- **PY-CORE-045**: 版本号一致性保障范式
 - **PY-CORE-012**: **本文档**（CMD窗口输出与web_output.log一致性范式）← 当前文档
+- **PY-CORE-045**: 版本号一致性保障范式
 ---
 ---
 ## 🔴 PY-CORE-013: 代码库卫生维护范式 (Codebase Hygiene Maintenance)
@@ -2846,9 +2847,10 @@ def install_playwright_cdn():
 | t | 042-043 | 042-043 | 满 |
 | u | 044-044 | 044 | 满 |
 | v | 045-045 | 045 | 满 |
-| w / x / y / z | — | — | ✅ 空 |
+| w | 046-046 | 046 | 满 |
+| x / y / z | — | — | ✅ 空 |
 
-> 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 030 起全部 +1）。当前队列长度 45，剩余可用号位 55（硬上限 100）。
+> 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 030 起全部 +1）。当前队列长度 46，剩余可用号位 54（硬上限 100）。
 
 ### 新增范式标准动作（顺序不可颠倒）
 
@@ -3569,6 +3571,98 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 
 ---
 
+## 📐 文档内引用编号升序范式 (Within-Document Reference Ascending Order) (PY-CORE-046)
+
+> **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: README.md / skill.md / skill.docx 中一切出现多个 PY-CORE 编号的位置（章节、表格、列表、单行引用）
+
+### 🔴 核心原则：只要同一处出现两个及以上编号，就必须「小号在前、大号在后」
+
+编号升序不是「部分章节有序」即可，而是**全文档所有出现点**都要有序。判定口径统一为「非降序」：允许相等（重复引用同一范式），不允许大号出现在小号之前。
+
+| 出现位置 | 判定口径 | 合格示例 | 不合格示例 |
+|---|---|---|---|
+| 范式正文章节 | 逐个 `##` 标题内的编号，自上而下 | `002 → 008 → … → 043 → 046` | `008 → 009 → 032 → 033 → 031 → 002` |
+| 文档导航表 | 表内范式条目行，自上而下 | `011 → 016 → 017 → 018 → 019 → 022 → 030 → 034 → 040 → 043 → 046` | `011 → 017 → 043 → 018 → 040` |
+| 完整代码范式汇总表 | 表内数据行，自上而下 | `001 → 002 → … → 046`（连续、零跳号） | `045 → 043 → 044` |
+| 连续列表块（`-` / `*` / `1.`） | 同一块内逐条「首个编号」 | `011 → 012 → 045` | `011 → 045 → 012` |
+| 变更记录「更新内容」有序列表 | 同一列表内逐条「首个编号」，并按升序重新编号 `1. 2. 3.` | `019 → 022 → 无编号项` | `022 → 019 → 022` |
+| 单行多编号引用 | 同一行内编号出现次序（前缀 `PY-CORE-` 后的数字部分） | `019/022`、`011/042/045` | `022/019`、`011/045/042` |
+
+### 排序算法（三步，缺一不可）
+
+| 步骤 | 动作 | 说明 |
+|---|---|---|
+| ① 取键 | 每条取「行内首个 `PY-CORE-\d{3}`」作为排序键 | 一行出现多个编号时，仅首个参与排序，行内其余编号按「单行多编号引用」口径单独升序化 |
+| ② 填键 | 无编号条目继承「其前一个含编号条目的键」；块首连续无编号条目继承「其后第一个含编号条目的键」 | 保证无编号条目不被甩到队首或队尾，只随邻近编号块移动 |
+| ③ 排序 | 以 `(键, 原始行号)` 为键做**稳定排序** | 键相同者保持原有相对次序；有序列表随后重排为 `1. 2. 3. …` 连续编号 |
+
+### 无编号条目的填充示例（块内 011 / 无 / 045 / 012）
+
+| 原始次序 | 填键后 | 排序结果 |
+|---|---|---|
+| 011、无、045、012 | 011、011、045、012 | 011、无（随 011）、012、045 |
+
+> 无编号条目永远跟随其「前一个含编号条目」，因此升序化不会改变它的叙述归属。
+
+### 校验脚本（可复制，提交前必跑）
+
+```python
+import re
+lines = open('README.md', encoding='utf-8').read().split('\n')
+ITEM = re.compile(r'^(\s*)([-*+]\s+|\d+\.\s+)')
+def firstnum(l):
+    m = re.findall(r'PY-CORE-(\d{3})', l)
+    return int(m[0]) if m else None
+# 1) 连续列表块内跨行升序
+viol, i, n = [], 0, len(lines)
+while i < n:
+    if ITEM.match(lines[i]):
+        j = i
+        while j < n and ITEM.match(lines[j]):
+            j += 1
+        vals = [k for k in (firstnum(lines[t]) for t in range(i, j)) if k is not None]
+        if len(vals) >= 2 and vals != sorted(vals):
+            viol.append((i + 1, j, vals))
+        i = j
+    else:
+        i += 1
+# 2) 单行多编号升序
+bad = [(k + 1, re.findall(r'PY-CORE-(\d{3})', l)) for k, l in enumerate(lines)
+       if len(re.findall(r'PY-CORE-(\d{3})', l)) >= 2
+       and re.findall(r'PY-CORE-(\d{3})', l) != sorted(re.findall(r'PY-CORE-(\d{3})', l))]
+# 3) 范式章节 / 表格行升序
+nums = [int(re.search(r'PY-CORE-(\d{3})', l).group(1)) for l in lines
+        if l.startswith('## ') and re.search(r'PY-CORE-(\d{3})', l)]
+print('列表块非升序', viol, '| 单行非升序', bad, '| 章节升序', nums == sorted(nums))
+assert not viol and not bad and nums == sorted(nums)
+```
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 只排章节、不排列表 | 变更记录与「相关范式」处仍出现大号在前 | 五类出现点一次性全扫全改 |
+| 只排「一行内」、不排「跨行」 | `022 → 019` 这类有序列表照旧乱序 | 以「连续列表块」为单位整体排序 |
+| 排序后不改有序列表序号 | 出现 `3.` 排在 `2.` 前面等二次乱序 | 排序后按 `1. 2. 3.` 重编号 |
+| 无编号条目被甩到队首/队尾 | 叙述归属错位，读者误解 | 按「继承前键」规则填充后再稳定排序 |
+| 只改 md、不重生成 docx | 三方文档不一致 | 改 md 后按 PY-CORE-018 重生成 skill.docx 并校验锚点 |
+| 只改 README 不改 skill.md | 两文档分叉 | 逐字节同步后 `cmp` 校验 |
+
+### 落地检查清单
+
+```
+[ ] 1. 列表块扫描：连续 `-` / `*` / `1.` 块内首个编号非降序，违规 0
+[ ] 2. 单行扫描：一行含 ≥2 编号且非升序，违规 0
+[ ] 3. 章节扫描：`##` 范式标题编号序列严格升序
+[ ] 4. 表格扫描：导航表与汇总表行序严格升序、汇总表 001~046 连续零跳号
+[ ] 5. 有序列表重编号：`1. 2. 3. …` 连续，无跳号无重复
+[ ] 6. 三方同步：README.md 与 skill.md 逐字节一致，skill.docx 重生成后锚点零缺失
+```
+
+> **判定标准**: 出现「列表块跨行非升序 / 单行多编号非升序 / 范式章节非升序 / 表格行序非升序 / 排序后未重编号 / 三方未同步」中任意一条，即视为「未符合本范式」。
+
+---
+
 ## 📊 完整代码范式汇总表
 
 | 范式编号 | 首字母 | 名称 | 覆盖文件 | 优先级 |
@@ -3618,8 +3712,9 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 | PY-CORE-043 | T | 终端实时日志接入 (Terminal Real-Time Log Integration) | run.bat / run.sh | 🔴 核心 |
 | PY-CORE-044 | U | 统一异常处理 (Unified Exception Handling) | main.py | 🔴 核心 |
 | PY-CORE-045 | V | 版本号一致性保障 (Version Consistency Guarantee) | main.py / README.md | 🔴 核心 |
+| PY-CORE-046 | W | 文档内引用编号升序 (Within-Document Reference Ascending Order) | README.md / skill.md | 🔴 核心 |
 
-**总计: 45个核心范式（PY-CORE-001 ~ PY-CORE-045，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
+**总计: 46个核心范式（PY-CORE-001 ~ PY-CORE-046，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
 
 ---
 
@@ -3931,12 +4026,12 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 > **Commit**: `6078990c, 8d1798da`
 
 #### 更新内容:
-1. **新范式固化**: 新增 PY-CORE-022「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L2441-L2634) [skill.md](skill.md#L2441-L2634)
-2. **新范式固化**: 新增 PY-CORE-019「每日利润表读取范式」，工作表固定「每日利润」，列位固定 A-F，第 1 行为表头，报表文本仅取 A 列以「截止」开头的行，多文件去重后拼接 [README.md](README.md#L2223-L2442) [skill.md](skill.md#L2223-L2442)
-3. **报表聚合修复**: `get_excel_files_with_report` 原「命中第一个文件即 break」导致多 Excel 时只取首个文件报表，改为遍历全部文件、文本去重后以空行拼接 [main.py](main.py#L3644-L3656)
+1. **新范式固化**: 新增 PY-CORE-019「每日利润表读取范式」，工作表固定「每日利润」，列位固定 A-F，第 1 行为表头，报表文本仅取 A 列以「截止」开头的行，多文件去重后拼接 [README.md](README.md#L2223-L2442) [skill.md](skill.md#L2223-L2442)
+2. **报表聚合修复**: `get_excel_files_with_report` 原「命中第一个文件即 break」导致多 Excel 时只取首个文件报表，改为遍历全部文件、文本去重后以空行拼接 [main.py](main.py#L3644-L3656)
+3. **新范式固化**: 新增 PY-CORE-022「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L2441-L2634) [skill.md](skill.md#L2441-L2634)
 4. **死代码清理**: 删除 `StockNumberComparator.load_excel_data`（48 行），该方法零调用点，且与 PY-CORE-022「多文件全量聚合」口径冲突，属误导性死代码 [main.py](main.py#L7005)
 5. **字段扩展**: 对比记录与「小计」记录新增 `excel_files` 全量清单字段，原 `excel_file` 字段保留，历史记录解析不受影响 [main.py](main.py#L7364-L7367) [main.py](main.py#L7456-L7459)
-6. **导航扩容**: 文档导航表 18 → 20 行，新增 022/019 两条；skill.docx 由 skill.md 重新生成，锚点全部命中
+6. **导航扩容**: 文档导航表 18 → 20 行，新增 019/022 两条；skill.docx 由 skill.md 重新生成，锚点全部命中
 7. **接口校验**: `/api/changelog` 全量复核：`changes` 为空条目 0 个，`commit` 字段「待生成/待补充」占位 0 处，全部为真实 Git 哈希
 
 ##### 1. 📊 每日利润报表多文件聚合 (🔧功能优化)
@@ -4574,10 +4669,10 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 > **Commit**: 0674f24c
 
 #### 更新内容:
-1. **新增 P0 范式章节**: skill.md 与 README.md 逐字新增 `PY-CORE-018 DOCX 文档生成范式`，含六条铁律表、五步流程、生成器三函数机制、8 条坑位表、落地检查清单与可复制的锚点校验脚本 [skill.md](skill.md) [README.md](README.md)
-2. **导航表扩容**: 导航表由 16 行增至 17 行，新增「📐 DOCX 文档生成范式」条目，与 PY-CORE-011/032/033 三条范式并列 [skill.md](skill.md#L10-L35)
-3. **交叉引用消歧**: `PY-CORE-016` 补注「生成流程与产出结构以 PY-CORE-018 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L19956)
-4. **skill.docx 重新生成**: 由 skill.md 重新生成，17 个导航超链接全部命中书签，导航仍固定第 1 页、正文从第 2 页开始
+1. **导航表扩容**: 导航表由 16 行增至 17 行，新增「📐 DOCX 文档生成范式」条目，与 PY-CORE-011/032/033 三条范式并列 [skill.md](skill.md#L10-L35)
+2. **交叉引用消歧**: `PY-CORE-016` 补注「生成流程与产出结构以 PY-CORE-018 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L19956)
+3. **skill.docx 重新生成**: 由 skill.md 重新生成，17 个导航超链接全部命中书签，导航仍固定第 1 页、正文从第 2 页开始
+4. **新增 P0 范式章节**: skill.md 与 README.md 逐字新增 `PY-CORE-018 DOCX 文档生成范式`，含六条铁律表、五步流程、生成器三函数机制、8 条坑位表、落地检查清单与可复制的锚点校验脚本 [skill.md](skill.md) [README.md](README.md)
 
 ##### 1. 📐 新增 PY-CORE-018 DOCX 文档生成范式 (把「导航置顶」从实现细节升格为强制规范)
 **问题描述**:
@@ -8278,13 +8373,13 @@ python config/crypto_tool.py encrypt-config
 - **参考位置**: [run.bat#L428-L440](run.bat#L428-L440) (:get_latest_python_version), [run.bat#L537-L549](run.bat#L537-L549) (:get_latest_node_version), [run.bat#L463](run.bat#L463) (调用点-Python), [run.bat#L558](run.bat#L558) (调用点-Node.js), [run.sh#L575-L586](run.sh#L575-L586) (get_latest_python_version函数), [run.sh#614-618](run.sh#614-618) (变量引用处)
 
 **测试验证**:
+- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 - ✅ GitHub API正常响应时能正确解析最新版本号(Python 3.x.x/Node.js vxx.x.x格式)
 - ✅ 网络断开或API限流时回退到默认版本(3.11.9/v20.11.1)不导致脚本中断
 - ✅ curl.exe(for Windows)/curl(for Linux)命令执行成功且输出可被PowerShell/grep正确解析
 - ✅ 变量替换后镜像源URL格式正确(如https://mirrors.huaweicloud.com/python/3.12.6/python-3.12.6-amd64.exe)
 - ✅ 下载的安装包文件名与实际版本一致(不再出现下载3.12.6但文件名写3.11.9的不一致问题)
 - ✅ CMD窗口输出符合PY-CORE-012规范([*]前缀+时间戳,无多余噪音)
-- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 
 ---
 
@@ -8419,13 +8514,13 @@ python config/crypto_tool.py encrypt-config
 - **参考位置**: [run.bat#L72-L97](run.bat#L72-L97) (Winget/Choco检测), [run.bat#L102-L130](run.bat#L102-L130) (:auto_install_winget), [run.bat#L132-L160](run.bat#L132-L160) (:auto_install_choco)
 
 **测试验证**:
+- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 - ✅ where winget/choco检测正常工作(已安装时跳过,未安装时触发自动安装)
 - ✅ 华为云镜像源连接速度测试准确(ms级精度)
 - ✅ 自动选择最快下载源(华为云<官方源时优先华为云)
 - ✅ Winget msixbundle下载并通过Add-AppxPackage成功安装
 - ✅ Chocolatey install.ps1下载执行成功并加入PATH
 - ✅ CMD窗口输出与PY-CORE-012规范一致(无噪音回显)
-- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 
 ---
 
@@ -8598,11 +8693,11 @@ python config/crypto_tool.py encrypt-config
 - **参考位置**: skill.md PY-CORE-012, README.md PY-CORE-012
 
 **测试验证**:
+- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 - ✅ PY-CORE-012范式已写入skill.md
 - ✅ PY-CORE-012范式已写入README.md
 - ✅ skill.docx已从skill.md重新生成
 - ✅ 三方(README.md/skill.md/skill.docx)一致
-- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 
 ---
 
@@ -9668,9 +9763,9 @@ python config/crypto_tool.py encrypt-config
 - **参考位置**: skill.md PY-CORE-045, README.md#L141
 
 **测试验证**:
+- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 - ✅ run.bat/run.sh/main.py/API/Web界面五点版本号一致
 - ✅ PY-CORE-045范式已写入skill.md
-- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 
 ---
 
@@ -10174,8 +10269,8 @@ if missing:
 ### 相关范式
 
 - **PY-CORE-010**: Changelog API数据结构与Git历史集成范式（定义API整体架构）
-- **PY-CORE-039**: 智能版本号匹配算法（定义版本号获取策略）
 - **PY-CORE-011**: **本文档**（定义单个版本的changes详细结构）
+- **PY-CORE-039**: 智能版本号匹配算法（定义版本号获取策略）
 
 三者关系：
 \\\
