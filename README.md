@@ -961,7 +961,7 @@ git status --short
 
 ### v5.0.9.94 (2026-11-12) - 🔄 **代码全量回退与本地工具链恢复** - 全部代码回退至v5.0.9.93(6078990c)+tools本地资源补齐(Playwright chromium-1169 macos/cloudflared macos 2026.10.7/node v20.18.0)+dist从Git恢复并装回hostc 2.1.3+node bin下npm与npx shim入口修复(指向真实cli)+探针命中tools/playwright/macos+三方文档逐字一致与docx重生成
 
-> **Commit**: `2fa9189d, f64db1be`
+> **Commit**: `2fa9189d, f64db1be, d9ac42a1`
 
 #### 更新内容:
 1. **代码全量回退**: 全部源码回退至 v5.0.9.93（`6078990c`），撤销其后 4 个提交，`git status` 工作区干净 [main.py](main.py)
