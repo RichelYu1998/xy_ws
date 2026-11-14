@@ -1575,9 +1575,9 @@ def _get_album_progress_path(album_id):
     raw = str(album_id or '')
     safe_id = re.sub(r'[^A-Za-z0-9_-]', '', raw)[:32]
     if not safe_id:
-        safe_id = 'h' + hashlib.md5(raw.encode('utf-8')).hexdigest()[:16]
+        safe_id = 'h' + hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]
     elif safe_id != raw:
-        safe_id = safe_id + '_' + hashlib.md5(raw.encode('utf-8')).hexdigest()[:8]
+        safe_id = safe_id + '_' + hashlib.sha256(raw.encode('utf-8')).hexdigest()[:8]
     return os.path.join(PathManager.get_file_dir(), f'fetch_progress_{safe_id}.json')
 
 def _load_album_progress(album_id):
