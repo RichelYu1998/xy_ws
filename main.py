@@ -12520,6 +12520,7 @@ if __name__ == '__main__':
                 category = '其他'
                 python_min = ''
                 python_compat = ''
+                python_runtime = ''
                 with open(req_path, 'r', encoding='utf-8') as f:
                     for raw in f:
                         line = raw.strip()
@@ -12530,6 +12531,10 @@ if __name__ == '__main__':
                                 py_match = re.search(r'Python\s*>=\s*([0-9]+\.[0-9]+)', line)
                                 if py_match:
                                     python_min = py_match.group(1) + '+'
+                            if not python_runtime:
+                                runtime_match = re.search(r'运行基线\s*>=\s*([0-9]+\.[0-9]+)', line)
+                                if runtime_match:
+                                    python_runtime = runtime_match.group(1) + '+'
                             if not python_compat:
                                 compat_match = re.search(r'兼容至\s*([0-9]+\.[0-9]+)', line)
                                 if compat_match and python_min:
@@ -12562,6 +12567,7 @@ if __name__ == '__main__':
                         'python': {
                             'min': python_min or '3.6+',
                             'compat': python_compat,
+                            'runtime': python_runtime or '3.9+',
                             'current': f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}',
                         },
                         'pip': pip_version,

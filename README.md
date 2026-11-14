@@ -49,7 +49,7 @@
 ## 💻 环境要求
 
 ### 基础环境
-- **Python**: 3.6+ (推荐 3.10+, 兼容至 3.14；3.6 以下 f-string/async 等语法不可用，3.6 以上逐步启用新特性)
+- **Python**: 3.6+（语法基线：3.6 以下 f-string/async 等语法不可用，3.6 以上逐步启用新特性；运行基线 3.9+：fastapi>=0.115 / pandas>=2.0 / pydantic>=2.7 均要求 ≥3.9；推荐 3.10+，兼容至 3.14）
 - **pip**: 23.0+ (安装依赖前会自动升级)
 - **操作系统**: Windows 10/11, Linux (Ubuntu 20.04+), macOS 10.15+
 
@@ -3854,7 +3854,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ## 🔄 最新更新
 
-### v5.0.9.106 (2026-11-14) - 🛡️ **清理安全四层防护 + 跨平台路径兼容 + 版本基线 3.6+** - 项目根目录一律拒绝清理（入口隐藏 → 前端预检 → 后端校验 → 排除名单兜底）+ 路径统一 `realpath`/`normcase`/`expanduser`/`os.sep`/`os.pathsep` 归一 + `shutil.rmtree` 只读文件 `onerror` 兜底 + 删除类模式目录必填 + 排除名单大小写不敏感兼容 + 跨平台细则写入 PY-CORE-020 范式 + Python 版本基线改为 3.6+ 兼容口径（`/api/dependencies` 新增 `compat` 字段）
+### v5.0.9.106 (2026-11-14) - 🛡️ **清理安全四层防护 + 跨平台路径兼容 + 版本口径双层兼容 3.6+/3.9+** - 项目根目录一律拒绝清理（入口隐藏 → 前端预检 → 后端校验 → 排除名单兜底）+ 路径统一 `realpath`/`normcase`/`expanduser`/`os.sep`/`os.pathsep` 归一 + `shutil.rmtree` 只读文件 `onerror` 兜底 + 删除类模式目录必填 + 排除名单大小写不敏感兼容 + 跨平台细则写入 PY-CORE-020 范式 + Python 版本口径改为语法/运行双层兼容（语法基线 3.6+ / 运行基线 3.9+，`/api/dependencies` 新增 `compat` 与 `runtime` 字段）
 
 > **Commit**: `1111aeb1`
 
@@ -3866,14 +3866,14 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 4. **排除名单大小写兼容**: `EXCLUDE_FOLDERS` / `EXCLUDE_FILE_NAMES` 统一小写，比对前 `item.name.lower()`，Windows 大小写不敏感文件系统下 `Config`/`File`/`Thumbs.db` 变体同样受保护 [main.py](main.py#L2100-L2101) [main.py](main.py#L2496-L2503)
 5. **只读文件删除兜底**: 新增 `_rmtree_onerror()`，`shutil.rmtree` 遇 `PermissionError` 自动 `chmod 0o777` 重试，兼容 Windows 只读属性，不再裸调用 [main.py](main.py#L2104)
 6. **跨平台细则入范式**: PY-CORE-020 新增《跨平台路径与文件系统兼容细则》，含四条铁律、平台差异对照表（6 行正确写法 vs 错误写法 vs 后果）、前后端职责划分与判定标准 [skill.md](skill.md#L19845-L19906)
-7. **版本基线 3.6+ 兼容口径**: 版本基线由不可运行的 `3.0+` 改为 `3.6+（兼容 3.6–3.14）`，`requirements.txt` 注释为唯一数据源，`/api/dependencies` 新增 `compat` 字段，页面、代码、文档三处同步 [requirements.txt](requirements.txt#L4-L5) [main.py](main.py#L12530-L12535)
-8. **防缓存与全量校验**: `app.js` 版本号递增至 `20261114180000`，`/api/dependencies` 改 `JSONResponse` 并加 `Cache-Control: no-store`，改动即时生效不再命中旧页面 [index.html](index.html#L2098) [main.py](main.py#L12558-L12572)
+7. **版本口径双层兼容**: 版本口径由不可运行的 `3.0+` 改为「语法基线 `3.6+`（兼容 3.6–3.14）+ 运行基线 `3.9+`」，`requirements.txt` 注释为唯一数据源，`/api/dependencies` 新增 `compat` / `runtime` 两个字段，页面、代码、文档三处同步 [requirements.txt](requirements.txt#L4-L5) [main.py](main.py#L12517-L12572)
+8. **防缓存与全量校验**: `app.js` 版本号递增至 `20261114190000`，`/api/dependencies` 改 `JSONResponse` 并加 `Cache-Control: no-store`，改动即时生效不再命中旧页面 [index.html](index.html#L2098) [main.py](main.py#L12558-L12572)
 
 **修复日期**: 2026-11-14
 **修复类型**: 🛡️安全加固 + 🖥️跨平台兼容 + 📚文档同步
 **影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [index.html](index.html), [requirements.txt](requirements.txt), [tox.ini](tox.ini), [config/clean_allowed_roots.example.txt](config/clean_allowed_roots.example.txt), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 1111aeb1
-**变更统计**: 后端函数签名扩展 1 处 + 新增兜底函数 1 个 + 破坏性接口参数对齐 3 处 + 前端入口过滤与预检 2 处 + 范式新增 1 节 + 版本口径 5 处同步
+**变更统计**: 后端函数签名扩展 1 处 + 新增兜底函数 1 个 + 破坏性接口参数对齐 3 处 + 前端入口过滤与预检 2 处 + 范式新增 1 节 + 接口新增字段 2 个 + 版本口径双层 7 处同步
 **作者**: 小旭二手机（西园路）
 
 ---
@@ -3977,20 +3977,20 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-##### 7. 🐍 版本基线 3.6+ 兼容口径 (🐍版本口径)
+##### 7. 🐍 版本口径改为语法/运行双层兼容 (🐍版本口径)
 **问题描述**:
 - **现象**: 页面「环境要求」展示 `Python 3.0+`，而代码里 f-string（3.6+）、`dataclasses`/`asyncio`（3.7+）、FastAPI（≥3.8）都要求更高版本，3.0–3.5 实跑直接 SyntaxError
 - **根因**: 版本基线被写成绝对下限口号，没有区分「3.6 以下语法不可用」与「3.6 以上逐步启用新特性」
 - **影响范围**: 文档可信度、新用户环境选择
 
 **修复方案**:
-- **技术实现**: 基线改为 `Python 3.6+（兼容 3.6–3.14）`；`requirements.txt` 注释作为唯一数据源，`/api/dependencies` 解析 `Python >=3.6` 与 `兼容至 3.14` 两个片段，新增 `compat` 字段（值 `3.6–3.14`），前端据此拼装展示文案，避免版本区间在前后端各写一份
+- **技术实现**: 口径改为 `Python 3.6+（语法基线，兼容 3.6–3.14；运行需 3.9+）`；`requirements.txt` 注释作为唯一数据源，`/api/dependencies` 解析 `Python >=3.6`、`运行基线 >=3.9`、`兼容至 3.14` 三个片段，输出 `min` / `runtime` / `compat` 三个字段，前端据此拼装展示文案，避免版本区间在前后端各写一份
 - **参考位置**: [requirements.txt](requirements.txt#L4-L5), [main.py](main.py#L12530-L12535), [main.py](main.py#L12558-L12572), [dist/app.js](dist/app.js#L1307-L1319), [index.html](index.html#L1831), [index.html](index.html#L1926)
 
 **测试验证**:
-- ✅ `/api/dependencies` 实测返回 `{"min":"3.6+","compat":"3.6–3.14","current":"3.9.6"}`
-- ✅ 页面静态兜底与 JS 渲染文案一致：`Python 3.6+（兼容 3.6–3.14，当前运行 3.9.6）`
-- ✅ 全项目 `3.0+` / `3.9+` 残留扫描为 0（requirements.txt / index.html / main.py / dist/app.js / tox.ini / README.md / skill.md）
+- ✅ `/api/dependencies` 实测返回 `{"min":"3.6+","compat":"3.6–3.14","runtime":"3.9+","current":"3.9.6"}`
+- ✅ 页面静态兜底与 JS 渲染文案一致：`Python 3.6+（语法基线，兼容 3.6–3.14；运行需 3.9+，当前运行 3.9.6）`
+- ✅ 全项目 `3.0+` 残留扫描为 0（requirements.txt / index.html / main.py / dist/app.js / tox.ini / README.md / skill.md）
 
 ---
 
@@ -4001,13 +4001,30 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **影响范围**: 改动生效性、问题排查效率
 
 **修复方案**:
-- **技术实现**: `index.html` 中 `app.js?v=` 递增至 `20261114180000`；`/api/dependencies` 由 `jsonify(...)` 改为 `JSONResponse(content=..., headers={'Cache-Control': 'no-cache, no-store, must-revalidate', ...})`
+- **技术实现**: `index.html` 中 `app.js?v=` 递增至 `20261114190000`；`/api/dependencies` 由 `jsonify(...)` 改为 `JSONResponse(content=..., headers={'Cache-Control': 'no-cache, no-store, must-revalidate', ...})`
 - **参考位置**: [index.html](index.html#L2098), [main.py](main.py#L12558-L12572)
 
 **测试验证**:
 - ✅ 响应头实测含 `cache-control: no-cache, no-store, must-revalidate`
-- ✅ 页面实际引用 `app.js?v=20261114180000`
+- ✅ 页面实际引用 `app.js?v=20261114190000`
 - ✅ 强制刷新后「环境要求」立即显示新口径
+
+---
+
+##### 9. 📌 运行基线按依赖实测收敛到 3.9+ (📌依赖实测)
+**问题描述**:
+- **现象**: 口径改成「Python 3.6+」后仍与事实有落差 —— 语法层确实 3.6 起可解析（walrus `:=` 0 处、`dataclasses` 0 处、内置泛型注解 0 处、`X | None` 0 处），但依赖装不上：`fastapi 0.128.8` / `uvicorn 0.39.0` / `pydantic 2.11.10` / `starlette 0.49.3` 的 `Requires-Python` 实测均为 `>=3.9`
+- **根因**: 把「语法能解析」当成了「环境能跑」，这是两个不同层级的门槛
+- **影响范围**: 声明可信度 —— 3.6–3.8 用户照着页面装依赖必然失败
+
+**修复方案**:
+- **技术实现**: 口径拆成两层并在同一处声明 —— 语法基线 `Python >=3.6` + 运行基线 `运行基线 >=3.9`；`/api/dependencies` 分别解析为 `min` / `runtime` 字段，`compat` 仍取 `3.6–3.14`；前端拼装为 `Python 3.6+（语法基线，兼容 3.6–3.14；运行需 3.9+，当前运行 3.9.6）`，页面静态兜底文案同口径，`tox.ini` 注释同步为「3.6+（语法） / 3.9+（运行）」
+- **参考位置**: [requirements.txt](requirements.txt#L5), [main.py](main.py#L12517-L12538), [main.py](main.py#L12566-L12572), [dist/app.js](dist/app.js#L1307-L1321), [index.html](index.html#L1926), [README.md](README.md#L52), [tox.ini](tox.ini#L4)
+
+**测试验证**:
+- ✅ `importlib.metadata` 实测四个核心依赖 `Requires-Python` 均为 `>=3.9`
+- ✅ 语法特性扫描 0 命中，语法层 3.6 可解析的结论成立
+- ✅ `/api/dependencies` 返回 `min` / `compat` / `runtime` / `current` 四字段，页面展示与接口一致
 
 ---
 

@@ -1307,12 +1307,14 @@
                     });
                     var envEl = document.getElementById('env-requirements');
                     if (envEl && data.python) {
-                        var pyText = 'Python ' + data.python.min;
+                        var pyText = 'Python ' + data.python.min + '（语法基线';
                         if (data.python.compat) {
-                            pyText += '（兼容 ' + data.python.compat + '，当前运行 ' + data.python.current + '）';
-                        } else {
-                            pyText += '（当前运行 ' + data.python.current + '）';
+                            pyText += '，兼容 ' + data.python.compat;
                         }
+                        if (data.python.runtime) {
+                            pyText += '；运行需 ' + data.python.runtime;
+                        }
+                        pyText += '，当前运行 ' + data.python.current + '）';
                         envEl.textContent = pyText
                             + ' / pip ' + (data.pip || '-')
                             + ' / Node.js 仅用于内网穿透工具（Playwright 不需要）';
