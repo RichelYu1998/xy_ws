@@ -3710,6 +3710,7 @@ def sec_sp(base_dir, user_path):
 
 # 清理类接口允许操作的根目录白名单
 _clean_allowed_roots_cache = None
+_clean_allowed_roots_signature = None
 _fs_case_insensitive_cache = None
 
 def _fs_is_case_insensitive():
@@ -3768,19 +3769,30 @@ def _read_clean_allowed_roots_file():
 
 def _get_clean_allowed_roots():
     """清理接口允许的根目录，默认仅项目目录，可用 CLEAN_ALLOWED_ROOTS 环境变量
-    或 config/clean_allowed_roots.txt 追加，两者都需显式配置，不接受任意路径"""
-    global _clean_allowed_roots_cache
-    if _clean_allowed_roots_cache is None:
-        roots = {os.path.realpath(PROJECT_DIR)}
-        for item in (os.environ.get('CLEAN_ALLOWED_ROOTS', '') or '').split(os.pathsep):
-            item = item.strip()
-            if item:
-                roots.add(os.path.realpath(os.path.expanduser(item)))
-        roots.update(_read_clean_allowed_roots_file())
-        _clean_allowed_roots_cache = tuple(sorted(roots))
+    或 config/clean_allowed_roots.txt 追加，两者都需显式配置，不接受任意路径
+
+    缓存带签名（白名单文件 mtime + 环境变量原文），任一项变化即重新读取，
+    编辑白名单文件后无需重启服务，避免「写进白名单却仍被拒」的错觉。
+    """
+    global _clean_allowed_roots_cache, _clean_allowed_roots_signature
+    try:
+        file_signature = os.path.getmtime(_get_clean_allowed_roots_file())
+    except OSError:
+        file_signature = None
+    signature = (file_signature, os.environ.get('CLEAN_ALLOWED_ROOTS', ''))
+    if _clean_allowed_roots_cache is not None and signature == _clean_allowed_roots_signature:
+        return _clean_allowed_roots_cache
+    roots = {os.path.realpath(PROJECT_DIR)}
+    for item in (os.environ.get('CLEAN_ALLOWED_ROOTS', '') or '').split(os.pathsep):
+        item = item.strip()
+        if item:
+            roots.add(os.path.realpath(os.path.expanduser(item)))
+    roots.update(_read_clean_allowed_roots_file())
+    _clean_allowed_roots_cache = tuple(sorted(roots))
+    _clean_allowed_roots_signature = signature
     return _clean_allowed_roots_cache
 
-def resolve_clean_directory(directory, default_dir=None, require_explicit=False, allow_project_root=False):
+def resolve_clean_directory(directory, default_dir=None, require_explicit=False):
     """解析清理目录并强制边界校验
 
     原实现对绝对路径直接放行、完全不做校验，等于可以通过
@@ -3790,9 +3802,9 @@ def resolve_clean_directory(directory, default_dir=None, require_explicit=False,
     require_explicit 为 True 时拒绝留空：破坏性清理不允许回落到项目目录，
     避免误触把项目根目录当成清理目标。
 
-    allow_project_root 默认 False：项目根目录一律拒绝清理（含大小写/软链
-    归一化后命中同一路径的情况），防止误操作把项目自身清空。项目内的子目录
-    （如 file/、config/）不受影响。
+    项目根目录与其祖先目录一律拒绝清理，且该校验在白名单之前执行、不读取
+    白名单结果：即使把项目根目录或它的父目录写进白名单也删不掉项目。
+    项目内的子目录（如 file/、config/）不受影响。
 
     Returns:
         (安全绝对路径, 错误信息)，不安全时路径为 None
@@ -3817,13 +3829,22 @@ def resolve_clean_directory(directory, default_dir=None, require_explicit=False,
         except Exception as e:  # [HANDLED]
             return None, f'路径解析失败: {e}'
 
-    if not allow_project_root and _clean_path_key(candidate) == _clean_path_key(project_root):
+    candidate_key = _clean_path_key(candidate)
+    project_key = _clean_path_key(project_root)
+
+    if candidate_key == project_key:
         return None, (
             f'拒绝清理项目根目录: {candidate}'
             f'（项目目录受保护，即使写进白名单也不会放行，请改为清理其子目录或白名单内的其它目录）'
         )
 
-    candidate_key = _clean_path_key(candidate)
+    if project_key.startswith(candidate_key + os.sep):
+        return None, (
+            f'拒绝清理项目根目录的上级目录: {candidate}'
+            f'（该目录包含项目目录 {project_root}，清理它会连带清空项目，'
+            f'即使写进白名单也不会放行，请改为清理项目内的子目录或其它目录）'
+        )
+
     for root in _get_clean_allowed_roots():
         root_key = _clean_path_key(root)
         if candidate_key == root_key:
@@ -12216,12 +12237,15 @@ if __name__ == '__main__':
             try:
                 config_file = _get_clean_allowed_roots_file()
                 project_dir = os.path.realpath(PROJECT_DIR)
+                project_key = _clean_path_key(project_dir)
                 roots = []
                 for root in _get_clean_allowed_roots():
+                    root_key = _clean_path_key(root)
                     roots.append({
                         'path': root,
                         'exists': os.path.isdir(root),
-                        'builtin': _clean_path_key(root) == _clean_path_key(project_dir),
+                        'builtin': root_key == project_key,
+                        'protected': root_key == project_key or project_key.startswith(root_key + os.sep),
                     })
                 return jsonify({
                     'success': True,
@@ -12242,7 +12266,7 @@ if __name__ == '__main__':
             if retry:
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
-                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR, allow_project_root=True)
+                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR)
                 if not directory:
                     return jsonify({'success': False, 'error': f'路径校验失败: {dir_error}'})
 

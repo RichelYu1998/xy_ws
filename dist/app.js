@@ -5993,7 +5993,7 @@
                         box.innerHTML = '<span style="color:#c00;">允许目录读取失败，请查看服务日志</span>';
                         return;
                     }
-                    const extraRoots = data.roots.filter(function(root) { return !root.builtin; });
+                    const extraRoots = data.roots.filter(function(root) { return !root.builtin && !root.protected; });
                     const parts = [];
                     if (extraRoots.length) {
                         parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>（点击可直接填入，不在列表内的一律拒绝）:</div>');
@@ -6004,7 +6004,7 @@
                     } else {
                         parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>: 仅项目目录（不在列表内的一律拒绝）</div>');
                     }
-                    parts.push('<div style="margin-top:6px;color:#888;">如需追加目录，编辑 <code>' + escapeHtml(data.config_file) + '</code>（一行一个路径）后重启服务</div>');
+                    parts.push('<div style="margin-top:6px;color:#888;">如需追加目录，编辑 <code>' + escapeHtml(data.config_file) + '</code>（一行一个路径）保存后即时生效；项目目录及其上级目录即使写入也会被拒绝</div>');
                     box.innerHTML = parts.join('');
                     box.querySelectorAll('.clean-root-pick').forEach(function(el) {
                         el.addEventListener('click', function() {
