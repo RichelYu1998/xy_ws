@@ -1486,6 +1486,8 @@ EOF
 | 覆盖面 | 文件头必须有用途说明；区块级、函数级、关键逻辑级三层注释缺一不可 |
 | 内容真实 | 注释只描述「实际存在且实际被使用」的东西，禁止写入未使用的配置项、未实现的函数、不存在的文件 |
 | 不增删 | 禁止为了满足注释要求而新建文件、拆分文件、改动数据结构或删除现有文件 |
+| 新增文件 | 新文件一落地就适用本节：先判定属于六类豁免还是范围内；范围内的必须**自带**中文注释（文件头用途 + 区块 + 关键逻辑三层）后才能提交，自检脚本会把它当成普通文件扫描，缺注释即报错 |
+| 临时文件 | Office 锁文件（`~$*`、`.~lock.*`）、`.DS_Store`、`*.log` 等非项目自有文件一律进 `.gitignore`，既不加注释也不入库 |
 
 自检命令（按最终口径扫描，只报真正该补的文件）:
 ```bash
@@ -4044,7 +4046,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ## 🔄 最新更新
 
-### v5.0.9.109 (2026-11-14) - 🧾 **changelog 兜底从「写死文案」换成「真实 Git 数据」+ 全仓库中文注释按最终口径落地** - `/api/changelog` 里「历史版本-详见README.md」「历史版本-无统计记录」「历史版本-无Git记录」这类合成占位全部下线，改为按版本号回溯真实短哈希、按哈希读取真实改动文件与增删行数；空 `changes` 版本改用该版本真实元信息合成完整记录；同时 31 个文件按 PY-CORE-013 §5 逐类型补中文注释，`.gitignore` 补 `tools/` 等 3 类忽略项；实测 450 版本 changes 空值 0 个 / commit 非哈希 0 个 / 精确占位残留 0 个 / 缺中文注释 0 个
+### v5.0.9.109 (2026-11-14) - 🧾 **changelog 兜底从「写死文案」换成「真实 Git 数据」+ 全仓库中文注释按最终口径落地** - `/api/changelog` 里「历史版本-详见README.md」「历史版本-无统计记录」「历史版本-无Git记录」这类合成占位全部下线，改为按版本号回溯真实短哈希、按哈希读取真实改动文件与增删行数；空 `changes` 版本改用该版本真实元信息合成完整记录；同时 31 个文件按 PY-CORE-013 §5 逐类型补中文注释，`.gitignore` 补 `tools/` 等 5 条忽略项；实测 450 版本 changes 空值 0 个 / commit 非哈希 0 个 / 精确占位残留 0 个 / 缺中文注释 0 个
 
 > **Commit**: `a65c1d0c, b3bc1671`
 
@@ -4055,7 +4057,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 3. **空 changes 终局兜底**: 任何版本都不允许返回空数组，用该版本真实 commit / 改动文件 / 变更统计合成 problem / solution / verification 全字段 [main.py](main.py#L12929-L12960)
 4. **三处旧占位兜底块清零**: 删除「详见README.md」「N/A」「历史版本-无Git记录」三套写死文案，占位符统一登记到 `_placeholder_tokens` 由新逻辑接管 [main.py](main.py#L12726-L12733) [main.py](main.py#L12638-L12654)
 5. **全仓库中文注释按最终口径落地**: 31 个文件按类型补注释（脚本头、区块、关键行三层），自检「缺中文注释 0 个 / 文件头无注释标记 0 个」 [README.md](README.md#L1439-L1523)
-6. **仓库卫生补漏**: `.gitignore` 补 `tools/`（1.1GB 内置工具链）、`.DS_Store`、`clean_files.log` 三条规则，`git add .` 不再拖二进制 [.gitignore](.gitignore#L66-L72)
+6. **仓库卫生补漏**: `.gitignore` 补 `tools/`（1.1GB 内置工具链）、`.DS_Store`、`clean_files.log`、`~$*` 与 `.~lock.*`（Office 打开 docx 时生成的二进制锁文件，如 `~$skill.docx`）共 5 条规则，`git add .` 不再拖二进制 [.gitignore](.gitignore#L66-L76)
 7. **三方文档同步**: README.md ↔ skill.md 逐字节一致，skill.docx 由 skill.md 重新生成 [README.md](README.md) [skill.md](skill.md) [skill.docx](skill.docx)
 
 **修复日期**: 2026-11-14
@@ -4152,19 +4154,19 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-##### 6. 🚫 .gitignore 补 3 类忽略项 (🚫仓库卫生)
+##### 6. 🚫 .gitignore 补 5 条忽略项 (🚫仓库卫生)
 **问题描述**:
-- **现象**: `tools/`（1.1GB 内置工具链）、`.DS_Store`、`clean_files.log` 长期处于未跟踪状态，一次 `git add .` 就会把 1.1GB 二进制拖进仓库
-- **根因**: 新增目录与运行产物未同步到忽略清单
+- **现象**: `tools/`（1.1GB 内置工具链）、`.DS_Store`、`clean_files.log` 长期处于未跟踪状态；用 Word/WPS 打开 `skill.docx` 还会生成 `~$skill.docx` 二进制锁文件，一次 `git add .` 就会把它们全部拖进仓库
+- **根因**: 新增目录、运行产物与 Office 临时锁文件均未同步到忽略清单
 - **影响范围**: 仓库体积与提交安全性
 
 **修复方案**:
-- **技术实现**: `.gitignore` 补 `tools/`、`.DS_Store`、`clean_files.log` 三条规则，并各自带中文分组说明
-- **参考位置**: [.gitignore](.gitignore#L66-L72)
+- **技术实现**: `.gitignore` 补 `tools/`、`.DS_Store`、`clean_files.log`、`~$*`、`.~lock.*` 五条规则，每条带中文分组说明；`~$*` 与 `.~lock.*` 覆盖 Word / WPS / LibreOffice 打开文档时生成的锁文件
+- **参考位置**: [.gitignore](.gitignore#L66-L76)
 
 **测试验证**:
 - ✅ `git check-ignore -v tools/node` 命中 `.gitignore:68`
-- ✅ `git status --short` 未跟踪项 0 个，工作区无任何残留待入库文件
+- ✅ `git check-ignore -v '~$skill.docx'` 命中 `.gitignore:75`，工作区未跟踪项 0 个
 - ✅ 代码提交实测 31 个文件 +557/-222、文档提交实测 3 个文件 +812/-2，无任何 1.1GB 二进制进入索引
 
 ---
