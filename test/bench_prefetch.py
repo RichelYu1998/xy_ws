@@ -1,11 +1,17 @@
+"""
+相册接口首包耗时基准测试（不含浏览器开销，默认 30 次）
+
+用途：单独度量「启动预热 → 拿到第一页数据」这一段耗时，验证对冲请求把服务端
+首字节抖动（2~8 秒）压到了什么水平。
+运行方式：.venv/bin/python test/bench_prefetch.py
+"""
 import json
-import os
 import statistics
 import subprocess
-import sys
-import time
 
 RUNS = 30
+
+# 子进程脚本：只做预热 + 取首包，不启动浏览器，避免干扰耗时统计
 CHILD = r'''
 import json, os, sys, time
 sys.path.insert(0, os.getcwd())
@@ -24,6 +30,7 @@ print(json.dumps({
 
 rows = []
 for i in range(1, RUNS + 1):
+    # 每轮独立进程，确保预热状态从零开始
     proc = subprocess.run(
         ['.venv/bin/python', '-c', CHILD], capture_output=True, text=True, timeout=120,
     )
@@ -36,6 +43,7 @@ for i in range(1, RUNS + 1):
     print(f'{i:2d} | {row["seconds"]:6.2f}s | 命中={row["hit"]} | 商品={row["count"]:4d} | '
           f'error={row["error"]}', flush=True)
 
+# 汇总：首包耗时分布、超阈值次数、未命中次数、错误类型分布、商品数一致性
 secs = [r['seconds'] for r in rows]
 print('\n===== 相册接口首包耗时（不含浏览器） =====')
 print(f'样本: {len(secs)}  均值: {statistics.mean(secs):.2f}s  中位: {statistics.median(secs):.2f}s')

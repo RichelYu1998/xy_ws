@@ -1,7 +1,13 @@
-# Auto detect text files and perform LF normalization
+# ============================================================
+# Git 换行符与编码属性 —— 保证跨平台（Windows / macOS / Linux）检出结果一致
+# 规则：text=auto 让 Git 自动识别文本文件并统一换行；eol 指定检出时使用的换行符
+# 维护要求：新增文件类型时，必须在此补一行，否则 Windows 端会出现整文件 diff
+# ============================================================
+
+# ---------- 默认行为：自动识别文本文件，入库统一为 LF ----------
 * text=auto
 
-# Force LF for specific file types
+# ---------- 按文件类型强制换行符 ----------
 *.md text eol=lf
 *.py text eol=lf
 *.js text eol=lf
@@ -10,7 +16,7 @@
 *.json text eol=lf
 *.docx binary
 
-# Normalize all text files to UTF-8
+# ---------- 按文件类型强制工作区编码为 UTF-8（避免中文注释乱码） ----------
 *.md text working-tree-encoding=UTF-8
 *.py text working-tree-encoding=UTF-8
 *.js text working-tree-encoding=UTF-8

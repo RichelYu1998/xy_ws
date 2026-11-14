@@ -1,4 +1,12 @@
- <!DOCTYPE html>
+<!--
+  项目代码导览展示页（静态单文件，无需构建，直接用浏览器打开即可）
+  ============================================================
+  用途：把仓库里「实际存在的全部文件」按目录树展示出来，每个条目右侧配一句中文说明，
+        同时汇总依赖清单、环境要求、使用方法与本项目的开发范式。
+  数据来源：项目结构树为手工维护（必须与实际文件系统逐条对齐）；依赖清单与 requirements.txt 对齐。
+  维护要求：新增 / 改名 / 删除任何文件时，必须在同一次改动内更新下方「项目结构」一节。
+-->
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1658,6 +1666,7 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 </head>
 <body>
+    <!-- 顶部固定导航栏：右侧的 current-time 与 cookie-status 由页面脚本实时刷新 -->
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
         <div class="container">
             <a class="navbar-brand" href="#">
@@ -1682,6 +1691,7 @@
             </div>
         </div>
     </nav>
+    <!-- 首屏：标题、版本号徽标（由 /api/changelog 拉取最新版本）与快速开始入口 -->
     <section id="home" class="hero-section">
         <div class="container text-center">
             <h1>Szwego商品爬虫和货号对比工具</h1>
@@ -1699,6 +1709,7 @@
             </div>
         </div>
     </section>
+    <!-- 功能特性：按卡片分组介绍采集、对比、加密、通知等能力 -->
     <section id="features" class="py-5">
         <div class="container">
             <div class="section-title">
@@ -1790,6 +1801,7 @@
             </div>
         </div>
     </section>
+    <!-- 天气时钟看板：以 iframe 内嵌 dist/index.html 的独立前端应用 -->
     <section id="weather" class="py-5" style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);">
         <div class="container">
             <div class="section-title">
@@ -1818,6 +1830,7 @@
             </div>
         </div>
     </section>
+    <!-- 技术栈：与 requirements.txt 的依赖分类保持一致，供新环境核对 -->
     <section id="tech" class="tech-stack py-5">
         <div class="container">
             <div class="section-title">
@@ -1852,6 +1865,7 @@
             </div>
         </div>
     </section>
+    <!-- 项目结构：本页核心区块，导览树必须与仓库真实文件逐条对齐，每条右侧附中文说明 -->
     <section id="structure" class="py-5">
         <div class="container">
             <div class="section-title">
@@ -1871,6 +1885,9 @@ xy_ws/
 ├── tox.ini                      <span style="color: #909399;"># 多版本兼容性测试配置</span>
 ├── README.md                    <span style="color: #909399;"># 项目说明（本页数据来源）</span>
 ├── skill.md / skill.docx        <span style="color: #909399;"># 技能文档（md 与 docx 同版本）</span>
+├── clean_files.log              <span style="color: #909399;"># 文件清理日志</span>
+├── .gitignore / .gitattributes  <span style="color: #909399;"># Git 忽略规则与换行符配置</span>
+├── .idea/                       <span style="color: #409EFF;">📁 IDE 工程配置（不入库）</span>
 ├── config/                      <span style="color: #409EFF;">📁 配置目录</span>
 │   ├── config.json              <span style="color: #909399;"># 主配置（敏感字段加密）</span>
 │   ├── config.json.example      <span style="color: #909399;"># 配置模板（脱敏）</span>
@@ -1878,28 +1895,49 @@ xy_ws/
 │   ├── cookies.json.example     <span style="color: #909399;"># Cookie 模板</span>
 │   ├── input_stock_numbers.txt  <span style="color: #909399;"># 货号输入文件</span>
 │   ├── crypto_tool.py           <span style="color: #909399;"># 配置加解密工具（encrypt/decrypt/encrypt-config）</span>
-│   └── staging.json / production.json  <span style="color: #909399;"># 分环境配置</span>
+│   ├── staging.json / production.json  <span style="color: #909399;"># 分环境配置</span>
+│   ├── clean_allowed_roots.txt  <span style="color: #909399;"># 清理目录白名单（真实路径，不入库）</span>
+│   ├── clean_allowed_roots.example.txt  <span style="color: #909399;"># 白名单脱敏示例（仅格式说明）</span>
+│   ├── .env.example             <span style="color: #909399;"># 环境变量示例（登录凭证 / 邮件通知）</span>
+│   ├── .salt                    <span style="color: #909399;"># 密钥派生盐值（不入库）</span>
+│   └── .encryption_key          <span style="color: #909399;"># 配置加密密钥（不入库）</span>
 ├── file/                        <span style="color: #409EFF;">📁 数据目录</span>
 │   ├── 20260605微购相册(小旭数码).json  <span style="color: #909399;"># 按日期归档的商品数据</span>
 │   ├── 20260605微购相册(小旭数码)_cache.json  <span style="color: #909399;"># 当日缓存</span>
 │   ├── security_report_*.json   <span style="color: #909399;"># 安全审计报告</span>
+│   ├── security_audit_server_*.log  <span style="color: #909399;"># 审计服务端日志（按端口分文件）</span>
 │   ├── web_output.log / app.log <span style="color: #909399;"># 运行日志</span>
+│   ├── crash_history.log        <span style="color: #909399;"># 崩溃历史记录</span>
+│   ├── stderr_subprocess.log    <span style="color: #909399;"># 子进程错误输出</span>
+│   ├── watchdog.pid / watchdog_daemon.log  <span style="color: #909399;"># 看门狗进程号与守护日志</span>
+│   ├── clean_files.log          <span style="color: #909399;"># 清理执行记录</span>
+│   ├── fetch_progress_*.json    <span style="color: #909399;"># 断点续爬进度（按相册 ID 落盘）</span>
 │   └── tunnel_url.txt           <span style="color: #909399;"># 隧道公网地址</span>
 ├── dist/                        <span style="color: #409EFF;">📁 前端资源</span>
 │   ├── index.html               <span style="color: #909399;"># 天气时钟看板页</span>
 │   ├── app.js                   <span style="color: #909399;"># 前端主逻辑（调用本页各 API）</span>
-│   ├── manifest.webmanifest    <span style="color: #909399;"># PWA 清单</span>
-│   ├── sw.js / registerSW.js   <span style="color: #909399;"># PWA 离线缓存</span>
-│   ├── workbox-*.js            <span style="color: #909399;"># Workbox 运行时</span>
-│   ├── package.json            <span style="color: #909399;"># Node.js 依赖声明</span>
-│   ├── patches/                <span style="color: #909399;"># patch-package 补丁</span>
-│   ├── assets/                 <span style="color: #909399;"># 静态资源</span>
-│   ├── favicon/ / fonts/       <span style="color: #909399;"># 图标与字体</span>
-│   └── screenshots/ / weather-icons/  <span style="color: #909399;"># 截图与天气图标</span>
+│   ├── manifest.webmanifest     <span style="color: #909399;"># PWA 清单</span>
+│   ├── sw.js / registerSW.js    <span style="color: #909399;"># PWA 离线缓存</span>
+│   ├── workbox-*.js             <span style="color: #909399;"># Workbox 运行时</span>
+│   ├── package.json             <span style="color: #909399;"># Node.js 依赖声明</span>
+│   ├── package-lock.json        <span style="color: #909399;"># 依赖锁定</span>
+│   ├── patches/                 <span style="color: #909399;"># patch-package 补丁（hostc+1.3.0.patch）</span>
+│   ├── assets/                  <span style="color: #909399;"># 静态资源</span>
+│   ├── favicon/ / fonts/        <span style="color: #909399;"># 图标与字体</span>
+│   ├── screenshots/ / weather-icons/  <span style="color: #909399;"># 截图与天气图标</span>
+│   └── node_modules/            <span style="color: #909399;"># 前端依赖（不入库）</span>
 ├── test/                        <span style="color: #409EFF;">📁 测试与工具</span>
+│   ├── __init__.py              <span style="color: #909399;"># 包标记（test 包用途说明）</span>
 │   ├── generate_docx.py         <span style="color: #909399;"># skill.md → skill.docx</span>
-│   ├── security_audit.py        <span style="color: #909399;"># 安全审计脚本</span>
-│   └── salt_crypto_tool.py      <span style="color: #909399;"># 配置加解密工具</span>
+│   ├── security_audit.py        <span style="color: #909399;"># 安全审计脚本（零问题判定）</span>
+│   ├── salt_crypto_tool.py      <span style="color: #909399;"># 配置加解密工具（命令行）</span>
+│   ├── test_429_handling.py     <span style="color: #909399;"># 429 限流专项测试（8 场景 23 断言）</span>
+│   ├── bench_30.py              <span style="color: #909399;"># 爬虫总耗时 30 次基准测试</span>
+│   ├── bench_prefetch.py        <span style="color: #909399;"># 相册首包耗时基准测试</span>
+│   ├── diag_hedge.py            <span style="color: #909399;"># 对冲请求延迟诊断</span>
+│   ├── diag_lanes.py            <span style="color: #909399;"># 多路并发延迟分布诊断</span>
+│   └── diag_fallback.py         <span style="color: #909399;"># 预热失败兜底路径诊断</span>
+├── temp/                        <span style="color: #409EFF;">📁 临时脚本目录（验证后即清空）</span>
 ├── tools/                       <span style="color: #409EFF;">📁 本地化工具链</span>
 │   ├── playwright/              <span style="color: #909399;"># 内置 Chromium 浏览器</span>
 │   ├── cloudflared/             <span style="color: #909399;"># Cloudflare 隧道</span>
@@ -1912,6 +1950,7 @@ xy_ws/
             </div>
         </div>
     </section>
+    <!-- 使用方法：首次配置 / 日常启动 / 依赖安装，内容由页面脚本注入 -->
     <section id="usage" class="py-5" style="background: #f8f9fa;">
         <div class="container">
             <div class="section-title">

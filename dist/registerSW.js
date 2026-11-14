@@ -1,1 +1,2 @@
+// 文件说明：Service Worker 注册脚本（构建生成，仅 1 行）。职责：页面 load 后注册 ./sw.js，作用域为当前目录，使看板具备离线缓存能力。
 if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('./sw.js', { scope: './' })})}

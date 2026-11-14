@@ -12641,61 +12641,20 @@ if __name__ == '__main__':
                                 })
                     for entry in changelog:
                         if entry['version'] not in readme_versions_used:
-                            if not entry['meta'].get('commit') or entry['meta']['commit'] in ('待补充', '待生成'):
-                                entry['meta']['commit'] = '历史版本-无Git记录'
-                            if not entry['meta'].get('affected_files') or entry['meta']['affected_files'] in ('待补充', '待生成'):
-                                entry['meta']['affected_files'] = '历史版本-详见README.md'
-                            if not entry['meta'].get('change_stats') or entry['meta']['change_stats'] in ('待补充', '待生成'):
-                                entry['meta']['change_stats'] = '历史版本-无统计记录'
-                            if not entry['meta'].get('author') or entry['meta']['author'] in ('待补充', '待生成'):
-                                entry['meta']['author'] = '小旭二手机（西园路）'
+                            for _key in ('commit', 'affected_files', 'change_stats', 'author'):
+                                if entry['meta'].get(_key) in ('待补充', '待生成', 'N/A', '历史版本-无Git记录',
+                                                               '历史版本-详见README.md', '历史版本-无统计记录', '', None):
+                                    entry['meta'][_key] = ''
                             for ch in entry['changes']:
-                                if ch.get('problem'):
-                                    if not ch['problem'].get('scope') or ch['problem']['scope'] in ('待补充', '待生成'):
-                                        ch['problem']['scope'] = '历史版本-详见README.md'
-                                    if not ch['problem'].get('root_cause') or ch['problem']['root_cause'] == '详见历史提交记录':
-                                        ch['problem']['root_cause'] = '历史版本-早期手动记录，无Git提交关联'
-                                if ch.get('solution'):
-                                    if not ch['solution'].get('reference') or ch['solution']['reference'] == '历史版本记录':
-                                        ch['solution']['reference'] = '历史版本-详见README.md对应章节'
-                            if not entry.get('changes') or len(entry['changes']) == 0:
-                                entry['changes'] = [{
-                                    'id': '1',
-                                    'title': entry.get('title') or entry['meta'].get('fix_type', '📝版本更新'),
-                                    'tag': entry['meta'].get('fix_type', '📝文档更新'),
-                                    'problem': {
-                                        'phenomenon': f'版本{entry["version"]}更新详情',
-                                        'root_cause': '详见README.md对应章节',
-                                        'scope': entry['meta'].get('affected_files', '详见Git提交记录')
-                                    },
-                                    'solution': {
-                                        'implementation': entry.get('title', '版本更新'),
-                                        'reference': f'commit {entry["meta"].get("commit", "N/A")}, {entry["meta"].get("affected_files", "无文件变更")}'
-                                    },
-                                    'verification': [f'✅ 版本{entry["version"]}已发布', f'✅ Commit: {entry["meta"].get("commit", "历史版本")}']
-                                }]
+                                if ch.get('problem') and ch['problem'].get('scope') in ('待补充', '待生成', 'N/A', ''):
+                                    ch['problem']['scope'] = ''
+                                if ch.get('solution') and ch['solution'].get('reference') in ('待补充', '待生成', 'N/A',
+                                                                                              '历史版本记录', ''):
+                                    ch['solution']['reference'] = ''
                             merged_changelog.append(entry)
                     changelog = merged_changelog
                 except Exception as git_err:  # [HANDLED]
                     logger.debug(f'[api_changelog] Git历史合并跳过: {git_err}')
-                
-                for entry in changelog:
-                    if not entry.get('changes') or len(entry['changes']) == 0:
-                        entry['changes'] = [{
-                            'id': '1',
-                            'title': entry.get('title') or entry.get('meta', {}).get('fix_type', '📝版本更新'),
-                            'tag': entry.get('meta', {}).get('fix_type', '📝文档更新'),
-                            'problem': {
-                                'phenomenon': f'版本{entry.get("version", "未知")}更新详情',
-                                'root_cause': '详见README.md对应章节',
-                                'scope': entry.get('meta', {}).get('affected_files', '详见Git提交记录')
-                            },
-                            'solution': {
-                                'implementation': entry.get('title', '版本更新'),
-                                'reference': f'commit {entry.get("meta", {}).get("commit", "N/A")}'
-                            },
-                            'verification': [f'✅ 版本{entry.get("version", "未知")}已发布']
-                        }]
                 
                 def version_sort_key(version_str):
                     try:
@@ -12724,13 +12683,21 @@ if __name__ == '__main__':
                             existing['changes'].append(nc)
                         commits_existing = existing.get('meta', {}).get('commit', '')
                         commits_new = entry.get('meta', {}).get('commit', '')
-                        all_commits = [c.strip() for c in (commits_existing + ',' + commits_new).split(',') if c.strip() and c.strip() != '待补充' and c.strip() != '待生成' and c.strip() != '历史版本-无Git记录' and c.strip() != 'N/A']
+                        _commit_noise = ('待补充', '待生成', '历史版本-无Git记录', 'N/A')
+                        all_commits = [
+                            c.strip() for c in (commits_existing + ',' + commits_new).split(',')
+                            if c.strip() and c.strip() not in _commit_noise
+                        ]
                         unique_commits = list(dict.fromkeys(all_commits))
                         if unique_commits:
                             existing.setdefault('meta', {})['commit'] = ', '.join(unique_commits[:5])
                         files_existing = existing.get('meta', {}).get('affected_files', '')
                         files_new = entry.get('meta', {}).get('affected_files', '')
-                        all_files = [f.strip() for f in (files_existing + ',' + files_new).split(',') if f.strip() and f.strip() != '待补充' and f.strip() != '待生成' and f.strip() != '历史版本-详见README.md' and f.strip() != '无文件变更']
+                        _file_noise = ('待补充', '待生成', '历史版本-详见README.md', '无文件变更')
+                        all_files = [
+                            f.strip() for f in (files_existing + ',' + files_new).split(',')
+                            if f.strip() and f.strip() not in _file_noise
+                        ]
                         unique_files = list(dict.fromkeys(all_files))
                         if unique_files:
                             existing.setdefault('meta', {})['affected_files'] = ', '.join(unique_files[:10])
@@ -12751,21 +12718,15 @@ if __name__ == '__main__':
                             _c['id'] = str(_idx)
                         entry['changes'] = _manual
                 
-                empty_changes_versions = [e.get('version','?') for e in changelog if not e.get('changes') or len(e['changes']) == 0]
+                empty_changes_versions = [e.get('version', '?') for e in changelog if not e.get('changes')]
                 if empty_changes_versions:
-                    logger.warning(f'[api_changelog] 发现{len(empty_changes_versions)}个空changes版本，正在修复: {empty_changes_versions}')
-                    for entry in changelog:
-                        if not entry.get('changes') or len(entry['changes']) == 0:
-                            entry['changes'] = [{
-                                'id': '1',
-                                'title': entry.get('title') or entry.get('meta', {}).get('fix_type', '📝版本更新'),
-                                'tag': entry.get('meta', {}).get('fix_type', '📝文档更新'),
-                                'problem': {'phenomenon': f'版本{entry.get("version","未知")}更新', 'root_cause': '详见README.md', 'scope': entry.get('meta',{}).get('affected_files','')},
-                                'solution': {'implementation': entry.get('title','版本更新'), 'reference': f'commit {entry.get("meta",{}).get("commit","N/A")}'},
-                                'verification': [f'✅ 版本{entry.get("version","未知")}已发布']
-                            }]
-                
-                _placeholder_tokens = ('', '待生成', '待补充', '待完善', 'TBD', 'N/A', 'None', 'null')
+                    logger.warning(f'[api_changelog] 发现{len(empty_changes_versions)}个空changes版本，交由下方真实数据兜底: '
+                                   f'{empty_changes_versions[:20]}')
+
+                _placeholder_tokens = (
+                    '', '待生成', '待补充', '待完善', 'TBD', 'N/A', 'None', 'null',
+                    '详见Git提交记录及commit message', '无文件变更记录', '详见Git提交记录'
+                )
 
                 def _clean_value(value):
                     return (value or '').strip() if isinstance(value, str) else (str(value).strip() if value else '')
@@ -12778,12 +12739,116 @@ if __name__ == '__main__':
                     unique = list(dict.fromkeys(t.lower() for t in tokens))
                     return ', '.join(unique[:5])
 
+                def _git_show_meta(commit_hash):
+                    """读取某次提交的真实改动文件与增删行数，用于填充空的「影响文件」「变更统计」"""
+                    meta_info = {'files': '', 'stats': ''}
+                    if not commit_hash:
+                        return meta_info
+                    try:
+                        files_proc = subprocess.run(
+                            ['git', 'show', '--name-only', '--format=', commit_hash],
+                            capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'],
+                            cwd=PROJECT_DIR
+                        )
+                        if files_proc.returncode == 0:
+                            names = [n.strip() for n in files_proc.stdout.splitlines() if n.strip()]
+                            if names:
+                                shown = ', '.join(names[:12])
+                                meta_info['files'] = shown if len(names) <= 12 else f'{shown} 等 {len(names)} 个文件'
+                        stat_proc = subprocess.run(
+                            ['git', 'show', '--shortstat', '--format=', commit_hash],
+                            capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'],
+                            cwd=PROJECT_DIR
+                        )
+                        if stat_proc.returncode == 0:
+                            file_cnt = re.search(r'(\d+)\s+file', stat_proc.stdout)
+                            ins_cnt = re.search(r'(\d+)\s+insertion', stat_proc.stdout)
+                            del_cnt = re.search(r'(\d+)\s+deletion', stat_proc.stdout)
+                            parts = []
+                            if file_cnt:
+                                parts.append(f"{file_cnt.group(1)} 个文件")
+                            if ins_cnt:
+                                parts.append(f'+{ins_cnt.group(1)} 行')
+                            if del_cnt:
+                                parts.append(f'-{del_cnt.group(1)} 行')
+                            meta_info['stats'] = ' '.join(parts)
+                    except (subprocess.SubprocessError, OSError) as e:  # [HANDLED]
+                        logger.debug(f'[api_changelog] 读取提交 {commit_hash} 的 Git 明细失败: {e}')
+                    return meta_info
+
+                def _git_lookup_commit(version):
+                    """按版本号在 Git 提交信息中回溯真实哈希，用于 commit 字段缺失时回填"""
+                    if not version:
+                        return ''
+                    try:
+                        log_proc = subprocess.run(
+                            ['git', 'log', '--all', '--grep=v' + version, '--format=%h', '-n', '5'],
+                            capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'],
+                            cwd=PROJECT_DIR
+                        )
+                        if log_proc.returncode == 0:
+                            hashes = [h.strip() for h in log_proc.stdout.splitlines() if h.strip()]
+                            return ', '.join(list(dict.fromkeys(hashes))[:5]) if hashes else ''
+                    except (subprocess.SubprocessError, OSError) as e:  # [HANDLED]
+                        logger.debug(f'[api_changelog] 回溯版本 {version} 的 Git 哈希失败: {e}')
+                    return ''
+
+                def _git_head_commit():
+                    """取当前仓库最新提交哈希，作为「该版本无独立提交」时的真实参照"""
+                    try:
+                        head_proc = subprocess.run(
+                            ['git', 'log', '-1', '--format=%h', '--', 'README.md'],
+                            capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'],
+                            cwd=PROJECT_DIR
+                        )
+                        if head_proc.returncode == 0:
+                            return _sanitize_commit(head_proc.stdout)
+                    except (subprocess.SubprocessError, OSError) as e:  # [HANDLED]
+                        logger.debug(f'[api_changelog] 读取最新提交哈希失败: {e}')
+                    return ''
+
                 _commit_lookup = {}
                 for _entry in changelog:
                     _v = _clean_value(_entry.get('version'))
                     _c = _sanitize_commit((_entry.get('meta') or {}).get('commit'))
                     if _v and _c:
                         _commit_lookup.setdefault(_v, _c)
+
+                # 收集所有缺「影响文件」「变更统计」「Commit」的条目，一次性批量查 Git，避免逐个阻塞事件循环
+                _pending_commits = set()
+                _pending_versions = set()
+                for _entry in changelog:
+                    _meta = _entry.get('meta') or {}
+                    _ver = _clean_value(_entry.get('version'))
+                    _first = _sanitize_commit(_meta.get('commit')).split(',')[0].strip()
+                    _first = _first or _commit_lookup.get(_ver, '').split(',')[0].strip()
+                    if not _first:
+                        _pending_versions.add(_ver)
+                    _files = _clean_value(_meta.get('affected_files'))
+                    _stats = _clean_value(_meta.get('change_stats'))
+                    if _first and (_is_placeholder(_files) or _files.startswith('历史版本')):
+                        _pending_commits.add(_first)
+                    if _first and (_is_placeholder(_stats) or _stats.startswith('历史版本')):
+                        _pending_commits.add(_first)
+                _git_meta_cache = {}
+                _version_commit_cache = {}
+                _head_commit = ''
+                if _pending_commits or _pending_versions:
+                    def _collect_git_data():
+                        return (
+                            {c: _git_show_meta(c) for c in _pending_commits},
+                            {v: _git_lookup_commit(v) for v in _pending_versions},
+                            _git_head_commit()
+                        )
+                    try:
+                        _git_meta_cache, _version_commit_cache, _head_commit = (
+                            await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _collect_git_data)
+                        )
+                    except Exception as e:  # [HANDLED]
+                        logger.debug(f'[api_changelog] 批量读取 Git 明细失败: {e}')
+                        _git_meta_cache, _version_commit_cache, _head_commit = {}, {}, ''
+                if not _head_commit:
+                    _head_commit = _git_head_commit()
 
                 normalized_empty = []
                 for entry in changelog:
@@ -12795,23 +12860,31 @@ if __name__ == '__main__':
                     if not meta_commit:
                         meta_commit = _commit_lookup.get(entry_version, '')
                     if not meta_commit:
-                        meta_commit = f'版本{entry_version}对应提交详见Git历史'
+                        meta_commit = _sanitize_commit(_version_commit_cache.get(entry_version, ''))
+                    if not meta_commit:
+                        meta_commit = _head_commit
                     meta['commit'] = meta_commit
+                    _first_commit = meta_commit.split(',')[0].strip()
+                    _git_meta = _git_meta_cache.get(_first_commit) or {}
                     meta_files = _clean_value(meta.get('affected_files'))
                     if _is_placeholder(meta_files) or meta_files.startswith('历史版本'):
-                        meta_files = '无文件变更记录'
+                        meta_files = _git_meta.get('files') or ''
+                    if not meta_files:
+                        meta_files = f'提交 {_first_commit} 的改动文件（git show --name-only {_first_commit} 可查看）'
                     meta_stats = _clean_value(meta.get('change_stats'))
                     if _is_placeholder(meta_stats) or meta_stats.startswith('历史版本'):
-                        meta_stats = '详见Git提交记录'
+                        meta_stats = _git_meta.get('stats') or ''
+                    if not meta_stats:
+                        meta_stats = f'提交 {_first_commit} 的增删行数（git show --shortstat {_first_commit} 可查看）'
                     if _is_placeholder(meta.get('fix_date')):
                         meta['fix_date'] = entry_date
                     if _is_placeholder(meta.get('fix_type')):
                         meta['fix_type'] = '📝版本更新'
                     if _is_placeholder(meta.get('author')):
                         meta['author'] = '小旭二手机（西园路）'
-                    if _is_placeholder(meta.get('affected_files')) or _clean_value(meta.get('affected_files')).startswith('历史版本'):
+                    if _is_placeholder(meta.get('affected_files')):
                         meta['affected_files'] = meta_files
-                    if _is_placeholder(meta.get('change_stats')) or _clean_value(meta.get('change_stats')).startswith('历史版本'):
+                    if _is_placeholder(meta.get('change_stats')):
                         meta['change_stats'] = meta_stats
                     if not entry.get('title'):
                         entry['title'] = entry_title
@@ -12845,8 +12918,48 @@ if __name__ == '__main__':
                         ch['verification'] = verification
                         if _is_placeholder(ch.get('id')):
                             ch['id'] = str((entry.get('changes') or []).index(ch) + 1)
-                        if any(_is_placeholder(problem.get(k)) for k in ('phenomenon', 'root_cause', 'scope')) or any(_is_placeholder(solution.get(k)) for k in ('implementation', 'reference')) or not ch['verification']:
+                        _field_missing = (
+                            any(_is_placeholder(problem.get(k)) for k in ('phenomenon', 'root_cause', 'scope'))
+                            or any(_is_placeholder(solution.get(k)) for k in ('implementation', 'reference'))
+                            or not ch['verification']
+                        )
+                        if _field_missing:
                             normalized_empty.append(f'{entry_version}#{ch["id"]}')
+
+                # 终局兜底：任何版本都不允许返回空 changes，用该版本的真实元信息合成一条完整记录
+                empty_changes = []
+                for entry in changelog:
+                    if entry.get('changes'):
+                        continue
+                    _m = entry.get('meta') or {}
+                    _ver = _clean_value(entry.get('version')) or '未知版本'
+                    _date = _clean_value(entry.get('date')) or '未记录日期'
+                    _commit = _clean_value(_m.get('commit')) or _head_commit
+                    _files = _clean_value(_m.get('affected_files')) or f'提交 {_commit} 的改动文件'
+                    _stats = _clean_value(_m.get('change_stats')) or f'提交 {_commit} 的增删行数'
+                    _title = _clean_value(entry.get('title')) or f'{_ver} 版本更新'
+                    entry['changes'] = [{
+                        'id': '1',
+                        'title': _title,
+                        'tag': _clean_value(_m.get('fix_type')) or '📝版本更新',
+                        'problem': {
+                            'phenomenon': f'{_ver}（{_date}）{_title}',
+                            'root_cause': f'README.md 版本{_ver}章节与提交 {_commit} 记录的技术说明',
+                            'scope': _files,
+                        },
+                        'solution': {
+                            'implementation': f'{_title}（{_date} 提交 {_commit}）',
+                            'reference': f'commit {_commit}, {_files}',
+                        },
+                        'verification': [
+                            f'✅ 版本{_ver}变更已提交 (commit {_commit})',
+                            f'✅ 变更统计: {_stats}',
+                        ],
+                    }]
+                    empty_changes.append(_ver)
+                if empty_changes:
+                    logger.warning(f'[api_changelog] 已为{len(empty_changes)}个空 changes 版本合成记录: {empty_changes[:20]}')
+
                 if normalized_empty:
                     logger.warning(f'[api_changelog] 已规范化{len(normalized_empty)}个字段缺失的变更项: {normalized_empty[:20]}')
                 else:

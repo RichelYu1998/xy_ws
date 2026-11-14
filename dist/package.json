@@ -1,4 +1,5 @@
 {
+  "_comment": "前端产物目录的 Node 依赖清单：cloudflared=Cloudflare 隧道客户端；hostc=另一款内网穿透客户端（配合 patches/ 下的补丁修复 WebSocket 超时崩溃）；patch-package=在 postinstall 阶段自动应用 patches/ 目录中的补丁。本字段为中文注释，npm 会忽略未知字段。",
   "name": "xy_ws-dist",
   "version": "1.0.0",
   "description": "xy_ws dist dependencies (hostc tunnel)",

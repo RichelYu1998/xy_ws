@@ -1,4 +1,10 @@
 <!doctype html>
+<!--
+  天气时钟看板入口页（前端构建产物，由 Vite 打包生成）
+  ============================================================
+  用途：作为独立 PWA 应用，被项目根目录 index.html 的「天气时钟看板」区块以内嵌方式引用。
+  注意：assets/ 下带哈希的 js/css 与本文件由构建工具同步产出，手工改动会在下次构建时被覆盖。
+-->
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -19,6 +25,7 @@
   <link rel="manifest" href="./manifest.webmanifest"></head>
   <body>
     <div id="app"></div>
+    <!-- 访客徽标挂载点：运行时由脚本在此处插入访问统计徽标，构建阶段保持为空 -->
     <!-- VISITOR_BADGE_PLACEHOLDER -->
   </body>
 </html>

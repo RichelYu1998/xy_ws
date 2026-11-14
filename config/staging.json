@@ -1,4 +1,5 @@
 {
+  "_comment": "预发布环境（staging）参数集：限流更宽松、缓存 TTL 更短、日志级别 DEBUG，便于联调时快速看到问题。字段说明：rate_limit=接口与上传的滑动窗口限流；cache=JSON/配置/静态资源的缓存有效期（秒）；alerts=CPU/内存/磁盘告警阈值（百分比）；logging=日志级别、单文件上限与备份份数；server=监听地址、端口与调试开关。",
   "environment": "staging",
   "rate_limit": {
     "api_max_requests": 200,

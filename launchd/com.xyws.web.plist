@@ -1,10 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS launchd 开机守护配置
+  ============================================================
+  用途：让本服务随登录自动拉起，并在崩溃后自动重启（等价于 Linux 的 systemd）
+  安装：cp launchd/com.xyws.web.plist ~/Library/LaunchAgents/
+        launchctl load ~/Library/LaunchAgents/com.xyws.web.plist
+  卸载：launchctl unload ~/Library/LaunchAgents/com.xyws.web.plist
+  注意：本文件内的路径为绝对路径，换机器部署时必须整段替换成新机器路径
+-->
 <plist version="1.0">
 <dict>
+    <!-- 服务唯一标识，须与文件名 com.xyws.web.plist 保持一致 -->
     <key>Label</key>
     <string>com.xyws.web</string>
 
+    <!-- 启动命令：用项目虚拟环境里的 Python 跑 main.py，以看门狗 + Web 模式监听 8888 端口 -->
     <key>ProgramArguments</key>
     <array>
         <string>/Users/yu/Downloads/demo/python/xy_ws/.venv/bin/python</string>
@@ -15,9 +26,11 @@
         <string>8888</string>
     </array>
 
+    <!-- 工作目录：必须是项目根目录，否则相对路径的 config/ 与 file/ 会找不到 -->
     <key>WorkingDirectory</key>
     <string>/Users/yu/Downloads/demo/python/xy_ws</string>
 
+    <!-- 环境变量：关闭 Python 输出缓冲（否则日志延迟刷盘）；指定内置 Playwright 浏览器目录 -->
     <key>EnvironmentVariables</key>
     <dict>
         <key>PYTHONUNBUFFERED</key>
@@ -26,18 +39,22 @@
         <string>/Users/yu/Downloads/demo/python/xy_ws/tools/playwright/macos</string>
     </dict>
 
+    <!-- 登录后立即启动 -->
     <key>RunAtLoad</key>
     <true/>
 
+    <!-- 保活策略：只要不是正常退出（退出码非 0）就自动重启 -->
     <key>KeepAlive</key>
     <dict>
         <key>SuccessfulExit</key>
         <false/>
     </dict>
 
+    <!-- 重启节流：两次拉起之间至少间隔 30 秒，避免崩溃循环把 CPU 打满 -->
     <key>ThrottleInterval</key>
     <integer>30</integer>
 
+    <!-- 标准输出与错误输出的落盘位置（都放在 file/ 目录，已被 .gitignore 忽略） -->
     <key>StandardOutPath</key>
     <string>/Users/yu/Downloads/demo/python/xy_ws/file/launchd_out.log</string>
 

@@ -5,6 +5,19 @@ cd /d "%~dp0"
 set PYTHONIOENCODING=utf-8
 title Szwego Crawler Tool
 
+:: ============================================================
+:: Windows 一键启动脚本
+:: ============================================================
+:: 用途：在 Windows 上自动完成「提权 -> 环境自检 -> 依赖安装 -> 启动服务」全流程
+:: 用法：双击本文件，或在 cmd 中执行 run.bat
+:: 流程：1) check_admin_rights  检测并以管理员权限重启自身
+::       2) check_prerequisites 检测 Python / Node / Playwright 等前置条件
+::       3) 读取 README.md 中的版本号用于控制台标题与日志
+::       4) 缺依赖时从国内镜像（华为云 / npmmirror / 清华）自动安装
+::       5) 最终调用 main.py 启动 Web 服务与爬虫
+:: 注意：本脚本所有路径均以 %~dp0（脚本所在目录）为基准，可从任意位置调用
+:: ============================================================
+
 call :check_admin_rights
 if errorlevel 1 (
     call :log [*] 正在请求管理员权限...

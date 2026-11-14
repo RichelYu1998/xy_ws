@@ -1,3 +1,12 @@
+# patch-package 补丁：修复 hostc 内网穿透在 WebSocket 连接超时时的未捕获 error 事件
+# ============================================================
+# 用途：hostc 在连接超时分支直接 close 尚未连通的 socket，会触发未监听的 "error" 事件，
+#       导致 Node 进程因未捕获异常整体退出（表现为隧道突然断开）。
+# 修复：1) 超时分支先挂一个空的 error 监听再关闭；2) 关闭函数区分 CONNECTING 状态，
+#       该状态下改用 terminate 并忽略后续 error；3) 兜底 terminate 也包在 try 内。
+# 生效：dist/package.json 的 postinstall 钩子会执行 patch-package 自动打上本补丁。
+# 维护：升级 hostc 版本后需重新生成同名补丁，文件名中的版本号必须与实际依赖版本一致。
+# ============================================================
 diff --git a/node_modules/hostc/dist/index.js b/node_modules/hostc/dist/index.js
 index c3907f7..9467ab3 100644
 --- a/node_modules/hostc/dist/index.js

@@ -15,21 +15,25 @@ from docx.oxml import OxmlElement
 
 
 class MarkdownToDocxConverter:
+    """Markdown → DOCX 转换器：负责样式预置、导航区置顶、书签锚点与表格渲染"""
 
     def __init__(self):
+        """初始化转换器：新建文档、预置样式、准备书签映射"""
         self.doc = Document()
         self._setup_styles()
-        self.heading_bookmarks = {}  # Store heading -> bookmark mapping for second pass
-        self.nav_table_cell = None   # Reference to navigation table cell for post-processing
+        self.heading_bookmarks = {}  # 标题书签映射：锚点 -> 段落对象
+        self.nav_table_cell = None   # 导航表格单元格引用，供后处理使用
 
     @staticmethod
     def _clean_text(text):
+        """清洗文本：剔除 Word 不接受的非法控制字符"""
         if not isinstance(text, str):
             text = str(text)
         text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', text)
         return text
 
     def _setup_styles(self):
+        """预置正文与各级标题样式（中文字体、字号、颜色、行距）"""
         style = self.doc.styles['Normal']
         font = style.font
         font.name = 'Microsoft YaHei'
@@ -64,16 +68,15 @@ class MarkdownToDocxConverter:
 
 
     def _post_process_navigation_links(self):
-        """Post-process to ensure all navigation links have valid bookmarks"""
-        from docx.oxml.shared import OxmlElement, qn
-        
-        # First pass: ensure all H2/H3 headings have bookmarks
+        """后处理：确保所有导航链接都指向有效的书签锚点"""
+
+        # 第一遍：保证所有 H2/H3 标题都已带上书签
         for para in self.doc.paragraphs:
             if para.style.name.startswith('Heading 2') or para.style.name.startswith('Heading 3'):
                 text = para.text.strip()
                 if text:
                     bookmark_id = self._generate_bookmark_id(text)
-                    # Check if bookmark already exists
+                    # 检查该段落是否已有书签，避免重复插入
                     has_bookmark = False
                     for child in para._p:
                         if child.tag.endswith('bookmarkStart'):
@@ -81,73 +84,74 @@ class MarkdownToDocxConverter:
                             break
                     if not has_bookmark:
                         self._add_bookmark_to_paragraph(para, bookmark_id)
-        
-        # Second pass: update navigation table hyperlinks (if table exists and is nav table)
+
+        # 第二遍：把导航表格里的链接改写为内部超链接（仅当表格存在且确为导航表）
         if self.doc.tables:
             table = self.doc.tables[0]
-            # Check if this is navigation table
+            # 判断首张表格是否为导航表（表头同时含「章节」与「位置/说明」）
             is_nav = False
             for cell in table.rows[0].cells:
                 if '章节' in cell.text and ('位置' in cell.text or '说明' in cell.text):
                     is_nav = True
                     break
-            
+
             if is_nav:
                 for row in table.rows[1:]:
                     if len(row.cells) >= 3:
                         cell = row.cells[2]
                         for para in cell.paragraphs:
                             text = para.text.strip()
-                            # Parse markdown link format
+                            # 解析 markdown 链接格式 [显示文本](#锚点)
                             link_match = re.match(r'\[([^\]]+)\]\(([^)]+)\)', text)
                             if link_match:
                                 display_text = link_match.group(1)
                                 anchor = link_match.group(2).lstrip('#')
-                                
-                                # Clear existing content
+
+                                # 清空原有内容，避免残留纯文本
                                 para.clear()
-                                
-                                # Create new hyperlink with proper styling
+
+                                # 重建为带样式的内部超链接
                                 hyperlink = OxmlElement('w:hyperlink')
                                 hyperlink.set(qn('w:anchor'), anchor)
-                                
+
                                 run = OxmlElement('w:r')
                                 rPr = OxmlElement('w:rPr')
-                                
+
                                 color = OxmlElement('w:color')
                                 color.set(qn('w:val'), '0066CC')
                                 rPr.append(color)
-                                
+
                                 u = OxmlElement('w:u')
                                 u.set(qn('w:val'), 'single')
                                 rPr.append(u)
-                                
+
                                 b = OxmlElement('w:b')
                                 rPr.append(b)
-                                
+
                                 sz = OxmlElement('w:sz')
                                 sz.set(qn('w:val'), '20')
                                 rPr.append(sz)
-                                
+
                                 run.append(rPr)
-                                
+
                                 t_elem = OxmlElement('w:t')
                                 t_elem.set(qn('xml:space'), 'preserve')
                                 t_elem.text = f'🔗 {display_text}'
                                 run.append(t_elem)
-                                
+
                                 hyperlink.append(run)
                                 para._p.append(hyperlink)
-                                
+
                                 hint = para.add_run(' (点击跳转)')
                                 hint.font.size = Pt(9)
                                 hint.font.color.rgb = RGBColor(128, 128, 128)
                                 hint.font.italic = True
+
     def _normalize_fences(self, lines):
-        """Normalize markdown fences to match author's convention:
-        - ```lang always opens a new block (close previous if open)
-        - ``` always closes the nearest open block
-        - Unclosed blocks auto-close at headings or EOF
+        """规整 markdown 代码围栏，统一为作者的书写习惯：
+        - 带语言的 ```lang 总是开启一个新块（若上一块未关闭则先补一个关闭围栏）
+        - 不带语言的 ``` 总是关闭最近一个未关闭的块
+        - 未关闭的块在遇到标题或文件末尾时自动补上关闭围栏
         """
         result = []
         is_open = False
@@ -177,17 +181,17 @@ class MarkdownToDocxConverter:
         return result
 
     def convert(self, md_path: str, output_path: str = 'skill.docx'):
+        """把 markdown 源文件完整转换为 docx 文档"""
         md_content = Path(md_path).read_text(encoding='utf-8')
         raw_lines = md_content.split('\n')
         lines = self._normalize_fences(raw_lines)
 
-        # Pull the navigation section out of the body so it can be rendered
-        # on page 1 regardless of where it sits in the markdown source.
+        # 把导航区块从正文中抽出来，保证它固定渲染在第 1 页，
+        # 不受它在 markdown 源文件里所处位置的限制。
         nav_block, lines = self._extract_nav_block(lines)
 
-        # First pass: collect all heading bookmark IDs so navigation links
-        # can reference them even though the nav table appears BEFORE the headings
-        # Must also respect fence state!
+        # 第一遍：先收集所有标题的书签 ID，因为导航表出现在标题之前，
+        # 必须提前建好锚点映射才能生成有效链接；同时必须跟随代码围栏状态跳过代码块内内容。
         is_open = False
         for line in lines:
             if line.startswith('```'):
@@ -199,8 +203,8 @@ class MarkdownToDocxConverter:
                 if 2 <= level <= 3:
                     bookmark_id = self._generate_bookmark_id(text)
                     self.heading_bookmarks[bookmark_id] = None
-        
-        # Second pass: generate doc content
+
+        # 第二遍：按行生成文档正文内容
         nav_placed = False
         i = 0
         while i < len(lines):
@@ -239,10 +243,10 @@ class MarkdownToDocxConverter:
         return output_path
 
     def _extract_nav_block(self, lines):
-        """Detect the navigation section (heading + intro + table) and cut it out.
+        """识别导航区块（标题 + 引言 + 表格）并把它从正文中剪切出来。
 
-        Returns (nav_block, remaining_lines). nav_block is None when no
-        navigation table (header containing 章节 + 位置/说明) is present.
+        返回 (nav_block, remaining_lines)；当不存在导航表
+        （表头同时含「章节」与「位置/说明」）时 nav_block 为 None。
         """
         for idx, line in enumerate(lines):
             if not (line.startswith('|') and '|' in line[1:]):
@@ -276,7 +280,7 @@ class MarkdownToDocxConverter:
         return None, lines
 
     def _render_nav_block(self, block):
-        """Render the navigation block at the top of page 1, then force a page break."""
+        """把导航区块渲染到第 1 页顶部，随后强制分页"""
         i = 0
         while i < len(block):
             line = block[i]
@@ -291,17 +295,18 @@ class MarkdownToDocxConverter:
         self.doc.add_page_break()
 
     def _handle_heading(self, lines, start_idx):
+        """处理 markdown 标题行：写入标题样式，并为 H2/H3 挂上书签"""
         line = lines[start_idx]
         level = len(line) - len(line.lstrip('#'))
         text = line.lstrip('#').strip()
-        
+
         if level <= 6:
             para = self.doc.add_heading(text, level=level if level > 0 else 0)
-            # Add bookmark for navigation links (only for H2 and H3 headings)
+            # 只有 H2/H3 标题参与导航，为其添加书签锚点
             if level >= 2 and level <= 3:
                 bookmark_id = self._generate_bookmark_id(text)
                 self._add_bookmark_to_paragraph(para, bookmark_id)
-                # Store mapping for later use
+                # 记录锚点与段落的映射，供后续导航链接查找
                 self.heading_bookmarks[bookmark_id] = para
         else:
             para = self.doc.add_paragraph()
@@ -312,6 +317,7 @@ class MarkdownToDocxConverter:
         return start_idx + 1
 
     def _handle_code_block(self, lines, start_idx):
+        """处理代码块：整块渲染为等宽字体 + 浅灰底纹，保留原始换行"""
         first_line = lines[start_idx]
         language = first_line[3:].strip() if len(first_line) > 3 else ''
         
@@ -343,6 +349,7 @@ class MarkdownToDocxConverter:
         return start_idx + 1
 
     def _handle_blockquote(self, lines, start_idx):
+        """处理引用块：连续以 > 开头的行合并为一个左缩进段落"""
         quote_lines = []
         while start_idx < len(lines) and lines[start_idx].startswith('>'):
             quote_text = lines[start_idx].lstrip('>').strip()
@@ -358,6 +365,7 @@ class MarkdownToDocxConverter:
         return start_idx
 
     def _handle_table(self, lines, start_idx):
+        """处理表格：跳过 --- 分隔行，导航表额外补一列可点击的跳转链接"""
         table_lines = []
         while start_idx < len(lines) and lines[start_idx].startswith('|'):
             table_lines.append(lines[start_idx])
@@ -373,12 +381,12 @@ class MarkdownToDocxConverter:
             if rows:
                 num_cols = max(len(row) for row in rows) if rows else 3
                 
-                # Check if navigation table (detect keywords across ALL header cells)
+                # 判断是否为导航表（在所有表头单元格里检索关键词）
                 has_chapter = any('章节' in cell for cell in rows[0])
                 has_location_or_desc = any('位置' in cell or '说明' in cell for cell in rows[0])
                 is_nav_table = has_chapter and has_location_or_desc
 
-                # For navigation table, add third column "位置（点击跳转）" in docx
+                # 导航表在 docx 中追加第三列「位置（点击跳转）」
                 docx_num_cols = num_cols + 1 if is_nav_table and num_cols == 2 else num_cols
                 table = self.doc.add_table(rows=1, cols=docx_num_cols)
                 table.style = 'Table Grid'
@@ -391,20 +399,20 @@ class MarkdownToDocxConverter:
                         for run in paragraph.runs:
                             run.bold = True
                 
-                # Add third column header for navigation table
+                # 为导航表补写第三列表头
                 if is_nav_table and num_cols == 2:
                     header_cells[2].text = '位置（点击跳转）'
                     for paragraph in header_cells[2].paragraphs:
                         for run in paragraph.runs:
                             run.bold = True
 
-                # Process data rows (add clickable links to last column)
+                # 逐行填充数据，导航表在最后一列写入可点击链接
                 for row_data in rows[1:]:
                     row = table.add_row().cells
                     for i, cell_text in enumerate(row_data[:num_cols]):
                         row[i].text = self._clean_text(cell_text)
-                    
-                    # Add clickable link in third column for navigation table
+
+                    # 导航表：第三列按章节名生成内部跳转链接
                     if is_nav_table and num_cols == 2:
                         chapter_name = row_data[0].strip() if len(row_data) > 0 else ''
                         self._add_clickable_link(row[2], '点击跳转', chapter_name)
@@ -412,6 +420,7 @@ class MarkdownToDocxConverter:
         return start_idx
 
     def _add_clickable_link(self, cell, text, chapter_name=None):
+        """在单元格内写入内部超链接，锚点优先取 markdown 链接，其次取章节名"""
         cell.text = ''
         para = cell.paragraphs[0]
 
@@ -462,7 +471,7 @@ class MarkdownToDocxConverter:
 
 
     def _generate_bookmark_id(self, title_text):
-        """Generate bookmark ID from title text (GitHub-style)"""
+        """由标题文本生成书签名（模拟 GitHub 锚点规则：小写、去标点、空格转连字符）"""
         anchor = title_text.lower()
         anchor = re.sub(r'[^\w\s\-]', '', anchor)
         anchor = anchor.replace(' ', '-')
@@ -470,6 +479,7 @@ class MarkdownToDocxConverter:
         return anchor.strip('-')
 
     def _find_heading_bookmark_id(self, markdown_anchor):
+        """按 markdown 锚点查找真实书签 ID：精确匹配 → 去连字符匹配 → 模糊包含匹配"""
         direct_id = self._generate_bookmark_id(markdown_anchor)
         if direct_id in self.heading_bookmarks:
             return direct_id
@@ -488,22 +498,23 @@ class MarkdownToDocxConverter:
         return direct_id
 
     def _add_bookmark_to_paragraph(self, para, bookmark_name):
-        """Add a Word bookmark to a paragraph"""
-        from docx.oxml.shared import OxmlElement, qn
-        
-        # Create bookmark start
+        """给段落挂上 Word 书签（bookmarkStart + bookmarkEnd）"""
+
+        # 书签起始标记
         bookmark_start = OxmlElement('w:bookmarkStart')
         bookmark_start.set(qn('w:id'), str(len(self.doc.element.body) + 1000))
         bookmark_start.set(qn('w:name'), bookmark_name)
-        
-        # Create bookmark end
+
+        # 书签结束标记
         bookmark_end = OxmlElement('w:bookmarkEnd')
         bookmark_end.set(qn('w:id'), str(len(self.doc.element.body) + 1000))
-        
-        # Insert at beginning of paragraph
+
+        # 起始标记插到段首，结束标记追加到段尾
         para._p.insert(0, bookmark_start)
         para._p.append(bookmark_end)
+
     def _handle_list(self, lines, start_idx, ordered=False):
+        """处理列表：无序列表加圆点前缀，有序列表保留原始编号"""
         while start_idx < len(lines):
             line = lines[start_idx]
             
@@ -532,10 +543,12 @@ class MarkdownToDocxConverter:
         return start_idx
 
     def _add_paragraph(self, text):
+        """写入普通段落，交由格式化方法解析行内标记"""
         para = self.doc.add_paragraph()
         self._add_formatted_text(para, self._clean_text(text))
 
     def _add_formatted_text(self, paragraph, text):
+        """解析行内标记：加粗 **、斜体 *、反引号代码、markdown 链接"""
         pattern = r'(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))'
         parts = re.split(pattern, text)
         
@@ -569,6 +582,7 @@ class MarkdownToDocxConverter:
                 paragraph.add_run(self._clean_text(part))
 
     def _add_horizontal_rule(self):
+        """写入一条分隔线（段落底边框实现）"""
         para = self.doc.add_paragraph()
         para.paragraph_format.space_before = Pt(12)
         para.paragraph_format.space_after = Pt(12)
@@ -584,6 +598,7 @@ class MarkdownToDocxConverter:
 
 
 def main():
+    """入口函数：读取项目根目录的 skill.md，生成同目录下的 skill.docx"""
     base_dir = Path(__file__).resolve().parent.parent
     md_path = str(base_dir / 'skill.md')
     docx_path = str(base_dir / 'skill.docx')

@@ -35,6 +35,16 @@ if sys.stdout.encoding != 'utf-8':
 if sys.stderr.encoding != 'utf-8':
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
+try:
+    # 可选依赖：仅在 Windows 下做 Salt 文件 ACL 细粒度检查时使用，缺失时降级跳过
+    import ntsecuritycon as con
+    import win32security
+    WIN_ACL_AVAILABLE = True
+except ImportError:
+    con = None
+    win32security = None
+    WIN_ACL_AVAILABLE = False
+
 @dataclass
 class SecurityIssue:
     """安全问题数据类"""
@@ -63,6 +73,7 @@ class SecurityAuditor:
     """安全审计器（版本号动态获取）"""
 
     def __init__(self, project_root: Optional[str] = None):
+        """初始化审计器：确定项目根目录、端口、版本号与待扫描文件清单"""
         self.project_root = Path(project_root).resolve() if project_root else resolve_project_root()
         self.web_port = int(os.environ.get('WEB_PORT', '8888'))
         self.issues: List[SecurityIssue] = []
@@ -112,6 +123,7 @@ class SecurityAuditor:
                 return 'vunknown'
 
             def vkey(v):
+                """把版本号转成可比较的整数元组，用于取最大值"""
                 return tuple(int(p) for p in v.split('.'))
 
             latest = max(versions, key=vkey)
@@ -249,11 +261,12 @@ class SecurityAuditor:
 
     # 排除已修复的代码模式 - 完整版
     def _should_exclude(self, issue: SecurityIssue) -> bool:
+        """判断是否应排除该问题 - 终极过滤"""
         file_path = getattr(issue, "file_path", "") or ""
         desc_lower = (getattr(issue, "description", "") or "").lower()
+        # 先按关键词直接放行：闭包、项目体积等属于误报
         if any(kw in desc_lower for kw in ["闭包", "closure", "项目体积", "体积较大"]):
             return True
-        """判断是否应排除该问题 - 终极过滤"""
         exclude_patterns = [
             r'\[AUDIT_RULE\]',           # 审计规则定义
             r'\[SECURED\]',              # 已安全标记
@@ -465,6 +478,7 @@ class SecurityAuditor:
             return any(re.search(p, joined, re.IGNORECASE) for p in signals)
 
         def scan_file(filename):
+            """扫描单个代码文件：按行匹配 Bug 模式并登记问题"""
             filepath = self.project_root / filename
             if not filepath.exists():
                 return
@@ -955,8 +969,9 @@ class SecurityAuditor:
                         ))
                 elif current_os == 'windows':
                     try:
-                        import ntsecuritycon as con
-                        import win32security
+                        if not WIN_ACL_AVAILABLE:
+                            # pywin32未安装，跳过详细检查（这是正常的，不是安全问题）
+                            raise ImportError('pywin32 未安装')
 
                         # 获取文件的DACL
                         sd = win32security.GetFileSecurity(str(salt_file), win32security.DACL_SECURITY_INFORMATION)

@@ -1,4 +1,5 @@
 {
+  "_comment": "配置模板（已脱敏）。用法：复制为同目录 config/config.json 后逐项替换 YOUR_* 占位符。字段说明：login=微购账号密码与登录方式；target_url=要采集的相册店铺地址；scroll_config=列表滚动采集参数（最大尝试次数/同高度停滞上限/滚动等待秒数/弹窗关闭间隔与次数）；headers=请求头（cookie 可留占位，实际优先读 cookie_file）；cookies=直接内联的 Cookie 列表，留空则读 config/cookies.json；output_file=采集结果 JSON 输出路径；cookie_file=Cookie 文件路径；excel_files=本地 Excel 货号表路径列表，支持 Windows/macOS 写法与 ~ 展开；email_notification_enabled=是否开启邮件通知；email_smtp_*=SMTP 服务器与授权码；email_to=收件人；tunnel_type=内网穿透类型（hostc/cloudflared）；web_api_key=Web 接口鉴权 Key，留空则启动时自动生成。",
   "login": {
     "username": "YOUR_QQ_PHONE_NUMBER",
     "password": "YOUR_PASSWORD",

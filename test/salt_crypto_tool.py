@@ -12,12 +12,13 @@ Salt文件加密解密工具
 遵循 UTF-8 编码 + 简体中文规范
 """
 
+import argparse
+import base64
+import json
 import os
 import sys
-import json
-import base64
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
+from typing import Any, Dict, Optional, Tuple
 
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -25,6 +26,7 @@ if sys.stderr.encoding != 'utf-8':
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 try:
+    # 可选依赖：cryptography 缺失时降级为「不可用」，不阻断脚本启动
     from cryptography.fernet import Fernet
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -53,6 +55,7 @@ class SaltCryptoTool:
     """Salt加密解密工具类"""
 
     def __init__(self):
+        """初始化工具实例：Fernet 句柄延迟到实际用到时再创建"""
         self._fernet: Optional[Fernet] = None
 
     def initialize_encryption(self, password: str) -> Tuple[bool, str]:
@@ -375,8 +378,6 @@ def print_status(status: Dict):
 
 def main():
     """主函数 - 命令行接口"""
-    import argparse
-
     parser = argparse.ArgumentParser(
         description='Salt文件加密解密工具',
         formatter_class=argparse.RawDescriptionHelpFormatter,
