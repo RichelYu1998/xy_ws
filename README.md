@@ -3856,7 +3856,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ### v5.0.9.108 (2026-11-14) - ⚡ **爬虫总耗时稳定压进 10 秒内：启动预热改为多路对冲请求 + Playwright 懒启动** - 服务端首字节抖动实测单路 2.27~8.29 秒，串行「超时再重试」会把尾延迟叠加到 12 秒以上；改成按 0.5 秒间隔错开发出 4 路请求、谁先成功用谁，尾延迟被压到每轮最快的那一路（2.27~4.27 秒）；同时把 Playwright 驱动改成懒启动，商品数据 100% 来自 API 的正常路径完全不创建驱动/浏览器/页面；实测 3 批共 90 次运行全部 10 秒内（均值 3.48/3.54/3.69 秒，最慢 5.10 秒），429 专项 8 场景 23 项断言全过，商品数稳定 101 条零丢失
 
-> **Commit**: `08f058ad`
+> **Commit**: `08f058ad, 201649b9`
 
 #### 更新内容: 把「串行等一次慢响应」改成「多路对冲抢最快的那一路」，并让正常路径完全不启动浏览器，把总耗时从 5.37 秒均值压到 3.5 秒级且 90 次运行零超 10 秒
 
@@ -3873,8 +3873,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **修复日期**: 2026-11-14
 **修复类型**: ⚡性能优化 + 🚀并发加速 + 🛡️限流防护 + 📚文档同步
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), [test/bench_30.py](test/bench_30.py), [test/test_429_handling.py](test/test_429_handling.py), [test/diag_lanes.py](test/diag_lanes.py), [test/diag_hedge.py](test/diag_hedge.py), [test/diag_fallback.py](test/diag_fallback.py), [test/bench_prefetch.py](test/bench_prefetch.py)
-**Commit**: 08f058ad
-**变更统计**: +835行 -157行
+**Commit**: 08f058ad, 201649b9
+**变更统计**: +836行 -157行
 **作者**: 小旭二手机（西园路）
 
 ---
@@ -4022,7 +4022,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **影响范围**: 文档可信度、changelog API 的 `changes` 内容
 
 **修复方案**:
-- **技术实现**: 按 PY-CORE-011 结构新增 v5.0.9.108 单条记录（9 个变更块全字段回填，Commit 用真实哈希 `08f058ad`，变更统计取 `git diff --numstat` 实测值），README.md 写完后整份复制到 skill.md 保证逐字节一致，再用 `test/generate_docx.py` 由 skill.md 重新生成 skill.docx
+- **技术实现**: 按 PY-CORE-011 结构新增 v5.0.9.108 单条记录（9 个变更块全字段回填，Commit 用真实哈希 `08f058ad, 201649b9`，变更统计取 `git diff --numstat` 实测值），README.md 写完后整份复制到 skill.md 保证逐字节一致，再用 `test/generate_docx.py` 由 skill.md 重新生成 skill.docx
 - **参考位置**: [README.md](README.md#L3857), [skill.md](skill.md#L3857), [test/generate_docx.py](test/generate_docx.py)
 
 **测试验证**:
