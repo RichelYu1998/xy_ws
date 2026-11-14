@@ -642,6 +642,20 @@ exit /b
 :cleanup_temp_dir
 set "DIR_NAME=%~1"
 set "MAX_SIZE=%~2"
+if /i not "%DIR_NAME%"=="temp" (
+    if /i not "%DIR_NAME%"=="./temp" (
+        set "MSG=[!] 拒绝清理 %DIR_NAME%：仅允许清理项目内 temp 子目录（项目根及其祖先目录删除权限恒为零）"
+        call :log %MSG%
+        exit /b 1
+    )
+)
+set "PROJECT_ROOT=%~dp0"
+set "TARGET_PATH=%~f1"
+if /i not "%TARGET_PATH%"=="%PROJECT_ROOT%temp" (
+    set "MSG=[!] 拒绝清理 %DIR_NAME%：目标路径必须恰好是项目根下的 temp 目录"
+    call :log %MSG%
+    exit /b 1
+)
 if exist "%DIR_NAME%" (
     for /f "delims=" %%a in ('powershell -NoProfile -Command "(Get-ChildItem -Path '%DIR_NAME%' -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum" 2^>nul') do set "DIR_SIZE=%%a"
     if defined DIR_SIZE if !DIR_SIZE! gtr %MAX_SIZE% (

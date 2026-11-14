@@ -370,6 +370,25 @@ cleanup_temp_dir() {
     local dir_name=$1
     local max_size_kb=$2
 
+    case "$dir_name" in
+        temp|./temp)
+            ;;
+        *)
+            log "[!] 拒绝清理 '$dir_name'：仅允许清理项目内 temp 子目录（项目根及其祖先目录删除权限恒为零）"
+            return 1
+            ;;
+    esac
+
+    local project_root
+    project_root=$(cd "$(dirname "$0")" && pwd)
+    local target_path
+    target_path=$(cd "$dir_name" 2>/dev/null && pwd)
+
+    if [ -z "$target_path" ] || [ "$target_path" != "$project_root/temp" ]; then
+        log "[!] 拒绝清理 '$dir_name'：目标路径必须恰好是项目根下的 temp 目录"
+        return 1
+    fi
+
     if [ -d "$dir_name" ]; then
         local size_kb
         size_kb=$(du -sk "$dir_name" 2>/dev/null | awk '{print $1}')
