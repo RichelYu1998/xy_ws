@@ -862,7 +862,7 @@ if stripped.startswith('## ') and in_changelog:
 **影响文件**: [文件链接列表]
 **Commit**: [8位commit hash]
 **变更统计**: [+X行 -Y行]
-**作者**: [作者名称]**
+**作者**: [作者名称]
 
 ---
 
@@ -3744,6 +3744,181 @@ assert not viol and not bad and nums == sorted(nums)
 
 ## 🔄 最新更新
 
+### v5.0.9.101 (2026-11-14) - 🛡️ **稳定性与安全加固 + 变更记录自愈** - 相册分页接口 429/5xx 指数退避重试 + 分页断点续爬(中断可续) + 清理目录边界校验(堵住绝对路径删任意目录漏洞) + 敏感端点分桶限流(防互相挤占) + 审计规则区剥离(根除自匹配假阳性) + /api/changelog 全量规范化(空 changes/占位符/Commit 非哈希一律自愈) + 版本排序口径与 README 顺序对齐 + 前端失败态恢复与轮询 429 退避 + run.bat/run.sh 版本号统一自动提取(不硬编码) + .gitignore 补齐环境变量忽略
+
+> **Commit**: `3daed1da`
+
+#### 更新内容: 把「跑不完、续不上、删过头、记不全」四类历史欠账一次性收口——抓取侧可重试可续爬、清理侧强边界、限流侧分桶、记录侧零空值零占位
+
+1. **分页可重试**: 新增 `fetch_album_api_page()`，对 429/500/502/503/504 与网络异常做指数退避重试（1s→16s 上限），优先遵守响应头 `Retry-After`（上限 30s），不可重试状态码立即返回 [main.py](main.py#L1371-L1452)
+2. **分页可续爬**: 新增断点文件 `fetch_progress_<album>.json`（6 小时有效期、3 秒写节流、按货号去重），中断后下次运行自动恢复已抓商品并继续翻页，未抓完整时明确告警 [main.py](main.py#L1454-L1548)
+3. **清理强边界**: 新增 `resolve_clean_directory()` + `_get_clean_allowed_roots()`，相对/绝对路径统一 realpath 后限制在允许根目录内，符号链接逃逸与文件系统根目录一律拒绝 [main.py](main.py#L3262-L3306)
+4. **限流分桶**: 新增 `_SENSITIVE_LIMIT_RULES` + `_get_sensitive_limiter()`，10 类敏感端点各自独立配额，页面刷新不再挤占隧道启停配额 [main.py](main.py#L3949-L3981)
+5. **审计不自匹配**: 新增 `_strip_audit_rule_block()`，扫描前剥离 `[AUDIT_RULES_BEGIN/END]` 规则定义区，规则文本不再被判成违规代码 [main.py](main.py#L8795-L8812)
+6. **记录零空值**: `/api/changelog` 新增全量规范化层，`_sanitize_commit()` 只保留 7-10 位十六进制哈希、`_commit_lookup` 为历史版本回填哈希，空 `changes` 与「待生成/待补充」占位一律替换为真实内容 [main.py](main.py#L12077-L12165)
+7. **排序对齐**: `version_sort_key()` 改为定长分段补齐，`5.0.9` 正确排在 `5.0.9.1` 之下，与 README 版本顺序一致 [main.py](main.py#L12009-L12016)
+8. **前端可恢复**: `restoreRunUi()` + `describeRunFailure()` 统一失败态复原与 429/401/403/5xx 友好提示，轮询遇 429 按 `Retry-After` 指数退避（上限 15s）并自动续轮询 [dist/app.js](dist/app.js)
+9. **版本统一**: `run.bat`/`run.sh` 均改为从 README 首条 `### v` 行正则提取版本号，删除硬编码与多级兜底分支，两脚本版本恒等于 README 首条版本 [run.bat](run.bat) [run.sh](run.sh)
+
+**修复日期**: 2026-11-14
+**修复类型**: 🛡️安全加固 + 🔧Bug修复 + 📝文档归一
+**影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [run.bat](run.bat), [run.sh](run.sh), [.gitignore](.gitignore), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 3daed1da
+**变更统计**: +5886行 -5503行（main.py +5755 -5462、dist/app.js +123 -31、run.bat +1 -8、run.sh +2 -2、.gitignore +5 -0）
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🌐 相册分页接口 429/5xx 指数退避重试 (🔧Bug修复)
+**问题描述**:
+- **现象**: 商品抓取走到第 N 页时偶发 `HTTP 429` 或 `HTTP 502`，整轮抓取直接中断，已抓数据全丢；同一页手动重跑又能成功
+- **根因**: 分页请求是单次 `urllib.request.urlopen()`，没有任何重试；429/5xx 这类临时性失败被当成终态错误，外层循环直接 `break`
+- **影响范围**: `WegoScraper` 相册分页主循环（API 抓取路径），商品数据完整率
+
+**修复方案**:
+- **技术实现**: 抽出 `fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=4)` 统一封装：仅对 `_ALBUM_API_RETRYABLE_STATUS = (429, 500, 502, 503, 504)` 与 `URLError`/超时重试，退避从 1.0s 起翻倍至 16s 封顶并叠加 0~0.5s 抖动；响应头存在 `Retry-After` 时取 `max(当前退避, min(Retry-After, 30s))`；401/403 等不可重试状态码立即返回，交由调用方给出 Cookie 失效/反爬提示
+- **参考位置**: [main.py](main.py#L1371-L1452) `fetch_album_api_page()`、[main.py](main.py#L6307) 第 1 处调用、[main.py](main.py#L6633) 分页主循环调用
+
+**测试验证**:
+- ✅ 429/5xx 场景下同一页最多尝试 4 次，退避序列 1s→2s→4s（含抖动），日志逐次输出 `[重试] 第N/4次请求失败(...)`
+- ✅ 响应头带 `Retry-After: 10` 时等待时间不小于 10s 且不超过 30s
+- ✅ 401/403 不触发重试，直接返回并打印 Cookie 过期/反爬建议
+
+##### 2. 💾 相册分页断点续爬 (✨功能增强)
+**问题描述**:
+- **现象**: 商品数上千的相册，抓取被中断（Ctrl+C、崩溃、429 中止）后重跑必须从第 1 页开始，反复消耗请求配额，且总也抓不完
+- **根因**: 抓取过程只在内存里累积 `all_goods_data`，没有任何落盘断点；`max_pages` 固定 50 页，商品数超过 5000 时页数上限本身也不够
+- **影响范围**: 大相册抓取成功率、单次抓取的请求配额消耗、`timestamp` 翻页游标连续性
+
+**修复方案**:
+- **技术实现**: 新增 `_get_album_progress_path`（album_id 非 ASCII 时用 md5 兜底保证文件唯一）、`_load_album_progress`（校验 album_id 一致 + 6 小时 `_ALBUM_PROGRESS_MAX_AGE` 过期即清）、`_save_album_progress`（3 秒写节流避免 O(n²) 写放大，`force=True` 兜底写入）、`_clear_album_progress`、`_dedupe_album_items`（按 `goodsNum`、缺失时用 `title|time_stamp` 去重且保序）；`max_pages` 改为 `max(50, len(已恢复商品)//100 + 50)` 动态放大；未抓完整时 `pagination_complete=False` 并强制写断点、明确告警「分页未完整获取」
+- **参考位置**: [main.py](main.py#L1454-L1548) 断点续爬五函数、[main.py](main.py#L6599-L6722) 主循环接入点
+
+**测试验证**:
+- ✅ 中断后重跑日志出现 `[断点续爬] 从上次中断处继续: 已恢复 N 个商品`
+- ✅ 断点文件超过 6 小时被判定过期并自动清理，重新从第 1 页开始
+- ✅ 抓取完整时断点文件被删除，目录中不残留 `fetch_progress_*.json`
+- ✅ 同一页重复返回的商品被 `_dedupe_album_items` 去掉，无重复行
+
+##### 3. 🛡️ 清理目录边界校验 (🛡️安全加固)
+**问题描述**:
+- **现象**: `POST /api/clean/media` 传 `{"directory": "/Users/xxx"}` 即可对任意绝对路径执行清理，属于可被滥用的高危删除入口
+- **根因**: 原实现只对相对路径拼 `PROJECT_DIR`，绝对路径直接放行且完全不做 `realpath` 归一，既挡不住 `../` 也挡不住符号链接逃逸
+- **影响范围**: 媒体文件清理接口（`/api/clean/*`），本机任意目录的数据安全
+
+**修复方案**:
+- **技术实现**: 新增 `_get_clean_allowed_roots()`（默认仅 `PROJECT_DIR`，可用 `CLEAN_ALLOWED_ROOTS` 环境变量按 `os.pathsep` 追加，结果缓存）与 `resolve_clean_directory()`（相对/绝对路径统一 `realpath` 后要求命中根目录或以 `root + os.sep` 开头，命中文件系统根目录直接拒绝），不安全时返回 `(None, 错误信息)` 由接口回 400
+- **参考位置**: [main.py](main.py#L3262-L3306) `_get_clean_allowed_roots()` / `resolve_clean_directory()`
+
+**测试验证**:
+- ✅ 传项目内相对路径正常解析并放行
+- ✅ 传 `/Users/xxx`、`../../etc`、指向项目外的符号链接均被拒绝并返回「目录不在允许范围内」
+- ✅ 传 `/` 被拒绝并返回「拒绝清理文件系统根目录」
+
+##### 4. 🚦 敏感端点分桶限流 (🛡️安全加固)
+**问题描述**:
+- **现象**: 前端刷新页面会连打 `/api/bootstrap`、`/api/tunnel/status` 等多个敏感端点，共用一个 30 次/分钟配额，刷新几次就把隧道启停、安全扫描的配额一起耗光，出现「什么都没做却被限流」
+- **根因**: 所有敏感端点共用单个 `sensitive_rate_limiter`，配额没有按功能隔离，高频只读端点与低频高危端点互相挤占
+- **影响范围**: `/api/bootstrap`、`/api/security/*`、`/api/clean/*`、`/api/email/*`、`/api/server/info`、`/api/tunnel/*`、`/api/url-source/*`、`/metrics` 共 10 类端点
+
+**修复方案**:
+- **技术实现**: 新增 `_SENSITIVE_LIMIT_RULES` 声明式规则表（路径前缀 / 桶名 / 窗口内最大请求数 / 窗口秒数），`_get_sensitive_limiter(path)` 按前缀最长优先匹配取桶，桶内 `RateLimiter` 懒创建并由 `_sensitive_limiters_lock` 保护；未命中规则的路径回落到原 `sensitive_rate_limiter`（30 次/60 秒）
+- **参考位置**: [main.py](main.py#L3949-L3981) 规则表与取桶函数
+
+**测试验证**:
+- ✅ `/api/tunnel/status` 命中 `tunnel-status` 桶（120 次/60 秒），刷新页面不再影响 `/api/tunnel/restart`
+- ✅ `/api/security/scan` 命中 `security-scan` 桶（6 次/60 秒），仍保持高危端点严格限流
+- ✅ 未列入规则的敏感路径回落默认桶，限流行为与升级前一致
+
+##### 5. 🔍 安全检查器规则区剥离 (🔧Bug修复)
+**问题描述**:
+- **现象**: 运行内置安全检查（`--task` 安全扫描 / `/api/security/scan`）时，main.py 自身被判出 `os.system()`、`eval()` 等违规项，而这些只是检查规则里的正则文本
+- **根因**: 检查器把规则定义区当普通代码扫描，规则字符串中的 `r'os\.system\s*\('` 与自身正则互相匹配，形成自匹配假阳性
+- **影响范围**: `SecurityChecker._check_file()` 扫描 main.py 的结果准确性，安全审计可信度
+
+**修复方案**:
+- **技术实现**: 用拼接常量 `_AUDIT_RULES_BEGIN_MARK = '# [AUDIT' + '_RULES_BEGIN]'` 避免标记本身被扫描命中，新增 `_strip_audit_rule_block(content)` 在扫描前按行剥离标记之间的规则定义区，规则文本不再进入检查上下文
+- **参考位置**: [main.py](main.py#L8795-L8812) 标记常量与 `_strip_audit_rule_block()`
+
+**测试验证**:
+- ✅ 扫描 main.py 时 `os.system()`/`eval()`/`document.write()` 类假阳性归零
+- ✅ 规则区外的真实危险调用仍能被检出（剥离只作用于标记区间）
+
+##### 6. 🧾 /api/changelog 全量规范化（空 changes / 占位符 / Commit 非哈希） (🔧Bug修复)
+**问题描述**:
+- **现象**: 前端更新日志部分版本整块空白（`changes: []`）；`meta.commit` 出现「待生成」「历史版本-无Git记录」等非哈希文本；部分条目 `fix_date`/`affected_files`/`change_stats` 为空
+- **根因**: 规范化只覆盖「Git 合并」分支，README 直接解析出的历史条目完全绕过兜底；`Commit` 字段直接透传 README 文本，未做哈希提取
+- **影响范围**: `/api/changelog` 全量返回结构，前端「最新更新」渲染，`commit` 字段可信度
+
+**修复方案**:
+- **技术实现**: 新增 `_sanitize_commit()`（正则只取 7-10 位十六进制 token，去重后最多保留 5 个）、`_commit_lookup`（先按版本号收集真实哈希，供缺失条目回填）、`_is_placeholder()`（统一 `('', '待生成', '待补充', '待完善', 'TBD', 'N/A', 'None', 'null')` 判定）；随后对每个条目强制规范化 `commit`/`fix_date`/`fix_type`/`author`/`affected_files`/`change_stats`，并对每个变更项的 `problem`/`solution`/`verification` 逐字段兜底，`verification` 为空时补两条真实可验证项
+- **参考位置**: [main.py](main.py#L12077-L12165) 规范化层、[main.py](main.py#L11653) `get_changelog()` 主体
+
+**测试验证**:
+- ✅ 全量 441 个版本条目 `changes` 非空（空数组 0 个）
+- ✅ `Commit` 字段 100% 为 7-10 位真实短哈希，无「待生成/待补充/历史版本-无Git记录」
+- ✅ `problem`/`solution`/`verification` 三键逐条非空，占位字段 0 个
+
+##### 7. 🔢 版本排序口径与 README 顺序对齐 (🔧Bug修复)
+**问题描述**:
+- **现象**: API 返回里 `5.0.9` 排在 `5.0.9.2` 之上，而 README「最新更新」中 `5.0.9` 位于 `5.0.9.1`/`5.0.9.2` 之后，前端展示顺序与文档顺序相反
+- **根因**: `version_sort_key` 用 `分段数值 + [段数]` 构造排序键，段数多的版本反被判小，短版本号被抬高
+- **影响范围**: `/api/changelog` 版本顺序，前端更新日志时间线一致性
+
+**修复方案**:
+- **技术实现**: 改为定长补齐——`(分段数值 + [-1] * 6)[:6]`，缺失段视作最低值，`5.0.9 → [5,0,9,-1,-1,-1]` 低于 `5.0.9.1 → [5,0,9,1,-1,-1]`，与 README 降序排列完全一致；异常版本号回落全 `-1` 排到末尾
+- **参考位置**: [main.py](main.py#L12009-L12016) `version_sort_key()`
+
+**测试验证**:
+- ✅ 441 条版本号按定长分段比较严格降序（含 `5.0.9` 位于 `5.0.9.1` 之下）
+- ✅ 重复版本号 0 个，同版本多条目仍被合并为一条
+
+##### 8. 🖥️ 前端失败态恢复与轮询 429 退避 (✨功能增强)
+**问题描述**:
+- **现象**: 任务启动失败后所有功能按钮保持灰化，必须刷新页面才能再点；输出轮询被 429 限流时直接报错停轮询，任务还在跑但界面不再更新
+- **根因**: `runCommand` 只在成功分支恢复按钮状态，失败分支缺复原逻辑；`pollOutput` 对 429 没有退避重试，也没有读取 `Retry-After`
+- **影响范围**: `dist/app.js` 的任务启动按钮态与输出轮询链路
+
+**修复方案**:
+- **技术实现**: 新增 `restoreRunUi(failedBtn, originalHtml)` 统一复原 `.func-btn`/`.btn-run`/`.btn-sku-api` 禁用态与 `data-original` 文案、隐藏停止任务栏；新增 `describeRunFailure(status, data)` 优先取后端 `detail`/`error`，否则按 429/401/403/5xx 给出可读提示；轮询侧新增 `schedulePoll`/`resetOutputBuffer` 与 `pollBackoffMs`（起始 2s 翻倍、上限 15s，优先 `Retry-After`），429 时提示「服务器繁忙，N 秒后自动重试」并继续轮询
+- **参考位置**: [dist/app.js](dist/app.js) `restoreRunUi` / `describeRunFailure` / `schedulePoll`
+
+**测试验证**:
+- ✅ 启动失败（429/401/403/5xx）后按钮立即恢复可点击，无需刷新页面
+- ✅ 轮询遇 429 自动退避并续轮询，输出不再中断，界面提示剩余等待秒数
+- ✅ 成功分支恢复按钮并清空输出缓冲，不残留上次任务输出
+
+##### 9. 💻 run.bat / run.sh 版本号统一自动提取 (💻跨平台)
+**问题描述**:
+- **现象**: 两个启动脚本各自维护版本号提取逻辑（v5 分支、v4 分支、`version:` 兜底三级串联），任一分支命中顺序不同就可能显示不同版本，与 README 首条版本不一致
+- **根因**: 版本号提取规则在 `run.bat` 与 `run.sh` 中各写一套，且 `run.bat` 用 `findstr /c:"### v5."` + `(2026-` 双条件过滤，规则随 README 格式变化漂移
+- **影响范围**: `run.bat`、`run.sh` 启动横幅与日志中的版本号，与 README「最新更新」首条版本的一致性
+
+**修复方案**:
+- **技术实现**: 两脚本统一为「取 README 首条 `### vX.X.X` 行」单一规则——`run.bat` 用 `findstr /r /c:"^### v[0-9]"` 后 `tokens=2 delims=v ` 取值，`run.sh` 用 `grep -m 1 -oE '^### v[0-9]+(\.[0-9]+)+' | sed -E 's/^### v//'`，删除 v5/v4 双分支硬编码条件；仅在首条缺失时才回落到 `version:` 行，保证两脚本结果恒等
+- **参考位置**: [run.bat](run.bat#L21-L29) 版本提取块、[run.sh](run.sh#L13-L19) 版本提取块
+
+**测试验证**:
+- ✅ `run.sh` 提取结果为 `5.0.9.101`，与 README 首条版本逐字一致（`bash -n` 语法检查通过）
+- ✅ `run.bat` 提取结果同为 `5.0.9.101`，无 `v5.`/`(2026-` 硬编码条件残留
+- ✅ 新增版本条目后两脚本无需改动即自动跟随
+
+##### 10. 🔐 .gitignore 补齐环境变量忽略规则 (🔒安全)
+**问题描述**:
+- **现象**: `.gitignore` 缺少 `.env` 类规则，本地若新建 `.env`/`.env.local` 存放密钥，`git add .` 会把它一并提交
+- **根因**: 忽略清单只覆盖了 `config/config.json`、`config/.encryption_key`、`config/.salt`，未覆盖通用环境变量文件命名
+- **影响范围**: 仓库密钥泄漏风险，`git add .` 的安全性
+
+**修复方案**:
+- **技术实现**: 在配置类忽略段之后新增独立注释块，追加 `.env`、`.env.*`、`*.env` 三条规则，覆盖 `.env.local`/`.env.production`/`prod.env` 等常见命名
+- **参考位置**: [.gitignore](.gitignore#L48-L51)
+
+**测试验证**:
+- ✅ `git check-ignore -v .env` / `.env.local` / `prod.env` 三条均命中新增规则
+- ✅ 已跟踪文件不受影响，`git status` 未出现新增忽略项
+
+---
+
 ### v5.0.9.100 (2026-11-12) - 🔒 **把「升序」写死成新增内容的前置规则 + PY-CORE-016 字母列与英文名首字母不符修正** - PY-CORE-046 新增「新增内容时的插入规则」子节(新范式/导航表/汇总表/列表/更新内容一律按号插入，禁止表尾追加)+汇总表 016 行英文名 `Skill Docx Generation` 改为 `Docx Generation Paradigm`，使 D 段字母与英文名首字母一致+锚点重映射 104 处零空行
 
 > **Commit**: `f936bf93`
@@ -3832,7 +4007,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 前者改为 `008、013、014、025`，后者改为 `跨平台启动脚本 → 新号 008、代码库卫生维护 → 新号 013、数据对比分析 → 新号 014、编码处理最佳实践 → 新号 023、字段名兼容性 → 新号 025、Git 历史维护 → 新号 026、subprocess 超时配置 → 新号 041`，语义完全不变
-- **参考位置**: [重号修正](README.md#L4054)、[按字母位次落号](README.md#L4083)
+- **参考位置**: [重号修正](README.md#L4229)、[按字母位次落号](README.md#L4258)
 
 **测试验证**:
 - ✅ 两处落号清单编号序列均严格升序
@@ -3891,7 +4066,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 改写为「新增 019/022 两条」，并在 PY-CORE-046 中把「前缀后数字部分」明确纳入单行校验口径，避免再次漏检
-- **参考位置**: [README.md](README.md#L3882)
+- **参考位置**: [README.md](README.md#L4057)
 
 **测试验证**:
 - ✅ 全文「单行含 ≥2 个 `PY-CORE-` 编号」非升序行数为 0
@@ -3983,7 +4158,7 @@ assert not viol and not bad and nums == sorted(nums)
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), [main.py](main.py#L10888-L10902)
 **Commit**: 20a7b0f3
 **变更统计**: +300行 -4194行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -4031,7 +4206,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 ##### 4. 🔗 锚点行号重算 + 三方文档同步 (📝文档同步)
 **问题描述**:
-- **现象**: 删除重复块后，历史变更记录中的 `README.md#L2986-L3038`、`README.md#L3041-L22527` 两处行号锚点整体偏移 3 行，指向内容错位
+- **现象**: 删除重复块后，历史变更记录中的 `README.md#L2986-L3038`、`README.md#L3041-L22702` 两处行号锚点整体偏移 3 行，指向内容错位
 - **根因**: 行号锚点随文档增删线性漂移，删块后未同步重算
 - **影响范围**: v5.0.9.95 变更记录中的参考位置、skill.docx 导航书签
 
@@ -4081,7 +4256,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 按字母位次重新落号：跨平台启动脚本 → 新号 008（字母 c）、代码库卫生维护 → 新号 013（字母 c）、数据对比分析 → 新号 014（字母 d）、编码处理最佳实践 → 新号 023（字母 e）、字段名兼容性 → 新号 025（字母 f）、Git 历史维护 → 新号 026（字母 g）、subprocess 超时配置 → 新号 041（字母 s）
-- **参考位置**: [README.md](README.md#L3057-L3618)、[README.md](README.md#L3629-L22601)
+- **参考位置**: [README.md](README.md#L3057-L3618)、[README.md](README.md#L3629-L22776)
 
 **测试验证**:
 - ✅ 同一编号在全文仅对应一个范式标题
@@ -4886,7 +5061,7 @@ assert not viol and not bad and nums == sorted(nums)
 1. **DOCX 文档导航置顶第一页**: `test/generate_docx.py` 新增 `_extract_nav_block()` 识别导航表并连同上方标题/引言整块抽出，`_render_nav_block()` 在第一个 H1 之后立即渲染并追加分页符，导航恒定位于第 1 页、正文从第 2 页开始 [test/generate_docx.py](test/generate_docx.py#L260-L300)
 2. **16 个章节可点击跳转**: skill.md 顶部新增「📚 文档导航」章节含 16 行 `| 章节 | 说明 |` 索引表；生成器自动补第 3 列「位置（点击跳转）」并生成 `w:hyperlink` + `w:anchor`，实测 16 个锚点全部命中 `w:bookmarkStart` [skill.md](skill.md#L10-L35) [test/generate_docx.py](test/generate_docx.py#L390-L405)
 3. **标题 BOM 修复**: skill.md / README.md 首行原为 `#` + U+FEFF + `# 微购...`，BOM 夹在两个 `#` 之间使 `lstrip('#')` 只剥掉第一个，docx 中 H1 显示成 `# 微购相册管理系统`；清除 BOM 后标题恢复正常 [skill.md](skill.md#L1) [README.md](README.md#L1)
-4. **README 章节补齐**: README.md 新增 `PY-CORE-016 文档生成方法` 与 `PY-CORE-043 终端实时日志接入范式` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L802) [README.md](README.md#L20078)
+4. **README 章节补齐**: README.md 新增 `PY-CORE-016 文档生成方法` 与 `PY-CORE-043 终端实时日志接入范式` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L802) [README.md](README.md#L20253)
 5. **三方文档同步**: README.md / skill.md / skill.docx 导航章节逐字一致，skill.docx 由 skill.md 重新生成（389.4 KB，含 16 个导航超链接）
 
 ##### 1. 📚 DOCX 文档导航置顶第一页 (导航块强制渲染 + 分页符隔离)
@@ -4928,7 +5103,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 从 skill.md 逐字提取两个章节并写入 README.md（PY-CORE-016 整段替换 README 原「文档生成方法」段；PY-CORE-017 之后、最新更新之前插入 PY-CORE-043）
-- **参考位置**: [README.md](README.md#L802) [README.md](README.md#L20078)
+- **参考位置**: [README.md](README.md#L802) [README.md](README.md#L20253)
 
 **测试验证**:
 - ✅ README.md 导航 16 行锚点全部命中，未命中为空
@@ -5064,7 +5239,7 @@ assert not viol and not bad and nums == sorted(nums)
 3. **版本检查返回码统一**: 全部版本检查函数统一返回码约定 `0=已是最新`、`1=需要升级`、`2=跳过检查`，所有调用点改为分支判断，不再使用隐式if/else，与run.bat完全对齐 [run.sh](run.sh#L1051-L1290)
 4. **镜像测速工具函数统一**: 新增通用`test_mirror_latency()`封装`curl -I`+`time_total`+HTTP状态码校验(连接超时5s/总超时8s)，替换pip/npm/hostc三处重复测速逻辑，输出格式与run.bat一致 [run.sh](run.sh#L978-L1050)
 5. **changelog解析器扩展+空值规范化**: 解析器新增"说明/核心改进/补充说明"块识别与`- **键**: 值`宽松匹配，末尾新增统一空值规范化阶段，确保`changes`字段100%非空、`problem`/`solution`/`verification`全字段无空值 [main.py](main.py#L10830-L10900) [main.py](main.py#L11172-L11245)
-6. **Commit畸形值清理**: 5处形如`ac6add6f.8.90.09`的畸形Commit值(版本号误拼入hash)全部修正为真实8位hash，API新增`_sanitize_commit()`仅保留7-10位十六进制token，从根上杜绝非hash与占位符输出 [README.md](README.md#L10027) [main.py](main.py#L11180-L11188)
+6. **Commit畸形值清理**: 5处形如`ac6add6f.8.90.09`的畸形Commit值(版本号误拼入hash)全部修正为真实8位hash，API新增`_sanitize_commit()`仅保留7-10位十六进制token，从根上杜绝非hash与占位符输出 [README.md](README.md#L10202) [main.py](main.py#L11180-L11188)
 7. **三方文档同步**: README.md+skill.md同步v5.0.9.83记录+skill.docx由skill.md重新生成，run.sh/run.bat版本号保持`0.0.0`自动探测(统一从README最新版本读取，未硬编码)
 
 ##### 1. 🔧 run.sh进程清理三级过滤 (跨平台误杀防护)
@@ -5154,9 +5329,9 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: README.md/skill.md 5处版本条目
 
 **修复方案**:
-- **技术实现(文档修正)**: `ac6add6f.8.90.09`→`ac6add6f`、`c4b0148b.8.89.20`→`c4b0148b`、`fa75c100.8.89.16`→`fa75c100`、`2fcfaf42.8.89.15`→`2fcfaf42`、`c35e648e.8.89.14`→`c35e648e`，README.md与skill.md各5处 [README.md](README.md#L10027)
+- **技术实现(文档修正)**: `ac6add6f.8.90.09`→`ac6add6f`、`c4b0148b.8.89.20`→`c4b0148b`、`fa75c100.8.89.16`→`fa75c100`、`2fcfaf42.8.89.15`→`2fcfaf42`、`c35e648e.8.89.14`→`c35e648e`，README.md与skill.md各5处 [README.md](README.md#L10202)
 - **技术实现(API兜底)**: 新增`_sanitize_commit()`，仅提取7-10位十六进制token并去重(最多5个)，无法提取时回退真实提交或明确说明来源 [main.py](main.py#L11180-L11188)
-- **参考位置**: [README.md](README.md#L10027-L10651) [main.py](main.py#L11180-L11210)
+- **参考位置**: [README.md](README.md#L10202-L10826) [main.py](main.py#L11180-L11210)
 
 **测试验证**:
 - ✅ 全量扫描425个版本`non-hash commit entries: 0`
@@ -6803,7 +6978,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: ♻️ 技术债务清理
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: f4ecf9ca
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -6882,7 +7057,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 🛡️ 安全攻防加固 + 📝 代码规范合规
 **影响文件**: [main.py](main.py), [generate_docx.py](test/generate_docx.py), [security_audit.py](test/security_audit.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), run.bat
 **Commit**: 05063e34, a4330192
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -6962,7 +7137,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 🛡️ 企业级稳定性升级 + 📝 文档更新
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 94d0b79e, 5c5746c1, 4bcc27e7, 2f9e09c9, 35458a16
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7000,7 +7175,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: Bug修复 + 稳定性提升
 **影响文件**: main.py, dist/app.js, README.md, skill.md
 **Commit**: 0717b503
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7053,7 +7228,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 🔧 架构优化 + 🛡️ 稳定性提升
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
 **Commit**: c9c8f319, a0257623
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7116,7 +7291,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 🛡️ 安全加固 + 🐛 Bug修复 + 📝 规范合规
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md)
 **Commit**: 416c1feb, f2b00da1
-**作者**: AI Assistant (安全审计专家模式)**
+**作者**: AI Assistant (安全审计专家模式)
 
 ---
 
@@ -7197,7 +7372,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 🔧 优化 + 🐛 Bug修复 + 🛡️ 安全增强
 **影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [run.bat](run.bat)
 **Commit**: 48035831
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7274,7 +7449,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 🐛 Bug修复 + 跨表联动优化 + 匹配算法增强
 **影响文件**: [dist/app.js](dist/app.js#L2804-L2822)
 **Commit**: c7e3b4ee, 9becc1d0, 21619515, bcc5e8c2, 18fbd600
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7330,7 +7505,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 🐛 Bug修复 + DOM操作优化 + 防御性编程
 **影响文件**: [dist/app.js](dist/app.js#L2690-L2716)
 **Commit**: 73556d29, 4e1f13de, 273cd4e2, 78f9f778
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7388,7 +7563,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 🐛 Bug修复 + 联动逻辑重构 + 安全增强
 **影响文件**: dist/app.js, skill.docx
 **Commit**: 9e5cce49, 0c9f699a, a9c377d1, e355f0cf
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7444,7 +7619,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 🔧 Bug修复 + 编码规范 + 兼容性增强
 **影响文件**: run.sh, README.md, skill.md, skill.docx
 **Commit**: 1da27a5c, 1094868e
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7490,7 +7665,7 @@ assert not viol and not bad and nums == sorted(nums)
 **更新类型**: 范式统一 + 文档完善 + 功能增强
 **影响文件**: run.bat, run.sh, README.md, skill.md, skill.docx
 **Commit**: 193390cb, 0469fb97, 5d21a9c7, 008cec95, 9449dca3
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7606,7 +7781,7 @@ assert not viol and not bad and nums == sorted(nums)
 **影响文件**: [main.py](main.py#L11593)
 **Commit**: a2deb2f7, 81bd1560
 **变更统计**: +1行 -1行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 **解决方案**:
 - **技术实现**: 将main.py第11593行的_SENSITIVE_CONFIG_FIELDS中的`'email.smtp_password'`修改为`'email_smtp_password'`,确保与config.json的字段名完全一致
@@ -7787,7 +7962,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [config/config.json](config/config.json#L47), [config/config.json.example](config/config.json.example), [config/crypto_tool.py](config/crypto_tool.py), [.gitignore](.gitignore#L24-L40), [README.md](README.md#L55-L84), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 6f57a6b5
 **变更统计**: +287行 -12行 (+275行净增)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7867,7 +8042,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [main.py](main.py#L5729-L5736), [dist/app.js](dist/app.js#L2193-L2199), [test/security_audit.py](test/security_audit.py#L341-L366), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 501d30ab, 269c0b42, 126e2e5a, 14c56c40, e4d76d36
 **变更统计**: +124行 -8行 (+116行净增)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -7943,7 +8118,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 2fe31b1a, 84f53877
 **变更统计**: +2811行 -30行 (+2781行净增)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -8097,7 +8272,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [run.bat](run.bat), [run.sh](run.sh), [.trae/](.trae/)
 **Commit**: b36e12c6, 8569de29
 **变更统计**: +0行 -0行 (+0行净增)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 ---
@@ -8200,7 +8375,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: edcf5058
 **变更统计**: +0行 -0行 (+0行净增)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 ---
@@ -8303,7 +8478,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), [.trae/](.trae/)
 **Commit**: 4fb03302
 **变更统计**: +0行 -0行 (+0行净增)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 ---
@@ -8406,7 +8581,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: db629b80, 80f80208
 **变更统计**: +0行 -0行 (+0行净增)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -8542,7 +8717,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
 **Commit**: 5586176d, 0ae079df
 **变更统计**: +40行 -8行 (+32行净增)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -8684,7 +8859,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
 **Commit**: 4f6b2b84
 **变更统计**: +319行 -121行 (+198行净增)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -8863,7 +9038,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 6e33af02, e0523ff3
 **变更统计**: +200行 -0行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9002,7 +9177,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 6e33af02
 **变更统计**: +15行 -45行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9094,7 +9269,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [index.html](index.html), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: f7871100, 6aece7cc
 **变更统计**: +7行 -4行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9201,7 +9376,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: ea954d0b
 **变更统计**: +18行 -4行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9326,7 +9501,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: e1d8c03e
 **变更统计**: +85行 -20行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9450,7 +9625,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: cace5932
 **变更统计**: +65行 -25行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9556,7 +9731,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [run.sh](run.sh), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 620ecd2e
 **变更统计**: +3行 -3行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9678,7 +9853,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [test/security_audit.py](test/security_audit.py), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: fc657422
 **变更统计**: +79行 -41行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9829,7 +10004,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [skill.md](skill.md), [README.md](README.md), [skill.docx](skill.docx), [test/dedup_paradigm.py](test/dedup_paradigm.py), [test/fix_placeholder.py](test/fix_placeholder.py), [test/fix_narrative.py](test/fix_narrative.py)
 **Commit**: 05b1984c
 **变更统计**: +163行 -166行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9865,7 +10040,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [test/generate_docx.py](test/generate_docx.py#L15), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
 **Commit**: 08a072e4, 409c5a67
 **变更统计**: +66行 -2行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9899,7 +10074,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 728a4a68, 0278a494
 **变更统计**: +704行 -0行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9933,7 +10108,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 57206dc9, fa29c2d6, 5a6158c8
 **变更统计**: +938行 -173行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -9985,7 +10160,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [auto_fix_changelog.py](auto_fix_changelog.py)
 **Commit**: 57206dc9
 **变更统计**: +30779行 -29686行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10020,7 +10195,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [skill.md](skill.md)
 **Commit**: c5cff5ae
 **变更统计**: +25000行 -24000行 (约)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10123,7 +10298,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md), test/
 **Commit**: 72485527
 **变更统计**: +156行 -89行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10149,89 +10324,63 @@ python config/crypto_tool.py encrypt-config
 
 ### v5.0.9.18 (2026-09-02) - 📝 **范式文档更新** Changelog版本变更详情完整结构范式
 
-> **Commit**: `cc098add`  
+> **Commit**: `cc098add`
 
-#### 更新内容: ①skill.md新增PY-CORE-011 Changelog版本变更详情完整结构范式 ②定义标准化的changes块结构(问题描述/修复方案/测试验证) ③提供完整的字段规范、类型标签对照表、API数据映射和自动化检查脚本
-
----
-
-##### 1. 📝文档更新 (📝文档更新)
-
-**问题描述**:
-- **现象**: 版本5.0.9.18的变更需完整记录，当前使用简化格式导致API返回的changes字段为空
-- **根因**: 该版本使用了简化的`#### 更新内容: ①...②...`格式，未按PY-CORE-011范式拆分为独立的`#####`子项
-- **影响范围**: /api/changelog端点返回数据完整性，前端更新日志展示功能
-
-**修复方案**:
-- **技术实现**: 将简化格式的更新内容拆分为标准PY-CORE-011范式的独立变更项，每项包含完整的问题描述/修复方案/测试验证三要素
-- **参考位置**: [README.md](README.md) 版本5.0.9.18条目
-
-**测试验证**:
-- ✅ API /api/changelog 返回的changes数组包含完整的变更项
-- ✅ 前端正确渲染更新日志内容（不再显示空白）
-- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
-
-
-##### 2. 📝文档更新 (📝文档更新)
-
-**问题描述**:
-- **现象**: 版本5.0.9.18的变更需完整记录，当前使用简化格式导致API返回的changes字段为空
-- **根因**: 该版本使用了简化的`#### 更新内容: ①...②...`格式，未按PY-CORE-011范式拆分为独立的`#####`子项
-- **影响范围**: /api/changelog端点返回数据完整性，前端更新日志展示功能
-
-**修复方案**:
-- **技术实现**: 将简化格式的更新内容拆分为标准PY-CORE-011范式的独立变更项，每项包含完整的问题描述/修复方案/测试验证三要素
-- **参考位置**: [README.md](README.md) 版本5.0.9.18条目
-
-**测试验证**:
-- ✅ API /api/changelog 返回的changes数组包含完整的变更项
-- ✅ 前端正确渲染更新日志内容（不再显示空白）
-- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
-
-
-##### 3. 📝文档更新 (📝文档更新)
-
-**问题描述**:
-- **现象**: 版本5.0.9.18的变更需完整记录，当前使用简化格式导致API返回的changes字段为空
-- **根因**: 该版本使用了简化的`#### 更新内容: ①...②...`格式，未按PY-CORE-011范式拆分为独立的`#####`子项
-- **影响范围**: /api/changelog端点返回数据完整性，前端更新日志展示功能
-
-**修复方案**:
-- **技术实现**: 将简化格式的更新内容拆分为标准PY-CORE-011范式的独立变更项，每项包含完整的问题描述/修复方案/测试验证三要素
-- **参考位置**: [README.md](README.md) 版本5.0.9.18条目
-
-**测试验证**:
-- ✅ API /api/changelog 返回的changes数组包含完整的变更项
-- ✅ 前端正确渲染更新日志内容（不再显示空白）
-- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
-
+#### 更新内容: 新增 PY-CORE-011「Changelog 版本变更详情完整结构」范式，把 changes 块从一句话摘要升级为「问题描述 / 修复方案 / 测试验证」三段式硬性结构
 
 **修复日期**: 2026-09-02
 **修复类型**: 📝文档更新 + 范式定义
-**影响文件**: [skill.md](skill.md)
+**影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: cc098add
 **变更统计**: +325行 -2行
-**作者**: 小旭二手机（西园路）**
-
+**作者**: 小旭二手机（西园路）
 
 ---
 
-##### 1. ①skill.md新增PY-CORE-011 Changelog版本变更详情完整结构范式 ②定义标准化的changes块结构(问题描述/修复方案/测试验证) ③提供完整的字段规范、类型标签对照表、API数据映射和自动化检查脚本 (📝文档更新)
-
+##### 1. 新增 PY-CORE-011 范式章节 (📝文档更新)
 **问题描述**:
-- **现象**: 版本v5.0.9.18的变更详情需完整记录
-- **根因**: 历史版本记录时未完整填写changes详情
-- **影响范围**: [skill.md](skill.md), /api/changelog端点, 前端Web界面
+- **现象**: `/api/changelog` 对早期版本返回 `changes: []` 空数组，前端「最新更新」卡片整块空白，用户看不到该版本改了什么
+- **根因**: 早期版本记录只写 `#### 更新内容: ①…②…` 一句话摘要，没有解析器可识别的 `##### N.` 变更子项，`current_change` 始终为空
+- **影响范围**: README.md / skill.md「最新更新」章节，/api/changelog 返回结构，前端更新日志渲染
 
 **修复方案**:
-- **技术实现**: 按照PY-CORE-011范式补全完整的变更详情结构（问题描述/修复方案/测试验证三要素）
-- **参考位置**: README.md, auto_fix_changelog.py自动生成
+- **技术实现**: 在「最新更新」章节之前新增独立的 PY-CORE-011 范式章节，规定每个版本至少包含一个 `##### N.` 变更子项，并把该范式登记进导航表与汇总表
+- **参考位置**: [README.md](README.md) 版本更新记录范式规范章节
 
 **测试验证**:
-- ✅ changes数组不再为空，包含完整变更详情
-- ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
-- ✅ /api/changelog返回的changes字段包含问题描述、修复方案、测试验证
+- ✅ 范式章节在「最新更新」之前就位，导航表可跳转到该章节
+- ✅ 章节内模板结构可被 `/api/changelog` 解析器逐项识别，不再落入空 changes 兜底分支
+
+##### 2. 定义标准 changes 块三段式结构 (📝文档更新)
+**问题描述**:
+- **现象**: 同一版本的不同变更挤在一句话里，前端只能展示一条笼统摘要，无法区分具体改动
+- **根因**: 缺少「问题描述 / 修复方案 / 测试验证」三段式结构定义，记录者按各自习惯书写，解析器无法稳定抽取字段
+- **影响范围**: 所有版本条目的变更卡片数量与字段完整性
+
+**修复方案**:
+- **技术实现**: 定义 `##### N. [标题] ([类型标签])` 标题行 + `**问题描述**`（现象/根因/影响范围）+ `**修复方案**`（技术实现/参考位置）+ `**测试验证**`（✅ 列表）三段式模板，要求每个版本至少一个变更块
+- **参考位置**: [README.md](README.md) 标准结构模板小节
+
+**测试验证**:
+- ✅ 模板三段式字段与解析器 `_close_entry()` 的抽取逻辑一一对应
+- ✅ 按模板书写的条目，`changes` 数组非空且 `problem` / `solution` / `verification` 三键齐全
+
+##### 3. 补齐字段规范、类型标签对照表与 API 数据映射 (📝文档更新)
+**问题描述**:
+- **现象**: 版本头部元数据（修复日期 / 修复类型 / 影响文件 / Commit / 变更统计 / 作者）写法不统一，部分条目缺字段，API 只能给出兜底值
+- **根因**: 只定义了结构骨架，没有逐字段的格式要求、必填标记与类型标签对照表，也没有说明字段到 API JSON 的映射关系
+- **影响范围**: 版本头部 6 个元数据字段，`meta` 对象与 `changes` 子字段的取值质量
+
+**修复方案**:
+- **技术实现**: 补「字段规范详解」表（字段 / 格式要求 / 示例 / 是否必填）、类型标签对照表（emoji + 标签），并给出 Markdown 字段到 `/api/changelog` JSON 键（`fix_date` / `fix_type` / `affected_files` / `commit` / `change_stats` / `author`、`problem` / `solution` / `verification`）的映射说明
+- **参考位置**: [README.md](README.md) 字段规范详解与类型标签对照表小节
+
+**测试验证**:
+- ✅ 6 个头部字段全部有格式要求与必填标记，`Commit` 明确要求 8 位短哈希、`变更统计` 明确要求真实行数
+- ✅ 映射说明覆盖 `meta` 6 键与 `changes` 3 段，与 `/api/changelog` 实际返回键名逐字一致
+
 ---
+
 
 ### v5.0.9.17 (2026-09-02) - 🔧 **全面修复** 为10个缺失changes的版本添加完整变更详情
 
@@ -10244,21 +10393,21 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [README.md](README.md), [skill.md](skill.md)
 **Commit**: 57206dc9
 **变更统计**: +181行 -1行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 
 ---
 
-##### 1. 为10个缺失changes的版本(v5.0.9.6~v5.0.9.15)添加完整的变更详情结构(问题描述/修复方案/测试验证) - 解决API返回changes为空数组的问题 (🔧Bug修复)
+##### 1. 为10个缺失changes的版本(v5.0.9.6~v5.0.9.15)补全变更详情 (🔧Bug修复)
 
 **问题描述**:
-- **现象**: 版本v5.0.9.17的变更详情需完整记录
-- **根因**: 历史版本记录时未完整填写changes详情
-- **影响范围**: [README.md](README.md), [skill.md](skill.md), /api/changelog端点, 前端Web界面
+- **现象**: v5.0.9.6 ~ v5.0.9.15 共 10 个版本在 `/api/changelog` 中返回 `changes: []`，前端更新日志对这些版本整块空白
+- **根因**: 这 10 个版本在 README.md 中只有版本标题和一句话摘要，没有 `##### N.` 变更子项，解析器 `current_change` 始终为空并落入空 changes 兜底分支
+- **影响范围**: README.md / skill.md 的 10 个历史版本条目，/api/changelog 返回数据，前端更新日志卡片
 
 **修复方案**:
-- **技术实现**: 按照PY-CORE-011范式补全完整的变更详情结构（问题描述/修复方案/测试验证三要素）
-- **参考位置**: README.md, auto_fix_changelog.py自动生成
+- **技术实现**: 按 PY-CORE-011 三段式结构为 10 个版本各补一个 `##### 1.` 变更块，包含现象/根因/影响范围、技术实现/参考位置、至少 2 条测试验证
+- **参考位置**: [README.md](README.md) v5.0.9.6~v5.0.9.15 章节
 
 **测试验证**:
 - ✅ changes数组不再为空，包含完整变更详情
@@ -10277,7 +10426,7 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [main.py](main.py#L8970-L8993), [skill.md](skill.md#py-core-039-智能版本号匹配算法-smart-version-number-matching-algorithm)
 **Commit**: da8351ed
 **变更统计**: +23行 -1行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10361,7 +10510,7 @@ python config/crypto_tool.py encrypt-config
 ❌ 错误示例1：缺少changes块
 \\\markdown
 
-### v5.0.9.15 (2026-08-31) - 📝 **文档更新**
+### v5.0.9.15 (2026-08-31) - 📝 **文档更新** skill.md新增Changelog API开发范式文档
 
 #### 更新内容: 在skill.md中新增Changelog API的开发范式文档
 
@@ -10370,21 +10519,21 @@ python config/crypto_tool.py encrypt-config
 **影响文件**: [skill.md](skill.md)
 **Commit**: 72485527
 **变更统计**: +93行 -2行(v5.0.9.15)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 
 ---
 
-##### 1. 在skill.md中新增Changelog API的开发范式文档 (📝文档更新)
+##### 1. 在skill.md中新增Changelog API开发范式文档 (📝文档更新)
 
 **问题描述**:
-- **现象**: 版本v5.0.9.15的变更详情需完整记录
-- **根因**: 历史版本记录时未完整填写changes详情
-- **影响范围**: [skill.md](skill.md), /api/changelog端点, 前端Web界面
+- **现象**: `/api/changelog` 的返回结构与解析规则只存在于 main.py 代码里，文档侧无任何说明，后续维护者改 README 格式时极易打断解析
+- **根因**: 缺少记录「Markdown 版本条目 ↔ API JSON」映射关系的开发范式章节，格式约束只靠口口相传
+- **影响范围**: [skill.md](skill.md) 的范式章节，/api/changelog 解析规则的稳定性，后续版本记录格式
 
 **修复方案**:
-- **技术实现**: 按照PY-CORE-011范式补全完整的变更详情结构（问题描述/修复方案/测试验证三要素）
-- **参考位置**: README.md, auto_fix_changelog.py自动生成
+- **技术实现**: 在 skill.md 新增「Changelog API 开发范式」章节，说明版本头部字段、`##### N.` 变更块结构，以及 Markdown 到 JSON 的字段映射关系
+- **参考位置**: [skill.md](skill.md) Changelog API 开发范式章节
 
 **测试验证**:
 - ✅ changes数组不再为空，包含完整变更详情
@@ -10478,7 +10627,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [main.py](main.py)
 **Commit**: 3099bed5
 **变更统计**: +42行 -42行(v5.0.9.14)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10510,7 +10659,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [main.py](main.py)
 **Commit**: 6cbddd4b
 **变更统计**: +42行 -42行(v5.0.9.13)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10542,7 +10691,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md)
 **Commit**: 12320720
 **变更统计**: +42行 -42行(v5.0.9.12)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10574,7 +10723,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [skill.md](skill.md)
 **Commit**: 79633bc9
 **变更统计**: +42行 -42行(v5.0.9.11)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10606,7 +10755,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [main.py](main.py), [README.md](README.md)
 **Commit**: 5c7cd412
 **变更统计**: +42行 -42行(v5.0.9.10)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10638,7 +10787,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md)
 **Commit**: b6c41494
 **变更统计**: +42行 -42行(v5.0.9.9)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10670,7 +10819,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [main.py](main.py), 前端代码
 **Commit**: d642ff9c
 **变更统计**: +42行 -42行(v5.0.9.8)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10702,7 +10851,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [main.py](main.py)
 **Commit**: 6f5d4675
 **变更统计**: +42行 -42行(v5.0.9.7)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10732,7 +10881,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [run.bat](run.bat)
 **Commit**: 38e3898a
 **变更统计**: +181行 -1行(v5.0.9.6)
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10762,7 +10911,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [run.bat](run.bat#L21-L41), [run.sh](run.sh#L30-L506), [main.py](main.py#L1893-L1943)
 **Commit**: 9e5cce49
 **变更统计**: run.bat +50行, run.sh +280行, main.py +50行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10794,7 +10943,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [run.sh](run.sh), [README.md](README.md)
 **Commit**: 814b30bd
 **变更统计**: +23行 -1行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10878,7 +11027,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md)
 **Commit**: dc6fef7f, 512eda94, 5ab958c1
 **变更统计**: +115行 -187行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10911,7 +11060,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [run.sh](run.sh), [skill.md](skill.md)
 **Commit**: 5ab958c1
 **变更统计**: +104行 -26行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -10943,7 +11092,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [.gitattributes](.gitattributes), [skill.md](skill.md)
 **Commit**: 512eda94
 **变更统计**: +6行 -4行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -11029,7 +11178,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md)
 **Commit**: 390f5159, 1f148531, 22d84d25, eaefa0ea, 6ef392c9
 **变更统计**: +115行 -187行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -11095,7 +11244,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [skill.md](skill.md)
 **Commit**: 0278a494
 **变更统计**: +869行 -2692行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -11128,7 +11277,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [skill.md](skill.md)
 **Commit**: 0278a494
 **变更统计**: +6408行 -7882行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -15016,7 +15165,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
 **Commit**: 0278a494
 **变更统计**: +399行 -0行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -15050,7 +15199,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [main.py](main.py), [requirements.txt](requirements.txt), [run.bat](run.bat), [run.sh](run.sh)
 **Commit**: 0278a494
 **变更统计**: +242行 -2行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -15084,7 +15233,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [generate_skill_docx.py](generate_skill_docx.py), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
 **Commit**: 0278a494
 **变更统计**: +239行 -8行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -15118,7 +15267,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [main.py](main.py)
 **Commit**: 0278a494
 **变更统计**: +13行 -2行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -15152,7 +15301,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py)
 **Commit**: 0278a494
 **变更统计**: +124行 -24行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -15186,7 +15335,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [skill.docx](skill.docx), [skill.md](skill.md)
 **Commit**: 0278a494
 **变更统计**: +353行 -31行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
@@ -15220,7 +15369,7 @@ PY-CORE-010 (API整体架构)
 **影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py)
 **Commit**: 0278a494
 **变更统计**: +292行 -315行
-**作者**: 小旭二手机（西园路）**
+**作者**: 小旭二手机（西园路）
 
 ---
 
