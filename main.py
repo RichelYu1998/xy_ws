@@ -178,6 +178,7 @@ def _album_prefetch_hedged(album_id, cookie_str):
     全部失败时把各路错误汇总抛出，由调用方回落到带完整 429 预算的常规流程。
     """
     done = threading.Event()
+    halt = threading.Event()
     lock = threading.Lock()
     holder = {'result': None, 'errors': [], 'rate_limited': False}
 
@@ -191,6 +192,7 @@ def _album_prefetch_hedged(album_id, cookie_str):
                 holder['errors'].append(str(exc))
                 if exc.status == 429:
                     holder['rate_limited'] = True
+                    halt.set()
             return
         except Exception as exc:  # [HANDLED]
             with lock:
@@ -200,11 +202,12 @@ def _album_prefetch_hedged(album_id, cookie_str):
             if holder['result'] is None:
                 holder['result'] = (items, pagination)
         done.set()
+        halt.set()
 
     workers = []
     hedge_count = max(1, _ALBUM_PREFETCH_HEDGES)
     for seq in range(hedge_count):
-        if seq and done.wait(_ALBUM_PREFETCH_HEDGE_GAP):
+        if seq and halt.wait(_ALBUM_PREFETCH_HEDGE_GAP):
             break
         with lock:
             stop = holder['rate_limited'] or (bool(workers) and len(holder['errors']) >= len(workers))
@@ -214,7 +217,17 @@ def _album_prefetch_hedged(album_id, cookie_str):
         worker.start()
         workers.append(worker)
 
-    done.wait(_ALBUM_PREFETCH_TIMEOUT + _ALBUM_PREFETCH_RETRY_WAIT)
+    # 等待结果：一旦拿到结果立即返回；若已发出的各路口径全部失败（如整批 429），
+    # 也立即返回，不再白等到超时上界，把时间留给上层回落到带完整 429 预算的常规流程
+    end_at = time.time() + _ALBUM_PREFETCH_TIMEOUT + _ALBUM_PREFETCH_RETRY_WAIT
+    while True:
+        remain = end_at - time.time()
+        if remain <= 0 or done.wait(min(0.05, remain)):
+            break
+        with lock:
+            all_failed = bool(workers) and len(holder['errors']) >= len(workers)
+        if all_failed:
+            break
     with lock:
         if holder['result'] is not None:
             return holder['result']

@@ -146,6 +146,55 @@ for _ in range(5):
 check(ok_all, '同一条连接连续5次请求全部成功（连接复用无残留状态）')
 check(STATE['hits'] == 5, f'5次请求全部到达服务端, 实测{STATE["hits"]}次')
 
+case('场景7: 对冲请求撞429立即停止发新路且不白等超时上界')
+orig_once = m._album_prefetch_once
+calls = []
+
+
+def fake_429(album_id, cookie_str):
+    calls.append(time.time())
+    raise m._AlbumPrefetchError('HTTP 429', status=429, retryable=True)
+
+
+m._album_prefetch_once = fake_429
+try:
+    t0 = time.time()
+    raised = False
+    try:
+        m._album_prefetch_hedged('album', 'a=b')
+    except m._AlbumPrefetchError as exc:
+        raised = True
+        hedge_err = str(exc)
+    dt = time.time() - t0
+finally:
+    m._album_prefetch_once = orig_once
+check(raised, f'全部路失败时抛出 _AlbumPrefetchError: {hedge_err}')
+check(len(calls) == 1, f'首路429后不再发新路(避免加剧限流), 实测{len(calls)}路')
+check(dt < 1.0, f'全部失败立即返回, 不白等超时上界, 实测{dt:.2f}秒')
+
+case('场景8: 对冲请求任一路成功即返回（尾延迟取最快那一路）')
+calls2 = []
+
+
+def fake_slow_then_fast(album_id, cookie_str):
+    calls2.append(time.time())
+    if len(calls2) == 1:
+        time.sleep(2.0)
+        raise m._AlbumPrefetchError('模拟慢路超时')
+    return [{'goodsId': 'g1'}], {'total': 1, 'isLoadMore': False}
+
+
+m._album_prefetch_once = fake_slow_then_fast
+try:
+    t0 = time.time()
+    items, pagination = m._album_prefetch_hedged('album', 'a=b')
+    dt = time.time() - t0
+finally:
+    m._album_prefetch_once = orig_once
+check(len(items) == 1 and pagination.get('total') == 1, '对冲成功返回第一页数据与分页信息')
+check(dt < 1.9, f'第二路成功即返回, 未被慢路拖到2秒, 实测{dt:.2f}秒')
+check(len(calls2) >= 2, f'慢路失败后仍有新路顶上, 实测发出{len(calls2)}路')
+
 server.shutdown()
 print('\n===== 结果 =====')
 print(f'用例失败数: {len(fails)}')
