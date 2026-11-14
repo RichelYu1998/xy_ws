@@ -29,6 +29,7 @@
 | 📐 安全审计零问题范式 (PY-CORE-040) | 总计问题必须为 0 的判定标准 |
 | 📐 终端实时日志接入范式 (PY-CORE-043) | sh / bat 实时日志双方案 |
 | 📐 文档内引用编号升序范式 (Within-Document Reference Ascending Order) (PY-CORE-046) | 全文档编号必须小号在前、大号在后 |
+| 📐 零缺陷全量验证范式 (Zero-Defect Full Coverage Verification) (PY-CORE-047) | 全量攻防 + 隐藏Bug清零 + 完整数据三合一判定 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -2848,9 +2849,10 @@ def install_playwright_cdn():
 | u | 044-044 | 044 | 满 |
 | v | 045-045 | 045 | 满 |
 | w | 046-046 | 046 | 满 |
-| x / y / z | — | — | ✅ 空 |
+| x / y | — | — | ✅ 空 |
+| z | 047-047 | 047 | 满 |
 
-> 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 030 起全部 +1）。当前队列长度 46，剩余可用号位 54（硬上限 100）。
+> 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 030 起全部 +1）。当前队列长度 47，剩余可用号位 53（硬上限 100）。
 
 ### 新增范式标准动作（顺序不可颠倒）
 
@@ -3680,6 +3682,113 @@ assert not viol and not bad and nums == sorted(nums)
 
 ---
 
+## 📐 零缺陷全量验证范式 (Zero-Defect Full Coverage Verification) (PY-CORE-047)
+
+> **创建日期**: 2026-11-14 | **最后更新**: 2026-11-14 | **优先级**: 🔴 P0 强制规范 | **适用范围**: test/security_audit.py 攻防验证 / main.py 分页抓取链路 / README.md / skill.md / skill.docx
+
+### 🔴 核心原则：攻防必须全量跑、Bug 必须清零、数据必须拿全——三者任一不达标即视为「本次交付未完成」
+
+「跑过一遍没报错」不等于「验证完成」。攻防项被跳过、失败被记成「无法判定」、抓取中途撞限流就收工，都属于**假通过**。本范式把三件事写成硬判定，任何一条不满足都不允许宣称完成。
+
+| 子标准 | 硬性要求 | 典型「假通过」表现 |
+|---|---|---|
+| ① 全量攻防 | 13 项黑盒攻击载荷逐项执行；服务未运行必须**自动拉起临时实例**，验证结束释放端口；执行数不足 13 即判不合格 | 服务没起就「跳过主动验证」并只记 INFO |
+| ② 隐藏Bug零容忍 | 审计 `总计问题` 必须为 0，禁止白名单降级；请求失败=防护未验证=**判失败**，不允许 `INCONCLUSIVE` 蒙混 | 把「请求失败」记为无法判定，问题数保持 0 |
+| ③ 完整数据 | 分页抓取以**服务端商品总数**为完整性判据；429 不放弃、缺口必补抓、容差按总数等比缩放 | 撞 429 直接 break、固定容差把小相册判成「已抓全」 |
+
+### 攻防 13 项清单（缺一即不合格）
+
+| # | 攻防项 | 载荷 | 期望结果 |
+|---|---|---|---|
+| 1 | 超大请求体防护 | `POST /api/sku/compare/txt` 11MB 请求体 | 413 拦截 |
+| 2 | 路由级超长字段防护 | 单字段 2MB 超长值 | 400/413/422 |
+| 3 | 畸形JSON防护 | 截断的非法 JSON | 400/422 |
+| 4 | JSON类型混淆防护 | 字段类型故意错位（数组塞进字符串位） | 400/422 |
+| 5 | 非法字段注入防护 | 注入未声明字段 + 原型污染键 | 400/422 |
+| 6 | 路径遍历防护 | `GET /../../../../etc/passwd` | 非 200 或返回 SPA 首页 |
+| 7 | 反射型XSS防护 | 查询串带 `<script>` 载荷 | 响应体不回显可执行脚本 |
+| 8 | SQL注入防护 | 查询串带 `' OR 1=1--` | 非 500、无 SQL 报错回显 |
+| 9 | CSRF同源校验 | 跨源 `Origin` 的 POST | 403/400 拒绝 |
+| 10 | 非法HTTP方法拦截 | `DELETE /api/changelog` | 404/405 |
+| 11 | 路径遍历内容复核 | 二次抓取 `/etc/passwd` 响应体 | 无 `root:x:` 泄露 |
+| 12 | 安全响应头基线 | `GET /` 响应头 | X-Content-Type-Options / X-Frame-Options / Referrer-Policy / CSP 四项齐全 |
+| 13 | 错误信息泄露复核 | `GET /api/product/search?search_type=invalid_type` | 无 `Traceback` / 文件路径 / `sqlite3.` 泄露 |
+
+> **执行口径**: 服务未就绪时由审计脚本 `subprocess.Popen([sys.executable, 'main.py', '--web'])` 自动拉起临时实例（`WEB_PORT` 可指定），45 秒内轮询端口就绪，验证结束 `terminate()` 释放端口；拉起失败或就绪超时一律记 **HIGH** 问题，禁止降级为 INFO 后放行。
+
+### 完整数据保障（分页抓取四层兜底）
+
+| 层 | 机制 | 参数 | 作用 |
+|---|---|---|---|
+| ① 限流预算 | 429 独立重试预算 + 全局限流闸门 + 页间延迟自适应 | `_ALBUM_RATE_LIMIT_MAX_RETRIES=12` / `_ALBUM_RATE_LIMIT_TOTAL_BUDGET=900` | 撞 429 不放弃，风控放行后继续抓同一页 |
+| ② 单页补抓 | 单页失败按递增等待重抓同一页 | `_ALBUM_PAGE_RETRY_ROUNDS=3` / `_ALBUM_PAGE_RETRY_WAIT=20` | 一页失败不再让整卷作废 |
+| ③ 整卷校验 | 服务端总数比对 + 最多 3 轮从头重抓 + 按货号合并去重 | `_ALBUM_FULL_PASS_MAX=3` / `_ALBUM_TOTAL_TOLERANCE=5` | 缺口必补，直到数量达标 |
+| ④ 断点续爬 | 进度文件节流写入 + 6 小时过期 + album_id 校验 | `_ALBUM_PROGRESS_MAX_AGE=21600` | 跨进程中断可续，补齐剩余商品 |
+
+**完整性判据三条硬规则**:
+
+| 规则 | 错误做法 | 正确做法 |
+|---|---|---|
+| 容差必须等比 | 固定容差 5：总数 3 的相册「已抓 0 个」也判完整 | `tolerance = min(5, total // 20)`，小相册容差收紧为 0 |
+| 歧义键必须过滤 | `count=100` 每页条数被当成总数，永远判不完整 | 已知本页条数时，`itemCount/count` 只有大于本页条数才当总数 |
+| 去重键必须唯一 | 无 `goodsNum` 时用 `title\|time_stamp` 兜底，字段全缺退化为同一空键，除首条外全被误删 | 空键再退化到整条记录的内容指纹（SHA256 前 32 位） |
+
+> **一句话口径**: 没有服务端总数时「翻到末页」才算完整；有服务端总数时「数量达标」才算完整；两者都没有证据时，一律按**不完整**处理并继续补抓。
+
+### 校验脚本（提交前必跑）
+
+```python
+import json, re, subprocess, sys
+
+# 1) 攻防 13 项必须全执行、0 失败
+report = sorted(__import__('glob').glob('file/security_report_*.json'))[-1]
+ad = json.load(open(report, encoding='utf-8'))['attack_defense']
+total = ad['passed'] + ad['failed']
+assert ad['server_available'] is True, '服务未就绪，攻防未执行'
+assert total >= 13, f'攻防项不足 13: {total}'
+assert ad['failed'] == 0, [c['name'] for c in ad['cases'] if c['status'] == 'FAILED']
+assert not [c for c in ad['cases'] if c['status'] == 'INCONCLUSIVE'], '存在无法判定项'
+
+# 2) 审计总计问题必须为 0
+summary = json.load(open(report, encoding='utf-8'))['summary']
+assert summary['total_issues'] == 0, summary
+
+# 3) 分页完整性判据不可退化为固定容差
+src = open('main.py', encoding='utf-8').read()
+assert 'tolerance = min(_ALBUM_TOTAL_TOLERANCE, total // 20)' in src
+assert 'hashlib.sha256' in src
+print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
+```
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 服务没起就跳过攻防 | 13 项一项没跑，报告却显示「0 问题」 | 自动拉起临时实例，拉起失败记 HIGH |
+| 请求失败记 `INCONCLUSIVE` | 防护未验证却不算问题，等于免检 | 请求失败一律记 `FAILED` + 对应等级问题 |
+| 攻防中途异常提前 return | 执行项不足 13 却静默通过 | 收尾校验执行数，不足即记 HIGH |
+| 固定容差判定完整 | 小相册漏商品且永远不补抓 | 容差按总数等比缩放 |
+| 歧义键当总数 | 每页条数=总数，永远判不完整、白翻多轮 | 歧义键按本页条数过滤 |
+| 去重键退化 | 字段全缺时商品被批量误删 | 内容指纹兜底 |
+| 临时实例不释放 | 端口被占，下次审计端口冲突 | 审计结束 `terminate()` 并校验端口释放 |
+| 只改代码不改文档 | 范式与实际实现脱节 | 同轮更新 README.md / skill.md 并重生成 docx |
+
+### 落地检查清单
+
+```
+[ ] 1. 攻防 13 项全部执行，passed+failed = 13，failed = 0
+[ ] 2. 服务未运行时自动拉起临时实例，审计结束后端口已释放
+[ ] 3. 无 INCONCLUSIVE / 无「已跳过」记录，请求失败一律判失败
+[ ] 4. 安全审计总计问题 = 0（CRITICAL/HIGH/MEDIUM/LOW 全为 0）
+[ ] 5. 分页完整性判据使用服务端总数 + 等比容差 + 多轮补抓 + 去重合并
+[ ] 6. 429 有独立重试预算与全局冷却闸门，不因限流丢数据
+[ ] 7. 三方同步：README.md 与 skill.md 逐字节一致，skill.docx 重生成后锚点零缺失
+```
+
+> **判定标准**: 出现「攻防项少于 13 / 存在无法判定项 / 服务未就绪即跳过 / 审计问题数非 0 / 完整性判据退化为固定容差 / 撞 429 直接放弃」中任意一条，即视为「未符合本范式」。
+
+---
+
 ## 📊 完整代码范式汇总表
 
 | 范式编号 | 首字母 | 名称 | 覆盖文件 | 优先级 |
@@ -3730,19 +3839,179 @@ assert not viol and not bad and nums == sorted(nums)
 | PY-CORE-044 | U | 统一异常处理 (Unified Exception Handling) | main.py | 🔴 核心 |
 | PY-CORE-045 | V | 版本号一致性保障 (Version Consistency Guarantee) | main.py / README.md | 🔴 核心 |
 | PY-CORE-046 | W | 文档内引用编号升序 (Within-Document Reference Ascending Order) | README.md / skill.md | 🔴 核心 |
+| PY-CORE-047 | Z | 零缺陷全量验证 (Zero-Defect Full Coverage Verification) | test/security_audit.py / main.py | 🔴 核心 |
 
-**总计: 46个核心范式（PY-CORE-001 ~ PY-CORE-046，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
+**总计: 47个核心范式（PY-CORE-001 ~ PY-CORE-047，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
 
 ---
 
-**文档版本**: v5.0.9.100  
-**最后更新**: 2026-11-12  
-**下次审查**: 2026-12-12  
+**文档版本**: v5.0.9.103  
+**最后更新**: 2026-11-14  
+**下次审查**: 2026-12-14  
 **维护者**: 小旭数码开发团队
 
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.103 (2026-11-14) - 🥊 **全量攻防强制执行 + 隐藏Bug清零 + 完整数据判据修正** - 攻防 13 项不再允许跳过(服务未起自动拉起临时实例/结束释放端口) + 请求失败一律判 FAILED 并记问题(INCONCLUSIVE 口径废除) + 执行项不足 13 直接记高危 + 完整性容差按服务端总数等比缩放(修小相册漏商品) + 歧义总数键按本页条数过滤(修永远判不完整) + 去重键空值退化改内容指纹(修商品被批量误删) + 新增 PY-CORE-047 零缺陷全量验证范式
+
+> **Commit**: `b1cbabcc`
+
+#### 更新内容: 把「攻防可以跳过、失败可以含糊、抓不全也算完成」三条退路全部堵死——攻防 13 项必须项项真跑真判，抓取完整性判据修掉三处会导致漏数据的隐藏 bug，并固化为 PY-CORE-047 范式
+
+1. **攻防自动拉起**: 新增 `_ensure_server()` / `_stop_server()`，服务未运行时自动 `subprocess.Popen([sys.executable, 'main.py', '--web'])` 拉起临时实例（`WEB_PORT` 可指定），45 秒内轮询端口就绪，验证结束 `terminate()` 释放端口；拉起失败/就绪超时记 HIGH，不再降级为 INFO 放行 [test/security_audit.py](test/security_audit.py#L1195-L1268)
+2. **废除免检口径**: 全部 `INCONCLUSIVE` 改为 `FAILED`，请求失败即「防护未验证」，按对应等级记入问题；路径遍历内容复核/安全响应头基线/错误信息泄露复核三处补齐 else 分支，不再出现「请求失败也算通过」[test/security_audit.py](test/security_audit.py#L1270-L1526)
+3. **执行数校验**: 新增收尾校验 `passed + failed < 13` 即记 HIGH「攻防项未全部执行」，杜绝中途异常提前 return 却静默通过 [test/security_audit.py](test/security_audit.py#L1516-L1526)
+4. **容差等比缩放**: `_album_is_complete()` 容差由固定 5 改为 `min(5, total // 20)`，修掉「总数 3 的相册一个没抓到也判完整」的漏数据 bug [main.py](main.py#L1457-L1467)
+5. **歧义总数键过滤**: `_extract_album_total()` 增加 `page_len` 参数，`itemCount/count` 在已知本页条数时只有大于本页条数才当总数，修掉「每页条数被当总数、永远判不完整、白翻多轮」的 bug [main.py](main.py#L1431-L1455)
+6. **去重键指纹兜底**: `_dedupe_album_items()` 在 `goodsNum` 与 `title/time_stamp` 全缺时改用整条记录的 SHA256 内容指纹，修掉「兜底键退化为同一空键、除首条外商品被批量误删」的 bug [main.py](main.py#L1661-L1687)
+7. **范式固化**: 新增 [PY-CORE-047 零缺陷全量验证范式](README.md#L3684-L3790)，含三大子标准（全量攻防 / 隐藏Bug零容忍 / 完整数据）、13 项攻防清单、四层兜底参数表、完整性判据三条硬规则、可复制校验脚本、8 条坑位表与 7 项落地检查清单；导航表/汇总表各增 1 行、区间表 z 段落号 047、总计 46→47 [README.md](README.md#L3684-L3790)
+8. **三方同步**: README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重生成，全文锚点重映射后零越界
+
+**修复日期**: 2026-11-14
+**修复类型**: 🥊攻防验证 + 🔧Bug修复 + 📝文档归一
+**影响文件**: [main.py](main.py), [test/security_audit.py](test/security_audit.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: b1cbabcc
+**变更统计**: 新增范式 1 条（47 个核心范式）+ 攻防新增 2 函数 1 校验 + 完整性判据 3 处修正
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🥊 攻防验证不再允许「服务没起就跳过」 (🥊攻防验证)
+**问题描述**:
+- **现象**: `_run_live_attack_defense_tests()` 探测不到本地服务时，只记一条 INFO「已跳过主动攻击验证」就直接 return，13 项黑盒攻击一项都没跑，报告仍显示「总计问题 0」
+- **根因**: 把「服务未运行」当成环境限制而非待验证项，用 INFO 级别自我豁免
+- **影响范围**: 攻防验证整体（13 项全部），审计结论的置信度归零
+
+**修复方案**:
+- **技术实现**: 新增 `_ensure_server()`，服务未运行则用 `subprocess.Popen([sys.executable, 'main.py', '--web'], env={WEB_PORT, HOST})` 拉起临时实例，日志写入 `file/security_audit_server_<port>.log`，45 秒内每 0.5 秒轮询端口；拉起失败或超时记 HIGH 并返回 False；新增 `_stop_server()` 在审计收尾与异常分支中 `terminate()`（10 秒宽限后 `kill()`），确保端口释放
+- **参考位置**: [test/security_audit.py](test/security_audit.py#L1195-L1268)
+
+**测试验证**:
+- ✅ `WEB_PORT=8899` 空跑实测：日志出现「🚀 服务未运行，自动拉起临时实例」，随后「✅ 临时服务已就绪」
+- ✅ 审计结束 `lsof -ti:8899` 无输出，端口已释放
+- ✅ 攻防输出「通过 13 / 失败 0 / 共 13 项」，`server_available=True`
+
+---
+
+##### 2. 🚫 废除 INCONCLUSIVE 免检口径 (🥊攻防验证)
+**问题描述**:
+- **现象**: 请求失败（连接异常）时，主循环把该攻防项记为 `INCONCLUSIVE` 并 `continue`，不计数、不记问题，等价于「没验证也算过」
+- **根因**: 状态机里保留了「无法判定」这一中间态，被当成通过路径使用
+- **影响范围**: 10 项批量攻防 + 3 项独立复核（路径遍历内容复核 / 安全响应头基线 / 错误信息泄露复核）
+
+**修复方案**:
+- **技术实现**: 主循环请求失败分支改为 `failed += 1` + `_add_issue(对应 severity)` + 状态记 `FAILED`；三项独立复核各自补齐 else 分支（响应头基线非 200、遍历复核请求失败、错误泄露复核请求失败），一律记问题并把 case 状态置 `FAILED`；汇总输出把「未通过项」判定条件扩为 `BYPASSED / FAILED`
+- **参考位置**: [test/security_audit.py](test/security_audit.py#L1270-L1526)
+
+**测试验证**:
+- ✅ 全量扫描输出无 `INCONCLUSIVE`，攻防用例状态仅 `BLOCKED / BYPASSED / FAILED`
+- ✅ 13 项全部 `BLOCKED`，`failed=0`
+- ✅ 汇总段「未通过项」为空
+
+---
+
+##### 3. 🔢 攻防执行数不足 13 即判不合格 (🥊攻防验证)
+**问题描述**:
+- **现象**: 攻防流程中途若抛异常提前 return，已执行项数少于 13，收尾仍打印「真实攻防验证完成」，无任何拦截
+- **根因**: 只统计通过/失败，未校验「应执行项数」
+- **影响范围**: 攻防完整性的最后一道闸门缺失
+
+**修复方案**:
+- **技术实现**: 收尾新增 `total_cases = passed + failed`，`total_cases < 13` 时 `_add_issue(HIGH, '攻防项未全部执行')`，`code_snippet` 输出 `executed=N expected=13`
+- **参考位置**: [test/security_audit.py](test/security_audit.py#L1516-L1526)
+
+**测试验证**:
+- ✅ 实测 `total_cases=13`，未触发告警
+- ✅ 断点演练：临时注释一项 case 后 `total_cases=12`，HIGH 问题如期出现
+
+---
+
+##### 4. 📏 完整性容差改为按服务端总数等比缩放 (🔧Bug修复)
+**问题描述**:
+- **现象**: `_album_is_complete()` 用固定容差 `_ALBUM_TOTAL_TOLERANCE=5`，服务端总数 3 的相册即使一个商品都没抓到（collected=0）也判定「已抓全」，直接结束补抓
+- **根因**: 容差设计只考虑大相册（几十上百个商品）的抖动，未对小相册收敛
+- **影响范围**: 小相册（总数 ≤ 5）全量漏抓，且因判为完整不会触发重抓
+
+**修复方案**:
+- **技术实现**: 改为 `tolerance = min(_ALBUM_TOTAL_TOLERANCE, total // 20)`，总数 3 时容差 0（必须严格拿全）、总数 20 时容差 1、总数 200 时容差 5；无服务端总数时仍以「翻到末页」为判据
+- **参考位置**: [main.py](main.py#L1457-L1467)
+
+**测试验证**:
+- ✅ `total=3, collected=2` → False（判不完整，继续补抓）；`collected=3` → True
+- ✅ `total=20, collected=19` → True（容差 1 生效）；`total=200, collected=199` → True
+- ✅ `total=0` 时按 `pass_complete` 判定，未翻到末页返回 False
+
+---
+
+##### 5. 🔍 歧义总数键按本页条数过滤 (🔧Bug修复)
+**问题描述**:
+- **现象**: `_extract_album_total()` 把 `pagination.itemCount` / `count` 直接当总数，部分接口这两个键表示「本页条数」（如每页 100），导致 album_total 恒为 100，整卷永远判不完整
+- **根因**: 键名语义存在二义性，取值时未结合上下文消歧
+- **影响范围**: 命中该语义的接口每次抓取都白跑 2 轮重抓（`_ALBUM_FULL_PASS_MAX=3`），且日志持续输出「准备补抓」
+
+**修复方案**:
+- **技术实现**: 函数签名扩为 `_extract_album_total(pagination, page_len=0)`，显式键 `total/totalCount/totalNum` 优先；歧义键 `itemCount/count` 在 `page_len > 0` 且数值 ≤ 本页条数时跳过；两处分页主循环调用改为传 `len(items)`
+- **参考位置**: [main.py](main.py#L1431-L1455)
+
+**测试验证**:
+- ✅ `{'count': 100}` + `page_len=20` → 100（大于本页，视为总数）
+- ✅ `{'count': 100}` + `page_len=100` → 0（等于本页，判为条数，忽略）
+- ✅ `{'itemCount': 5, 'total': 12}` + `page_len=5` → 12（显式键优先）
+
+---
+
+##### 6. 🧬 去重键空值退化改用内容指纹 (🔧Bug修复)
+**问题描述**:
+- **现象**: `_dedupe_album_items()` 在商品无 `goodsNum` 时用 `title|time_stamp` 兜底，若两者也缺，键退化为 `'|'` 这一固定空键，同批次内除首条外全部被当作重复删除
+- **根因**: 兜底键构造后未校验「是否仍为空」
+- **影响范围**: 无货号商品（部分接口返回结构差异）批量丢失，且重抓合并时越合越少
+
+**修复方案**:
+- **技术实现**: 兜底键等于 `'|'` 时改用 `hashlib.sha256(json.dumps(item, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()[:32]` 作为内容指纹，序列化异常再退化为 `__raw_{len(result)}` 保证不丢；货号正常时行为不变
+- **参考位置**: [main.py](main.py#L1661-L1687)
+
+**测试验证**:
+- ✅ `[{'a':1},{'a':2},{'a':1}]` → 去重后 2 条（内容指纹生效，未退化为 1 条）
+- ✅ 货号去重 `A/B/A` → `A/B`，行为未变
+- ✅ 仅 `title` 不同 → 2 条保留
+
+---
+
+##### 7. 📐 新增 PY-CORE-047 零缺陷全量验证范式 (📐范式定义)
+**问题描述**:
+- **现象**: 「全量攻防 / 隐藏Bug清零 / 完整数据」三项要求散落在变更记录与临时口径里，没有独立范式可判定，新增代码时无从对照
+- **根因**: 三项要求横跨 `test/security_audit.py` 与 `main.py` 两条链路，此前未被抽象成统一范式
+- **影响范围**: 攻防、审计、抓取三处验收口径不统一
+
+**修复方案**:
+- **技术实现**: 按 PY-CORE-034 规则取标题英文名首字母 `z` 落号 047（z 段此前为空，队列尾部插入，零重排），新增 [PY-CORE-047 零缺陷全量验证范式](README.md#L3684-L3790)：三大子标准表、13 项攻防清单（含载荷与期望）、分页四层兜底参数表、完整性判据三条硬规则、可复制校验脚本、8 条坑位表、7 项落地检查清单与判定标准；导航表与汇总表各插 1 行，区间表新增 `z | 047-047 | 047 | 满`，总计 46→47
+- **参考位置**: [PY-CORE-034 区间表](README.md#L2826-L2853)、[PY-CORE-047 零缺陷全量验证范式](README.md#L3684-L3790)
+
+**测试验证**:
+- ✅ 汇总表 47 行、`PY-CORE-001 ~ PY-CORE-047` 连续，跳号 0、重号 0
+- ✅ `##` 章节编号序列仍严格升序，导航表行序升序
+- ✅ 区间表 a-z 各段占用与汇总表首字母列一致
+
+---
+
+##### 8. 📄 三方文档同步与 docx 重生成 (📝文档归一)
+**问题描述**:
+- **现象**: 范式新增与 changelog 写入后，README.md / skill.md / skill.docx 若不同步，会出现导航锚点断链与版本口径不一致
+- **根因**: 三方文档需在同一轮内完成「写 md → 同步 → 重生成 → 校验」
+- **影响范围**: 文档导航、`/api/changelog` 输出、版本号一致性
+
+**修复方案**:
+- **技术实现**: skill.md 与 README.md 逐字节同步（`cmp` 校验），执行 `python test/generate_docx.py` 由 skill.md 重生成 skill.docx，再对全文内部锚点做行号重映射并校验越界数为 0
+- **参考位置**: [PY-CORE-042 三方文档互证范式](README.md)
+
+**测试验证**:
+- ✅ `cmp skill.md README.md` 无差异
+- ✅ skill.docx 重生成成功，导航锚点缺失 0
+- ✅ 内部锚点越界 0，`/api/changelog` 最新条目 8 项字段齐全
+
+---
 
 ### v5.0.9.102 (2026-11-14) - 🚦 **限流韧性加固 + 整卷数据完整性** - 相册分页 429 独立重试预算(12次/5s→60s/累计15分钟) + 全局限流闸门(撞429后统一冷却再发) + 页间延迟自适应(限流后放缓、成功后回落) + 单页补抓3轮 + 整卷服务端总数比对与最多3轮重抓合并去重 + 断点续爬叠加补齐 + 双抓取路径同步加固
 
