@@ -19,6 +19,7 @@ for i in range(10):
     t0 = time.time()
     try:
         items, pagination = m._album_prefetch_hedged(album_id, cookie_str)
-        print(f'{i:2d} | {time.time() - t0:6.2f}s | ok items={len(items)} isLoadMore={pagination.get("isLoadMore")}', flush=True)
+        more = pagination.get('isLoadMore')
+        print(f'{i:2d} | {time.time() - t0:6.2f}s | ok items={len(items)} isLoadMore={more}', flush=True)
     except m._AlbumPrefetchError as exc:
         print(f'{i:2d} | {time.time() - t0:6.2f}s | FAIL {exc}', flush=True)
