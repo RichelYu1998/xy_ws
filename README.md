@@ -4452,7 +4452,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ### v5.0.9.116 (2026-11-14) - 🔴 **config/ 全量热读取收口：密钥文件改为签名热读取，白名单逐条显示不再隐藏，删除两个零读取点死配置** - ① `config/.encryption_key` / `config/.salt` 原先只在单例初始化时读一次，换密钥必须重启，现改为 `SecureConfigManager._fernet` property + `(mtime_ns, size, CONFIG_ENCRYPTION_KEY)` 签名缓存；② 前端白名单列表原先过滤掉 `builtin` / `protected` 条目，导致「文件里写了几行、界面只显示几行」的错觉，现改为逐条全量展示并标注 `[可清理]` / `[受保护]` / `[目录不存在]`；③ 清理 `config/production.json`、`config/staging.json` 两个全仓库零读取点的死配置文件，并同步目录树与文档；④ PY-CORE-015 新增「全量覆盖 / 禁止死配置 / 模板不算运行期配置」三条规则与覆盖表，检查清单扩到 10 项
 
-> **Commit**: `PENDING`
+> **Commit**: `5b9b55a0`
 
 #### 更新内容: 让 config/ 下每个运行期文件都真正热读取，并让界面如实反映「读到了几条」
 
