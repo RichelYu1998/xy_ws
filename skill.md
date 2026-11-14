@@ -165,6 +165,8 @@ xy_ws/
 ├── run.bat                 # Windows 启动脚本
 ├── tox.ini                 # tox 配置
 ├── clean_files.log         # 文件清理日志
+├── .gitignore / .gitattributes # Git 忽略规则与换行符配置
+├── .idea/                  # IDE 工程配置（不入库）
 ├── config/                 # 配置目录
 │   ├── config.json         # 主配置文件
 │   ├── config.json.example # 配置模板（脱敏）
@@ -174,14 +176,33 @@ xy_ws/
 │   ├── staging.json        # 预发环境配置
 │   ├── input_stock_numbers.txt  # 货号输入文件
 │   ├── crypto_tool.py      # 配置加解密工具（encrypt/decrypt/encrypt-config）
+│   ├── clean_allowed_roots.txt # 清理目录白名单（真实路径，不入库）
+│   ├── clean_allowed_roots.example.txt # 白名单脱敏示例（仅格式说明）
+│   ├── .env.example        # 环境变量示例（登录凭证 / 邮件通知）
 │   ├── .encryption_key     # 配置加密密钥
 │   └── .salt               # 密钥派生盐值
 ├── file/                   # 采集数据目录（按日期命名的微购相册 JSON）
+│   ├── security_report_*.json # 安全审计报告
+│   ├── security_audit_server_*.log # 审计服务端日志（按端口分文件）
+│   ├── web_output.log / app.log # 运行日志
+│   ├── crash_history.log   # 崩溃历史记录
+│   ├── stderr_subprocess.log # 子进程错误输出
+│   ├── watchdog.pid / watchdog_daemon.log # 看门狗进程号与守护日志
+│   ├── clean_files.log     # 清理执行记录
+│   ├── fetch_progress_*.json # 断点续爬进度（按相册 ID 落盘）
+│   └── tunnel_url.txt      # 隧道公网地址
 ├── temp/                   # 临时文件目录
 ├── test/                   # 辅助脚本目录
+│   ├── __init__.py         # 包标记（test 包用途说明）
 │   ├── generate_docx.py    # skill.docx 文档生成脚本
 │   ├── salt_crypto_tool.py # 加盐加密工具
-│   └── security_audit.py   # 安全审计脚本
+│   ├── security_audit.py   # 安全审计脚本
+│   ├── test_429_handling.py # 429 限流专项测试（8 场景 23 断言）
+│   ├── bench_30.py         # 爬虫总耗时 30 次基准测试
+│   ├── bench_prefetch.py   # 相册首包耗时基准测试
+│   ├── diag_hedge.py       # 对冲请求延迟诊断
+│   ├── diag_lanes.py       # 多路并发延迟分布诊断
+│   └── diag_fallback.py    # 预热失败兜底路径诊断
 ├── launchd/                # macOS 守护进程配置
 │   └── com.xyws.web.plist
 ├── dist/                   # 前端资源
@@ -1340,6 +1361,175 @@ class CleanupChecklist:
             Markdown格式的恢复指南
         """
         pass  # 实现略
+
+#### 3. test / temp 目录脚本规范（2026-11-14 补充）
+`test/` 与 `temp/` 是代码库卫生的重点区域，脚本必须同时满足「可读」与「可清理」两条线。
+
+| 要求 | 具体标准 |
+|------|---------|
+| 目录职责 | `test/` 存放长期有效的基准测试、诊断脚本与安全工具；`temp/` 只存放一次性临时脚本，验证完成即删除，禁止长期驻留 |
+| 模块文档字符串 | 每个脚本首行必须写中文 docstring，说明「用途 + 运行方式（含实际命令）」 |
+| 函数/类文档字符串 | 每个函数、类、方法都要有中文 docstring，说明职责与输入输出；桩函数（stub）同样要写清用途 |
+| 关键逻辑注释 | 子进程调用原因、状态重置、桩函数替换与还原、断言汇总、冷却/限流判定等关键行必须有中文注释 |
+| 注释语言 | 统一中文；原有英文注释一律改写为中文，不保留双语冗余 |
+| 导入规范 | 全部 import 集中在文件顶部且同一模块只导入一次，详见 PY-CORE-028；脚本若需 `sys.path.insert` 或设置 `os.environ`，该准备语句紧贴标准库导入之后、`import main as m` 之前 |
+| 清理判定 | `temp/` 脚本在对应验证任务结束后即删除；`test/` 脚本若无实际复用价值（一次性排障）同样应删除而非留在 `test/` |
+
+自检命令:
+```bash
+# 1) 列出 test/ 下全部脚本及其模块 docstring 首行
+for f in test/*.py; do echo "== $f"; sed -n '2,4p' "$f"; done
+
+# 2) 确认 temp/ 已清空（应为空目录或无该目录）
+ls -A temp/ 2>/dev/null || echo "temp/ 不存在"
+```
+
+#### 4. 代码导览全量覆盖范式（2026-11-14 补充）
+[index.html](index.html) 的「项目结构树」是项目唯一的代码导览入口，必须与实际文件系统逐条对齐：现存文件不得缺条目，已删文件不得留条目，每个条目右侧必须有一句中文说明。
+
+| 要求 | 具体标准 |
+|------|---------|
+| 全量覆盖 | 除 `dist/node_modules`、`tools/*`、`file/` 下按日期滚动的归档 JSON 只展开一层外，其余目录下所有文件都要列条目，包括隐藏文件 |
+| 中文注释 | 每个文件条目右侧必须有 `# 中文说明`，写清「是什么 + 干什么」；密钥、盐值、Cookie、目录白名单等敏感文件还要标注「不入库」 |
+| 目录条目 | 目录用 📁 加中文职责名（配置目录 / 数据目录 / 前端资源 / 内置工具），与同级文件条目对齐 |
+| 隐藏文件 | `.gitignore`、`.gitattributes`、`.env.example`、`.encryption_key`、`.salt` 等以点开头的文件同样要列，不得因为「看不见」而漏 |
+| 命名一致 | 条目名与真实文件名完全一致；`security_report_*.json`、`workbox-*.js` 这类通配仅用于按时间或哈希滚动的同类文件 |
+| 同步时机 | 新增、改名、删除任何文件时，必须在同一次改动内更新导览树，禁止「代码改了导览没改」 |
+
+自检命令（通配与折叠目录都识别，只报真正遗漏）:
+```bash
+.venv/bin/python - <<'EOF'
+import fnmatch, html, pathlib, re
+
+tree = html.unescape(re.sub(r'<[^>]+>', '', re.findall(
+    r'<pre[^>]*>(.*?)</pre>', pathlib.Path('index.html').read_text(encoding='utf-8'), re.S)[0]))
+
+tokens, wildcards = set(), []
+for line in tree.split('\n'):
+    m = re.match(r'\s*[│\s]*[├└]──\s+(.*)$', line)
+    if m:
+        part = re.split(r'#|📁', m.group(1))[0]
+        for tok in part.split():
+            wildcards.append(tok) if '*' in tok else tokens.add(tok.rstrip('/'))
+
+# 折叠目录（导览只列一行目录，不展开内部文件）
+COLLAPSED = {'assets', 'fonts', 'favicon', 'weather-icons', 'patches', 'screenshots',
+             'node_modules', '.idea', 'inspectionProfiles', 'playwright', 'cloudflared', 'node', 'python'}
+# 按日期滚动的归档数据（导览用代表性条目 + 通配覆盖）
+ARCHIVE = '*微购相册*'
+# 完全不纳入导览的目录（依赖 / 版本库 / 缓存 / 内置工具链）
+SKIP = {'.venv', '.git', '__pycache__', 'tools', 'node_modules'}
+
+missing = [str(p) for p in sorted(pathlib.Path('.').rglob('*'))
+           if p.is_file() and not any(x in SKIP for x in p.parts)
+           and not any(x in COLLAPSED for x in p.parts)
+           and p.name not in tokens
+           and not any(fnmatch.fnmatch(p.name, w) for w in wildcards)
+           and not fnmatch.fnmatch(p.name, ARCHIVE)
+           and p.name != '.DS_Store']
+print(f'导览条目 {len(tokens) + len(wildcards)} 个，遗漏 {len(missing)} 个: {missing}')
+EOF
+```
+
+核心价值:
+- ✅ 一眼看懂仓库: 新接手不必逐个目录翻找，导览树就是地图
+- ✅ 防止僵尸条目: 文件删了导览还留着，会把排障引到不存在的位置
+- ✅ 敏感文件可见可控: 密钥类文件在导览里显式标注「不入库」，避免误提交
+
+#### 5. 全文件类型中文注释范式（2026-11-14 修订）
+
+**适用范围（最终口径）**: 仓库内除下面六类**整体豁免**对象外，其余**全部文件**都必须有中文注释，无一例外；同时**不得为了凑注释而新增、拆分或删除任何文件**。
+
+| 豁免对象 | 说明 |
+|---------|------|
+| `*.json` | JSON 语法不支持注释。对象型模板（`config.json.example`、`config/staging.json`、`config/production.json`、`dist/package.json`、`dist/manifest.webmanifest`）在首个键位插入 `_comment` 字段承载中文说明；数组型（`cookies.json.example`）与程序写出的业务数据（`file/` 下归档数据、`*_cache.json`、`config/config.json`、锁文件）不插字段，中文说明由导览树条目承载 |
+| `*.docx` | 二进制文档（`skill.docx`），由 `test/generate_docx.py` 从 `skill.md` 生成，正文即中文 |
+| `tools/` | 内置第三方工具链（`node`、`python`、`cloudflared`、`playwright`），非项目自有代码 |
+| `dist/` | 前端构建产物目录（压缩 bundle、`sw.js`、`workbox-*.js`、字体 `*.woff2`、图标 `*.svg`/`*.png`、`package-lock.json`），每次构建整份重写，人工注释无法长期保留 |
+| `.venv/` | Python 虚拟环境依赖，非项目自有代码 |
+| `.idea/` | IDE 工程配置（`workspace.xml`、`misc.xml`、`*.iml`、`.name` 等），随时被 IDE 重写，且已在 `.gitignore` 中排除 |
+
+**范围内的文件类型与注释载体**:
+
+| 文件类型 | 注释载体 | 具体要求 |
+|---------|---------|---------|
+| `.py` | `#` 注释 + docstring | 模块 docstring（用途+运行方式）、函数/类 docstring（职责+输入输出）、关键逻辑行内注释 |
+| `.html` | `<!-- -->` | 文件头写用途与数据来源，每个 `<section>` / 关键容器上方写中文说明 |
+| `.plist` | `<!-- -->` | 文件头写用途与安装卸载命令，每个 `<key>` 上方写该键的作用 |
+| `.sh` / `.bat` | `#` / `::` | 脚本头写用途与运行方式，每个功能分段前写中文说明 |
+| `.patch` | `#` 前缀段落 | 文件头写补丁用途、修复点、生效方式与升级维护要求 |
+| `.ini` / `tox.ini` | `#` | 文件头写用途与运行命令，每个配置段上方写中文说明 |
+| `.txt`（说明类） | `#` | 分组注释 + 逐条中文说明，如 `config/clean_allowed_roots.txt` |
+| `.env.example` | `#` | 文件头写用法（复制为 `.env`），每个变量上方写用途与取值示例 |
+| `.gitignore` / `.gitattributes` | `#` | 文件头写规则说明，按用途分组，每组上方写中文分类说明 |
+| `.md`（`README.md` / `skill.md`） | 正文中文 | 本身即中文正文与范式说明，无需额外注释标记 |
+
+**范围内物理上无法承载注释的残留文件（中文说明由导览树条目承载，不视为违规）**:
+
+| 文件 | 原因 |
+|------|------|
+| `config/.salt`、`config/.encryption_key` | 二进制密钥/盐值，插入文本会直接破坏加解密 |
+| `.DS_Store`（根目录 / `file/`） | macOS Finder 自动生成的二进制元数据 |
+| `file/watchdog.pid` | 运行时写入的进程号，被代码按整数解析 |
+| `file/tunnel_url.txt` | 纯数据文件，内容为单行公网地址，被代码按行正则提取，插入 `#` 会被当成数据 |
+| `config/input_stock_numbers.txt` | 纯数据文件，逐行货号，首行 `序列号` 为数据表头而非注释，插入 `#` 会参与货号比对 |
+| `file/crash_history.log`、`file/stderr_subprocess.log` 等 `*.log` | 运行时追加写入（当前为空文件，等崩溃/子进程输出时才写入），人工加注释会被后续追加内容冲散 |
+
+> 备注: `dist/` 下 6 个压缩产物（`sw.js`、`registerSW.js`、`workbox-9c191d2f.js`、`assets/index-*.js`、`assets/vendor-*.js`、`assets/index-*.css`）本轮已额外补了文件头中文说明，属超出豁免范围的加分项；重新构建后会被覆盖，不纳入强制项。
+
+**硬性约束**:
+
+| 约束 | 说明 |
+|------|------|
+| 语言统一 | 一律中文；原英文注释必须改写为中文，不保留双语冗余 |
+| 位置 | 写在被注释内容的正上方（段落级）或行尾（单行），不得写在内容下方 |
+| 覆盖面 | 文件头必须有用途说明；区块级、函数级、关键逻辑级三层注释缺一不可 |
+| 内容真实 | 注释只描述「实际存在且实际被使用」的东西，禁止写入未使用的配置项、未实现的函数、不存在的文件 |
+| 不增删 | 禁止为了满足注释要求而新建文件、拆分文件、改动数据结构或删除现有文件 |
+
+自检命令（按最终口径扫描，只报真正该补的文件）:
+```bash
+.venv/bin/python - <<'EOF'
+import pathlib, re
+
+CN = re.compile(r'[\u4e00-\u9fff]')
+# 六类整体豁免：*.json / *.docx / tools/ / dist/ / .venv/ / .idea/
+EXEMPT_PARTS = {'.venv', '.git', '__pycache__', 'tools', 'dist', '.idea'}
+EXEMPT_SUFFIX = {'.json', '.docx'}
+# 范围内物理上无法承载注释的残留文件（见上方表格）
+WHITELIST = {'.DS_Store', '.salt', '.encryption_key', 'watchdog.pid',
+             'tunnel_url.txt', 'input_stock_numbers.txt'}
+# 代码类文件的注释标记（用于二次校验「有中文但是否真写在注释里」）
+HEAD = {'.py': ('"""', "'"), '.sh': ('#',), '.bat': ('::', 'REM'), '.html': ('<!--',),
+        '.plist': ('<!--',), '.patch': ('#',), '.ini': ('#',), '.txt': ('#',),
+        '.example': ('#',), '.gitignore': ('#',), '.gitattributes': ('#',)}
+
+missing, weak = [], []
+for p in sorted(pathlib.Path('.').rglob('*')):
+    if not p.is_file():
+        continue
+    if any(x in EXEMPT_PARTS for x in p.parts):
+        continue                      # 六类整体豁免
+    if p.suffix in EXEMPT_SUFFIX or '.json.' in p.name:
+        continue                      # JSON / docx（含 *.json.example 模板）
+    if p.name in WHITELIST or p.suffix == '.log':
+        continue                      # 二进制密钥 / 纯数据 / 运行时日志
+    text = p.read_text(encoding='utf-8', errors='ignore')
+    if not CN.search(text):
+        missing.append(str(p))        # 一个中文字都没有 → 必须补
+        continue
+    marks = HEAD.get(p.suffix) or HEAD.get(p.name)
+    if marks and not any(m in text[:2000] for m in marks):
+        weak.append(str(p))           # 有中文但不在注释标记里 → 需人工确认
+print(f'缺中文注释 {len(missing)} 个: {missing}')
+print(f'文件头无注释标记 {len(weak)} 个: {weak}')
+EOF
+```
+
+核心价值:
+- ✅ 注释即说明书: 每个文件打开第一屏就知道「这是什么、为什么存在、怎么用」
+- ✅ 防止幽灵配置: 注释必须描述实际使用的字段，倒逼清理未使用配置
+- ✅ 不增删原则: 注释只做解释、不做改造，避免为凑格式而拆文件
 
 ──────────────────────────────────────────────────
 
@@ -3853,6 +4043,148 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.109 (2026-11-14) - 🧾 **changelog 兜底从「写死文案」换成「真实 Git 数据」+ 全仓库中文注释按最终口径落地** - `/api/changelog` 里「历史版本-详见README.md」「历史版本-无统计记录」「历史版本-无Git记录」这类合成占位全部下线，改为按版本号回溯真实短哈希、按哈希读取真实改动文件与增删行数；空 `changes` 版本改用该版本真实元信息合成完整记录；同时 31 个文件按 PY-CORE-013 §5 逐类型补中文注释，`.gitignore` 补 `tools/` 等 3 类忽略项；实测 450 版本 changes 空值 0 个 / commit 非哈希 0 个 / 精确占位残留 0 个 / 缺中文注释 0 个
+
+> **Commit**: `a65c1d0c`
+
+#### 更新内容: 把 changelog 元信息的「保底文案」全部换成 Git 真实数据，并把全仓库注释按最终口径补到零缺失
+
+1. **Git 真实数据三件套**: 新增 `_git_show_meta()` / `_git_lookup_commit()` / `_git_head_commit()`，改动文件、增删行数、缺失哈希一律回 Git 取真值，不再写死中文文案 [main.py](main.py#L12742-L12810)
+2. **批量查询不卡事件循环**: 先扫出全部待查条目，再用 `run_in_executor` 一次性批量取，450 个版本不再逐个阻塞 [main.py](main.py#L12818-L12851)
+3. **空 changes 终局兜底**: 任何版本都不允许返回空数组，用该版本真实 commit / 改动文件 / 变更统计合成 problem / solution / verification 全字段 [main.py](main.py#L12929-L12960)
+4. **三处旧占位兜底块清零**: 删除「详见README.md」「N/A」「历史版本-无Git记录」三套写死文案，占位符统一登记到 `_placeholder_tokens` 由新逻辑接管 [main.py](main.py#L12726-L12733) [main.py](main.py#L12638-L12654)
+5. **全仓库中文注释按最终口径落地**: 31 个文件按类型补注释（脚本头、区块、关键行三层），自检「缺中文注释 0 个 / 文件头无注释标记 0 个」 [README.md](README.md#L1439-L1523)
+6. **仓库卫生补漏**: `.gitignore` 补 `tools/`（1.1GB 内置工具链）、`.DS_Store`、`clean_files.log` 三条规则，`git add .` 不再拖二进制 [.gitignore](.gitignore#L66-L72)
+7. **三方文档同步**: README.md ↔ skill.md 逐字节一致，skill.docx 由 skill.md 重新生成 [README.md](README.md) [skill.md](skill.md) [skill.docx](skill.docx)
+
+**修复日期**: 2026-11-14
+**修复类型**: 🧾数据自愈 + 📝文档规范 + 🚫仓库卫生
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), [.gitignore](.gitignore), [.gitattributes](.gitattributes), [run.sh](run.sh), [run.bat](run.bat), [index.html](index.html), [config/config.json.example](config/config.json.example), [config/staging.json](config/staging.json), [config/production.json](config/production.json), [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist), [test/generate_docx.py](test/generate_docx.py), [test/security_audit.py](test/security_audit.py), [test/test_429_handling.py](test/test_429_handling.py)
+**Commit**: a65c1d0c
+**变更统计**: +557行 -222行
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🧾 Git 真实数据三件套替代写死文案 (🧾数据自愈)
+**问题描述**:
+- **现象**: `/api/changelog` 部分历史版本的 `affected_files` 返回「历史版本-详见README.md」、`change_stats` 返回「历史版本-无统计记录」、`commit` 返回「历史版本-无Git记录」，前端展示的不是真实数据
+- **根因**: 早期实现只求「字段非空」，用固定中文文案兜底，没有回到 Git 仓库取真值
+- **影响范围**: `/api/changelog` 全部 449 个版本的元信息可信度
+
+**修复方案**:
+- **技术实现**: 新增 `_git_show_meta(commit_hash)` 用 `git show --name-only` / `git show --shortstat` 读真实改动文件与增删行数；新增 `_git_lookup_commit(version)` 用 `git log --all --grep=v<版本>` 回溯真实短哈希；新增 `_git_head_commit()` 取 README.md 最近一次提交作为「该版本无独立提交」的真实参照；三个函数全部带 `TIMEOUT_CONFIG['subprocess_kill']` 超时与 `[HANDLED]` 异常兜底
+- **参考位置**: [main.py](main.py#L12742-L12810)
+
+**测试验证**:
+- ✅ `curl /api/changelog` 实测 450 个版本，`affected_files` / `change_stats` 全部为真实文件清单与真实增删行数，无一条「历史版本-」文案
+- ✅ `commit` 字段 450 条全部匹配 `[0-9a-f]{7,10}` 正则（多哈希以 `, ` 分隔），非哈希 0 个
+- ✅ 抽样 v5.0.9.108 返回真实三哈希 `08f058ad, 201649b9, d9b7f54b`，与 `git show` 实测的 7 files / 2 files / 4 files 完全一致
+
+---
+
+##### 2. ⚡ 批量查询不再逐条阻塞事件循环 (⚡性能优化)
+**问题描述**:
+- **现象**: 若在规范化循环里逐条调 `git show`，449 个版本最坏要起上千次 subprocess，接口会被拖到几十秒
+- **根因**: 兜底逻辑与数据来源耦合在同一个循环内，查询次数随版本数线性增长
+- **影响范围**: `/api/changelog` 响应时间
+
+**修复方案**:
+- **技术实现**: 先扫出 `_pending_commits` / `_pending_versions` 两个待查集合（同一哈希只查一次），再在 `run_in_executor(_blocking_io_executor, ...)` 里一次性批量取回，结果缓存进 `_git_meta_cache` / `_version_commit_cache`，主循环只读缓存
+- **参考位置**: [main.py](main.py#L12818-L12851)
+
+**测试验证**:
+- ✅ 冷启动首次请求 `/api/changelog` 实测 9.88 秒返回（含 450 版本解析 + 批量 Git 查询）
+- ✅ 同一哈希在 450 个版本中重复出现时只查询一次，查询次数由「版本数」降到「去重哈希数」
+- ✅ 批量收集异常时回落为空缓存，接口仍返回 200 且走兜底文案，不抛 500
+
+---
+
+##### 3. 🔗 空 changes 版本按真实元信息合成完整记录 (🔗数据完整性)
+**问题描述**:
+- **现象**: 历史上有版本的 `changes` 是空数组，前端「最新更新」整块空白
+- **根因**: 旧的空 changes 兜底块内容本身是占位文案，且新旧兜底叠加后互相覆盖
+- **影响范围**: 前端更新日志展示完整性
+
+**修复方案**:
+- **技术实现**: 新增终局兜底循环，凡 `changes` 为空的版本，用该版本真实 `commit` / `affected_files` / `change_stats` / `title` 合成一条含 `problem` / `solution` / `verification` 全字段的记录，文案里直接写明可复核的 Git 命令
+- **参考位置**: [main.py](main.py#L12929-L12960)
+
+**测试验证**:
+- ✅ 实测 450 个版本 `changes` 空数组 0 个，`changes` 总条数 1111 条
+- ✅ 合成记录的 `solution.reference` 形如 `commit <哈希>, <真实文件清单>`，可直接用 `git show <哈希>` 复核
+- ✅ 合成记录 `verification` 两条均带真实哈希与真实增删行数，无一条占位文案
+
+---
+
+##### 4. 🧹 三处旧占位兜底块清零 (🧹代码卫生)
+**问题描述**:
+- **现象**: 同一个接口里并存 3 处「写死中文文案」的空 changes 兜底，后执行的覆盖先执行的，改一处完全不生效
+- **根因**: 历次迭代层层叠加兜底，只加不删
+- **影响范围**: `/api/changelog` 兜底行为的可维护性
+
+**修复方案**:
+- **技术实现**: 删除「详见README.md对应章节」「N/A」「历史版本-无Git记录」「无文件变更记录」「详见Git提交记录」五套写死文案的赋值分支，占位符统一登记进 `_placeholder_tokens`，由第 1 条与第 3 条的真实数据逻辑接管；版本合并时的过滤名单同步收敛为 `_commit_noise` / `_file_noise` 两个元组
+- **参考位置**: [main.py](main.py#L12726-L12733) [main.py](main.py#L12641-L12654) [main.py](main.py#L12686-L12698)
+
+**测试验证**:
+- ✅ 全量扫描 450 版本，精确匹配占位符（空串 / 待生成 / 待补充 / TBD / N/A / None / null / 详见Git提交记录 / 无文件变更记录）残留 0 处
+- ✅ `git grep "历史版本-" -- main.py` 命中 4 行，全部位于 `_commit_noise` / `_file_noise` 与合并清理名单的枚举值中（用于「识别并清空」旧占位），无一处再赋值给响应字段
+- ✅ 合并重复版本时 `commit` 与 `affected_files` 不再拼进占位词，实测唯一化后仍是纯哈希与真实路径
+
+---
+
+##### 5. 📝 全仓库中文注释按最终口径落地 (📝文档规范)
+**问题描述**:
+- **现象**: 31 个文件（`run.sh` / `run.bat` / `index.html` / `config/*` / `launchd/*` / `test/*` / `dist` 产物）注释不足或残留英文注释，与 PY-CORE-013 §5 最终口径不符
+- **根因**: 注释规范此前只覆盖 `.py`，其他文件类型没有明确载体与自检脚本
+- **影响范围**: 全仓库可读性与新人接手成本
+
+**修复方案**:
+- **技术实现**: 按 §5 表格逐类型补注释——脚本头写用途/用法/流程，`<section>` 与 `<key>` 上方写中文说明，`test/*.py` 补模块与函数 docstring，关键逻辑行补行内注释；`run.sh`（头 14 行）与 `run.bat`（头 19 行）只加文件头说明，版本读取逻辑零改动（仍从 README 最新 `### v` 标题行自动继承）
+- **参考位置**: [README.md](README.md#L1439-L1523) [run.sh](run.sh#L1-L14) [run.bat](run.bat#L1-L19)
+
+**测试验证**:
+- ✅ §5 自检脚本实测「缺中文注释 0 个 / 文件头无注释标记 0 个」
+- ✅ 六类豁免（`*.json` / `*.docx` / `tools/` / `dist/` / `.venv/` / `.idea/`）与 7 个物理无法承载注释的残留文件全部登记在表，未为凑注释改动任何密钥、货号与隧道地址
+- ✅ `run.sh` / `run.bat` 的 `VERSION` 仍为启动时从 README grep/findstr 读取，未硬编码任何版本号
+
+---
+
+##### 6. 🚫 .gitignore 补 3 类忽略项 (🚫仓库卫生)
+**问题描述**:
+- **现象**: `tools/`（1.1GB 内置工具链）、`.DS_Store`、`clean_files.log` 长期处于未跟踪状态，一次 `git add .` 就会把 1.1GB 二进制拖进仓库
+- **根因**: 新增目录与运行产物未同步到忽略清单
+- **影响范围**: 仓库体积与提交安全性
+
+**修复方案**:
+- **技术实现**: `.gitignore` 补 `tools/`、`.DS_Store`、`clean_files.log` 三条规则，并各自带中文分组说明
+- **参考位置**: [.gitignore](.gitignore#L66-L72)
+
+**测试验证**:
+- ✅ `git check-ignore -v tools/node` 命中 `.gitignore:68`
+- ✅ `git status --short` 未跟踪项 0 个，工作区无任何残留待入库文件
+- ✅ 提交实测 31 个文件、+557 行 -222 行，无任何 1.1GB 二进制进入索引
+
+---
+
+##### 7. 📚 三方文档逐字节同步 (📚文档同步)
+**问题描述**:
+- **现象**: README.md 与 skill.md 曾出现段落差异，skill.docx 内容随之滞后
+- **根因**: 两份文档靠手工同步，缺一道逐字节校验
+- **影响范围**: 交付文档一致性
+
+**修复方案**:
+- **技术实现**: README.md 作为唯一源头，写完立即 `cp README.md skill.md`，再用 `test/generate_docx.py` 从 skill.md 生成 skill.docx，最后用 `cmp` 校验两份 md 逐字节一致
+- **参考位置**: [README.md](README.md) [skill.md](skill.md) [skill.docx](skill.docx) [test/generate_docx.py](test/generate_docx.py)
+
+**测试验证**:
+- ✅ `cmp README.md skill.md` 无差异输出，两份文件字节级一致
+- ✅ skill.docx 由 skill.md 重新生成，新增 v5.0.9.109 条目的 7 个变更块标题全部可在 docx 中检索到
+- ✅ 版本记录单条合一，`grep -c "^### v5.0.9.109"` 在 README 与 skill.md 中均为 1
+
+---
 
 ### v5.0.9.108 (2026-11-14) - ⚡ **爬虫总耗时稳定压进 10 秒内：启动预热改为多路对冲请求 + Playwright 懒启动** - 服务端首字节抖动实测单路 2.27~8.29 秒，串行「超时再重试」会把尾延迟叠加到 12 秒以上；改成按 0.5 秒间隔错开发出 4 路请求、谁先成功用谁，尾延迟被压到每轮最快的那一路（2.27~4.27 秒）；同时把 Playwright 驱动改成懒启动，商品数据 100% 来自 API 的正常路径完全不创建驱动/浏览器/页面；实测 3 批共 90 次运行全部 10 秒内（均值 3.48/3.54/3.69 秒，最慢 5.10 秒），429 专项 8 场景 23 项断言全过，商品数稳定 101 条零丢失
 
@@ -20081,6 +20413,10 @@ DEBUG - 速率限制存储清理: 12000 -> 8500 条目
    - 标准库模块
    - 第三方库模块（按字母排序）
    - 本地模块
+5. **导入唯一性**（2026-11-14 补充）: 同一个模块在同一个文件里只允许出现一次导入语句，禁止「顶部导一次、函数里再导一次」，也禁止 `import x, y, z` 与单行 `import x` 混用造成重复
+6. **适用范围**（2026-11-14 补充）: 本规范覆盖项目内**全部** `.py` 文件，包括 `main.py`、`config/crypto_tool.py`、`test/` 下的测试与诊断脚本、`temp/` 下的临时脚本，不存在「小脚本可以不遵守」的例外
+7. **脚本注释要求**（2026-11-14 补充）: `test/` 下每个脚本必须带中文模块文档字符串（说明用途 + 运行方式），关键步骤（子进程调用、状态重置、桩函数替换、断言汇总等）必须有中文注释；原有英文注释一律改为中文
+8. **路径前置例外**: `test/` 脚本若需先 `sys.path.insert(...)` 或先设置 `os.environ` 再导入 `main`，该路径/环境准备语句必须紧贴标准库 import 之后、`import main as m` 之前，且中间不得插入任何业务代码
 
 **正确示例 ✅**
 ```python
@@ -20141,6 +20477,75 @@ if [ -n "$INLINE_IMPORTS" ]; then
     exit 1
 fi
 echo "✅ Import 规范检查通过"
+```
+
+**AST 级全量校验（2026-11-14 补充，覆盖全部 .py）**:
+```python
+import ast
+import collections
+import pathlib
+
+SKIP = {'.venv', 'node_modules', 'tools', 'dist', '__pycache__'}
+
+# 遍历全仓库的 .py（main.py、config/、test/、temp/ 一并纳入，不设例外）
+for p in sorted(pathlib.Path('.').rglob('*.py')):
+    if SKIP & set(p.parts):
+        continue
+    tree = ast.parse(p.read_text(encoding='utf-8'))
+
+    # 1) 函数/方法内部不得出现任何 import
+    inner = [(n.name, sub.lineno) for n in ast.walk(tree)
+             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+             for sub in ast.walk(n) if isinstance(sub, (ast.Import, ast.ImportFrom))]
+
+    # 2) 顶层导入不得重复（同一模块只允许导入一次）
+    names = collections.Counter()
+    for n in tree.body:
+        if isinstance(n, (ast.Import, ast.ImportFrom)):
+            for a in n.names:
+                names[a.asname or a.name] += 1
+    dup = {k: v for k, v in names.items() if v > 1}
+
+    # 3) 模块文档字符串与函数/类文档字符串不得缺失
+    missing = [n.name for n in ast.walk(tree)
+               if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+               and ast.get_docstring(n) is None]
+
+    print(f'{p}: 内联导入={inner} 重复导入={dup} 缺docstring={missing}')
+```
+
+**脚本注释示例（2026-11-14 补充）**:
+```python
+"""
+对冲请求（Hedged Requests）诊断脚本
+
+用途：连续 10 轮直接调用 _album_prefetch_hedged()，观察每轮耗时与返回的商品数、
+分页标记，确认「谁先成功用谁」确实把尾延迟压到最快那一路的水平。
+运行方式：.venv/bin/python test/diag_hedge.py
+"""
+import json
+import os
+import sys
+import time
+
+# 先把项目根目录加入搜索路径，再导入主模块（导入必须集中在文件顶部）
+sys.path.insert(0, os.getcwd())
+import main as m
+
+# 读取目标相册 ID
+with open('config/config.json', encoding='utf-8') as f:
+    album_id = m._album_extract_id((json.load(f) or {}).get('target_url', ''))
+
+ROUNDS = 10
+
+for i in range(ROUNDS):
+    t0 = time.time()
+    try:
+        items, pagination = m._album_prefetch_hedged(album_id, cookie_str)
+        print(f'{i:2d} | {time.time() - t0:6.2f}s | ok items={len(items)}', flush=True)
+    except m._AlbumPrefetchError as exc:
+        # 所有路都失败时才会走到这里，记录异常便于判断是否服务端整体不可用
+        print(f'{i:2d} | {time.time() - t0:6.2f}s | FAIL {exc}', flush=True)
 ```
 
 **核心价值**
