@@ -4046,7 +4046,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ### v5.0.9.109 (2026-11-14) - 🧾 **changelog 兜底从「写死文案」换成「真实 Git 数据」+ 全仓库中文注释按最终口径落地** - `/api/changelog` 里「历史版本-详见README.md」「历史版本-无统计记录」「历史版本-无Git记录」这类合成占位全部下线，改为按版本号回溯真实短哈希、按哈希读取真实改动文件与增删行数；空 `changes` 版本改用该版本真实元信息合成完整记录；同时 31 个文件按 PY-CORE-013 §5 逐类型补中文注释，`.gitignore` 补 `tools/` 等 3 类忽略项；实测 450 版本 changes 空值 0 个 / commit 非哈希 0 个 / 精确占位残留 0 个 / 缺中文注释 0 个
 
-> **Commit**: `a65c1d0c`
+> **Commit**: `a65c1d0c, b3bc1671`
 
 #### 更新内容: 把 changelog 元信息的「保底文案」全部换成 Git 真实数据，并把全仓库注释按最终口径补到零缺失
 
@@ -4061,8 +4061,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **修复日期**: 2026-11-14
 **修复类型**: 🧾数据自愈 + 📝文档规范 + 🚫仓库卫生
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), [.gitignore](.gitignore), [.gitattributes](.gitattributes), [run.sh](run.sh), [run.bat](run.bat), [index.html](index.html), [config/config.json.example](config/config.json.example), [config/staging.json](config/staging.json), [config/production.json](config/production.json), [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist), [test/generate_docx.py](test/generate_docx.py), [test/security_audit.py](test/security_audit.py), [test/test_429_handling.py](test/test_429_handling.py)
-**Commit**: a65c1d0c
-**变更统计**: +557行 -222行
+**Commit**: a65c1d0c, b3bc1671
+**变更统计**: +1369行 -224行（代码提交 31 个文件 +557/-222，文档提交 3 个文件 +812/-2）
 **作者**: 小旭二手机（西园路）
 
 ---
@@ -4165,7 +4165,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **测试验证**:
 - ✅ `git check-ignore -v tools/node` 命中 `.gitignore:68`
 - ✅ `git status --short` 未跟踪项 0 个，工作区无任何残留待入库文件
-- ✅ 提交实测 31 个文件、+557 行 -222 行，无任何 1.1GB 二进制进入索引
+- ✅ 代码提交实测 31 个文件 +557/-222、文档提交实测 3 个文件 +812/-2，无任何 1.1GB 二进制进入索引
 
 ---
 
