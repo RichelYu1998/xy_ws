@@ -49,7 +49,7 @@
 ## 💻 环境要求
 
 ### 基础环境
-- **Python**: 3.9+ (推荐 3.10+, 兼容至 3.14)
+- **Python**: 3.6+ (推荐 3.10+, 兼容至 3.14；3.6 以下 f-string/async 等语法不可用，3.6 以上逐步启用新特性)
 - **pip**: 23.0+ (安装依赖前会自动升级)
 - **操作系统**: Windows 10/11, Linux (Ubuntu 20.04+), macOS 10.15+
 
@@ -603,7 +603,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.0', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.6', '3.9', '3.10', '3.11', '3.12']
 
     steps:
     - uses: actions/checkout@v4
@@ -3812,7 +3812,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 | PY-CORE-017 | D | 双启动脚本同步 (Dual Startup Script Sync) | run.bat / run.sh | 🔴 核心 |
 | PY-CORE-018 | D | DOCX文档生成 (DOCX Document Generation) | test/generate_docx.py | 🔴 核心 |
 | PY-CORE-019 | D | 每日利润表读取 (Daily Profit Report Read) | main.py / /api/daily-profit | 🔴 核心 |
-| PY-CORE-020 | E | 环境自适应 (Environment-Aware Design) | main.py | 🔴 核心 |
+| PY-CORE-020 | E | 环境自适应 (Environment-Aware Design) / 跨平台路径与文件系统兼容 (Cross-Platform Path & Filesystem Compatibility) | main.py / dist/app.js | 🔴 核心 |
 | PY-CORE-021 | E | 边界条件测试 (Edge Case Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
 | PY-CORE-022 | E | Excel货号E列读取 (Excel SKU Column-E Read) | main.py | 🔴 核心 |
 | PY-CORE-023 | E | 编码处理最佳实践 (Encoding Best Practices) | main.py | 🔴 核心 |
@@ -19266,7 +19266,7 @@ PY-CORE-010 (API整体架构)
 |------|-----|
 | **项目名称** | 微购相册管理系统 (WegoAlbum Manager) |
 | **项目类型** | Web服务 + 数据采集 + 自动化分析 |
-| **技术栈** | Python 3.9+ / FastAPI / Playwright / Pydantic |
+| **技术栈** | Python 3.6+ / FastAPI / Playwright / Pydantic |
 | **编码标准** | UTF-8 (强制) |
 | **安全等级** | 生产级 (98% OWASP Top 10合规) |
 
@@ -19840,6 +19840,68 @@ class Environment:
 - ✅ 环境变量覆盖所有硬编码路径
 - ✅ WEB_PORT环境变量覆盖硬编码端口 (v3.8.90.09)
 - ✅ Playwright三层防护（路径预检→系统Chrome→自动安装兜底）
+- ✅ 跨平台路径与文件系统兼容（realpath + normcase + expanduser + os.pathsep + rmtree onerror）
+
+跨平台路径与文件系统兼容细则 (Cross-Platform Path & Filesystem Compatibility)
+
+范式描述
+所有涉及「用户输入路径 / 目录遍历 / 文件删除」的逻辑，必须在 Windows、macOS、Linux 三平台语义完全一致，
+禁止出现「macOS 上通过、Windows 上误删或误拦」的偏差。跨平台兼容不是"路径能跑通"，而是"边界判定结果一致"。
+
+四条铁律
+1. 路径归一：用户输入一律 expanduser → 绝对化 → os.path.realpath，再做比较；禁止直接字符串比较路径。
+2. 大小写：路径比较必须经 os.path.normcase（Windows 转小写+反斜杠，POSIX 恒等）；文件名匹配必须
+   item.name.lower() 后再比对排除名单，否则 Windows 上 Config/File/Thumbs.db 等大小写变体不会被保护。
+3. 分隔符：拼接一律 os.path.join，前缀判断一律 root + os.sep，多路径环境变量一律 os.pathsep（Windows 为 ;）。
+4. 删除兜底：shutil.rmtree 必须传 onerror 回调，遇 PermissionError 时 chmod 0o777 后重试（Windows 只读文件特性）。
+   Python <3.12 用 onerror，>=3.12 用 onexc，禁止裸调用 shutil.rmtree(path)。
+
+核心实现
+def resolve_clean_directory(directory, default_dir=None, require_explicit=False, allow_project_root=False):
+    base = os.path.realpath(default_dir or PROJECT_DIR)
+    project_root = os.path.realpath(PROJECT_DIR)
+    raw = (directory or '').strip()
+    if not raw:
+        if require_explicit:
+            return None, '请显式填写要清理的目录（不允许留空，避免误清理项目目录）'
+        candidate = base
+    else:
+        if raw.startswith('~'):
+            raw = os.path.expanduser(raw)
+        candidate = os.path.realpath(raw) if os.path.isabs(raw) else os.path.realpath(os.path.join(base, raw))
+    # 项目根目录一律拒绝（normcase 归一，大小写/尾部斜杠/软链逃逸全部命中）
+    if not allow_project_root and os.path.normcase(candidate) == os.path.normcase(project_root):
+        return None, f'拒绝清理项目根目录: {candidate}'
+    candidate_key = os.path.normcase(candidate)
+    for root in _get_clean_allowed_roots():
+        root_key = os.path.normcase(root)
+        if candidate_key == root_key:
+            if os.path.dirname(root) == root:
+                return None, f'拒绝清理文件系统根目录: {candidate}'
+            return candidate, None
+        if candidate_key.startswith(root_key + os.sep):
+            return candidate, None
+    return None, f'目录不在允许范围内: {candidate}'
+
+平台差异对照表
+| 差异点 | 正确写法 | 错误写法 | 后果 |
+|---|---|---|---|
+| 路径分隔符 | os.path.join / os.sep | 'a/b' 字符串拼接 | Windows 上路径失效 |
+| 大小写 | os.path.normcase 比较 | 直接 == 比较 | Windows 上绕过保护名单 |
+| 多目录环境变量 | os.pathsep 分割 | ':' 硬编码 | Windows 上整串被当成一个路径 |
+| 家目录 | os.path.expanduser | 硬编码 '/Users/xxx' | 换机即失效 |
+| 只读文件删除 | rmtree(onerror=...) | 裸 rmtree(path) | Windows 上 PermissionError |
+| 可执行后缀 | Environment.EXE_SUFFIX | 'python.exe' 硬编码 | macOS/Linux 找不到文件 |
+
+前后端职责划分
+- 后端：唯一可信边界。所有拦截必须在后端完成，绕过前端直接调接口也必须被拒。
+- 前端：仅做预检提示（提前给出可读错误 + 弹窗），不得作为唯一防线。
+- 前端路径归一化仅在命中盘符（^[a-zA-Z]:）时才转小写；POSIX 路径保持大小写敏感，
+  否则 /opt/WS 会被误判为 /opt/ws，把两个真实存在的不同目录混为一谈。
+
+判定标准
+出现「直接字符串比较路径 / 未 normcase 比较 / 未 expanduser / 硬编码分隔符或家目录 / 裸调用 shutil.rmtree /
+仅有前端拦截而后端无校验 / 前端对 POSIX 路径强制小写」中任意一条，即视为「未符合本范式」。
 
 ──────────────────────────────────────────────────
 

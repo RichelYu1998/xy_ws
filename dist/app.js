@@ -1307,7 +1307,13 @@
                     });
                     var envEl = document.getElementById('env-requirements');
                     if (envEl && data.python) {
-                        envEl.textContent = 'Python ' + data.python.min + '（当前运行 ' + data.python.current + '）'
+                        var pyText = 'Python ' + data.python.min;
+                        if (data.python.compat) {
+                            pyText += '（兼容 ' + data.python.compat + '，当前运行 ' + data.python.current + '）';
+                        } else {
+                            pyText += '（当前运行 ' + data.python.current + '）';
+                        }
+                        envEl.textContent = pyText
                             + ' / pip ' + (data.pip || '-')
                             + ' / Node.js 仅用于内网穿透工具（Playwright 不需要）';
                     }
@@ -5900,6 +5906,19 @@
             }
         }
         
+        let cleanProjectDir = '';
+
+        function normalizeCleanPath(p) {
+            const s = (p || '').trim().replace(/\\/g, '/').replace(/\/+$/, '');
+            return /^[a-zA-Z]:/.test(s) ? s.toLowerCase() : s;
+        }
+
+        function isCleanProjectRoot(p) {
+            const target = normalizeCleanPath(p);
+            const root = normalizeCleanPath(cleanProjectDir);
+            return !!target && !!root && target === root;
+        }
+
         function showCleanerPanel() {
             const cleanerPanel = document.getElementById('cleaner-panel');
             const cleanerContent = document.getElementById('cleaner-content');
@@ -5910,7 +5929,7 @@
                 <div style="padding: 20px;">
                     <div class="form-group">
                         <label><strong>清理目录:</strong></label>
-                        <input type="text" id="clean-directory" class="form-control" value="" placeholder="请输入要清理的目录（留空使用当前目录）">
+                        <input type="text" id="clean-directory" class="form-control" value="" placeholder="请输入要清理的目录（删除类模式必填，不可留空）">
                         <div id="clean-allowed-roots" style="margin-top:8px;font-size:12px;color:#666;"></div>
                     </div>
                     <div class="form-group">
@@ -5960,16 +5979,22 @@
             fetch('/api/clean/allowed-roots')
                 .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
+                    if (data && data.success) cleanProjectDir = data.project_dir || '';
                     if (!data.success || !data.roots || !data.roots.length) {
                         box.innerHTML = '<span style="color:#c00;">允许目录读取失败，请查看服务日志</span>';
                         return;
                     }
+                    const extraRoots = data.roots.filter(function(root) { return !root.builtin; });
                     const parts = [];
-                    parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>（点击可直接填入，不在列表内的一律拒绝）:</div>');
-                    data.roots.forEach(function(root) {
-                        const label = escapeHtml(root.path) + (root.builtin ? ' <span style="color:#888;">(项目目录)</span>' : '') + (root.exists ? '' : ' <span style="color:#c00;">(目录不存在)</span>');
-                        parts.push('<div style="margin:2px 0;"><a href="javascript:void(0)" class="clean-root-pick" data-path="' + escapeHtml(root.path) + '" style="color:#06c;text-decoration:underline;">' + label + '</a></div>');
-                    });
+                    if (extraRoots.length) {
+                        parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>（点击可直接填入，不在列表内的一律拒绝）:</div>');
+                        extraRoots.forEach(function(root) {
+                            const label = escapeHtml(root.path) + (root.exists ? '' : ' <span style="color:#c00;">(目录不存在)</span>');
+                            parts.push('<div style="margin:2px 0;"><a href="javascript:void(0)" class="clean-root-pick" data-path="' + escapeHtml(root.path) + '" style="color:#06c;text-decoration:underline;">' + label + '</a></div>');
+                        });
+                    } else {
+                        parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>: 仅项目目录（不在列表内的一律拒绝）</div>');
+                    }
                     parts.push('<div style="margin-top:6px;color:#888;">如需追加目录，编辑 <code>' + escapeHtml(data.config_file) + '</code>（一行一个路径）后重启服务</div>');
                     box.innerHTML = parts.join('');
                     box.querySelectorAll('.clean-root-pick').forEach(function(el) {
@@ -5998,6 +6023,27 @@
             const directory = directoryEl ? directoryEl.value || '' : '';
             const dryRun = dryRunEl ? dryRunEl.checked : false;
             const minutes = minutesEl ? minutesEl.value || 5 : 5;
+
+            if (['all', 'png', 'media'].indexOf(mode) !== -1 && !directory.trim()) {
+                if (outputDiv) {
+                    outputDiv.style.display = 'block';
+                    outputDiv.innerHTML = '<span style="color:#c00;">请先填写要清理的目录（该模式不允许留空，避免误清理项目目录）</span>';
+                }
+                if (statusDiv) statusDiv.innerHTML = '<span style="color:#c00;">已阻止：目录为空</span>';
+                if (typeof showToast === 'function') showToast('请先填写要清理的目录（删除类模式不允许留空）', 'error', 6000);
+                return;
+            }
+
+            if (isCleanProjectRoot(directory)) {
+                const msg = '拒绝清理项目根目录: ' + cleanProjectDir + '（项目目录受保护，请改为清理其子目录或白名单内的其它目录）';
+                if (outputDiv) {
+                    outputDiv.style.display = 'block';
+                    outputDiv.innerHTML = '<span style="color:#c00;">' + escapeHtml(msg) + '</span>';  /* [ESCAPED] */
+                }
+                if (statusDiv) statusDiv.innerHTML = '<span style="color:#c00;">已阻止：项目根目录</span>';
+                if (typeof showToast === 'function') showToast(msg, 'error', 8000);
+                return;
+            }
             
             if (btn) {
                 btn.disabled = true;
@@ -6052,6 +6098,7 @@
                 } else {
                     if (outputDiv) outputDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败: ' + escapeHtml(  /* [ESCAPED] */result.error) + '</span>';
                     if (statusDiv) statusDiv.innerHTML = '<span style="color: #f56c6c;">✗ 执行失败</span>';
+                    if (typeof showToast === 'function') showToast(result.error || '执行失败', 'error', 8000);
                 }
                 if (btn) {
                     btn.disabled = false;

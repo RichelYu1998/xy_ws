@@ -2098,7 +2098,16 @@ VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm', '.m
 MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | VIDEO_EXTENSIONS
 EXCLUDE_EXTENSIONS = {'.log', '.sh', '.py', '.bat', '.json', '.md', '.txt', '.html', '.htm', '.sql', '.xml', '.yml', '.yaml', '.ini', '.cfg', '.conf'}
 EXCLUDE_FOLDERS = {'file', 'config', '__pycache__', 'clean', '.venv', 'templates', '.git', '.idea', 'node_modules', '.vscode', 'static'}
-EXCLUDE_FILE_NAMES = {'.DS_Store', 'Thumbs.db', '.gitkeep', '.gitignore'}  # 特殊文件名保护
+EXCLUDE_FILE_NAMES = {'.ds_store', 'thumbs.db', '.gitkeep', '.gitignore'}  # 特殊文件名保护（统一小写，兼容 Windows 大小写不敏感文件系统）
+
+
+def _rmtree_onerror(func, path, exc_info):
+    """删除目录时的兜底：Windows 上只读文件会让 rmtree 失败，去掉只读属性后重试"""
+    try:
+        os.chmod(path, 0o777)
+        func(path)
+    except Exception as e:  # [HANDLED]
+        logger.debug(f'  强制删除失败 {path}: {e}')
 
 def clean_old_files(
         directory: str,
@@ -2484,14 +2493,14 @@ def clean_all_files(
     for item in directory.iterdir():
         if item.is_file():
             ext = item.suffix.lower()
-            if item.name in EXCLUDE_FILE_NAMES:
+            if item.name.lower() in EXCLUDE_FILE_NAMES:
                 logger.info(f"保留文件: {item.name}")
             elif ext not in EXCLUDE_EXTENSIONS:
                 files_to_delete.append(item)
             else:
                 logger.info(f"保留文件: {item.name}")
         elif item.is_dir():
-            if item.name not in EXCLUDE_FOLDERS:
+            if item.name.lower() not in EXCLUDE_FOLDERS:
                 folders_to_delete.append(item)
             else:
                 logger.info(f"保留文件夹: {item.name}")
@@ -2579,7 +2588,7 @@ def clean_all_files(
 
     for folder in folders_to_delete:
         with ExceptionContext(f"删除文件夹 {folder.name}", default=False) as ctx:
-            shutil.rmtree(folder)
+            shutil.rmtree(folder, onerror=_rmtree_onerror)
             deleted_folders_count += 1
             logger.info(f"已删除文件夹: {folder.name}")
             if ctx.error:
@@ -3437,36 +3446,57 @@ def _get_clean_allowed_roots():
         _clean_allowed_roots_cache = tuple(sorted(roots))
     return _clean_allowed_roots_cache
 
-def resolve_clean_directory(directory, default_dir=None):
+def resolve_clean_directory(directory, default_dir=None, require_explicit=False, allow_project_root=False):
     """解析清理目录并强制边界校验
 
     原实现对绝对路径直接放行、完全不做校验，等于可以通过
     {"directory": "/Users/xxx"} 删除任意目录下的文件。这里统一把相对路径和
     绝对路径都 realpath 解析后限制在允许根目录内，符号链接逃逸也会被挡住。
 
+    require_explicit 为 True 时拒绝留空：破坏性清理不允许回落到项目目录，
+    避免误触把项目根目录当成清理目标。
+
+    allow_project_root 默认 False：项目根目录一律拒绝清理（含大小写/软链
+    归一化后命中同一路径的情况），防止误操作把项目自身清空。项目内的子目录
+    （如 file/、config/）不受影响。
+
     Returns:
         (安全绝对路径, 错误信息)，不安全时路径为 None
     """
     base = os.path.realpath(default_dir or PROJECT_DIR)
+    project_root = os.path.realpath(PROJECT_DIR)
     raw = (directory or '').strip()
 
     if not raw:
-        return base, None
+        if require_explicit:
+            return None, (
+                f'请显式填写要清理的目录（不允许留空，避免误清理项目目录 {base}）'
+                f'；可用目录见 {_get_clean_allowed_roots_file()}'
+            )
+        candidate = base
+    else:
+        if raw.startswith('~'):
+            raw = os.path.expanduser(raw)
 
-    if raw.startswith('~'):
-        raw = os.path.expanduser(raw)
+        try:
+            candidate = os.path.realpath(raw) if os.path.isabs(raw) else os.path.realpath(os.path.join(base, raw))
+        except Exception as e:  # [HANDLED]
+            return None, f'路径解析失败: {e}'
 
-    try:
-        candidate = os.path.realpath(raw) if os.path.isabs(raw) else os.path.realpath(os.path.join(base, raw))
-    except Exception as e:  # [HANDLED]
-        return None, f'路径解析失败: {e}'
+    if not allow_project_root and os.path.normcase(candidate) == os.path.normcase(project_root):
+        return None, (
+            f'拒绝清理项目根目录: {candidate}'
+            f'（项目目录受保护，请改为清理其子目录或白名单内的其它目录）'
+        )
 
+    candidate_key = os.path.normcase(candidate)
     for root in _get_clean_allowed_roots():
-        if candidate == root:
+        root_key = os.path.normcase(root)
+        if candidate_key == root_key:
             if os.path.dirname(root) == root:
                 return None, f'拒绝清理文件系统根目录: {candidate}'
             return candidate, None
-        if candidate.startswith(root + os.sep):
+        if candidate_key.startswith(root_key + os.sep):
             return candidate, None
 
     allowed = ', '.join(_get_clean_allowed_roots())
@@ -11786,7 +11816,7 @@ if __name__ == '__main__':
             if retry:
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
-                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR)
+                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR, allow_project_root=True)
                 if not directory:
                     return jsonify({'success': False, 'error': f'路径校验失败: {dir_error}'})
 
@@ -11809,7 +11839,7 @@ if __name__ == '__main__':
             if retry:
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
-                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR)
+                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR, require_explicit=True)
                 if not directory:
                     return jsonify({'success': False, 'error': f'路径校验失败: {dir_error}'})
                 dry_run = False  # CleanGroupRequest暂不支持dry_run，后续可扩展
@@ -11829,7 +11859,7 @@ if __name__ == '__main__':
             if retry:
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
-                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR)
+                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR, require_explicit=True)
                 if not directory:
                     return jsonify({'success': False, 'error': f'路径校验失败: {dir_error}'})
                 minutes = req.minutes
@@ -11850,7 +11880,7 @@ if __name__ == '__main__':
             if retry:
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
-                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR)
+                directory, dir_error = resolve_clean_directory(req.directory, PROJECT_DIR, require_explicit=True)
                 if not directory:
                     return jsonify({'success': False, 'error': f'路径校验失败: {dir_error}'})
                 dry_run = req.dry_run
@@ -11873,7 +11903,7 @@ if __name__ == '__main__':
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
                 data = await request.json()  # [SECURITY] VALIDATED
-                directory, dir_error = resolve_clean_directory(data.get('directory', ''), PROJECT_DIR)
+                directory, dir_error = resolve_clean_directory(data.get('directory', ''), PROJECT_DIR, require_explicit=True)
                 if not directory:
                     return jsonify({'success': False, 'error': f'路径校验失败: {dir_error}'})
                 dry_run = bool(data.get('dry_run', False))
@@ -11896,7 +11926,7 @@ if __name__ == '__main__':
                 return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
             try:
                 data = await request.json()  # [SECURITY] VALIDATED
-                directory, dir_error = resolve_clean_directory(data.get('directory', ''), PROJECT_DIR)
+                directory, dir_error = resolve_clean_directory(data.get('directory', ''), PROJECT_DIR, require_explicit=True)
                 if not directory:
                     return jsonify({'success': False, 'error': f'路径校验失败: {dir_error}'})
                 dry_run = bool(data.get('dry_run', False))
@@ -12489,6 +12519,7 @@ if __name__ == '__main__':
                 dependencies = []
                 category = '其他'
                 python_min = ''
+                python_compat = ''
                 with open(req_path, 'r', encoding='utf-8') as f:
                     for raw in f:
                         line = raw.strip()
@@ -12499,6 +12530,10 @@ if __name__ == '__main__':
                                 py_match = re.search(r'Python\s*>=\s*([0-9]+\.[0-9]+)', line)
                                 if py_match:
                                     python_min = py_match.group(1) + '+'
+                            if not python_compat:
+                                compat_match = re.search(r'兼容至\s*([0-9]+\.[0-9]+)', line)
+                                if compat_match and python_min:
+                                    python_compat = f'{python_min.rstrip("+")}–{compat_match.group(1)}'
                             cat_match = re.match(r'^#\s*=+\s+([^=]+?)\s+=+\s*$', line)
                             if cat_match:
                                 category = cat_match.group(1).strip()
@@ -12520,16 +12555,24 @@ if __name__ == '__main__':
                     pip_version = im.version('pip')
                 except Exception:  # [HANDLED]
                     pip_version = ''
-                return jsonify({
-                    'success': True,
-                    'source': 'requirements.txt',
-                    'python': {
-                        'min': python_min or '3.9+',
-                        'current': f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}',
+                return JSONResponse(
+                    content={
+                        'success': True,
+                        'source': 'requirements.txt',
+                        'python': {
+                            'min': python_min or '3.6+',
+                            'compat': python_compat,
+                            'current': f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}',
+                        },
+                        'pip': pip_version,
+                        'dependencies': dependencies,
                     },
-                    'pip': pip_version,
-                    'dependencies': dependencies,
-                })
+                    headers={
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                )
             except Exception as e:  # [HANDLED]
                 logger.error(f'[api_dependencies] 获取失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({'success': False, 'error': '依赖清单读取失败'}, status_code=500)
