@@ -12,8 +12,8 @@ fi
 
 VERSION="0.0.0"
 if [ -f "README.md" ]; then
-    VERSION=$(grep -m 1 -oE '###\s+v[0-9]+(\.[0-9]+)+' README.md 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || echo "0.0.0")
-    if [ "$VERSION" = "0.0.0" ]; then
+    VERSION=$(grep -m 1 -oE '^### v[0-9]+(\.[0-9]+)+' README.md 2>/dev/null | sed -E 's/^### v//' | head -1 || echo "0.0.0")
+    if [ -z "$VERSION" ] || [ "$VERSION" = "0.0.0" ]; then
         VERSION=$(grep -m 1 -oE "version:[\"]?[0-9]+(\.[0-9]+)+" README.md 2>/dev/null | grep -oE '[0-9]+(\.[0-9]+)+' | head -1 || echo "0.0.0")
     fi
 fi

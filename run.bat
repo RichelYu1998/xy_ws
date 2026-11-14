@@ -20,16 +20,9 @@ if errorlevel 1 (
 
 set "VERSION=0.0.0"
 if exist "README.md" (
-    for /f "delims=" %%L in ('type README.md ^| findstr /c:"### v5." ^| findstr /c:"(2026-"') do (
+    for /f "delims=" %%L in ('type README.md ^| findstr /r /c:"^### v[0-9]"') do (
         for /f "tokens=2 delims=v " %%v in ("%%L") do (
             if "!VERSION!"=="0.0.0" set "VERSION=%%v"
-        )
-    )
-    if "!VERSION!"=="0.0.0" (
-        for /f "delims=" %%L in ('type README.md ^| findstr /c:"### v4." ^| findstr /c:"(2026-"') do (
-            for /f "tokens=2 delims=v " %%v in ("%%L") do (
-                if "!VERSION!"=="0.0.0" set "VERSION=%%v"
-            )
         )
     )
     if "!VERSION!"=="0.0.0" (

@@ -45,6 +45,11 @@ config/config.json
 config/.encryption_key
 config/.salt
 
+# Environment variables (never commit)
+.env
+.env.*
+*.env
+
 # Crypto tool (security sensitive, not for distribution)
 config/update_password.py
 config/demo_crypto.py

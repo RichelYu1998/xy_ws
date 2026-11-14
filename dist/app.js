@@ -1612,8 +1612,37 @@
             if (stopTaskBar) stopTaskBar.style.display = 'none';
         }
         
+        function restoreRunUi(failedBtn, originalHtml) {
+            document.querySelectorAll('.func-btn').forEach(b => { b.disabled = false; });
+            document.querySelectorAll('.btn-run').forEach(b => {
+                b.disabled = false;
+                const orig = b.getAttribute('data-original');
+                if (orig) b.innerHTML = orig;
+            });
+            document.querySelectorAll('.btn-sku-api').forEach(b => { b.disabled = false; });
+            if (failedBtn) {
+                failedBtn.disabled = false;
+                if (originalHtml) failedBtn.innerHTML = originalHtml;
+            }
+            const stopTaskBar = document.getElementById('stop-task-bar');
+            if (stopTaskBar) stopTaskBar.style.display = 'none';
+        }
+
+        function describeRunFailure(status, data) {
+            if (data && (data.detail || data.error)) {
+                return String(data.detail || data.error);
+            }
+            if (status === 429) return '请求过于频繁或并发任务数已达上限，请稍后再试';
+            if (status === 401) return '登录已过期，请重新获取Cookie';
+            if (status === 403) return '操作被拒绝';
+            if (status >= 500) return '服务器内部错误 (' + status + ')';
+            return 'HTTP ' + status;
+        }
+
         function runCommand(cmd, btn) {
             if (!btn) return;
+            const originalHtml = btn.getAttribute('data-original') || btn.innerHTML;
+            btn.setAttribute('data-original', originalHtml);
             document.querySelectorAll('.func-btn').forEach(b => b.disabled = true);
             btn.disabled = true;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 运行中...';
@@ -1628,36 +1657,70 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ command: cmd })
             })
-            .then(response => safeParseJson(response))
-            .then(data => {
-                if (data.success) {
+            .then(response => safeParseJson(response).then(data => ({ status: response.status, data: data })))
+            .then(result => {
+                const data = result.data || {};
+                if (result.status === 200 && data.success) {
                     currentTaskId = data.task_id;
+                    resetOutputBuffer();
                     showOutputPanel();
                     if (outputContent) outputContent.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
-                    pollingInterval = setInterval(window.pollOutput, 1000);
+                    schedulePoll(POLL_INTERVAL_MS);
                 } else {
-                    showToast('启动失败: ' + data.error, 'error');
+                    showToast('启动失败: ' + describeRunFailure(result.status, data), 'error');
+                    restoreRunUi(btn, originalHtml);
                 }
             })
             .catch(error => {
                 console.error('请求失败:', error);
                 showToast('请求失败: ' + error.message, 'error');
+                restoreRunUi(btn, originalHtml);
             });
         }
         
+        const POLL_INTERVAL_MS = 2000;
+        let pollBackoffMs = 0;
+        let pollFailCount = 0;
+        let pollTimer = null;
+        let outputBuffer = '';
+        let outputOffset = 0;
+
+        function resetOutputBuffer() {
+            outputBuffer = '';
+            outputOffset = 0;
+        }
+
+        function schedulePoll(delay) {
+            if (pollTimer) {
+                clearTimeout(pollTimer);
+                pollTimer = null;
+            }
+            pollTimer = setTimeout(function () {
+                pollTimer = null;
+                window.pollOutput();
+            }, delay);
+            pollingInterval = pollTimer;
+        }
+
         window.pollOutput = function() {
             if (!currentTaskId) {
                 clearInterval(pollingInterval);
                 pollingInterval = null;
                 return;
             }
-            fetch('/output/' + currentTaskId)
+            fetch('/output/' + currentTaskId + '?since=' + outputOffset)
             .then(response => {
                 if (response.status === 429) {
-                    console.warn('pollOutput 被限流(429)，暂停轮询');
-                    clearInterval(pollingInterval);
-                    pollingInterval = null;
-                    return { status: 'error', error: '请求过于频繁，已暂停轮询' };
+                    const retryAfterSec = parseInt(response.headers.get('Retry-After') || '0', 10);
+                    pollBackoffMs = Math.min(
+                        Math.max(retryAfterSec > 0 ? retryAfterSec * 1000 : 0, pollBackoffMs ? pollBackoffMs * 2 : 2000),
+                        15000
+                    );
+                    console.warn('pollOutput 被限流(429)，' + (pollBackoffMs / 1000) + ' 秒后自动重试');
+                    const statusDiv = document.getElementById('output-status');
+                    if (statusDiv) statusDiv.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 服务器繁忙，' + (pollBackoffMs / 1000) + ' 秒后自动重试...</span>';
+                    schedulePoll(pollBackoffMs);
+                    return { __rateLimited: true };
                 }
                 if (!response.ok && response.status !== 200) {
                     console.warn('pollOutput 收到非200响应:', response.status);
@@ -1671,27 +1734,44 @@
                 return safeParseJson(response);
             })
             .then(data => {
+                if (data && data.__rateLimited) {
+                    return;
+                }
+                pollBackoffMs = 0;
+                pollFailCount = 0;
                 const outputDiv = document.getElementById('output-content');
                 const statusDiv = document.getElementById('output-status');
-                
-                if (data.output) {
+
+                const delta = typeof data.output === 'string' ? data.output : '';
+                if (data.reset) {
+                    outputBuffer = delta;
+                } else {
+                    outputBuffer += delta;
+                }
+                if (typeof data.offset === 'number') {
+                    outputOffset = data.offset + delta.length;
+                } else {
+                    outputOffset = outputBuffer.length;
+                }
+
+                if (outputBuffer) {
                     // 检测是否包含爬虫统计数据（总商品数、高价商品、预计售出等）
-                    const hasSpiderStats = data.output.includes('成功获取') || 
-                                          data.output.includes('售价 >= 599') || 
-                                          data.output.includes('预计售出价格累计') ||
-                                          data.output.includes('平均每个设备售出均价');
+                    const hasSpiderStats = outputBuffer.includes('成功获取') || 
+                                          outputBuffer.includes('售价 >= 599') || 
+                                          outputBuffer.includes('预计售出价格累计') ||
+                                          outputBuffer.includes('平均每个设备售出均价');
                     
                     if (hasSpiderStats) {
                         // 爬虫运行时：解析日志输出实时显示统计数据
                         const spiderContent = document.getElementById('spider-output-content');
                         const existingCard = spiderContent ? spiderContent.querySelector('.comparison-card, .products-card') : null;
                         if (!existingCard) {
-                            showComparisonCard(data.output);
+                            showComparisonCard(outputBuffer);
                         }
                     } else {
                         // 其他任务：只显示日志输出
                         if (outputDiv) {
-                            outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(data.output) + '</pre>';
+                            outputDiv.innerHTML = '<pre style="margin: 0; white-space: pre-wrap; word-break: break-all;">' + formatOutput(outputBuffer) + '</pre>';
                             const isMobile = window.innerWidth < 576;
                             if (!isMobile) {
                                 outputDiv.scrollTop = outputDiv.scrollHeight;
@@ -1768,13 +1848,25 @@
                         if (stopTaskBar) stopTaskBar.style.display = 'none';
                     }
                 }
+
+                if (currentTaskId && data.status !== 'completed' && data.status !== 'error') {
+                    schedulePoll(POLL_INTERVAL_MS);
+                }
             })
             .catch(error => {
                 console.error('pollOutput 出错:', error);
-                clearInterval(pollingInterval);
-                pollingInterval = null;
-                currentTaskId = null;
-                currentChoice = null;
+                pollFailCount += 1;
+                if (pollFailCount >= 10) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    currentTaskId = null;
+                    currentChoice = null;
+                    return;
+                }
+                const retryDelay = Math.min(2000 * Math.pow(2, pollFailCount - 1), 15000);
+                const statusDiv = document.getElementById('output-status');
+                if (statusDiv) statusDiv.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 连接异常，' + (retryDelay / 1000) + ' 秒后自动重试 (' + pollFailCount + '/10)...</span>';
+                schedulePoll(retryDelay);
             });
         }
         
@@ -3606,24 +3698,24 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ command: cmd })
             })
-            .then(response => safeParseJson(response))
-            .then(data => {
-                if (data.success) {
+            .then(response => safeParseJson(response).then(data => ({ status: response.status, data: data })))
+            .then(result => {
+                const data = result.data || {};
+                if (result.status === 200 && data.success) {
                     currentTaskId = data.task_id;
+                    resetOutputBuffer();
                     showOutputPanel();
                     const outputContent = document.getElementById('output-content');
                     if (outputContent) outputContent.innerHTML = '<span style="color: #e6a23c;"><i class="fa fa-spinner fa-spin"></i> 正在执行...</span>';
-                    pollingInterval = setInterval(window.pollOutput, 1000);
+                    schedulePoll(POLL_INTERVAL_MS);
                 } else {
-                    showToast('启动失败: ' + data.error, 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = btn.getAttribute('data-original');
+                    showToast('启动失败: ' + describeRunFailure(result.status, data), 'error');
+                    restoreRunUi(btn, btn.getAttribute('data-original'));
                 }
             })
             .catch(error => {
                 showToast('请求失败: ' + error.message, 'error');
-                btn.disabled = false;
-                btn.innerHTML = btn.getAttribute('data-original');
+                restoreRunUi(btn, btn.getAttribute('data-original'));
             });
         }
         
