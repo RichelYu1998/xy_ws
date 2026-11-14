@@ -12406,7 +12406,7 @@ if __name__ == '__main__':
                     current_block_type = None
 
                 for line in lines:
-                    if '最新更新' in line.strip() and line.strip().startswith('##'):
+                    if re.match(r'^##\s+.*最新更新', line.strip()):
                         in_changelog = True
                         continue
                     if not in_changelog:
@@ -13021,7 +13021,7 @@ if __name__ == '__main__':
                 debug_lines = []
                 in_changelog = False
                 for i, line in enumerate(lines, 1):
-                    if '最新更新' in line.strip() and line.strip().startswith('##'):
+                    if re.match(r'^##\s+.*最新更新', line.strip()):
                         in_changelog = True
                     if in_changelog:
                         debug_lines.append(f'{i:4d}: {line}')
