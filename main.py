@@ -3710,6 +3710,37 @@ def sec_sp(base_dir, user_path):
 
 # 清理类接口允许操作的根目录白名单
 _clean_allowed_roots_cache = None
+_fs_case_insensitive_cache = None
+
+def _fs_is_case_insensitive():
+    """探测当前文件系统是否大小写不敏感（macOS APFS 默认不敏感，Linux 通常敏感）
+
+    posix 下 os.path.normcase 是空操作，若直接用它比较路径，大小写不敏感的文件
+    系统上同一个目录的不同大小写写法会被当成两个不同路径。这里用项目目录内真实
+    存在的文件名做一次探针，翻转大小写后仍能命中即判定为不敏感。
+    """
+    global _fs_case_insensitive_cache
+    if _fs_case_insensitive_cache is None:
+        _fs_case_insensitive_cache = os.name == 'nt'
+        for base in (os.path.realpath(PROJECT_DIR), os.path.dirname(os.path.realpath(PROJECT_DIR))):
+            try:
+                names = [n for n in os.listdir(base) if n.lower() != n.upper()]
+            except Exception as e:  # [HANDLED]
+                logger.debug(f'  文件系统大小写探测失败 {base}: {e}')
+                continue
+            for name in names:
+                alt = name.swapcase()
+                if alt != name and os.path.exists(os.path.join(base, alt)):
+                    _fs_case_insensitive_cache = True
+                    break
+            if _fs_case_insensitive_cache:
+                break
+    return _fs_case_insensitive_cache
+
+def _clean_path_key(path):
+    """生成路径比较键：realpath + normcase 归一，大小写不敏感的文件系统上再 casefold"""
+    key = os.path.normcase(os.path.realpath(path))
+    return key.casefold() if _fs_is_case_insensitive() else key
 
 def _get_clean_allowed_roots_file():
     """清理接口允许根目录的配置文件路径（一行一个目录，# 开头为注释）"""
@@ -3786,17 +3817,17 @@ def resolve_clean_directory(directory, default_dir=None, require_explicit=False,
         except Exception as e:  # [HANDLED]
             return None, f'路径解析失败: {e}'
 
-    if not allow_project_root and os.path.normcase(candidate) == os.path.normcase(project_root):
+    if not allow_project_root and _clean_path_key(candidate) == _clean_path_key(project_root):
         return None, (
             f'拒绝清理项目根目录: {candidate}'
-            f'（项目目录受保护，请改为清理其子目录或白名单内的其它目录）'
+            f'（项目目录受保护，即使写进白名单也不会放行，请改为清理其子目录或白名单内的其它目录）'
         )
 
-    candidate_key = os.path.normcase(candidate)
+    candidate_key = _clean_path_key(candidate)
     for root in _get_clean_allowed_roots():
-        root_key = os.path.normcase(root)
+        root_key = _clean_path_key(root)
         if candidate_key == root_key:
-            if os.path.dirname(root) == root:
+            if os.path.dirname(os.path.normpath(root)) == os.path.normpath(root):
                 return None, f'拒绝清理文件系统根目录: {candidate}'
             return candidate, None
         if candidate_key.startswith(root_key + os.sep):
@@ -12190,7 +12221,7 @@ if __name__ == '__main__':
                     roots.append({
                         'path': root,
                         'exists': os.path.isdir(root),
-                        'builtin': root == project_dir,
+                        'builtin': _clean_path_key(root) == _clean_path_key(project_dir),
                     })
                 return jsonify({
                     'success': True,
