@@ -3845,7 +3845,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-**文档版本**: v5.0.9.104  
+**文档版本**: v5.0.9.105  
 **最后更新**: 2026-11-14  
 **下次审查**: 2026-12-14  
 **维护者**: 小旭数码开发团队
@@ -3853,6 +3853,112 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.105 (2026-11-14) - 🧼 **白名单脱敏示例入库 + 展示页可视化** - 真实白名单 `config/clean_allowed_roots.txt` 仍进 .gitignore 不入库（含本机真实路径）+ 新增脱敏示例 `config/clean_allowed_roots.example.txt` 入库（仅格式说明/占位符/跨平台写法）+ 新增 `GET /api/clean/allowed-roots` 返回白名单明细 + 清理面板新增允许目录展示区（点击即填入、不存在标红、追加方法提示）
+
+> **Commit**: `ff25d587`
+
+#### 更新内容: 真实路径文件不入库、脱敏示例入库，同时把「允许清理哪些目录」直接搬到页面上可见可选
+
+1. **真实白名单不入库**: `config/clean_allowed_roots.txt` 继续留在 `.gitignore`，该文件含本机绝对路径（`/Users/yu/Downloads/微购`），提交会泄露本机目录结构且换机即失效 [.gitignore](.gitignore#L48-L50)
+2. **脱敏示例入库**: 新增 `config/clean_allowed_roots.example.txt`，只保留规则说明、占位符写法与 macOS/Windows 双平台示例，不含任何真实路径，随仓库分发作为格式文档 [clean_allowed_roots.example.txt](config/clean_allowed_roots.example.txt)
+3. **新增白名单查询接口**: `GET /api/clean/allowed-roots` 返回每个允许目录的 `path`/`exists`/`builtin` 以及 `config_file`、`config_file_exists`、`env_var`、`env_value`，前端不必再猜白名单内容 [main.py](main.py#L11755-L11781)
+4. **清理面板可视化**: 打开清理面板即展示「允许清理的目录」列表，点击任一条目直接填入输入框；目录不存在时标红提示；底部给出追加目录的配置文件路径 [dist/app.js](dist/app.js#L5957-L5992)
+5. **安全边界不变**: 白名单只影响「允许哪些根目录」，`realpath` 归一化 + 前缀比对 + 根目录单独拒绝逻辑未动，`/etc`、`/`、`/Users/yu`、`../../../etc` 实测仍全部拒绝
+6. **验证**: 接口实测返回 2 条白名单（项目目录 `builtin:true`、`/Users/yu/Downloads/微购` `exists:true`），`/api/clean/list` 对该目录 `success:true`，`/etc` 返回拒绝；安全审计攻防 13/13 通过、总计问题 0；`git check-ignore` 确认真实文件被忽略、示例文件未被忽略
+
+**修复日期**: 2026-11-14
+**修复类型**: 🧼配置脱敏 + ✨功能增强
+**影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [.gitignore](.gitignore), [config/clean_allowed_roots.example.txt](config/clean_allowed_roots.example.txt), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: ff25d587
+**变更统计**: 新增接口 1 个 + 前端展示函数 1 个 + 脱敏示例文件 1 个 + 忽略规则 1 条
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🧼 真实白名单文件继续不入库 (🧼配置脱敏)
+**问题描述**:
+- **现象**: 一度把 `config/clean_allowed_roots.txt` 从 `.gitignore` 移除并提交，而文件里写的是本机真实绝对路径 `/Users/yu/Downloads/微购`
+- **根因**: 白名单内容是「机器相关配置」而非「可分发配置」，真实路径既泄露本机目录结构，换台机器后又是无效条目
+- **影响范围**: 仓库卫生、跨机可用性
+
+**修复方案**:
+- **技术实现**: 恢复 `config/clean_allowed_roots.txt` 忽略规则并补充注释说明「真实白名单不入库、脱敏示例需入库」，两者职责分离
+- **参考位置**: [.gitignore](.gitignore#L48-L50)
+
+**测试验证**:
+- ✅ `git check-ignore -v config/clean_allowed_roots.txt` → `.gitignore:50`
+- ✅ `git status --short` 不出现该文件
+- ✅ 本地文件仍存在且被正常读取（`config_file_exists:true`）
+
+---
+
+##### 2. 📄 新增脱敏示例文件入库 (📄脱敏示例)
+**问题描述**:
+- **现象**: 真实文件不入库后，新用户不知道这个配置文件叫什么、放哪、怎么写
+- **根因**: 缺少可提交的格式文档，只能靠 README 里一句话
+- **影响范围**: 部署上手成本
+
+**修复方案**:
+- **技术实现**: 新增 `config/clean_allowed_roots.example.txt`，逐条写明「一行一个目录」「`#` 注释含行尾」「`~` 展开」「项目目录始终允许」「`CLEAN_ALLOWED_ROOTS` 环境变量分隔符差异」「白名单外一律拒绝」「改后需重启」，示例路径全部用 `<用户名>` 与通用目录名占位，另附 Windows 正斜杠/双反斜杠写法
+- **参考位置**: [clean_allowed_roots.example.txt](config/clean_allowed_roots.example.txt)
+
+**测试验证**:
+- ✅ 文件内不含任何真实用户路径
+- ✅ `git check-ignore` 返回非忽略，可正常 `git add`
+- ✅ 真实文件头部已加「格式示例见同目录 clean_allowed_roots.example.txt」指引
+
+---
+
+##### 3. 🔍 新增白名单查询接口 (🔍白名单接口)
+**问题描述**:
+- **现象**: 白名单只在服务端内存里，前端无法知道当前允许哪些目录，用户输错只能靠报错文本反推
+- **根因**: 缺少只读的白名单查询端点
+- **影响范围**: 清理面板可用性
+
+**修复方案**:
+- **技术实现**: 新增 `GET /api/clean/allowed-roots`，走与清理接口相同的敏感端点分桶限流，返回 `roots[]`（含 `path`/`exists`/`builtin`）、`project_dir`、`config_file`、`config_file_exists`、`env_var`、`env_value`；异常统一 `[HANDLED]` 记日志并返回通用错误
+- **参考位置**: [main.py](main.py#L11755-L11781)
+
+**测试验证**:
+- ✅ 实测返回 `{"success":true,"roots":[{"path":".../xy_ws","exists":true,"builtin":true},{"path":"/Users/yu/Downloads/微购","exists":true,"builtin":false}],...}`
+- ✅ 限流命中时返回 429 与 `Retry-After`
+
+---
+
+##### 4. 🖥️ 清理面板展示允许目录 (🖥️展示可视化)
+**问题描述**:
+- **现象**: 用户打开清理面板只看到一个空输入框，不知道能填什么
+- **根因**: 白名单信息没有在界面上暴露
+- **影响范围**: 清理功能的可发现性
+
+**修复方案**:
+- **技术实现**: 面板打开时调用 `loadCleanAllowedRoots()` 渲染列表，每条为可点击链接，点击即把路径写入 `#clean-directory`；`builtin` 标注「(项目目录)」、`exists:false` 标红「(目录不存在)」；底部提示追加目录需编辑 `config_file` 后重启；请求失败时展示红色兜底文案而非空白
+- **参考位置**: [dist/app.js](dist/app.js#L5957-L5992)、[dist/app.js](dist/app.js#L5914)
+
+**测试验证**:
+- ✅ `node --check dist/app.js` 通过
+- ✅ 面板渲染 2 条白名单，点击可填入
+- ✅ 接口异常时展示「允许目录读取失败」而非静默空白
+
+---
+
+##### 5. 🛡️ 安全边界零回归 (🛡️边界回归)
+**问题描述**:
+- **现象**: 白名单可配置 + 页面展示后，容易被误认为「校验松了」
+- **根因**: 配置化与放宽校验容易被混为一谈
+- **影响范围**: `/api/clean/*` 全部接口的文件删除能力
+
+**修复方案**:
+- **技术实现**: 本次只新增只读接口与前端展示，`resolve_clean_directory()` 的 `realpath` 归一化、逐 root 前缀比对、文件系统根目录单独拒绝逻辑一行未改
+- **参考位置**: [main.py](main.py#L3440-L3477)
+
+**测试验证**:
+- ✅ `/etc` → 拒绝（`/private/etc` 不在白名单）
+- ✅ `/`、`/Users/yu`、`../../../etc` → 拒绝
+- ✅ 安全审计攻防 13/13 通过、总计问题 0
+
+---
 
 ### v5.0.9.104 (2026-11-14) - 🔓 **清理目录白名单可配置 + 边界校验不放松** - 新增 `config/clean_allowed_roots.txt` 显式白名单(一行一目录/# 注释) + 与 `CLEAN_ALLOWED_ROOTS` 环境变量、项目目录合并判定 + `/etc`、`/`、`/Users/yu`、`../../../etc` 仍一律拒绝 + 拒绝提示直接给出配置文件路径与配置方法 + `~` 路径先 expanduser 再 realpath + 白名单文件加入 .gitignore 不入库
 
