@@ -11752,6 +11752,34 @@ if __name__ == '__main__':
                 logger.error(f'[get_product_by_description] 查询失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({'found': False, 'error': '查询商品信息失败'})
 
+        @app.get('/api/clean/allowed-roots')  # [SECURED]
+        async def api_clean_allowed_roots(request: Request):
+            retry = _check_sensitive_rate_limit(request)
+            if retry:
+                return JSONResponse(status_code=429, content={'success': False, 'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
+            try:
+                config_file = _get_clean_allowed_roots_file()
+                project_dir = os.path.realpath(PROJECT_DIR)
+                roots = []
+                for root in _get_clean_allowed_roots():
+                    roots.append({
+                        'path': root,
+                        'exists': os.path.isdir(root),
+                        'builtin': root == project_dir,
+                    })
+                return jsonify({
+                    'success': True,
+                    'roots': roots,
+                    'project_dir': project_dir,
+                    'config_file': config_file,
+                    'config_file_exists': os.path.isfile(config_file),
+                    'env_var': 'CLEAN_ALLOWED_ROOTS',
+                    'env_value': os.environ.get('CLEAN_ALLOWED_ROOTS', ''),
+                })
+            except Exception as e:  # [HANDLED]
+                logger.error(f'[api_clean_allowed_roots] 操作失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '白名单读取失败，请查看服务器日志'})
+
         @app.post('/api/clean/list')  # [SECURED]
         async def api_clean_list(req: CleanDirectoryRequest, request: Request):
             retry = _check_sensitive_rate_limit(request)

@@ -5911,6 +5911,7 @@
                     <div class="form-group">
                         <label><strong>清理目录:</strong></label>
                         <input type="text" id="clean-directory" class="form-control" value="" placeholder="请输入要清理的目录（留空使用当前目录）">
+                        <div id="clean-allowed-roots" style="margin-top:8px;font-size:12px;color:#666;"></div>
                     </div>
                     <div class="form-group">
                         <label><strong>清理模式:</strong></label>
@@ -5950,6 +5951,38 @@
             
             const cleanBtn = document.getElementById('btn-execute-clean');
             if (cleanBtn) cleanBtn.addEventListener('click', executeClean);
+            loadCleanAllowedRoots();
+        }
+
+        function loadCleanAllowedRoots() {
+            const box = document.getElementById('clean-allowed-roots');
+            if (!box) return;
+            fetch('/api/clean/allowed-roots')
+                .then(function(response) { return safeParseJson(response); })
+                .then(function(data) {
+                    if (!data.success || !data.roots || !data.roots.length) {
+                        box.innerHTML = '<span style="color:#c00;">允许目录读取失败，请查看服务日志</span>';
+                        return;
+                    }
+                    const parts = [];
+                    parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>（点击可直接填入，不在列表内的一律拒绝）:</div>');
+                    data.roots.forEach(function(root) {
+                        const label = escapeHtml(root.path) + (root.builtin ? ' <span style="color:#888;">(项目目录)</span>' : '') + (root.exists ? '' : ' <span style="color:#c00;">(目录不存在)</span>');
+                        parts.push('<div style="margin:2px 0;"><a href="javascript:void(0)" class="clean-root-pick" data-path="' + escapeHtml(root.path) + '" style="color:#06c;text-decoration:underline;">' + label + '</a></div>');
+                    });
+                    parts.push('<div style="margin-top:6px;color:#888;">如需追加目录，编辑 <code>' + escapeHtml(data.config_file) + '</code>（一行一个路径）后重启服务</div>');
+                    box.innerHTML = parts.join('');
+                    box.querySelectorAll('.clean-root-pick').forEach(function(el) {
+                        el.addEventListener('click', function() {
+                            const dirEl = document.getElementById('clean-directory');
+                            if (dirEl) dirEl.value = this.getAttribute('data-path') || '';
+                        });
+                    });
+                })
+                .catch(function(e) {
+                    console.error('Failed to load clean allowed roots:', e);
+                    box.innerHTML = '<span style="color:#c00;">允许目录读取失败</span>';
+                });
         }
         
         function executeClean() {

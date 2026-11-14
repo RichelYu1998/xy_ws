@@ -45,7 +45,8 @@ config/config.json
 config/.encryption_key
 config/.salt
 
-# Machine-specific clean allowlist (paths differ per host)
+# Machine-specific clean allowlist (contains real local paths, never commit)
+# 真实白名单不入库；脱敏格式示例 config/clean_allowed_roots.example.txt 需入库
 config/clean_allowed_roots.txt
 
 # Environment variables (never commit)
