@@ -45,6 +45,9 @@ config/config.json
 config/.encryption_key
 config/.salt
 
+# Machine-specific clean allowlist (paths differ per host)
+config/clean_allowed_roots.txt
+
 # Environment variables (never commit)
 .env
 .env.*

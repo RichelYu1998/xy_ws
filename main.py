@@ -3399,15 +3399,41 @@ def sec_sp(base_dir, user_path):
 # 清理类接口允许操作的根目录白名单
 _clean_allowed_roots_cache = None
 
+def _get_clean_allowed_roots_file():
+    """清理接口允许根目录的配置文件路径（一行一个目录，# 开头为注释）"""
+    return os.path.join(PathManager.get_config_dir(), 'clean_allowed_roots.txt')
+
+def _read_clean_allowed_roots_file():
+    """读取配置文件中的额外允许目录，文件不存在或读取失败时返回空集合"""
+    path = _get_clean_allowed_roots_file()
+    roots = set()
+    if not os.path.isfile(path):
+        return roots
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.split('#', 1)[0].strip()
+                if not line:
+                    continue
+                try:
+                    roots.add(os.path.realpath(os.path.expanduser(line)))
+                except Exception as e:  # [HANDLED]
+                    logger.debug(f'  忽略无法解析的允许目录 {line!r}: {e}')
+    except Exception as e:  # [HANDLED]
+        logger.debug(f'  读取允许目录配置失败: {e}')
+    return roots
+
 def _get_clean_allowed_roots():
-    """清理接口允许的根目录，默认仅项目目录，可用 CLEAN_ALLOWED_ROOTS 环境变量追加"""
+    """清理接口允许的根目录，默认仅项目目录，可用 CLEAN_ALLOWED_ROOTS 环境变量
+    或 config/clean_allowed_roots.txt 追加，两者都需显式配置，不接受任意路径"""
     global _clean_allowed_roots_cache
     if _clean_allowed_roots_cache is None:
         roots = {os.path.realpath(PROJECT_DIR)}
         for item in (os.environ.get('CLEAN_ALLOWED_ROOTS', '') or '').split(os.pathsep):
             item = item.strip()
             if item:
-                roots.add(os.path.realpath(item))
+                roots.add(os.path.realpath(os.path.expanduser(item)))
+        roots.update(_read_clean_allowed_roots_file())
         _clean_allowed_roots_cache = tuple(sorted(roots))
     return _clean_allowed_roots_cache
 
@@ -3427,6 +3453,9 @@ def resolve_clean_directory(directory, default_dir=None):
     if not raw:
         return base, None
 
+    if raw.startswith('~'):
+        raw = os.path.expanduser(raw)
+
     try:
         candidate = os.path.realpath(raw) if os.path.isabs(raw) else os.path.realpath(os.path.join(base, raw))
     except Exception as e:  # [HANDLED]
@@ -3441,7 +3470,11 @@ def resolve_clean_directory(directory, default_dir=None):
             return candidate, None
 
     allowed = ', '.join(_get_clean_allowed_roots())
-    return None, f'目录不在允许范围内: {candidate}（允许范围: {allowed}）'
+    return None, (
+        f'目录不在允许范围内: {candidate}（允许范围: {allowed}）'
+        f'；如需清理其它目录，请把该目录写入 {_get_clean_allowed_roots_file()} '
+        f'（一行一个路径）或设置环境变量 CLEAN_ALLOWED_ROOTS'
+    )
 
 def _get_allowed_origins():
     """动态生成允许的CORS源，基于当前WEB_PORT"""
