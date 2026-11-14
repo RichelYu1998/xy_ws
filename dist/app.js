@@ -5994,6 +5994,7 @@
                         return;
                     }
                     const extraRoots = data.roots.filter(function(root) { return !root.builtin && !root.protected; });
+                    const ignoredRoots = data.roots.filter(function(root) { return root.protected; });
                     const parts = [];
                     if (extraRoots.length) {
                         parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>（点击可直接填入，不在列表内的一律拒绝）:</div>');
@@ -6003,6 +6004,12 @@
                         });
                     } else {
                         parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>: 仅项目目录（不在列表内的一律拒绝）</div>');
+                    }
+                    if (ignoredRoots.length) {
+                        parts.push('<div style="margin-top:6px;color:#888;"><strong>已读取但被忽略</strong>（受保护，写入白名单也不会放行）:</div>');
+                        ignoredRoots.forEach(function(root) {
+                            parts.push('<div style="margin:2px 0;color:#a60;">' + escapeHtml(root.path) + ' <span style="color:#c00;">— ' + escapeHtml(root.reason || '受保护') + '</span></div>');
+                        });
                     }
                     parts.push('<div style="margin-top:6px;color:#888;">如需追加目录，编辑 <code>' + escapeHtml(data.config_file) + '</code>（一行一个路径）保存后即时生效；项目目录及其上级目录即使写入也会被拒绝</div>');
                     box.innerHTML = parts.join('');

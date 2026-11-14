@@ -3771,12 +3771,13 @@ def _get_clean_allowed_roots():
     """清理接口允许的根目录，默认仅项目目录，可用 CLEAN_ALLOWED_ROOTS 环境变量
     或 config/clean_allowed_roots.txt 追加，两者都需显式配置，不接受任意路径
 
-    缓存带签名（白名单文件 mtime + 环境变量原文），任一项变化即重新读取，
+    缓存带签名（白名单文件 mtime_ns + size 双要素，以及环境变量原文），任一项变化即重新读取，
     编辑白名单文件后无需重启服务，避免「写进白名单却仍被拒」的错觉。
     """
     global _clean_allowed_roots_cache, _clean_allowed_roots_signature
     try:
-        file_signature = os.path.getmtime(_get_clean_allowed_roots_file())
+        st = os.stat(_get_clean_allowed_roots_file())
+        file_signature = (st.st_mtime_ns, st.st_size)
     except OSError:
         file_signature = None
     signature = (file_signature, os.environ.get('CLEAN_ALLOWED_ROOTS', ''))
@@ -12253,17 +12254,28 @@ if __name__ == '__main__':
                 project_dir = os.path.realpath(PROJECT_DIR)
                 project_key = _clean_path_key(project_dir)
                 roots = []
+                ignored = []
                 for root in _get_clean_allowed_roots():
                     root_key = _clean_path_key(root)
-                    roots.append({
+                    builtin = root_key == project_key
+                    protected = builtin or project_key.startswith(root_key + os.sep)
+                    item = {
                         'path': root,
                         'exists': os.path.isdir(root),
-                        'builtin': root_key == project_key,
-                        'protected': root_key == project_key or project_key.startswith(root_key + os.sep),
-                    })
+                        'builtin': builtin,
+                        'protected': protected,
+                    }
+                    if protected:
+                        item['reason'] = (
+                            '项目根目录受保护，永不清理' if builtin
+                            else f'项目根目录的上级目录（包含 {project_dir}），清理会连带清空项目'
+                        )
+                        ignored.append(item)
+                    roots.append(item)
                 return jsonify({
                     'success': True,
                     'roots': roots,
+                    'ignored_roots': ignored,
                     'project_dir': project_dir,
                     'config_file': config_file,
                     'config_file_exists': os.path.isfile(config_file),
