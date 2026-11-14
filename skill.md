@@ -4056,7 +4056,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 2. **批量查询不卡事件循环**: 先扫出全部待查条目，再用 `run_in_executor` 一次性批量取，450 个版本不再逐个阻塞 [main.py](main.py#L12818-L12851)
 3. **空 changes 终局兜底**: 任何版本都不允许返回空数组，用该版本真实 commit / 改动文件 / 变更统计合成 problem / solution / verification 全字段 [main.py](main.py#L12929-L12960)
 4. **三处旧占位兜底块清零**: 删除「详见README.md」「N/A」「历史版本-无Git记录」三套写死文案，占位符统一登记到 `_placeholder_tokens` 由新逻辑接管 [main.py](main.py#L12726-L12733) [main.py](main.py#L12638-L12654)
-5. **全仓库中文注释按最终口径落地**: 31 个文件按类型补注释（脚本头、区块、关键行三层），自检「缺中文注释 0 个 / 文件头无注释标记 0 个」 [README.md](README.md#L1439-L1523)
+5. **全仓库中文注释按最终口径落地**: 31 个文件按类型补注释（脚本头、区块、关键行三层），自检「缺中文注释 0 个 / 文件头无注释标记 0 个」 [README.md](README.md#L1439-L1535)
 6. **仓库卫生补漏**: `.gitignore` 补 `tools/`（1.1GB 内置工具链）、`.DS_Store`、`clean_files.log`、`~$*` 与 `.~lock.*`（Office 打开 docx 时生成的二进制锁文件，如 `~$skill.docx`）共 5 条规则，`git add .` 不再拖二进制 [.gitignore](.gitignore#L66-L76)
 7. **三方文档同步**: README.md ↔ skill.md 逐字节一致，skill.docx 由 skill.md 重新生成 [README.md](README.md) [skill.md](skill.md) [skill.docx](skill.docx)
 
@@ -4145,7 +4145,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 **修复方案**:
 - **技术实现**: 按 §5 表格逐类型补注释——脚本头写用途/用法/流程，`<section>` 与 `<key>` 上方写中文说明，`test/*.py` 补模块与函数 docstring，关键逻辑行补行内注释；`run.sh`（头 14 行）与 `run.bat`（头 19 行）只加文件头说明，版本读取逻辑零改动（仍从 README 最新 `### v` 标题行自动继承）
-- **参考位置**: [README.md](README.md#L1439-L1523) [run.sh](run.sh#L1-L14) [run.bat](run.bat#L1-L19)
+- **参考位置**: [README.md](README.md#L1439-L1535) [run.sh](run.sh#L1-L14) [run.bat](run.bat#L1-L19)
 
 **测试验证**:
 - ✅ §5 自检脚本实测「缺中文注释 0 个 / 文件头无注释标记 0 个」
