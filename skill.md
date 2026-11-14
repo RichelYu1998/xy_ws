@@ -4412,7 +4412,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ### v5.0.9.115 (2026-11-14) - 🐛 **白名单「写了却看不到」修复：受保护目录不再静默隐藏，签名补齐 size 双要素** - ① `config/clean_allowed_roots.txt` 里写入项目根目录后，前端「允许清理的目录」列表里看不到，容易被误判为「这行没读到」；实际是 `builtin` / `protected` 被前端过滤掉了；② `/api/clean/allowed-roots` 新增 `ignored_roots` 字段，逐条给出 `reason`（项目根受保护 / 项目根的上级目录），前端新增「已读取但被忽略」区块显式展示；③ `_get_clean_allowed_roots` 的缓存签名由单一 `os.path.getmtime` 改为 `(st_mtime_ns, st_size)` + 环境变量原文，与 PY-CORE-015「签名双要素」对齐，修掉同秒等长改写漏判；④ 同步修正 PY-CORE-015 签名来源表与 PY-CORE-051 反模式 / 检查清单
 
-> **Commit**: `PENDING`
+> **Commit**: `14eb5ef5`
 
 #### 更新内容: 把「白名单读到了但界面不说」这个误导点修掉，同时补齐白名单文件的签名强度
 
