@@ -3845,7 +3845,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-**文档版本**: v5.0.9.105  
+**文档版本**: v5.0.9.106  
 **最后更新**: 2026-11-14  
 **下次审查**: 2026-12-14  
 **维护者**: 小旭数码开发团队
@@ -3853,6 +3853,163 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.106 (2026-11-14) - 🛡️ **清理安全四层防护 + 跨平台路径兼容 + 版本基线 3.6+** - 项目根目录一律拒绝清理（入口隐藏 → 前端预检 → 后端校验 → 排除名单兜底）+ 路径统一 `realpath`/`normcase`/`expanduser`/`os.sep`/`os.pathsep` 归一 + `shutil.rmtree` 只读文件 `onerror` 兜底 + 删除类模式目录必填 + 排除名单大小写不敏感兼容 + 跨平台细则写入 PY-CORE-020 范式 + Python 版本基线改为 3.6+ 兼容口径（`/api/dependencies` 新增 `compat` 字段）
+
+> **Commit**: `1111aeb1`
+
+#### 更新内容: 把「清理目录」这条最危险的链路做成四层防护，把 Windows/macOS/Linux 差异全部收进范式，并把 Python 版本口径改成可解释的兼容区间
+
+1. **项目根目录一律拒绝**: 清理面板不再把项目目录渲染成可点击条目，后端 `resolve_clean_directory()` 对项目根目录无条件拒绝，绕过前端直接调接口同样被拦 [main.py](main.py#L3449-L3500) [dist/app.js](dist/app.js#L5987-L5992)
+2. **删除类模式目录必填**: 删除全部 / PNG / 媒体三个破坏性接口强制 `require_explicit=True`，目录留空不再回落到项目目录，直接返回「请显式填写要清理的目录」 [main.py](main.py#L11842-L11929)
+3. **跨平台路径归一**: 用户输入统一 `~` 展开 → 绝对化 → `os.path.realpath` 归一，比较统一 `os.path.normcase`，前缀判断统一 `root + os.sep`，多目录环境变量统一 `os.pathsep`，Windows/macOS/Linux 判定结果一致 [main.py](main.py#L3455-L3500)
+4. **排除名单大小写兼容**: `EXCLUDE_FOLDERS` / `EXCLUDE_FILE_NAMES` 统一小写，比对前 `item.name.lower()`，Windows 大小写不敏感文件系统下 `Config`/`File`/`Thumbs.db` 变体同样受保护 [main.py](main.py#L2100-L2101) [main.py](main.py#L2496-L2503)
+5. **只读文件删除兜底**: 新增 `_rmtree_onerror()`，`shutil.rmtree` 遇 `PermissionError` 自动 `chmod 0o777` 重试，兼容 Windows 只读属性，不再裸调用 [main.py](main.py#L2104)
+6. **跨平台细则入范式**: PY-CORE-020 新增《跨平台路径与文件系统兼容细则》，含四条铁律、平台差异对照表（6 行正确写法 vs 错误写法 vs 后果）、前后端职责划分与判定标准 [skill.md](skill.md#L19845-L19906)
+7. **版本基线 3.6+ 兼容口径**: 版本基线由不可运行的 `3.0+` 改为 `3.6+（兼容 3.6–3.14）`，`requirements.txt` 注释为唯一数据源，`/api/dependencies` 新增 `compat` 字段，页面、代码、文档三处同步 [requirements.txt](requirements.txt#L4-L5) [main.py](main.py#L12530-L12535)
+8. **防缓存与全量校验**: `app.js` 版本号递增至 `20261114180000`，`/api/dependencies` 改 `JSONResponse` 并加 `Cache-Control: no-store`，改动即时生效不再命中旧页面 [index.html](index.html#L2098) [main.py](main.py#L12558-L12572)
+
+**修复日期**: 2026-11-14
+**修复类型**: 🛡️安全加固 + 🖥️跨平台兼容 + 📚文档同步
+**影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [index.html](index.html), [requirements.txt](requirements.txt), [tox.ini](tox.ini), [config/clean_allowed_roots.example.txt](config/clean_allowed_roots.example.txt), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 1111aeb1
+**变更统计**: 后端函数签名扩展 1 处 + 新增兜底函数 1 个 + 破坏性接口参数对齐 3 处 + 前端入口过滤与预检 2 处 + 范式新增 1 节 + 版本口径 5 处同步
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🛡️ 项目根目录一律拒绝清理 (🛡️安全加固)
+**问题描述**:
+- **现象**: 清理面板把「项目目录 `xy_ws`」也渲染成可点击条目，误点一次就把整个项目目录清空；目录输入框留空提交时，清理目标回落到项目目录
+- **根因**: 清理入口只校验「目录是否存在、是否在白名单内」，没有把「项目根目录」本身列为禁止目标；而留空时的默认值恰好指向项目根目录
+- **影响范围**: 数据安全 —— 源码、配置、日志、依赖一次全丢，且不可恢复
+
+**修复方案**:
+- **技术实现**: 四层防护 —— ① 前端过滤 `builtin` 标记的项目目录，不再渲染可点击入口；② 前端 `normalizeCleanPath` 命中项目根目录时直接 `showToast` 报错、不发请求；③ 后端 `resolve_clean_directory()` 新增 `allow_project_root` 开关，默认 `False` 时对项目根目录无条件拒绝；④ 目录遍历侧 `EXCLUDE_FOLDERS` / `EXCLUDE_FILE_NAMES` 兜底，即便走到删除阶段也不会碰到 `config`/`file`/`main.py` 等关键项
+- **参考位置**: [main.py](main.py#L3449-L3500), [main.py](main.py#L3486-L3490), [dist/app.js](dist/app.js#L5911-L5920), [dist/app.js](dist/app.js#L5987-L5992)
+
+**测试验证**:
+- ✅ 请求 `/api/clean/all` 且 `directory` 指向项目根目录 → 返回「拒绝清理项目根目录」
+- ✅ 清理面板不再出现项目目录条目，仅展示白名单中的外部目录
+- ✅ 前端预检命中时弹窗报错且不发出任何网络请求（Network 面板零请求）
+
+---
+
+##### 2. 🚫 删除类模式目录必填 (🚫参数校验)
+**问题描述**:
+- **现象**: 删除全部 / 删除 PNG / 删除媒体三个接口在目录参数为空时不会报错，而是静默清理默认目录
+- **根因**: `resolve_clean_directory()` 的 `directory` 为空时回落 `default_dir`，对只读列举接口是便利，对破坏性接口就是隐患
+- **影响范围**: 误操作风险 —— 用户以为「没填就是不动」，实际执行了删除
+
+**修复方案**:
+- **技术实现**: 函数新增 `require_explicit` 开关，三个破坏性接口统一传 `require_explicit=True`，为空时返回「请显式填写要清理的目录（不允许留空，避免误清理项目目录）」；只读列举接口 `/api/clean/list` 保持 `allow_project_root=True` 以便查看项目目录内容
+- **参考位置**: [main.py](main.py#L3471-L3476), [main.py](main.py#L11842-L11929)
+
+**测试验证**:
+- ✅ 三个删除接口传空 `directory` → 均返回 400 语义的错误文案，未执行任何删除
+- ✅ `/api/clean/list` 传空 → 仍可正常列举项目目录（只读不受影响）
+
+---
+
+##### 3. 🖥️ 跨平台路径归一 (🖥️跨平台兼容)
+**问题描述**:
+- **现象**: 同一份路径在 Windows 与 macOS/Linux 上判定结果不一致 —— Windows 上 `D:\ws\xy_ws\` 与 `d:/ws/xy_ws` 被当成两个目录，macOS 上 `~` 未被展开导致白名单匹配失败
+- **根因**: 路径比较直接用了字符串 `==`，拼接硬编码 `/`，多目录环境变量按 `:` 切分（Windows 实际是 `;`）
+- **影响范围**: 跨平台可用性 —— 保护逻辑在 Windows 上可被大小写/分隔符绕过
+
+**修复方案**:
+- **技术实现**: 统一链路 —— `~` 先 `os.path.expanduser`，相对路径按 `default_dir` 绝对化，最终一律 `os.path.realpath`（同时消解软链逃逸）；比较一律 `os.path.normcase`（Windows 转小写 + 反斜杠，POSIX 恒等）；前缀判断用 `root_key + os.sep`；环境变量切分用 `os.pathsep`
+- **参考位置**: [main.py](main.py#L3455-L3500), [skill.md](skill.md#L19845-L19906)
+
+**测试验证**:
+- ✅ macOS 实测 `~/Downloads/微购` 展开后命中白名单，`../../../etc` 逃逸被拒绝
+- ✅ Windows 路径语义按 `normcase` 模拟比对：`D:\WS\XY_WS` 与 `d:/ws/xy_ws` 判定为同一目录
+- ✅ 前端归一化仅在命中盘符（`^[a-zA-Z]:`）时才转小写，POSIX 路径保持大小写敏感
+
+---
+
+##### 4. 🧾 排除名单大小写兼容 (🧾文件系统兼容)
+**问题描述**:
+- **现象**: Windows 上 `Config`、`File`、`Thumbs.db` 这些大小写变体不会被排除名单命中
+- **根因**: 排除集合里是小写常量，比对时直接拿原始文件名，而 Windows 文件系统大小写不敏感
+- **影响范围**: 清理误删关键配置目录
+
+**修复方案**:
+- **技术实现**: `EXCLUDE_FOLDERS` / `EXCLUDE_FILE_NAMES` 统一小写常量，比对前统一 `item.name.lower()`，与 `os.path.normcase` 的路径比较口径保持一致
+- **参考位置**: [main.py](main.py#L2100-L2101), [main.py](main.py#L2496-L2503)
+
+**测试验证**:
+- ✅ `Config` / `FILE` / `Thumbs.DB` 三种写法实测均被排除，不再进入清理队列
+- ✅ macOS/Linux 行为不变（原本就大小写敏感，小写比对不影响真实小写目录）
+
+---
+
+##### 5. 📄 只读文件删除兜底 (📄删除兜底)
+**问题描述**:
+- **现象**: Windows 上清理含只读属性的文件会抛 `PermissionError`，整个清理流程中断并留下半删状态
+- **根因**: 直接 `shutil.rmtree(path)`，未处理 Windows 只读文件特性（POSIX 上只读不影响删除，Windows 上会拒绝）
+- **影响范围**: 清理成功率、残留文件一致性
+
+**修复方案**:
+- **技术实现**: 新增 `_rmtree_onerror(func, path, exc_info)`，捕获 `PermissionError` 后 `os.chmod(path, 0o777)` 再重试一次；所有 `rmtree` 调用统一走该回调，禁止裸调用
+- **参考位置**: [main.py](main.py#L2104)
+
+**测试验证**:
+- ✅ 构造只读文件后执行清理 → 文件被删除，无异常抛出
+- ✅ 非权限类异常仍正常上抛，不被吞掉
+
+---
+
+##### 6. 📚 跨平台细则写入范式 (📚范式补录)
+**问题描述**:
+- **现象**: 跨平台适配此前散落在代码里，没有形成可复用的判定标准，新代码容易再次出现「macOS 能跑、Windows 误删」
+- **根因**: PY-CORE-020 只写了环境检测（`Environment` 类），缺「用户输入路径 / 目录遍历 / 文件删除」这一类文件系统语义的约束
+- **影响范围**: 后续所有涉及路径与删除的改动
+
+**修复方案**:
+- **技术实现**: 在 PY-CORE-020 下新增《跨平台路径与文件系统兼容细则》：四条铁律（路径归一 / 大小写 / 分隔符 / 删除兜底）、平台差异对照表（6 行正确写法 vs 错误写法 vs 后果）、前后端职责划分（后端为唯一可信边界、前端仅预检、前端只对盘符路径转小写）、7 条判定标准；同步更新范式汇总表与关键特性清单
+- **参考位置**: [skill.md](skill.md#L19845-L19906), [skill.md](skill.md#L3815)
+
+**测试验证**:
+- ✅ 范式编号零跳号零重号（PY-CORE-001 ~ PY-CORE-047 连续）
+- ✅ README.md 与 skill.md 逐字节一致（SHA256 相同）
+- ✅ 判定标准 7 条均可对照代码逐条复核
+
+---
+
+##### 7. 🐍 版本基线 3.6+ 兼容口径 (🐍版本口径)
+**问题描述**:
+- **现象**: 页面「环境要求」展示 `Python 3.0+`，而代码里 f-string（3.6+）、`dataclasses`/`asyncio`（3.7+）、FastAPI（≥3.8）都要求更高版本，3.0–3.5 实跑直接 SyntaxError
+- **根因**: 版本基线被写成绝对下限口号，没有区分「3.6 以下语法不可用」与「3.6 以上逐步启用新特性」
+- **影响范围**: 文档可信度、新用户环境选择
+
+**修复方案**:
+- **技术实现**: 基线改为 `Python 3.6+（兼容 3.6–3.14）`；`requirements.txt` 注释作为唯一数据源，`/api/dependencies` 解析 `Python >=3.6` 与 `兼容至 3.14` 两个片段，新增 `compat` 字段（值 `3.6–3.14`），前端据此拼装展示文案，避免版本区间在前后端各写一份
+- **参考位置**: [requirements.txt](requirements.txt#L4-L5), [main.py](main.py#L12530-L12535), [main.py](main.py#L12558-L12572), [dist/app.js](dist/app.js#L1307-L1319), [index.html](index.html#L1831), [index.html](index.html#L1926)
+
+**测试验证**:
+- ✅ `/api/dependencies` 实测返回 `{"min":"3.6+","compat":"3.6–3.14","current":"3.9.6"}`
+- ✅ 页面静态兜底与 JS 渲染文案一致：`Python 3.6+（兼容 3.6–3.14，当前运行 3.9.6）`
+- ✅ 全项目 `3.0+` / `3.9+` 残留扫描为 0（requirements.txt / index.html / main.py / dist/app.js / tox.ini / README.md / skill.md）
+
+---
+
+##### 8. 🔁 防缓存与全量校验 (🔁防缓存)
+**问题描述**:
+- **现象**: 代码已改但页面仍显示旧值（`Python 3.9+（当前运行 3.9.6）`），排查后确认是浏览器缓存了旧 `app.js` 与旧接口响应
+- **根因**: `app.js` 的 `?v=` 版本号未随改动递增，`/api/dependencies` 也没有禁止缓存的响应头
+- **影响范围**: 改动生效性、问题排查效率
+
+**修复方案**:
+- **技术实现**: `index.html` 中 `app.js?v=` 递增至 `20261114180000`；`/api/dependencies` 由 `jsonify(...)` 改为 `JSONResponse(content=..., headers={'Cache-Control': 'no-cache, no-store, must-revalidate', ...})`
+- **参考位置**: [index.html](index.html#L2098), [main.py](main.py#L12558-L12572)
+
+**测试验证**:
+- ✅ 响应头实测含 `cache-control: no-cache, no-store, must-revalidate`
+- ✅ 页面实际引用 `app.js?v=20261114180000`
+- ✅ 强制刷新后「环境要求」立即显示新口径
+
+---
 
 ### v5.0.9.105 (2026-11-14) - 🧼 **白名单脱敏示例入库 + 展示页可视化** - 真实白名单 `config/clean_allowed_roots.txt` 仍进 .gitignore 不入库（含本机真实路径）+ 新增脱敏示例 `config/clean_allowed_roots.example.txt` 入库（仅格式说明/占位符/跨平台写法）+ 新增 `GET /api/clean/allowed-roots` 返回白名单明细 + 清理面板新增允许目录展示区（点击即填入、不存在标红、追加方法提示）
 
