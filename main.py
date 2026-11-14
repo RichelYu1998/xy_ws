@@ -48,7 +48,7 @@ from html import escape
 from pathlib import Path
 from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
 
-# ─── 启动阶段并行预热 ────────────────────────────────────────
+# ─── 启动阶段并行预热 ──────────────────────────────────
 # 模块导入（openpyxl/pandas/fastapi/playwright 等）固定要花 1.2~1.5 秒，浏览器
 # 启动还要 1~2 秒。这段时间网络完全是空闲的，让分页接口在后台线程里先跑起来，
 # 把本地的初始化开销藏进网络往返里，等于白捡 1 秒以上的启动时间。
@@ -59,9 +59,9 @@ from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
 # 上限不宜过大：超大相册一次回包几十MB会拖慢解析，1000条约 4~6MB，属于安全区间。
 _ALBUM_PAGE_LIMIT = int(os.environ.get('ALBUM_PAGE_LIMIT', '1000'))
 _album_logger = logging.getLogger('main.album')
-_ALBUM_DEFAULT_ID = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
-_ALBUM_API_HOST = 'www.szwego.com'
-_ALBUM_API_PATH = '/album/personal/all'
+_ALBUM_DEFAULT_ID = os.environ.get('ALBUM_DEFAULT_ID', '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ')
+_ALBUM_API_HOST = os.environ.get('ALBUM_API_HOST', 'www.szwego.com')
+_ALBUM_API_PATH = os.environ.get('ALBUM_API_PATH', '/album/personal/all')
 _ALBUM_PREFETCH_UA = (
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
     '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -1528,25 +1528,32 @@ _ALBUM_API_RETRYABLE_STATUS = (429, 500, 502, 503, 504)
 
 # 429 是服务端反爬限流，短退避重试几乎必然拿不全商品数据，因此单独给足预算：
 # 最多 12 次重试、退避 5s→60s、累计等待上限 15 分钟，等到风控窗口放行后继续抓同一页
-_ALBUM_RATE_LIMIT_MAX_RETRIES = 12
-_ALBUM_RATE_LIMIT_BASE_DELAY = 5.0
-_ALBUM_RATE_LIMIT_MAX_DELAY = 60.0
-_ALBUM_RATE_LIMIT_TOTAL_BUDGET = 900.0
+_ALBUM_RATE_LIMIT_MAX_RETRIES = int(os.environ.get('ALBUM_RATE_LIMIT_MAX_RETRIES', '12'))
+_ALBUM_RATE_LIMIT_BASE_DELAY = float(os.environ.get('ALBUM_RATE_LIMIT_BASE_DELAY', '5.0'))
+_ALBUM_RATE_LIMIT_MAX_DELAY = float(os.environ.get('ALBUM_RATE_LIMIT_MAX_DELAY', '60.0'))
+_ALBUM_RATE_LIMIT_TOTAL_BUDGET = float(os.environ.get('ALBUM_RATE_LIMIT_TOTAL_BUDGET', '900.0'))
 
 # 单页临时性失败（限流/5xx/断网）的补抓轮数与轮间等待，避免一页失败就丢掉整卷数据
-_ALBUM_PAGE_RETRY_ROUNDS = 2
-_ALBUM_PAGE_RETRY_WAIT = 2.0
+_ALBUM_PAGE_RETRY_ROUNDS = int(os.environ.get('ALBUM_PAGE_RETRY_ROUNDS', '2'))
+_ALBUM_PAGE_RETRY_WAIT = float(os.environ.get('ALBUM_PAGE_RETRY_WAIT', '2.0'))
 
 # 整卷翻页最多补抓轮数：一轮翻完仍少于服务端总数时，重新从头翻页合并去重
-_ALBUM_FULL_PASS_MAX = 3
+_ALBUM_FULL_PASS_MAX = int(os.environ.get('ALBUM_FULL_PASS_MAX', '3'))
 # 整卷补抓轮之间只需短暂喘息，长等待留给 429 专用预算，避免正常补抓白等 20 秒
-_ALBUM_PASS_RETRY_WAIT = 1.0
+_ALBUM_PASS_RETRY_WAIT = float(os.environ.get('ALBUM_PASS_RETRY_WAIT', '1.0'))
 
 # 单次相册分页请求超时：正常响应 1~3 秒，超时过长会让偶发抖动把整次运行拖到分钟级
 _ALBUM_API_TIMEOUT = float(os.environ.get('ALBUM_API_TIMEOUT', '10'))
 
+# 翻页页数上限：按服务端总数/单页条数估算，再留固定余量兜住总数缺失的情况
+_ALBUM_MAX_PAGES_FLOOR = int(os.environ.get('ALBUM_MAX_PAGES_FLOOR', '10'))
+_ALBUM_MAX_PAGES_EXTRA = int(os.environ.get('ALBUM_MAX_PAGES_EXTRA', '10'))
+
+# 复用启动预热结果的最长等待：略大于单页超时，避免预热线程卡住拖慢主流程
+_ALBUM_PREFETCH_WAIT_EXTRA = float(os.environ.get('ALBUM_PREFETCH_WAIT_EXTRA', '1'))
+
 # 服务端 total 可能把已删除/隐藏商品算在内，允许极小差额不算缺失
-_ALBUM_TOTAL_TOLERANCE = 5
+_ALBUM_TOTAL_TOLERANCE = int(os.environ.get('ALBUM_TOTAL_TOLERANCE', '5'))
 
 # 全局限流闸门：任一请求撞到429后，后续所有请求统一等到冷却结束再发，避免连环429
 _album_rate_limit_until = 0.0
@@ -1578,16 +1585,25 @@ def _album_note_success():
         if _album_rate_limit_hits > 0:
             _album_rate_limit_hits -= 1
 
+# 页间延迟：无风控时只做极短抖动，撞 429 后按命中次数线性放大，压力缓解自动回落
+_ALBUM_PAGE_DELAY_MIN = float(os.environ.get('ALBUM_PAGE_DELAY_MIN', '0.05'))
+_ALBUM_PAGE_DELAY_JITTER = float(os.environ.get('ALBUM_PAGE_DELAY_JITTER', '0.1'))
+_ALBUM_PAGE_DELAY_COOLDOWN_MAX = float(os.environ.get('ALBUM_PAGE_DELAY_COOLDOWN_MAX', '5.0'))
+_ALBUM_PAGE_DELAY_SLOW_BASE = float(os.environ.get('ALBUM_PAGE_DELAY_SLOW_BASE', '0.4'))
+_ALBUM_PAGE_DELAY_SLOW_STEP = float(os.environ.get('ALBUM_PAGE_DELAY_SLOW_STEP', '0.4'))
+_ALBUM_PAGE_DELAY_SLOW_MAX = float(os.environ.get('ALBUM_PAGE_DELAY_SLOW_MAX', '3.0'))
+
 def _album_page_delay():
     """页间延迟：撞过429就放缓节奏，风控压力缓解后自动回落"""
     cooldown = _album_cooldown_remaining()
     if cooldown > 0:
-        return min(cooldown, 5.0) + random.uniform(0, 1.0)
+        return min(cooldown, _ALBUM_PAGE_DELAY_COOLDOWN_MAX) + random.uniform(0, 1.0)
     with _album_rate_limit_lock:
         hits = _album_rate_limit_hits
     if hits <= 0:
-        return 0.05 + random.uniform(0, 0.1)
-    return 0.4 + min(0.4 * hits, 3.0) + random.uniform(0, 0.4)
+        return _ALBUM_PAGE_DELAY_MIN + random.uniform(0, _ALBUM_PAGE_DELAY_JITTER)
+    slow = _ALBUM_PAGE_DELAY_SLOW_BASE + min(_ALBUM_PAGE_DELAY_SLOW_STEP * hits, _ALBUM_PAGE_DELAY_SLOW_MAX)
+    return slow + random.uniform(0, _ALBUM_PAGE_DELAY_SLOW_STEP)
 
 def _extract_album_total(pagination, page_len=0):
     """从分页信息里取服务端商品总数，取不到返回0（用于完整性校验）
@@ -7053,7 +7069,7 @@ class WegoScraper:
         # 启动阶段（导入依赖、启动浏览器）已并行发出的第一页请求，这里直接复用，
         # 相当于把那段本地初始化时间完全藏进网络往返里
         prefetched_complete = False
-        prefetched = _take_album_prefetch(album_id, wait_seconds=_ALBUM_API_TIMEOUT + 1)
+        prefetched = _take_album_prefetch(album_id, wait_seconds=_ALBUM_API_TIMEOUT + _ALBUM_PREFETCH_WAIT_EXTRA)
         if prefetched is not None:
             prefetched_items, prefetched_pagination = prefetched
             album_total = max(album_total, _extract_album_total(prefetched_pagination, len(prefetched_items)))
@@ -7084,7 +7100,7 @@ class WegoScraper:
             page_retry = 0
             # 页数上限随已恢复/已累积的数据与服务端总数动态放大，避免商品多时永远抓不完
             expected = album_total if album_total > 0 else len(all_goods_data)
-            max_pages = max(10, expected // max(1, _ALBUM_PAGE_LIMIT) + 10)
+            max_pages = max(_ALBUM_MAX_PAGES_FLOOR, expected // max(1, _ALBUM_PAGE_LIMIT) + _ALBUM_MAX_PAGES_EXTRA)
             while page_num < max_pages:
                 if page_num > 0 or (pass_num == 0 and resumed):
                     await asyncio.sleep(_album_page_delay())
