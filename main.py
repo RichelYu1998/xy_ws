@@ -66,6 +66,15 @@ _ALBUM_PREFETCH_UA = (
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
     '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 )
+# 启动预热采用"对冲请求"(hedged requests)：服务端首字节抖动实测 2~11 秒（同一接口并发
+# 4 路时最快那一路稳定在 2~4.3 秒），串行"超时再重试"会把尾延迟叠加成 12 秒以上；
+# 改成错开发出多路请求，谁先成功用谁，其余请求拿到结果后立即放弃，尾延迟压到最快那一路。
+_ALBUM_PREFETCH_TIMEOUT = float(os.environ.get('ALBUM_PREFETCH_TIMEOUT', '5'))
+_ALBUM_PREFETCH_HEDGES = int(os.environ.get('ALBUM_PREFETCH_HEDGES', '4'))
+_ALBUM_PREFETCH_HEDGE_GAP = float(os.environ.get('ALBUM_PREFETCH_HEDGE_GAP', '0.5'))
+_ALBUM_PREFETCH_RETRY_WAIT = float(os.environ.get('ALBUM_PREFETCH_RETRY_WAIT', '0.5'))
+# 复用启动预热结果的最长等待：对冲总耗时上界 = 间隔×(路数-1) + 单路超时，再留 1 秒余量
+_ALBUM_PREFETCH_WAIT_EXTRA = float(os.environ.get('ALBUM_PREFETCH_WAIT_EXTRA', '1'))
 
 _album_prefetch = {
     'event': threading.Event(),
@@ -96,8 +105,128 @@ def _album_prefetch_needed():
     return False
 
 
+class _AlbumPrefetchError(Exception):
+    """预热请求失败；status 为 HTTP 状态码，retryable 表示是否值得立刻重试"""
+
+    def __init__(self, message, status=None, retryable=True):
+        super().__init__(message)
+        self.status = status
+        self.retryable = retryable
+
+
+def _album_prefetch_once(album_id, cookie_str):
+    """单次预热请求，成功返回 (items, pagination)，失败抛 _AlbumPrefetchError"""
+    params = {
+        'albumId': album_id,
+        'searchValue': '',
+        'searchImg': '',
+        'startDate': '',
+        'endDate': '',
+        'sourceId': '',
+        'pageSize': _ALBUM_PAGE_LIMIT,
+        'limit': _ALBUM_PAGE_LIMIT,
+    }
+    path = f'{_ALBUM_API_PATH}?{urllib.parse.urlencode(params)}'
+    headers = {
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'Accept-Encoding': 'gzip, deflate',
+        'User-Agent': _ALBUM_PREFETCH_UA,
+        'x-wg-language': 'zh',
+        'Cookie': cookie_str,
+        'Connection': 'keep-alive',
+    }
+    conn = http.client.HTTPSConnection(_ALBUM_API_HOST, timeout=_ALBUM_PREFETCH_TIMEOUT)
+    try:
+        conn.request('GET', path, headers=headers)
+        resp = conn.getresponse()
+        raw = resp.read()
+        if resp.status != 200:
+            raise _AlbumPrefetchError(
+                f'HTTP {resp.status}', status=resp.status,
+                retryable=resp.status == 429 or resp.status >= 500,
+            )
+        encoding = (resp.getheader('Content-Encoding') or '').lower()
+        if 'gzip' in encoding:
+            text = gzip.decompress(raw).decode('utf-8', errors='replace')
+        else:
+            text = raw.decode('utf-8', errors='replace')
+        data = json.loads(text)
+        if not isinstance(data, dict):
+            raise _AlbumPrefetchError('返回非JSON对象')
+        if data.get('code') and data.get('code') != 0:
+            raise _AlbumPrefetchError(f'业务错误 code={data.get("code")}')
+        result = data.get('result') or {}
+        items = result.get('items') or []
+        if not isinstance(items, list):
+            raise _AlbumPrefetchError('items字段格式错误')
+        pagination = result.get('pagination') or {}
+        if not isinstance(pagination, dict):
+            pagination = {}
+        return items, pagination
+    finally:
+        try:
+            conn.close()
+        except Exception as exc:  # [HANDLED]
+            _album_logger.debug(f'关闭预热连接异常: {type(exc).__name__}: {exc}')
+
+
+def _album_prefetch_hedged(album_id, cookie_str):
+    """多路对冲请求：错开发出 N 路，谁先成功用谁
+
+    任一路撞到 429 就立即停止继续发新请求（避免把限流越打越死），
+    全部失败时把各路错误汇总抛出，由调用方回落到带完整 429 预算的常规流程。
+    """
+    done = threading.Event()
+    lock = threading.Lock()
+    holder = {'result': None, 'errors': [], 'rate_limited': False}
+
+    def _one(seq):
+        if done.is_set():
+            return
+        try:
+            items, pagination = _album_prefetch_once(album_id, cookie_str)
+        except _AlbumPrefetchError as exc:
+            with lock:
+                holder['errors'].append(str(exc))
+                if exc.status == 429:
+                    holder['rate_limited'] = True
+            return
+        except Exception as exc:  # [HANDLED]
+            with lock:
+                holder['errors'].append(f'{type(exc).__name__}: {exc}')
+            return
+        with lock:
+            if holder['result'] is None:
+                holder['result'] = (items, pagination)
+        done.set()
+
+    workers = []
+    hedge_count = max(1, _ALBUM_PREFETCH_HEDGES)
+    for seq in range(hedge_count):
+        if seq and done.wait(_ALBUM_PREFETCH_HEDGE_GAP):
+            break
+        with lock:
+            stop = holder['rate_limited'] or (bool(workers) and len(holder['errors']) >= len(workers))
+        if stop:
+            break
+        worker = threading.Thread(target=_one, args=(seq,), name=f'album-hedge-{seq}', daemon=True)
+        worker.start()
+        workers.append(worker)
+
+    done.wait(_ALBUM_PREFETCH_TIMEOUT + _ALBUM_PREFETCH_RETRY_WAIT)
+    with lock:
+        if holder['result'] is not None:
+            return holder['result']
+        errors = list(holder['errors'])
+        rate_limited = holder['rate_limited']
+    if not errors:
+        raise _AlbumPrefetchError('对冲请求全部超时')
+    raise _AlbumPrefetchError('；'.join(sorted(set(errors))), retryable=rate_limited)
+
+
 def _album_prefetch_worker():
-    """后台线程：读完配置与Cookie立刻发出第一页请求，与后续导入/浏览器启动并行"""
+    """后台线程：读完配置与Cookie立刻并发发出第一页请求，与后续导入/浏览器启动并行"""
     state = _album_prefetch
     try:
         base = os.path.dirname(os.path.abspath(__file__))
@@ -110,63 +239,13 @@ def _album_prefetch_worker():
             f'{c.get("name", "")}={c.get("value", "")}'
             for c in cookies if isinstance(c, dict) and c.get('name') and c.get('value')
         ])
-        params = {
-            'albumId': album_id,
-            'searchValue': '',
-            'searchImg': '',
-            'startDate': '',
-            'endDate': '',
-            'sourceId': '',
-            'pageSize': _ALBUM_PAGE_LIMIT,
-            'limit': _ALBUM_PAGE_LIMIT,
-        }
-        path = f'{_ALBUM_API_PATH}?{urllib.parse.urlencode(params)}'
-        headers = {
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'zh-CN,zh;q=0.9',
-            'Accept-Encoding': 'gzip, deflate',
-            'User-Agent': _ALBUM_PREFETCH_UA,
-            'x-wg-language': 'zh',
-            'Cookie': cookie_str,
-            'Connection': 'keep-alive',
-        }
-        timeout = float(os.environ.get('ALBUM_API_TIMEOUT', '10'))
-        conn = http.client.HTTPSConnection(_ALBUM_API_HOST, timeout=timeout)
         try:
-            conn.request('GET', path, headers=headers)
-            resp = conn.getresponse()
-            raw = resp.read()
-            encoding = (resp.getheader('Content-Encoding') or '').lower()
-            if 'gzip' in encoding:
-                text = gzip.decompress(raw).decode('utf-8', errors='replace')
-            else:
-                text = raw.decode('utf-8', errors='replace')
-            if resp.status != 200:
-                state['error'] = f'HTTP {resp.status}'
-                return
-            data = json.loads(text)
-            if not isinstance(data, dict):
-                state['error'] = '返回非JSON对象'
-                return
-            if data.get('code') and data.get('code') != 0:
-                state['error'] = f'业务错误 code={data.get("code")}'
-                return
-            result = data.get('result') or {}
-            items = result.get('items') or []
-            if not isinstance(items, list):
-                state['error'] = 'items字段格式错误'
-                return
-            pagination = result.get('pagination') or {}
-            if not isinstance(pagination, dict):
-                pagination = {}
+            items, pagination = _album_prefetch_hedged(album_id, cookie_str)
             state['album_id'] = album_id
             state['items'] = items
             state['pagination'] = pagination
-        finally:
-            try:
-                conn.close()
-            except Exception as exc:  # [HANDLED]
-                _album_logger.debug(f'关闭预热连接异常: {type(exc).__name__}: {exc}')
+        except _AlbumPrefetchError as exc:
+            state['error'] = str(exc)
     except Exception as exc:  # [HANDLED]
         state['error'] = f'{type(exc).__name__}: {exc}'
     finally:
@@ -1548,9 +1627,6 @@ _ALBUM_API_TIMEOUT = float(os.environ.get('ALBUM_API_TIMEOUT', '10'))
 # 翻页页数上限：按服务端总数/单页条数估算，再留固定余量兜住总数缺失的情况
 _ALBUM_MAX_PAGES_FLOOR = int(os.environ.get('ALBUM_MAX_PAGES_FLOOR', '10'))
 _ALBUM_MAX_PAGES_EXTRA = int(os.environ.get('ALBUM_MAX_PAGES_EXTRA', '10'))
-
-# 复用启动预热结果的最长等待：略大于单页超时，避免预热线程卡住拖慢主流程
-_ALBUM_PREFETCH_WAIT_EXTRA = float(os.environ.get('ALBUM_PREFETCH_WAIT_EXTRA', '1'))
 
 # 服务端 total 可能把已删除/隐藏商品算在内，允许极小差额不算缺失
 _ALBUM_TOTAL_TOLERANCE = int(os.environ.get('ALBUM_TOTAL_TOLERANCE', '5'))
@@ -6691,7 +6767,7 @@ class WegoScraper:
         }
         
         # 使用正确的API获取商品列表
-        api_url = 'https://www.szwego.com/album/personal/all'
+        api_url = f'https://{_ALBUM_API_HOST}{_ALBUM_API_PATH}'
         
         all_goods_data = []
         
@@ -7049,7 +7125,7 @@ class WegoScraper:
             'x-wg-language': 'zh'
         }
         
-        api_url = 'https://www.szwego.com/album/personal/all'
+        api_url = f'https://{_ALBUM_API_HOST}{_ALBUM_API_PATH}'
         
         all_goods_data = []
         page_timestamp = ''
@@ -7069,7 +7145,11 @@ class WegoScraper:
         # 启动阶段（导入依赖、启动浏览器）已并行发出的第一页请求，这里直接复用，
         # 相当于把那段本地初始化时间完全藏进网络往返里
         prefetched_complete = False
-        prefetched = _take_album_prefetch(album_id, wait_seconds=_ALBUM_API_TIMEOUT + _ALBUM_PREFETCH_WAIT_EXTRA)
+        prefetch_wait = (
+            _ALBUM_PREFETCH_HEDGE_GAP * max(0, _ALBUM_PREFETCH_HEDGES - 1)
+            + _ALBUM_PREFETCH_TIMEOUT + _ALBUM_PREFETCH_RETRY_WAIT + _ALBUM_PREFETCH_WAIT_EXTRA
+        )
+        prefetched = _take_album_prefetch(album_id, wait_seconds=prefetch_wait)
         if prefetched is not None:
             prefetched_items, prefetched_pagination = prefetched
             album_total = max(album_total, _extract_album_total(prefetched_pagination, len(prefetched_items)))
@@ -7085,8 +7165,27 @@ class WegoScraper:
             if not (prefetched_load_more and page_timestamp):
                 pagination_complete = True
                 prefetched_complete = True
-        elif _album_prefetch.get('error'):
-            logger.debug(f'  [启动预热] 未命中（{_album_prefetch.get("error")}），改用常规请求')
+        else:
+            if _album_prefetch.get('error'):
+                logger.debug(f'  [启动预热] 未命中（{_album_prefetch.get("error")}），改用常规请求')
+            # 预热未命中时第一页同样走多路对冲：单路串行 + 10 秒超时会把一次抖动放大成
+            # 十几秒，多路对冲取最快的那一路，才能把尾延迟稳定压进 10 秒以内
+            try:
+                hedge_items, hedge_pagination = await asyncio.to_thread(
+                    _album_prefetch_hedged, album_id, cookie_str
+                )
+                album_total = max(album_total, _extract_album_total(hedge_pagination, len(hedge_items)))
+                if hedge_items:
+                    all_goods_data = _dedupe_album_items(all_goods_data + hedge_items)
+                page_timestamp = str(hedge_pagination.get('pageTimestamp', '') or '')
+                hedge_load_more = bool(hedge_pagination.get('isLoadMore', False))
+                logger.debug(f'  [首屏对冲] 拿到 {len(hedge_items)} 个商品, isLoadMore={hedge_load_more}, '
+                             f'累计={len(all_goods_data)}')
+                if not (hedge_load_more and page_timestamp):
+                    pagination_complete = True
+                    prefetched_complete = True
+            except _AlbumPrefetchError as exc:
+                logger.debug(f'  [首屏对冲] 未命中（{exc}），回落到常规翻页')
         # 完整性保障：单轮翻页可能因限流中断而缺失，最多补抓 _ALBUM_FULL_PASS_MAX 轮
         for pass_num in range(_ALBUM_FULL_PASS_MAX):
             if pass_num == 0 and prefetched_complete:
@@ -7584,114 +7683,125 @@ class WegoScraper:
             
     async def _run_browser_flow(self):
         browser_start = time.time()
-        async with async_playwright() as p:
-            print('正在启动浏览器...')
 
-            # 商品数据 100% 来自 API，浏览器启动 + 建页要花近 2 秒，这段时间里
-            # 分页请求完全可以先跑起来，二者并行，等于把浏览器启动耗时完全藏掉。
-            api_start = time.time()
-            api_task = asyncio.create_task(self.fetch_all_products_via_api(None))
+        # 商品数据 100% 来自 API，浏览器启动 + 建页要花近 2 秒，这段时间里
+        # 分页请求完全可以先跑起来，二者并行，等于把浏览器启动耗时完全藏掉。
+        api_start = time.time()
+        api_task = asyncio.create_task(self.fetch_all_products_via_api(None))
 
-            system = self.get_system_info()
-            browser_args = self.get_browser_args()
-            chrome_path = self.get_chrome_path()
+        system = self.get_system_info()
+        browser_args = self.get_browser_args()
+        chrome_path = self.get_chrome_path()
 
-            print(f'检测到系统: {system}')
-            if chrome_path:
-                print(f'使用系统Chrome: {chrome_path}')
-            else:
-                print(f'使用Playwright内置Chromium')
+        print(f'检测到系统: {system}')
+        if chrome_path:
+            print(f'使用系统Chrome: {chrome_path}')
+        else:
+            print(f'使用Playwright内置Chromium')
 
-            browser = None
-            context = None
+        products = None
+        try:
+            # 先等 API：正常路径商品数据全部来自 API，连 Playwright 驱动都不启动，
+            # 只有 API 彻底失败才现启浏览器走页面兜底，省掉驱动/浏览器/建页/关闭整条链路
             try:
-                browser = await Environment.launch_browser(
-                    p, headless=False, args=browser_args, executable_path=chrome_path
-                )
-                print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
-
-                context_start = time.time()
-                context = await browser.new_context(
-                    viewport=Environment.get_default_viewport(),
-                    user_agent=self.get_user_agent()
-                )
-                print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
-
-                cookie_start = time.time()
-                cookie_file = self.config_manager.get_cookie_file()
-                if FileManager.file_exists(cookie_file):
-                    cookies = FileManager.read_json(cookie_file)
-                    if cookies:
-                        print(f'已加载 {len(cookies)} 个Cookie')
-                        await context.add_cookies(cookies)
-                print(f'Cookie加载耗时: {time.time() - cookie_start:.2f}秒')
-
-                page_start = time.time()
-                page = await context.new_page()
-                print(f'页面创建耗时: {time.time() - page_start:.2f}秒')
-
+                products, fetch_complete = await api_task
+                self.last_fetch_complete = fetch_complete
+            except Exception as e:  # [HANDLED]
+                logger.warning(f'并行API抓取失败，回退到页面流程: {e}')
                 products = None
+
+            if not products:
+                # API 没拿到数据才走页面导航 + DOM 兜底，正常路径完全跳过导航
+                async with async_playwright() as p:
+                    products = await self._fetch_products_via_page(
+                        p, browser_start, browser_args, chrome_path
+                    )
+            print(f'数据获取耗时: {time.time() - api_start:.2f}秒')
+
+            if products:
+                save_start = time.time()
+                self.save_data(products)
+                print(f'数据保存耗时: {time.time() - save_start:.2f}秒')
+
+                compare_start = time.time()
+                if getattr(self, 'last_fetch_complete', True):
+                    print('\n开始自动对比当天JSON文件...')
+                    comparator = StockNumberComparator()
+                    comparator.compare_json_files()
+                    print(f'对比耗时: {time.time() - compare_start:.2f}秒')
+                else:
+                    print('\n⚠️ 商品数据未完整获取，已跳过自动对比，避免把缺失商品误判为已删除')
+        finally:
+            if not api_task.done():
+                api_task.cancel()
+
+    async def _fetch_products_via_page(self, p, browser_start, browser_args, chrome_path):
+        """API 彻底失败时的页面兜底：现启浏览器、加载Cookie、导航取数并回写Cookie"""
+        print('正在启动浏览器...')
+        browser = None
+        context = None
+        try:
+            browser = await Environment.launch_browser(
+                p, headless=False, args=browser_args, executable_path=chrome_path
+            )
+            print(f'浏览器启动耗时: {time.time() - browser_start:.2f}秒')
+
+            context_start = time.time()
+            context = await browser.new_context(
+                viewport=Environment.get_default_viewport(),
+                user_agent=self.get_user_agent()
+            )
+            print(f'上下文创建耗时: {time.time() - context_start:.2f}秒')
+
+            cookie_start = time.time()
+            cookie_file = self.config_manager.get_cookie_file()
+            if FileManager.file_exists(cookie_file):
+                cookies = FileManager.read_json(cookie_file)
+                if cookies:
+                    print(f'已加载 {len(cookies)} 个Cookie')
+                    await context.add_cookies(cookies)
+            print(f'Cookie加载耗时: {time.time() - cookie_start:.2f}秒')
+
+            page_start = time.time()
+            page = await context.new_page()
+            print(f'页面创建耗时: {time.time() - page_start:.2f}秒')
+
+            products = await self.get_data_with_playwright(page)
+
+            save_cookie_start = time.time()
+            try:
+                cookies = await context.cookies()
+                szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
+                for cookie in szwego_cookies:
+                    if cookie['domain'] == 'www.szwego.com':
+                        cookie['domain'] = '.szwego.com'
+                FileManager.write_json(cookie_file, szwego_cookies)
+                print(f'Cookie已保存到 {cookie_file}')
+                print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
+            except Exception as e:  # [HANDLED]
+                if is_pw_transient_error(e):
+                    logger.debug(f'Cookie保存跳过（浏览器驱动已断开，可忽略）: {e}')
+                else:
+                    print(f'⚠️  Cookie保存失败: {e}')
+                    print('继续执行，不影响数据获取...')
+            return products
+        finally:
+            close_start = time.time()
+            if context is not None:
                 try:
-                    products, fetch_complete = await api_task
-                    self.last_fetch_complete = fetch_complete
+                    await context.close()
                 except Exception as e:  # [HANDLED]
-                    logger.warning(f'并行API抓取失败，回退到页面流程: {e}')
-                    products = None
-
-                if not products:
-                    # API 没拿到数据才走页面导航 + DOM 兜底，正常路径完全跳过导航
-                    products = await self.get_data_with_playwright(page)
-                print(f'数据获取耗时: {time.time() - api_start:.2f}秒')
-
-                if products:
-                    save_start = time.time()
-                    self.save_data(products)
-                    print(f'数据保存耗时: {time.time() - save_start:.2f}秒')
-
-                    compare_start = time.time()
-                    if getattr(self, 'last_fetch_complete', True):
-                        print('\n开始自动对比当天JSON文件...')
-                        comparator = StockNumberComparator()
-                        comparator.compare_json_files()
-                        print(f'对比耗时: {time.time() - compare_start:.2f}秒')
-                    else:
-                        print('\n⚠️ 商品数据未完整获取，已跳过自动对比，避免把缺失商品误判为已删除')
-
-                save_cookie_start = time.time()
+                    logger.debug(f'上下文关闭异常(可忽略): {e}')
+            if browser is not None:
                 try:
-                    cookies = await context.cookies()
-                    szwego_cookies = [cookie for cookie in cookies if 'szwego.com' in cookie['domain']]
-                    for cookie in szwego_cookies:
-                        if cookie['domain'] == 'www.szwego.com':
-                            cookie['domain'] = '.szwego.com'
-                    FileManager.write_json(cookie_file, szwego_cookies)
-                    print(f'Cookie已保存到 {cookie_file}')
-                    print(f'Cookie保存耗时: {time.time() - save_cookie_start:.2f}秒')
+                    await browser.close()
+                    print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
                 except Exception as e:  # [HANDLED]
                     if is_pw_transient_error(e):
-                        logger.debug(f'Cookie保存跳过（浏览器驱动已断开，可忽略）: {e}')
+                        logger.debug(f'浏览器已断开，跳过关闭（可忽略）: {e}')
                     else:
-                        print(f'⚠️  Cookie保存失败: {e}')
-                        print('继续执行，不影响数据获取...')
-            finally:
-                close_start = time.time()
-                if not api_task.done():
-                    api_task.cancel()
-                if context is not None:
-                    try:
-                        await context.close()
-                    except Exception as e:  # [HANDLED]
-                        logger.debug(f'上下文关闭异常(可忽略): {e}')
-                if browser is not None:
-                    try:
-                        await browser.close()
-                        print(f'浏览器关闭耗时: {time.time() - close_start:.2f}秒')
-                    except Exception as e:  # [HANDLED]
-                        if is_pw_transient_error(e):
-                            logger.debug(f'浏览器已断开，跳过关闭（可忽略）: {e}')
-                        else:
-                            print(f'⚠️  浏览器关闭失败: {e}')
-                            logger.debug('浏览器可能已经关闭，继续执行...')
+                        print(f'⚠️  浏览器关闭失败: {e}')
+                        logger.debug('浏览器可能已经关闭，继续执行...')
 
     async def run(self):
         start_time = time.time()
