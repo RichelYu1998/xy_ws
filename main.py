@@ -1370,7 +1370,87 @@ def safe_urlopen(url_or_req, timeout=None, context=None):
 # 相册分页接口可重试的状态码（429/5xx属于临时性失败，重试同一页即可）
 _ALBUM_API_RETRYABLE_STATUS = (429, 500, 502, 503, 504)
 
-def fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=4):
+# 429 是服务端反爬限流，短退避重试几乎必然拿不全商品数据，因此单独给足预算：
+# 最多 12 次重试、退避 5s→60s、累计等待上限 15 分钟，等到风控窗口放行后继续抓同一页
+_ALBUM_RATE_LIMIT_MAX_RETRIES = 12
+_ALBUM_RATE_LIMIT_BASE_DELAY = 5.0
+_ALBUM_RATE_LIMIT_MAX_DELAY = 60.0
+_ALBUM_RATE_LIMIT_TOTAL_BUDGET = 900.0
+
+# 单页临时性失败（限流/5xx/断网）的补抓轮数与轮间等待，避免一页失败就丢掉整卷数据
+_ALBUM_PAGE_RETRY_ROUNDS = 3
+_ALBUM_PAGE_RETRY_WAIT = 20.0
+
+# 整卷翻页最多补抓轮数：一轮翻完仍少于服务端总数时，重新从头翻页合并去重
+_ALBUM_FULL_PASS_MAX = 3
+
+# 服务端 total 可能把已删除/隐藏商品算在内，允许极小差额不算缺失
+_ALBUM_TOTAL_TOLERANCE = 5
+
+# 全局限流闸门：任一请求撞到429后，后续所有请求统一等到冷却结束再发，避免连环429
+_album_rate_limit_until = 0.0
+_album_rate_limit_hits = 0
+_album_rate_limit_lock = threading.Lock()
+
+def _mark_album_rate_limited(wait_seconds):
+    """登记一次429限流，把全局冷却截止时间往后推"""
+    global _album_rate_limit_until
+    with _album_rate_limit_lock:
+        _album_rate_limit_until = max(_album_rate_limit_until, time.time() + max(0.0, wait_seconds))
+
+def _album_cooldown_remaining():
+    """剩余限流冷却秒数"""
+    with _album_rate_limit_lock:
+        return max(0.0, _album_rate_limit_until - time.time())
+
+def _album_throttle_wait():
+    """请求前等待全局限流冷却结束，让风控窗口先过去"""
+    remaining = _album_cooldown_remaining()
+    while remaining > 0:
+        time.sleep(min(remaining, 3.0))
+        remaining = _album_cooldown_remaining()
+
+def _album_note_success():
+    """请求成功后逐步衰减限流计数，让页间延迟慢慢回到正常节奏"""
+    global _album_rate_limit_hits
+    with _album_rate_limit_lock:
+        if _album_rate_limit_hits > 0:
+            _album_rate_limit_hits -= 1
+
+def _album_page_delay():
+    """页间延迟：撞过429就放缓节奏，风控压力缓解后自动回落"""
+    cooldown = _album_cooldown_remaining()
+    if cooldown > 0:
+        return min(cooldown, 5.0) + random.uniform(0, 1.0)
+    with _album_rate_limit_lock:
+        hits = _album_rate_limit_hits
+    if hits <= 0:
+        return 0.4 + random.uniform(0, 0.4)
+    return 0.4 + min(0.4 * hits, 3.0) + random.uniform(0, 0.4)
+
+def _extract_album_total(pagination):
+    """从分页信息里取服务端商品总数，取不到返回0（用于完整性校验）"""
+    if not isinstance(pagination, dict):
+        return 0
+    for key in ('total', 'totalCount', 'totalNum', 'itemCount', 'count'):
+        value = pagination.get(key)
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            num = int(value)
+        except (TypeError, ValueError):
+            continue
+        if num > 0:
+            return num
+    return 0
+
+def _album_is_complete(collected, total, pass_complete):
+    """判断整卷商品是否已抓全：有服务端总数就比对数量，没有就要求翻到末页"""
+    if total > 0:
+        return collected >= total - _ALBUM_TOTAL_TOLERANCE
+    return bool(pass_complete)
+
+def fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=4, rate_limit_max_retries=None):
     """请求相册分页接口，对429/5xx/网络异常做指数退避重试
 
     Args:
@@ -1378,19 +1458,30 @@ def fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=
         headers: 请求头字典
         cookie_str: Cookie字符串
         timeout: 单次请求超时（秒）
-        max_retries: 最大尝试次数（含首次）
+        max_retries: 非429错误的尝试次数（含首次）
+        rate_limit_max_retries: 429限流的尝试次数，默认取 _ALBUM_RATE_LIMIT_MAX_RETRIES
 
     Returns:
         tuple: (status_code, text, error_message)
             error_message 为 None 表示请求成功拿到200响应；
             非 None 表示重试耗尽或遇到不可重试的错误
     """
-    delay = 1.0
+    global _album_rate_limit_hits
+    if rate_limit_max_retries is None:
+        rate_limit_max_retries = _ALBUM_RATE_LIMIT_MAX_RETRIES
+    general_delay = 1.0
+    rate_delay = _ALBUM_RATE_LIMIT_BASE_DELAY
+    general_attempts = 0
+    rate_attempts = 0
+    rate_total_wait = 0.0
     status_code = None
     text = ''
     last_error = None
 
-    for attempt in range(1, max_retries + 1):
+    while True:
+        _album_throttle_wait()
+        status_code = None
+        text = ''
         retry_after = None
         resp = None
         try:
@@ -1403,14 +1494,13 @@ def fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=
             status_code = resp.getcode()
             text = resp.read().decode('utf-8', errors='replace')
             if status_code == 200:
+                _album_note_success()
                 return status_code, text, None
             last_error = f'HTTP {status_code}'
             try:
                 retry_after = resp.headers.get('Retry-After') if resp.headers else None
             except Exception:
                 retry_after = None
-            if status_code not in _ALBUM_API_RETRYABLE_STATUS:
-                return status_code, text, last_error
         except urllib.error.HTTPError as http_err:
             status_code = http_err.code
             try:
@@ -1422,8 +1512,6 @@ def fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=
                 retry_after = http_err.headers.get('Retry-After') if http_err.headers else None
             except Exception:
                 retry_after = None
-            if status_code not in _ALBUM_API_RETRYABLE_STATUS:
-                return status_code, text, last_error
         except urllib.error.URLError as url_err:
             last_error = f'URLError: {url_err}'
         except Exception as req_error:
@@ -1435,21 +1523,45 @@ def fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=
                 except Exception:
                     pass
 
-        if attempt >= max_retries:
-            break
+        if status_code == 429:
+            # 限流单独计数：只有连续撞满预算才放弃，风控一放行就立刻续抓同一页
+            rate_attempts += 1
+            if rate_attempts >= rate_limit_max_retries or rate_total_wait >= _ALBUM_RATE_LIMIT_TOTAL_BUDGET:
+                # 预算耗尽也要登记冷却，避免紧接着的请求立刻再撞一次429
+                _mark_album_rate_limited(rate_delay)
+                last_error = f'HTTP 429 限流未解除（已等待 {rate_total_wait:.0f} 秒，重试 {rate_attempts} 次）'
+                return status_code, text, last_error
+            wait_seconds = rate_delay
+            if retry_after:
+                try:
+                    wait_seconds = max(wait_seconds, min(float(retry_after), _ALBUM_RATE_LIMIT_MAX_DELAY))
+                except (TypeError, ValueError):
+                    pass
+            wait_seconds += random.uniform(0, 0.5)
+            with _album_rate_limit_lock:
+                _album_rate_limit_hits += 1
+            _mark_album_rate_limited(wait_seconds)
+            rate_total_wait += wait_seconds
+            logger.debug(f'  [限流] 第{rate_attempts}/{rate_limit_max_retries}次遇到429，等待{wait_seconds:.1f}秒后重试（累计{rate_total_wait:.0f}秒）')
+            rate_delay = min(rate_delay * 2, _ALBUM_RATE_LIMIT_MAX_DELAY)
+            continue
 
-        wait_seconds = delay
+        if status_code is not None and status_code not in _ALBUM_API_RETRYABLE_STATUS:
+            return status_code, text, last_error
+
+        general_attempts += 1
+        if general_attempts >= max_retries:
+            return status_code, text, last_error
+
+        wait_seconds = general_delay + random.uniform(0, 0.5)
         if retry_after:
             try:
                 wait_seconds = max(wait_seconds, min(float(retry_after), 30.0))
             except (TypeError, ValueError):
                 pass
-        wait_seconds += random.uniform(0, 0.5)
-        logger.debug(f'  [重试] 第{attempt}/{max_retries}次请求失败({last_error})，{wait_seconds:.1f}秒后重试')
+        logger.debug(f'  [重试] 第{general_attempts}/{max_retries}次请求失败({last_error})，{wait_seconds:.1f}秒后重试')
         time.sleep(wait_seconds)
-        delay = min(delay * 2, 16.0)
-
-    return status_code, text, last_error
+        general_delay = min(general_delay * 2, 16.0)
 
 # 相册分页断点续爬：进度文件有效期（秒），超时后视为过期，避免与新数据混用
 _ALBUM_PROGRESS_MAX_AGE = 6 * 3600
@@ -6282,129 +6394,160 @@ class WegoScraper:
         
         # 获取所有商品（处理分页）
         page_timestamp = ''
-        for page_num in range(50):
-            if page_num > 0:
-                await asyncio.sleep(0.4 + random.uniform(0, 0.4))
-            params = {
-                'albumId': album_id,
-                'searchValue': '',
-                'searchImg': '',
-                'startDate': '',
-                'endDate': '',
-                'sourceId': '',
-                'pageSize': 100
-            }
-            # 只有第一页不需要timestamp，后续需要
-            if page_timestamp:
-                params['timestamp'] = page_timestamp
-            
-            try:
-                query_string = urllib.parse.urlencode(params)
-                full_url = f'{api_url}?{query_string}'
+        album_total = 0
+        auth_failed = False
+        # 完整性保障：单轮翻页可能因限流中断而缺失，最多补抓 _ALBUM_FULL_PASS_MAX 轮
+        for pass_num in range(_ALBUM_FULL_PASS_MAX):
+            if pass_num > 0:
+                page_timestamp = ''
+                logger.debug(f'  [完整性补抓] 第{pass_num+1}轮从头翻页补齐，当前已拿到 {len(all_goods_data)} 个商品')
+            pass_complete = False
+            page_num = 0
+            page_retry = 0
+            while page_num < 50:
+                if page_num > 0 or pass_num > 0:
+                    await asyncio.sleep(_album_page_delay())
+                params = {
+                    'albumId': album_id,
+                    'searchValue': '',
+                    'searchImg': '',
+                    'startDate': '',
+                    'endDate': '',
+                    'sourceId': '',
+                    'pageSize': 100
+                }
+                # 只有第一页不需要timestamp，后续需要
+                if page_timestamp:
+                    params['timestamp'] = page_timestamp
+                
+                try:
+                    query_string = urllib.parse.urlencode(params)
+                    full_url = f'{api_url}?{query_string}'
 
-                logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, pageSize=100')
+                    logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, pageSize=100')
 
-                status_code, text, fetch_error = fetch_album_api_page(full_url, headers, cookie_str, timeout=15)
+                    status_code, text, fetch_error = fetch_album_api_page(full_url, headers, cookie_str, timeout=15)
 
-                if fetch_error:
-                    logger.debug(f'  第{page_num+1}页请求最终失败: {fetch_error}')
-                    if text:
-                        logger.debug(f'  错误响应内容: {text[:300]}...')
-                    if status_code == 401:
-                        logger.debug(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
-                    elif status_code == 403:
-                        logger.debug(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
-                    elif status_code == 429:
-                        logger.debug(f'  💡 建议: 请求过于频繁，重试后仍失败，已中止分页（本次拿货价可能不完整）')
-                    elif status_code and status_code >= 500:
-                        logger.debug(f'  💡 建议: 服务器内部错误，请稍后重试或联系管理员')
-                    break
-
-                if status_code == 200:
-                    if text.strip().startswith('<'):
-                        logger.debug(f'  ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）')
-                        logger.debug(f'  📄 响应内容前200字符: {text[:200]}...')
-                        if '登录' in text or 'login' in text.lower():
-                            logger.debug(f'  🔒 检测到: 需要重新登录（Cookie已过期）')
-                        elif '验证码' in text or 'captcha' in text.lower():
-                            logger.debug(f'  🛡️ 检测到: 触发了验证码验证')
-                        elif '403' in text or 'forbidden' in text.lower():
-                            logger.debug(f'  🚫 检测到: 访问被禁止（403 Forbidden）')
-                        elif '404' in text:
-                            logger.debug(f'  ❌ 检测到: API端点不存在（404 Not Found）')
-                        else:
-                            logger.debug(f'  ⚠️  未知错误类型，请检查网络连接和Cookie有效性')
+                    if fetch_error:
+                        logger.debug(f'  第{page_num+1}页请求失败: {fetch_error}')
+                        if text:
+                            logger.debug(f'  错误响应内容: {text[:300]}...')
+                        if status_code == 401:
+                            logger.debug(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
+                            auth_failed = True
+                            break
+                        if status_code == 403:
+                            logger.debug(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
+                            auth_failed = True
+                            break
+                        if status_code == 429:
+                            logger.debug(f'  💡 限流等待已达预算上限，暂停后继续补抓（已拿到 {len(all_goods_data)} 个商品）')
+                        elif status_code and status_code >= 500:
+                            logger.debug(f'  💡 服务器内部错误，稍后继续补抓')
+                        page_retry += 1
+                        if page_retry <= _ALBUM_PAGE_RETRY_ROUNDS:
+                            wait_round = _ALBUM_PAGE_RETRY_WAIT * page_retry
+                            logger.debug(f'  第{page_num+1}页临时性失败，{wait_round:.0f}秒后进行第{page_retry}轮补抓')
+                            await asyncio.sleep(wait_round)
+                            continue
                         break
-                    
-                    try:
-                        data = json.loads(text)
-                        
-                        if not isinstance(data, dict):
-                            logger.debug(f'  ⚠️ API返回数据格式错误（非字典类型）')
-                            break
-                        
-                        if data.get('code') and data.get('code') != 0:
-                            logger.debug(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
-                            break
-                        
-                        result = data.get('result')
-                        if not result or not isinstance(result, dict):
-                            logger.debug(f'  ⚠️ API返回数据缺少result字段')
-                            break
-                        
-                        items = result.get('items', [])
-                        if not isinstance(items, list):
-                            logger.debug(f'  ⚠️ items字段格式错误')
-                            items = []
-                        
-                        pagination = result.get('pagination', {})
-                        if not isinstance(pagination, dict):
-                            pagination = {}
-                        
-                        if items:
-                            all_goods_data.extend(items)
-                            
-                            is_load_more = pagination.get('isLoadMore', False)
-                            try:
-                                page_timestamp = str(pagination.get('pageTimestamp', ''))
-                            except (ValueError, TypeError):
-                                page_timestamp = ''
-                            
-                            logger.debug(f'  第{page_num+1}页: 获取 {len(items)} 个商品, isLoadMore={is_load_more}, 累计={len(all_goods_data)}')
-                            
-                            if page_num == 0 and items:
-                                try:
-                                    first_item = items[0] if items else {}
-                                    title = str(first_item.get('title', ''))[:30]
-                                    goods_num = str(first_item.get('goodsNum', ''))
-                                    logger.debug(f'    调试: 第一个商品 title={title}... goodsNum={goods_num}')
-                                except Exception as debug_error:
-                                    logger.debug(f'    调试: 商品信息读取失败: {debug_error}')
-                            
-                            is_load_more = pagination.get('isLoadMore', False)
-                            try:
-                                page_timestamp = str(pagination.get('pageTimestamp', ''))
-                            except (ValueError, TypeError):
-                                page_timestamp = ''
-                            
-                            if is_load_more and page_timestamp:
-                                params['timestamp'] = page_timestamp
+
+                    page_retry = 0
+                    if status_code == 200:
+                        if text.strip().startswith('<'):
+                            logger.debug(f'  ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）')
+                            logger.debug(f'  📄 响应内容前200字符: {text[:200]}...')
+                            if '登录' in text or 'login' in text.lower():
+                                logger.debug(f'  🔒 检测到: 需要重新登录（Cookie已过期）')
+                            elif '验证码' in text or 'captcha' in text.lower():
+                                logger.debug(f'  🛡️ 检测到: 触发了验证码验证')
+                            elif '403' in text or 'forbidden' in text.lower():
+                                logger.debug(f'  🚫 检测到: 访问被禁止（403 Forbidden）')
+                            elif '404' in text:
+                                logger.debug(f'  ❌ 检测到: API端点不存在（404 Not Found）')
                             else:
-                                logger.debug(f'  分页结束: isLoadMore={is_load_more}, pageTimestamp={page_timestamp or "(空)"}')
-                                break
-                        else:
-                            logger.debug(f'  第{page_num+1}页: 无商品数据，结束分页')
+                                logger.debug(f'  ⚠️  未知错误类型，请检查网络连接和Cookie有效性')
+                            auth_failed = True
                             break
-                    except json.JSONDecodeError as e:
-                        logger.debug(f'  ❌ JSON解析失败: {e}')
-                        logger.debug(f'  📄 响应内容前500字符: {text[:500]}...')
-                        break
-                    except Exception as e:  # [HANDLED]
-                        handle_exception(e, 'fetch_cost_prices_via_api解析响应')
-                        break
-            except Exception as e:  # [HANDLED]
-                handle_exception(e, 'fetch_cost_prices_via_api请求')
+                        
+                        try:
+                            data = json.loads(text)
+                            
+                            if not isinstance(data, dict):
+                                logger.debug(f'  ⚠️ API返回数据格式错误（非字典类型）')
+                                break
+                            
+                            if data.get('code') and data.get('code') != 0:
+                                logger.debug(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
+                                break
+                            
+                            result = data.get('result')
+                            if not result or not isinstance(result, dict):
+                                logger.debug(f'  ⚠️ API返回数据缺少result字段')
+                                break
+                            
+                            items = result.get('items', [])
+                            if not isinstance(items, list):
+                                logger.debug(f'  ⚠️ items字段格式错误')
+                                items = []
+                            
+                            pagination = result.get('pagination', {})
+                            if not isinstance(pagination, dict):
+                                pagination = {}
+                            album_total = max(album_total, _extract_album_total(pagination))
+                            
+                            if items:
+                                all_goods_data = _dedupe_album_items(all_goods_data + items)
+                                
+                                is_load_more = pagination.get('isLoadMore', False)
+                                try:
+                                    page_timestamp = str(pagination.get('pageTimestamp', ''))
+                                except (ValueError, TypeError):
+                                    page_timestamp = ''
+                                
+                                logger.debug(f'  第{page_num+1}页: 获取 {len(items)} 个商品, isLoadMore={is_load_more}, 累计={len(all_goods_data)}')
+                                
+                                if page_num == 0 and items:
+                                    try:
+                                        first_item = items[0] if items else {}
+                                        title = str(first_item.get('title', ''))[:30]
+                                        goods_num = str(first_item.get('goodsNum', ''))
+                                        logger.debug(f'    调试: 第一个商品 title={title}... goodsNum={goods_num}')
+                                    except Exception as debug_error:
+                                        logger.debug(f'    调试: 商品信息读取失败: {debug_error}')
+                                
+                                if is_load_more and page_timestamp:
+                                    params['timestamp'] = page_timestamp
+                                else:
+                                    logger.debug(f'  分页结束: isLoadMore={is_load_more}, pageTimestamp={page_timestamp or "(空)"}')
+                                    pass_complete = True
+                                    break
+                            else:
+                                logger.debug(f'  第{page_num+1}页: 无商品数据，结束分页')
+                                pass_complete = True
+                                break
+                        except json.JSONDecodeError as e:
+                            logger.debug(f'  ❌ JSON解析失败: {e}')
+                            logger.debug(f'  📄 响应内容前500字符: {text[:500]}...')
+                            break
+                        except Exception as e:  # [HANDLED]
+                            handle_exception(e, 'fetch_cost_prices_via_api解析响应')
+                            break
+                except Exception as e:  # [HANDLED]
+                    handle_exception(e, 'fetch_cost_prices_via_api请求')
+                    break
+                page_num += 1
+            
+            if auth_failed:
                 break
+            if _album_is_complete(len(all_goods_data), album_total, pass_complete):
+                break
+            if album_total:
+                logger.debug(f'  ⚠️ 第{pass_num+1}轮结束: 已拿到 {len(all_goods_data)} / 服务端总数 {album_total}，准备补抓')
+            else:
+                logger.debug(f'  ⚠️ 第{pass_num+1}轮未翻到末页（已拿到 {len(all_goods_data)} 个商品），准备补抓')
+            if pass_num + 1 < _ALBUM_FULL_PASS_MAX:
+                await asyncio.sleep(_ALBUM_PAGE_RETRY_WAIT)
         
         logger.debug(f'共获取 {len(all_goods_data)} 个商品数据')
         
@@ -6598,6 +6741,8 @@ class WegoScraper:
         page_timestamp = ''
         pagination_complete = False
         resumed = False
+        album_total = 0
+        auth_failed = False
         
         progress = _load_album_progress(album_id)
         if progress:
@@ -6607,117 +6752,151 @@ class WegoScraper:
             logger.debug(f'  [断点续爬] 从上次中断处继续: 已恢复 {len(all_goods_data)} 个商品, timestamp={page_timestamp or "(空)"}')
         
         logger.debug('开始通过API获取所有商品（使用urllib，不依赖浏览器）...')
-        # 页数上限随已恢复的断点数据动态放大，避免商品数超过 5000 时永远抓不完
-        max_pages = max(50, len(all_goods_data) // 100 + 50)
-        for page_num in range(max_pages):
-            if page_num > 0 or resumed:
-                await asyncio.sleep(0.4 + random.uniform(0, 0.4))
-            params = {
-                'albumId': album_id,
-                'searchValue': '',
-                'searchImg': '',
-                'startDate': '',
-                'endDate': '',
-                'sourceId': '',
-                'pageSize': 100
-            }
-            if page_timestamp:
-                params['timestamp'] = page_timestamp
-            
-            try:
-                query_string = urllib.parse.urlencode(params)
-                full_url = f'{api_url}?{query_string}'
+        # 完整性保障：单轮翻页可能因限流中断而缺失，最多补抓 _ALBUM_FULL_PASS_MAX 轮
+        for pass_num in range(_ALBUM_FULL_PASS_MAX):
+            if pass_num > 0:
+                page_timestamp = ''
+                logger.debug(f'  [完整性补抓] 第{pass_num+1}轮从头翻页补齐，当前已拿到 {len(all_goods_data)} 个商品')
+            pass_complete = False
+            page_num = 0
+            page_retry = 0
+            # 页数上限随已恢复/已累积的数据与服务端总数动态放大，避免商品多时永远抓不完
+            expected = album_total if album_total > 0 else len(all_goods_data)
+            max_pages = max(50, expected // 100 + 50)
+            while page_num < max_pages:
+                if page_num > 0 or (pass_num == 0 and resumed):
+                    await asyncio.sleep(_album_page_delay())
+                params = {
+                    'albumId': album_id,
+                    'searchValue': '',
+                    'searchImg': '',
+                    'startDate': '',
+                    'endDate': '',
+                    'sourceId': '',
+                    'pageSize': 100
+                }
+                if page_timestamp:
+                    params['timestamp'] = page_timestamp
+                
+                try:
+                    query_string = urllib.parse.urlencode(params)
+                    full_url = f'{api_url}?{query_string}'
 
-                logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, pageSize=100')
+                    logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, pageSize=100')
 
-                status_code, text, fetch_error = fetch_album_api_page(full_url, headers, cookie_str, timeout=15)
+                    status_code, text, fetch_error = fetch_album_api_page(full_url, headers, cookie_str, timeout=15)
 
-                if fetch_error:
-                    logger.debug(f'  第{page_num+1}页请求最终失败: {fetch_error}')
-                    if text:
-                        logger.debug(f'  错误响应内容: {text[:300]}...')
-                    if status_code == 401:
-                        logger.debug(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
-                    elif status_code == 403:
-                        logger.debug(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
-                    elif status_code == 429:
-                        logger.debug(f'  💡 建议: 请求过于频繁，重试后仍失败，已中止分页（本次商品数据可能不完整）')
-                    elif status_code and status_code >= 500:
-                        logger.debug(f'  💡 建议: 服务器内部错误，请稍后重试或联系管理员')
-                    break
-
-                if status_code == 200:
-                    if text.strip().startswith('<'):
-                        logger.debug(f'  ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）')
-                        logger.debug(f'  📄 响应内容前200字符: {text[:200]}...')
-                        if '登录' in text or 'login' in text.lower():
-                            logger.debug(f'  🔒 检测到: 需要重新登录（Cookie已过期）')
-                        elif '验证码' in text or 'captcha' in text.lower():
-                            logger.debug(f'  🛡️ 检测到: 触发了验证码验证')
-                        elif '403' in text or 'forbidden' in text.lower():
-                            logger.debug(f'  🚫 检测到: 访问被禁止（403 Forbidden）')
-                        elif '404' in text:
-                            logger.debug(f'  ❌ 检测到: API端点不存在（404 Not Found）')
-                        else:
-                            logger.debug(f'  ⚠️  未知错误类型，请检查网络连接和Cookie有效性')
+                    if fetch_error:
+                        logger.debug(f'  第{page_num+1}页请求失败: {fetch_error}')
+                        if text:
+                            logger.debug(f'  错误响应内容: {text[:300]}...')
+                        if status_code == 401:
+                            logger.debug(f'  💡 建议: Cookie已过期或无效，请重新获取Cookie')
+                            auth_failed = True
+                            break
+                        if status_code == 403:
+                            logger.debug(f'  💡 建议: 访问被拒绝，可能触发了反爬机制')
+                            auth_failed = True
+                            break
+                        if status_code == 429:
+                            logger.debug(f'  💡 限流等待已达预算上限，暂停后继续补抓（已拿到 {len(all_goods_data)} 个商品）')
+                        elif status_code and status_code >= 500:
+                            logger.debug(f'  💡 服务器内部错误，稍后继续补抓')
+                        page_retry += 1
+                        if page_retry <= _ALBUM_PAGE_RETRY_ROUNDS:
+                            wait_round = _ALBUM_PAGE_RETRY_WAIT * page_retry
+                            logger.debug(f'  第{page_num+1}页临时性失败，{wait_round:.0f}秒后进行第{page_retry}轮补抓')
+                            await asyncio.sleep(wait_round)
+                            continue
                         break
-                    try:
-                        data = json.loads(text)
-                        if not isinstance(data, dict):
-                            logger.debug(f'  ⚠️ API返回数据格式错误（非字典类型）')
-                            break
-                        if data.get('code') and data.get('code') != 0:
-                            logger.debug(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
-                            break
-                        result = data.get('result')
-                        if not result or not isinstance(result, dict):
-                            logger.debug(f'  ⚠️ API返回数据缺少result字段')
-                            break
-                        
-                        items = result.get('items', [])
-                        if not isinstance(items, list):
-                            logger.debug(f'  ⚠️ items字段格式错误')
-                            items = []
-                        
-                        pagination = result.get('pagination', {})
-                        if not isinstance(pagination, dict):
-                            pagination = {}
-                        
-                        if items:
-                            all_goods_data.extend(items)
-                            logger.debug(f'  第{page_num+1}页: 获取 {len(items)} 个商品, 累计={len(all_goods_data)}')
-                            
-                            is_load_more = pagination.get('isLoadMore', False)
-                            try:
-                                page_timestamp = str(pagination.get('pageTimestamp', ''))
-                            except (ValueError, TypeError):
-                                page_timestamp = ''
-                            
-                            if is_load_more and page_timestamp:
-                                params['timestamp'] = page_timestamp
-                                _save_album_progress(album_id, all_goods_data, page_timestamp)
+
+                    page_retry = 0
+                    if status_code == 200:
+                        if text.strip().startswith('<'):
+                            logger.debug(f'  ⚠️  错误: API返回了HTML而非JSON（可能原因：Cookie过期/失效、触发反爬机制、服务器错误）')
+                            logger.debug(f'  📄 响应内容前200字符: {text[:200]}...')
+                            if '登录' in text or 'login' in text.lower():
+                                logger.debug(f'  🔒 检测到: 需要重新登录（Cookie已过期）')
+                            elif '验证码' in text or 'captcha' in text.lower():
+                                logger.debug(f'  🛡️ 检测到: 触发了验证码验证')
+                            elif '403' in text or 'forbidden' in text.lower():
+                                logger.debug(f'  🚫 检测到: 访问被禁止（403 Forbidden）')
+                            elif '404' in text:
+                                logger.debug(f'  ❌ 检测到: API端点不存在（404 Not Found）')
                             else:
-                                pagination_complete = True
-                                _clear_album_progress(album_id)
-                                break
-                        else:
-                            pagination_complete = True
-                            _clear_album_progress(album_id)
+                                logger.debug(f'  ⚠️  未知错误类型，请检查网络连接和Cookie有效性')
+                            auth_failed = True
                             break
-                    except json.JSONDecodeError as e:
-                        logger.debug(f'  ❌ JSON解析失败: {e}')
-                        logger.debug(f'  📄 响应内容前500字符: {text[:500]}...')
-                        break
-                    except Exception as e:  # [HANDLED]
-                        logger.debug(f'  解析失败: {e}')
-                        break
-            except Exception as e:  # [HANDLED]
-                logger.debug(f'  请求异常: {e}')
+                        try:
+                            data = json.loads(text)
+                            if not isinstance(data, dict):
+                                logger.debug(f'  ⚠️ API返回数据格式错误（非字典类型）')
+                                break
+                            if data.get('code') and data.get('code') != 0:
+                                logger.debug(f'  ❌ API业务错误: code={data.get("code")}, message={data.get("message", "未知错误")}')
+                                break
+                            result = data.get('result')
+                            if not result or not isinstance(result, dict):
+                                logger.debug(f'  ⚠️ API返回数据缺少result字段')
+                                break
+                            
+                            items = result.get('items', [])
+                            if not isinstance(items, list):
+                                logger.debug(f'  ⚠️ items字段格式错误')
+                                items = []
+                            
+                            pagination = result.get('pagination', {})
+                            if not isinstance(pagination, dict):
+                                pagination = {}
+                            album_total = max(album_total, _extract_album_total(pagination))
+                            
+                            if items:
+                                all_goods_data = _dedupe_album_items(all_goods_data + items)
+                                logger.debug(f'  第{page_num+1}页: 获取 {len(items)} 个商品, 累计={len(all_goods_data)}')
+                                
+                                is_load_more = pagination.get('isLoadMore', False)
+                                try:
+                                    page_timestamp = str(pagination.get('pageTimestamp', ''))
+                                except (ValueError, TypeError):
+                                    page_timestamp = ''
+                                
+                                if is_load_more and page_timestamp:
+                                    params['timestamp'] = page_timestamp
+                                else:
+                                    pass_complete = True
+                                    break
+                            else:
+                                pass_complete = True
+                                break
+                        except json.JSONDecodeError as e:
+                            logger.debug(f'  ❌ JSON解析失败: {e}')
+                            logger.debug(f'  📄 响应内容前500字符: {text[:500]}...')
+                            break
+                        except Exception as e:  # [HANDLED]
+                            logger.debug(f'  解析失败: {e}')
+                            break
+                except Exception as e:  # [HANDLED]
+                    logger.debug(f'  请求异常: {e}')
+                    break
+                page_num += 1
+            
+            if auth_failed:
                 break
+            if _album_is_complete(len(all_goods_data), album_total, pass_complete):
+                pagination_complete = True
+                break
+            if album_total:
+                logger.debug(f'  ⚠️ 第{pass_num+1}轮结束: 已拿到 {len(all_goods_data)} / 服务端总数 {album_total}，准备补抓')
+            else:
+                logger.debug(f'  ⚠️ 第{pass_num+1}轮未翻到末页（已拿到 {len(all_goods_data)} 个商品），准备补抓')
+            if pass_num + 1 < _ALBUM_FULL_PASS_MAX:
+                await asyncio.sleep(_ALBUM_PAGE_RETRY_WAIT)
         
         logger.debug(f'共获取 {len(all_goods_data)} 个商品数据')
         
-        if not pagination_complete:
+        if pagination_complete:
+            logger.debug(f'  ✅ 分页已完整获取，共 {len(all_goods_data)} 个商品')
+        else:
             _save_album_progress(album_id, all_goods_data, page_timestamp, force=True)
             logger.debug(f'  ⚠️ 分页未完整获取（已拿到 {len(all_goods_data)} 个商品），已保存断点，下次运行将从断点继续')
         
