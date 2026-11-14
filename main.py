@@ -4358,7 +4358,6 @@ def _is_private_ip(ip_str):
 
 WRITE_METHODS = frozenset(['POST', 'PUT', 'PATCH', 'DELETE'])
 CSRF_EXEMPT_PATHS = frozenset(['/api/bootstrap'])
-WEB_API_KEY = None
 
 if PROMETHEUS_AVAILABLE:
     REQUEST_COUNT = Counter('http_requests_total', '总请求数', ['method', 'endpoint', 'status'])
@@ -5907,11 +5906,21 @@ class ConfigManager:
     def __init__(self, config_path=None):
         self.config_path = config_path or PathManager.get_config_file()
         self._config = None
+        self._config_signature = None
+
+    def _config_file_signature(self):
+        try:
+            st = os.stat(self.config_path)
+            return (st.st_mtime_ns, st.st_size)
+        except OSError:
+            return None
 
     @property
     def config(self):
-        if self._config is None:
+        signature = self._config_file_signature()
+        if self._config is None or signature != self._config_signature:
             self._config = self._load_config()
+            self._config_signature = signature
         return self._config
 
     def _load_config(self):
@@ -5957,8 +5966,9 @@ class ConfigManager:
         return self.config.get(key, default)
 
     def set(self, key, value):
-        if self._config is not None:
-            self._config[key] = value
+        config = self.config
+        if isinstance(config, dict):
+            config[key] = value
             self.save_config()
 
     def get_cookie_file(self):
@@ -5996,10 +6006,14 @@ class ConfigManager:
 # API Key 认证初始化 (v3.8.89.29) - 必须在 ConfigManager 定义之后
 # ============================================================
 _web_config_mgr = ConfigManager()
-WEB_API_KEY = _web_config_mgr.get('web_api_key')
-if not WEB_API_KEY:
-    WEB_API_KEY = secrets.token_urlsafe(32)
-    _web_config_mgr.set('web_api_key', WEB_API_KEY)
+_DEFAULT_WEB_API_KEY = secrets.token_urlsafe(32)
+
+def get_web_api_key():
+    key = _web_config_mgr.get('web_api_key')
+    if not key:
+        key = _DEFAULT_WEB_API_KEY
+        _web_config_mgr.set('web_api_key', key)
+    return key
 
 class CookieValidator:
     """Cookie验证器 - 提供完整的cookie验证和友好提示"""
@@ -10580,7 +10594,7 @@ if __name__ == '__main__':
             retry = _check_sensitive_rate_limit(request)
             if retry:
                 return JSONResponse(status_code=429, content={'error': '请求过于频繁', 'retry_after': retry}, headers={'Retry-After': str(retry), **_no_store_headers()})
-            return JSONResponse(content={'api_key': WEB_API_KEY}, headers=_no_store_headers())
+            return JSONResponse(content={'api_key': get_web_api_key()}, headers=_no_store_headers())
 
         @app.get('/health')  # [SECURED]
         async def health_check():
