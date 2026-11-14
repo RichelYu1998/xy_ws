@@ -19,6 +19,7 @@ import time
 import stat
 import socket
 import platform
+import subprocess
 import threading
 import asyncio
 import urllib.request
@@ -70,6 +71,7 @@ class SecurityAuditor:
         self.version = self._get_version()
         self.code_files = self._collect_code_files()
         self._lock = threading.Lock()
+        self._server_proc = None
         self.results = {
             'scan_metadata': {
                 'version': self.version,
@@ -184,6 +186,7 @@ class SecurityAuditor:
 
             print("\n🥊 [10/10] 真实攻防验证 - 黑盒攻击载荷")
             self._run_live_attack_defense_tests()
+            self._stop_server()
 
             end_time = time.time()
             self.results['performance_metrics']['total_scan_time'] = f"{end_time - start_time:.2f}s"
@@ -192,6 +195,7 @@ class SecurityAuditor:
             return self.results
 
         except Exception as e:
+            self._stop_server()
             print(f"❌ 审计过程异常: {e}")
             raise
 
@@ -1188,22 +1192,88 @@ class SecurityAuditor:
         except OSError:
             return False
 
+    def _ensure_server(self) -> bool:
+        """攻防验证前置：服务未运行时自动拉起临时实例，禁止静默跳过任何一项攻防"""
+        if self._server_alive():
+            return True
+
+        print(f"  🚀 服务未运行，自动拉起临时实例 (端口 {self.web_port})，确保 13 项攻防全部执行")
+        env = os.environ.copy()
+        env['WEB_PORT'] = str(self.web_port)
+        env['HOST'] = '127.0.0.1'
+        log_path = self.project_root / 'file' / f'security_audit_server_{self.web_port}.log'
+        log_handle = None
+        try:
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_handle = open(log_path, 'w', encoding='utf-8')
+            self._server_proc = subprocess.Popen(
+                [sys.executable, 'main.py', '--web'],
+                cwd=str(self.project_root),
+                env=env,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT
+            )
+        except Exception as e:
+            if log_handle:
+                try:
+                    log_handle.close()
+                except Exception:
+                    pass
+            self._add_issue(SecurityIssue(
+                severity='HIGH',
+                category='AttackDefense',
+                file_path='runtime',
+                line_number=0,
+                description=f'[攻防验证] 临时服务拉起失败，黑盒攻击验证无法执行: {e}',
+                recommendation='确保 python main.py --web 可在无人值守下启动，攻防验证不允许跳过',
+                code_snippet=f'python main.py --web (WEB_PORT={self.web_port})'
+            ))
+            return False
+
+        deadline = time.time() + 45.0
+        while time.time() < deadline:
+            if self._server_alive():
+                time.sleep(1.0)
+                print(f"  ✅ 临时服务已就绪: http://127.0.0.1:{self.web_port}")
+                return True
+            if self._server_proc.poll() is not None:
+                break
+            time.sleep(0.5)
+
+        self._stop_server()
+        self._add_issue(SecurityIssue(
+            severity='HIGH',
+            category='AttackDefense',
+            file_path='runtime',
+            line_number=0,
+            description='[攻防验证] 临时服务启动后未就绪，黑盒攻击验证无法执行',
+            recommendation=f'查看启动日志 {log_path}，修复后重新执行审计以完成全部攻防验证',
+            code_snippet=f'python main.py --web (WEB_PORT={self.web_port})'
+        ))
+        return False
+
+    def _stop_server(self):
+        """停止审计期间拉起的临时服务，释放端口"""
+        proc = self._server_proc
+        self._server_proc = None
+        if proc is None:
+            return
+        try:
+            proc.terminate()
+            proc.wait(timeout=10)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
     def _run_live_attack_defense_tests(self):
         """真实攻防验证：对运行中的服务发起黑盒攻击载荷，逐项校验防护是否生效"""
         print(f"  🥊 目标: http://127.0.0.1:{self.web_port}")
 
-        if not self._server_alive():
+        if not self._ensure_server():
             self.results['attack_defense']['server_available'] = False
-            self._add_issue(SecurityIssue(
-                severity='INFO',
-                category='AttackDefense',
-                file_path='runtime',
-                line_number=0,
-                description='[攻防验证] 本地服务未运行，黑盒攻击载荷验证已跳过（静态扫描结果仍然有效）',
-                recommendation=f'启动服务后重新执行审计以获得完整攻防结论: ./run.sh 或 python main.py --web --port {self.web_port}',
-                code_snippet=f'http://127.0.0.1:{self.web_port} unreachable'
-            ))
-            print("  ⚠️ 服务未运行，跳过主动攻击验证")
+            print("  ❌ 服务无法就绪，攻防验证未执行（已记为高危问题，审计不达标）")
             return
 
         self.results['attack_defense']['server_available'] = True
@@ -1269,10 +1339,20 @@ class SecurityAuditor:
         for severity, name, method, path, kwargs, expected, risk in cases:
             status, resp_body, resp_headers = self._http_probe(method, path, **kwargs)
             if status is None:
-                print(f"    ⚠️ {name}: 请求失败 ({resp_body[:60]})")
+                print(f"    ❌ {name}: 请求失败无法验证 ({resp_body[:60]})")
+                self.results['attack_defense']['failed'] += 1
+                self._add_issue(SecurityIssue(
+                    severity=severity,
+                    category='AttackDefense',
+                    file_path='runtime',
+                    line_number=0,
+                    description=f'[攻防验证] {name} 请求失败，防护是否生效无法确认',
+                    recommendation=f'检查服务可用性与路由 {method} {path}，攻防项不允许因请求失败而免检',
+                    code_snippet=f'{method} {path} -> {resp_body[:120]}'
+                ))
                 self.results['attack_defense']['cases'].append({
                     'name': name, 'severity': severity, 'request': f'{method} {path}',
-                    'status': 'INCONCLUSIVE', 'expected': sorted(expected), 'detail': resp_body[:120]
+                    'status': 'FAILED', 'expected': sorted(expected), 'detail': resp_body[:120]
                 })
                 continue
             if status == 'REJECTED':
@@ -1330,10 +1410,22 @@ class SecurityAuditor:
         elif status is not None:
             self.results['attack_defense']['passed'] += 1
             print(f"    ✅ 路径遍历内容泄露复核: 已阻断 (HTTP {status})")
+        else:
+            self.results['attack_defense']['failed'] += 1
+            self._add_issue(SecurityIssue(
+                severity='CRITICAL',
+                category='AttackDefense',
+                file_path='runtime',
+                line_number=0,
+                description='[攻防验证] 路径遍历内容泄露复核请求失败，无法确认是否泄露',
+                recommendation='确保静态文件路由可探测，路径遍历必须可验证',
+                code_snippet='GET /../../../../etc/passwd -> 请求失败'
+            ))
+            print("    ❌ 路径遍历内容泄露复核: 请求失败，无法确认")
         self.results['attack_defense']['cases'].append({
             'name': '路径遍历内容泄露复核', 'severity': 'CRITICAL',
             'request': 'GET /../../../../etc/passwd',
-            'status': 'BYPASSED' if traversal_leaked else ('BLOCKED' if status is not None else 'INCONCLUSIVE'),
+            'status': 'BYPASSED' if traversal_leaked else ('BLOCKED' if status is not None else 'FAILED'),
             'expected': ['无 root:x: 泄露'],
             'detail': f'HTTP {status}'
         })
@@ -1357,9 +1449,21 @@ class SecurityAuditor:
         elif status == 200:
             self.results['attack_defense']['passed'] += 1
             print(f"    ✅ 安全响应头基线: {len(required_headers)}/{len(required_headers)} 全部存在")
+        else:
+            self.results['attack_defense']['failed'] += 1
+            self._add_issue(SecurityIssue(
+                severity='MEDIUM',
+                category='AttackDefense',
+                file_path='runtime',
+                line_number=0,
+                description=f'[攻防验证] 安全响应头基线请求失败（HTTP {status}），无法确认安全头是否下发',
+                recommendation='确保根路径返回 200 并可读取响应头，安全头基线必须可验证',
+                code_snippet=f'GET / -> {status}'
+            ))
+            print(f"    ❌ 安全响应头基线: 请求失败 (HTTP {status})")
         self.results['attack_defense']['cases'].append({
             'name': '安全响应头基线', 'severity': 'MEDIUM', 'request': 'GET /',
-            'status': 'BLOCKED' if (status == 200 and not missing) else ('BYPASSED' if status == 200 else 'INCONCLUSIVE'),
+            'status': 'BLOCKED' if (status == 200 and not missing) else ('BYPASSED' if status == 200 else 'FAILED'),
             'expected': required_headers,
             'detail': f'缺失 {missing}' if missing else '全部存在'
         })
@@ -1388,14 +1492,37 @@ class SecurityAuditor:
         elif status is not None:
             self.results['attack_defense']['passed'] += 1
             print(f"    ✅ 错误信息泄露复核: 已阻断 (HTTP {status})")
+        else:
+            self.results['attack_defense']['failed'] += 1
+            self._add_issue(SecurityIssue(
+                severity='HIGH',
+                category='AttackDefense',
+                file_path='runtime',
+                line_number=0,
+                description='[攻防验证] 错误信息泄露复核请求失败，无法确认是否泄露异常栈',
+                recommendation='确保 /api/product/search 可探测，错误信息泄露必须可验证',
+                code_snippet='GET /api/product/search?search_type=invalid_type -> 请求失败'
+            ))
+            print("    ❌ 错误信息泄露复核: 请求失败，无法确认")
         self.results['attack_defense']['cases'].append({
             'name': '错误信息泄露复核', 'severity': 'HIGH',
             'request': 'GET /api/product/search?search_type=invalid_type',
-            'status': 'BYPASSED' if leaked else ('BLOCKED' if status is not None else 'INCONCLUSIVE'),
+            'status': 'BYPASSED' if leaked else ('BLOCKED' if status is not None else 'FAILED'),
             'expected': ['无异常栈泄露'], 'detail': f'HTTP {status}'
         })
 
-        print(f"  ✅ 真实攻防验证完成: 通过 {self.results['attack_defense']['passed']} / 失败 {self.results['attack_defense']['failed']}")
+        total_cases = self.results['attack_defense']['passed'] + self.results['attack_defense']['failed']
+        print(f"  ✅ 真实攻防验证完成: 通过 {self.results['attack_defense']['passed']} / 失败 {self.results['attack_defense']['failed']} / 共 {total_cases} 项")
+        if total_cases < 13:
+            self._add_issue(SecurityIssue(
+                severity='HIGH',
+                category='AttackDefense',
+                file_path='runtime',
+                line_number=0,
+                description=f'[攻防验证] 攻防项未全部执行: 实际 {total_cases} 项，应为 13 项',
+                recommendation='攻防清单必须全量执行，禁止因异常提前中断',
+                code_snippet=f'executed={total_cases} expected=13'
+            ))
 
     def _generate_report(self):
         """生成审计报告"""
@@ -1465,11 +1592,11 @@ class SecurityAuditor:
             total_cases = ad['passed'] + ad['failed']
             print(f"\n🥊 攻防验证: 目标 {ad['target']}")
             print(f"   通过 {ad['passed']} / 失败 {ad['failed']} / 共 {total_cases} 项")
-            bypassed = [c['name'] for c in ad['cases'] if c['status'] == 'BYPASSED']
+            bypassed = [c['name'] for c in ad['cases'] if c['status'] in ('BYPASSED', 'FAILED')]
             if bypassed:
-                print(f"   被绕过项: {', '.join(bypassed)}")
+                print(f"   未通过项: {', '.join(bypassed)}")
         elif ad['server_available'] is False:
-            print(f"\n🥊 攻防验证: 服务未运行（{ad['target']}），已跳过主动攻击验证")
+            print(f"\n🥊 攻防验证: 服务无法就绪（{ad['target']}），已记为高危问题（禁止跳过）")
 
         if summary['critical'] > 0 or summary['high'] > 0:
             print(f"\n⚠️ 发现 {summary['critical'] + summary['high']} 个高危问题，建议立即修复！")

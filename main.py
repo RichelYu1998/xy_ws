@@ -1428,11 +1428,18 @@ def _album_page_delay():
         return 0.4 + random.uniform(0, 0.4)
     return 0.4 + min(0.4 * hits, 3.0) + random.uniform(0, 0.4)
 
-def _extract_album_total(pagination):
-    """从分页信息里取服务端商品总数，取不到返回0（用于完整性校验）"""
+def _extract_album_total(pagination, page_len=0):
+    """从分页信息里取服务端商品总数，取不到返回0（用于完整性校验）
+
+    'itemCount'/'count' 在部分接口里表示「本页条数」而非总数，已知本页条数时
+    这两个歧义键只有数值大于本页条数才视为总数，避免把每页 100 误当成总数，
+    导致永远判定不完整、白白多翻几轮。
+    """
     if not isinstance(pagination, dict):
         return 0
-    for key in ('total', 'totalCount', 'totalNum', 'itemCount', 'count'):
+    explicit_keys = ('total', 'totalCount', 'totalNum')
+    ambiguous_keys = ('itemCount', 'count')
+    for key in explicit_keys + ambiguous_keys:
         value = pagination.get(key)
         if value is None or isinstance(value, bool):
             continue
@@ -1440,14 +1447,22 @@ def _extract_album_total(pagination):
             num = int(value)
         except (TypeError, ValueError):
             continue
-        if num > 0:
-            return num
+        if num <= 0:
+            continue
+        if key in ambiguous_keys and page_len and num <= page_len:
+            continue
+        return num
     return 0
 
 def _album_is_complete(collected, total, pass_complete):
-    """判断整卷商品是否已抓全：有服务端总数就比对数量，没有就要求翻到末页"""
+    """判断整卷商品是否已抓全：有服务端总数就比对数量，没有就要求翻到末页
+
+    容差按总数等比缩放（总数 5% 且不超过 _ALBUM_TOTAL_TOLERANCE），避免小相册
+    （如总数 3 个）被固定容差 5 直接判定为「已抓全」而漏掉缺失商品。
+    """
     if total > 0:
-        return collected >= total - _ALBUM_TOTAL_TOLERANCE
+        tolerance = min(_ALBUM_TOTAL_TOLERANCE, total // 20)
+        return collected >= total - tolerance
     return bool(pass_complete)
 
 def fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=4, rate_limit_max_retries=None):
@@ -1644,7 +1659,11 @@ def _clear_album_progress(album_id):
         logger.debug(f'  [断点续爬] 删除进度文件失败: {e}')
 
 def _dedupe_album_items(items):
-    """按货号（缺失时用标题+时间戳）去重，保留首次出现的顺序"""
+    """按货号（缺失时用内容指纹）去重，保留首次出现的顺序
+
+    没有 goodsNum 的商品不能只用 title+timestamp 兜底：字段全缺时会退化成同一个
+    空键，导致除第一个外全部被误删。这里改用整条记录的内容指纹，跨轮次依然稳定。
+    """
     seen = set()
     result = []
     for item in items:
@@ -1653,6 +1672,13 @@ def _dedupe_album_items(items):
         key = str(item.get('goodsNum', '') or '')
         if not key:
             key = f'{item.get("title", "")}|{item.get("time_stamp", "")}'
+        if key == '|':
+            try:
+                key = hashlib.sha256(
+                    json.dumps(item, sort_keys=True, ensure_ascii=False, default=str).encode('utf-8')
+                ).hexdigest()[:32]
+            except (TypeError, ValueError):
+                key = f'__raw_{len(result)}'
         if key in seen:
             continue
         seen.add(key)
@@ -6494,7 +6520,7 @@ class WegoScraper:
                             pagination = result.get('pagination', {})
                             if not isinstance(pagination, dict):
                                 pagination = {}
-                            album_total = max(album_total, _extract_album_total(pagination))
+                            album_total = max(album_total, _extract_album_total(pagination, len(items)))
                             
                             if items:
                                 all_goods_data = _dedupe_album_items(all_goods_data + items)
@@ -6848,7 +6874,7 @@ class WegoScraper:
                             pagination = result.get('pagination', {})
                             if not isinstance(pagination, dict):
                                 pagination = {}
-                            album_total = max(album_total, _extract_album_total(pagination))
+                            album_total = max(album_total, _extract_album_total(pagination, len(items)))
                             
                             if items:
                                 all_goods_data = _dedupe_album_items(all_goods_data + items)
