@@ -4409,7 +4409,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ### v5.0.9.113 (2026-11-14) - 🔴 **三条新范式落地 + 号位取消上限：config 全量热读取、temp 提交前归零、项目根删除权限恒为零** - ① 编号规则里的「硬上限 100」取消，改为「号位不设人为上限」，突破 999 自然进位为四位，前缀与 A-Z 位次规则不变；② `ConfigManager` 由「一次性加载永久缓存」改为 `(mtime_ns, size)` 签名热读取，`WEB_API_KEY` 由模块级常量改为 `get_web_api_key()` 实时取值，改配置不再需要重启；③ 新增 `PY-CORE-015` 配置热读取、`PY-CORE-046` 临时目录提交前清理、`PY-CORE-051` 项目根目录零删除权限三条范式，编号按 A-Z 位次全量重排 36 个，范式总数 48 → 51
 
-> **Commit**: `{{COMMIT}}`
+> **Commit**: `f56886bf`
 
 #### 更新内容: 把「号位上限」「配置冷缓存」「temp 随提交入库」三个长期隐患一次性修掉，并固化为三条可验收的正式范式
 
@@ -4427,7 +4427,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **修复日期**: 2026-11-14
 **修复类型**: 🔴安全加固 + ⚡性能优化 + 📝范式治理
 **影响文件**: [main.py](main.py), [.gitignore](.gitignore), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: {{COMMIT}}
+**Commit**: f56886bf
 **变更统计**: +1179行 -470行（main.py 配置签名热读取与 API Key 实时取值，.gitignore 新增 temp/ 忽略规则，README.md 与 skill.md 新增三条范式与版本条目，skill.docx 由 skill.md 二进制重生成）
 **作者**: 小旭二手机（西园路）
 
