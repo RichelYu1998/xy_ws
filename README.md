@@ -3744,19 +3744,174 @@ assert not viol and not bad and nums == sorted(nums)
 
 ## 🔄 最新更新
 
+### v5.0.9.102 (2026-11-14) - 🚦 **限流韧性加固 + 整卷数据完整性** - 相册分页 429 独立重试预算(12次/5s→60s/累计15分钟) + 全局限流闸门(撞429后统一冷却再发) + 页间延迟自适应(限流后放缓、成功后回落) + 单页补抓3轮 + 整卷服务端总数比对与最多3轮重抓合并去重 + 断点续爬叠加补齐 + 双抓取路径同步加固
+
+> **Commit**: `957b9877`
+
+#### 更新内容: 把「撞429就断、断了就丢数据」彻底堵死——限流不再等于放弃，风控放行后自动续抓同一页，并以服务端商品总数作为完整性判据反复补抓直到拿全
+
+1. **429独立预算**: 新增 `_ALBUM_RATE_LIMIT_MAX_RETRIES=12` / `_ALBUM_RATE_LIMIT_BASE_DELAY=5.0` / `_ALBUM_RATE_LIMIT_MAX_DELAY=60.0` / `_ALBUM_RATE_LIMIT_TOTAL_BUDGET=900.0`，429 与 5xx 分开计数，通用重试次数不再被限流耗光 [main.py](main.py#L1371-L1392)
+2. **全局闸门**: 新增 `_mark_album_rate_limited()` / `_album_cooldown_remaining()` / `_album_throttle_wait()`，任一请求撞429后把全局冷却截止时间推后，后续请求统一等到冷却结束再发，杜绝连环429 [main.py](main.py#L1395-L1411)
+3. **延迟自适应**: 新增 `_album_note_success()` / `_album_page_delay()`，撞过429后页间延迟随命中次数线性放大（上限 +3s），成功后逐步衰减回 0.4s 基础节奏 [main.py](main.py#L1413-L1428)
+4. **单页补抓**: 新增 `_ALBUM_PAGE_RETRY_ROUNDS=3` / `_ALBUM_PAGE_RETRY_WAIT=20.0`，单页临时性失败按 20s/40s/60s 递增等待补抓同一页，不再一页失败就整卷作废 [main.py](main.py#L1378-L1382)
+5. **完整性校验**: 新增 `_extract_album_total()` / `_album_is_complete()` / `_ALBUM_TOTAL_TOLERANCE=5`，从 `pagination.total/totalCount/totalNum/itemCount/count` 取服务端商品总数，已抓数量达标才判定完整 [main.py](main.py#L1431-L1451)
+6. **整卷重抓**: 新增 `_ALBUM_FULL_PASS_MAX=3`，一轮翻完仍少于服务端总数时从头重翻并按货号合并去重，最多 3 轮直到拿全 [main.py](main.py#L6753-L6900)
+7. **双路径同步**: `fetch_all_products_via_api`（带断点续爬）与 `fetch_cost_prices_via_api`（补抓拿货价）两条分页链路同时接入上述机制，401/403 与 HTML 登录页仍立即中止并提示 Cookie 失效 [main.py](main.py#L6397-L6552) [main.py](main.py#L6753-L6900)
+8. **断点仍可续**: 未抓完整时继续写 `fetch_progress_<album>.json`（3 秒写节流 + 6 小时过期），补抓轮次与断点续爬叠加，跨进程也能补齐剩余商品 [main.py](main.py#L1569-L1658)
+9. **弱哈希清零**: `_get_album_progress_path()` 断点文件名的兜底哈希由 MD5 改为 SHA256（长度不变，仅算法升级），安全审计 A02「弱哈希算法」由 4 项高危归零 [main.py](main.py#L1569-L1582)
+
+**修复日期**: 2026-11-14
+**修复类型**: 🚦稳定性加固 + 🔧Bug修复
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 957b9877
+**变更统计**: +744行 -255行（main.py +404 -225、README.md +170 -15、skill.md +170 -15、skill.docx 447190→451831 bytes）
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🚦 429 独立重试预算 (🔧Bug修复)
+**问题描述**:
+- **现象**: 商品数多的相册抓到中途报 `HTTP 429`，整轮抓取直接中断，只拿到一部分商品；重跑又从第 1 页开始，反复撞同一段风控
+- **根因**: 429 与 5xx 共用一套 4 次通用重试（退避 1s→16s、累计不足 30s），远短于服务端风控窗口；预算耗尽即被当成终态
+- **影响范围**: `fetch_album_api_page()`、`fetch_all_products_via_api()` 与 `fetch_cost_prices_via_api()` 两条分页主循环
+
+**修复方案**:
+- **技术实现**: 新增 `_ALBUM_RATE_LIMIT_MAX_RETRIES=12` / `_ALBUM_RATE_LIMIT_BASE_DELAY=5.0` / `_ALBUM_RATE_LIMIT_MAX_DELAY=60.0` / `_ALBUM_RATE_LIMIT_TOTAL_BUDGET=900.0`，429 与 5xx 分开计数；退避 5s→60s 封顶，`Retry-After` 取 `max(当前退避, min(响应头, 60s))`；累计等待超过 900s 才判定限流未解除，预算耗尽后仍登记冷却，避免紧接着的请求立刻再撞
+- **参考位置**: [main.py](main.py#L1371-L1392) 限流常量、[main.py](main.py#L1453-L1564) `fetch_album_api_page()`
+
+**测试验证**:
+- ✅ 本地模拟服务端连续返回 3 次 429 后放行，第 4 次请求拿到 200，商品数据完整
+- ✅ 429 重试预算耗尽时返回 `HTTP 429 限流未解除（已等待 N 秒，重试 N 次）` 并登记全局冷却
+- ✅ 401/403 不消耗 429 预算，只发 1 次请求即返回并提示 Cookie 失效
+
+##### 2. 🚪 全局限流闸门 (🔧Bug修复)
+**问题描述**:
+- **现象**: 同一轮里第 1 页撞 429 重试成功后，第 2 页立刻再撞 429，两页交替触发限流，整体耗时翻倍
+- **根因**: 每页各自退避，没有任何跨请求的共享状态，服务端风控窗口未结束就继续发请求
+- **影响范围**: 同一相册内的页间请求、两个抓取链路之间
+
+**修复方案**:
+- **技术实现**: 新增全局状态 `_album_rate_limit_until` / `_album_rate_limit_hits` / `_album_rate_limit_lock` 与 `_mark_album_rate_limited()` / `_album_cooldown_remaining()` / `_album_throttle_wait()`；任一请求撞 429 后把冷却截止时间推后（随命中次数递增，上限 60s），后续请求在发之前统一 `_album_throttle_wait()` 等到冷却结束
+- **参考位置**: [main.py](main.py#L1395-L1411) 限流闸门辅助函数
+
+**测试验证**:
+- ✅ 模拟第 1 页撞 429 后，第 2 页请求在冷却结束前不发出，日志输出等待秒数
+- ✅ 冷却结束后首请求即成功，命中计数随成功递减，闸门自动解除
+
+##### 3. ⏱️ 页间延迟自适应 (✨功能增强)
+**问题描述**:
+- **现象**: 固定 0.4s 页间延迟在正常状态下偏慢，在限流状态下又偏快，两头都不合适
+- **根因**: 延迟是写死的常量，没有随服务端压力反馈调整
+- **影响范围**: 分页翻页节奏、整体抓取耗时
+
+**修复方案**:
+- **技术实现**: 新增 `_album_note_success()` 与 `_album_page_delay()`，页间延迟 = 0.4s 基础值 + 命中次数 × 1.0s（上限 +3s），每成功一次命中计数递减 1，无命中时回落到基础节奏
+- **参考位置**: [main.py](main.py#L1413-L1428) 延迟自适应函数
+
+**测试验证**:
+- ✅ 连续命中 3 次 429 后页间延迟为 3.4s，随后成功 3 次回落到 0.4s
+- ✅ 无 429 场景延迟恒为 0.4s，不额外拖慢正常抓取
+
+##### 4. 🔁 单页补抓 3 轮 (🔧Bug修复)
+**问题描述**:
+- **现象**: 某一页重试耗尽后整轮翻页直接结束，后面 10 页的商品全部拿不到
+- **根因**: 外层循环把单页失败当整卷终态，缺少「同一页再补抓几轮」的中间层
+- **影响范围**: 分页主循环的单页失败处理
+
+**修复方案**:
+- **技术实现**: 新增 `_ALBUM_PAGE_RETRY_ROUNDS=3` / `_ALBUM_PAGE_RETRY_WAIT=20.0`，单页失败按 20s / 40s / 60s 递增等待后重抓同一页，3 轮仍失败才进入整卷重抓分支
+- **参考位置**: [main.py](main.py#L1378-L1382) 补抓常量、[main.py](main.py#L6753-L6900) 分页主循环
+
+**测试验证**:
+- ✅ 第 2 页首次 502、20s 后补抓成功，后续页正常翻完，12 条数据完整
+- ✅ 第 2 页连续 3 轮失败后进入整卷重抓，不丢已抓数据
+
+##### 5. 📐 整卷完整性校验 (✨功能增强)
+**问题描述**:
+- **现象**: 日志显示「分页未完整获取（已拿到 37 个商品）」，服务端相册实际有 120 个商品，缺失部分没有任何补救动作
+- **根因**: 分页结束只靠 `isLoadMore` 判断，从不与服务端商品总数比对，缺多少无从感知
+- **影响范围**: 商品数据完整率、断点文件准确性
+
+**修复方案**:
+- **技术实现**: 新增 `_extract_album_total()` 从 `pagination` 的 `total/totalCount/totalNum/itemCount/count` 取服务端总数；`_album_is_complete()` 以「已抓数量 ≥ 总数 - `_ALBUM_TOTAL_TOLERANCE`(5)」为完整判据，取不到总数时回落 `isLoadMore` 末页判定；`max_pages` 按服务端总数动态放大
+- **参考位置**: [main.py](main.py#L1431-L1451) 完整性判定函数
+
+**测试验证**:
+- ✅ 服务端 total=12、3 页共 12 条：判定完整，翻页 3 次即结束
+- ✅ 服务端 total=100 但仅能拿到 12 条：判定不完整，日志明确提示「分页未完整获取（已拿到 12 个商品）」
+- ✅ 响应缺少 `pagination` 字段：回落 `isLoadMore` 末页判定，不误判为完整
+
+##### 6. 📦 整卷多轮重抓合并去重 (🔧Bug修复)
+**问题描述**:
+- **现象**: 单页补抓 3 轮仍失败时，整卷只落 37/120 条数据，只能等下次运行补齐
+- **根因**: 没有「整卷从头再翻一遍并把两次结果合并」的兜底，缺页永远补不回来
+- **影响范围**: 大相册（多页）的完整性保障
+
+**修复方案**:
+- **技术实现**: 新增 `_ALBUM_FULL_PASS_MAX=3` 与 `_dedupe_album_items()`，一轮翻完仍少于服务端总数时从头重翻，按货号合并去重保序，最多 3 轮直到拿全；每轮结束重新比对总数决定是否继续
+- **参考位置**: [main.py](main.py#L6753-L6900) 整卷补抓主循环、[main.py](main.py#L1646-L1658) 去重合并
+
+**测试验证**:
+- ✅ 第 2 页持续 502：第 1 轮拿到 8 条，第 2 轮重翻补齐 12 条，判定完整并退出
+- ✅ 3 轮仍不足时落断点并明确告警，不静默丢数据
+
+##### 7. 🛣️ 双抓取路径同步加固 (🔧Bug修复)
+**问题描述**:
+- **现象**: 商品全量链路已可重试，但拿货价补抓链路仍是老逻辑，撞 429 就直接放弃该商品价格
+- **根因**: 两条链路各自维护分页循环，加固只做了一半
+- **影响范围**: `fetch_cost_prices_via_api()` 拿货价数据完整率
+
+**修复方案**:
+- **技术实现**: `fetch_all_products_via_api`（带断点续爬）与 `fetch_cost_prices_via_api`（补抓拿货价）两条分页链路同时接入 429 独立预算、全局闸门、单页补抓、整卷完整性校验；401/403 与 HTML 登录页仍立即中止并提示 Cookie 失效
+- **参考位置**: [main.py](main.py#L6397-L6552) 拿货价分页循环、[main.py](main.py#L6753-L6900) 全量商品分页循环
+
+**测试验证**:
+- ✅ 拿货价链路第 2 页撞 429 后按新预算重试成功，价格数据与商品数据同批完整
+- ✅ 两条链路共用同一全局闸门，任一链路撞 429 后另一链路同步等待冷却
+
+##### 8. 💾 断点续爬叠加补齐 (✨功能增强)
+**问题描述**:
+- **现象**: 多轮重抓后仍未拿全时，进程退出即丢失进度，下次运行只能从第 1 页重来
+- **根因**: 断点只在单轮结束时落盘，与补抓轮次没有联动
+- **影响范围**: 跨进程补齐能力、重复抓取成本
+
+**修复方案**:
+- **技术实现**: 未抓完整时继续写 `fetch_progress_<album>.json`（3 秒写节流、6 小时过期、按货号去重），下次运行先恢复已抓商品再叠加新一轮补抓；抓完整后清理断点文件，避免与新数据混用
+- **参考位置**: [main.py](main.py#L1569-L1658) 断点续爬五函数
+
+**测试验证**:
+- ✅ 首轮 12/100 中断后退出，再次运行恢复 12 条并继续翻页补齐
+- ✅ 断点文件超过 6 小时自动失效，不会把过期数据混入新一轮结果
+
+##### 9. 🔐 断点文件名哈希算法升级 (🛡️安全加固)
+**问题描述**:
+- **现象**: 安全审计报告 `file/security_report_*.json` 出现 4 项 HIGH（A02:2021 弱哈希算法），定位在 `_get_album_progress_path()` 第 1578、1580 行
+- **根因**: 断点文件名兜底哈希用了 MD5，虽然只用于生成文件名、不参与任何安全校验，但仍触发 A02 规则
+- **影响范围**: 安全审计结论、代码规范合规性
+
+**修复方案**:
+- **技术实现**: 两处 `hashlib.md5(...).hexdigest()` 改为 `hashlib.sha256(...).hexdigest()`，截取长度保持 16/8 位不变，断点文件名格式与去重能力完全一致，不影响既有断点文件读取
+- **参考位置**: [main.py](main.py#L1569-L1582) `_get_album_progress_path()`
+
+**测试验证**:
+- ✅ 重跑 `test/security_audit.py`，HIGH 由 4 项降为 0 项，攻防验证 13/13 通过
+- ✅ 非 ASCII 相册名与含特殊字符的相册名仍生成不同断点文件，去重能力不变
+
+---
+
 ### v5.0.9.101 (2026-11-14) - 🛡️ **稳定性与安全加固 + 变更记录自愈** - 相册分页接口 429/5xx 指数退避重试 + 分页断点续爬(中断可续) + 清理目录边界校验(堵住绝对路径删任意目录漏洞) + 敏感端点分桶限流(防互相挤占) + 审计规则区剥离(根除自匹配假阳性) + /api/changelog 全量规范化(空 changes/占位符/Commit 非哈希一律自愈) + 版本排序口径与 README 顺序对齐 + 前端失败态恢复与轮询 429 退避 + run.bat/run.sh 版本号统一自动提取(不硬编码) + .gitignore 补齐环境变量忽略
 
 > **Commit**: `3daed1da`
 
 #### 更新内容: 把「跑不完、续不上、删过头、记不全」四类历史欠账一次性收口——抓取侧可重试可续爬、清理侧强边界、限流侧分桶、记录侧零空值零占位
 
-1. **分页可重试**: 新增 `fetch_album_api_page()`，对 429/500/502/503/504 与网络异常做指数退避重试（1s→16s 上限），优先遵守响应头 `Retry-After`（上限 30s），不可重试状态码立即返回 [main.py](main.py#L1371-L1452)
-2. **分页可续爬**: 新增断点文件 `fetch_progress_<album>.json`（6 小时有效期、3 秒写节流、按货号去重），中断后下次运行自动恢复已抓商品并继续翻页，未抓完整时明确告警 [main.py](main.py#L1454-L1548)
-3. **清理强边界**: 新增 `resolve_clean_directory()` + `_get_clean_allowed_roots()`，相对/绝对路径统一 realpath 后限制在允许根目录内，符号链接逃逸与文件系统根目录一律拒绝 [main.py](main.py#L3262-L3306)
-4. **限流分桶**: 新增 `_SENSITIVE_LIMIT_RULES` + `_get_sensitive_limiter()`，10 类敏感端点各自独立配额，页面刷新不再挤占隧道启停配额 [main.py](main.py#L3949-L3981)
-5. **审计不自匹配**: 新增 `_strip_audit_rule_block()`，扫描前剥离 `[AUDIT_RULES_BEGIN/END]` 规则定义区，规则文本不再被判成违规代码 [main.py](main.py#L8795-L8812)
-6. **记录零空值**: `/api/changelog` 新增全量规范化层，`_sanitize_commit()` 只保留 7-10 位十六进制哈希、`_commit_lookup` 为历史版本回填哈希，空 `changes` 与「待生成/待补充」占位一律替换为真实内容 [main.py](main.py#L12077-L12165)
-7. **排序对齐**: `version_sort_key()` 改为定长分段补齐，`5.0.9` 正确排在 `5.0.9.1` 之下，与 README 版本顺序一致 [main.py](main.py#L12009-L12016)
+1. **分页可重试**: 新增 `fetch_album_api_page()`，对 429/500/502/503/504 与网络异常做指数退避重试（1s→16s 上限），优先遵守响应头 `Retry-After`（上限 30s），不可重试状态码立即返回 [main.py](main.py#L1453-L1564)
+2. **分页可续爬**: 新增断点文件 `fetch_progress_<album>.json`（6 小时有效期、3 秒写节流、按货号去重），中断后下次运行自动恢复已抓商品并继续翻页，未抓完整时明确告警 [main.py](main.py#L1569-L1658)
+3. **清理强边界**: 新增 `resolve_clean_directory()` + `_get_clean_allowed_roots()`，相对/绝对路径统一 realpath 后限制在允许根目录内，符号链接逃逸与文件系统根目录一律拒绝 [main.py](main.py#L3376-L3419)
+4. **限流分桶**: 新增 `_SENSITIVE_LIMIT_RULES` + `_get_sensitive_limiter()`，10 类敏感端点各自独立配额，页面刷新不再挤占隧道启停配额 [main.py](main.py#L4063-L4094)
+5. **审计不自匹配**: 新增 `_strip_audit_rule_block()`，扫描前剥离 `[AUDIT_RULES_BEGIN/END]` 规则定义区，规则文本不再被判成违规代码 [main.py](main.py#L8972-L8991)
+6. **记录零空值**: `/api/changelog` 新增全量规范化层，`_sanitize_commit()` 只保留 7-10 位十六进制哈希、`_commit_lookup` 为历史版本回填哈希，空 `changes` 与「待生成/待补充」占位一律替换为真实内容 [main.py](main.py#L12264-L12341)
+7. **排序对齐**: `version_sort_key()` 改为定长分段补齐，`5.0.9` 正确排在 `5.0.9.1` 之下，与 README 版本顺序一致 [main.py](main.py#L12188-L12196)
 8. **前端可恢复**: `restoreRunUi()` + `describeRunFailure()` 统一失败态复原与 429/401/403/5xx 友好提示，轮询遇 429 按 `Retry-After` 指数退避（上限 15s）并自动续轮询 [dist/app.js](dist/app.js)
 9. **版本统一**: `run.bat`/`run.sh` 均改为从 README 首条 `### v` 行正则提取版本号，删除硬编码与多级兜底分支，两脚本版本恒等于 README 首条版本 [run.bat](run.bat) [run.sh](run.sh)
 
@@ -3777,7 +3932,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 抽出 `fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=4)` 统一封装：仅对 `_ALBUM_API_RETRYABLE_STATUS = (429, 500, 502, 503, 504)` 与 `URLError`/超时重试，退避从 1.0s 起翻倍至 16s 封顶并叠加 0~0.5s 抖动；响应头存在 `Retry-After` 时取 `max(当前退避, min(Retry-After, 30s))`；401/403 等不可重试状态码立即返回，交由调用方给出 Cookie 失效/反爬提示
-- **参考位置**: [main.py](main.py#L1371-L1452) `fetch_album_api_page()`、[main.py](main.py#L6307) 第 1 处调用、[main.py](main.py#L6633) 分页主循环调用
+- **参考位置**: [main.py](main.py#L1453-L1564) `fetch_album_api_page()`、[main.py](main.py#L6429) 第 1 处调用、[main.py](main.py#L6787) 分页主循环调用
 
 **测试验证**:
 - ✅ 429/5xx 场景下同一页最多尝试 4 次，退避序列 1s→2s→4s（含抖动），日志逐次输出 `[重试] 第N/4次请求失败(...)`
@@ -3791,8 +3946,8 @@ assert not viol and not bad and nums == sorted(nums)
 - **影响范围**: 大相册抓取成功率、单次抓取的请求配额消耗、`timestamp` 翻页游标连续性
 
 **修复方案**:
-- **技术实现**: 新增 `_get_album_progress_path`（album_id 非 ASCII 时用 md5 兜底保证文件唯一）、`_load_album_progress`（校验 album_id 一致 + 6 小时 `_ALBUM_PROGRESS_MAX_AGE` 过期即清）、`_save_album_progress`（3 秒写节流避免 O(n²) 写放大，`force=True` 兜底写入）、`_clear_album_progress`、`_dedupe_album_items`（按 `goodsNum`、缺失时用 `title|time_stamp` 去重且保序）；`max_pages` 改为 `max(50, len(已恢复商品)//100 + 50)` 动态放大；未抓完整时 `pagination_complete=False` 并强制写断点、明确告警「分页未完整获取」
-- **参考位置**: [main.py](main.py#L1454-L1548) 断点续爬五函数、[main.py](main.py#L6599-L6722) 主循环接入点
+- **技术实现**: 新增 `_get_album_progress_path`（album_id 非 ASCII 时用哈希兜底保证文件唯一（v5.0.9.102 已由 MD5 升级为 SHA256））、`_load_album_progress`（校验 album_id 一致 + 6 小时 `_ALBUM_PROGRESS_MAX_AGE` 过期即清）、`_save_album_progress`（3 秒写节流避免 O(n²) 写放大，`force=True` 兜底写入）、`_clear_album_progress`、`_dedupe_album_items`（按 `goodsNum`、缺失时用 `title|time_stamp` 去重且保序）；`max_pages` 改为 `max(50, len(已恢复商品)//100 + 50)` 动态放大；未抓完整时 `pagination_complete=False` 并强制写断点、明确告警「分页未完整获取」
+- **参考位置**: [main.py](main.py#L1569-L1658) 断点续爬五函数、[main.py](main.py#L6686-L6900) 主循环接入点
 
 **测试验证**:
 - ✅ 中断后重跑日志出现 `[断点续爬] 从上次中断处继续: 已恢复 N 个商品`
@@ -3808,7 +3963,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 新增 `_get_clean_allowed_roots()`（默认仅 `PROJECT_DIR`，可用 `CLEAN_ALLOWED_ROOTS` 环境变量按 `os.pathsep` 追加，结果缓存）与 `resolve_clean_directory()`（相对/绝对路径统一 `realpath` 后要求命中根目录或以 `root + os.sep` 开头，命中文件系统根目录直接拒绝），不安全时返回 `(None, 错误信息)` 由接口回 400
-- **参考位置**: [main.py](main.py#L3262-L3306) `_get_clean_allowed_roots()` / `resolve_clean_directory()`
+- **参考位置**: [main.py](main.py#L3376-L3419) `_get_clean_allowed_roots()` / `resolve_clean_directory()`
 
 **测试验证**:
 - ✅ 传项目内相对路径正常解析并放行
@@ -3823,7 +3978,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 新增 `_SENSITIVE_LIMIT_RULES` 声明式规则表（路径前缀 / 桶名 / 窗口内最大请求数 / 窗口秒数），`_get_sensitive_limiter(path)` 按前缀最长优先匹配取桶，桶内 `RateLimiter` 懒创建并由 `_sensitive_limiters_lock` 保护；未命中规则的路径回落到原 `sensitive_rate_limiter`（30 次/60 秒）
-- **参考位置**: [main.py](main.py#L3949-L3981) 规则表与取桶函数
+- **参考位置**: [main.py](main.py#L4063-L4094) 规则表与取桶函数
 
 **测试验证**:
 - ✅ `/api/tunnel/status` 命中 `tunnel-status` 桶（120 次/60 秒），刷新页面不再影响 `/api/tunnel/restart`
@@ -3838,7 +3993,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 用拼接常量 `_AUDIT_RULES_BEGIN_MARK = '# [AUDIT' + '_RULES_BEGIN]'` 避免标记本身被扫描命中，新增 `_strip_audit_rule_block(content)` 在扫描前按行剥离标记之间的规则定义区，规则文本不再进入检查上下文
-- **参考位置**: [main.py](main.py#L8795-L8812) 标记常量与 `_strip_audit_rule_block()`
+- **参考位置**: [main.py](main.py#L8972-L8991) 标记常量与 `_strip_audit_rule_block()`
 
 **测试验证**:
 - ✅ 扫描 main.py 时 `os.system()`/`eval()`/`document.write()` 类假阳性归零
@@ -3852,7 +4007,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 新增 `_sanitize_commit()`（正则只取 7-10 位十六进制 token，去重后最多保留 5 个）、`_commit_lookup`（先按版本号收集真实哈希，供缺失条目回填）、`_is_placeholder()`（统一 `('', '待生成', '待补充', '待完善', 'TBD', 'N/A', 'None', 'null')` 判定）；随后对每个条目强制规范化 `commit`/`fix_date`/`fix_type`/`author`/`affected_files`/`change_stats`，并对每个变更项的 `problem`/`solution`/`verification` 逐字段兜底，`verification` 为空时补两条真实可验证项
-- **参考位置**: [main.py](main.py#L12077-L12165) 规范化层、[main.py](main.py#L11653) `get_changelog()` 主体
+- **参考位置**: [main.py](main.py#L12264-L12341) 规范化层、[main.py](main.py#L11833) `get_changelog()` 主体
 
 **测试验证**:
 - ✅ 全量 441 个版本条目 `changes` 非空（空数组 0 个）
@@ -3867,7 +4022,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 **修复方案**:
 - **技术实现**: 改为定长补齐——`(分段数值 + [-1] * 6)[:6]`，缺失段视作最低值，`5.0.9 → [5,0,9,-1,-1,-1]` 低于 `5.0.9.1 → [5,0,9,1,-1,-1]`，与 README 降序排列完全一致；异常版本号回落全 `-1` 排到末尾
-- **参考位置**: [main.py](main.py#L12009-L12016) `version_sort_key()`
+- **参考位置**: [main.py](main.py#L12188-L12196) `version_sort_key()`
 
 **测试验证**:
 - ✅ 441 条版本号按定长分段比较严格降序（含 `5.0.9` 位于 `5.0.9.1` 之下）
