@@ -6,6 +6,7 @@ import ctypes
 from contextlib import asynccontextmanager
 import glob
 import gzip
+import http.client
 import hashlib
 import importlib.metadata as im
 import inspect
@@ -46,6 +47,161 @@ from functools import wraps
 from html import escape
 from pathlib import Path
 from typing import List, Dict, Optional, Any, Callable, TypeVar, Union, Tuple
+
+# ─── 启动阶段并行预热 ────────────────────────────────────────
+# 模块导入（openpyxl/pandas/fastapi/playwright 等）固定要花 1.2~1.5 秒，浏览器
+# 启动还要 1~2 秒。这段时间网络完全是空闲的，让分页接口在后台线程里先跑起来，
+# 把本地的初始化开销藏进网络往返里，等于白捡 1 秒以上的启动时间。
+# 只对爬虫任务(--task 1)生效，其它任务和 Web 服务启动不会白打一次接口。
+
+# 单次请求条数：接口的 pageSize 参数被服务端忽略（恒定返回32条），真正生效的是 limit。
+# 设大 limit 后常见相册一次请求就能翻完（原4次串行请求压成1次），是提速的最大来源。
+# 上限不宜过大：超大相册一次回包几十MB会拖慢解析，1000条约 4~6MB，属于安全区间。
+_ALBUM_PAGE_LIMIT = int(os.environ.get('ALBUM_PAGE_LIMIT', '1000'))
+_album_logger = logging.getLogger('main.album')
+_ALBUM_DEFAULT_ID = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
+_ALBUM_API_HOST = 'www.szwego.com'
+_ALBUM_API_PATH = '/album/personal/all'
+_ALBUM_PREFETCH_UA = (
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+)
+
+_album_prefetch = {
+    'event': threading.Event(),
+    'album_id': None,
+    'items': None,
+    'pagination': None,
+    'error': None,
+}
+_album_prefetch_thread = None
+
+
+def _album_extract_id(url):
+    """从相册URL里提取albumId，取不到时回落到默认相册"""
+    match = re.search(r'albumId=([^&/]+)|/shop_detail/([^/?#]+)', str(url or ''))
+    if not match:
+        return _ALBUM_DEFAULT_ID
+    return match.group(1) or match.group(2) or _ALBUM_DEFAULT_ID
+
+
+def _album_prefetch_needed():
+    """只有爬虫任务需要预热，避免对比/清理/Web服务任务白打一次接口"""
+    argv = sys.argv
+    if '--task=1' in argv:
+        return True
+    for index, arg in enumerate(argv):
+        if arg == '--task' and index + 1 < len(argv) and argv[index + 1] == '1':
+            return True
+    return False
+
+
+def _album_prefetch_worker():
+    """后台线程：读完配置与Cookie立刻发出第一页请求，与后续导入/浏览器启动并行"""
+    state = _album_prefetch
+    try:
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, 'config', 'config.json'), 'r', encoding='utf-8') as f:
+            target_url = (json.load(f) or {}).get('target_url', '')
+        album_id = _album_extract_id(target_url)
+        with open(os.path.join(base, 'config', 'cookies.json'), 'r', encoding='utf-8') as f:
+            cookies = json.load(f)
+        cookie_str = '; '.join([
+            f'{c.get("name", "")}={c.get("value", "")}'
+            for c in cookies if isinstance(c, dict) and c.get('name') and c.get('value')
+        ])
+        params = {
+            'albumId': album_id,
+            'searchValue': '',
+            'searchImg': '',
+            'startDate': '',
+            'endDate': '',
+            'sourceId': '',
+            'pageSize': _ALBUM_PAGE_LIMIT,
+            'limit': _ALBUM_PAGE_LIMIT,
+        }
+        path = f'{_ALBUM_API_PATH}?{urllib.parse.urlencode(params)}'
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'zh-CN,zh;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
+            'User-Agent': _ALBUM_PREFETCH_UA,
+            'x-wg-language': 'zh',
+            'Cookie': cookie_str,
+            'Connection': 'keep-alive',
+        }
+        timeout = float(os.environ.get('ALBUM_API_TIMEOUT', '10'))
+        conn = http.client.HTTPSConnection(_ALBUM_API_HOST, timeout=timeout)
+        try:
+            conn.request('GET', path, headers=headers)
+            resp = conn.getresponse()
+            raw = resp.read()
+            encoding = (resp.getheader('Content-Encoding') or '').lower()
+            if 'gzip' in encoding:
+                text = gzip.decompress(raw).decode('utf-8', errors='replace')
+            else:
+                text = raw.decode('utf-8', errors='replace')
+            if resp.status != 200:
+                state['error'] = f'HTTP {resp.status}'
+                return
+            data = json.loads(text)
+            if not isinstance(data, dict):
+                state['error'] = '返回非JSON对象'
+                return
+            if data.get('code') and data.get('code') != 0:
+                state['error'] = f'业务错误 code={data.get("code")}'
+                return
+            result = data.get('result') or {}
+            items = result.get('items') or []
+            if not isinstance(items, list):
+                state['error'] = 'items字段格式错误'
+                return
+            pagination = result.get('pagination') or {}
+            if not isinstance(pagination, dict):
+                pagination = {}
+            state['album_id'] = album_id
+            state['items'] = items
+            state['pagination'] = pagination
+        finally:
+            try:
+                conn.close()
+            except Exception as exc:  # [HANDLED]
+                _album_logger.debug(f'关闭预热连接异常: {type(exc).__name__}: {exc}')
+    except Exception as exc:  # [HANDLED]
+        state['error'] = f'{type(exc).__name__}: {exc}'
+    finally:
+        state['event'].set()
+
+
+def _take_album_prefetch(album_id, wait_seconds=0.0):
+    """取出预热结果
+
+    Returns:
+        tuple: (items, pagination) 预热成功且相册一致时返回；
+            None 表示预热失败或相册不一致，调用方应走正常请求
+    """
+    state = _album_prefetch
+    if not state['event'].wait(wait_seconds):
+        return None
+    if state['items'] is None or str(state['album_id']) != str(album_id):
+        return None
+    return state['items'], state['pagination']
+
+
+def _start_album_prefetch():
+    """启动预热线程（重复调用不会重复发请求）"""
+    global _album_prefetch_thread
+    if _album_prefetch_thread is not None:
+        return
+    _album_prefetch_thread = threading.Thread(
+        target=_album_prefetch_worker, name='album-prefetch', daemon=True
+    )
+    _album_prefetch_thread.start()
+
+
+if _album_prefetch_needed():
+    _start_album_prefetch()
+
 try:
     import openpyxl
 except ImportError:
@@ -1378,11 +1534,16 @@ _ALBUM_RATE_LIMIT_MAX_DELAY = 60.0
 _ALBUM_RATE_LIMIT_TOTAL_BUDGET = 900.0
 
 # 单页临时性失败（限流/5xx/断网）的补抓轮数与轮间等待，避免一页失败就丢掉整卷数据
-_ALBUM_PAGE_RETRY_ROUNDS = 3
-_ALBUM_PAGE_RETRY_WAIT = 20.0
+_ALBUM_PAGE_RETRY_ROUNDS = 2
+_ALBUM_PAGE_RETRY_WAIT = 2.0
 
 # 整卷翻页最多补抓轮数：一轮翻完仍少于服务端总数时，重新从头翻页合并去重
 _ALBUM_FULL_PASS_MAX = 3
+# 整卷补抓轮之间只需短暂喘息，长等待留给 429 专用预算，避免正常补抓白等 20 秒
+_ALBUM_PASS_RETRY_WAIT = 1.0
+
+# 单次相册分页请求超时：正常响应 1~3 秒，超时过长会让偶发抖动把整次运行拖到分钟级
+_ALBUM_API_TIMEOUT = float(os.environ.get('ALBUM_API_TIMEOUT', '10'))
 
 # 服务端 total 可能把已删除/隐藏商品算在内，允许极小差额不算缺失
 _ALBUM_TOTAL_TOLERANCE = 5
@@ -1425,7 +1586,7 @@ def _album_page_delay():
     with _album_rate_limit_lock:
         hits = _album_rate_limit_hits
     if hits <= 0:
-        return 0.4 + random.uniform(0, 0.4)
+        return 0.05 + random.uniform(0, 0.1)
     return 0.4 + min(0.4 * hits, 3.0) + random.uniform(0, 0.4)
 
 def _extract_album_total(pagination, page_len=0):
@@ -1465,7 +1626,78 @@ def _album_is_complete(collected, total, pass_complete):
         return collected >= total - tolerance
     return bool(pass_complete)
 
-def fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=4, rate_limit_max_retries=None):
+_album_http_conn = None
+_album_http_conn_key = None
+_album_http_lock = threading.Lock()
+
+def _album_close_http_conn():
+    """关闭并丢弃复用的长连接，下次请求重新建连"""
+    global _album_http_conn, _album_http_conn_key
+    conn = _album_http_conn
+    _album_http_conn = None
+    _album_http_conn_key = None
+    if conn is not None:
+        try:
+            conn.close()
+        except Exception as exc:  # [HANDLED]
+            _album_logger.debug(f'关闭复用连接异常: {type(exc).__name__}: {exc}')
+
+def _album_http_get(full_url, headers, cookie_str, timeout):
+    """复用同一条 HTTPS 连接并开启 gzip 压缩请求相册接口
+
+    原来每页都用 urlopen 重新建连，每页都要重复 TCP+TLS 握手，且不带
+    Accept-Encoding 导致 140KB 的响应体全量明文传输；改为连接复用 + gzip 后，
+    单页耗时从 5 秒级降到 1~2 秒级，整卷翻页速度提升数倍。
+
+    Returns:
+        tuple: (status_code, text, retry_after, error_message)
+            出错时 status_code 为 None，error_message 为异常描述
+    """
+    global _album_http_conn, _album_http_conn_key
+    parts = urllib.parse.urlsplit(full_url)
+    key = (parts.scheme, parts.netloc)
+    path = parts.path + (f'?{parts.query}' if parts.query else '')
+    req_headers = dict(headers)
+    req_headers['Cookie'] = cookie_str
+    req_headers['Accept-Encoding'] = 'gzip, deflate'
+    req_headers['Connection'] = 'keep-alive'
+    with _album_http_lock:
+        last_exc = None
+        # 复用连接可能已被服务端超时关闭，此时用新连接立即重试一次，
+        # 不消耗外层重试次数
+        for _ in range(2):
+            reused = _album_http_conn is not None and _album_http_conn_key == key
+            try:
+                if _album_http_conn is None or _album_http_conn_key != key:
+                    _album_close_http_conn()
+                    if parts.scheme == 'https':
+                        _album_http_conn = http.client.HTTPSConnection(parts.netloc, timeout=timeout)
+                    else:
+                        _album_http_conn = http.client.HTTPConnection(parts.netloc, timeout=timeout)
+                    _album_http_conn_key = key
+                conn = _album_http_conn
+                conn.request('GET', path, headers=req_headers)
+                resp = conn.getresponse()
+                raw = resp.read()
+                status_code = resp.status
+                retry_after = resp.getheader('Retry-After')
+                encoding = (resp.getheader('Content-Encoding') or '').lower()
+                if 'gzip' in encoding:
+                    text = gzip.decompress(raw).decode('utf-8', errors='replace')
+                else:
+                    text = raw.decode('utf-8', errors='replace')
+                if resp.will_close:
+                    _album_close_http_conn()
+                return status_code, text, retry_after, None
+            except Exception as exc:  # [HANDLED]
+                last_exc = exc
+                _album_close_http_conn()
+                if not reused:
+                    break
+        return None, '', None, f'{type(last_exc).__name__}: {last_exc}'
+
+def fetch_album_api_page(full_url, headers, cookie_str, timeout=_ALBUM_API_TIMEOUT,
+                         max_retries=4, rate_limit_max_retries=None):
     """请求相册分页接口，对429/5xx/网络异常做指数退避重试
 
     Args:
@@ -1495,48 +1727,14 @@ def fetch_album_api_page(full_url, headers, cookie_str, timeout=15, max_retries=
 
     while True:
         _album_throttle_wait()
-        status_code = None
-        text = ''
-        retry_after = None
-        resp = None
-        try:
-            req = urllib.request.Request(full_url)
-            for key, value in headers.items():
-                req.add_header(key, value)
-            req.add_header('Cookie', cookie_str)
-
-            resp = urllib.request.urlopen(req, timeout=timeout)
-            status_code = resp.getcode()
-            text = resp.read().decode('utf-8', errors='replace')
-            if status_code == 200:
-                _album_note_success()
-                return status_code, text, None
+        status_code, text, retry_after, req_error = _album_http_get(full_url, headers, cookie_str, timeout)
+        if req_error:
+            last_error = req_error
+        elif status_code == 200:
+            _album_note_success()
+            return status_code, text, None
+        else:
             last_error = f'HTTP {status_code}'
-            try:
-                retry_after = resp.headers.get('Retry-After') if resp.headers else None
-            except Exception:
-                retry_after = None
-        except urllib.error.HTTPError as http_err:
-            status_code = http_err.code
-            try:
-                text = http_err.read().decode('utf-8', errors='replace') if http_err.fp else ''
-            except Exception:
-                text = ''
-            last_error = f'HTTP {status_code}'
-            try:
-                retry_after = http_err.headers.get('Retry-After') if http_err.headers else None
-            except Exception:
-                retry_after = None
-        except urllib.error.URLError as url_err:
-            last_error = f'URLError: {url_err}'
-        except Exception as req_error:
-            last_error = f'{type(req_error).__name__}: {req_error}'
-        finally:
-            if resp:
-                try:
-                    resp.close()
-                except Exception:
-                    pass
 
         if status_code == 429:
             # 限流单独计数：只有连续撞满预算才放弃，风控一放行就立刻续抓同一页
@@ -6490,6 +6688,7 @@ class WegoScraper:
             if pass_num > 0:
                 page_timestamp = ''
                 logger.debug(f'  [完整性补抓] 第{pass_num+1}轮从头翻页补齐，当前已拿到 {len(all_goods_data)} 个商品')
+            pass_start_count = len(all_goods_data)
             pass_complete = False
             page_num = 0
             page_retry = 0
@@ -6503,7 +6702,8 @@ class WegoScraper:
                     'startDate': '',
                     'endDate': '',
                     'sourceId': '',
-                    'pageSize': 100
+                    'pageSize': _ALBUM_PAGE_LIMIT,
+                    'limit': _ALBUM_PAGE_LIMIT
                 }
                 # 只有第一页不需要timestamp，后续需要
                 if page_timestamp:
@@ -6513,9 +6713,12 @@ class WegoScraper:
                     query_string = urllib.parse.urlencode(params)
                     full_url = f'{api_url}?{query_string}'
 
-                    logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, pageSize=100')
+                    logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, '
+                                 f'limit={_ALBUM_PAGE_LIMIT}')
 
-                    status_code, text, fetch_error = fetch_album_api_page(full_url, headers, cookie_str, timeout=15)
+                    status_code, text, fetch_error = await asyncio.to_thread(
+                        fetch_album_api_page, full_url, headers, cookie_str, _ALBUM_API_TIMEOUT
+                    )
 
                     if fetch_error:
                         logger.debug(f'  第{page_num+1}页请求失败: {fetch_error}')
@@ -6631,12 +6834,15 @@ class WegoScraper:
                 break
             if _album_is_complete(len(all_goods_data), album_total, pass_complete):
                 break
+            if len(all_goods_data) <= pass_start_count:
+                logger.debug(f'  第{pass_num+1}轮未拿到新商品，继续补抓也拿不到，结束')
+                break
             if album_total:
                 logger.debug(f'  ⚠️ 第{pass_num+1}轮结束: 已拿到 {len(all_goods_data)} / 服务端总数 {album_total}，准备补抓')
             else:
                 logger.debug(f'  ⚠️ 第{pass_num+1}轮未翻到末页（已拿到 {len(all_goods_data)} 个商品），准备补抓')
             if pass_num + 1 < _ALBUM_FULL_PASS_MAX:
-                await asyncio.sleep(_ALBUM_PAGE_RETRY_WAIT)
+                await asyncio.sleep(_ALBUM_PASS_RETRY_WAIT)
         
         logger.debug(f'共获取 {len(all_goods_data)} 个商品数据')
         
@@ -6729,8 +6935,14 @@ class WegoScraper:
             # 页面导航重试机制
             max_retries = RETRY_CONFIG['browser_navigation_max_retries']
             page_loaded = False
-            
-            for retry in range(max_retries):
+            # 商品数据全部走 API，页面本身只用来取 URL 里的 albumId；地址不是有效网页时
+            # 直接跳过导航，避免每次运行都白等 3+3+2 秒重试和固定 2 秒停顿
+            navigable = str(target_url or '').lower().startswith(('http://', 'https://'))
+            if not navigable:
+                logger.debug(f'target_url 不是有效网页地址（{target_url!r}），'
+                             f'跳过页面导航，直接走 API')
+
+            for retry in range(max_retries if navigable else 0):
                 goto_start = time.time()
                 try:
                     logger.debug(f'尝试加载页面 (第{retry + 1}/{max_retries}次)...')
@@ -6741,17 +6953,14 @@ class WegoScraper:
                 except Exception as e:  # [HANDLED]
                     logger.debug(f'页面导航出错: {e}')
                     if retry < max_retries - 1:
-                        logger.debug(f'等待3秒后重试...')
-                        await asyncio.sleep(3)
-                    else:
-                        logger.debug('所有重试都失败，尝试继续执行...')
-                        await asyncio.sleep(SLEEP_CONFIG['medium'])
+                        logger.debug(f'等待1秒后重试...')
+                        await asyncio.sleep(1)
                 logger.debug(f'页面导航耗时: {time.time() - goto_start:.2f}秒')
             
-            if not page_loaded:
+            if navigable and not page_loaded:
                 logger.debug('警告: 页面可能未完全加载，继续执行...')
             
-            await asyncio.sleep(2)
+            await asyncio.sleep(0.2)
             
             # 直接通过API获取所有商品数据
             logger.debug('直接通过API获取所有商品数据...')
@@ -6841,17 +7050,41 @@ class WegoScraper:
             logger.debug(f'  [断点续爬] 从上次中断处继续: 已恢复 {len(all_goods_data)} 个商品, timestamp={page_timestamp or "(空)"}')
         
         logger.debug('开始通过API获取所有商品（使用urllib，不依赖浏览器）...')
+        # 启动阶段（导入依赖、启动浏览器）已并行发出的第一页请求，这里直接复用，
+        # 相当于把那段本地初始化时间完全藏进网络往返里
+        prefetched_complete = False
+        prefetched = _take_album_prefetch(album_id, wait_seconds=_ALBUM_API_TIMEOUT + 1)
+        if prefetched is not None:
+            prefetched_items, prefetched_pagination = prefetched
+            album_total = max(album_total, _extract_album_total(prefetched_pagination, len(prefetched_items)))
+            if prefetched_items:
+                all_goods_data = _dedupe_album_items(all_goods_data + prefetched_items)
+            try:
+                page_timestamp = str(prefetched_pagination.get('pageTimestamp', ''))
+            except (ValueError, TypeError):
+                page_timestamp = ''
+            prefetched_load_more = bool(prefetched_pagination.get('isLoadMore', False))
+            logger.debug(f'  [启动预热] 复用启动阶段请求: {len(prefetched_items)} 个商品, '
+                         f'isLoadMore={prefetched_load_more}, 累计={len(all_goods_data)}')
+            if not (prefetched_load_more and page_timestamp):
+                pagination_complete = True
+                prefetched_complete = True
+        elif _album_prefetch.get('error'):
+            logger.debug(f'  [启动预热] 未命中（{_album_prefetch.get("error")}），改用常规请求')
         # 完整性保障：单轮翻页可能因限流中断而缺失，最多补抓 _ALBUM_FULL_PASS_MAX 轮
         for pass_num in range(_ALBUM_FULL_PASS_MAX):
+            if pass_num == 0 and prefetched_complete:
+                break
             if pass_num > 0:
                 page_timestamp = ''
                 logger.debug(f'  [完整性补抓] 第{pass_num+1}轮从头翻页补齐，当前已拿到 {len(all_goods_data)} 个商品')
+            pass_start_count = len(all_goods_data)
             pass_complete = False
             page_num = 0
             page_retry = 0
             # 页数上限随已恢复/已累积的数据与服务端总数动态放大，避免商品多时永远抓不完
             expected = album_total if album_total > 0 else len(all_goods_data)
-            max_pages = max(50, expected // 100 + 50)
+            max_pages = max(10, expected // max(1, _ALBUM_PAGE_LIMIT) + 10)
             while page_num < max_pages:
                 if page_num > 0 or (pass_num == 0 and resumed):
                     await asyncio.sleep(_album_page_delay())
@@ -6862,7 +7095,8 @@ class WegoScraper:
                     'startDate': '',
                     'endDate': '',
                     'sourceId': '',
-                    'pageSize': 100
+                    'pageSize': _ALBUM_PAGE_LIMIT,
+                    'limit': _ALBUM_PAGE_LIMIT
                 }
                 if page_timestamp:
                     params['timestamp'] = page_timestamp
@@ -6871,9 +7105,12 @@ class WegoScraper:
                     query_string = urllib.parse.urlencode(params)
                     full_url = f'{api_url}?{query_string}'
 
-                    logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, pageSize=100')
+                    logger.debug(f'  请求第{page_num+1}页, timestamp={page_timestamp or "(空)"}, '
+                                 f'limit={_ALBUM_PAGE_LIMIT}')
 
-                    status_code, text, fetch_error = fetch_album_api_page(full_url, headers, cookie_str, timeout=15)
+                    status_code, text, fetch_error = await asyncio.to_thread(
+                        fetch_album_api_page, full_url, headers, cookie_str, _ALBUM_API_TIMEOUT
+                    )
 
                     if fetch_error:
                         logger.debug(f'  第{page_num+1}页请求失败: {fetch_error}')
@@ -6974,12 +7211,15 @@ class WegoScraper:
             if _album_is_complete(len(all_goods_data), album_total, pass_complete):
                 pagination_complete = True
                 break
+            if len(all_goods_data) <= pass_start_count:
+                logger.debug(f'  第{pass_num+1}轮未拿到新商品，继续补抓也拿不到，结束')
+                break
             if album_total:
                 logger.debug(f'  ⚠️ 第{pass_num+1}轮结束: 已拿到 {len(all_goods_data)} / 服务端总数 {album_total}，准备补抓')
             else:
                 logger.debug(f'  ⚠️ 第{pass_num+1}轮未翻到末页（已拿到 {len(all_goods_data)} 个商品），准备补抓')
             if pass_num + 1 < _ALBUM_FULL_PASS_MAX:
-                await asyncio.sleep(_ALBUM_PAGE_RETRY_WAIT)
+                await asyncio.sleep(_ALBUM_PASS_RETRY_WAIT)
         
         logger.debug(f'共获取 {len(all_goods_data)} 个商品数据')
         
@@ -7331,6 +7571,11 @@ class WegoScraper:
         async with async_playwright() as p:
             print('正在启动浏览器...')
 
+            # 商品数据 100% 来自 API，浏览器启动 + 建页要花近 2 秒，这段时间里
+            # 分页请求完全可以先跑起来，二者并行，等于把浏览器启动耗时完全藏掉。
+            api_start = time.time()
+            api_task = asyncio.create_task(self.fetch_all_products_via_api(None))
+
             system = self.get_system_info()
             browser_args = self.get_browser_args()
             chrome_path = self.get_chrome_path()
@@ -7369,9 +7614,18 @@ class WegoScraper:
                 page = await context.new_page()
                 print(f'页面创建耗时: {time.time() - page_start:.2f}秒')
 
-                data_start = time.time()
-                products = await self.get_data_with_playwright(page)
-                print(f'数据获取耗时: {time.time() - data_start:.2f}秒')
+                products = None
+                try:
+                    products, fetch_complete = await api_task
+                    self.last_fetch_complete = fetch_complete
+                except Exception as e:  # [HANDLED]
+                    logger.warning(f'并行API抓取失败，回退到页面流程: {e}')
+                    products = None
+
+                if not products:
+                    # API 没拿到数据才走页面导航 + DOM 兜底，正常路径完全跳过导航
+                    products = await self.get_data_with_playwright(page)
+                print(f'数据获取耗时: {time.time() - api_start:.2f}秒')
 
                 if products:
                     save_start = time.time()
@@ -7405,6 +7659,8 @@ class WegoScraper:
                         print('继续执行，不影响数据获取...')
             finally:
                 close_start = time.time()
+                if not api_task.done():
+                    api_task.cancel()
                 if context is not None:
                     try:
                         await context.close()
