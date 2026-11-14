@@ -4172,7 +4172,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ### v5.0.9.112 (2026-11-14) - 🔴 **清理目录白名单保护升格为硬范式：项目根目录与其祖先目录即使写进白名单也删不掉** - 实测确认「白名单里写项目根目录」确实删不掉（硬拦截在白名单之前且不读白名单），但发现两个真实缺口并修到「是」为止：① 白名单写**父目录**（项目祖先）能连带把项目根清掉；② 白名单文件改动后必须重启才生效；③ `/api/clean/list` 曾用 `allow_project_root=True` 绕过根保护。修复后 `allow_project_root` 开关彻底移除、祖先目录同步硬拦截、白名单缓存带 mtime 签名即时生效、`/api/clean/allowed-roots` 增 `protected` 标记；同时把该机制固化为 `PY-CORE-014` 范式（c 组末位），按 A-Z 规则全量重排 015~048
 
-> **Commit**: `bfe9ba1e`
+> **Commit**: `82abe711`
 
 #### 更新内容: 把「白名单写进项目根也删不掉」从口头承诺变成不可绕过的代码约束，并固化为 PY-CORE-014 范式
 
@@ -4189,7 +4189,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **修复日期**: 2026-11-14
 **修复类型**: 🔴安全加固 + 📝范式治理
 **影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: bfe9ba1e
+**Commit**: 82abe711
 **变更统计**: +936行 -466行（main.py 保护逻辑与白名单缓存，dist/app.js 前端呈现，README.md 与 skill.md 新增范式与版本条目，skill.docx 由 skill.md 二进制重生成）
 **作者**: 小旭二手机（西园路）
 
