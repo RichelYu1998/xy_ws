@@ -171,14 +171,12 @@ xy_ws/
 ├── clean_files.log         # 文件清理日志
 ├── .gitignore / .gitattributes # Git 忽略规则与换行符配置
 ├── .idea/                  # IDE 工程配置（不入库）
-├── config/                 # 配置目录
-│   ├── config.json         # 主配置文件
+├── config/                 # 配置目录（每个运行期文件都必须有热读取点，禁止死配置）
+│   ├── config.json         # 主配置文件（ConfigManager 签名热读取 / SecureConfigManager 每次重读解密）
 │   ├── config.json.example # 配置模板（脱敏）
-│   ├── cookies.json        # Cookie 存储
+│   ├── cookies.json        # Cookie 存储（每次调用重新 open，改完即生效）
 │   ├── cookies.json.example# Cookie 模板
-│   ├── production.json     # 生产环境配置
-│   ├── staging.json        # 预发环境配置
-│   ├── input_stock_numbers.txt  # 货号输入文件
+│   ├── input_stock_numbers.txt  # 货号输入文件（每次调用重新 open）
 │   ├── crypto_tool.py      # 配置加解密工具（encrypt/decrypt/encrypt-config）
 │   ├── clean_allowed_roots.txt # 清理目录白名单（真实路径，不入库）
 │   ├── clean_allowed_roots.example.txt # 白名单脱敏示例（仅格式说明）
@@ -1446,7 +1444,7 @@ EOF
 
 | 豁免对象 | 说明 |
 |---------|------|
-| `*.json` | JSON 语法不支持注释。对象型模板（`config.json.example`、`config/staging.json`、`config/production.json`、`dist/package.json`、`dist/manifest.webmanifest`）在首个键位插入 `_comment` 字段承载中文说明；数组型（`cookies.json.example`）与程序写出的业务数据（`file/` 下归档数据、`*_cache.json`、`config/config.json`、锁文件）不插字段，中文说明由导览树条目承载 |
+| `*.json` | JSON 语法不支持注释。对象型模板（`config.json.example`、`dist/package.json`、`dist/manifest.webmanifest`）在首个键位插入 `_comment` 字段承载中文说明；数组型（`cookies.json.example`）与程序写出的业务数据（`file/` 下归档数据、`*_cache.json`、`config/config.json`、锁文件）不插字段，中文说明由导览树条目承载 |
 | `*.docx` | 二进制文档（`skill.docx`），由 `test/generate_docx.py` 从 `skill.md` 生成，正文即中文 |
 | `tools/` | 内置第三方工具链（`node`、`python`、`cloudflared`、`playwright`），非项目自有代码 |
 | `dist/` | 前端构建产物目录（压缩 bundle、`sw.js`、`workbox-*.js`、字体 `*.woff2`、图标 `*.svg`/`*.png`、`package-lock.json`），每次构建整份重写，人工注释无法长期保留 |
@@ -2259,6 +2257,21 @@ def resolve_clean_directory(directory, default_dir=None, require_explicit=False)
 | **🔴 敏感字段先解密** | 热读取返回前必须走 `_decrypt_sensitive`，返回给调用方的永远是明文语义 | 上层拿到 `ENC(...)` 密文，功能异常 |
 | **🔴 写入即落盘** | `set()` 先改内存再 `save_config()` 落盘，落盘后签名自然变化，下次读取以文件为准 | 内存与文件不一致，多进程读到不同值 |
 | **🟡 常量不得缓存配置值** | 模块级常量（如 `WEB_API_KEY`）只能作为兜底默认值，实际取值走管理器实时 `get()` | 改了配置但常量仍是旧值，出现「配置不生效」 |
+| **🔴 全量覆盖，逐个登记** | `config/` 下每个运行期文件都必须有明确读取点，并在下节覆盖表中登记「文件 → 读取点 → 签名来源」，缺一即不合格 | 只改主配置、漏掉旁支文件，改白名单/密钥仍要重启 |
+| **🔴 禁止死配置** | `config/` 下不允许存在「没有任何读取点」的文件：要么接上热读取，要么删除，不许留在目录里当摆设 | 用户改了文件却毫无反应，排查方向被误导 |
+| **🔴 模板文件不算运行期配置** | `*.example` / `.env.example` / `crypto_tool.py` 属模板与工具，不参与热读取，但必须在文档中标注其性质 | 把模板当成配置去改，改完自然「不生效」 |
+
+### config/ 全量热读取覆盖表（缺一即不合格）
+
+| 文件 | 读取点 | 签名来源 | 改完是否即时生效 |
+|---|---|---|---|
+| `config/config.json` | `ConfigManager.config` / `SecureConfigManager.load_config` | `(mtime_ns, size)` / 每次重读 | ✅ 是 |
+| `config/cookies.json` | `WeGo` 系列 5 处 `open(...)` 直读 | 不缓存，每次读 | ✅ 是 |
+| `config/input_stock_numbers.txt` | `/api/compare/*` 两处直读 + `PathManager.get_input_file()` | 不缓存，每次读 | ✅ 是 |
+| `config/clean_allowed_roots.txt` | `_get_clean_allowed_roots()` | `(mtime_ns, size, 环境变量原文)` | ✅ 是 |
+| `config/.encryption_key` | `SecureConfigManager._fernet`（property） | `(mtime_ns, size, CONFIG_ENCRYPTION_KEY)` | ✅ 是 |
+| `config/.salt` | `SecureConfigManager._fernet`（property） | `(mtime_ns, size, CONFIG_ENCRYPTION_KEY)` | ✅ 是 |
+| `config/*.example` / `.env.example` / `crypto_tool.py` | 无（模板与工具，非运行期配置） | — | — |
 
 ### 标准实现模板（签名缓存三件套）
 
@@ -2294,7 +2307,29 @@ class ConfigManager:
 |---|---|---|
 | 单个 JSON 配置文件 | `(mtime_ns, size)` | `config/config.json` → `ConfigManager.config` |
 | 文本白名单文件 | `(mtime_ns, size, 环境变量原文)` | `config/clean_allowed_roots.txt` → `_get_clean_allowed_roots()` |
-| 无缓存直读 | 不缓存，每次读 | 只读一次的小文件、加密密钥文件 |
+| 密钥文件派生的加密器 | `(mtime_ns, size, 环境变量原文)` | `config/.encryption_key` + `config/.salt` → `SecureConfigManager._fernet` |
+| 无缓存直读 | 不缓存，每次读 | `cookies.json` / `input_stock_numbers.txt` 等只读一次的小文件 |
+
+### 密钥文件热读取模板（property 版）
+
+密钥文件常被误认为「只在启动时读一次」，实际换密钥、换密码后同样需要即时生效，因此也走同一套签名缓存：
+
+```python
+@property
+def _fernet(self):
+    signature = self._key_files_signature()
+    if signature != self._fernet_signature:
+        self._fernet_cache = self._build_fernet()
+        self._fernet_signature = signature
+    return self._fernet_cache
+
+@_fernet.setter
+def _fernet(self, value):
+    self._fernet_cache = value
+    self._fernet_signature = self._key_files_signature()
+```
+
+保留 setter 是为了兼容初始化流程里「先建 Fernet 再写盘」的写法，写入后立即刷新签名，避免刚设的值被下一轮签名比对判为过期。
 
 ### 反模式警告（致命）
 
@@ -2306,6 +2341,8 @@ class ConfigManager:
 | 🟡 只比 `mtime` 秒级时间戳 | 同秒等长改写漏判 | `st_mtime_ns` + `st_size` |
 | 🟡 解析失败时 `return {}` | 坏配置被静默忽略，故障被掩盖 | 抛 `AppException.config_error` 并记日志 |
 | 🟡 缓存解密前的原始密文 | 上层拿到 `ENC(...)` | 缓存解密后的语义值 |
+| 🔴 `config/` 下存在没有任何读取点的死配置文件 | 用户改了文件毫无反应，误判为热读取失效 | 接上热读取点，或删除该文件，不留摆设 |
+| 🟡 只把 `config.json` 做成热读取，其余文件靠重启 | 「全量热读取」名不副实，旁支文件仍要重启 | 按覆盖表逐个核对，缺一即不合格 |
 
 ### 落地检查清单
 
@@ -2317,9 +2354,12 @@ class ConfigManager:
 [ ] 5. 敏感字段读取结果为明文语义（无 ENC( 前缀泄漏到业务层）
 [ ] 6. 全仓库无 `@lru_cache` / `cached_property` 包裹的配置读取点
 [ ] 7. 模块级常量只作兜底默认值，实际取值经管理器实时读取
+[ ] 8. config/ 下每个运行期文件都能在覆盖表中找到读取点，无遗漏、无死配置
+[ ] 9. config/.encryption_key 或 config/.salt 变更后，加密器签名刷新且解密行为随之变化
+[ ] 10. config/cookies.json、config/input_stock_numbers.txt 改动后，下次调用即读到新内容
 ```
 
-> **判定标准**: 出现「配置文件改动需重启才生效 / 配置读取被 `lru_cache` 或 `cached_property` 永久缓存 / 解析失败静默返回默认值 / 业务层拿到密文」中任意一条，即视为「未符合本范式」。
+> **判定标准**: 出现「配置文件改动需重启才生效 / 配置读取被 `lru_cache` 或 `cached_property` 永久缓存 / 解析失败静默返回默认值 / 业务层拿到密文 / `config/` 下存在无读取点的死配置文件 / 覆盖表与实际读取点不一致」中任意一条，即视为「未符合本范式」。
 
 ---
 
@@ -4401,7 +4441,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-**文档版本**: v5.0.9.115  
+**文档版本**: v5.0.9.116  
 **最后更新**: 2026-11-14  
 **下次审查**: 2026-12-14  
 **维护者**: 小旭数码开发团队
@@ -4409,6 +4449,18 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.116 (2026-11-14) - 🔴 **config/ 全量热读取收口：密钥文件改为签名热读取，白名单逐条显示不再隐藏，删除两个零读取点死配置** - ① `config/.encryption_key` / `config/.salt` 原先只在单例初始化时读一次，换密钥必须重启，现改为 `SecureConfigManager._fernet` property + `(mtime_ns, size, CONFIG_ENCRYPTION_KEY)` 签名缓存；② 前端白名单列表原先过滤掉 `builtin` / `protected` 条目，导致「文件里写了几行、界面只显示几行」的错觉，现改为逐条全量展示并标注 `[可清理]` / `[受保护]` / `[目录不存在]`；③ 清理 `config/production.json`、`config/staging.json` 两个全仓库零读取点的死配置文件，并同步目录树与文档；④ PY-CORE-015 新增「全量覆盖 / 禁止死配置 / 模板不算运行期配置」三条规则与覆盖表，检查清单扩到 10 项
+
+> **Commit**: `PENDING`
+
+#### 更新内容: 让 config/ 下每个运行期文件都真正热读取，并让界面如实反映「读到了几条」
+
+1. **密钥文件热读取**: `SecureConfigManager._fernet` 由实例属性改为 property，签名比对 `_key_files_signature()`（两个密钥文件的 `(mtime_ns, size)` + `CONFIG_ENCRYPTION_KEY` 原文），签名变化即重建 Fernet；保留 setter 以兼容「先建再落盘」的初始化流程 [main.py](main.py#L724-L782)
+2. **白名单全量展示**: 去掉 `!builtin && !protected` 的前端过滤，改为「白名单已读取 N 条」逐条渲染，每条附状态标签，受保护条目不可点击填入 [dist/app.js](dist/app.js#L5994-L6016)
+3. **删除死配置**: `config/production.json` / `config/staging.json` 全仓库无任何读取点（`api_max_requests`、`json_ttl_seconds`、`cpu_percent_threshold` 等键在 main.py 中零命中），属摆设文件，按「禁止死配置」规则删除，目录树与注释规范表同步移除
+4. **范式收口**: PY-CORE-015 新增覆盖表（7 行，逐文件登记读取点与签名来源）+ 密钥文件 property 模板 + 2 条反模式 + 检查清单 8/9/10 三项，判定标准补入「死配置」「覆盖表不一致」[README.md](README.md#L2240-L2366)
+5. **实测 10/10 通过**: config.json（ConfigManager / SecureConfigManager 双通道）、cookies.json、clean_allowed_roots.txt、input_stock_numbers.txt、.salt 签名变化与恢复、.encryption_key 字节未损、production/staging 确认零读取点
 
 ### v5.0.9.115 (2026-11-14) - 🐛 **白名单「写了却看不到」修复：受保护目录不再静默隐藏，签名补齐 size 双要素** - ① `config/clean_allowed_roots.txt` 里写入项目根目录后，前端「允许清理的目录」列表里看不到，容易被误判为「这行没读到」；实际是 `builtin` / `protected` 被前端过滤掉了；② `/api/clean/allowed-roots` 新增 `ignored_roots` 字段，逐条给出 `reason`（项目根受保护 / 项目根的上级目录），前端新增「已读取但被忽略」区块显式展示；③ `_get_clean_allowed_roots` 的缓存签名由单一 `os.path.getmtime` 改为 `(st_mtime_ns, st_size)` + 环境变量原文，与 PY-CORE-015「签名双要素」对齐，修掉同秒等长改写漏判；④ 同步修正 PY-CORE-015 签名来源表与 PY-CORE-051 反模式 / 检查清单
 
@@ -23991,16 +24043,14 @@ xy_ws/
 ├── clean_files.log         # 文件清理日志
 ├── run.bat                 # Windows 启动脚本
 ├── run.sh                  # Linux/Mac 启动脚本
-├── config/                 # 配置目录
-│   ├── config.json         # 主配置文件
+├── config/                 # 配置目录（每个运行期文件都必须有热读取点，禁止死配置）
+│   ├── config.json         # 主配置文件（ConfigManager 签名热读取 / SecureConfigManager 每次重读解密）
 │   ├── config.json.example # 配置模板（脱敏）
-│   ├── cookies.json        # Cookie 存储
+│   ├── cookies.json        # Cookie 存储（每次调用重新 open，改完即生效）
 │   ├── cookies.json.example# Cookie 模板
-│   ├── production.json     # 生产环境配置
-│   ├── staging.json        # 预发环境配置
-│   ├── input_stock_numbers.txt  # 货号输入文件
-│   ├── .encryption_key     # 配置加密密钥
-│   └── .salt               # 密钥派生盐值
+│   ├── input_stock_numbers.txt  # 货号输入文件（每次调用重新 open）
+│   ├── .encryption_key     # 配置加密密钥（签名热读取，改动即时重载）
+│   └── .salt               # 密钥派生盐值（签名热读取，改动即时重载）
 ├── file/                   # 采集数据目录（按日期命名的微购相册 JSON）
 ├── temp/                   # 临时文件目录
 ├── test/                   # 辅助脚本目录

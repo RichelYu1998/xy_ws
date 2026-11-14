@@ -5993,25 +5993,29 @@
                         box.innerHTML = '<span style="color:#c00;">允许目录读取失败，请查看服务日志</span>';
                         return;
                     }
-                    const extraRoots = data.roots.filter(function(root) { return !root.builtin && !root.protected; });
-                    const ignoredRoots = data.roots.filter(function(root) { return root.protected; });
                     const parts = [];
-                    if (extraRoots.length) {
-                        parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>（点击可直接填入，不在列表内的一律拒绝）:</div>');
-                        extraRoots.forEach(function(root) {
-                            const label = escapeHtml(root.path) + (root.exists ? '' : ' <span style="color:#c00;">(目录不存在)</span>');
+                    parts.push('<div style="margin-bottom:4px;"><strong>白名单已读取 ' + data.roots.length + ' 条</strong>（文件里写了几行就显示几行，不会隐藏）:</div>');
+                    data.roots.forEach(function(root) {
+                        let state = '可清理';
+                        let color = '#080';
+                        let clickable = true;
+                        if (root.protected) {
+                            state = (root.builtin ? '项目根目录' : '项目根的上级目录') + ' · 受保护，永不清理';
+                            color = '#a60';
+                            clickable = false;
+                        } else if (!root.exists) {
+                            state = '目录不存在，清理会失败';
+                            color = '#c00';
+                            clickable = false;
+                        }
+                        const label = escapeHtml(root.path) + ' <span style="color:' + color + ';">[' + state + ']</span>';
+                        if (clickable) {
                             parts.push('<div style="margin:2px 0;"><a href="javascript:void(0)" class="clean-root-pick" data-path="' + escapeHtml(root.path) + '" style="color:#06c;text-decoration:underline;">' + label + '</a></div>');
-                        });
-                    } else {
-                        parts.push('<div style="margin-bottom:4px;"><strong>允许清理的目录</strong>: 仅项目目录（不在列表内的一律拒绝）</div>');
-                    }
-                    if (ignoredRoots.length) {
-                        parts.push('<div style="margin-top:6px;color:#888;"><strong>已读取但被忽略</strong>（受保护，写入白名单也不会放行）:</div>');
-                        ignoredRoots.forEach(function(root) {
-                            parts.push('<div style="margin:2px 0;color:#a60;">' + escapeHtml(root.path) + ' <span style="color:#c00;">— ' + escapeHtml(root.reason || '受保护') + '</span></div>');
-                        });
-                    }
-                    parts.push('<div style="margin-top:6px;color:#888;">如需追加目录，编辑 <code>' + escapeHtml(data.config_file) + '</code>（一行一个路径）保存后即时生效；项目目录及其上级目录即使写入也会被拒绝</div>');
+                        } else {
+                            parts.push('<div style="margin:2px 0;color:#666;">' + label + '</div>');
+                        }
+                    });
+                    parts.push('<div style="margin-top:6px;color:#888;">如需追加目录，编辑 <code>' + escapeHtml(data.config_file) + '</code>（一行一个路径）保存后即时生效；标注「受保护」的目录即使写进白名单也不会放行</div>');
                     box.innerHTML = parts.join('');
                     box.querySelectorAll('.clean-root-pick').forEach(function(el) {
                         el.addEventListener('click', function() {

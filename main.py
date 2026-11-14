@@ -725,7 +725,8 @@ class SecureConfigManager:
     """安全配置管理器 - 整合原config_secure_template.py"""
 
     _instance=None
-    _fernet=None
+    _fernet_cache=None
+    _fernet_signature=None
 
     def __new__(cls):
         if cls._instance is None:
@@ -734,16 +735,47 @@ class SecureConfigManager:
         return cls._instance
 
     def _initialize(self):
+        self._fernet_cache=None
+        self._fernet_signature=None
+
+    @staticmethod
+    def _key_files_signature():
+        """密钥文件签名：.encryption_key / .salt 的 (mtime_ns, size) + 环境变量原文"""
+        signature=[]
+        for path in (PROJECT_DIR/'config'/'.encryption_key', PROJECT_DIR/'config'/'.salt'):
+            try:
+                st=os.stat(path)
+                signature.append((st.st_mtime_ns, st.st_size))
+            except OSError:
+                signature.append(None)
+        return (tuple(signature), os.environ.get('CONFIG_ENCRYPTION_KEY',''))
+
+    def _build_fernet(self):
+        """按当前密钥文件构建 Fernet，密钥文件不存在或非法时返回 None"""
         key_file=PROJECT_DIR/'config'/'.encryption_key'
         salt_file=PROJECT_DIR/'config'/'.salt'
-        if os.path.exists(key_file) and os.path.exists(salt_file):
-            key=self._load_key(key_file,salt_file)
-            if key:
-                if Fernet is not None:
-                    try:
-                        self._fernet=Fernet(key)
-                    except (ValueError, TypeError):
-                        pass
+        if not (os.path.exists(key_file) and os.path.exists(salt_file)):
+            return None
+        key=self._load_key(key_file,salt_file)
+        if not key or Fernet is None:
+            return None
+        try:
+            return Fernet(key)
+        except (ValueError, TypeError):
+            return None
+
+    @property
+    def _fernet(self):
+        signature=self._key_files_signature()
+        if signature!=self._fernet_signature:
+            self._fernet_cache=self._build_fernet()
+            self._fernet_signature=signature
+        return self._fernet_cache
+
+    @_fernet.setter
+    def _fernet(self,value):
+        self._fernet_cache=value
+        self._fernet_signature=self._key_files_signature()
 
     def _load_key(self,key_file,salt_file):
         env_key=os.environ.get('CONFIG_ENCRYPTION_KEY')
