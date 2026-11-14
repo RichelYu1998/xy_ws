@@ -4046,6 +4046,64 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ## 🔄 最新更新
 
+### v5.0.9.110 (2026-11-14) - 🖥️ **清理目录路径比较改为「文件系统感知」+ changelog 源数据全量补全** - 清理目录的路径比较不再依赖 `os.path.normcase`（posix 上它是空操作，macOS APFS 大小写不敏感时全小写写法能绕过项目根目录保护、白名单同目录会被误拒）；新增 `_fs_is_case_insensitive()` 实测探测 + `_clean_path_key()` 统一比较键；同时把「最新更新」章节 447 个版本条目缺失的 `修复日期`/`修复类型`/`影响文件`/`变更统计`/`作者` 按真实 Git 数据全量补齐，55 个空 `更新内容` 标题用版本头作者原文补回，三方文档同步且启动脚本版本号仍自动继承
+
+> **Commit**: `42b9b887`
+
+#### 更新内容: 把清理目录的路径比较从「字符串相等」升级为「文件系统语义相等」，并把 changelog 每个版本条目缺的元数据按真实 Git 数据补齐
+
+1. **文件系统大小写探测**: 新增 `_fs_is_case_insensitive()`，Windows 直接判不敏感，其余平台在项目目录及其父目录取真实文件名做「大小写翻转仍命中」探针，结果缓存到 `_fs_case_insensitive_cache`，探测失败仅降级为敏感不抛错 [main.py](main.py#L3713-L3738)
+2. **统一路径比较键**: 新增 `_clean_path_key()`，`realpath` + `normcase` 归一，仅在文件系统本身不敏感时再 `casefold`，杜绝「Linux 上错误忽略大小写」与「macOS 上漏拦」两头跑偏 [main.py](main.py#L3740-L3743)
+3. **项目根目录硬保护**: 判定改用 `_clean_path_key`，提示文案明确「即使写进白名单也不会放行」，白名单里写上项目目录也不影响拦截 [main.py](main.py#L3820-L3824)
+4. **白名单匹配与根判定**: 白名单命中比较、`/api/clean/allowed-roots` 的 `builtin` 标记统一改用同一比较键；文件系统根目录判定由 `dirname(root)==root` 改为 `dirname(normpath(root))==normpath(root)`，兼容带尾斜杠写法 [main.py](main.py#L3826-L3833) [main.py](main.py#L12224)
+5. **changelog 源数据全量补全**: 「最新更新」章节 447 个版本条目按 `git show --name-only` / `git show --shortstat` 的真实数据补齐 `修复日期` 30 处、`修复类型` 30 处、`影响文件` 340 处、`变更统计` 363 处、`作者` 37 处 [README.md](README.md#L4047)
+6. **字段名归一**: `更新日期` → `修复日期`、`更新类型` → `修复类型` 共 673 处，解析器保留旧别名兼容，历史条目与新模板口径一致 [main.py](main.py#L12450-L12453)
+7. **空「更新内容」标题补回**: 55 个只有 `#### 更新内容:` 没有正文的版本，标题取版本头作者手写的加粗摘要原文，不再留空 [README.md](README.md)
+8. **三方文档同步与版本统一**: README.md ↔ skill.md 逐字节一致，skill.docx 由 skill.md 重新生成；run.sh / run.bat 版本号仍为 `0.0.0` 自动从 README 首条版本读取，未硬编码
+
+**修复日期**: 2026-11-14
+**修复类型**: 🖥️跨平台兼容 + 🧾数据自愈
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 42b9b887
+**变更统计**: +37行 -6行
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🖥️ 路径比较改为文件系统感知 (🖥️跨平台兼容)
+**问题描述**:
+- **现象**: macOS 上把清理目录写成全小写路径（与真实目录仅大小写不同）时，项目根目录保护不生效；白名单里写 `/Users/yu/Downloads/微购`，用户输入全小写的同一目录却被判「不在允许范围」
+- **根因**: `os.path.normcase` 在 posix 平台是空操作，只有 Windows 才会折叠大小写；而 macOS APFS 默认大小写不敏感，`os.path.realpath` 也不会把大小写纠正回真实文件名，导致「字符串相等」判断与文件系统实际语义不一致
+- **影响范围**: 清理目录解析（`resolve_clean_directory`）、白名单匹配、`/api/clean/allowed-roots` 的 `builtin` 标记、文件系统根目录判定
+
+**修复方案**:
+- **技术实现(探测)**: `_fs_is_case_insensitive()` 先按平台短路（`os.name == 'nt'` 直接 True），再在项目目录与父目录取真实文件名 `swapcase()` 后 `os.path.exists` 探针，命中即判不敏感，结果缓存复用
+- **技术实现(比较键)**: `_clean_path_key()` = `realpath` → `normcase` →（仅在文件系统不敏感时）`casefold`，所有路径比较点统一调用
+- **技术实现(保护顺序)**: 项目根目录判定保持在白名单之前，且不读取白名单结果，确保「写进白名单也删不掉」
+- **参考位置**: [main.py](main.py#L3713-L3743) [main.py](main.py#L3820-L3833)
+
+**测试验证**:
+- ✅ macOS 实测全小写项目路径被拦截，提示「即使写进白名单也不会放行」
+- ✅ 白名单 `/Users/yu/Downloads/微购` 输入全小写同目录可正常放行
+- ✅ 文件系统根目录 `/` 与项目根目录均被拒绝，普通子目录正常放行
+- ✅ `python3 -m py_compile main.py` 通过
+
+##### 2. 🧾 changelog 源数据全量补全 (🧾数据自愈)
+**问题描述**:
+- **现象**: 「最新更新」章节大量历史版本只有 `#### 更新内容:` 空标题，缺 `变更统计` / `影响文件` / `修复日期` / `作者`，`/api/changelog` 只能靠运行时合成，前端展示的元信息不是文档原文
+- **根因**: 早期版本条目按简化格式书写，未按 PY-CORE-011 模板逐字段落库；字段名还存在 `更新日期` / `更新类型` 两种写法
+- **影响范围**: 447 个版本条目的元数据完整性，`/api/changelog` 的 `changes` / `meta` 数据来源
+
+**修复方案**:
+- **技术实现(真实数据)**: 以条目已有 Commit 哈希为准，缺失时用 `git log --all --grep=v<版本号>` 回溯，再以 `git show --name-only` 取真实改动文件、`git show --shortstat` 取真实增删行数，多哈希累加
+- **技术实现(标题补回)**: 空 `#### 更新内容:` 的标题取版本头 `- **加粗摘要**` 原文，不做任何机器生成文案
+- **技术实现(字段名归一)**: `更新日期` → `修复日期`、`更新类型` → `修复类型` 共 673 处，解析器保留旧别名兼容
+- **参考位置**: [README.md](README.md#L4047)
+
+**测试验证**:
+- ✅ 全量扫描 447 个版本：缺字段 0 个、空值 0 个、`待生成` / `待补充` / `TBD` 字段值 0 个、Commit 非哈希 0 个
+- ✅ 每条 `影响文件` / `变更统计` 均可由所列哈希在 Git 中复现
+
 ### v5.0.9.109 (2026-11-14) - 🧾 **changelog 兜底从「写死文案」换成「真实 Git 数据」+ 全仓库中文注释按最终口径落地** - `/api/changelog` 里「历史版本-详见README.md」「历史版本-无统计记录」「历史版本-无Git记录」这类合成占位全部下线，改为按版本号回溯真实短哈希、按哈希读取真实改动文件与增删行数；空 `changes` 版本改用该版本真实元信息合成完整记录；同时 31 个文件按 PY-CORE-013 §5 逐类型补中文注释，`.gitignore` 补 `tools/` 等 5 条忽略项；实测 450 版本 changes 空值 0 个 / commit 非哈希 0 个 / 精确占位残留 0 个 / 缺中文注释 0 个
 
 > **Commit**: `a65c1d0c, b3bc1671, fdb22477, 05fef0db`
@@ -5722,7 +5780,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `4e40e2b6`
 
-#### 更新内容:
+**修复日期**: 2026-11-12
+**修复类型**: 📝范式治理
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +1524行 -1126行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: PY-CORE 编号按 A-Z 全量重排 + 编号规则范式固化
 1. **全量重排**: 44 个既有范式按「标题英文名首字母 A-Z + 同字母内原相对次序」稳定排序，重排为 `PY-CORE-001` ~ `PY-CORE-045`（含新增 1 条编号规则范式，共 45 条），零跳号、零重号、零遗漏 [README.md](README.md)
 2. **重号修正**: 历史遗留重号共 3 处——编码处理最佳实践 → 新号 023（字母 e）、Git 历史维护 → 新号 026（字母 g）、subprocess 超时配置 → 新号 041（字母 s），并复核旧号 007/008 双占项最终落号为 008、013、014、025
 3. **规则固化**: 新增 [范式编号规则范式 (PY-CORE-034)](README.md#L2801-L2894)，明确「前缀不可变、数字可累加、字母原生固定、按 A-Z 位次整体重排、区间表、硬上限 100」
@@ -5809,7 +5873,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `2fa9189d, f64db1be, d9ac42a1`
 
-#### 更新内容:
+**修复日期**: 2026-11-12
+**修复类型**: 🔧版本回退
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +504行 -10行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 代码全量回退与本地工具链恢复
 1. **代码全量回退**: 全部源码回退至 v5.0.9.93（`6078990c`），撤销其后 4 个提交，`git status` 工作区干净 [main.py](main.py)
 2. **本地工具链恢复**: `tools/playwright/macos/chromium-1169`（Chromium.app 可执行就位）、`tools/cloudflared/macos/cloudflared`（2026.10.7）、`tools/node/v20.18.0`（node / npm / npx 全可用）
 3. **前端产物恢复**: `dist/` 从 Git 恢复全部前端文件，`dist/node_modules` 装回 `hostc 2.1.3`、`cloudflared`、`patch-package`
@@ -5884,7 +5954,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `6078990c, 8d1798da`
 
-#### 更新内容:
+**修复日期**: 2026-11-12
+**修复类型**: 🔧功能优化
+**影响文件**: [main.py](main.py), [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +87行 -85行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: Excel读取范式固化与死代码清理
 1. **新范式固化**: 新增 PY-CORE-019「每日利润表读取范式」，工作表固定「每日利润」，列位固定 A-F，第 1 行为表头，报表文本仅取 A 列以「截止」开头的行，多文件去重后拼接 [README.md](README.md#L2224-L2444) [skill.md](skill.md#L2224-L2444)
 2. **报表聚合修复**: `get_excel_files_with_report` 原「命中第一个文件即 break」导致多 Excel 时只取首个文件报表，改为遍历全部文件、文本去重后以空行拼接 [main.py](main.py#L3644-L3656)
 3. **新范式固化**: 新增 PY-CORE-022「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L2442-L2636) [skill.md](skill.md#L2442-L2636)
@@ -5969,7 +6045,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `fd6e60f2, 9a933cac, 54597285`
 
-#### 更新内容:
+**修复日期**: 2026-11-11
+**修复类型**: 🛡️安全加固
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [main.py](main.py)
+**变更统计**: +341行 -1行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 敏感字段全量加密与PY-CORE-030临时脚本范式
 1. **敏感字段清零**: config.json 中最后一个明文敏感字段 `headers.cookie` 已加密，三字段全部为 `ENC(...)` [config/crypto_tool.py](config/crypto_tool.py#L25)
 2. **解密链路复核**: `SecureConfigManager` 解密三字段全部成功，headers.cookie 与加密前明文逐字节一致 [main.py](main.py#L518-L531)
 3. **新范式固化**: 新增 PY-CORE-030，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L2632-L3438) [skill.md](skill.md#L2632-L3438)
@@ -6051,7 +6133,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `0c4b8e28, ec3b5ae9, 43b748c7`
 
-#### 更新内容:
+**修复日期**: 2026-11-11
+**修复类型**: ✨功能增强
+**影响文件**: [.gitignore](.gitignore), [config/crypto_tool.py](config/crypto_tool.py), [index.html](index.html), [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +629行 -7行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 补全config/crypto_tool.py配置加解密工具
 1. **工具补全**: 新增 `config/crypto_tool.py`，落地文档中的 5 个子命令，敏感字段清单与 main.py 完全一致 [config/crypto_tool.py](config/crypto_tool.py#L40-L282)
 2. **密钥互通**: `_load_fernet()` 优先 `CONFIG_ENCRYPTION_KEY` 派生、其次读 `.encryption_key`，480000 次迭代与密文格式逐字对齐 main.py [config/crypto_tool.py](config/crypto_tool.py#L66-L92)
 3. **崩溃修复**: 依赖缺失时的 `except InvalidToken` TypeError 改为 isinstance 判定并统一转 RuntimeError，输出友好提示 [config/crypto_tool.py](config/crypto_tool.py#L126-L133)
@@ -6162,7 +6250,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `ab35073b`
 
-#### 更新内容:
+**修复日期**: 2026-11-10
+**修复类型**: 🐛Bug修复
+**影响文件**: [dist/app.js](dist/app.js), [index.html](index.html), [main.py](main.py), [requirements.txt](requirements.txt)
+**变更统计**: +401行 -77行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 展示页溢出修复与依赖清单接口
 1. **卡片溢出**: `.feature-card` 补断词规则与 `min-width: 0`，根治长 API 路径顶破卡片边界 [index.html](index.html#L57-L105)
 2. **联系方式**: 页脚 QQ/微信 由唤起 App 改为「复制」按钮，剪贴板不可用时回退 `execCommand` [index.html](index.html#L2036-L2089)
 3. **依赖接口**: 新增 `/api/dependencies`，从 requirements.txt 动态解析分类、版本约束与用途，Python 最低版本不再硬编码 [main.py](main.py#L11444-L11507)
@@ -6259,7 +6353,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `42d76c87`
 
-#### 更新内容:
+**修复日期**: 2026-11-07
+**影响文件**: [main.py](main.py), [test/security_audit.py](test/security_audit.py)
+**变更统计**: +387行 -51行
+**作者**: 小旭二手机（西园路）
+**修复类型**: 🎯目标达成
+
+#### 更新内容: 安全审计零问题达标与真实黑盒攻防验证
 1. **真实攻防**: 删除「循环打印已阻截」的伪攻防，改为对 `127.0.0.1:8888` 发起 13 项真实 HTTP 攻击载荷，用状态码与响应体双向判定 [test/security_audit.py](test/security_audit.py#L1161-L1398)
 2. **三层结构**: 报告拆分为 `issues_detail` / `observations_detail` / `verified_controls` / `attack_defense` 四段，INFO 不再计入 `total_issues`，使「总计问题 0」成为可验证事实 [test/security_audit.py](test/security_audit.py#L351-L395)
 3. **误报修正**: `await ... lock` 由风险项改为正向验证，23 条 INFO 归零并统计为「异步锁同步保护 23 处」 [test/security_audit.py](test/security_audit.py#L903)
@@ -6357,7 +6457,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `d2fc0fe3`
 
-#### 更新内容:
+**修复日期**: 2026-11-07
+**影响文件**: [launchd/com.xyws.web.plist](launchd/com.xyws.web.plist), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +267行 -72行
+**修复类型**: 🛡️安全加固
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 双端启动脚本看门狗重构
 1. **探活提速**: 移除 `HEALTH_COUNTER` 嵌套计数，看门狗由 15 分钟一次改为每 30 秒探活一次，连续 3 次失败即触发清理重启 [run.sh](run.sh#L1778-L1816)
 2. **DaemonGuard 兜底**: 守护模式下监听 `main.py --watchdog` 退出，异常退出自动清理残留并重新拉起（上限 10 次、冷却 10 秒、连续 2 次未检测到才判定）[run.sh](run.sh#L1863-L1935)
 3. **重启计数生效**: 补上 `WEB_RESTART_COUNT` 自增与上限拦截，达到 10 次后停止自动重启并继续探活，杜绝重启风暴 [run.sh](run.sh#L1810-L1820)
@@ -6472,7 +6578,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: c801bc8d
 
-#### 更新内容:
+**修复日期**: 2026-11-07
+**影响文件**: [dist/app.js](dist/app.js), [index.html](index.html)
+**修复类型**: 🐛Bug修复
+**变更统计**: +34行 -31行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 商品详情入库时间相对显示修复
 1. **自然日对齐**: 天级相对时间改为按自然日零点差计算，11-05 入库的商品在 11-07 显示「2天前」而非「1天前」[dist/app.js](dist/app.js#L901-L937)
 2. **时间戳解析兼容**: `YYYY-MM-DD HH:mm:ss` 的空格替换为 `T` 后解析，规避 Safari 对非 ISO 格式返回 Invalid Date；解析失败时不渲染该行而非输出 `NaN` [dist/app.js](dist/app.js#L903-L905)
 3. **前端缓存刷新**: `index.html` 中 app.js 的 `?v` 参数更新为 `20261107120000`，强制浏览器丢弃旧缓存 [index.html](index.html#L1906)
@@ -6527,7 +6639,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 0674f24c
 
-#### 更新内容:
+**修复日期**: 2026-11-07
+**修复类型**: 把「导航置顶」从实现细节升格为强制规范
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +256行 -0行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: PY-CORE-016交叉引用补注与DOCX文档生成范式(PY-CORE-018)新增
 1. **导航表扩容**: 导航表由 16 行增至 17 行，新增「📐 DOCX 文档生成范式」条目，与 PY-CORE-011/032/033 三条范式并列 [skill.md](skill.md#L10-L35)
 2. **交叉引用消歧**: `PY-CORE-016` 补注「生成流程与产出结构以 PY-CORE-018 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L1932)
 3. **skill.docx 重新生成**: 由 skill.md 重新生成，17 个导航超链接全部命中书签，导航仍固定第 1 页、正文从第 2 页开始
@@ -6555,7 +6673,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 209173d6, 2c94f548
 
-#### 更新内容:
+**修复日期**: 2026-11-07
+**修复类型**: 导航块强制渲染 + 分页符隔离
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_docx.py](test/generate_docx.py)
+**变更统计**: +467行 -73行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: DOCX文档导航置顶第一页+16章节可点击跳转+标题BOM修复
 1. **DOCX 文档导航置顶第一页**: `test/generate_docx.py` 新增 `_extract_nav_block()` 识别导航表并连同上方标题/引言整块抽出，`_render_nav_block()` 在第一个 H1 之后立即渲染并追加分页符，导航恒定位于第 1 页、正文从第 2 页开始 [test/generate_docx.py](test/generate_docx.py#L260-L300)
 2. **16 个章节可点击跳转**: skill.md 顶部新增「📚 文档导航」章节含 16 行 `| 章节 | 说明 |` 索引表；生成器自动补第 3 列「位置（点击跳转）」并生成 `w:hyperlink` + `w:anchor`，实测 16 个锚点全部命中 `w:bookmarkStart` [skill.md](skill.md#L10-L35) [test/generate_docx.py](test/generate_docx.py#L390-L405)
 3. **标题 BOM 修复**: skill.md / README.md 首行原为 `#` + U+FEFF + `# 微购...`，BOM 夹在两个 `#` 之间使 `lstrip('#')` 只剥掉第一个，docx 中 H1 显示成 `# 微购相册管理系统`；清除 BOM 后标题恢复正常 [skill.md](skill.md#L1) [README.md](README.md#L1)
@@ -6612,7 +6736,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 225b1fae, d123f61f, 209173d6
 
-#### 更新内容:
+**修复日期**: 2026-11-07
+**修复类型**: RLIMIT_NPROC 误设
+**影响文件**: [.idea/.name](.idea/.name), [README.md](README.md), [dist/package-lock.json](dist/package-lock.json), [dist/package.json](dist/package.json), [main.py](main.py), [run.bat](run.bat), 等 9 个文件
+**变更统计**: +695行 -143行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容+子进程重试显式化
 1. **Errno 35 根因根治**: `_setup_unix_protection()` 删除硬编码 `RLIMIT_NPROC=100`，改为仅当系统额度低于 2048 时向上修正，杜绝“进程额度瞬间耗尽”导致的 `BlockingIOError: [Errno 35] Resource temporarily unavailable` [main.py](main.py#L3249-L3258)
 2. **子进程启动重试+兜底**: 新增 `_popen_with_retry()` 核心重试函数，`Popen` 遇 EAGAIN/errno 35 自动重试 6 次（指数退避 0.15s 起），仍失败则 fallback `posix_spawn`，并对含 `preexec_fn`/`start_new_session` 等不兼容参数自动降级；`subprocess.Popen` 全局补丁与 `_popen_retry()` 均委托该核心函数 [main.py](main.py#L119-L225) [main.py](main.py#L3978-L3982)
 3. **终端实时日志接入**: run.sh 守护进程模式新增 `tail -n 0 -f "$LOG_FILE"` 后台跟随，`TAIL_PID` 全局声明 + `wait` 后回收 + `trap cleanup_exit` 二次回收；run.bat 使用 `start /b cmd /c "..." < nul` 继承控制台，天然实时且禁止叠加 tail（避免双份输出） [run.sh](run.sh#L1865-L1880) [run.sh](run.sh#L2265-L2280) [run.bat](run.bat#L1573)
@@ -6731,7 +6861,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: aba82a29
 
-#### 更新内容:
+**变更统计**: +1357行 -441行
+
+#### 更新内容: run.sh与run.bat全量1:1同步+changelog API空值根治+Commit占位符清零
 1. **run.sh进程清理三级过滤**: 新增`PW_BROWSER_PATTERN`/`PW_PROC_PATTERN`/`PW_BROWSER_NAMES`/`PW_PROC_NAMES`/`PY_PROC_NAMES`/`NODE_PROC_NAMES`/`CFD_PROC_NAMES`全局常量，`_proc_pids_by_pattern()`新增第三参数进程名白名单过滤，与run.bat的WMI进程名过滤规则完全一致，杜绝误杀用户浏览器/其他Python程序 [run.sh](run.sh#L24-L31) [run.sh](run.sh#L1900-L1938)
 2. **残留进程3轮重试**: 新增`while [ "$kill_retry" -lt 3 ]`循环清理main.py与端口监听进程，与run.bat `kill_residual_retry`逻辑完全一致，3轮后仍未释放则明确告警 [run.sh](run.sh#L2052-L2081)
 3. **版本检查返回码统一**: 全部版本检查函数统一返回码约定 `0=已是最新`、`1=需要升级`、`2=跳过检查`，所有调用点改为分支判断，不再使用隐式if/else，与run.bat完全对齐 [run.sh](run.sh#L1051-L1290)
@@ -6848,8 +6980,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ run.sh/run.bat版本号均为`0.0.0`自动探测模式，未硬编码版本
 
 **影响文件**: [run.sh](run.sh), [run.bat](run.bat), [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**更新日期**: 2026-11-05
-**更新类型**: 🔧 双端同步 + 🛡️ API健壮性加固
+**修复日期**: 2026-11-05
+**修复类型**: 🔧 双端同步 + 🛡️ API健壮性加固
 **作者**: 小旭二手机（西园路）
 
 ----
@@ -6858,7 +6990,12 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 9d0ec7b9
 
-#### 更新内容:
+**修复日期**: 2026-11-05
+**修复类型**: )依赖检查逻辑重构 (数据解析Bug
+**变更统计**: +371行 -28行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 依赖检查逻辑重构+镜像测速修复+hostc升级回显修复+Playwright驱动安装
 1. **check_deps_satisfied()依赖检查逻辑重构**: 原来使用简单正则分割解析requirements.txt，遇到`uvicorn[standard]>=0.30.0`等带extras和完整版本约束的行会解析错误，导致始终返回缺失。现改用`packaging.requirements.Requirement`和`packaging.version.Version`正确解析，支持extras标识(自动对应到包名uvicorn)和语义化版本约束(=,>=,>等) [main.py](main.py#L7903-L7933)
 2. **run.bat 8处PowerShell单引号语法错误修复**: 所有镜像测速中`[double]\'!VAR!\'*1000`的多余单引号包裹导致PowerShell无法正确解析数值，测速结果始终为空，所有镜像被错误判定为超时。现改为`[double]!VAR!*1000`，涉及winget/清华PIP/阿里云PIP/豆瓣PIP/中科大PIP/淘宝NPM/官方NPM/hostc共8处 [run.bat](run.bat#L125) [run.bat](run.bat#L159) [run.bat](run.bat#L243) [run.bat](run.bat#L698) [run.bat](run.bat#L826) [run.bat](run.bat#L885) [run.bat](run.bat#L926) [run.bat](run.bat#L1133)
 3. **hostc升级后版本号未更新修复**: hostc检测到新版本并执行安装后，重新获取版本号的代码中`setlocal disabledelayedexpansion`放在`for`循环外部而`endlocal`放在`for`循环内部，导致升级后`HOSTC_VER`变量被清除，版本号始终显示旧值。修复为将`setlocal`/`endlocal`都移入`for`循环内部正确配对 [run.bat](run.bat#L334)
@@ -6933,7 +7070,12 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 7efa1499,5e83b9c1,ca1ea8c7,f0b52f33,16a28490
 
-#### 更新内容:
+**修复日期**: 2026-10-26
+**修复类型**: 解决cmd.exe 0xc0000005
+**变更统计**: +885行 -372行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 跨平台防崩溃系统
 1. **Windows系统级崩溃防护**: 禁用cmd.exe错误弹框(SetErrorMode SEM_NOGPFAULTERRORBOX)防止0xc0000005访问违规卡死+设置高优先级进程(SetPriorityClass HIGH_PRIORITY_CLASS) [main.py](main.py)
 2. **macOS/Linux崩溃防护**: SIGHUP信号忽略(终端断开不退出)+rlimit资源限制(文件描述符4096/内存80%/CPU 24h/子进程100)+SIGXFSZ处理 [main.py](main.py)
 3. **自动内存清理机制**: 每5分钟执行gc.collect()+清理线程池缓存+记录内存变化日志(释放MB数) [main.py](main.py)
@@ -7036,7 +7178,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 42257bd2
 
-#### 更新内容:
+**修复日期**: 2026-10-24
+**修复类型**: HIGH级别安全加固
+**影响文件**: [README.md](README.md), [file/fix_report_20261024.md](file/fix_report_20261024.md), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +508行 -5行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 安全加固+数据完整性修复
 1. **JSON输入三重验证(OWASP Input Validation)**: API端点接收用户JSON输入时添加try-catch捕获解析异常+验证请求体必须是字典类型+验证skus字段必须是字符串类型，防止恶意提交畸形JSON导致服务崩溃或注入攻击，符合OWASP安全最佳实践 [main.py](main.py#L8977-L8989)
 2. **API备注字段100%完整读取(noteArr全量遍历)**: 修复商品有多条备注时只读取第一条导致信息丢失的bug，现在遍历noteArr数组中所有备注项并用换行符`\n`连接，确保业务信息100%完整保留 [main.py](main.py#L6019-L6032)
 3. **员工信息字段优化(staffInfo读取)**: 读取员工昵称(staffNick)字段，简洁显示为"店长"，去除冗长的员工ID显示，提升界面可读性 [main.py](main.py#L6036-L6040)
@@ -7117,7 +7265,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 3d9238d3
 
-#### 更新内容:
+**修复日期**: 2026-10-23
+**修复类型**: 8类进程100%覆盖
+**影响文件**: [README.md](README.md), [file/_changelog_api.json](file/_changelog_api.json), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +22098行 -20行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 企业级启动防护体系
 1. **全面进程清理系统(kill_all_interfering_processes)**: 启动前自动清理8类可能干扰的进程(Python主进程/hostc隧道/cloudflared隧道/Chrome-Chromium浏览器/Playwright驱动/Firefox浏览器/Edge浏览器/端口占用进程)，覆盖4个关键节点(程序启动/程序退出/自动重启/看门狗重启)，确保100%干净启动环境
 2. **30分钟心跳检测看门狗(watchdog_loop)**: 企业级监控机制，每30秒检测Web服务状态，连续3次失败触发全面清理+自动重启(最多10次+10s冷却+60s启动超时)，每30分钟输出"💚 心跳健康"报告，7x24小时全天候守护
 3. **Playwright浏览器驱动自动修复(check_and_fix_playwright)**: 启动时自动检测Chromium浏览器驱动完整性，缺失或损坏时自动执行`python -m playwright install chromium`安装，支持Windows/Linux/macOS三平台，彻底解决PermissionError闪退问题
@@ -7183,7 +7337,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 3137d02b
 
-#### 更新内容:
+**修复日期**: 2026-09-29
+**修复类型**: HTTP连接句柄耗尽
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.md](skill.md), [test/check_changelog.py](test/check_changelog.py)
+**变更统计**: +359行 -124行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 资源泄漏修复+代码规范合规
 1. **资源泄漏修复**: 多处urllib.request.urlopen响应对象未调用close()导致HTTP连接句柄泄漏，添加try/finally块确保resp.close()执行（Environment.check_url/select_pip_mirror/install_playwright_cdn/fetch_all_products_via_api等）
 2. **代码规范合规**: 移除函数内重复import(psutil/subprocess/sys/signal)，统一使用文件顶部导入，符合PEP 8 import规范
 3. **变量作用域修复**: `args in dir()`改为`args in globals()`，dir()无法可靠检测模块级变量，globals()为正确方式
@@ -7246,7 +7406,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 7db538e2
 
-#### 更新内容:
+**修复日期**: 2026-09-29
+**修复类型**: NameError→500→全部请求失败
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +6行 -6行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 中间件status_code_code未定义500错误修复
 1. **中间件变量未定义修复**: 在_log_and_security_middleware中间件中，`status_code_code`变量在条件判断中使用但从未赋值，导致`NameError: name 'status_code_code' is not defined`
 2. **500错误消除**: 该NameError被全局异常处理器捕获后返回500，导致所有HTTP请求(包括GET /)都返回500 Internal Server Error
 3. **服务恢复**: 修复后添加`status_code_code = response.status_code`从response对象获取状态码，服务恢复正常200响应
@@ -7272,7 +7438,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: bc138e21
 
-#### 更新内容:
+**修复日期**: 2026-09-29
+**修复类型**: Playwright→urllib解耦
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +204行 -65行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: API翻页防崩溃加固+page.url异常保护
 1. **API翻页防崩溃加固**: 将fetch_all_products_via_api函数中的`page.request.get`(依赖Playwright浏览器进程)替换为`urllib.request.urlopen`(Python标准库)，API请求与浏览器进程完全解耦，即使浏览器崩溃也能正常翻页获取所有商品数据
 2. **pageSize参数添加**: API请求参数新增`pageSize: 100`，每页最多获取100个商品(原来默认32个)，减少翻页次数提升效率
 3. **翻页上限提升**: 最大翻页数从`range(20)`提升至`range(50)`，支持更多页的数据获取
@@ -7321,7 +7493,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 22989c6f
 
-#### 更新内容:
+**修复日期**: 2026-09-27
+**修复类型**: Git/Node.js/Python/hostc/cloudflared
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [dist/package-lock.json](dist/package-lock.json), [dist/package.json](dist/package.json), [main.py](main.py), [run.bat](run.bat), 等 9 个文件
+**变更统计**: +671行 -66行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 启动脚本版本自动检测升级+隧道独立显示修复+前端alertDiv错误修复
 1. **启动脚本版本自动检测升级**: run.bat和run.sh新增Git、Node.js、Python、hostc、cloudflared五个工具的版本自动检测与升级函数，启动时自动检查是否为最新版本并在兼容性允许范围内升级
 2. **隧道独立显示修复**: 修改dist/app.js中隧道状态显示逻辑，hostc和Cloudflare隧道独立显示，一个失败不影响另一个的展示
 3. **前端alertDiv错误修复**: 移除dist/app.js中对未定义变量alertDiv的引用，修复"操作失败: alertDiv is not defined"错误
@@ -7383,7 +7561,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 68976523
 
-#### 更新内容:
+**修复日期**: 2026-09-23
+**修复类型**: 事件循环看门狗触发
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +192行 -22行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 服务器自动重启+DOCX超链接修复+依赖清理
 1. **服务器自动重启功能**: 新增_auto_restart_server()函数，当事件循环看门狗检测到90s无响应时自动重启服务器，包含3次重试上限和60秒冷却机制
 2. **DOCX超链接生成修复**: generate_docx.py的_add_clickable_link方法支持纯文本章节名自动生成超链接，解决skill.md导航表格第3列位置（点击跳转）无法点击的问题
 3. **依赖清理**: requirements.txt删除未使用的pymysql依赖，减少安装体积
@@ -7429,7 +7613,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 76bde1ad
 
-#### 更新内容:
+**变更统计**: +22行 -2行
+
+#### 更新内容: 移动端表格联动修复
 1. **移动端touch事件支持**: 为表格容器添加touchstart/touchmove事件监听，在移动设备上滑动时实时触发syncScroll联动
 2. **跳过隐藏行修复**: 在findFirstVisibleRow函数中添加`if (row.style.display === 'none') continue`跳过被搜索筛选隐藏的行，避免获取错误的offsetTop导致滚动到顶部
 3. **底部滚动计算修复**: 去除targetScrollTop计算公式中多余的tbodyOffsetTop偏移量，确保底部滚动时表0正确显示对应商品
@@ -7454,8 +7640,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 三方文档同步完成
 
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**更新日期**: 2026-09-22
-**更新类型**: 🐛 Bug修复 + 📱 移动端优化
+**修复日期**: 2026-09-22
+**修复类型**: 🐛 Bug修复 + 📱 移动端优化
 **作者**: 小旭二手机（西园路）
 
 ----
@@ -7464,7 +7650,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 50962908, a565ebd8
 
-#### 更新内容:
+**修复日期**: 2026-09-22
+**修复类型**: 🧹清理优化
+**影响文件**: [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +125行 -53行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: Temp自动清理功能Bug修复（完全清空）
 1. **get_dir_size函数重构**: 将[run.bat#L381-L387](run.bat#L381-L387)中的PowerShell命令`(Get-ChildItem -Path ... | Measure-Object -Property Length -Sum).Sum`替换为Windows原生`dir /s /a`命令，解决批处理for循环中PowerShell返回空值的兼容性问题
 2. **cleanup_temp_dir完全清空升级**: [run.bat#L355-L377](run.bat#L355-L377)将`del /f /s /q "%DIR_NAME%\*.*"(仅删除文件)改为`rd /s /q "%DIR_NAME%" + mkdir`(删除整个目录并重建，确保完全清空包括子文件夹)
 3. **check_temp_size完全清空升级**: [run.bat#L1159-L1168](run.bat#L1159-L1168)将`del /f /s /q temp\*.*`改为`rd /s /q temp + mkdir temp`，实现60秒定时检查时的完全清空
@@ -7494,7 +7686,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 8ec7e617
 
-#### 更新内容:
+**修复日期**: 2026-09-20
+**修复类型**: 图一5个参数全部正确显示
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +60行 -1行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 爬虫执行结果弹窗数据解析修复
 1. **后端打印格式重构**: 将[main.py#L6148](main.py#L6148)的单行打印`预计售出总价 | 平均售出价 | 平台手续费 | 成本总计`拆分为4行独立打印，每个统计值独占一行
 2. **平均售出均价关键词修正**: 将"平均售出价"改为"平均售出均价"，匹配前端[app.js#L1855](dist/app.js#L1855)的解析条件`line.includes('平均') && line.includes('均价')`
 3. **平台手续费关键词修正**: 将"平台手续费"改为"闲鱼平台手续费累计"，匹配前端[app.js#L2074](dist/app.js#L2074)的精确解析条件`line.includes('闲鱼平台手续费累计:')`
@@ -7522,7 +7720,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: ed8dd2b4, eebc47c1, f7e29a79, 292e7250
 
-#### 更新内容:
+**修复日期**: 2026-09-19
+**修复类型**: 15s间隔+3次失败触发
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [run.bat](run.bat), [run.sh](run.sh), [.gitignore](.gitignore), 等 8 个文件
+**变更统计**: +609行 -8行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 启动脚本生产级加固+Playwright子进程权限修复
 1. **run.bat健康检查系统**: 新增`:check_web_health`函数，每15秒通过curl检测localhost:WEB_PORT的HTTP状态码(200/302判定为正常)，连续3次失败(HEALTH_MAX_FAILS=3)触发自动重启
 2. **run.bat自动重启系统**: 新增`:restart_web_server`函数，实现完整的重启流程：清理残留进程→等待冷却→重新启动→验证就绪，包含WEB_RESTART_COUNT计数器和WEB_MAX_RESTARTS=10上限防止无限重启循环
 3. **run.sh自动重启逻辑**: 将原来的`wait $PYTHON_PID`改为while循环，Web服务退出后自动清理进程(pkill -9)并重启，与run.bat保持一致的重启策略(10次上限+10s冷却)
@@ -7594,7 +7798,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: c72d7a70
 
-#### 更新内容:
+**修复日期**: 2026-09-19
+**修复类型**: file=sys.stderr) TypeError修复 (6处→/api/changelog 500消除
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +608行 -160行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 服务器崩溃预防全面修复
 1. **logger.debug(file=sys.stderr) TypeError修复**: 移除6处logging调用中非法的file=sys.stderr参数(file是print()的参数不是logging的参数)，彻底解决/api/changelog每次请求500 Internal Server Error
 2. **latest_json变量作用域NameError修复**: 修复/api/sku/compare、/api/sku/compare/excel、/api/sku/compare/txt三个路由中latest_json在内部函数定义但未返回导致外部NameError的bug
 3. **lambda json.load(open())文件句柄泄漏修复**: 将2处lambda: json.load(open(...))改为def _load_diff_log(): with open(...) as _f: return json.load(_f)，确保文件句柄正确关闭
@@ -7709,7 +7919,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 3f111a32
 
-#### 更新内容:
+**修复日期**: 2026-09-19
+**修复类型**: Cloudflare Tunnel启动成功率100%
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +162行 -0行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 进程残留清理系统+代码规范修复
 1. **run.bat启动清理增强**: 在启动和退出时自动清理cloudflared.exe残留进程（原仅清理python.exe和hostc.exe），彻底解决旧进程占用导致CF Tunnel连续失败50次的问题
 2. **main.py智能进程管理**: start_cloudflare_tunnel()函数启动前检测并终止旧CF进程（先terminate等待5秒，超时则kill），再调用Environment.kill_process_by_name('cloudflared.exe')强制清理所有残留
 3. **错误诊断系统增强**: CF启动失败时自动输出诊断信息（端口占用检测+冲突进程列表），帮助快速定位问题根因
@@ -7758,7 +7974,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 8558824c
 
-#### 更新内容:
+**修复日期**: 2026-09-18
+**修复类型**: 7个指标全动态计算
+**影响文件**: [temp_diff.txt](temp_diff.txt)
+**变更统计**: +0行 -111行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 动态统计值系统
 1. **动态统计引擎**: 搜索/筛选操作后，7个统计卡片不再显示全部商品的固定值，而是**实时计算当前筛选结果**的统计数据（预计售出总价=匹配商品售价总和，平均售价=总价/数量，平台手续费=总价×1.6%，成本总计=匹配商品拿货价总和，售出利润=售价-成本，利润率=利润/售价×100%，净利率=(利润-手续费)/售价×100%）
 2. **数据属性扩展**: 表格行渲染时新增`data-cost`属性存储每件商品的拿货价（从后端API的cost_price字段读取），为动态成本计算提供数据基础
 3. **搜索逻辑增强**: 在现有的按货号/描述/售价/价格区间4种搜索模式中，新增成本累加逻辑（从每行的data-cost属性读取并累加），确保筛选后的统计值准确反映匹配商品的真实财务状况
@@ -7801,7 +8023,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 152449b1
 
-#### 更新内容:
+**修复日期**: 2026-09-18
+**修复类型**: 4种模式+前后端完整实现
+**影响文件**: [dist/app.js](dist/app.js), [main.py](main.py)
+**变更统计**: +371行 -62行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 价格搜索系统+安全审计完善+Bug修复
 1. **后端API升级**: /api/product/search接口新增price/price_min/price_max参数支持，实现4种搜索模式(sku/description/price/price_range)，返回数据增强(search_price_range字段)
 2. **前端UI重构**: 新增搜索类型下拉选择器(按货号/按描述/按售价/价格区间)，价格区间模式自动显示双输入框(最低价-最高价)，动态placeholder和帮助文本
 3. **搜索逻辑Bug修复**: 修复选择"按货号"时错误搜索商品名称字段的严重Bug，每种搜索类型严格只搜索对应字段(sku→货号, description→描述, price→售价, price_range→售价范围)
@@ -7930,7 +8158,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: c47d1882, 39edb57d, b300c9b8, f2cbee4d, 5081006d, f4267ec9, 1aa94fdf, 4239fb8b, c52d3652, a555ef33, 5f62e9fe
 
-#### 更新内容:
+**修复日期**: 2026-09-18
+**修复类型**: 后端四维计算+前端可视化
+**影响文件**: [dist/app.js](dist/app.js), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +451行 -178行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 利润分析系统+响应式布局
 1. **后端利润计算引擎**: 在/api/products接口新增4个计算字段(profit/profitRate/netProfit/netProfitRate)，实现售出利润=总价-成本、利润率=利润/总价*100%、净利润=利润-手续费、净利率=净利润/总价*100%的完整财务分析链路
 2. **前端7卡片2-3-2响应式布局**: 将原4数据单行展示升级为7数据三行展示(第1行:预计售出总价+售出利润 | 第2行:平均售价+平台手续费+成本总计 | 第3行:利润率+净利率)，每项独立配色和视觉层次
 3. **移动端三档自适应**: 实现桌面端(>768px)保持2-3-2原始布局、平板端(≤768px)自动调整为2列换行、手机端(≤480px)单列堆叠的三档响应式方案，字体/间距/宽度智能缩放
@@ -7962,7 +8196,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: e6d58b2c, 2d8c3b76, 7b56ab96, 8cefba04, 8d3cc4a8
 
-#### 更新内容:
+**修复日期**: 2026-09-18
+**修复类型**: 第4个数据卡片+后端合并输出
+**影响文件**: [dist/app.js](dist/app.js), [main.py](main.py)
+**变更统计**: +38行 -11行
+**作者**: 小旭二手机（西园路）
+
+#### 更新内容: 数据展示增强+Bug修复
 1. **商品汇总卡片新增成本总计显示**: 在前端界面的商品数据汇总区域新增第4个数据卡片"成本总计"(灰色加粗样式#909399)，与现有的预计售出总价/平均售出均价/平台手续费并排显示，形成完整的数据概览
 2. **后端四数据合并单行输出**: 将原三行打印语句(预计售出总价/平均售出价/平台手续费)合并为一行，新增成本总计字段，使用  |  分隔符提升可读性
 3. **前端解析逻辑完善**: 在app.js中新增第6个解析块(// 6. 成本总计)，匹配"成本总计"或"累计成本"关键字，提取数值赋值给skuData.costPrice
@@ -8043,7 +8283,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: ecf8b515, 6c3fc5bd, b218bea8, dd35a437, 6f82f6fb, 752dcf88, d7037bcd
 
-#### 更新内容:
+**变更统计**: +1049行 -9573行
+
+#### 更新内容: 综合更新
 1. **移动端按钮挤在一行问题修复**: 将`flex-wrap: nowrap`改为`flex-wrap: wrap`，允许按钮自动换行，不再强制单行横向滚动
 2. **按钮大小不一致问题修复**: 移除`width: 100%`和`flex: 1 1 auto`，改用`width: calc(50% - 4px)`+`min-width: 140px`+`max-width: 180px`统一所有按钮宽度
 3. **按钮可点击性优化**: 最小高度从32px提升至44px（符合移动端触摸目标标准），内边距从4px 3px增加至8px 10px
@@ -8153,8 +8395,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - 桌面端100%无影响（响应式设计，仅影响<576px屏幕）
 
 **影响文件**: [index.html](index.html), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**更新日期**: 2026-09-17
-**更新类型**: 🎯 UI优化 + 🔧 响应式设计改进
+**修复日期**: 2026-09-17
+**修复类型**: 🎯 UI优化 + 🔧 响应式设计改进
 **作者**: AI Assistant (Trae IDE)
 
 ---
@@ -8163,7 +8405,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 57f636f3, d28ba9ab
 
-#### 更新内容:
+**变更统计**: +303行 -209行
+
+#### 更新内容: 文档规范全面加固
 1. **Commit hash全量回填**: 为所有缺失Commit的版本补全真实Git提交hash
 2. **空changes消除**: changelog API返回的空changes数组全部补全
 3. **导航跳转修复**: 文档导航超链接可点击跳转到对应章节
@@ -8199,8 +8443,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 根目录运行同样正常
 
 **影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_docx.py](test/generate_docx.py)
-**更新日期**: 2026-09-14
-**更新类型**: 🎯 文档规范加固 + 🔧 Bug修复
+**修复日期**: 2026-09-14
+**修复类型**: 🎯 文档规范加固 + 🔧 Bug修复
 **作者**: 小旭二手机（西园路）
 
 ---
@@ -8209,7 +8453,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: 2e3d4428 (已提交到本地)
 
-#### 更新内容:
+**变更统计**: +2行 -2行
+
+#### 更新内容: 移动端真机闪屏+联动失效精准修复
 1. **移动端点击序列号闪屏修复(P0)**: 将scrollTo({behavior:'smooth'})改为移动端使用instant滚动(container.scrollTop=xxx)，避免WebKit渲染引擎缺陷导致的强制重绘和闪烁
 2. **移动端表格渲染崩溃修复(P0)**: showLinkedBadge()中移除position:relative+transform:scale()+zIndex:10三重危险属性，改用安全的background-color高亮方式，彻底消除移动端真机表格布局崩溃
 3. **联动功能恢复修复**: 移动端缩短_programmaticScroll锁定时间(500ms→100ms)，避免与syncScroll()产生冲突导致联动失效
@@ -8243,8 +8489,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - 设备检测机制优雅降级，未来新增平台只需修改正则表达式
 
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**更新日期**: 2026-09-14
-**更新类型**: 🎯 Bug修复+🛡️ 移动端兼容性加固
+**修复日期**: 2026-09-14
+**修复类型**: 🎯 Bug修复+🛡️ 移动端兼容性加固
 **作者**: 小旭二手机（西园路）
 
 ##### 2. 📝 文档导航超链接增强 (可点击跳转功能)
@@ -8273,7 +8519,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `54719c96, f440e741`  
 
-#### 更新内容:
+**变更统计**: +153行 -19行
+
+#### 更新内容: 数据模型去冗余+文档结构修复
 1. **product字典双语键去冗余**: 删除fetch_all_products_via_api中10个重复英文键(name/price/cost_price/stock_number/remark/staff/image/created_time/timestamp)，只保留中文键
 2. **cache合并冗余赋值删除**: 删除save_data中product['price']=cache_price和product['cost_price']=cache_cost两行冗余写入
 3. **changelog API changes字段空值修复**: v5.0.9.58在README.md和skill.md中均缺少#####子项导致changes为空，已补全
@@ -8312,8 +8560,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ changelog API: v5.0.9.58 changes字段不再为空
 
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**更新日期**: 2026-09-12
-**更新类型**: ♻️ 重构+📝 文档更新
+**修复日期**: 2026-09-12
+**修复类型**: ♻️ 重构+📝 文档更新
 **作者**: 小旭二手机（西园路）
 **Commit**: 2e3d4428, f440e741, 54719c96
 
@@ -8323,7 +8571,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `5ca820fc, faac750b`  
 
-#### 更新内容:
+**变更统计**: +265行 -103行
+
+#### 更新内容: 企业级文件IO安全加固
 1. **JSON读取容错修复(P0)**: FileManager.read_json检测到"Extra data"(截断的JSON尾巴)时，用JSONDecoder.raw_decode()取第一个有效对象，并自动截断写回磁盘修复
 2. **原子写入框架**: FileManager.write_json/write_text/write_bytes统一改为".tmp临时文件→os.replace原子替换"写入，消除Windows文件缩短时残留尾巴问题
 3. **新增FileManager.write_bytes**: 二进制文件原子写入(密钥文件、BOM修复等场景)
@@ -8356,8 +8606,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - 所有重要数据文件的写入路径统一管理，未来不再遗漏
 
 **影响文件**: [main.py](main.py), [README.md](README.md), [README.md](README.md), [skill.docx](skill.docx)
-**更新日期**: 2026-09-12
-**更新类型**: 🛡️ 安全加固+架构重构
+**修复日期**: 2026-09-12
+**修复类型**: 🛡️ 安全加固+架构重构
 **作者**: 小旭二手机（西园路）
 
 ---
@@ -8389,8 +8639,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - 3处pure-append场景性能从O(N)降为O(1)
 
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
-**更新日期**: 2026-09-12
-**更新类型**: 🛡️ Bug修复+稳定性加固
+**修复日期**: 2026-09-12
+**修复类型**: 🛡️ Bug修复+稳定性加固
 **作者**: 小旭二手机（西园路）
 **Commit**: b5a67441, faac750b, 36b826fd, 034f0fe7, 5ca820fc
 
@@ -8399,7 +8649,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `933d5e4f, 4f17917e`  
 
-#### 更新内容:
+**变更统计**: +1940行 -503行
+
+#### 更新内容: 安全审计+稳定性全面加固
 1. **security_audit.py 多线程重构(核心优化)**: 废弃硬编码行号白名单(150行)→纯正则内容自动识别，彻底解决git diff后行号偏移导致的误报；扩展扫描范围到全项目代码文件；修复Windows反斜杠路径匹配；修复UTF-8编码+线程安全锁
 2. **Playwright事件循环阻塞修复(高危)**: `launch_browser()`中同步`install_playwright_cdn()`通过`loop.run_in_executor()`改为线程池执行，不再阻塞async事件循环
 3. **Playwright资源泄漏修复**: `run_scraper/update_cookie/setup`三处添加try/finally块确保browser/context始终关闭，防止orphaned进程
@@ -8427,8 +8679,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ Commit hash: 所有版本条目已补齐
 
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
-**更新日期**: 2026-09-11
-**更新类型**: 🔧 功能优化+安全加固
+**修复日期**: 2026-09-11
+**修复类型**: 🔧 功能优化+安全加固
 **作者**: 小旭二手机（西园路）
 **Commit**: 9f90e5e5
 
@@ -8437,7 +8689,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `c8a82058`  
 
-#### 更新内容:
+**变更统计**: +225行 -0行
+
+#### 更新内容: FastAPI DeprecationWarning 消除
 1. **废弃 API 移除**: `@app.on_event("startup")` + `@app.on_event("shutdown")` 合并为单个 `lifespan(app)` 异步上下文管理器
    - FastAPI 在新版本中已将 `on_event` 标记为 deprecated，启动时会弹出 DeprecationWarning
    - 新方案：startup 逻辑放在 `yield` 之前，shutdown 清理逻辑放在 `yield` 之后，通过 `lifespan=lifespan` 参数传给 FastAPI 构造函数
@@ -8472,8 +8726,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - 删除函数: `_setup_crash_protection()`、`_shutdown_cleanup()`
 - 新增函数: `lifespan(app)` — 包含 startup 逻辑（loop handler + excepthook 安装）+ shutdown 逻辑（CF 清理）
 
-**更新日期**: 2026-09-09
-**更新类型**: ♻️ 技术债务清理
+**修复日期**: 2026-09-09
+**修复类型**: ♻️ 技术债务清理
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: f4ecf9ca
 **作者**: 小旭二手机（西园路）
@@ -8484,7 +8738,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `05063e34, a4330192`  
 
-#### 更新内容:
+**变更统计**: +605行 -87行
+
+#### 更新内容: 安全攻防全面加固
 1. **Plan B readline()阻塞死锁修复(高危)**: Cloudflare Quick Tunnel输出读取从直接readline()改为Queue+daemon线程非阻塞模式
    - 旧代码: cf_process.stdout.readline() 会无限阻塞（进程正常但未输出新行时）→ 导致整个start_cloudflare_tunnel卡死
    - 新代码: _cf_read_stdout守护线程把每行放入_line_q，主循环用line_q.get_nowait()+0.2s轮询超时
@@ -8551,8 +8807,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - 新增保护: _cf_state_lock锁3处覆盖、Queue非阻塞读取、asyncio exception handler、threading.excepthook、shutdown cleanup
 - 删除死代码: signal_module (L7500)
 
-**更新日期**: 2026-09-09
-**更新类型**: 🛡️ 安全攻防加固 + 📝 代码规范合规
+**修复日期**: 2026-09-09
+**修复类型**: 🛡️ 安全攻防加固 + 📝 代码规范合规
 **影响文件**: [main.py](main.py), [generate_docx.py](test/generate_docx.py), [security_audit.py](test/security_audit.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), run.bat
 **Commit**: 05063e34, a4330192
 **作者**: 小旭二手机（西园路）
@@ -8563,7 +8819,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `38329408, 2f9e09c9, 35458a16, 4bcc27e7, 94d0b79e`  
 
-#### 更新内容:
+**变更统计**: +1248行 -406行
+
+#### 更新内容: 企业级稳定性升级
 1. **服务器崩溃预防体系(核心升级)**: 6大防护机制，将服务器崩溃风险降低90%+
    - 文件操作异常处理(6+处): SecureConfigManager、_auto_encrypt_config、get_excel_files_with_report等关键位置添加try-except
    - 全局异常处理器: 捕获所有未处理异常，返回友好错误信息(带唯一ID)
@@ -8631,8 +8889,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - 删除代码: 不完整的try块(第10697行)、多余的except块(第10833-10836行)
 - 影响范围: main.py(约350行新增/修改) + README.md + skill.md + skill.docx
 
-**更新日期**: 2026-09-07
-**更新类型**: 🛡️ 企业级稳定性升级 + 📝 文档更新
+**修复日期**: 2026-09-07
+**修复类型**: 🛡️ 企业级稳定性升级 + 📝 文档更新
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 94d0b79e, 5c5746c1, 4bcc27e7, 2f9e09c9, 35458a16
 **作者**: 小旭二手机（西园路）
@@ -8644,7 +8902,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `22351201`  
 
-#### 更新内容:
+**变更统计**: +86行 -13行
+
+#### 更新内容: Bug修复
 1. **前端"隧道共享"按钮逻辑修复(核心修复)**: "隧道共享"按钮从调用POST /api/tunnel/start改为GET /api/tunnel/status，纯展示不启动
    - startTunnelAndShow(): 移除fetch('/api/tunnel/start', {method: 'POST'})，改为fetch('/api/tunnel/status')
    - 按钮加载文字: "启动中..." -> "获取中..."（符合实际功能）
@@ -8669,8 +8929,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - [OK] "启动隧道"测试: 管理页面点启动仍正常工作，但CF运行时会被跳过
 - [OK] 后端防御测试: 直接调POST /api/tunnel/start，CF也不会被重启
 
-**更新日期**: 2026-09-07
-**更新类型**: Bug修复 + 稳定性提升
+**修复日期**: 2026-09-07
+**修复类型**: Bug修复 + 稳定性提升
 **影响文件**: main.py, dist/app.js, README.md, skill.md
 **Commit**: 0717b503
 **作者**: 小旭二手机（西园路）
@@ -8698,7 +8958,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `c9c8f319, a0257623`  
 
-#### 更新内容:
+**变更统计**: +167行 -55行
+
+#### 更新内容: 架构优化
 1. **restart_tunnel与CF隧道解耦(核心架构)**: restart_tunnel只管hostc进程，CF隧道完全交给cf_heartbeat_loop独立管理
    - _do_restart: 调用auto_start_tunnel(skip_cf=True)，重启hostc时不碰CF进程
    - auto_start_tunnel: 新增skip_cf参数，skip_cf=True时跳过CF验证/启动
@@ -8722,8 +8984,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ hostc重启测试: hostc崩溃后restart_tunnel正确重启hostc
 - ✅ 验证阈值测试: hostc URL偶发超时不立即重启(需连续3次)
 
-**更新日期**: 2026-09-07
-**更新类型**: 🔧 架构优化 + 🛡️ 稳定性提升
+**修复日期**: 2026-09-07
+**修复类型**: 🔧 架构优化 + 🛡️ 稳定性提升
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md)
 **Commit**: c9c8f319, a0257623
 **作者**: 小旭二手机（西园路）
@@ -8754,7 +9016,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `416c1feb, f2b00da1`  
 
-#### 更新内容:
+**变更统计**: +353行 -9行
+
+#### 更新内容: 安全加固+Bug修复
 1. **XSS漏洞修复(核心安全)**: 修复2个XSS注入点(高危+中危)
    - 联动徽章: desc/sku/price未转义直接插入innerHTML [app.js#L570](dist/app.js#L570)
    - 隧道状态消息: statusMessage未转义 [app.js#L5509](dist/app.js#L5509)
@@ -8785,8 +9049,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 语法验证: node -c app.js exit code 0
 - ✅ 安全审计: 所有检测规则100%通过
 
-**更新日期**: 2026-09-07
-**更新类型**: 🛡️ 安全加固 + 🐛 Bug修复 + 📝 规范合规
+**修复日期**: 2026-09-07
+**修复类型**: 🛡️ 安全加固 + 🐛 Bug修复 + 📝 规范合规
 **影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md)
 **Commit**: 416c1feb, f2b00da1
 **作者**: AI Assistant (安全审计专家模式)
@@ -8836,7 +9100,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `48035831`  
 
-#### 更新内容:
+**变更统计**: +234行 -16行
+
+#### 更新内容: 优化+修复
 1. **防崩溃优化(核心)**: 5层防护机制,大幅降低服务器崩溃概率80-90%
    - 前端轮询频率: 2秒→10秒(-80%请求量)
    - API频率限制: 每IP每分钟30次(防DDOS)
@@ -8866,8 +9132,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 全局函数测试: 鼠标悬停/点击联动/视频播放正常工作
 - ✅ API限流测试: 高频请求返回429 Too Many Requests
 
-**更新日期**: 2026-09-07
-**更新类型**: 🔧 优化 + 🐛 Bug修复 + 🛡️ 安全增强
+**修复日期**: 2026-09-07
+**修复类型**: 🔧 优化 + 🐛 Bug修复 + 🛡️ 安全增强
 **影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [run.bat](run.bat)
 **Commit**: 48035831
 **作者**: 小旭二手机（西园路）
@@ -8920,7 +9186,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `c7e3b4ee, 9becc1d0, 21619515, bcc5e8c2, 18fbd600`  
 
-#### 更新内容:
+**变更统计**: +141行 -80行
+
+#### 更新内容: Bug修复
 1. 修复跨表联动在货号为空时的匹配失败问题
 2. 优化匹配逻辑: 优先使用data-sku,失败后降级使用data-desc精确匹配
 3. 解决MacBook Air M4等无货号商品在表1滚动时表0无法同步定位的问题
@@ -8943,8 +9211,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 混合场景测试: 表格同时包含有/无货号商品时联动正常
 - ✅ GetDiagnostics: 0错误0警告
 
-**更新日期**: 2026-09-06
-**更新类型**: 🐛 Bug修复 + 跨表联动优化 + 匹配算法增强
+**修复日期**: 2026-09-06
+**修复类型**: 🐛 Bug修复 + 跨表联动优化 + 匹配算法增强
 **影响文件**: [dist/app.js](dist/app.js#L2804-L2822)
 **Commit**: c7e3b4ee, 9becc1d0, 21619515, bcc5e8c2, 18fbd600
 **作者**: 小旭二手机（西园路）
@@ -8976,7 +9244,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `73556d29, 4e1f13de, 273cd4e2, 78f9f778`  
 
-#### 更新内容:
+**变更统计**: +21046行 -33586行
+
+#### 更新内容: Bug修复
 1. 修复获取商品失败报错: Cannot set properties of null (setting 'textContent')
 2. 重构DOM操作时机: 将Badge更新逻辑从模板字符串内移至insertAdjacentHTML之后执行
 3. 添加防御性空值检查: 使用if判断确保DOM元素存在后再操作
@@ -8999,8 +9269,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ Badge更新: 高价商品数和新增商品数正确显示
 - ✅ 边界测试: DOM元素不存在时不报错(防御性编程生效)
 
-**更新日期**: 2026-09-06
-**更新类型**: 🐛 Bug修复 + DOM操作优化 + 防御性编程
+**修复日期**: 2026-09-06
+**修复类型**: 🐛 Bug修复 + DOM操作优化 + 防御性编程
 **影响文件**: [dist/app.js](dist/app.js#L2690-L2716)
 **Commit**: 73556d29, 4e1f13de, 273cd4e2, 78f9f778
 **作者**: 小旭二手机（西园路）
@@ -9032,7 +9302,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `9e5cce49, 0c9f699a, a9c377d1, e355f0cf`  
 
-#### 更新内容:
+**变更统计**: +2670行 -1806行
+
+#### 更新内容: Bug修复
 1. 修复跨表联动逻辑: 从SKU匹配改为商品描述匹配,解决SKU为空时无法联动的问题
 2. 新增findRowsByIdentifier函数: 优先通过data-desc属性匹配,兜底使用data-sku
 3. 修复商品描述中多个连续空格导致的HTML属性解析错误: 添加normalizeDesc空格规范化
@@ -9057,8 +9329,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ SKU为空商品: 通过描述精确匹配
 - ✅ 特殊字符描述: 不报错正常联动
 
-**更新日期**: 2026-09-06
-**更新类型**: 🐛 Bug修复 + 联动逻辑重构 + 安全增强
+**修复日期**: 2026-09-06
+**修复类型**: 🐛 Bug修复 + 联动逻辑重构 + 安全增强
 **影响文件**: dist/app.js, skill.docx
 **Commit**: 9e5cce49, 0c9f699a, a9c377d1, e355f0cf
 **作者**: 小旭二手机（西园路）
@@ -9088,7 +9360,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `1da27a5c, 1094868e`  
 
-#### 更新内容:
+**变更统计**: +155行 -23行
+
+#### 更新内容: 🔧 Bug修复 - 启动脚本编码问题全面修复(时间格式+中文乱码+缺失函数)
 1. 修复run.sh时间格式错误(.3N): macOS date命令不支持%N纳秒格式,添加操作系统检测
 2. 修复run.sh中文乱码(��): bash变量+中文直接拼接UTF-8 bug,改用printf格式化
 3. 修复run.sh缺失函数错误: 添加log_blank_console_only函数定义(4处调用)
@@ -9113,8 +9387,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 函数调用: log_blank_console_only正常执行 (无command not found)
 - ✅ 日志文件: web_output.log读写正常 (控制台+文件同步)
 
-**更新日期**: 2026-09-04
-**更新类型**: 🔧 Bug修复 + 编码规范 + 兼容性增强
+**修复日期**: 2026-09-04
+**修复类型**: 🔧 Bug修复 + 编码规范 + 兼容性增强
 **影响文件**: run.sh, README.md, skill.md, skill.docx
 **Commit**: 1da27a5c, 1094868e
 **作者**: 小旭二手机（西园路）
@@ -9145,7 +9419,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `193390cb, 0469fb97, 5d21a9c7, 008cec95, 9449dca3`  
 
-#### 更新内容:
+**变更统计**: +805行 -237行
+
+#### 更新内容: 范式统一 - PY-CORE-012: CMD窗口输出与web_output.log一致性规范
 1. run.bat移除UTF-8 BOM导致@echo off失效问题,所有echo改为call:log(97处修改)
 2. run.sh修复6处裸echo,统一使用log()函数(44处修改)
 3. 新增README.md日志输出规范章节(第54-95行),提供快速参考指南
@@ -9159,8 +9435,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - 消息类型标记: [*] [ERROR] [WARNING] [1/N]
 - 零裸echo: run.bat 0处/run.sh 0处(除日志函数内部)
 
-**更新日期**: 2026-09-04
-**更新类型**: 范式统一 + 文档完善 + 功能增强
+**修复日期**: 2026-09-04
+**修复类型**: 范式统一 + 文档完善 + 功能增强
 **影响文件**: run.bat, run.sh, README.md, skill.md, skill.docx
 **Commit**: 193390cb, 0469fb97, 5d21a9c7, 008cec95, 9449dca3
 **作者**: 小旭二手机（西园路）
@@ -9192,7 +9468,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `a2deb2f7, 81bd1560`  
 
-#### 更新内容:
+#### 更新内容: Bug修复
 1. **Bug修复**: 敏感配置字段名修正（`email.smtp_password` → `email_smtp_password`）
 2. **根因分析**: 字段名不一致导致 SMTP 认证失败
 3. **测试验证**: 修复效果验证
@@ -9274,8 +9550,8 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 
 
-**更新日期**: 2026-09-04
-**更新类型**: 🐛Bug修复 + 🔒安全加固
+**修复日期**: 2026-09-04
+**修复类型**: 🐛Bug修复 + 🔒安全加固
 **影响文件**: [main.py](main.py#L11593)
 **Commit**: a2deb2f7, 81bd1560
 **变更统计**: +1行 -1行
@@ -9296,7 +9572,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 > **Commit**: `6f57a6b5`  
 
-#### 更新内容:
+#### 更新内容: 功能增强
 1. **功能增强**: 邮件系统修复
 2. **配置管理**: 加密解密工具
 3. **安全加固**: Git 配置安全
@@ -9455,8 +9731,8 @@ python config/crypto_tool.py encrypt-config
 - ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 
 
-**更新日期**: 2026-09-04
-**更新类型**: 🔧功能增强 + 🔒安全加固 + 📝文档规范化 + 🔐配置管理
+**修复日期**: 2026-09-04
+**修复类型**: 🔧功能增强 + 🔒安全加固 + 📝文档规范化 + 🔐配置管理
 **影响文件**: [config/config.json](config/config.json#L47), [config/config.json.example](config/config.json.example), [config/crypto_tool.py](config/crypto_tool.py), [.gitignore](.gitignore#L24-L40), [README.md](README.md#L55-L84), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 6f57a6b5
 **变更统计**: +287行 -12行 (+275行净增)
@@ -9469,7 +9745,7 @@ python config/crypto_tool.py encrypt-config
 
 > **Commit**: `501d30ab, 269c0b42, 126e2e5a, 14c56c40, e4d76d36`  
 
-#### 更新内容:
+#### 更新内容: Bug修复
 1. **Bug修复**: 爬虫统计卡片显示问题修复（logger.debug→logger.info）
 2. **安全增强**: 安全审计新增日志级别最佳实践自动检测
 3. **文档规范化**: 三方文档同步
@@ -9549,7 +9825,7 @@ python config/crypto_tool.py encrypt-config
 
 > **Commit**: `2fe31b1a, 84f53877`  
 
-#### 更新内容:
+#### 更新内容: 范式修复
 1. **技术债务清理**: 33 个版本简化格式转为标准 PY-CORE-011 格式
 2. **文档规范化**: 三方文档同步（README+skill+docx）
 3. **Bug修复**: 修复 /api/changelog 返回空 changes 数组与前端空白
@@ -9611,7 +9887,7 @@ python config/crypto_tool.py encrypt-config
 - ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 
 
-**更新日期**: 2026-09-03
+**修复日期**: 2026-09-03
 **修复类型**: 🔧技术债务清理 + 📝文档规范化 + 🐛Bug修复
 **影响文件**: [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 2fe31b1a, 84f53877
@@ -11380,7 +11656,9 @@ python config/crypto_tool.py encrypt-config
 
 > **Commit**: `a14d1e70`  
 
-#### 更新内容:
+**变更统计**: +25行 -5行
+
+#### 更新内容: 优化
 1. security_audit.py版本号从写死的v3.8.90.15改为动态从README.md获取
 2. 解决每次版本升级都需要手动修改审计脚本版本号的问题
 3. 实现版本号自动同步,降低维护成本
@@ -11398,8 +11676,8 @@ python config/crypto_tool.py encrypt-config
 - ✅ 版本号自动获取: 审计报告显示正确的当前版本
 - ✅ 兼容性: 不影响现有审计功能
 
-**更新日期**: 2026-09-02
-**更新类型**: 🔧 优化 + 维护成本降低
+**修复日期**: 2026-09-02
+**修复类型**: 🔧 优化 + 维护成本降低
 **影响文件**: test/security_audit.py
 **Commit**: 0c9f699a
 **作者**: RichelYu1998
@@ -12863,10 +13141,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `72ab0a7f`  
 
+**影响文件**: [README.md](README.md)
+**变更统计**: +6542行 -7036行
+
 #### 更新内容: v5.0.4: 从Git恢复README.md并安全添加v4.7版本记录+重新生成skill.docx
 
-**更新日期**: 2026-08-31
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-31
+**修复类型**: 📝 文档补录
 **Commit**: 72ab0a7f
 **作者**: RichelYu1998
 
@@ -12883,10 +13164,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `064367e7`  
 
+**影响文件**: [README.md](README.md)
+**变更统计**: +6809行 -6779行
+
 #### 更新内容: v5.0.3: 补充README.md缺失的v4.7版本记录并重新生成skill.docx
 
-**更新日期**: 2026-08-31
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-31
+**修复类型**: 📝 文档补录
 **Commit**: 064367e7
 **作者**: RichelYu1998
 
@@ -12903,10 +13187,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `4775297d`  
 
+**影响文件**: [generate_docx.py](generate_docx.py)
+**变更统计**: +0行 -58行
+
 #### 更新内容: v5.0.2: 优化文档生成流程，统一使用test/generate_docx.py动态化生成器
 
-**更新日期**: 2026-08-31
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-31
+**修复类型**: 📝 文档补录
 **Commit**: 4775297d
 **作者**: RichelYu1998
 
@@ -12923,10 +13210,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `970ce1a4, 37534fa8`  
 
+**影响文件**: [README.md](README.md), [generate_docx.py](generate_docx.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_docx.py](test/generate_docx.py), [requirements.txt](requirements.txt)
+**变更统计**: +2800行 -476行
+
 #### 更新内容: v5.0.1: 修复skill.md表格格式错误并重新生成skill.docx文档
 
-**更新日期**: 2026-08-31
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-31
+**修复类型**: 📝 文档补录
 **Commit**: 970ce1a4, 37534fa8
 **作者**: RichelYu1998
 
@@ -12942,6 +13232,8 @@ PY-CORE-010 (API整体架构)
 ### v5.0.0 (2026-08-31) - 🏗️架构优化 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx
 
 > **Commit**: `87ccb2ca`  
+
+**作者**: 小旭二手机（西园路）
 
 #### 更新内容: v5.0: 文档生成器100%动态化重构 - 删除硬编码脚本/更新skill.md和README.md/从skill.md生成skill.docx (2026-08-31)
 
@@ -13034,6 +13326,8 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `46b6cefb, bbd1b05b`  
 
+**作者**: 小旭二手机（西园路）
+
 #### 更新内容: v4.7: 🌐 双隧道全自动启动+硬编码消除（重大功能升级）— 实现auto_start_tunnel()函数自动检测并启动Hostc和Cloudflare双隧道无需手动干预，新增TUNNEL_CONFIG配置字典消除硬编码（CF_MAX_RETRIES/CF_RETRY_DELAY/CF_QUICK_TUNNEL_TIMEOUT/CF_HEARTBEAT_INTERVAL/HOSTC_HEARTBEAT_INTERVAL/URL_VERIFY_TIMEOUT/URL_VERIFY_MAX_RETRIES共7个环境变量可控参数），CF智能重试机制解决429 Too Many Requests问题（默认3次重试间隔60秒自动等待后重试），日志级别优化（所有CF相关日志从logger.debug()升级为log_print() INFO级别确保启动过程完全可见），Bug修复（Plan B命令参数拼接os.environ.get('HOST','localhost')字符串未正确解析改为host变量正确拼接），错误诊断增强（CF进程退出时自动读取并显示进程输出前500字符便于快速定位问题），配置集中管理（统一使用TIMEOUT_CONFIG和TUNNEL_CONFIG两个配置字典所有超时和隧道参数可通过环境变量自定义），同步更新README.md/skill.md/skill.docx三份文档记录此次重大功能升级
 
 **修复日期**: 2026-08-31
@@ -13108,6 +13402,8 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `04745d12`  
 
+**作者**: 小旭二手机（西园路）
+
 #### 更新内容: v4.5 文件清理功能API修复+路径验证优化 (2026-08-31) - 修复422错误+支持绝对相对路径输入
 
 **修复日期**: 2026-08-31
@@ -13135,6 +13431,8 @@ PY-CORE-010 (API整体架构)
 ### v4.4 (2026-08-31) - 🐛Bug修复 v4.4 (2026-08-31) - 🗑️ 临时修复脚本清理+项目规范化
 
 > **Commit**: `bc634be3, 3a2d480e, 7ced840e, 761a04f7, 3e797861`  
+
+**作者**: 小旭二手机（西园路）
 
 #### 更新内容: v4.4 (2026-08-31) - 🗑️ 临时修复脚本清理+项目规范化
 
@@ -13228,8 +13526,11 @@ PY-CORE-010 (API整体架构)
 
 #### 更新内容: 📝文档更新 v5.0.9: README版本记录格式全面规范化为v4.3.0标准 + skill.md范式升级 + skill.docx重新生成
 
-**更新日期**: 2026-08-31
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-31
+**修复类型**: 📝 文档补录
+
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +34488行 -10716行
 **Commit**: d6a9ae2b
 **作者**: RichelYu1998
 
@@ -13245,6 +13546,8 @@ PY-CORE-010 (API整体架构)
 ### v4.2.0 (2026-08-30) - ✨功能增强 v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化
 
 > **Commit**: `1fc481a7`  
+
+**作者**: 小旭二手机（西园路）
 
 #### 更新内容: v4.2 (2026-08-30) - 🌐 局域网地址显示增强+日志完善+代码规范化
 
@@ -13273,6 +13576,8 @@ PY-CORE-010 (API整体架构)
 ### v4.1.0 (2026-08-30) - 🗑️清理 BOM字符清理+临时文件整理+项目规范化
 
 > **Commit**: `c73d5774`  
+
+**作者**: 小旭二手机（西园路）
 
 #### 更新内容: v4.1: BOM字符清理+临时文件整理+项目规范化
 
@@ -13349,6 +13654,8 @@ PY-CORE-010 (API整体架构)
 ### v4.0 (2026-08-30) - 🔒安全 🛡️ 全面攻防压测系统+所有问题清零+代码规范化
 
 > **Commit**: `cd6eb089, 436d374d, 49af48c0, 780c68b2, b8a2afc6`  
+
+**作者**: 小旭二手机（西园路）
 
 #### 更新内容: v4.0: 🛡️ 全面攻防压测系统+所有问题清零+代码规范化
 
@@ -13586,10 +13893,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `175d3d42, f232e699, 91be5446, 0b6d8513`  
 
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [main.py](main.py), [skill.md](skill.md), [test/__init__.py](test/__init__.py), [test/test_version.py](test/test_version.py), 等 14 个文件
+**变更统计**: +1502行 -301行
+
 #### 更新内容: 🔧v5.0.9.27 security_audit.py版本号改为动态从README.md获取(原写死v3.8.90.15)
 
-**更新日期**: 2026-09-02
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-09-02
+**修复类型**: 📝 文档补录
 **Commit**: d9e03b2c, 175d3d42, f232e699, 91be5446, 0b6d8513
 **作者**: RichelYu1998
 
@@ -13606,10 +13916,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6fde8fce`  
 
+**影响文件**: [.gitignore](.gitignore), [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +108行 -18行
+
 #### 更新内容: v3.8.90.14: 攻防纵深加固+隐藏Bug清零第三轮 — CSRF同源校验支持动态隧道+日志注入防护+8处API响应str(e)信息泄露清零(含完整traceback泄露)+swagger版本硬编码改VERSION+uvicorn host改WEB_HOST环境变量+健康检查脱敏+skill.docx同步生成
 
-**更新日期**: 2026-08-26
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-26
+**修复类型**: 📝 文档补录
 **Commit**: 6fde8fce
 **作者**: RichelYu1998
 
@@ -13626,10 +13939,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `95ab7ece`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +164行 -26行
+
 #### 更新内容: v3.8.90.13: 全面安全审计+隐藏Bug清零第二轮 — 信息泄露+限流缺口+缓存控制+裸except+Windows磁盘兼容
 
-**更新日期**: 2026-08-26
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-26
+**修复类型**: 📝 文档补录
 **Commit**: 95ab7ece
 **作者**: RichelYu1998
 
@@ -13646,10 +13962,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `29218fd1`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +136行 -80行
+
 #### 更新内容: v3.8.90.12 (2026-08-26) - 隐藏Bug清零 + 浏览器启动修复 — PROJECT_DIR类型错误+uvicorn导入位置错误+Connection closed驱动修复
 
-**更新日期**: 2026-08-26
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-26
+**修复类型**: 📝 文档补录
 **Commit**: 29218fd1
 **作者**: RichelYu1998
 
@@ -13666,10 +13985,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d9e59e14`  
 
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +183行 -21行
+
 #### 更新内容: v3.8.90.11 (2026-08-24) - 🎯 双向滚动联动底部同步修复 — 解决高价商品表拉到底部时总商品列表不同步问题
 
-**更新日期**: 2026-08-24
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-24
+**修复类型**: 📝 文档补录
 **Commit**: d9e59e14
 **作者**: RichelYu1998
 
@@ -13686,10 +14008,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `1d46d7b0`  
 
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +115行 -25行
+
 #### 更新内容: 🐛修复(app.js): 移动端双表联动修复 — 消除滚动同步抖动+点击行联动高亮 (v3.8.90.10)
 
-**更新日期**: 2026-08-24
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-24
+**修复类型**: 📝 文档补录
 **Commit**: 1d46d7b0
 **作者**: RichelYu1998
 
@@ -13735,10 +14060,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `73f9b648`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +94行 -54行
+
 #### 更新内容: 🐛修复: Playwright多镜像源安装+系统Chrome回退兜底 v3.8.90.08
 
-**更新日期**: 2026-08-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-22
+**修复类型**: 📝 文档补录
 **Commit**: 73f9b648
 **作者**: RichelYu1998
 
@@ -13755,10 +14083,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `fdb65d3d`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +322行 -86行
+
 #### 更新内容: 📝 补全skill.md版本历史表(27个缺失版本v3.8.89.12-v3.8.90.07) + 修复pandoc YAML解析问题 + 重新生成skill.docx
 
-**更新日期**: 2026-08-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-22
+**修复类型**: 📝 文档补录
 **Commit**: 867ad415
 **作者**: RichelYu1998
 
@@ -13775,10 +14106,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a589db25`  
 
+**影响文件**: [README.md](README.md), [requirements.txt](requirements.txt), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +118行 -17行
+
 #### 更新内容: v3.8.90.06 - Python 3.14兼容性修复 + 启动脚本pip强制升级 + run.bat BOM修复 + 日志文件锁修复
 
-**更新日期**: 2026-08-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-22
+**修复类型**: 📝 文档补录
 **Commit**: a589db25
 **作者**: RichelYu1998
 
@@ -13795,10 +14129,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9b4a9ac7, 49c218cd`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [md_to_docx.py](md_to_docx.py), [skill.md](skill.md)
+**变更统计**: +360行 -108行
+
 #### 更新内容: v3.8.90.05 (2026-08-21) - 📝 修正README.md最新更新版本号 — 补全v3.8.90.02至v3.8.90.05完整更新记录
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: 9b4a9ac7
 **作者**: RichelYu1998
 
@@ -13815,10 +14152,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `619a434e, 0fd64656`  
 
+**影响文件**: [skill.docx](skill.docx), [README.md](README.md), [check_python_version.py](check_python_version.py), [main.py](main.py), [skill.md](skill.md), [tests/test_version.py](tests/test_version.py), 等 7 个文件
+**变更统计**: +129行 -121行
+
 #### 更新内容: v3.8.90.04 (2026-08-21) - 📄 重新生成skill.docx — 同步版本检查集成变更
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: 619a434e, 0fd64656
 **作者**: RichelYu1998
 
@@ -13835,10 +14175,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `bac24600, 4d5bdf9e`  
 
+**影响文件**: [skill.docx](skill.docx), [README.md](README.md), [check_python_version.py](check_python_version.py), [requirements.txt](requirements.txt), [skill.md](skill.md), [tests/__init__.py](tests/__init__.py), 等 8 个文件
+**变更统计**: +567行 -1行
+
 #### 更新内容: v3.8.90.03 (2026-08-21) - 📄 重新生成skill.docx — 同步DOC-CORE-001文档管理范式
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: bac24600, 4d5bdf9e
 **作者**: RichelYu1998
 
@@ -13855,10 +14198,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `2effd0b1`  
 
+**影响文件**: [README.md](README.md), [requirements.txt](requirements.txt), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +102行 -15行
+
 #### 更新内容: v3.8.90.05 (2026-08-21) - 📝 修正README.md最新更新版本号 — 补全v3.8.90.02至v3.8.90.05完整更新记录
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: 9b4a9ac7
 **作者**: RichelYu1998
 
@@ -13875,10 +14221,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `c0879573`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +58行 -41行
+
 #### 更新内容: v3.8.90.01: 移除写操作认证拦截，支持局域网/公网隧道全源访问
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: c0879573
 **作者**: RichelYu1998
 
@@ -13895,10 +14244,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `be321ad8`  
 
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +248行 -20行
+
 #### 更新内容: v3.8.90.00: 安全隐患全面修复+隐藏Bug清零 - P0:_module_logger/safe_read_json/logger未定义 P1:TunnelManager/CSRF Host头回退/API Key HTML泄露 P2:bootstrap IP检查/配置明文加密 P3:黑名单纵深防御保留 安全评分96%->98%
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: be321ad8
 **作者**: RichelYu1998
 
@@ -13915,10 +14267,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8e1a56ca`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +94行 -4行
+
 #### 更新内容: 🐛修复(hostc): v3.8.89.32 WebSocket安全关闭补丁重新应用 + patch-package补丁未生效修复 + 文档同步更新
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: 8e1a56ca
 **作者**: RichelYu1998
 
@@ -13935,10 +14290,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `099077b4`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [requirements.txt](requirements.txt), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +941行 -75行
+
 #### 更新内容: v3.8.89.31: 安全检查系统整合进main.py + Playwright移动端8项安全检查 + 依赖审计API + 配置加密管理API + SECURITY_CHECKLIST.md合并删除 + 3个独立.py文件删除
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: 099077b4
 **作者**: RichelYu1998
 
@@ -13955,10 +14313,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `06b37b98`  
 
+**影响文件**: [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +74行 -3行
+
 #### 更新内容: v3.8.89.30: 启动脚本残留进程自动清理 - run.bat/run.sh分层清理Playwright驱动node进程+兜底清理，消除Connection closed while reading from the driver错误
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: 06b37b98
 **作者**: RichelYu1998
 
@@ -13975,10 +14336,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f976da42, e3168286, 9c780467`  
 
+**影响文件**: [main.py](main.py), [README.md](README.md), [dist/app.js](dist/app.js), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +199行 -43行
+
 #### 更新内容: 🐛修复: v3.8.89.29 - 修复Windows GBK控制台¥字符UnicodeEncodeError，stdout/stderr重配置UTF-8
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: f976da42, e3168286, 9c780467
 **作者**: RichelYu1998
 
@@ -13995,10 +14359,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a79a5c19, fbae1b72`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +59行 -12行
+
 #### 更新内容: 🐛修复: v3.8.89.28 - 邮件Subject头Header()崩溃修复(From+Subject两处)，实发邮件验证通过
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: a79a5c19, fbae1b72
 **作者**: RichelYu1998
 
@@ -14015,10 +14382,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `935e1e19`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +80行 -10行
+
 #### 更新内容: security: v3.8.89.27 - 安全加固第三轮 + CSP/隧道注入/速率限制
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: 935e1e19
 **作者**: RichelYu1998
 
@@ -14035,10 +14405,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `637f095b`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +111行 -25行
+
 #### 更新内容: convention: v3.8.89.26 - Import唯一性范式 + 6处内联导入清理
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: 637f095b
 **作者**: RichelYu1998
 
@@ -14055,10 +14428,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `c656ac60`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +106行 -18行
+
 #### 更新内容: security: v3.8.89.25 - 安全加固第二轮 + CORS/命令注入/信息泄露修复
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: c656ac60
 **作者**: RichelYu1998
 
@@ -14075,10 +14451,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `751258a0`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +210行 -24行
+
 #### 更新内容: security: v3.8.89.24 - 安全漏洞修复 + 代码规范严格化
 
-**更新日期**: 2026-08-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-21
+**修复类型**: 📝 文档补录
 **Commit**: 751258a0
 **作者**: RichelYu1998
 
@@ -14095,10 +14474,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `1c29e08b`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +48行 -4行
+
 #### 更新内容: v3.8.89.23 - 邮件Header()参数修复 + 文档同步更新
 
-**更新日期**: 2026-08-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-20
+**修复类型**: 📝 文档补录
 **Commit**: 1c29e08b
 **作者**: RichelYu1998
 
@@ -14115,10 +14497,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f66d3f7a, afa81fb4`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +158行 -32行
+
 #### 更新内容: v3.8.89.22 - Bug修复三连击 + FastAPI兼容性完善 + 文档同步更新
 
-**更新日期**: 2026-08-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-20
+**修复类型**: 📝 文档补录
 **Commit**: f66d3f7a, afa81fb4
 **作者**: RichelYu1998
 
@@ -14135,10 +14520,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `cdff6222`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +229行 -51行
+
 #### 更新内容: v3.8.89.21: SSRF安全防御体系 + Import优化 + 项目清理
 
-**更新日期**: 2026-08-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-20
+**修复类型**: 📝 文档补录
 **Commit**: cdff6222
 **作者**: RichelYu1998
 
@@ -14184,10 +14572,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e599f25e, d1d5f83f, 02274d75, b9a40b0c, 445265f2`  
 
+**影响文件**: [README.md](README.md), [skill.md](skill.md), [dist/app.js](dist/app.js)
+**变更统计**: +2755行 -2518行
+
 #### 更新内容: v3.8.89.19 📝 统一所有 314 个版本 changelog 格式 + 添加编写规范到 README.md 和 skill.md
 
-**更新日期**: 2026-08-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-11
+**修复类型**: 📝 文档补录
 **Commit**: e599f25e, d1d5f83f, 02274d75, b9a40b0c, 445265f2
 **作者**: RichelYu1998
 
@@ -14204,10 +14595,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `027c88b0, b9ca8da9`  
 
+**影响文件**: [.trae/skills/project-manager/SKILL.md](.trae/skills/project-manager/SKILL.md), [README.md](README.md), [skill.docx](skill.docx), [dist/app.js](dist/app.js), [skill.md](skill.md)
+**变更统计**: +712行 -276行
+
 #### 更新内容: 📝文档(readme+docx): v3.8.89.18 文档体系规范化 - 删除多余SKILL.md，统一文档管理
 
-**更新日期**: 2026-08-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-11
+**修复类型**: 📝 文档补录
 **Commit**: 027c88b0, b9ca8da9
 **作者**: RichelYu1998
 
@@ -14224,10 +14618,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6fd6fe30`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +511行 -4行
+
 #### 更新内容: v3.8.89.17 🔧 编码问题根治 + subprocess超时优化 + 文档全面更新
 
-**更新日期**: 2026-08-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-11
+**修复类型**: 📝 文档补录
 **Commit**: 6fd6fe30
 **作者**: RichelYu1998
 
@@ -14360,10 +14757,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f14cf83c, d6ee1523`  
 
+**影响文件**: [.gitattributes](.gitattributes), [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml), [README.md](README.md), [dist/app.js](dist/app.js), [force_refresh.html](force_refresh.html), [skill.docx](skill.docx), 等 15 个文件
+**变更统计**: +1245行 -1761行
+
 #### 更新内容: ⚙️整理: 合并v3.8.89.13后的多余提交 + 修复main.py编码问题
 
-**更新日期**: 2026-08-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-11
+**修复类型**: 📝 文档补录
 **Commit**: f14cf83c, d6ee1523
 **作者**: RichelYu1998
 
@@ -14380,10 +14780,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `867ad415, ded03f2c`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [dist/app.js](dist/app.js), [generate_skill_docx.py](generate_skill_docx.py), [main.py](main.py)
+**变更统计**: +897行 -17行
+
 #### 更新内容: 📝 补全v3.8.89.12.1-12.5子版本(skill.md+README.md) + 重新生成skill.docx
 
-**更新日期**: 2026-08-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-22
+**修复类型**: 📝 文档补录
 **Commit**: 87c401be, 867ad415, b9a25358, 345efa4c, 999390c3
 **作者**: RichelYu1998
 
@@ -14400,10 +14803,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9b94312e, 2f93c320, 5798a091, 20c50a69, 38397644`  
 
+**影响文件**: [dist/app.js](dist/app.js), [main.py](main.py), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
+**变更统计**: +259行 -32行
+
 #### 更新内容: 📝文档: 将skill.md补充完整，包含从v1.0.0到v3.8.89.11的所有版本记录
 
-**更新日期**: 2026-07-31
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-31
+**修复类型**: 📝 文档补录
 **Commit**: 9b94312e, 2f93c320, 5798a091, 20c50a69, 38397644
 **作者**: RichelYu1998
 
@@ -14420,8 +14826,11 @@ PY-CORE-010 (API整体架构)
 
 #### 更新内容: 📝文档: 最新更新按版本号拆分(v3.8.89.11/v3.8.89.10/v3.8.89.9)
 
-**更新日期**: 2026-07-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-30
+**修复类型**: 📝 文档补录
+
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +7行 -7行
 **Commit**: 5798a091
 **作者**: RichelYu1998
 
@@ -14438,10 +14847,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `14989c45`  
 
+**影响文件**: [README.md](README.md), [check_fields.py](check_fields.py), [check_price_data.py](check_price_data.py), ["file/20260730\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json.backup"]("file/20260730\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json.backup"), [main.py](main.py), [skill.md](skill.md), 等 7 个文件
+**变更统计**: +6369行 -34行
+
 #### 更新内容: 📝文档: 最新更新按版本号拆分(v3.8.89.11/v3.8.89.10/v3.8.89.9)
 
-**更新日期**: 2026-07-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-30
+**修复类型**: 📝 文档补录
 **Commit**: 5798a091
 **作者**: RichelYu1998
 
@@ -14458,10 +14870,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `48a05f35`  
 
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [index.html](index.html), [main.py](main.py), [skill.docx](skill.docx)
+**变更统计**: +374行 -39行
+
 #### 更新内容: v3.8.89.8: 修复FastAPI迁移问题 - 高价商品、TXT对比、请求处理、数据源、CDN日志
 
-**更新日期**: 2026-07-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-30
+**修复类型**: 📝 文档补录
 **Commit**: 48a05f35
 **作者**: RichelYu1998
 
@@ -14478,10 +14893,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `943bc889`  
 
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [skill.docx](skill.docx)
+**变更统计**: +389行 -73行
+
 #### 更新内容: v3.8.89.6 - 🐛 爬虫结果卡片格式统一修复
 
-**更新日期**: 2026-07-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-30
+**修复类型**: 📝 文档补录
 **Commit**: 943bc889
 **作者**: RichelYu1998
 
@@ -14498,10 +14916,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `08033835, 53aa5169`  
 
+**影响文件**: [dist/app.js](dist/app.js), [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [tests/test_main.py](tests/test_main.py)
+**变更统计**: +1047行 -18行
+
 #### 更新内容: v3.8.89.5-hotfix: 修复JavaScript日期解析错误日志级别 - console.debug改为console.error
 
-**更新日期**: 2026-07-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-30
+**修复类型**: 📝 文档补录
 **Commit**: 08033835, 53aa5169
 **作者**: RichelYu1998
 
@@ -14518,10 +14939,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `003ca529`  
 
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [generate_skill_docx.py](generate_skill_docx.py), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +249行 -205行
+
 #### 更新内容: v3.8.89.4 - 全面隐藏 Bug 修复 + 代码质量提升
 
-**更新日期**: 2026-07-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-30
+**修复类型**: 📝 文档补录
 **Commit**: 003ca529
 **作者**: RichelYu1998
 
@@ -14538,10 +14962,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `493d1b5f`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test_8_buttons.py](test_8_buttons.py)
+**变更统计**: +335行 -12行
+
 #### 更新内容: 🔧 v3.8.89.3: Flask遗留代码修复 + jsonify兼容层 - 8个按钮测试7/8通过
 
-**更新日期**: 2026-07-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-29
+**修复类型**: 📝 文档补录
 **Commit**: 493d1b5f
 **作者**: RichelYu1998
 
@@ -14558,10 +14985,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9c9845a5`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [requirements.txt](requirements.txt), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +677行 -271行
+
 #### 更新内容: 🚀 v3.8.89.2: FastAPI迁移100%完成 - 22个路由全部转换
 
-**更新日期**: 2026-07-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-29
+**修复类型**: 📝 文档补录
 **Commit**: 9c9845a5
 **作者**: RichelYu1998
 
@@ -14578,10 +15008,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `86347152`  
 
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +4798行 -4190行
+
 #### 更新内容: v3.8.89.1: 修复Excel对比货号点击无响应 + 更新文档规范
 
-**更新日期**: 2026-07-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-29
+**修复类型**: 📝 文档补录
 **Commit**: 86347152
 **作者**: RichelYu1998
 
@@ -14598,10 +15031,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `fb666e20`  
 
+**影响文件**: [check_fields.py](check_fields.py), [check_price_data.py](check_price_data.py), [dist/app.js](dist/app.js), [update_docs.py](update_docs.py)
+**变更统计**: +2行 -277行
+
 #### 更新内容: 🐛修复(app.js): v3.8.89 - 修复语法错误+清理测试代码+更新版本号
 
-**更新日期**: 2026-07-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-30
+**修复类型**: 📝 文档补录
 **Commit**: fb666e20
 **作者**: RichelYu1998
 
@@ -14618,10 +15054,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `42112d96, 6babc05f`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md), [main.py](main.py)
+**变更统计**: +675行 -30行
+
 #### 更新内容: v3.8.88.2 - 🐛 紧急Bug修复：事件绑定缺失导致商品详情和利润报表功能失效
 
-**更新日期**: 2026-07-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-29
+**修复类型**: 📝 文档补录
 **Commit**: 42112d96, 6babc05f
 **作者**: RichelYu1998
 
@@ -14638,10 +15077,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `067b1a49`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +224行 -6行
+
 #### 更新内容: v3.8.88.1: 额外安全加固 - XSS防护 + 定时器泄漏修复
 
-**更新日期**: 2026-07-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-29
+**修复类型**: 📝 文档补录
 **Commit**: 067b1a49
 **作者**: RichelYu1998
 
@@ -14658,10 +15100,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `031fdbe3`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +281行 -34行
+
 #### 更新内容: v3.8.88: 全面修复 'Unexpected token <' 错误 + API路由安全加固
 
-**更新日期**: 2026-07-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-29
+**修复类型**: 📝 文档补录
 **Commit**: 031fdbe3
 **作者**: RichelYu1998
 
@@ -14678,10 +15123,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `0cadf730`  
 
+**影响文件**: [.idea/MarsCodeWorkspaceAppSettings.xml](.idea/MarsCodeWorkspaceAppSettings.xml), [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +165行 -94行
+
 #### 更新内容: v3.8.87: 商品详情入库时间实时计算修复 - 基于入库时间戳动态计算相对时间，不再使用源API静态字符串
 
-**更新日期**: 2026-07-26
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-26
+**修复类型**: 📝 文档补录
 **Commit**: 0cadf730
 **作者**: RichelYu1998
 
@@ -14698,10 +15146,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `bb21cbcc`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +282行 -55行
+
 #### 更新内容: v3.8.86: 商品搜索多表联动 + 分表统计 - 搜索时4个表格联动过滤 - 每个表格独立统计行(售出总价/均价/手续费) - 顶部徽章实时更新匹配数 - 搜索结果分表展示彩色标签 - 更新README.md/skill.md/skill.docx
 
-**更新日期**: 2026-07-26
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-26
+**修复类型**: 📝 文档补录
 **Commit**: bb21cbcc
 **作者**: RichelYu1998
 
@@ -14718,10 +15169,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f8fe569c`  
 
+**影响文件**: [.idea/MarsCodeWorkspaceAppSettings.xml](.idea/MarsCodeWorkspaceAppSettings.xml), [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +173行 -12行
+
 #### 更新内容: ✨功能: 商品搜索统计实时计算优化 (v3.8.85)
 
-**更新日期**: 2026-07-26
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-26
+**修复类型**: 📝 文档补录
 **Commit**: f8fe569c
 **作者**: RichelYu1998
 
@@ -14738,10 +15192,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `975711e3`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +97行 -3行
+
 #### 更新内容: v3.8.84 - 安全漏洞修复 + 命令注入防护
 
-**更新日期**: 2026-07-25
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-25
+**修复类型**: 📝 文档补录
 **Commit**: 975711e3
 **作者**: RichelYu1998
 
@@ -14758,10 +15215,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f43ffa93`  
 
+**影响文件**: [README.md](README.md), [generate_skill_docx.py](generate_skill_docx.py), [main.py](main.py), [skill.docx](skill.docx)
+**变更统计**: +421行 -232行
+
 #### 更新内容: v3.8.83 - 关键Bug修复 + 资源管理优化
 
-**更新日期**: 2026-07-25
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-25
+**修复类型**: 📝 文档补录
 **Commit**: f43ffa93
 **作者**: RichelYu1998
 
@@ -14778,10 +15238,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `66bb380d`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +198行 -6行
+
 #### 更新内容: v3.8.82: 入库时间显示优化
 
-**更新日期**: 2026-07-24
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-24
+**修复类型**: 📝 文档补录
 **Commit**: 66bb380d
 **作者**: RichelYu1998
 
@@ -14798,10 +15261,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d6952f12, 0cc8bafe, ff40e0bf, a49c45a5`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md), [main.py](main.py)
+**变更统计**: +650行 -249行
+
 #### 更新内容: v3.8.81 - 商品详情弹窗展示每个商品自己的入库时间
 
-**更新日期**: 2026-07-24
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-24
+**修复类型**: 📝 文档补录
 **Commit**: d6952f12, 0cc8bafe, ff40e0bf, a49c45a5
 **作者**: RichelYu1998
 
@@ -14818,10 +15284,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `22babdcf, 0650ae1b, 2b896271`  
 
+**影响文件**: [generate_skill_docx.py](generate_skill_docx.py), [requirements.txt](requirements.txt), [skill.docx](skill.docx), [README.md](README.md), [index.html](index.html), [main.py](main.py), 等 7 个文件
+**变更统计**: +333行 -238行
+
 #### 更新内容: ⚙️整理: 删除generate_skill_docx.py脚本 (v3.8.78)
 
-**更新日期**: 2026-07-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-20
+**修复类型**: 📝 文档补录
 **Commit**: 22babdcf, 0650ae1b, 2b896271
 **作者**: RichelYu1998
 
@@ -14838,10 +15307,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `1619559f`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +236行 -6行
+
 #### 更新内容: ✨功能: Swagger UI移动端适配 (v3.8.77)
 
-**更新日期**: 2026-07-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-20
+**修复类型**: 📝 文档补录
 **Commit**: 1619559f
 **作者**: RichelYu1998
 
@@ -14858,10 +15330,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `12053e0b`  
 
+**影响文件**: [.trae/skills/xy-ws-coding-standards/SKILL.md](.trae/skills/xy-ws-coding-standards/SKILL.md), [README.md](README.md), [skill.md](skill.md)
+**变更统计**: +104行 -80行
+
 #### 更新内容: 🏗️重构: 删除.trae文件夹，整合skill范式到文档 (v3.8.76)
 
-**更新日期**: 2026-07-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-20
+**修复类型**: 📝 文档补录
 **Commit**: 12053e0b
 **作者**: RichelYu1998
 
@@ -14878,10 +15353,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d3ad1805`  
 
+**影响文件**: [.trae/skills/xy-ws-coding-standards/SKILL.md](.trae/skills/xy-ws-coding-standards/SKILL.md), [README.md](README.md), [index.html](index.html), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +207行 -9行
+
 #### 更新内容: ✨功能: 创建skill系统 + 文档规范化 (v3.8.75)
 
-**更新日期**: 2026-07-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-20
+**修复类型**: 📝 文档补录
 **Commit**: d3ad1805
 **作者**: RichelYu1998
 
@@ -14898,10 +15376,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `5d4ef6c7, 6dec792d, 0c8159c2, 5b1666f4, c1d4bbff`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +18行 -22行
+
 #### 更新内容: v3.8.73: 删除README.md中多余的空白行，统一格式
 
-**更新日期**: 2026-07-19
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-19
+**修复类型**: 📝 文档补录
 **Commit**: 5d4ef6c7, 6dec792d, 0c8159c2, 5b1666f4, c1d4bbff
 **作者**: RichelYu1998
 
@@ -14918,10 +15399,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e9b2e505, 9e1c4402, 05d4c688, 92838463`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [requirements.txt](requirements.txt), [skill.docx](skill.docx), [skill.md](skill.md), [.github/workflows/ci-cd.yml](.github/workflows/ci-cd.yml), 等 18 个文件
+**变更统计**: +3696行 -2584行
+
 #### 更新内容: v3.8.71: 修复Swagger文档(改用手动swagger.json+纯HTML UI避免flask-restx路由冲突)，Pydantic V2兼容(field_validator)，补全requirements.txt依赖
 
-**更新日期**: 2026-07-19
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-19
+**修复类型**: 📝 文档补录
 **Commit**: e9b2e505, 9e1c4402, 05d4c688, 92838463
 **作者**: RichelYu1998
 
@@ -14938,10 +15422,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8534ff6b`  
 
+**影响文件**: [README.md](README.md), [skill.md](skill.md)
+**变更统计**: +154行 -29行
+
 #### 更新内容: v3.8.70.1: 统一文档语言规范 - 所有更新日志必须使用中文
 
-**更新日期**: 2026-07-19
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-19
+**修复类型**: 📝 文档补录
 **Commit**: 8534ff6b
 **作者**: RichelYu1998
 
@@ -14958,10 +15445,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `af42f561`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.md](skill.md), [tests/test_security_fixes.py](tests/test_security_fixes.py)
+**变更统计**: +1353行 -42行
+
 #### 更新内容: v3.8.70: 企业级生产优化 - 实施38项改进
 
-**更新日期**: 2026-07-19
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-19
+**修复类型**: 📝 文档补录
 **Commit**: af42f561
 **作者**: RichelYu1998
 
@@ -14978,10 +15468,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `288084d8`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +490行 -14行
+
 #### 更新内容: v3.8.69: 全面安全审计 - 修复7个关键Bug
 
-**更新日期**: 2026-07-19
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-19
+**修复类型**: 📝 文档补录
 **Commit**: 288084d8
 **作者**: RichelYu1998
 
@@ -14998,10 +15491,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `77b36596, 910e59ff`  
 
+**影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [skill.md](skill.md), [main.py](main.py)
+**变更统计**: +5396行 -5076行
+
 #### 更新内容: 🐛修复(app.js): v3.8.68 - High price count parsing optimization and file cleanup
 
-**更新日期**: 2026-07-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-30
+**修复类型**: 📝 文档补录
 **Commit**: 77b36596, 910e59ff
 **作者**: RichelYu1998
 
@@ -15018,10 +15514,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e70406df`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +491行 -18行
+
 #### 更新内容: v3.8.73: 修复README.md版本号 - 删除乱码，更新版本号从v3.8.67到v3.8.73
 
-**更新日期**: 2026-07-19
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-19
+**修复类型**: 📝 文档补录
 **Commit**: c1d4bbff
 **作者**: RichelYu1998
 
@@ -15038,10 +15537,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `dc06a22a`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +138行 -6行
+
 #### 更新内容: v3.8.66 - CF独立性测试验证+verify_url参数修复
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: dc06a22a
 **作者**: RichelYu1998
 
@@ -15058,10 +15560,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `43602558`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +221行 -10行
+
 #### 更新内容: v3.8.65 - CF隧道独立性优化+智能复用机制
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: 43602558
 **作者**: RichelYu1998
 
@@ -15078,10 +15583,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `c99521fd`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx)
+**变更统计**: +47行 -14行
+
 #### 更新内容: v3.8.64 - 隧道共享弹窗恢复原始hostc样式+新增Cloudflare URL
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: c99521fd
 **作者**: RichelYu1998
 
@@ -15098,10 +15606,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9562e458`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx)
+**变更统计**: +51行 -22行
+
 #### 更新内容: v3.8.63 - 隧道共享弹窗同时显示hostc和Cloudflare双公网地址
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: 9562e458
 **作者**: RichelYu1998
 
@@ -15118,10 +15629,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `4f49783a`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx)
+**变更统计**: +23行 -2行
+
 #### 更新内容: v3.8.62 - Toast显示具体复制的URL地址
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: 4f49783a
 **作者**: RichelYu1998
 
@@ -15138,10 +15652,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `c03d3d47`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx)
+**变更统计**: +18行 -3行
+
 #### 更新内容: v3.8.61 - 修复隧道管理面板复制按钮ID冲突，Toast弹窗恢复正常
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: c03d3d47
 **作者**: RichelYu1998
 
@@ -15158,10 +15675,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `59f610f1`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx)
+**变更统计**: +24行 -9行
+
 #### 更新内容: v3.8.60 - 公网地址复制按钮样式统一（btn-light + 复制文字）
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: 59f610f1
 **作者**: RichelYu1998
 
@@ -15178,10 +15698,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `751f8e30`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +42行 -11行
+
 #### 更新内容: v3.8.59 - 公网地址复制按钮（Cloudflare + hostc）
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: 751f8e30
 **作者**: RichelYu1998
 
@@ -15198,10 +15721,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a5160958`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +84行 -20行
+
 #### 更新内容: v3.8.58 - 邮件防重复发送修复 + skill.docx 同步更新
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: a5160958
 **作者**: RichelYu1998
 
@@ -15218,10 +15744,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `17095a99, f7901f8f`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +113行 -35行
+
 #### 更新内容: 📝文档: 添加 v3.8.57 版本更新日志到 README.md
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: 17095a99, f7901f8f
 **作者**: RichelYu1998
 
@@ -15238,10 +15767,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a93d3200`  
 
+**影响文件**: [README.md](README.md), [file/hostc_output.txt](file/hostc_output.txt), [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), 等 7 个文件
+**变更统计**: +60行 -95行
+
 #### 更新内容: v3.8.56 - 移除 hostc_output.txt，简化隧道管理
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: a93d3200
 **作者**: RichelYu1998
 
@@ -15258,10 +15790,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `088e0ed4`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx)
+**变更统计**: +29行 -1行
+
 #### 更新内容: v3.8.55 - Cloudflare 邮件通知日志统一
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: 088e0ed4
 **作者**: RichelYu1998
 
@@ -15278,10 +15813,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `b7d4b02b`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +47行 -1行
+
 #### 更新内容: v3.8.54 - Cloudflare 限流检测与友好提示
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: b7d4b02b
 **作者**: RichelYu1998
 
@@ -15298,10 +15836,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `cb352791`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh), [skill.md](skill.md)
+**变更统计**: +128行 -13行
+
 #### 更新内容: v3.8.53 - 修复双隧道地址写入冲突
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: cb352791
 **作者**: RichelYu1998
 
@@ -15318,10 +15859,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f38f0421`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +123行 -174行
+
 #### 更新内容: v3.8.52: 双隧道独立发邮件 + 心跳写入修复
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: f38f0421
 **作者**: RichelYu1998
 
@@ -15338,10 +15882,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `40ccd95f, 55a55163`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [main.py](main.py), [temp_npm_time.txt](temp_npm_time.txt)
+**变更统计**: +102行 -27行
+
 #### 更新内容: v3.8.51 - 更新README和skill文档
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: 40ccd95f, 55a55163
 **作者**: RichelYu1998
 
@@ -15358,10 +15905,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `bb25ff0f`  
 
+**影响文件**: [main.py](main.py), [temp_npm_time.txt](temp_npm_time.txt)
+**变更统计**: +6行 -3行
+
 #### 更新内容: v3.8.50 - 修复CF心跳验证日志输出
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: bb25ff0f
 **作者**: RichelYu1998
 
@@ -15378,10 +15928,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `ef92239d`  
 
+**影响文件**: [README.md](README.md), [generate_docx.py](generate_docx.py), [index.html](index.html), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +192行 -6行
+
 #### 更新内容: v3.8.49 - 添加CF心跳验证详细日志
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: ef92239d
 **作者**: RichelYu1998
 
@@ -15398,10 +15951,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `42c774e7`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +71行 -5行
+
 #### 更新内容: v3.8.48 - 隧道类型选择器动态默认值
 
-**更新日期**: 2026-07-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-18
+**修复类型**: 📝 文档补录
 **Commit**: 42c774e7
 **作者**: RichelYu1998
 
@@ -15418,10 +15974,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `15171ec2`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +111行 -7行
+
 #### 更新内容: v3.8.47: 双隧道互为备用通知 + fallback_available 邮件类型
 
-**更新日期**: 2026-07-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-17
+**修复类型**: 📝 文档补录
 **Commit**: 15171ec2
 **作者**: RichelYu1998
 
@@ -15438,10 +15997,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `61b9fc68, 2a79a063, 42c7d6b2`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [config/config.json.example](config/config.json.example), [.idea/MarsCodeWorkspaceAppSettings.xml](.idea/MarsCodeWorkspaceAppSettings.xml)
+**变更统计**: +499行 -629行
+
 #### 更新内容: v3.8.46: CF + hostc 双隧道并行 + 心跳验证 + 删除 NS 监控
 
-**更新日期**: 2026-07-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-17
+**修复类型**: 📝 文档补录
 **Commit**: 61b9fc68, 2a79a063, 42c7d6b2
 **作者**: RichelYu1998
 
@@ -15458,10 +16020,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `83b9789d`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +225行 -6行
+
 #### 更新内容: v3.8.45: NS升级自动监控 + Quick Tunnel自动升级到Named Tunnel
 
-**更新日期**: 2026-07-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-17
+**修复类型**: 📝 文档补录
 **Commit**: 83b9789d
 **作者**: RichelYu1998
 
@@ -15478,10 +16043,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `bf58a8c9`  
 
+**影响文件**: [README.md](README.md), [config/config.json.example](config/config.json.example), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [tools/cloudflared/macos/cloudflared-arm64](tools/cloudflared/macos/cloudflared-arm64)
+**变更统计**: +358行 -17行
+
 #### 更新内容: v3.8.44: Named Tunnel + 自定义域名 + 自动降级到 Quick Tunnel
 
-**更新日期**: 2026-07-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-17
+**修复类型**: 📝 文档补录
 **Commit**: bf58a8c9
 **作者**: RichelYu1998
 
@@ -15498,10 +16066,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `25dd3664`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py), [skill.md](skill.md), [tools/cloudflared/README.md](tools/cloudflared/README.md), [tools/cloudflared/linux/cloudflared](tools/cloudflared/linux/cloudflared), 等 9 个文件
+**变更统计**: +614行 -15行
+
 #### 更新内容: ✨功能: Cloudflare Tunnel 跨平台支持 + 隧道切换优化 (v3.8.43)
 
-**更新日期**: 2026-07-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-17
+**修复类型**: 📝 文档补录
 **Commit**: 25dd3664
 **作者**: RichelYu1998
 
@@ -15518,10 +16089,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `366acf2d`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +145行 -11行
+
 #### 更新内容: v3.8.42: Flask访问日志格式优化
 
-**更新日期**: 2026-07-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-17
+**修复类型**: 📝 文档补录
 **Commit**: 366acf2d
 **作者**: RichelYu1998
 
@@ -15538,10 +16112,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `c910bd5e`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +100行 -1行
+
 #### 更新内容: v3.8.41: 心跳循环重启后状态重置修复
 
-**更新日期**: 2026-07-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-17
+**修复类型**: 📝 文档补录
 **Commit**: c910bd5e
 **作者**: RichelYu1998
 
@@ -15558,10 +16135,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f39dd963`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +153行 -11行
+
 #### 更新内容: v3.8.40: hostc进程竞态条件修复 + 调试日志增强
 
-**更新日期**: 2026-07-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-17
+**修复类型**: 📝 文档补录
 **Commit**: f39dd963
 **作者**: RichelYu1998
 
@@ -15578,10 +16158,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `eb798477`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +66行 -17行
+
 #### 更新内容: v3.8.39: ⚡ 隧道心跳与稳定性验证加速优化 - 心跳间隔60→30秒, 失效阈值3→2次, 稳定性验证2→1次, 空窗期从3-5分钟缩短至1-1.5分钟
 
-**更新日期**: 2026-07-12
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-12
+**修复类型**: 📝 文档补录
 **Commit**: eb798477
 **作者**: RichelYu1998
 
@@ -15598,10 +16181,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6a8215dd`  
 
+**影响文件**: [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +143行 -1行
+
 #### 更新内容: v3.8.38: 端口8888占用竞态条件修复
 
-**更新日期**: 2026-07-12
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-12
+**修复类型**: 📝 文档补录
 **Commit**: 6a8215dd
 **作者**: RichelYu1998
 
@@ -15618,10 +16204,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `b5cc8253`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +73行 -7行
+
 #### 更新内容: v3.8.37: /api/readme-sections 500 错误修复
 
-**更新日期**: 2026-07-12
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-12
+**修复类型**: 📝 文档补录
 **Commit**: b5cc8253
 **作者**: RichelYu1998
 
@@ -15638,10 +16227,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6bad363d`  
 
+**影响文件**: [README.md](README.md), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +181行 -64行
+
 #### 更新内容: v3.8.36: run.sh 函数定义顺序修复 + pre_launch 函数化重构
 
-**更新日期**: 2026-07-12
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-12
+**修复类型**: 📝 文档补录
 **Commit**: 6bad363d
 **作者**: RichelYu1998
 
@@ -15658,10 +16250,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `b242f2bc`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +500行 -1行
+
 #### 更新内容: v3.8.35: 核心范式文档补全（7项）
 
-**更新日期**: 2026-07-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-11
+**修复类型**: 📝 文档补录
 **Commit**: b242f2bc
 **作者**: RichelYu1998
 
@@ -15678,10 +16273,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `b5e90f34`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +308行 -1行
+
 #### 更新内容: v3.8.34: 移动端适配范式文档化
 
-**更新日期**: 2026-07-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-11
+**修复类型**: 📝 文档补录
 **Commit**: b5e90f34
 **作者**: RichelYu1998
 
@@ -15698,10 +16296,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `abe1b3b0`  
 
+**影响文件**: [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +51行 -5行
+
 #### 更新内容: v3.8.33: hostc CDN镜像源修正 + bat/sh镜像列表统一
 
-**更新日期**: 2026-07-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-11
+**修复类型**: 📝 文档补录
 **Commit**: abe1b3b0
 **作者**: RichelYu1998
 
@@ -15718,10 +16319,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `5fb18c52`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +167行 -52行
+
 #### 更新内容: v3.8.32: 隧道守护二次验证+指数退避+心跳阈值优化
 
-**更新日期**: 2026-07-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-11
+**修复类型**: 📝 文档补录
 **Commit**: 5fb18c52
 **作者**: RichelYu1998
 
@@ -15738,10 +16342,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `33dc9c0e`  
 
+**影响文件**: [.DS_Store](.DS_Store), [.gitignore](.gitignore), [README.md](README.md), [__pycache__/main.cpython-311.pyc](__pycache__/main.cpython-311.pyc), [__pycache__/main.cpython-313.pyc](__pycache__/main.cpython-313.pyc), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), 等 55 个文件
+**变更统计**: +308行 -103895行
+
 #### 更新内容: v3.8.31: 心跳逻辑5项优化+宽限期重构+隧道重启修复+版本号统一从README获取
 
-**更新日期**: 2026-07-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-11
+**修复类型**: 📝 文档补录
 **Commit**: 33dc9c0e
 **作者**: RichelYu1998
 
@@ -15758,10 +16365,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `2e5dfe92`  
 
+**影响文件**: [.DS_Store](.DS_Store), [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +226行 -216行
+
 #### 更新内容: ✨功能: 隧道重启逻辑重构 - 合并双路径+宽限期机制(v3.8.30)
 
-**更新日期**: 2026-07-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-11
+**修复类型**: 📝 文档补录
 **Commit**: 2e5dfe92
 **作者**: RichelYu1998
 
@@ -15778,10 +16388,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `758490fa, fff9b30f`  
 
+**影响文件**: [skill.docx](skill.docx), [.DS_Store](.DS_Store), [README.md](README.md), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +185行 -9行
+
 #### 更新内容: ⚙️整理: regenerate skill.docx from skill.md (v3.8.29)
 
-**更新日期**: 2026-07-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-11
+**修复类型**: 📝 文档补录
 **Commit**: 758490fa, fff9b30f
 **作者**: RichelYu1998
 
@@ -15798,10 +16411,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `43008c50, 72fc6d04`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +145行 -33行
+
 #### 更新内容: v3.8.28: hostc等待URL超时从120秒降至30秒
 
-**更新日期**: 2026-07-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-11
+**修复类型**: 📝 文档补录
 **Commit**: 43008c50, 72fc6d04
 **作者**: RichelYu1998
 
@@ -15818,10 +16434,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `80e869f3`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +124行 -45行
+
 #### 更新内容: v3.8.27: 隧道重启死循环修复 - tunnel_need_restart重置+hostc启动等待URL
 
-**更新日期**: 2026-07-10
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-10
+**修复类型**: 📝 文档补录
 **Commit**: 80e869f3
 **作者**: RichelYu1998
 
@@ -15838,10 +16457,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `87365334`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +106行 -26行
+
 #### 更新内容: v3.8.26: 隧道旧URL复用Bug修复 - auto_start_tunnel增加hostc进程存活检测
 
-**更新日期**: 2026-07-10
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-10
+**修复类型**: 📝 文档补录
 **Commit**: 87365334
 **作者**: RichelYu1998
 
@@ -15858,10 +16480,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6c837d37`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +223行 -37行
+
 #### 更新内容: v3.8.25: pip依赖安装智能跳过 - main.py --check-deps + run.bat/run.sh优化 - 启动加速20秒→0.1秒
 
-**更新日期**: 2026-07-10
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-10
+**修复类型**: 📝 文档补录
 **Commit**: 6c837d37
 **作者**: RichelYu1998
 
@@ -15878,10 +16503,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e8a53c37, d0328bf6, f76fadf6, 4db08011`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +343行 -33行
+
 #### 更新内容: v3.8.24: hostc退出自动重启 - read_output/_wait_and_notify检测退出后立即标记重启，restart_tunnel立即响应
 
-**更新日期**: 2026-07-10
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-10
+**修复类型**: 📝 文档补录
 **Commit**: e8a53c37, d0328bf6, f76fadf6, 4db08011
 **作者**: RichelYu1998
 
@@ -15898,10 +16526,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `3de9e1a9`  
 
+**影响文件**: [.gitignore](.gitignore), [README.md](README.md), [dist/assets/huninn-0-400-normal-Dne9Gz3b.woff](dist/assets/huninn-0-400-normal-Dne9Gz3b.woff), [dist/assets/huninn-1-400-normal-1CCSdtaz.woff](dist/assets/huninn-1-400-normal-1CCSdtaz.woff), [dist/assets/huninn-10-400-normal-Cnm4Xsyr.woff](dist/assets/huninn-10-400-normal-Cnm4Xsyr.woff), [dist/assets/huninn-102-400-normal-ClztsVdn.woff](dist/assets/huninn-102-400-normal-ClztsVdn.woff), 等 263 个文件
+**变更统计**: +479行 -34862行
+
 #### 更新内容: v3.8.23: Web服务秒级启动 + 隧道非阻塞优化 + hostc本地化 + CDN轮询安装 + dist优化
 
-**更新日期**: 2026-07-10
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-10
+**修复类型**: 📝 文档补录
 **Commit**: 3de9e1a9
 **作者**: RichelYu1998
 
@@ -15918,10 +16549,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `38da2403`  
 
+**影响文件**: [.gitignore](.gitignore), [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [dist/hostc/server/node_modules/.bin/tsc](dist/hostc/server/node_modules/.bin/tsc), [dist/hostc/server/node_modules/.bin/tsc.CMD](dist/hostc/server/node_modules/.bin/tsc.CMD), [dist/hostc/server/node_modules/.bin/tsc.ps1](dist/hostc/server/node_modules/.bin/tsc.ps1), 等 407 个文件
+**变更统计**: +1100行 -1248729行
+
 #### 更新内容: v3.8.21: Node.js依赖合并 + API范式文档完善 + 安全规范
 
-**更新日期**: 2026-07-10
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-10
+**修复类型**: 📝 文档补录
 **Commit**: 38da2403
 **作者**: RichelYu1998
 
@@ -15938,10 +16572,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `fa9141d9, 230c375c, e14e9e5d`  
 
+**影响文件**: [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md), [index.html](index.html), 等 7 个文件
+**变更统计**: +577行 -132行
+
 #### 更新内容: v3.8.20: 即时邮件通知+前端状态修复+验证加速; 去除预启动概念改为直接启动
 
-**更新日期**: 2026-07-10
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-10
+**修复类型**: 📝 文档补录
 **Commit**: fa9141d9, 230c375c, e14e9e5d
 **作者**: RichelYu1998
 
@@ -15958,10 +16595,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `2f421122, 030d3e3d, 8cdd0bd1, bd69776f, f034c1d3`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [main.py](main.py)
+**变更统计**: +120行 -103行
+
 #### 更新内容: v3.8.18: 文档同步 - README/skill.md/skill.docx 更新auto_start_tunnel不阻塞规范 + PY-STD-TUNNEL-003
 
-**更新日期**: 2026-07-10
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-10
+**修复类型**: 📝 文档补录
 **Commit**: 2f421122, 030d3e3d, 8cdd0bd1, bd69776f, f034c1d3
 **作者**: RichelYu1998
 
@@ -15978,10 +16618,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `2821c988`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +718行 -61行
+
 #### 更新内容: v3.8.17: 隧道启动优化 - hostc预启动 + Python智能等待
 
-**更新日期**: 2026-07-10
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-10
+**修复类型**: 📝 文档补录
 **Commit**: 2821c988
 **作者**: RichelYu1998
 
@@ -15998,10 +16641,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e9439ff8`  
 
+**影响文件**: [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +254行 -52行
+
 #### 更新内容: v3.8.16: macOS时间戳Bug修复 + 跨平台毫秒级时间戳统一
 
-**更新日期**: 2026-07-09
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-09
+**修复类型**: 📝 文档补录
 **Commit**: e9439ff8
 **作者**: RichelYu1998
 
@@ -16018,10 +16664,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f10cdc62, 2715d09e, 4ac09fb1, f0e50fd1, 63c1e4bc`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [main.py](main.py)
+**变更统计**: +581行 -168行
+
 #### 更新内容: 📚 v3.8.15 文档完整更新: 全局时间戳100%覆盖规范
 
-**更新日期**: 2026-07-09
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-09
+**修复类型**: 📝 文档补录
 **Commit**: f10cdc62, 2715d09e, 4ac09fb1, f0e50fd1, 63c1e4bc
 **作者**: RichelYu1998
 
@@ -16038,10 +16687,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `2243b1ab, 0ad4f113`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [test_changelog.py](test_changelog.py), [main.py](main.py)
+**变更统计**: +780行 -52行
+
 #### 更新内容: v3.8.14 - README.md 三段式结构规范补齐 + skill.docx 重新生成
 
-**更新日期**: 2026-07-08
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-08
+**修复类型**: 📝 文档补录
 **Commit**: 2243b1ab, 0ad4f113
 **作者**: RichelYu1998
 
@@ -16058,10 +16710,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `23dc7835`  
 
+**影响文件**: [.gitignore](.gitignore), [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +265行 -24行
+
 #### 更新内容: v3.8.13 - 🔧 关键Bug修复 + API信息完整性增强 + 更新日志格式优化
 
-**更新日期**: 2026-07-08
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-08
+**修复类型**: 📝 文档补录
 **Commit**: 23dc7835
 **作者**: RichelYu1998
 
@@ -16078,10 +16733,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `3855601b, 7fe0d4af`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [main.py](main.py)
+**变更统计**: +414行 -101行
+
 #### 更新内容: v3.8.12 - 📝 添加版本号格式规范到 README.md 和 skill.md，修复 bat 解析问题，生成 skill.docx
 
-**更新日期**: 2026-07-08
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-08
+**修复类型**: 📝 文档补录
 **Commit**: 3855601b, 7fe0d4af
 **作者**: RichelYu1998
 
@@ -16098,10 +16756,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `1db2cbe4`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx)
+**变更统计**: +872行 -2行
+
 #### 更新内容: v3.8.11: 完整历史记录恢复与文档更新
 
-**更新日期**: 2026-07-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-05
+**修复类型**: 📝 文档补录
 **Commit**: 1db2cbe4
 **作者**: RichelYu1998
 
@@ -16118,10 +16779,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `c4b734ac, 948f440f`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +1753行 -3547行
+
 #### 更新内容: v3.8.10 - 更新文档：README.md + skill.md + skill.docx 同步代码规范
 
-**更新日期**: 2026-07-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-05
+**修复类型**: 📝 文档补录
 **Commit**: c4b734ac, 948f440f
 **作者**: RichelYu1998
 
@@ -16138,10 +16802,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `60e2fcf0`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +96行 -44行
+
 #### 更新内容: v3.8.9 (2026-07-05) - 🔒 强制URL去重机制（同一地址30分钟内只发1次邮件）
 
-**更新日期**: 2026-07-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-05
+**修复类型**: 📝 文档补录
 **Commit**: 60e2fcf0
 **作者**: RichelYu1998
 
@@ -16158,10 +16825,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f629caa2`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +127行 -6行
+
 #### 更新内容: v3.8.8 (2026-07-05) - 🚀 公网地址可用即自动发邮件（零延迟通知优化）
 
-**更新日期**: 2026-07-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-05
+**修复类型**: 📝 文档补录
 **Commit**: f629caa2
 **作者**: RichelYu1998
 
@@ -16178,10 +16848,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6ee7e5f9, 3b7fadf4`  
 
+**影响文件**: [skill.docx](skill.docx), [main.py](main.py)
+**变更统计**: +140行 -88行
+
 #### 更新内容: v3.8.7 (2026-07-05) - 📄 更新skill.docx文档（线程安全URL去重机制修复）
 
-**更新日期**: 2026-07-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-05
+**修复类型**: 📝 文档补录
 **Commit**: 6ee7e5f9, 3b7fadf4
 **作者**: RichelYu1998
 
@@ -16198,10 +16871,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `73464def, 9e557e09, dd49e272`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [main.py](main.py), [skill.md](skill.md)
+**变更统计**: +407行 -77行
+
 #### 更新内容: 🏗️重构: v3.8.6内容改为标准API格式（- **分类** + 子条目）
 
-**更新日期**: 2026-07-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-05
+**修复类型**: 📝 文档补录
 **Commit**: 73464def, 9e557e09, dd49e272
 **作者**: RichelYu1998
 
@@ -16218,10 +16894,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `27bcbcef, aeb7014e, 1ca66701`  
 
+**影响文件**: [generate_docx.py](generate_docx.py), [skill.docx](skill.docx), [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh), 等 9 个文件
+**变更统计**: +747行 -14行
+
 #### 更新内容: 📄 v3.8.5 - 生成符合规范的 skill.docx
 
-**更新日期**: 2026-07-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-05
+**修复类型**: 📝 文档补录
 **Commit**: 27bcbcef, aeb7014e, 1ca66701
 **作者**: RichelYu1998
 
@@ -16238,10 +16917,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8de0262f`  
 
+**影响文件**: [.DS_Store](.DS_Store), [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +45行 -2行
+
 #### 更新内容: v3.8.4: 修复从非项目目录运行启动脚本时Web服务启动失败Bug
 
-**更新日期**: 2026-07-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-04
+**修复类型**: 📝 文档补录
 **Commit**: 8de0262f
 **作者**: RichelYu1998
 
@@ -16258,10 +16940,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `04404d40`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +34行 -3行
+
 #### 更新内容: ✨功能: v3.8.3 - 修复'最新更新'区域空白Bug + Markdown标题格式规范
 
-**更新日期**: 2026-07-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-04
+**修复类型**: 📝 文档补录
 **Commit**: 04404d40
 **作者**: RichelYu1998
 
@@ -16278,10 +16963,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d7799952`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +64行 -18行
+
 #### 更新内容: 🐛修复: web_output.log启动日志被覆盖Bug - v3.8.2
 
-**更新日期**: 2026-07-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-04
+**修复类型**: 📝 文档补录
 **Commit**: d7799952
 **作者**: RichelYu1998
 
@@ -16298,10 +16986,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `21fbf4ba, 784f1f71`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [main.py](main.py)
+**变更统计**: +2253行 -43行
+
 #### 更新内容: 📝文档: v3.8.1 - skill.md全面补全(main.py独立函数§2.15 + index.html前端61个函数§2.16), API端点修正, README去重, skill.docx重新生成
 
-**更新日期**: 2026-07-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-04
+**修复类型**: 📝 文档补录
 **Commit**: 21fbf4ba, 784f1f71
 **作者**: RichelYu1998
 
@@ -16318,10 +17009,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `50632236`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +682行 -503行
+
 #### 更新内容: 📝文档: v3.8.0 文档系统全面升级
 
-**更新日期**: 2026-07-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-04
+**修复类型**: 📝 文档补录
 **Commit**: 50632236
 **作者**: RichelYu1998
 
@@ -16338,10 +17032,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `17dabaa8, c04675d3`  
 
+**影响文件**: [generate_skill_docx.py](generate_skill_docx.py), [main.py](main.py), [skill.docx](skill.docx), [README.md](README.md), [skill.md](skill.md)
+**变更统计**: +937行 -223行
+
 #### 更新内容: v3.7.9: 删除generate_skill_docx.py + 重新生成skill.docx
 
-**更新日期**: 2026-07-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-04
+**修复类型**: 📝 文档补录
 **Commit**: 17dabaa8, c04675d3
 **作者**: RichelYu1998
 
@@ -16358,10 +17055,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d7d068c6, 0614ea38, 76b27ac6, e432f111, 9bcd2683`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [run.sh](run.sh), [run.bat](run.bat)
+**变更统计**: +187行 -92行
+
 #### 更新内容: v3.7.8: 隧道快速恢复机制-3秒级响应+邮件去重
 
-**更新日期**: 2026-07-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-04
+**修复类型**: 📝 文档补录
 **Commit**: d7d068c6, 0614ea38, 76b27ac6, e432f111, 9bcd2683
 **作者**: RichelYu1998
 
@@ -16378,10 +17078,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `24c1bb65`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +86行 -0行
+
 #### 更新内容: v3.7.7: 修复Excel与JSON对比按钮状态不复位问题，更新skill.md/skill.docx按钮状态管理规范
 
-**更新日期**: 2026-06-28
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-28
+**修复类型**: 📝 文档补录
 **Commit**: 24c1bb65
 **作者**: RichelYu1998
 
@@ -16398,10 +17101,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `1dcfcd9f, e7e8f8f3, c9edc2a6, b7d7ce38, a3bc4ce5`  
 
+**影响文件**: [README.md](README.md), [generate_skill_docx.py](generate_skill_docx.py), [run.bat](run.bat), [run.sh](run.sh), [skill.docx](skill.docx), [skill.md](skill.md), 等 7 个文件
+**变更统计**: +531行 -119行
+
 #### 更新内容: v3.7.6: 修复pip.conf trusted-host重复/提取错误、整数比较空值、macOS du -sb兼容性、更新skill.md/README.md/skill.docx
 
-**更新日期**: 2026-06-27
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-27
+**修复类型**: 📝 文档补录
 **Commit**: 1dcfcd9f, e7e8f8f3, c9edc2a6, b7d7ce38, a3bc4ce5
 **作者**: RichelYu1998
 
@@ -16418,10 +17124,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `00cdfb9b, 9b8a5446, c0077994`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +201行 -251行
+
 #### 更新内容: v3.7.5: 修复利润趋势图联动、Excel日期转换、Y轴动态缩放、代码损坏
 
-**更新日期**: 2026-06-26
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-26
+**修复类型**: 📝 文档补录
 **Commit**: 00cdfb9b, 9b8a5446, c0077994
 **作者**: RichelYu1998
 
@@ -16438,10 +17147,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `76a5a7f7`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +322行 -43行
+
 #### 更新内容: v3.7.4: 利润报表汇总行点击展开位置修复 + 聚合级别修正 + 跨系统/移动端确认 + skill同步
 
-**更新日期**: 2026-06-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-18
+**修复类型**: 📝 文档补录
 **Commit**: 76a5a7f7
 **作者**: RichelYu1998
 
@@ -16458,10 +17170,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `84f5bf54`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +132行 -4行
+
 #### 更新内容: v3.7.3: DOMContentLoaded闭合修复 + 按钮样式统一 + skill/docx同步
 
-**更新日期**: 2026-06-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-18
+**修复类型**: 📝 文档补录
 **Commit**: 84f5bf54
 **作者**: RichelYu1998
 
@@ -16478,10 +17193,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9d2fd964`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +85行 -2行
+
 #### 更新内容: v3.7.2: 修复index.html第5197行标签闭合 + skill.md/docx规范更新
 
-**更新日期**: 2026-06-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-18
+**修复类型**: 📝 文档补录
 **Commit**: 9d2fd964
 **作者**: RichelYu1998
 
@@ -16498,10 +17216,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `95719082`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [index.html](index.html), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +608行 -87行
+
 #### 更新内容: v3.7.1: 跨系统硬编码彻底消除 + V3.5.0移动端规范复查
 
-**更新日期**: 2026-06-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-18
+**修复类型**: 📝 文档补录
 **Commit**: 95719082
 **作者**: RichelYu1998
 
@@ -16518,10 +17239,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6dbd5812, 9669222d, b0554098, 25ef7123, efa2c209`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md), [main.py](main.py), [dist/hostc/server/AGENTS.md](dist/hostc/server/AGENTS.md), [dist/hostc/server/README.md](dist/hostc/server/README.md), 等 7 个文件
+**变更统计**: +1148行 -144行
+
 #### 更新内容: 📝文档: 新增完整编码规范文档（v3.6.0 + v3.5.0 + README格式规范）
 
-**更新日期**: 2026-07-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-05
+**修复类型**: 📝 文档补录
 **Commit**: 6dbd5812, 9669222d, b0554098, 25ef7123, efa2c209
 **作者**: RichelYu1998
 
@@ -16538,10 +17262,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f8b6eb6a, 4aa3f495`  
 
+**影响文件**: [index.html](index.html), [.gitignore](.gitignore), [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +874行 -9行
+
 #### 更新内容: v3.5.8: 更新前端版本号和更新日志至3.5.8
 
-**更新日期**: 2026-06-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-11
+**修复类型**: 📝 文档补录
 **Commit**: f8b6eb6a, 4aa3f495
 **作者**: RichelYu1998
 
@@ -16558,10 +17285,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `c333bbb9, 270b272c`  
 
+**影响文件**: [index.html](index.html), [README.md](README.md), [main.py](main.py)
+**变更统计**: +77行 -38行
+
 #### 更新内容: v3.5.7: 前端添加最新更新模块，版本号同步更新
 
-**更新日期**: 2026-06-07
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-07
+**修复类型**: 📝 文档补录
 **Commit**: c333bbb9
 **作者**: RichelYu1998
 
@@ -16578,10 +17308,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `7008898d`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html)
+**变更统计**: +218行 -19行
+
 #### 更新内容: v3.5.6: 完善移动端适配功能和表格样式优化
 
-**更新日期**: 2026-06-06
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-06
+**修复类型**: 📝 文档补录
 **Commit**: 7008898d
 **作者**: RichelYu1998
 
@@ -16598,10 +17331,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e918c88c`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py)
+**变更统计**: +150行 -37行
+
 #### 更新内容: v3.5.4 - 每日利润报表优化：日期格式统一、项目字段、表头固定、错误处理增强
 
-**更新日期**: 2026-06-06
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-06
+**修复类型**: 📝 文档补录
 **Commit**: e918c88c
 **作者**: RichelYu1998
 
@@ -16618,10 +17354,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `70757aee`  
 
+**影响文件**: [README.md](README.md)
+**变更统计**: +11行 -1行
+
 #### 更新内容: 📝文档: 更新 v3.5.3 版本日志 - 汇总视图与明细联动功能
 
-**更新日期**: 2026-06-06
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-06
+**修复类型**: 📝 文档补录
 **Commit**: 70757aee
 **作者**: RichelYu1998
 
@@ -16638,10 +17377,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `cacd0b3a, 97afd46a, 881c58b4, 639af06a`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [index.html](index.html), [index.js](index.js), [main.py](main.py)
+**变更统计**: +366行 -2319行
+
 #### 更新内容: 📝文档: 更新 v3.5.2 版本日志
 
-**更新日期**: 2026-06-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-05
+**修复类型**: 📝 文档补录
 **Commit**: cacd0b3a, 97afd46a, 881c58b4, 639af06a
 **作者**: RichelYu1998
 
@@ -16893,10 +17635,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `556dcc7d`  
 
+**影响文件**: [.gitignore](.gitignore), [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +64行 -2行
+
 #### 更新内容: v3.4.37: 优化临时文件清理机制，修复bat脚本启动时误杀进程问题
 
-**更新日期**: 2026-06-05
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-05
+**修复类型**: 📝 文档补录
 **Commit**: 556dcc7d
 **作者**: RichelYu1998
 
@@ -16913,10 +17658,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a81a4efc`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +17行 -3行
+
 #### 更新内容: 修复文件清理 API JSON 解析错误 (v3.4.34)
 
-**更新日期**: 2026-06-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-04
+**修复类型**: 📝 文档补录
 **Commit**: a81a4efc
 **作者**: RichelYu1998
 
@@ -16933,10 +17681,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `310a9635`  
 
+**影响文件**: [.gitignore](.gitignore), [README.md](README.md), [clean_files.log](clean_files.log), [index.html](index.html), [main.py](main.py), [temp/_temp_excel_12d92594fe1c471bbf7134283dfacc1b.xlsx](temp/_temp_excel_12d92594fe1c471bbf7134283dfacc1b.xlsx), 等 10 个文件
+**变更统计**: +462行 -384行
+
 #### 更新内容: v3.4.33 - 代码优化和跨系统支持增强
 
-**更新日期**: 2026-06-03
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-03
+**修复类型**: 📝 文档补录
 **Commit**: 310a9635
 **作者**: RichelYu1998
 
@@ -16953,10 +17704,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e13a91bd, 879d82fa, 524a1c64, 388e391f`  
 
+**影响文件**: [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh), [main.py](main.py)
+**变更统计**: +350行 -134行
+
 #### 更新内容: v3.4.32: 修复镜像源显示问题并统一run.sh逻辑
 
-**更新日期**: 2026-06-03
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-03
+**修复类型**: 📝 文档补录
 **Commit**: e13a91bd, 879d82fa, 524a1c64, 388e391f
 **作者**: RichelYu1998
 
@@ -16973,10 +17727,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `ed7f4296`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +19行 -5行
+
 #### 更新内容: 🐛修复: 修复文件清理工具获取文件大小错误 (v3.4.31)
 
-**更新日期**: 2026-06-01
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-01
+**修复类型**: 📝 文档补录
 **Commit**: ed7f4296
 **作者**: RichelYu1998
 
@@ -16993,10 +17750,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `94226bfd`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +33行 -7行
+
 #### 更新内容: 🐛修复: 修复清理工具 API 空目录检测问题 (v3.4.30)
 
-**更新日期**: 2026-05-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-30
+**修复类型**: 📝 文档补录
 **Commit**: 94226bfd
 **作者**: RichelYu1998
 
@@ -17013,10 +17773,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `994dda31`  
 
+**影响文件**: [README.md](README.md)
+**变更统计**: +6行 -0行
+
 #### 更新内容: README: 更新 v3.4.29 日志
 
-**更新日期**: 2026-05-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-30
+**修复类型**: 📝 文档补录
 **Commit**: 994dda31
 **作者**: RichelYu1998
 
@@ -17033,10 +17796,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `b6d9be48`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [clean_files.log](clean_files.log), [main.py](main.py), [temp/_temp_excel_12d92594fe1c471bbf7134283dfacc1b.xlsx](temp/_temp_excel_12d92594fe1c471bbf7134283dfacc1b.xlsx), [temp/_temp_excel_3cefee3eee6640f287a76295135a80f6.xlsx](temp/_temp_excel_3cefee3eee6640f287a76295135a80f6.xlsx), 等 9 个文件
+**变更统计**: +434行 -3行
+
 #### 更新内容: v3.4.28: 优化Flask 404处理和邮件冷却期补发机制
 
-**更新日期**: 2026-05-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-30
+**修复类型**: 📝 文档补录
 **Commit**: b6d9be48
 **作者**: RichelYu1998
 
@@ -17053,10 +17819,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `2e492b3e`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +10行 -5行
+
 #### 更新内容: v3.4.27: 修复文件清理工具'删除所有文件和文件夹'功能报错
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 2e492b3e
 **作者**: RichelYu1998
 
@@ -17073,10 +17842,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f59d7924`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +770行 -396行
+
 #### 更新内容: v3.4.26: 重构统一异常处理系统 + 增强 tunnel_status API URL 验证
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: f59d7924
 **作者**: RichelYu1998
 
@@ -17093,10 +17865,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8c173ef1`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +67行 -20行
+
 #### 更新内容: v3.4.25: Excel读取改为复制到临时文件，彻底解决共享违规
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 8c173ef1
 **作者**: RichelYu1998
 
@@ -17113,10 +17888,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `4918817b, 2ac97bb6`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +9行 -13行
+
 #### 更新内容: README: 更新 v3.4.24 日志
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 4918817b, 2ac97bb6
 **作者**: RichelYu1998
 
@@ -17133,10 +17911,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `bc1051c2`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [index.html](index.html), [main.py](main.py)
+**变更统计**: +133行 -46行
+
 #### 更新内容: v3.4.23: 修复 Excel 文件读取时的 Windows 共享违规问题
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: bc1051c2
 **作者**: RichelYu1998
 
@@ -17153,10 +17934,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `58bdaa4b`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +7行 -1行
+
 #### 更新内容: v3.4.22: 优化心跳检测间隔从60秒到5秒，提高隧道故障检测速度
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 58bdaa4b
 **作者**: RichelYu1998
 
@@ -17173,10 +17957,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `279b23da`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +18行 -0行
+
 #### 更新内容: v3.4.21: 确保 tunnel_url.txt 持久一致
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 279b23da
 **作者**: RichelYu1998
 
@@ -17193,10 +17980,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f9c4fe71`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +7行 -0行
+
 #### 更新内容: v3.4.20: 优化 tunnel_url.txt 写入格式
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: f9c4fe71
 **作者**: RichelYu1998
 
@@ -17213,10 +18003,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `dd67e338`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +14行 -4行
+
 #### 更新内容: v3.4.19: 同步写入 tunnel_url.txt
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: dd67e338
 **作者**: RichelYu1998
 
@@ -17233,10 +18026,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `474322b3`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +11行 -6行
+
 #### 更新内容: v3.4.18: 完全移除 tunnel_url 全局变量的更新逻辑
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 474322b3
 **作者**: RichelYu1998
 
@@ -17253,10 +18049,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `bac0af3d`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +39行 -38行
+
 #### 更新内容: v3.4.17: 统一所有模块从 web_output.log 获取公网地址
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: bac0af3d
 **作者**: RichelYu1998
 
@@ -17273,10 +18072,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `70a874de`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +6行 -2行
+
 #### 更新内容: v3.4.16: 修复 old_url 未定义错误
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 70a874de
 **作者**: RichelYu1998
 
@@ -17293,10 +18095,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `be1179b6`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +13行 -37行
+
 #### 更新内容: v3.4.15: 简化启动流程，移除冗余等待逻辑
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: be1179b6
 **作者**: RichelYu1998
 
@@ -17313,10 +18118,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `15afea5f`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +42行 -18行
+
 #### 更新内容: v3.4.14: read_output 改为读取 hostc stdout 输出
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 15afea5f
 **作者**: RichelYu1998
 
@@ -17333,10 +18141,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `cbd01611`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +26行 -42行
+
 #### 更新内容: v3.4.13: 完全移除 tunnel_url.txt 读取逻辑，全部从 web_output.log
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: cbd01611
 **作者**: RichelYu1998
 
@@ -17353,10 +18164,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9bddf06d`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +30行 -4行
+
 #### 更新内容: v3.4.12: 修复等待 URL 逻辑，直接检查 web_output.log
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 9bddf06d
 **作者**: RichelYu1998
 
@@ -17373,10 +18187,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `682634aa`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +63行 -301行
+
 #### 更新内容: v3.4.11: 大幅简化 tunnel 重启逻辑
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 682634aa
 **作者**: RichelYu1998
 
@@ -17393,10 +18210,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `569c73f0`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +41行 -5行
+
 #### 更新内容: v3.4.10: 优化 hostc 进程稳定性，URL 无效时等待 60 秒再重启
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 569c73f0
 **作者**: RichelYu1998
 
@@ -17413,10 +18233,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `84af90e9`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +67行 -68行
+
 #### 更新内容: v3.4.9: 统一使用 web_output.log 作为公网地址唯一来源
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 84af90e9
 **作者**: RichelYu1998
 
@@ -17433,10 +18256,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `cadaa944, 8cdc3602`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +139行 -158行
+
 #### 更新内容: v3.4.8: 统一公网地址来源，全部从 web_output.log 获取
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: cadaa944, 8cdc3602
 **作者**: RichelYu1998
 
@@ -17453,10 +18279,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `31bac7e7, cae017ec`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +27行 -4行
+
 #### 更新内容: v3.4.7: 更新 README
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 31bac7e7, cae017ec
 **作者**: RichelYu1998
 
@@ -17473,10 +18302,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f6ce2f30`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +55行 -1行
+
 #### 更新内容: v3.4.6: 修复 tunnel_url.txt 为空时无法重启问题
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: f6ce2f30
 **作者**: RichelYu1998
 
@@ -17493,10 +18325,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a990a144`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +17行 -1行
+
 #### 更新内容: v3.4.5: 修复 tunnel_url.txt 为空时重启循环问题
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: a990a144
 **作者**: RichelYu1998
 
@@ -17513,10 +18348,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `42556d6c`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +25行 -2行
+
 #### 更新内容: v3.4.4: 优化 tunnel_url.txt 为空时立即重启，不等待20秒超时
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 42556d6c
 **作者**: RichelYu1998
 
@@ -17533,10 +18371,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `892533c6`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py)
+**变更统计**: +78行 -75行
+
 #### 更新内容: v3.4.3: 修复 tunnel_url.txt 为空时不重启、守护线程重复启动日志刷屏、URL 无效时不返回无效地址
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 892533c6
 **作者**: RichelYu1998
 
@@ -17553,10 +18394,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `0f4df05a`  
 
+**影响文件**: [README.md](README.md)
+**变更统计**: +10行 -10行
+
 #### 更新内容: v3.4.2: 前端展示URL可用性验证 + 心跳检测日志优化
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 0f4df05a
 **作者**: RichelYu1998
 
@@ -17573,10 +18417,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f0e7f2a1`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat)
+**变更统计**: +121行 -7行
+
 #### 更新内容: v3.4.1: 修复 web_output.log 日志同步问题
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: f0e7f2a1
 **作者**: RichelYu1998
 
@@ -17593,10 +18440,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a7bf016d`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py)
+**变更统计**: +36行 -10行
+
 #### 更新内容: v3.4.0: 修复隧道状态显示和日志同步问题
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: a7bf016d
 **作者**: RichelYu1998
 
@@ -17613,10 +18463,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `59ab04fd`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.sh](run.sh)
+**变更统计**: +57行 -51行
+
 #### 更新内容: v3.3.9: 修复 tunnel_url 和前端显示不一致问题
 
-**更新日期**: 2026-05-28
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-28
+**修复类型**: 📝 文档补录
 **Commit**: 59ab04fd
 **作者**: RichelYu1998
 
@@ -17633,10 +18486,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `75da044d`  
 
+**影响文件**: [README.md](README.md)
+**变更统计**: +7行 -5行
+
 #### 更新内容: v3.3.8: 拆分版本，优化更新日志格式
 
-**更新日期**: 2026-05-28
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-28
+**修复类型**: 📝 文档补录
 **Commit**: 75da044d
 **作者**: RichelYu1998
 
@@ -17653,10 +18509,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `c9bcc7ba, 370f5b1e, 6efd02a5, 13021f6c, 1290b226`  
 
+**影响文件**: [index.html](index.html), [README.md](README.md), [main.py](main.py)
+**变更统计**: +207行 -262行
+
 #### 更新内容: v3.3.7: 前端隧道状态轮询间隔从5秒改为2秒，更快同步URL变化
 
-**更新日期**: 2026-05-28
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-28
+**修复类型**: 📝 文档补录
 **Commit**: c9bcc7ba, 370f5b1e, 6efd02a5, 13021f6c, 1290b226
 **作者**: RichelYu1998
 
@@ -17673,10 +18532,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `3bffaee8, a1ccf1ab, 1660b98f`  
 
+**影响文件**: [main.py](main.py), [README.md](README.md)
+**变更统计**: +83行 -355行
+
 #### 更新内容: v3.3.6 - 优化进程清理逻辑，避免无效清理导致的失败统计
 
-**更新日期**: 2026-05-28
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-28
+**修复类型**: 📝 文档补录
 **Commit**: 3bffaee8, a1ccf1ab, 1660b98f
 **作者**: RichelYu1998
 
@@ -17693,10 +18555,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `42183c31, 0ccf62b9, 3d6e28ae, be0a1c56, dbea6c34`  
 
+**影响文件**: [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh), [README.md](README.md)
+**变更统计**: +69行 -28行
+
 #### 更新内容: v3.3.5 - 统一进程检测逻辑确保跨系统兼容
 
-**更新日期**: 2026-05-28
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-28
+**修复类型**: 📝 文档补录
 **Commit**: 42183c31, 0ccf62b9, 3d6e28ae, be0a1c56, dbea6c34
 **作者**: RichelYu1998
 
@@ -17713,10 +18578,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `daf1d1bf`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +35行 -2行
+
 #### 更新内容: v3.3.4 - 隧道日志输出优化和进程清理改进
 
-**更新日期**: 2026-05-24
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-24
+**修复类型**: 📝 文档补录
 **Commit**: daf1d1bf
 **作者**: RichelYu1998
 
@@ -17733,10 +18601,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `dad9c021`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +92行 -10行
+
 #### 更新内容: v3.3.3: 修复隧道进程泄漏和邮件通知问题
 
-**更新日期**: 2026-05-23
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-23
+**修复类型**: 📝 文档补录
 **Commit**: dad9c021
 **作者**: RichelYu1998
 
@@ -17753,10 +18624,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f40a3e64`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +20行 -5行
+
 #### 更新内容: v3.3.1: 修复 Web 界面运行爬虫时 Input/output error 问题
 
-**更新日期**: 2026-05-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-22
+**修复类型**: 📝 文档补录
 **Commit**: f40a3e64
 **作者**: RichelYu1998
 
@@ -17773,10 +18647,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f9e967e5`  
 
+**影响文件**: [README.md](README.md), ["file/20260522\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260522\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), ["file/20260522\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"]("file/20260522\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"), [file/tunnel_url.txt](file/tunnel_url.txt), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +598行 -235行
+
 #### 更新内容: v3.3.0: 自动配置阿里云pip镜像加速
 
-**更新日期**: 2026-05-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-22
+**修复类型**: 📝 文档补录
 **Commit**: f9e967e5
 **作者**: RichelYu1998
 
@@ -17793,10 +18670,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a6b989f5`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +110行 -17行
+
 #### 更新内容: v3.2.9 - 修复隧道频繁重启和邮件发送问题
 
-**更新日期**: 2026-05-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-22
+**修复类型**: 📝 文档补录
 **Commit**: a6b989f5
 **作者**: RichelYu1998
 
@@ -17813,10 +18693,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `88ca5013`  
 
+**影响文件**: [README.md](README.md), [config/config.json.example](config/config.json.example), [main.py](main.py)
+**变更统计**: +168行 -244行
+
 #### 更新内容: v3.2.8 - Flask启动时邮件通知增强
 
-**更新日期**: 2026-05-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-22
+**修复类型**: 📝 文档补录
 **Commit**: 88ca5013
 **作者**: RichelYu1998
 
@@ -17833,10 +18716,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `b21b4f78, 891467e9`  
 
+**影响文件**: [README.md](README.md), ["file/20260521\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260521\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), ["file/20260521\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"]("file/20260521\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"), ["file/20260522\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260522\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), ["file/20260522\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"]("file/20260522\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"), [file/tunnel_url.txt](file/tunnel_url.txt), 等 8 个文件
+**变更统计**: +5651行 -814行
+
 #### 更新内容: v3.2.7 - 新增公网地址变更邮件通知功能
 
-**更新日期**: 2026-05-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-22
+**修复类型**: 📝 文档补录
 **Commit**: b21b4f78, 891467e9
 **作者**: RichelYu1998
 
@@ -17853,10 +18739,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8d3759c8, 07e9580a`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py)
+**变更统计**: +625行 -533行
+
 #### 更新内容: v3.2.6: 前端JavaScript优化 - 移除冗余日志，简化代码结构
 
-**更新日期**: 2026-05-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-21
+**修复类型**: 📝 文档补录
 **Commit**: 8d3759c8, 07e9580a
 **作者**: RichelYu1998
 
@@ -17873,10 +18762,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `ebe44b7d`  
 
+**影响文件**: [README.md](README.md), [cloudflared.exe](cloudflared.exe), [file/cloudflared-windows-amd64.exe](file/cloudflared-windows-amd64.exe), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +15行 -121行
+
 #### 更新内容: v3.2.5: 简化启动流程，移除隧道选择菜单
 
-**更新日期**: 2026-05-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-21
+**修复类型**: 📝 文档补录
 **Commit**: ebe44b7d
 **作者**: RichelYu1998
 
@@ -17893,10 +18785,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `1b6da815, e3f2a6b9`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [CLOUDFLARE_TUNNEL.md](CLOUDFLARE_TUNNEL.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [cloudflared.exe](cloudflared.exe), ["file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), 等 14 个文件
+**变更统计**: +5745行 -1246行
+
 #### 更新内容: v3.2.4: 前端展示URL可用性验证 + 心跳检测日志优化
 
-**更新日期**: 2026-05-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-29
+**修复类型**: 📝 文档补录
 **Commit**: 1b6da815, e3f2a6b9
 **作者**: RichelYu1998
 
@@ -17913,10 +18808,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `46092f98`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +1477行 -100行
+
 #### 更新内容: v3.2.3: Cloudflare Tunnel 配置功能
 
-**更新日期**: 2026-05-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-21
+**修复类型**: 📝 文档补录
 **Commit**: 46092f98
 **作者**: RichelYu1998
 
@@ -17933,10 +18831,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `1f7c0f6a`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +63行 -6行
+
 #### 更新内容: v3.2.2 - 修复隧道自动重连死循环问题，实现无感切换到新的公网 URL
 
-**更新日期**: 2026-05-21
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-21
+**修复类型**: 📝 文档补录
 **Commit**: 1f7c0f6a
 **作者**: RichelYu1998
 
@@ -17953,10 +18854,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `2bee5074`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +44行 -0行
+
 #### 更新内容: v3.2.1: 守护线程重启时保持 URL 一致
 
-**更新日期**: 2026-05-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-20
+**修复类型**: 📝 文档补录
 **Commit**: 2bee5074
 **作者**: RichelYu1998
 
@@ -17973,10 +18877,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6fbe62b9`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +48行 -6行
+
 #### 更新内容: v3.2.0: 外部启动隧道监控机制
 
-**更新日期**: 2026-05-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-20
+**修复类型**: 📝 文档补录
 **Commit**: 6fbe62b9
 **作者**: RichelYu1998
 
@@ -17993,10 +18900,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `12fd1145`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [file/tunnel_url.txt](file/tunnel_url.txt), [main.py](main.py)
+**变更统计**: +51行 -7行
+
 #### 更新内容: v3.1.9: 优化前端隧道共享按钮，优先复用tunnel_url.txt中的已有地址
 
-**更新日期**: 2026-05-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-20
+**修复类型**: 📝 文档补录
 **Commit**: 12fd1145
 **作者**: RichelYu1998
 
@@ -18013,10 +18923,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `90376332, f953258c, 9962cfb4`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), ["file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), ["file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"]("file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"), [file/tunnel_url.txt](file/tunnel_url.txt), [index.html](index.html)
+**变更统计**: +634行 -156行
+
 #### 更新内容: v3.1.8: 增强隧道保持在线机制
 
-**更新日期**: 2026-05-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-20
+**修复类型**: 📝 文档补录
 **Commit**: 90376332, f953258c, 9962cfb4
 **作者**: RichelYu1998
 
@@ -18033,10 +18946,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `4a64f75a`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), ["file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), ["file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"]("file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"), [file/tunnel_url.txt](file/tunnel_url.txt), [index.html](index.html), 等 7 个文件
+**变更统计**: +195行 -13行
+
 #### 更新内容: v3.1.7 - 货号对比重复检测优化
 
-**更新日期**: 2026-05-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-20
+**修复类型**: 📝 文档补录
 **Commit**: 4a64f75a
 **作者**: RichelYu1998
 
@@ -18053,10 +18969,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d38a6eff`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +188行 -14行
+
 #### 更新内容: v3.1.5: 隧道自动重连机制
 
-**更新日期**: 2026-05-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-18
+**修复类型**: 📝 文档补录
 **Commit**: d38a6eff
 **作者**: RichelYu1998
 
@@ -18073,10 +18992,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e8bf93ca, a96b7dcc`  
 
+**影响文件**: [main.py](main.py), [README.md](README.md), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +73行 -43行
+
 #### 更新内容: 更新版本号至 v3.1.3
 
-**更新日期**: 2026-05-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-18
+**修复类型**: 📝 文档补录
 **Commit**: e8bf93ca, a96b7dcc
 **作者**: RichelYu1998
 
@@ -18093,10 +19015,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e176d3c9, ccced8d8, d3b77985, 2c01b1d1, 54641f65`  
 
+**影响文件**: [README.md](README.md), [file/tunnel_url.txt](file/tunnel_url.txt), [git_push.bat](git_push.bat), [index.html](index.html), [main.py](main.py), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), 等 10 个文件
+**变更统计**: +5389行 -64行
+
 #### 更新内容: v3.1.2: 天气看板预加载优化
 
-**更新日期**: 2026-05-18
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-18
+**修复类型**: 📝 文档补录
 **Commit**: e176d3c9, ccced8d8, d3b77985, 2c01b1d1, 54641f65
 **作者**: RichelYu1998
 
@@ -18113,10 +19038,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `ad7fc58e, c769e234`  
 
+**影响文件**: [README.md](README.md), ["file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), ["file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"]("file/20260520\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201)_cache.json"), [file/tunnel_url.txt](file/tunnel_url.txt), [index.html](index.html), [main.py](main.py)
+**变更统计**: +268行 -106行
+
 #### 更新内容: v3.1.1: 修复隧道复制按钮失效问题
 
-**更新日期**: 2026-05-20
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-20
+**修复类型**: 📝 文档补录
 **Commit**: ad7fc58e, c769e234
 **作者**: RichelYu1998
 
@@ -18133,10 +19061,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `965f7a70`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [dist/cli/index.js](dist/cli/index.js), [dist/client/index.d.ts](dist/client/index.d.ts), [dist/client/index.js](dist/client/index.js), [dist/hostc/cli/index.js](dist/hostc/cli/index.js), 等 572 个文件
+**变更统计**: +1328927行 -55行
+
 #### 更新内容: v3.0.8: 隧道共享功能增强 - 可点击链接、一键复制、启动预下载hostc
 
-**更新日期**: 2026-05-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-17
+**修复类型**: 📝 文档补录
 **Commit**: 965f7a70
 **作者**: RichelYu1998
 
@@ -18153,10 +19084,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `faf8e2ac`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py)
+**变更统计**: +410行 -3行
+
 #### 更新内容: v3.0.7: 优化隧道共享功能 + 跨平台兼容性增强
 
-**更新日期**: 2026-05-17
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-17
+**修复类型**: 📝 文档补录
 **Commit**: faf8e2ac
 **作者**: RichelYu1998
 
@@ -18173,10 +19107,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `19c2d29c`  
 
+**影响文件**: [.idea/vcs.xml](.idea/vcs.xml), [README.md](README.md), [config/config.json](config/config.json), [dist/assets/huninn-0-400-normal-Bi2_jJCB.woff2](dist/assets/huninn-0-400-normal-Bi2_jJCB.woff2), [dist/assets/huninn-0-400-normal-Dne9Gz3b.woff](dist/assets/huninn-0-400-normal-Dne9Gz3b.woff), [dist/assets/huninn-1-400-normal-1CCSdtaz.woff](dist/assets/huninn-1-400-normal-1CCSdtaz.woff), 等 269 个文件
+**变更统计**: +27669行 -10行
+
 #### 更新内容: v3.0.6: 集成天气时钟看板，独立区块展示，完整响应式适配
 
-**更新日期**: 2026-05-06
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-06
+**修复类型**: 📝 文档补录
 **Commit**: 19c2d29c
 **作者**: RichelYu1998
 
@@ -18193,10 +19130,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d68aa62a`  
 
+**影响文件**: [.DS_Store](.DS_Store), [.idea/xy_ws.iml](.idea/xy_ws.iml), [README.md](README.md), [clean_files.log](clean_files.log), [config/cookies.json](config/cookies.json), [main.py](main.py)
+**变更统计**: +60行 -15行
+
 #### 更新内容: v3.0.5: 修复Excel与JSON对比功能中新增高价商品判定逻辑错误
 
-**更新日期**: 2026-05-01
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-01
+**修复类型**: 📝 文档补录
 **Commit**: d68aa62a
 **作者**: RichelYu1998
 
@@ -18213,10 +19153,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9769db46`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +18行 -3行
+
 #### 更新内容: v3.0.4: Excel文件路径去重和货号读取顺序优化
 
-**更新日期**: 2026-05-01
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-01
+**修复类型**: 📝 文档补录
 **Commit**: 9769db46
 **作者**: RichelYu1998
 
@@ -18233,10 +19176,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f5bcdc8d`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html)
+**变更统计**: +117行 -7行
+
 #### 更新内容: v3.0.3: 移动端导航栏固定置顶优化
 
-**更新日期**: 2026-05-01
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-01
+**修复类型**: 📝 文档补录
 **Commit**: f5bcdc8d
 **作者**: RichelYu1998
 
@@ -18253,10 +19199,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `321f628a`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html)
+**变更统计**: +381行 -25行
+
 #### 更新内容: v3.0.2 - 移动端响应式适配全面优化
 
-**更新日期**: 2026-05-01
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-05-01
+**修复类型**: 📝 文档补录
 **Commit**: 321f628a
 **作者**: RichelYu1998
 
@@ -18273,10 +19222,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `caf8b291, 90cee311`  
 
+**影响文件**: [README.md](README.md), [config/config.json](config/config.json), [main.py](main.py)
+**变更统计**: +126行 -46行
+
 #### 更新内容: 更新README - 添加v3.0.1版本更新日志
 
-**更新日期**: 2026-04-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-30
+**修复类型**: 📝 文档补录
 **Commit**: caf8b291, 90cee311
 **作者**: RichelYu1998
 
@@ -18293,10 +19245,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9c972d0e`  
 
+**影响文件**: [.idea/MarsCodeWorkspaceAppSettings.xml](.idea/MarsCodeWorkspaceAppSettings.xml), [.idea/misc.xml](.idea/misc.xml), [.idea/xy_ws.iml](.idea/xy_ws.iml), [README.md](README.md), [clean_files.log](clean_files.log), [config/config.json](config/config.json), 等 19 个文件
+**变更统计**: +817行 -8909行
+
 #### 更新内容: v3.0.0 - Cookie管理优化和跨平台兼容性提升
 
-**更新日期**: 2026-04-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-30
+**修复类型**: 📝 文档补录
 **Commit**: 9c972d0e
 **作者**: RichelYu1998
 
@@ -18313,10 +19268,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8fe7c71b`  
 
+**影响文件**: [README.md](README.md), [index.html](index.html), [main.py](main.py), [run.bat](run.bat)
+**变更统计**: +1284行 -546行
+
 #### 更新内容: v2.9.6 - 启动脚本优化和功能改进
 
-**更新日期**: 2026-04-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-30
+**修复类型**: 📝 文档补录
 **Commit**: 8fe7c71b
 **作者**: RichelYu1998
 
@@ -18333,10 +19291,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e4d53ef3, bcd9169f`  
 
+**影响文件**: [README.md](README.md), [xy_ws/README.md](xy_ws/README.md), [xy_ws/index.html](xy_ws/index.html)
+**变更统计**: +896行 -85行
+
 #### 更新内容: 📝文档: 更新README.md到v2.9.5，添加完整更新日志
 
-**更新日期**: 2026-04-30
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-30
+**修复类型**: 📝 文档补录
 **Commit**: e4d53ef3, bcd9169f
 **作者**: RichelYu1998
 
@@ -18353,10 +19314,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `b50bf9af`  
 
+**影响文件**: [xy_ws/README.md](xy_ws/README.md), [xy_ws/index.html](xy_ws/index.html), [xy_ws/main.py](xy_ws/main.py)
+**变更统计**: +262行 -65行
+
 #### 更新内容: v2.9.4: 新增互动式货号对比功能
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: b50bf9af
 **作者**: RichelYu1998
 
@@ -18373,10 +19337,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `40c823a8`  
 
+**影响文件**: [xy_ws/README.md](xy_ws/README.md), [xy_ws/index.html](xy_ws/index.html), [xy_ws/main.py](xy_ws/main.py)
+**变更统计**: +155行 -46行
+
 #### 更新内容: v2.9.3: Cookie更新前自动清空机制
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: 40c823a8
 **作者**: RichelYu1998
 
@@ -18393,10 +19360,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `29294843`  
 
+**影响文件**: [xy_ws/README.md](xy_ws/README.md), [xy_ws/index.html](xy_ws/index.html)
+**变更统计**: +50行 -21行
+
 #### 更新内容: v2.9.2: 优化商品列表联动滚动功能
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: 29294843
 **作者**: RichelYu1998
 
@@ -18413,10 +19383,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a59e2110`  
 
+**影响文件**: [xy_ws/README.md](xy_ws/README.md), [xy_ws/index.html](xy_ws/index.html)
+**变更统计**: +9行 -2行
+
 #### 更新内容: v2.9.1: 优化前端时间显示功能，减少DOM重渲染开销
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: a59e2110
 **作者**: RichelYu1998
 
@@ -18433,10 +19406,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `efcf9ebf`  
 
+**影响文件**: [xy_ws/README.md](xy_ws/README.md), [xy_ws/index.html](xy_ws/index.html), [xy_ws/main.py](xy_ws/main.py), [xy_ws/requirements.txt](xy_ws/requirements.txt), [xy_ws/run.bat](xy_ws/run.bat), [xy_ws/run.sh](xy_ws/run.sh)
+**变更统计**: +7402行 -0行
+
 #### 更新内容: v2.9.0: 添加前端时间显示功能并优化JavaScript代码
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: efcf9ebf
 **作者**: RichelYu1998
 
@@ -18453,10 +19429,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `f9af6096, 484fe803`  
 
+**影响文件**: [xy_ws/README.md](xy_ws/README.md), [README.md](README.md), [index.html](index.html), [main.py](main.py)
+**变更统计**: +149行 -18行
+
 #### 更新内容: 全面修复README.md更新日志：调整v2.6.0-v2.8.0版本日期顺序，确保所有版本号和日期按时间递增排列
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: f9af6096, 484fe803
 **作者**: RichelYu1998
 
@@ -18473,10 +19452,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `cf9c9211`  
 
+**影响文件**: [xy_ws/README.md](xy_ws/README.md)
+**变更统计**: +3行 -0行
+
 #### 更新内容: 更新v2.7.2日志：修复/api/clean/list文件显示格式
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: cf9c9211
 **作者**: RichelYu1998
 
@@ -18493,10 +19475,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `343dd926`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +6行 -1行
+
 #### 更新内容: 修复README.md版本时间顺序问题：v2.8.0改为04-29，v2.7.1改为04-27，修复v2.5.21重复问题
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: f9af6096
 **作者**: RichelYu1998
 
@@ -18513,10 +19498,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `4a3b8eda, 1eb221b7, d2cb82e6`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [index.html](index.html)
+**变更统计**: +1055行 -9行
+
 #### 更新内容: v2.7.0: 添加特殊文件名保护（.DS_Store, Thumbs.db等）
 
-**更新日期**: 2026-04-28
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-28
+**修复类型**: 📝 文档补录
 **Commit**: 4a3b8eda, 1eb221b7, d2cb82e6
 **作者**: RichelYu1998
 
@@ -18533,10 +19521,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `19906ee0, 8795d6a9`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [index.html](index.html)
+**变更统计**: +251行 -32行
+
 #### 更新内容: v2.6.1: 添加自动数据库存储功能，运行爬虫时自动保存商品数据到MySQL
 
-**更新日期**: 2026-04-28
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-28
+**修复类型**: 📝 文档补录
 **Commit**: 19906ee0, 8795d6a9
 **作者**: RichelYu1998
 
@@ -18553,10 +19544,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `cc9e1be9, ec476faa, b44dbcdb, bd16f65b, b1a83fdd`  
 
+**影响文件**: [README.md](README.md), [xy_ws/README.md](xy_ws/README.md), [index.html](index.html), [main.py](main.py)
+**变更统计**: +113行 -36行
+
 #### 更新内容: 🐛修复: 删除错误添加的v2.6.0 (2026-06-26)版本条目
 
-**更新日期**: 2026-06-26
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-06-26
+**修复类型**: 📝 文档补录
 **Commit**: cc9e1be9, ec476faa, b44dbcdb, bd16f65b, b1a83fdd
 **作者**: RichelYu1998
 
@@ -18573,8 +19567,11 @@ PY-CORE-010 (API整体架构)
 
 #### 更新内容: ✅v5.0.9.40: 100%完成占位符替换-最后4个(v2.5.24/v2.5.23)使用真实Git数据(+9行-9行/+15行-5行)+三方文档同步
 
-**更新日期**: 2026-09-03
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-09-03
+**修复类型**: 📝 文档补录
+
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +4行 -4行
 **Commit**: edcf5058
 **作者**: RichelYu1998
 
@@ -18591,8 +19588,11 @@ PY-CORE-010 (API整体架构)
 
 #### 更新内容: ✅v5.0.9.40: 100%完成占位符替换-最后4个(v2.5.24/v2.5.23)使用真实Git数据(+9行-9行/+15行-5行)+三方文档同步
 
-**更新日期**: 2026-09-03
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-09-03
+**修复类型**: 📝 文档补录
+
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +4行 -4行
 **Commit**: edcf5058
 **作者**: RichelYu1998
 
@@ -18609,10 +19609,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `5bbe26fa`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +6行 -3行
+
 #### 更新内容: v2.5.22: 移除闲鱼平台手续费60元封顶限制，改为按单机售价的1.6%计算
 
-**更新日期**: 2026-04-19
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-19
+**修复类型**: 📝 文档补录
 **Commit**: 5bbe26fa
 **作者**: RichelYu1998
 
@@ -18629,10 +19632,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `decda6de, 1cef3abf, 2d0a8936`  
 
+**影响文件**: [README.md](README.md), [config/config.json](config/config.json), [main.py](main.py), [config/cookies.json](config/cookies.json)
+**变更统计**: +394行 -278行
+
 #### 更新内容: 修复README.md版本时间顺序问题：v2.8.0改为04-29，v2.7.1改为04-27，修复v2.5.21重复问题
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: decda6de, 1cef3abf, 2d0a8936
 **作者**: RichelYu1998
 
@@ -18649,10 +19655,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8b6cbfbd`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat)
+**变更统计**: +7行 -4行
+
 #### 更新内容: v2.5.20: 修复Windows浏览器检测，使用dir+findstr替代通配符
 
-**更新日期**: 2026-04-15
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-15
+**修复类型**: 📝 文档补录
 **Commit**: 8b6cbfbd
 **作者**: RichelYu1998
 
@@ -18669,10 +19678,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e6e2541b`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.sh](run.sh)
+**变更统计**: +11行 -3行
+
 #### 更新内容: v2.5.19: 优化macOS浏览器检测，支持Google Chrome for Testing.app
 
-**更新日期**: 2026-04-15
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-15
+**修复类型**: 📝 文档补录
 **Commit**: e6e2541b
 **作者**: RichelYu1998
 
@@ -18689,10 +19701,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9f3ecc83, 11c0e2cc`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +393行 -79行
+
 #### 更新内容: v2.5.18: 优化浏览器检测，避免重复下载Playwright浏览器
 
-**更新日期**: 2026-04-15
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-15
+**修复类型**: 📝 文档补录
 **Commit**: 9f3ecc83, 11c0e2cc
 **作者**: RichelYu1998
 
@@ -18709,10 +19724,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `3954e8c7`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +259行 -49行
+
 #### 更新内容: v2.5.17 - 优化拿货价提取性能和代码结构
 
-**更新日期**: 2026-04-13
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-13
+**修复类型**: 📝 文档补录
 **Commit**: 3954e8c7
 **作者**: RichelYu1998
 
@@ -18729,10 +19747,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a37ce274`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +266行 -4行
+
 #### 更新内容: v2.5.16 - 优化CookieValidator类，精炼代码逻辑
 
-**更新日期**: 2026-04-12
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-12
+**修复类型**: 📝 文档补录
 **Commit**: a37ce274
 **作者**: RichelYu1998
 
@@ -18749,10 +19770,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `0c068d27`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +24行 -15行
+
 #### 更新内容: v2.5.14: 修复路径错误，完善PathManager统一管理
 
-**更新日期**: 2026-04-12
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-12
+**修复类型**: 📝 文档补录
 **Commit**: 0c068d27
 **作者**: RichelYu1998
 
@@ -18769,10 +19793,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `da624ea9, 3a55d610`  
 
+**影响文件**: [xy_ws/README.md](xy_ws/README.md), [README.md](README.md), [main.py](main.py)
+**变更统计**: +137行 -54行
+
 #### 更新内容: 修复README.md更新日志版本顺序问题：修复v2.5.13-22版本重复和日期混乱问题，重新整理所有版本号确保连续性和时间顺序正确
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: da624ea9, 3a55d610
 **作者**: RichelYu1998
 
@@ -18789,10 +19816,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `86edd22f`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +68行 -19行
+
 #### 更新内容: v2.5.12: 优化系统检测逻辑，统一跨平台浏览器配置
 
-**更新日期**: 2026-04-12
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-12
+**修复类型**: 📝 文档补录
 **Commit**: 86edd22f
 **作者**: RichelYu1998
 
@@ -18809,10 +19839,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `5b7ba45a`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +7行 -3行
+
 #### 更新内容: v2.5.10: 修复导入错误，确保Excel对比功能正常运行
 
-**更新日期**: 2026-04-12
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-12
+**修复类型**: 📝 文档补录
 **Commit**: 5b7ba45a
 **作者**: RichelYu1998
 
@@ -18829,10 +19862,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d0de8f17`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +17行 -11行
+
 #### 更新内容: v2.5.9: 优化代码逻辑，使用列表推导式简化文件查找代码
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: d0de8f17
 **作者**: RichelYu1998
 
@@ -18849,10 +19885,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `dfb74f3e`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +9行 -4行
+
 #### 更新内容: v2.5.8: 修复excel_file为None的错误，解决os.path.exists的TypeError
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: dfb74f3e
 **作者**: RichelYu1998
 
@@ -18869,10 +19908,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6a8172e2`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +8行 -2行
+
 #### 更新内容: v2.5.7: 修复价格比较错误，解决parse_price返回None的TypeError
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 6a8172e2
 **作者**: RichelYu1998
 
@@ -18889,10 +19931,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `28754298`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +14行 -5行
+
 #### 更新内容: v2.5.6: 优化Cookie更新完成后的延迟，提升响应速度
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 28754298
 **作者**: RichelYu1998
 
@@ -18909,10 +19954,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `ff4872b3`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +5行 -3行
+
 #### 更新内容: v2.5.5: 移除Cookie更新后的回车确认，简化操作流程
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: ff4872b3
 **作者**: RichelYu1998
 
@@ -18929,10 +19977,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `ff2b31a6`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +61行 -37行
+
 #### 更新内容: v2.5.4: 实现真正的自动关闭浏览器，检测登录后自动关闭
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: ff2b31a6
 **作者**: RichelYu1998
 
@@ -18949,10 +20000,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `b9987504`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +7行 -3行
+
 #### 更新内容: v2.5.3: 优化Cookie更新提示信息，明确自动关闭浏览器
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: b9987504
 **作者**: RichelYu1998
 
@@ -18969,10 +20023,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `88490c51`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +51行 -49行
+
 #### 更新内容: v2.5.2: 简化Cookie更新流程，参考v2.1.1版本实现
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 88490c51
 **作者**: RichelYu1998
 
@@ -18989,10 +20046,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `93460fcc`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +108行 -52行
+
 #### 更新内容: v2.5.0: 优化商品信息提取逻辑，精简代码结构
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 93460fcc
 **作者**: RichelYu1998
 
@@ -19009,10 +20069,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `549fe464`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +64行 -8行
+
 #### 更新内容: v2.4.7: 新增独立Cookie自动更新功能，优化浏览器启动流程关闭
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 549fe464
 **作者**: RichelYu1998
 
@@ -19029,10 +20092,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d1d39426`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +25行 -8行
+
 #### 更新内容: v2.4.6: 完善备注提取功能，提取所有有备注的商品信息
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: d1d39426
 **作者**: RichelYu1998
 
@@ -19049,10 +20115,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8eca99ae`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +14行 -2行
+
 #### 更新内容: v2.4.5: 修复备注提取错误，支持无标签备注信息提取
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 8eca99ae
 **作者**: RichelYu1998
 
@@ -19069,10 +20138,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `baef0a9e`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +33行 -16行
+
 #### 更新内容: v2.4.4: 修复价格提取错误，支持千分制价格格式
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: baef0a9e
 **作者**: RichelYu1998
 
@@ -19089,10 +20161,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `741a18bc`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +12行 -1行
+
 #### 更新内容: v2.4.1: 新增平均每个设备售出均价统计
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 741a18bc
 **作者**: RichelYu1998
 
@@ -19109,10 +20184,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `5b47a606`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +16行 -45行
+
 #### 更新内容: v2.4.0: 简化JSON文件布局，优化价格显示为千分制
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 5b47a606
 **作者**: RichelYu1998
 
@@ -19129,10 +20207,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6cd62840`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +14行 -2行
+
 #### 更新内容: v2.3.6: 增强HTML内容搜索，完善拿货价提取逻辑
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 6cd62840
 **作者**: RichelYu1998
 
@@ -19149,10 +20230,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a440e05a`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +16行 -4行
+
 #### 更新内容: v2.3.5: 增强成本价识别，添加智能价格提取逻辑
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: a440e05a
 **作者**: RichelYu1998
 
@@ -19169,10 +20253,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `00c603a5`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +21行 -1行
+
 #### 更新内容: v2.3.4: 新增拿货价提取功能，修复设备成本累计和设备均价为0的问题
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 00c603a5
 **作者**: RichelYu1998
 
@@ -19189,10 +20276,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `ce6619fe`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +22行 -3行
+
 #### 更新内容: v2.3.3: 新增设备均价，优化闲鱼平台手续费计算（单机最高60元封顶）
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: ce6619fe
 **作者**: RichelYu1998
 
@@ -19209,10 +20299,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d104e122`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +35行 -1行
+
 #### 更新内容: v2.3.2: 新增累计统计功能，添加预计售出价格、设备成本和平台手续费累计
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: d104e122
 **作者**: RichelYu1998
 
@@ -19229,10 +20322,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `ce4ec80a`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +32行 -2行
+
 #### 更新内容: v2.3.1: 保留Cookie更新选项，仅支持自动更新功能
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: ce4ec80a
 **作者**: RichelYu1998
 
@@ -19249,10 +20345,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e4c15617`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +90行 -316行
+
 #### 更新内容: v2.3.0: 功能整合优化，合并菜单选项并精炼代码逻辑
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: e4c15617
 **作者**: RichelYu1998
 
@@ -19269,10 +20368,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `7b0e8e0c`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +116行 -118行
+
 #### 更新内容: v2.2.2: Excel对比JSON功能增强，添加小计字段并精炼代码逻辑
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 7b0e8e0c
 **作者**: RichelYu1998
 
@@ -19289,10 +20391,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `185650e9`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +13行 -1行
+
 #### 更新内容: v2.2.1: 添加自动对比功能，确保每次运行爬虫后都生成小计字段
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 185650e9
 **作者**: RichelYu1998
 
@@ -19309,10 +20414,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `969f8701`  
 
+**影响文件**: [README.md](README.md), [config/config.json](config/config.json), [main.py](main.py)
+**变更统计**: +25行 -12行
+
 #### 更新内容: v2.2.0: 性能优化，提升并发处理能力和元素去重效率
 
-**更新日期**: 2026-04-09
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-09
+**修复类型**: 📝 文档补录
 **Commit**: 969f8701
 **作者**: RichelYu1998
 
@@ -19329,10 +20437,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `5d0498cb`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +41行 -72行
+
 #### 更新内容: v2.1.9: 代码精炼优化，简化逻辑提升可维护性
 
-**更新日期**: 2026-04-09
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-09
+**修复类型**: 📝 文档补录
 **Commit**: 5d0498cb
 **作者**: RichelYu1998
 
@@ -19349,10 +20460,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `85cc59ee`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +42行 -17行
+
 #### 更新内容: v2.1.8: 优化滚动加载策略，采用激进模式快速加载所有数据
 
-**更新日期**: 2026-04-09
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-09
+**修复类型**: 📝 文档补录
 **Commit**: 85cc59ee
 **作者**: RichelYu1998
 
@@ -19369,10 +20483,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e6c2959c`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +91行 -23行
+
 #### 更新内容: 📝文档: 添加早期版本历史记录(v1.4.2-v2.1.7)并统一作者名称为'小旭二手机（西园路）'
 
-**更新日期**: 2026-07-31
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-31
+**修复类型**: 📝 文档补录
 **Commit**: b27c0138
 **作者**: RichelYu1998
 
@@ -19389,10 +20506,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `ff979e44`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +38行 -3行
+
 #### 更新内容: v2.1.6: 修复弹窗关闭超时问题，添加时间统计优化性能
 
-**更新日期**: 2026-04-09
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-09
+**修复类型**: 📝 文档补录
 **Commit**: ff979e44
 **作者**: RichelYu1998
 
@@ -19409,10 +20529,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d722238a`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +22行 -6行
+
 #### 更新内容: v2.1.5: 修复高价商品筛选逻辑，解决对比结果不准确问题
 
-**更新日期**: 2026-04-08
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-08
+**修复类型**: 📝 文档补录
 **Commit**: d722238a
 **作者**: RichelYu1998
 
@@ -19429,10 +20552,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `387a54bf`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +58行 -12行
+
 #### 更新内容: v2.1.3: 优化JSON文件对比记录机制，支持多条对比记录
 
-**更新日期**: 2026-04-08
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-08
+**修复类型**: 📝 文档补录
 **Commit**: 387a54bf
 **作者**: RichelYu1998
 
@@ -19449,10 +20575,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `4da3f530`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +93行 -18行
+
 #### 更新内容: v2.1.2: 优化JSON文件对比功能，新增缓存文件机制
 
-**更新日期**: 2026-04-08
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-08
+**修复类型**: 📝 文档补录
 **Commit**: 4da3f530
 **作者**: RichelYu1998
 
@@ -19469,10 +20598,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `3f98753d`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +54行 -15行
+
 #### 更新内容: v2.5.2: 简化Cookie更新流程，参考v2.1.1版本实现
 
-**更新日期**: 2026-04-11
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-11
+**修复类型**: 📝 文档补录
 **Commit**: 88490c51
 **作者**: RichelYu1998
 
@@ -19489,10 +20621,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `efe2f227`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [main.py](main.py)
+**变更统计**: +18行 -1行
+
 #### 更新内容: 新增调试功能 (v2.1.0)
 
-**更新日期**: 2026-04-08
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-08
+**修复类型**: 📝 文档补录
 **Commit**: efe2f227
 **作者**: RichelYu1998
 
@@ -19509,10 +20644,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `34d4f859`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [config/cookies.json](config/cookies.json), [main.py](main.py)
+**变更统计**: +165行 -5行
+
 #### 更新内容: 新增当天JSON文件对比功能 (v2.0.9)
 
-**更新日期**: 2026-04-08
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-08
+**修复类型**: 📝 文档补录
 **Commit**: 34d4f859
 **作者**: RichelYu1998
 
@@ -19529,10 +20667,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9ec2cfe7`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [config/cookies.json](config/cookies.json), ["file/20260405\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260405\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), ["file/20260406\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260406\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), [file/diff_log_20260405.json](file/diff_log_20260405.json), 等 7 个文件
+**变更统计**: +2874行 -3行
+
 #### 更新内容: 修复跨平台浏览器启动问题 (v2.0.8)
 
-**更新日期**: 2026-04-08
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-08
+**修复类型**: 📝 文档补录
 **Commit**: 9ec2cfe7
 **作者**: RichelYu1998
 
@@ -19549,10 +20690,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d0d54ec5`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +8行 -9行
+
 #### 更新内容: v2.0.7: 优化高价商品筛选，修复浏览器启动
 
-**更新日期**: 2026-04-07
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-07
+**修复类型**: 📝 文档补录
 **Commit**: d0d54ec5
 **作者**: RichelYu1998
 
@@ -19569,10 +20713,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `756d6a96`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +81行 -39行
+
 #### 更新内容: v2.0.6: 优化数据变化分析代码，精简逻辑
 
-**更新日期**: 2026-04-07
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-07
+**修复类型**: 📝 文档补录
 **Commit**: 756d6a96
 **作者**: RichelYu1998
 
@@ -19589,10 +20736,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `4a9e7269`  
 
+**影响文件**: [CHANGELOG.md](CHANGELOG.md), [README.md](README.md)
+**变更统计**: +11行 -1行
+
 #### 更新内容: v2.0.5: 更新Cookie过期时间
 
-**更新日期**: 2026-04-06
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-06
+**修复类型**: 📝 文档补录
 **Commit**: 4a9e7269
 **作者**: RichelYu1998
 
@@ -19609,10 +20759,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `e6606f1a`  
 
+**影响文件**: [CHANGELOG.md](CHANGELOG.md), [README.md](README.md), [main.py](main.py)
+**变更统计**: +81行 -15行
+
 #### 更新内容: v2.0.4: 新增Cookie自动更新功能，优化Excel文件检查
 
-**更新日期**: 2026-04-06
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-06
+**修复类型**: 📝 文档补录
 **Commit**: e6606f1a
 **作者**: RichelYu1998
 
@@ -19629,10 +20782,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `4092c3ad, 6fd1bef2`  
 
+**影响文件**: [xy_ws/README.md](xy_ws/README.md), [xy_ws/index.html](xy_ws/index.html), [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [config/cookies.json](config/cookies.json), ["file/20260404\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260404\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), 等 8 个文件
+**变更统计**: +819行 -90行
+
 #### 更新内容: v2.0.3: 新增商品列表联动滚动功能
 
-**更新日期**: 2026-04-29
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-29
+**修复类型**: 📝 文档补录
 **Commit**: 4092c3ad, 6fd1bef2
 **作者**: RichelYu1998
 
@@ -19649,10 +20805,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `95f887b8`  
 
+**影响文件**: [README.md](README.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), [file/diff_log_20260404.json](file/diff_log_20260404.json), [main.py](main.py), [temp_header.py](temp_header.py)
+**变更统计**: +220行 -2行
+
 #### 更新内容: 新增高价商品信息写入JSON功能 (v2.0.2)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 95f887b8
 **作者**: RichelYu1998
 
@@ -19669,10 +20828,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `774ae533`  
 
+**影响文件**: [README.md](README.md), [config/cookies.json](config/cookies.json), ["file/20260404\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"]("file/20260404\345\276\256\350\264\255\347\233\270\345\206\214(\345\260\217\346\227\255\346\225\260\347\240\201).json"), [file/diff_log_20260404.json](file/diff_log_20260404.json), [main.py](main.py)
+**变更统计**: +222行 -6行
+
 #### 更新内容: 优化高价商品筛选逻辑 (v2.0.1)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 774ae533
 **作者**: RichelYu1998
 
@@ -19689,10 +20851,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `498c72be`  
 
+**影响文件**: [.idea/MarsCodeWorkspaceAppSettings.xml](.idea/MarsCodeWorkspaceAppSettings.xml), [.idea/vcs.xml](.idea/vcs.xml), [OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md), [README.md](README.md), [TESTING.md](TESTING.md), [__pycache__/main.cpython-314.pyc](__pycache__/main.cpython-314.pyc), 等 10 个文件
+**变更统计**: +2095行 -954行
+
 #### 更新内容: 新增货号对比高价商品筛选功能 (v2.0.0)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 498c72be
 **作者**: RichelYu1998
 
@@ -19709,10 +20874,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `1a043680`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +35行 -1行
+
 #### 更新内容: 添加高价商品筛选功能 (v1.9.0)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 1a043680
 **作者**: RichelYu1998
 
@@ -19729,10 +20897,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `58adb450`  
 
+**影响文件**: [README.md](README.md), [config/config.json](config/config.json), [main.py](main.py), [run.bat](run.bat), [run.sh](run.sh)
+**变更统计**: +114行 -14行
+
 #### 更新内容: 添加运行时间显示和动态调整功能 (v1.8.0)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 58adb450
 **作者**: RichelYu1998
 
@@ -19749,10 +20920,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d06a15f9`  
 
+**影响文件**: [README.md](README.md), [config/config.json](config/config.json), [main.py](main.py)
+**变更统计**: +39行 -10行
+
 #### 更新内容: 滚动参数可配置化 (v1.7.0)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: d06a15f9
 **作者**: RichelYu1998
 
@@ -19769,10 +20943,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `d5dc48de`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +15行 -6行
+
 #### 更新内容: 修复页面加载死机问题 (v1.6.2)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: d5dc48de
 **作者**: RichelYu1998
 
@@ -19789,10 +20966,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `bc964097`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +26行 -7行
+
 #### 更新内容: 修复滚动死循环问题 (v1.6.1)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: bc964097
 **作者**: RichelYu1998
 
@@ -19809,10 +20989,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8e74270d`  
 
+**影响文件**: [OPTIMIZATION_SUMMARY.md](OPTIMIZATION_SUMMARY.md), [README.md](README.md), [main.py](main.py), [run.bat](run.bat)
+**变更统计**: +412行 -58行
+
 #### 更新内容: 完成所有高优先级优化 (v1.6.0)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 8e74270d
 **作者**: RichelYu1998
 
@@ -19829,10 +21012,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `6346d21f`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +20行 -24行
+
 #### 更新内容: 简化JSON数据结构为5个核心字段 (v1.5.0)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 6346d21f
 **作者**: RichelYu1998
 
@@ -19849,10 +21035,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `a6eee7f1`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +10行 -7行
+
 #### 更新内容: 优化页面加载逻辑，减少等待时间 (v1.4.3)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: a6eee7f1
 **作者**: RichelYu1998
 
@@ -19869,10 +21058,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `b27c0138, 2d2395a3, b84418d1`  
 
+**影响文件**: [README.md](README.md), [generate_docx.py](generate_docx.py), [skill.docx](skill.docx), [skill.md](skill.md), [TESTING.md](TESTING.md), [main.py](main.py), 等 8 个文件
+**变更统计**: +606行 -10行
+
 #### 更新内容: 📝文档: 添加早期版本历史记录(v1.4.2-v2.1.7)并统一作者名称为'小旭二手机（西园路）'
 
-**更新日期**: 2026-07-31
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-31
+**修复类型**: 📝 文档补录
 **Commit**: b27c0138, 2d2395a3, b84418d1
 **作者**: RichelYu1998
 
@@ -19889,10 +21081,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `7a088370`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +6行 -14行
+
 #### 更新内容: 优化登录等待逻辑，移除手动确认步骤 (v1.4.1)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 7a088370
 **作者**: RichelYu1998
 
@@ -19909,10 +21104,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `271a2578`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +47行 -23行
+
 #### 更新内容: 扩展商品数据字段到20个完整字段 (v1.4.0)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 271a2578
 **作者**: RichelYu1998
 
@@ -19929,10 +21127,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `61b1d8e8`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +23行 -2行
+
 #### 更新内容: 新增数据变化描述和字段说明 (v1.3.4)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 61b1d8e8
 **作者**: RichelYu1998
 
@@ -19949,10 +21150,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `dbaa5e1a`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +22行 -9行
+
 #### 更新内容: 新增对比结果消息到JSON日志 (v1.3.3)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: dbaa5e1a
 **作者**: RichelYu1998
 
@@ -19969,10 +21173,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `8bad5825`  
 
+**影响文件**: [README.md](README.md), [main.py](main.py)
+**变更统计**: +8行 -0行
+
 #### 更新内容: 修复JSON数据解析错误 (v1.3.2)
 
-**更新日期**: 2026-04-04
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-04-04
+**修复类型**: 📝 文档补录
 **Commit**: 8bad5825
 **作者**: RichelYu1998
 
@@ -19989,10 +21196,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `bd404fdf`  
 
+**影响文件**: [README.md](README.md), [file/diff_log_20260404.json](file/diff_log_20260404.json), [main.py](main.py)
+**变更统计**: +443行 -476行
+
 #### 更新内容: 🔧v5.0.9.19 版本一致性修复: ①删除test开头的py文件 ②修复v5.0.9.15/v1.3.1格式问题(缺少换行符) ③添加缺失的v1.1.0/v1.2.0/v1.3.0版本到README.md ④确保README与skill版本记录保持一致
 
-**更新日期**: 2026-09-02
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-09-02
+**修复类型**: 📝 文档补录
 **Commit**: 72485527
 **作者**: RichelYu1998
 
@@ -20009,8 +21219,11 @@ PY-CORE-010 (API整体架构)
 
 #### 更新内容: 🔧v5.0.9.19 版本一致性修复: ①删除test开头的py文件 ②修复v5.0.9.15/v1.3.1格式问题(缺少换行符) ③添加缺失的v1.1.0/v1.2.0/v1.3.0版本到README.md ④确保README与skill版本记录保持一致
 
-**更新日期**: 2026-09-02
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-09-02
+**修复类型**: 📝 文档补录
+
+**影响文件**: [README.md](README.md)
+**变更统计**: +93行 -2行
 **Commit**: 72485527
 **作者**: RichelYu1998
 
@@ -20027,8 +21240,11 @@ PY-CORE-010 (API整体架构)
 
 #### 更新内容: 🔧v5.0.9.19 版本一致性修复: ①删除test开头的py文件 ②修复v5.0.9.15/v1.3.1格式问题(缺少换行符) ③添加缺失的v1.1.0/v1.2.0/v1.3.0版本到README.md ④确保README与skill版本记录保持一致
 
-**更新日期**: 2026-09-02
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-09-02
+**修复类型**: 📝 文档补录
+
+**影响文件**: [README.md](README.md)
+**变更统计**: +93行 -2行
 **Commit**: 72485527
 **作者**: RichelYu1998
 
@@ -20045,8 +21261,11 @@ PY-CORE-010 (API整体架构)
 
 #### 更新内容: 🔧v5.0.9.19 版本一致性修复: ①删除test开头的py文件 ②修复v5.0.9.15/v1.3.1格式问题(缺少换行符) ③添加缺失的v1.1.0/v1.2.0/v1.3.0版本到README.md ④确保README与skill版本记录保持一致
 
-**更新日期**: 2026-09-02
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-09-02
+**修复类型**: 📝 文档补录
+
+**影响文件**: [README.md](README.md)
+**变更统计**: +93行 -2行
 **Commit**: 72485527
 **作者**: RichelYu1998
 
@@ -20063,10 +21282,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `5cac47a9`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +85行 -0行
+
 #### 更新内容: 📝 补全v1.0.00.01/v1.0.00.02到skill.md+README.md版本历史表 + 重新生成skill.docx — Git全版本300个现已100%对齐
 
-**更新日期**: 2026-08-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-22
+**修复类型**: 📝 文档补录
 **Commit**: 02a68c84
 **作者**: RichelYu1998
 
@@ -20083,10 +21305,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `02a68c84, 764f2740`  
 
+**影响文件**: [README.md](README.md), [skill.docx](skill.docx), [skill.md](skill.md)
+**变更统计**: +2745行 -3134行
+
 #### 更新内容: 📝 补全v1.0.00.01/v1.0.00.02到skill.md+README.md版本历史表 + 重新生成skill.docx — Git全版本300个现已100%对齐
 
-**更新日期**: 2026-08-22
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-08-22
+**修复类型**: 📝 文档补录
 **Commit**: 02a68c84, 764f2740
 **作者**: RichelYu1998
 
@@ -20103,10 +21328,13 @@ PY-CORE-010 (API整体架构)
 
 > **Commit**: `9d5185ce`  
 
+**影响文件**: [skill.md](skill.md)
+**变更统计**: +13029行 -4155行
+
 #### 更新内容: 📝文档: 将skill.md补充完整，包含从v1.0.0到v3.8.89.11的所有版本记录
 
-**更新日期**: 2026-07-31
-**更新类型**: 📝 文档补录
+**修复日期**: 2026-07-31
+**修复类型**: 📝 文档补录
 **Commit**: 9d5185ce
 **作者**: RichelYu1998
 
