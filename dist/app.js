@@ -911,30 +911,38 @@
                 const createdDate = new Date(String(p.入库时间戳).replace(' ', 'T'));
                 const now = new Date();
                 if (!isNaN(createdDate.getTime())) {
-                    const diffMs = now - createdDate;
-                    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-                    const diffHours = diffMs / (1000 * 60 * 60);
-                    const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                    const diffDays = Math.max(0, Math.round((startOfDay(now) - startOfDay(createdDate)) / (1000 * 60 * 60 * 24)));
+                    const diffMs = Math.max(0, now - createdDate);
+                    const totalMinutes = Math.floor(diffMs / (1000 * 60));
+                    const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+                    const totalDays = Math.floor(totalHours / 24);
                     
                     let relativeTime = '';
-                    if (diffMinutes < 1) {
+                    if (totalMinutes < 1) {
                         relativeTime = '刚刚';
-                    } else if (diffMinutes < 60) {
-                        relativeTime = diffMinutes + '分钟前';
-                    } else if (diffHours < 24) {
-                        const approxDays = Math.round(diffHours / 24);
-                        relativeTime = Math.floor(diffHours) + '小时' + (approxDays >= 1 ? '（约' + approxDays + '天）' : '') + '前';
-                    } else if (diffDays < 30) {
-                        const approxWeeks = Math.floor(diffDays / 7);
-                        relativeTime = diffDays + '天' + (approxWeeks >= 1 ? '（约' + approxWeeks + '周）' : '') + '前';
-                    } else if (diffDays < 365) {
-                        relativeTime = diffDays + '天（约' + Math.floor(diffDays / 30) + '个月）前';
+                    } else if (totalMinutes < 60) {
+                        relativeTime = totalMinutes + '分钟前';
+                    } else if (totalHours < 24) {
+                        const restMinutes = totalMinutes - totalHours * 60;
+                        relativeTime = totalHours + '小时' + (restMinutes > 0 ? restMinutes + '分钟' : '') + '前';
                     } else {
-                        relativeTime = diffDays + '天（约' + Math.floor(diffDays / 365) + '年）前';
+                        const restHours = totalHours - totalDays * 24;
+                        const hourPart = restHours > 0 ? restHours + '小时' : '';
+                        if (totalDays < 30) {
+                            relativeTime = totalDays + '天' + hourPart + '前';
+                        } else if (totalDays < 365) {
+                            const months = Math.floor(totalDays / 30);
+                            const restDays = totalDays - months * 30;
+                            relativeTime = months + '个月' + (restDays > 0 ? restDays + '天' : '') + hourPart + '前';
+                        } else {
+                            const years = Math.floor(totalDays / 365);
+                            const restAfterYears = totalDays - years * 365;
+                            const months = Math.floor(restAfterYears / 30);
+                            const restDays = restAfterYears - months * 30;
+                            relativeTime = years + '年' + (months > 0 ? months + '个月' : '') + (restDays > 0 ? restDays + '天' : '') + hourPart + '前';
+                        }
                     }
                     
-                    const ageDays = Math.max(0, diffHours / 24);
+                    const ageDays = Math.max(0, diffMs / (1000 * 60 * 60 * 24));
                     const ageRatio = Math.min(1, Math.log1p(ageDays) / Math.log1p(90));
                     const hue = 120 * (1 - ageRatio);
                     const sat = 62 + 20 * ageRatio;
