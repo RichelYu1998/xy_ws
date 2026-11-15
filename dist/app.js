@@ -923,23 +923,23 @@
                     } else if (diffMinutes < 60) {
                         relativeTime = diffMinutes + '分钟前';
                     } else if (diffHours < 24) {
-                        relativeTime = Math.floor(diffHours) + '小时前';
+                        const approxDays = Math.round(diffHours / 24);
+                        relativeTime = Math.floor(diffHours) + '小时' + (approxDays >= 1 ? '（约' + approxDays + '天）' : '') + '前';
                     } else if (diffDays < 30) {
-                        relativeTime = diffDays + '天前';
+                        const approxWeeks = Math.floor(diffDays / 7);
+                        relativeTime = diffDays + '天' + (approxWeeks >= 1 ? '（约' + approxWeeks + '周）' : '') + '前';
                     } else if (diffDays < 365) {
-                        relativeTime = Math.floor(diffDays / 30) + '月前';
+                        relativeTime = diffDays + '天（约' + Math.floor(diffDays / 30) + '个月）前';
                     } else {
-                        relativeTime = Math.floor(diffDays / 365) + '年前';
+                        relativeTime = diffDays + '天（约' + Math.floor(diffDays / 365) + '年）前';
                     }
                     
-                    let colorStyle = '';
-                    if (diffHours <= 24) {
-                        colorStyle = 'color: #67c23a; font-weight: bold;';
-                    } else if (diffHours <= 72) {
-                        colorStyle = 'color: #E6A23C; font-weight: bold;';
-                    } else {
-                        colorStyle = 'color: #f56c6c; font-weight: bold;';
-                    }
+                    const ageDays = Math.max(0, diffHours / 24);
+                    const ageRatio = Math.min(1, Math.log1p(ageDays) / Math.log1p(90));
+                    const hue = 120 * (1 - ageRatio);
+                    const sat = 62 + 20 * ageRatio;
+                    const light = 45 - 10 * ageRatio;
+                    const colorStyle = `color: hsl(${hue.toFixed(0)}, ${sat.toFixed(0)}%, ${light.toFixed(0)}%); font-weight: bold;`;
                     
                     productTimeHtml = `<div style="margin-bottom:10px;${colorStyle}"><strong>🕐 入库时间:</strong> ${relativeTime}（${escapeHtml(  /* [ESCAPED] */p.入库时间戳)}）</div>`;
                 }
