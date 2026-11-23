@@ -75,6 +75,23 @@
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
         }
+
+        function escapeJsStr(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/"/g, '\\"')
+                .replace(/\r/g, '\\r')
+                .replace(/\n/g, '\\n')
+                .replace(/\u2028/g, '\\u2028')
+                .replace(/\u2029/g, '\\u2029');
+        }
+
+        function escapeJsAttr(text) {
+            if (!text) return '';
+            return escapeAttr(escapeJsStr(text));
+        }
         
         function isValidUrl(url) {
             if (!url) return false;
@@ -973,17 +990,18 @@
                 
                 validImages.forEach((img, i) => {
                     const decodedUrl = decodeBase64Url(img);
-                    const safeVideoUrl = escapeAttr(decodedUrl);
+                    const safeVideoUrl = escapeJsAttr(decodedUrl);
+                    const safeSrcUrl = escapeAttr(decodedUrl);
                     const isVideo = decodedUrl.includes('/pvod/') || /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v|3gp)(\?|$)/i.test(decodedUrl);
                     if (isVideo) {
                         modalHtml += `<div style="position:relative;" class="product-thumb-placeholder">
-                            <video src="${decodedUrl}" controls preload="metadata" class="product-thumb" style="background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${safeVideoUrl}', false)" onloadeddata="handleVideoLoad(this)">  /* [XSS_SAFE] */
+                            <video src="${safeSrcUrl}" controls preload="metadata" class="product-thumb" style="background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${safeVideoUrl}', false)" onloadeddata="handleVideoLoad(this)">  /* [XSS_SAFE] */
                                 您的浏览器不支持视频播放
                             </video>
                             <div class="video-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:12px;">加载中...</div>
                         </div>`;
                     } else {
-                        modalHtml += `<img src="${decodedUrl}" onclick="showImagePreview('${safeVideoUrl}', ${i})" class="product-thumb" title="点击预览大图" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjE0Ij7nmoTlm77niYHmraLlvTwvdGV4dD48L3N2Zz4='">`;
+                        modalHtml += `<img src="${safeSrcUrl}" onclick="showImagePreview('${safeVideoUrl}', ${i})" class="product-thumb" title="点击预览大图" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjE0Ij7nmoTlm77niYHmraLlvTwvdGV4dD48L3N2Zz4='">`;
                     }
                 });
                 modalHtml += `</div>`;
@@ -1158,15 +1176,16 @@
                 
                 if (isVideo) {
                     const parent = previewImg.parentElement;
-                    const safeVideoUrl = escapeAttr(decodedUrl);  /* [XSS_SAFE] */
-                    const videoHtml = `<video id="previewImage" src="${safeVideoUrl}" controls autoplay preload="auto" crossorigin="anonymous" playsinline style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${safeVideoUrl}', true)">
+                    const safeVideoSrc = escapeAttr(decodedUrl);  /* [XSS_SAFE] */
+                    const safeVideoJs = escapeJsAttr(decodedUrl);  /* [XSS_SAFE] */
+                    const videoHtml = `<video id="previewImage" src="${safeVideoSrc}" controls autoplay preload="auto" crossorigin="anonymous" playsinline style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;background:#000;" onclick="event.stopPropagation()" onerror="handleVideoError(this, '${safeVideoJs}', true)">
                         您的浏览器不支持视频播放
                     </video>`;
                     previewImg.outerHTML = videoHtml;
                 } else {
                     if (previewImg.tagName === 'VIDEO') {
                         const parent = previewImg.parentElement;
-                        const imgHtml = `<img id="previewImage" src="${decodedUrl}" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;" onclick="event.stopPropagation()">`;
+                        const imgHtml = `<img id="previewImage" src="${escapeAttr(decodedUrl)}" style="max-width:95%;max-height:90%;object-fit:contain;border-radius:8px;cursor:default;" onclick="event.stopPropagation()">`;
                         previewImg.outerHTML = imgHtml;
                     } else {
                         previewImg.src = decodedUrl;
@@ -1222,6 +1241,9 @@
                             console.error('[商品描述] ❌ 显示模态框失败:', modalError);
                             showToast('显示商品详情失败: ' + modalError.message, 'error');
                         }
+                    } else if (data.ambiguous) {
+                        console.warn('[商品描述] 匹配到多个商品:', data.count, data.candidates);
+                        showToast(data.error || ('匹配到 ' + (data.count || 0) + ' 个商品，请用货号查询'), 'error');
                     } else {
                         console.warn('[商品描述] 未找到商品:', data.error);
                         showToast(data.error || '未找到该商品', 'error');
@@ -1229,6 +1251,31 @@
                 })
                 .catch(error => {
                     console.error('[商品描述] 查询异常:', error);
+                    showToast('查询失败: ' + error.message, 'error');
+                });
+        }
+
+        window.showProductById = function(productId) {
+            fetch(`/api/product/by-id?product_id=${encodeURIComponent(productId)}`)
+                .then(response => safeParseJson(response))
+                .then(data => {
+                    if (data.found) {
+                        try {
+                            showProductModal(data.product);
+                        } catch (modalError) {
+                            console.error('[商品ID] ❌ 显示模态框失败:', modalError);
+                            showToast('显示商品详情失败: ' + modalError.message, 'error');
+                        }
+                    } else if (data.ambiguous) {
+                        console.warn('[商品ID] 匹配到多个商品:', data.count, data.candidates);
+                        showToast(data.error || ('匹配到 ' + (data.count || 0) + ' 个商品，请用货号查询'), 'error');
+                    } else {
+                        console.warn('[商品ID] 未找到商品:', data.error);
+                        showToast(data.error || '未找到该商品', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('[商品ID] 查询异常:', error);
                     showToast('查询失败: ' + error.message, 'error');
                 });
         }
@@ -1251,9 +1298,13 @@
                 var descLink = e.target.closest('.desc-link');
                 if (descLink) {
                     e.preventDefault();
+                    var productId = descLink.dataset.id;
                     var desc = descLink.dataset.desc;
-                    if (desc) {
-                        console.log('[按钮点击] 查看商品详情:', desc);
+                    if (productId) {
+                        console.log('[按钮点击] 按ID查看商品详情:', productId);
+                        showProductById(productId);
+                    } else if (desc) {
+                        console.log('[按钮点击] 按描述查看商品详情:', desc);
                         showProductByDescription(desc);
                     }
                     return;
@@ -2558,10 +2609,10 @@
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.addedProducts.map((p, idx) => { const rawName = p.name || ''; const normalizedName = rawName.replace(/\s+/g, ' ').trim(); const safeNameForAttr = normalizedName.replace(/'/g, "&#39;").replace(/"/g, "&quot;").replace(/`/g, "&#96;"); const safeNameForJS = normalizedName.replace(/'/g, "\\'").replace(/"/g, '\\\"').replace(/\\/g, '\\\\').replace(/\n/g, "\\n").replace(/\r/g, "\\r"); return `<tr data-sku="${escapeAttr(p.sku)}" data-desc="${safeNameForAttr}" onmouseover="highlightRow('${safeNameForJS}')" onmouseout="unhighlightRow('${safeNameForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeNameForJS}')">
+                                        ${skuData.addedProducts.map((p, idx) => { const rawName = p.name || ''; const normalizedName = rawName.replace(/\s+/g, ' ').trim(); const safeNameForAttr = escapeAttr(normalizedName); const safeNameForJS = escapeJsAttr(normalizedName); const stableId = p.sku ? ('sku:' + String(p.sku).trim()) : ''; return `<tr data-sku="${escapeAttr(p.sku)}" data-id="${escapeAttr(stableId)}" data-desc="${safeNameForAttr}" onmouseover="highlightRow('${safeNameForJS}')" onmouseout="unhighlightRow('${safeNameForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeNameForJS}')">
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(  /* [ESCAPED] */p.sku)}</a></td>
-                                            <td style="word-break: break-word; white-space: normal; min-width: 200px;"><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${escapeAttr(p.name || '')}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${escapeAttr(p.name || '')}">${escapeHtml(  /* [ESCAPED] */p.name || '-')}</a></td>
+                                            <td style="word-break: break-word; white-space: normal; min-width: 200px;"><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${safeNameForAttr}" data-id="${escapeAttr(stableId)}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${safeNameForAttr}">${escapeHtml(  /* [ESCAPED] */normalizedName || '-')}</a></td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`; }).join('')}
                                     </tbody>
@@ -2600,10 +2651,10 @@
                                 <table class="change-table">
                                     <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th></tr></thead>
                                     <tbody>
-                                        ${skuData.newHighPriceProducts.map((p, idx) => { const rawName = p.name || ''; const normalizedName = rawName.replace(/\s+/g, ' ').trim(); const safeNameForAttr = normalizedName.replace(/'/g, "&#39;").replace(/"/g, "&quot;").replace(/`/g, "&#96;"); const safeNameForJS = normalizedName.replace(/'/g, "\\'").replace(/"/g, '\\\"').replace(/\\/g, '\\\\').replace(/\n/g, "\\n").replace(/\r/g, "\\r"); return `<tr data-sku="${escapeAttr(p.sku)}" data-desc="${safeNameForAttr}" onmouseover="highlightRow('${safeNameForJS}')" onmouseout="unhighlightRow('${safeNameForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeNameForJS}')">
+                                        ${skuData.newHighPriceProducts.map((p, idx) => { const rawName = p.name || ''; const normalizedName = rawName.replace(/\s+/g, ' ').trim(); const safeNameForAttr = escapeAttr(normalizedName); const safeNameForJS = escapeJsAttr(normalizedName); const stableId = p.sku ? ('sku:' + String(p.sku).trim()) : ''; return `<tr data-sku="${escapeAttr(p.sku)}" data-id="${escapeAttr(stableId)}" data-desc="${safeNameForAttr}" onmouseover="highlightRow('${safeNameForJS}')" onmouseout="unhighlightRow('${safeNameForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeNameForJS}')">
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(  /* [ESCAPED] */p.sku)}</a></td>
-                                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${escapeAttr(p.name || '')}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${escapeAttr(p.name || '')}">${escapeHtml(  /* [ESCAPED] */p.name || '-')}</a></td>
+                                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${safeNameForAttr}" data-id="${escapeAttr(stableId)}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${safeNameForAttr}">${escapeHtml(  /* [ESCAPED] */normalizedName || '-')}</a></td>
                                             <td>${p.price || '-'}</td>
                                         </tr>`; }).join('')}
                                     </tbody>
@@ -3080,16 +3131,17 @@
                         else if (isAdded) rowStyle = 'background: #e3f2fd;';
                         const normalizedDesc = desc.replace(/\s+/g, ' ').trim();
                         const descDisplay = normalizedDesc;
-                        const safeDescForAttr = normalizedDesc.replace(/'/g, "&#39;").replace(/"/g, "&quot;").replace(/`/g, "&#96;");
-                        const safeDescForJS = normalizedDesc.replace(/'/g, "\\'").replace(/"/g, '\\\"').replace(/\\/g, '\\\\').replace(/\n/g, "\\n").replace(/\r/g, "\\r");
-                        const identifier = desc || sku;
+                        const safeDescForAttr = escapeAttr(normalizedDesc);
+                        const safeDescForJS = escapeJsAttr(normalizedDesc);
+                        const identifier = normalizedDesc || sku;
+                        const productId = p._id || identifier;
 
                         const _costPrice = (p.拿货价 || p.cost_price || p.回收价格 || '');
-                        const _costAttr = _costPrice ? ` data-cost="${_costPrice.toString().replace('¥', '').replace(',', '')}"` : '';
-                        tableHtml += `<tr data-sku="${sku}" data-desc="${safeDescForAttr}"${_costAttr} style="${rowStyle}" onmouseover="highlightRow('${safeDescForJS}')" onmouseout="unhighlightRow('${safeDescForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeDescForJS}')">
+                        const _costAttr = _costPrice ? ` data-cost="${escapeAttr(_costPrice.toString().replace('¥', '').replace(',', ''))}"` : '';
+                        tableHtml += `<tr data-sku="${escapeAttr(sku)}" data-id="${escapeAttr(productId)}" data-desc="${safeDescForAttr}"${_costAttr} style="${rowStyle}" onmouseover="highlightRow('${safeDescForJS}')" onmouseout="unhighlightRow('${safeDescForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeDescForJS}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(sku)}" class="sku-link">${escapeHtml(  /* [ESCAPED] */sku) || '-'}</a></td>
-                            <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${escapeAttr(desc)}" class="desc-link" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${escapeHtml(  /* [ESCAPED] */descDisplay)}</a></td>
+                            <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-id="${escapeAttr(productId)}" data-desc="${safeDescForAttr}" class="desc-link" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${escapeHtml(  /* [ESCAPED] */descDisplay)}</a></td>
                             <td style="font-weight: bold;">${p.售价 || '-'}</td>
                             <td>${p.员工 || '-'}</td>
                         </tr>`;

@@ -475,6 +475,110 @@ _module_logger.setLevel(logging.DEBUG)
 logger = logging.getLogger('FileCleaner')
 logger.setLevel(logging.DEBUG)
 
+_PRODUCT_JSON_GLOB = '*微购相册*.json'
+_PRODUCT_JSON_EXCLUDE_MARKERS = ('_cache', '~$', '.tmp', '.bak')
+_PRODUCT_DESC_MAX_LEN = 2000
+
+
+def _iter_product_json_files():
+    """列出可用商品数据文件（排除缓存/临时文件），按修改时间从新到旧"""
+    base = os.path.join(PROJECT_DIR, 'file')
+    files = []
+    for path in glob.glob(os.path.join(base, _PRODUCT_JSON_GLOB)):
+        name = os.path.basename(path)
+        if any(marker in name for marker in _PRODUCT_JSON_EXCLUDE_MARKERS):
+            continue
+        files.append(path)
+    def _mtime(path):
+        try:
+            return os.path.getmtime(path)
+        except OSError:
+            return 0.0
+    return sorted(files, key=lambda p: (_mtime(p), p), reverse=True)
+
+
+def _latest_product_json_path():
+    """返回最新的商品数据文件路径；无可用文件时返回 None"""
+    files = _iter_product_json_files()
+    return files[0] if files else None
+
+
+def _load_latest_product_json():
+    """读取最新商品数据文件，返回 (data, path)；失败返回 (None, None)"""
+    path = _latest_product_json_path()
+    if not path:
+        return None, None
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f), path
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        logger.warning(f'[ProductJSON] 读取失败 {os.path.basename(path)}: {type(exc).__name__}: {exc}')
+        return None, None
+
+
+def _normalize_text(text):
+    """把任意文本归一化为"去掉所有空白字符"的形态，用于自由文本比较"""
+    return re.sub(r'\s+', '', str(text or ''))
+
+
+def _normalize_sku(sku):
+    """货号归一化：去空白并转大写，避免首尾空格/大小写差异导致匹配失败"""
+    return _normalize_text(sku).upper()
+
+
+def _sku_matches(candidate, target):
+    """货号比较：优先严格相等，其次空白归一化后相等"""
+    if candidate is None or target is None:
+        return False
+    if str(candidate) == str(target):
+        return True
+    return _normalize_sku(candidate) == _normalize_sku(target) and bool(_normalize_sku(target))
+
+
+def _product_desc(product):
+    """读取商品描述文本（兼容 商品描述/商品名称 两种字段名）"""
+    if not isinstance(product, dict):
+        return ''
+    return product.get('商品描述') or product.get('商品名称') or ''
+
+
+def _product_stable_id(product, index=0):
+    """生成商品稳定标识：优先货号，其次描述摘要（避免把自由文本当主键）"""
+    if not isinstance(product, dict):
+        return f'idx:{index}'
+    sku = str(product.get('货号') or product.get('stock_number') or '').strip()
+    if sku:
+        return f'sku:{sku}'
+    desc = _normalize_text(_product_desc(product))
+    if not desc:
+        return f'idx:{index}'
+    digest = hashlib.sha256(desc.encode('utf-8')).hexdigest()[:12]
+    return f'desc:{digest}'
+
+
+def _assign_product_ids(products):
+    """为商品列表统一分配 _id，重复标识自动追加序号以保证唯一"""
+    if not isinstance(products, list):
+        return products
+    used = {}
+    for idx, p in enumerate(products):
+        if not isinstance(p, dict):
+            continue
+        base = _product_stable_id(p, idx)
+        seq = used.get(base, 0)
+        used[base] = seq + 1
+        p['_id'] = base if seq == 0 else f'{base}#{seq}'
+    return products
+
+
+def _attach_decoded_images(product):
+    """把商品图片字段解码后回填，返回该商品"""
+    if isinstance(product, dict):
+        images = product.get('图片', [])
+        product['图片'] = decode_base64_images(images) if images else []
+    return product
+
+
 PW_TRANSIENT_PATTERNS = (
     'Connection closed while reading from the driver',
     'Connection.init: Connection closed',
@@ -6347,8 +6451,14 @@ class FileManager:
             json_files = []
             for file in os.listdir(directory):
                 if file.endswith('.json') and pattern in file:
+                    if any(marker in file for marker in _PRODUCT_JSON_EXCLUDE_MARKERS):
+                        continue
                     file_path = os.path.join(directory, file)
-                    json_files.append((file_path, os.path.getmtime(file_path)))
+                    try:
+                        mtime = os.path.getmtime(file_path)
+                    except OSError:
+                        continue
+                    json_files.append((file_path, mtime))
             
             if not json_files:
                 logger.debug(f'未找到包含"{pattern}"的JSON文件')
@@ -8320,9 +8430,10 @@ class StockNumberComparator:
             logger.debug(f'从JSON文件中读取到 {len(json_stock_numbers)} 个货号\n')
             
             high_price_stock_numbers = [
-                p.get('货号', '') for p in products 
+                str(p.get('货号', '')).strip() for p in products 
                 if WegoScraper.parse_price(p.get('售价', '') or p.get('price','')) is not None
                 and WegoScraper.parse_price(p.get('售价', '') or p.get('price','')) >= 599
+                and str(p.get('货号', '')).strip()
             ]
             
             excel_stock_numbers = self.load_all_excel_data(remove_duplicates=False, platform=platform)
@@ -11192,17 +11303,13 @@ if __name__ == '__main__':
         async def compare_sku():
             try:
                 def _load_sku_compare_data():
-                    json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                    if not json_files:
-                        return None, None, None, None
-                    try:
-                        latest_json = max(json_files, key=os.path.getmtime)
-                    except (OSError, ValueError):
+                    latest_json = _latest_product_json_path()
+                    if not latest_json:
                         return None, None, None, None
                     with open(latest_json, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     products = data.get('商品列表', []) if isinstance(data, dict) else data
-                    json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                    json_stock_numbers = sorted([str(p.get('货号', '')).strip() for p in products if str(p.get('货号', '')).strip()])
                     input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
                     txt_stock_numbers = []
                     if os.path.exists(input_file):
@@ -11243,17 +11350,13 @@ if __name__ == '__main__':
         async def compare_sku_txt(request: Request):
             try:
                 def _load_compare_txt_data():
-                    json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                    if not json_files:
-                        return None, None, None, None
-                    try:
-                        latest_json = max(json_files, key=os.path.getmtime)
-                    except (OSError, ValueError):
+                    latest_json = _latest_product_json_path()
+                    if not latest_json:
                         return None, None, None, None
                     with open(latest_json, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     products = data.get('商品列表', []) if isinstance(data, dict) else data
-                    json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                    json_stock_numbers = sorted([str(p.get('货号', '')).strip() for p in products if str(p.get('货号', '')).strip()])
                     txt_stock_numbers_raw = []
                     input_file = os.path.join(PROJECT_DIR, 'config', 'input_stock_numbers.txt')
                     if os.path.exists(input_file):
@@ -11404,18 +11507,13 @@ if __name__ == '__main__':
                 diff_log_file = os.path.join(PROJECT_DIR, 'file', f'diff_log_{today}.json')
                 
                 def _load_sku_excel_data():
-                    json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                    json_files = [f for f in json_files if '_cache' not in f]
-                    if not json_files:
-                        return None, None, None, None
-                    try:
-                        latest_json = max(json_files, key=os.path.getmtime)
-                    except (OSError, ValueError):
+                    latest_json = _latest_product_json_path()
+                    if not latest_json:
                         return None, None, None, None
                     with open(latest_json, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     products = data.get('商品列表', []) if isinstance(data, dict) else data
-                    json_stock_numbers = sorted([p.get('货号', '') for p in products if p.get('货号')])
+                    json_stock_numbers = sorted([str(p.get('货号', '')).strip() for p in products if str(p.get('货号', '')).strip()])
                     excel_files_list, daily_profit_report = get_excel_files_with_report()
                     return data, json_stock_numbers, (excel_files_list, daily_profit_report), latest_json
                 data, json_stock_numbers, excel_info, latest_json = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_sku_excel_data)
@@ -11601,15 +11699,14 @@ if __name__ == '__main__':
         async def get_all_products():
             try:
                 def _load_products_json():
-                    json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                    if not json_files:
+                    latest_file = _latest_product_json_path()
+                    if not latest_file:
                         return None, 'no_files'
                     try:
-                        latest_file = max(json_files, key=os.path.getmtime)
-                    except (OSError, ValueError):
+                        with open(latest_file, 'r', encoding='utf-8') as f:
+                            data = json.load(f)
+                    except (OSError, ValueError, json.JSONDecodeError):
                         return None, 'invalid_files'
-                    with open(latest_file, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
                     return data, os.path.basename(latest_file)
                 data, latest_filename = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_products_json)
                 if data is None:
@@ -11632,9 +11729,12 @@ if __name__ == '__main__':
                     sku = p.get('货号', '') or p.get('stock_number', '')
                     p['_isNew'] = sku in added_skus
 
+                _assign_product_ids(products)
+
                 high_price_stats = data.get('高价商品统计', {})
                 high_price_products = high_price_stats.get('商品列表', [])
                 high_price_count = high_price_stats.get('数量', 0)
+                _assign_product_ids(high_price_products)
                 
                 total_price = 0
                 total_fee = 0
@@ -11911,13 +12011,9 @@ if __name__ == '__main__':
                 return jsonify({'error': '服务器内部错误，请查看日志'}, status_code=500)
 
         def get_all_products():
-            json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-            if not json_files:
+            latest_file = _latest_product_json_path()
+            if not latest_file:
                 return jsonify({'error': '没有找到JSON文件'}, status_code=404)
-            try:
-                latest_file = max(json_files, key=os.path.getmtime)
-            except (OSError, ValueError):
-                return jsonify({'error': '没有找到有效的JSON文件'}, status_code=404)
             try:
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -11941,6 +12037,8 @@ if __name__ == '__main__':
                     p['图片'] = media_result if media_result else (img_data if isinstance(img_data, list) else [img_data] if img_data else [])
                     sku = p.get('货号', '') or p.get('stock_number', '')
                     p['_isNew'] = sku in added_skus
+
+                _assign_product_ids(products)
 
                 high_price_products = []
                 total_price = 0
@@ -12001,23 +12099,20 @@ if __name__ == '__main__':
             if not sku:
                 return jsonify({'error': '请提供货号'}, status_code=400)
             def _load_product_json():
-                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                if not json_files:
-                    return None, None
-                try:
-                    latest_file = max(json_files, key=os.path.getmtime)
-                except (OSError, ValueError):
+                latest_file = _latest_product_json_path()
+                if not latest_file:
                     return None, None
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 return data, latest_file
             data, latest_file = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_product_json)
             if data is None:
+                safe_log(logger, 'warning', '[get_product] 没有可用的商品数据文件')
                 return jsonify({'found': False, 'error': '没有找到JSON文件'})
             try:
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 for p in products:
-                    if str(p.get('货号')) == str(sku):
+                    if _sku_matches(p.get('货号'), sku):
                         # 解码Base64图片URL
                         images = p.get('图片', [])
                         if images:
@@ -12042,7 +12137,10 @@ if __name__ == '__main__':
                                 p['图片'] = []
                         else:
                             p['图片'] = []
+                        p['_id'] = _product_stable_id(p, 0)
                         return jsonify({'found': True, 'product': p})
+                safe_log(logger, 'warning', '[get_product] 未找到货号={s} 文件={f} 商品数={n}',
+                         s=sku, f=os.path.basename(latest_file or ''), n=len(products))
                 return jsonify({'found': False, 'error': '未找到该商品'})
             except Exception as e:  # [HANDLED]
                 logger.error(f'商品详情接口异常: {type(e).__name__}: {e}', exc_info=True)
@@ -12109,12 +12207,8 @@ if __name__ == '__main__':
                     return jsonify({'error': '最低价不能大于最高价'}, status_code=400)
 
             def _load_search_json():
-                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                if not json_files:
-                    return None, None
-                try:
-                    latest_file = max(json_files, key=os.path.getmtime)
-                except (OSError, ValueError):
+                latest_file = _latest_product_json_path()
+                if not latest_file:
                     return None, None
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
@@ -12125,13 +12219,15 @@ if __name__ == '__main__':
             try:
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 
+                _assign_product_ids(products)
                 matched_products = []
                 
                 if search_type == 'sku':
                     for p in products:
-                        if p.get('货号') == sku:
+                        if _sku_matches(p.get('货号'), sku):
                             media_result = []
                             new_image_url = p.get('图片', '')
+                            img_data = new_image_url
                             if new_image_url:
                                 try:
                                     if isinstance(new_image_url, str):
@@ -12170,17 +12266,34 @@ if __name__ == '__main__':
                                     media_result = [img_data]
                             p['图片'] = media_result
                             return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
+                    safe_log(logger, 'warning', '[search_product] 货号搜索未命中 货号={s} 文件={f}',
+                             s=sku, f=os.path.basename(latest_file or ''))
                     return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
                 
                 elif search_type == 'description':
+                    target_keyword = _normalize_text(sku).lower()
+                    exact_products = []
+                    partial_products = []
                     for p in products:
-                        stored_desc = p.get('商品描述', '') or p.get('商品名称', '')
-                        if sku.lower() in stored_desc.lower():
-                            images = p.get('图片', [])
-                            p['图片'] = decode_base64_images(images) if images else []
-                            matched_products.append(p)
+                        stored_desc = _normalize_text(_product_desc(p)).lower()
+                        if not target_keyword or target_keyword not in stored_desc:
+                            continue
+                        _attach_decoded_images(p)
+                        if stored_desc == target_keyword:
+                            exact_products.append(p)
+                        else:
+                            partial_products.append(p)
+                    matched_products = exact_products + partial_products
                     if matched_products:
-                        return jsonify({'found': True, 'products': matched_products[:50], 'total': len(matched_products), 'filename': os.path.basename(latest_file)})
+                        return jsonify({
+                            'found': True,
+                            'products': matched_products[:50],
+                            'total': len(matched_products),
+                            'exact_count': len(exact_products),
+                            'filename': os.path.basename(latest_file)
+                        })
+                    safe_log(logger, 'warning', '[search_product] 描述搜索未命中 关键词长度={n} 文件={f}',
+                             n=len(sku), f=os.path.basename(latest_file or ''))
                     return jsonify({'found': False, 'error': f'未找到包含 "{sku}" 的商品'})
                 
                 elif search_type == 'price':
@@ -12197,9 +12310,13 @@ if __name__ == '__main__':
                                 continue
                     if matched_products:
                         return jsonify({'found': True, 'products': matched_products[:50], 'total': len(matched_products), 'filename': os.path.basename(latest_file), 'search_price': f'¥{price_float:,.2f}'})
+                    safe_log(logger, 'warning', '[search_product] 售价搜索未命中 售价={p} 文件={f}',
+                             p=price_float, f=os.path.basename(latest_file or ''))
                     return jsonify({'found': False, 'error': f'未找到售价为 ¥{price_float:,.2f} 的商品'})
                 
                 elif search_type == 'price_range':
+                    range_desc = f'¥{parsed_min:,.2f}' if parsed_min else '0'
+                    range_desc += f' - ¥{parsed_max:,.2f}' if parsed_max else '+'
                     for p in products:
                         price_str = p.get('售价', '') or p.get('price', '')
                         if price_str:
@@ -12219,8 +12336,6 @@ if __name__ == '__main__':
                             except (ValueError, TypeError):
                                 continue
                     if matched_products:
-                        range_desc = f'¥{parsed_min:,.2f}' if parsed_min else '0'
-                        range_desc += f' - ¥{parsed_max:,.2f}' if parsed_max else '+'
                         return jsonify({
                             'found': True, 
                             'products': matched_products[:100], 
@@ -12230,6 +12345,8 @@ if __name__ == '__main__':
                             'price_min': parsed_min,
                             'price_max': parsed_max
                         })
+                    safe_log(logger, 'warning', '[search_product] 价格区间未命中 区间={r} 文件={f}',
+                             r=range_desc, f=os.path.basename(latest_file or ''))
                     return jsonify({'found': False, 'error': f'未找到价格在 {range_desc} 范围内的商品'})
                 
             except Exception as e:  # [HANDLED]
@@ -12242,38 +12359,119 @@ if __name__ == '__main__':
             if not description:
                 return JSONResponse(content={'error': '请提供商品描述'}, status_code=400)
 
-            if len(description) > 500:
-                return JSONResponse(content={'error': '商品描述过长（最大500字符）'}, status_code=400)
+            if len(description) > _PRODUCT_DESC_MAX_LEN:
+                return JSONResponse(content={'error': f'商品描述过长（最大{_PRODUCT_DESC_MAX_LEN}字符）'}, status_code=400)
 
-            if re.search(r'[<>"\'&]', description):
-                safe_log(logger, 'warning', '[get_product_by_description] 检测到可疑字符 in description: {desc}', desc=description)
-                return JSONResponse(content={'error': '商品描述包含非法字符'}, status_code=400)
+            if any(ord(ch) < 32 and ch not in '\n\r\t' for ch in description):
+                safe_log(logger, 'warning', '[get_product_by_description] 描述含控制字符，已拒绝')
+                return JSONResponse(content={'error': '商品描述包含控制字符'}, status_code=400)
 
             def _load_desc_json():
-                json_files = glob.glob(os.path.join(PROJECT_DIR, 'file', '*微购相册*.json'))
-                if not json_files:
-                    return None, None
-                try:
-                    latest_file = max(json_files, key=os.path.getmtime)
-                except (OSError, ValueError):
+                latest_file = _latest_product_json_path()
+                if not latest_file:
                     return None, None
                 with open(latest_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 return data, latest_file
             data, latest_file = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_desc_json)
             if data is None:
+                safe_log(logger, 'warning', '[get_product_by_description] 没有可用的商品数据文件')
                 return jsonify({'found': False, 'error': '没有找到JSON文件'})
             try:
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
-                for p in products:
-                    stored_desc = p.get('商品描述', '')
-                    if stored_desc.replace(' ', '') == description.replace(' ', ''):
-                        images = p.get('图片', [])
-                        p['图片'] = decode_base64_images(images) if images else []
-                        return jsonify({'found': True, 'product': p})
+                _assign_product_ids(products)
+                target_desc = _normalize_text(description)
+
+                def _ambiguous(cands):
+                    return jsonify({
+                        'found': False,
+                        'ambiguous': True,
+                        'count': len(cands),
+                        'candidates': [
+                            {'id': c.get('_id'), 'sku': c.get('货号', '') or c.get('stock_number', '')}
+                            for c in cands[:20]
+                        ],
+                        'error': f'匹配到 {len(cands)} 个商品，请用货号精确查询'
+                    })
+
+                exact = [p for p in products if _normalize_text(_product_desc(p)) == target_desc]
+                if len(exact) == 1:
+                    return jsonify({'found': True, 'product': _attach_decoded_images(exact[0])})
+                if len(exact) > 1:
+                    safe_log(logger, 'warning', '[get_product_by_description] 描述命中多个商品 count={n}', n=len(exact))
+                    return _ambiguous(exact)
+
+                candidates = [p for p in products if target_desc and target_desc in _normalize_text(_product_desc(p))]
+                if len(candidates) == 1:
+                    safe_log(logger, 'warning', '[get_product_by_description] 精确匹配失败，已用唯一子串兜底命中')
+                    return jsonify({'found': True, 'product': _attach_decoded_images(candidates[0])})
+                if len(candidates) > 1:
+                    safe_log(logger, 'warning', '[get_product_by_description] 子串命中多个商品 count={n}', n=len(candidates))
+                    return _ambiguous(candidates)
+
+                safe_log(logger, 'warning', '[get_product_by_description] 未找到商品 文件={f} 描述长度={n} 描述前40字={d}',
+                         f=os.path.basename(latest_file or ''), n=len(description), d=description[:40])
                 return jsonify({'found': False, 'error': '未找到该商品'})
             except Exception as e:  # [HANDLED]
                 logger.error(f'[get_product_by_description] 查询失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'found': False, 'error': '查询商品信息失败'})
+
+        @app.get('/api/product/by-id')  # [SECURED]
+        async def get_product_by_id(product_id: str = ''):
+            product_id = product_id.strip()
+            if not product_id or len(product_id) > 200:
+                return JSONResponse(content={'error': '请提供有效的商品ID'}, status_code=400)
+
+            def _load_id_json():
+                latest_file = _latest_product_json_path()
+                if not latest_file:
+                    return None, None
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return data, latest_file
+            data, latest_file = await asyncio.get_running_loop().run_in_executor(_blocking_io_executor, _load_id_json)
+            if data is None:
+                safe_log(logger, 'warning', '[get_product_by_id] 没有可用的商品数据文件')
+                return jsonify({'found': False, 'error': '没有找到JSON文件'})
+            try:
+                products = data.get('商品列表', []) if isinstance(data, dict) else data
+                _assign_product_ids(products)
+                for p in products:
+                    if p.get('_id') == product_id:
+                        return jsonify({'found': True, 'product': _attach_decoded_images(p)})
+
+                fallback = []
+                pid_lower = product_id.lower()
+                if pid_lower.startswith('sku:'):
+                    target_sku = product_id[4:].split('#')[0]
+                    fallback = [p for p in products if _sku_matches(p.get('货号') or p.get('stock_number') or '', target_sku)]
+                elif pid_lower.startswith('desc:'):
+                    target_digest = product_id[5:].split('#')[0]
+                    fallback = [
+                        p for p in products
+                        if hashlib.sha256(_normalize_text(_product_desc(p)).encode('utf-8')).hexdigest()[:12] == target_digest.lower()
+                    ]
+                if len(fallback) == 1:
+                    safe_log(logger, 'warning', '[get_product_by_id] 严格ID未命中，已按归一化兜底命中 ID={i}', i=product_id)
+                    return jsonify({'found': True, 'product': _attach_decoded_images(fallback[0])})
+                if len(fallback) > 1:
+                    safe_log(logger, 'warning', '[get_product_by_id] 兜底命中多个商品 ID={i} count={n}', i=product_id, n=len(fallback))
+                    return jsonify({
+                        'found': False,
+                        'ambiguous': True,
+                        'count': len(fallback),
+                        'candidates': [
+                            {'id': c.get('_id'), 'sku': c.get('货号', '') or c.get('stock_number', '')}
+                            for c in fallback[:20]
+                        ],
+                        'error': f'匹配到 {len(fallback)} 个商品，请用货号精确查询'
+                    })
+
+                safe_log(logger, 'warning', '[get_product_by_id] 未找到ID={i} 文件={f} 商品数={n}',
+                         i=product_id, f=os.path.basename(latest_file or ''), n=len(products))
+                return jsonify({'found': False, 'error': '未找到该商品'})
+            except Exception as e:  # [HANDLED]
+                logger.error(f'[get_product_by_id] 查询失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({'found': False, 'error': '查询商品信息失败'})
 
         @app.get('/api/clean/allowed-roots')  # [SECURED]

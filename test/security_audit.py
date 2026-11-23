@@ -3,7 +3,7 @@
 安全攻防全面审计脚本（版本号动态从README.md获取）
 遵循 UTF-8 编码 + 简体中文规范
 功能：
-1. 隐藏Bug排查（代码静态分析）
+1. 隐藏Bug排查（代码静态分析 + 数据契约类潜伏缺陷）
 2. 安全漏洞扫描（OWASP Top 10）
 3. XSS/注入攻击检测
 4. 性能压测基准测试
@@ -169,7 +169,7 @@ class SecurityAuditor:
         start_time = time.time()
 
         try:
-            print("\n📋 [1/10] 隐藏Bug排查 - 代码静态分析")
+            print("\n📋 [1/10] 隐藏Bug排查 - 代码静态分析 + 数据契约类潜伏缺陷")
             self._scan_hidden_bugs()
 
             print("\n🛡️ [2/10] OWASP Top 10 安全扫描")
@@ -518,6 +518,186 @@ class SecurityAuditor:
                     fut.result()
                 except Exception as e:
                     pass
+
+        self._scan_data_contract_bugs()
+
+    def _scan_data_contract_bugs(self):
+        """数据契约类隐藏Bug：自由文本主键 / 归一化不一致 / 缓存混入 / 静默失败
+
+        这类缺陷的共同特征是"代码路径正确、数据形态触发"，失败时仍返回 200，
+        日志与监控无异常信号，属于最难发现的潜伏型缺陷，因此单独成组检测。
+        """
+        targets = [f for f in (self.code_files or []) if f.endswith('.py') or f.endswith('.js')]
+        normalize_hits = 0
+        stable_id_hits = 0
+        sku_match_hits = 0
+        js_attr_hits = 0
+        for filename in targets:
+            filepath = self.project_root / filename
+            try:
+                content = filepath.read_text(encoding='utf-8')
+            except Exception:
+                continue
+            lines = content.split('\n')
+
+            for idx, line in enumerate(lines):
+                window = '\n'.join(lines[max(0, idx - 6): idx + 7])
+
+                # 规则1：缓存/临时文件可能被当成主数据源
+                if re.search(r"glob\.glob\(.*微购相册", line):
+                    if not re.search(r'_cache|_PRODUCT_JSON_EXCLUDE_MARKERS|_latest_product_json_path|_iter_product_json_files', window):
+                        self._add_issue(SecurityIssue(
+                            severity='HIGH',
+                            category='DataContract',
+                            file_path=filename,
+                            line_number=idx + 1,
+                            description='[数据契约] 商品数据源通配符未排除缓存/临时文件，可能读到 _cache 快照',
+                            recommendation='统一使用 _latest_product_json_path() 或显式过滤 _cache/~$/.tmp/.bak',
+                            code_snippet=line.strip()[:100]
+                        ))
+
+                # 规则2：只删半角空格的单向归一化，换行/Tab 仍会导致精确匹配失败
+                if re.search(r"\.replace\(\s*' '\s*,\s*''\s*\)", line) and '==' in line:
+                    if not re.search(r"re\.sub\(r'\\s\+'", window):
+                        self._add_issue(SecurityIssue(
+                            severity='MEDIUM',
+                            category='DataContract',
+                            file_path=filename,
+                            line_number=idx + 1,
+                            description='[数据契约] 自由文本比较仅删除半角空格，换行/Tab/全角空白导致匹配失败',
+                            recommendation="改用 re.sub(r'\\s+', '', text) 统一归一化后再比较",
+                            code_snippet=line.strip()[:100]
+                        ))
+
+                # 规则3：静默失败 —— 返回 200 + found=false 却不记录任何日志
+                if re.search(r"'found'\s*:\s*False", line) and re.search(r'return|jsonify|JSONResponse', line):
+                    if not re.search(r'logger|safe_log|log_print|safe_print', window):
+                        self._add_issue(SecurityIssue(
+                            severity='MEDIUM',
+                            category='DataContract',
+                            file_path=filename,
+                            line_number=idx + 1,
+                            description='[数据契约] 静默失败：未命中直接返回 200 且无日志，问题不可观测',
+                            recommendation='在未命中分支记录 warning 日志（含文件名、关键词长度等定位信息）',
+                            code_snippet=line.strip()[:100]
+                        ))
+
+                # 规则4：对自由文本使用过宽字符黑名单，正常商品描述会被误拒
+                if re.search(r"re\.search\(r'\[<", line) and 'description' in line:
+                    self._add_issue(SecurityIssue(
+                        severity='MEDIUM',
+                        category='DataContract',
+                        file_path=filename,
+                        line_number=idx + 1,
+                        description='[数据契约] 自由文本使用过宽字符黑名单(&<>"\')，正常描述被误判为非法',
+                        recommendation='只拒绝控制字符（ord(ch) < 32 且非 \\n\\r\\t），输出侧统一转义',
+                        code_snippet=line.strip()[:100]
+                    ))
+
+                # 规则5：把自由文本当唯一主键（前端用 data-desc 作为点击键，无稳定 ID）
+                if 'class="desc-link"' in line and 'data-desc' in line:
+                    if not re.search(r'data-id', content):
+                        self._add_issue(SecurityIssue(
+                            severity='MEDIUM',
+                            category='DataContract',
+                            file_path=filename,
+                            line_number=idx + 1,
+                            description='[数据契约] 前端以商品描述自由文本作为唯一键，同描述多商品会点错/打不开',
+                            recommendation='行与链接同时携带稳定 _id（货号优先，缺失时用描述摘要），点击按 ID 查询',
+                            code_snippet=line.strip()[:100]
+                        ))
+
+                # 规则5b：描述命中多个商品时静默取第一个，无歧义提示
+                if re.search(r'matched\s*=\s*p\b', line) and re.search(r'\bbreak\b', window):
+                    if not re.search(r'ambiguous|len\(exact\)|len\(candidates\)', window):
+                        self._add_issue(SecurityIssue(
+                            severity='MEDIUM',
+                            category='DataContract',
+                            file_path=filename,
+                            line_number=idx + 1,
+                            description='[数据契约] 自由文本命中多个商品时静默取第一个，可能展示错误商品',
+                            recommendation='精确匹配优先；多命中时返回 ambiguous + 候选列表，让用户改用货号精确查询',
+                            code_snippet=line.strip()[:100]
+                        ))
+
+                # 规则6：货号原样字符串比较，首尾空格/大小写差异导致查不到
+                if re.search(r"(?:p|product)\.get\('货号'\)\s*==|str\(p\.get\('货号'\)\)\s*==", line):
+                    if not re.search(r'_sku_matches|_normalize_sku', window):
+                        self._add_issue(SecurityIssue(
+                            severity='MEDIUM',
+                            category='DataContract',
+                            file_path=filename,
+                            line_number=idx + 1,
+                            description='[数据契约] 货号未归一化即比较，JSON 中带首尾空格或大小写差异时匹配失败',
+                            recommendation='使用 _sku_matches()（严格相等优先，其次去空白+大写后相等）',
+                            code_snippet=line.strip()[:100]
+                        ))
+
+                # 规则7：同一表格中行与链接的描述键归一化方式不一致
+                if 'data-desc="${escapeAttr(' in line:
+                    self._add_issue(SecurityIssue(
+                        severity='MEDIUM',
+                        category='DataContract',
+                        file_path=filename,
+                        line_number=idx + 1,
+                        description='[数据契约] 描述直接以原文写入 data-desc，与行键归一化方式不一致导致点不开',
+                        recommendation='行与链接统一使用归一化后的描述（如 safeDescForAttr），或统一改用 data-id',
+                        code_snippet=line.strip()[:100]
+                    ))
+
+                # 规则8：自由文本拼进 HTML 属性内的 JS 字符串，实体未整体转义可被闭合注入
+                if re.search(r"on(?:mouseover|mouseout|click|error|loadeddata)=\"[^\"]*'\$\{", line):
+                    wide_window = '\n'.join(lines[max(0, idx - 30): idx + 7])
+                    if not re.search(r'escapeJsAttr\(', wide_window):
+                        self._add_issue(SecurityIssue(
+                            severity='HIGH',
+                            category='DataContract',
+                            file_path=filename,
+                            line_number=idx + 1,
+                            description='[数据契约] 自由文本拼入 HTML 属性内的 JS 字符串未整体转义，&quot; 等实体会被解码闭合导致注入',
+                            recommendation='先做 JS 字符串转义，再用 escapeAttr() 包裹整个属性值（& 必须先转义），即 escapeJsAttr()',
+                            code_snippet=line.strip()[:100]
+                        ))
+
+                # 正向验证：已采用空白归一化比较
+                if re.search(r"re\.sub\(r'\\s\+', '', str\(", line) or re.search(r"_normalize_text\(", line):
+                    normalize_hits += 1
+
+                # 正向验证：商品稳定 ID / 货号归一化比较已落地
+                if re.search(r"_product_stable_id\(|_assign_product_ids\(", line):
+                    stable_id_hits += 1
+                if re.search(r"_sku_matches\(", line):
+                    sku_match_hits += 1
+                if re.search(r'escapeJsAttr\(', line):
+                    js_attr_hits += 1
+
+        if stable_id_hits:
+            self._add_verified_control(
+                '商品稳定标识（货号优先 + 描述摘要）', stable_id_hits,
+                f'{stable_id_hits} 处使用 _product_stable_id/_assign_product_ids，自由文本不再充当唯一键'
+            )
+            print(f"    ✅ 商品稳定标识分配: {stable_id_hits} 处已确认")
+        if sku_match_hits:
+            self._add_verified_control(
+                '货号归一化比较', sku_match_hits,
+                f'{sku_match_hits} 处使用 _sku_matches，首尾空格/大小写差异不再导致查不到'
+            )
+            print(f"    ✅ 货号归一化比较: {sku_match_hits} 处已确认")
+
+        if js_attr_hits:
+            self._add_verified_control(
+                '属性内 JS 字符串双层转义', js_attr_hits,
+                f'{js_attr_hits} 处使用 escapeJsAttr（JS 转义 + HTML 属性转义），实体解码后无法闭合引号'
+            )
+            print(f"    ✅ 属性内 JS 字符串双层转义: {js_attr_hits} 处已确认")
+
+        if normalize_hits:
+            self._add_verified_control(
+                '自由文本空白归一化比较', normalize_hits,
+                f'{normalize_hits} 处使用 re.sub(r"\\s+", "", text) 归一化后比较，换行/空格差异不再影响匹配'
+            )
+            print(f"    ✅ 自由文本空白归一化比较: {normalize_hits} 处已确认")
+        print("  ✅ 数据契约类隐藏Bug排查完成")
 
     def _scan_owasp_top10(self):
         """OWASP Top 10 安全扫描"""
