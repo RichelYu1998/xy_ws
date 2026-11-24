@@ -3060,17 +3060,17 @@
             let searchMaxPrice = null;
             
             if (searchType === 'price') {
-                const priceClean = searchTerm.replace('¥', '').replace(',', '').trim();
+                const priceClean = searchTerm.replace(/¥/g, '').replace(/,/g, '').trim();
                 searchPrice = parseFloat(priceClean);
                 if (isNaN(searchPrice)) {
                     showToast('售价格式无效，请输入有效数字', 'error');
                     return;
                 }
             } else if (searchType === 'price_range') {
-                const parts = searchTerm.split('-');
+                const parts = searchTerm.split(/[-~至]/);
                 
                 if (parts[0] && parts[0].trim()) {
-                    const minClean = parts[0].replace('¥', '').replace(',', '').trim();
+                    const minClean = parts[0].replace(/¥/g, '').replace(/,/g, '').trim();
                     searchMinPrice = parseFloat(minClean);
                     if (isNaN(searchMinPrice) || searchMinPrice < 0) {
                         showToast('最低价格式无效，请输入正数', 'error');
@@ -3079,7 +3079,7 @@
                 }
                 
                 if (parts[1] && parts[1].trim()) {
-                    const maxClean = parts[1].replace('¥', '').replace(',', '').trim();
+                    const maxClean = parts[1].replace(/¥/g, '').replace(/,/g, '').trim();
                     searchMaxPrice = parseFloat(maxClean);
                     if (isNaN(searchMaxPrice) || searchMaxPrice < 0) {
                         showToast('最高价格式无效，请输入正数', 'error');
@@ -3099,6 +3099,7 @@
             }
             
             const searchLower = searchTerm.toLowerCase().trim();
+            const searchNeedle = searchLower.replace(/\s+/g, '');
             
             tableIds.forEach(tableId => {
                 const tableRows = document.querySelectorAll('#' + tableId + ' tbody tr');
@@ -3111,20 +3112,27 @@
                     const desc = (row.getAttribute('data-desc') || '').toLowerCase();
                     const remark = (row.getAttribute('data-remark') || '').toLowerCase();
                     const brand = (row.getAttribute('data-brand') || '').toLowerCase();
+                    const brandAlias = (row.getAttribute('data-brand-alias') || '').toLowerCase().replace(/\s+/g, '');
                     const category = (row.getAttribute('data-category') || '').toLowerCase();
+                    const skuForms = (row.getAttribute('data-search-sku') || '').toLowerCase();
+                    const descForms = (row.getAttribute('data-search-desc') || '').toLowerCase();
+                    const remarkForms = (row.getAttribute('data-search-remark') || '').toLowerCase();
                     const priceCell = row.querySelector('.price-cell') || row.querySelector('td:nth-child(4)');
                     const priceText = priceCell ? (priceCell.textContent || '') : '';
                     
                     let isMatch = false;
 
                     if (searchType === 'sku') {
-                        isMatch = sku.includes(searchLower);
+                        isMatch = sku.includes(searchLower) || (searchNeedle && skuForms.includes(searchNeedle));
                     } else if (searchType === 'description') {
-                        isMatch = desc.includes(searchLower);
+                        isMatch = desc.includes(searchLower) || (searchNeedle && descForms.includes(searchNeedle));
                     } else if (searchType === 'remark') {
-                        isMatch = remark.includes(searchLower);
+                        isMatch = remark.includes(searchLower) || (searchNeedle && remarkForms.includes(searchNeedle));
                     } else if (searchType === 'brand') {
                         isMatch = brand.includes(searchLower) || (category + '/' + brand).includes(searchLower);
+                        if (!isMatch && searchNeedle) {
+                            isMatch = brandAlias.includes(searchNeedle);
+                        }
                     } else if (searchType === 'price' && searchPrice !== null) {
                         const rowPriceMatch = priceText.match(/¥?([\d,]+\.?\d*)/);
                         if (rowPriceMatch) {
@@ -3404,7 +3412,7 @@
                         const _costAttr = _costPrice ? ` data-cost="${escapeAttr(_costPrice.toString().replace('¥', '').replace(',', ''))}"` : '';
                         const _remark = (p.备注 || p.remark || '').toString();
                         const _remarkAttr = _remark ? ` data-remark="${escapeAttr(_remark)}"` : '';
-                        tableHtml += `<tr data-sku="${escapeAttr(sku)}" data-id="${escapeAttr(productId)}" data-desc="${safeDescForAttr}" data-brand="${escapeAttr(p._brand || '')}" data-category="${escapeAttr(p._category || '')}"${_remarkAttr}${_costAttr} style="${rowStyle}" onmouseover="highlightRow('${safeDescForJS}')" onmouseout="unhighlightRow('${safeDescForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeDescForJS}')">
+                        tableHtml += `<tr data-sku="${escapeAttr(sku)}" data-id="${escapeAttr(productId)}" data-desc="${safeDescForAttr}" data-brand="${escapeAttr(p._brand || '')}" data-brand-alias="${escapeAttr(p._brand_alias || '')}" data-category="${escapeAttr(p._category || '')}" data-search-sku="${escapeAttr(p._search_sku || '')}" data-search-desc="${escapeAttr(p._search_desc || '')}" data-search-remark="${escapeAttr(p._search_remark || '')}"${_remarkAttr}${_costAttr} style="${rowStyle}" onmouseover="highlightRow('${safeDescForJS}')" onmouseout="unhighlightRow('${safeDescForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeDescForJS}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(sku)}" class="sku-link">${escapeHtml(  /* [ESCAPED] */sku) || '-'}</a></td>
                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-id="${escapeAttr(productId)}" data-desc="${safeDescForAttr}" class="desc-link" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${escapeHtml(  /* [ESCAPED] */descDisplay)}</a></td>
@@ -3767,20 +3775,20 @@
                                     searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索货号字段</strong>，支持模糊匹配（如输入 "466" 可找到货号包含 466 的商品）';
                                     break;
                                 case 'description':
-                                    searchInput.placeholder = '输入商品名称或描述关键词...';
-                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索商品名称和描述</strong>，支持模糊匹配（如输入 "iPhone" 可找到所有 iPhone 相关商品）';
+                                    searchInput.placeholder = '输入中文 / 拼音 / 首字母 / 英文 / 数字...';
+                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索商品名称和描述</strong>，中文、拼音全拼（xiaomi）、首字母（xm）、英文、数字任意输入均可命中';
                                     break;
                                 case 'price':
                                     searchInput.placeholder = '输入精确售价(如: 799, 1500, 3299)...';
                                     searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索售价字段</strong>，精确匹配价格（如输入 "500" 只会找到售价正好是 ¥500 的商品）';
                                     break;
                                 case 'remark':
-                                    searchInput.placeholder = '输入备注关键词(如: 高价商品, 只在JSON)...';
-                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索备注字段</strong>，支持模糊匹配（如输入 "高价" 可找到备注包含高价的商品）';
+                                    searchInput.placeholder = '输入备注关键词(如: 高价, gaojia, gj)...';
+                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索备注字段</strong>，中文、拼音全拼、首字母、英文、数字任意输入均可命中';
                                     break;
                                 case 'brand':
-                                    searchInput.placeholder = '输入品牌(如: 华为, 苹果, 联想, 大疆)...';
-                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>按品牌筛选商品</strong>，也可输入「品类/品牌」（如 "手机/华为"）缩小范围';
+                                    searchInput.placeholder = '输入品牌(如: 华为, huawei, 苹果, apple)...';
+                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>按品牌筛选商品</strong>，支持中文 / 英文 / 拼音 / 首字母（huawei、apple、pg、p90），也可输入「品类/品牌」（如 "手机/华为"）';
                                     break;
                             }
                         }
@@ -6324,11 +6332,25 @@
             const box = document.getElementById('clean-allowed-roots');
             if (!box) return;
             fetch('/api/clean/allowed-roots')
-                .then(function(response) { return safeParseJson(response); })
-                .then(function(data) {
-                    if (data && data.success) cleanProjectDir = data.project_dir || '';
-                    if (!data.success || !data.roots || !data.roots.length) {
-                        box.innerHTML = '<span style="color:#c00;">允许目录读取失败，请查看服务日志</span>';
+                .then(function(response) {
+                    return safeParseJson(response).then(function(data) {
+                        return { status: response.status, data: data || {} };
+                    });
+                })
+                .then(function(result) {
+                    const data = result.data;
+                    if (result.status === 429) {
+                        const wait = data.retry_after || 60;
+                        box.innerHTML = '<span style="color:#c00;">白名单读取过于频繁，请 ' + wait + ' 秒后刷新页面重试（该接口只读，不影响清理执行）</span>';
+                        return;
+                    }
+                    if (!data.success) {
+                        box.innerHTML = '<span style="color:#c00;">允许目录读取失败：' + escapeHtml(data.error || '未知原因') + '</span>';
+                        return;
+                    }
+                    cleanProjectDir = data.project_dir || '';
+                    if (!data.roots || !data.roots.length) {
+                        box.innerHTML = '<span style="color:#c00;">白名单为空：请编辑 <code>' + escapeHtml(data.config_file || '') + '</code> 添加允许清理的目录（一行一个路径）</span>';
                         return;
                     }
                     const parts = [];
@@ -6364,7 +6386,7 @@
                 })
                 .catch(function(e) {
                     console.error('Failed to load clean allowed roots:', e);
-                    box.innerHTML = '<span style="color:#c00;">允许目录读取失败</span>';
+                    box.innerHTML = '<span style="color:#c00;">允许目录读取失败：' + escapeHtml((e && e.message) || '网络异常') + '</span>';
                 });
         }
         

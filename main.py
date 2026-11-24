@@ -535,6 +535,127 @@ def _sku_matches(candidate, target):
     return _normalize_sku(candidate) == _normalize_sku(target) and bool(_normalize_sku(target))
 
 
+def _sku_fuzzy_matches(candidate, target):
+    """货号模糊比较：先精确，再「归一化后包含」，满足输入 466 命中 46624 的模糊搜索"""
+    if _sku_matches(candidate, target):
+        return True
+    candidate_norm = _normalize_sku(candidate)
+    target_norm = _normalize_sku(target)
+    if not candidate_norm or not target_norm:
+        return False
+    return target_norm in candidate_norm
+
+
+# ─── 拼音搜索（全拼 / 首字母，中英混排一律可用） ──────────
+# 目标：任何文本类搜索都能用拼音全拼或首字母输入，例如 xiaomi→小米、
+# hongmi→红米、huawei→华为；pypinyin 缺失时退化为内置品牌别名反查，
+# 保证「无中文输入也能搜到中文内容」这条能力在任何环境都不掉线。
+try:
+    from pypinyin import lazy_pinyin as _lazy_pinyin, Style as _PinyinStyle
+    _PINYIN_READY = True
+except ImportError:  # [HANDLED]
+    _lazy_pinyin = None
+    _PinyinStyle = None
+    _PINYIN_READY = False
+    logging.getLogger('main').warning('[Pinyin] 未安装 pypinyin，拼音搜索退化为内置别名反查')
+
+# 多音字/行业词覆盖表：中文词 → (全拼, 首字母)
+# pypinyin 对「国行」默认取 xing，而商品语境读 hang，必须用词表钉死读音；
+# 这张表同时是 pypinyin 缺失时的兜底词库，保证核心品牌与规格词始终可拼音搜索。
+_PINYIN_WORD_OVERRIDES = {
+    '苹果': ('pingguo', 'pg'), '华为': ('huawei', 'hw'), '小米': ('xiaomi', 'xm'),
+    '红米': ('hongmi', 'hm'), '荣耀': ('rongyao', 'ry'), '三星': ('sanxing', 'sx'),
+    '联想': ('lianxiang', 'lx'), '戴尔': ('daier', 'de'), '惠普': ('huipu', 'hp'),
+    '华硕': ('huashuo', 'hs'), '宏碁': ('hongqi', 'hq'), '宏基': ('hongji', 'hj'),
+    '机械革命': ('jixiegeming', 'jxgm'), '神舟': ('shenzhou', 'sz'),
+    '雷神': ('leishen', 'ls'), '微星': ('weixing', 'wx'), '大疆': ('dajiang', 'dj'),
+    '索尼': ('suoni', 'sn'), '佳能': ('jianeng', 'jn'), '尼康': ('nikang', 'nk'),
+    '松下': ('songxia', 'sx'), '魅族': ('meizu', 'mz'), '努比亚': ('nubiya', 'nby'),
+    '真我': ('zhenwo', 'zw'), '一加': ('yijia', 'yj'), '中兴': ('zhongxing', 'zx'),
+    '摩托罗拉': ('motuoluola', 'mtll'), '诺基亚': ('nuojiya', 'njy'),
+    '谷歌': ('guge', 'gg'), '黑鲨': ('heisha', 'hs'), '外星人': ('waixingren', 'wxr'),
+    '手机': ('shouji', 'sj'), '笔记本': ('bijiben', 'bjb'), '平板': ('pingban', 'pb'),
+    '手表': ('shoubiao', 'sb'), '其他': ('qita', 'qt'), '电池': ('dianchi', 'dc'),
+    '成色': ('chengse', 'cs'), '国行': ('guohang', 'gh'), '港版': ('gangban', 'gb'),
+    '美版': ('meiban', 'mb'), '日版': ('riban', 'rb'), '韩版': ('hanban', 'hb'),
+    '行货': ('hanghuo', 'hh'), '水货': ('shuihuo', 'sh'), '靓机': ('liangji', 'lj'),
+    '准新': ('zhunxin', 'zx'), '保修': ('baoxiu', 'bx'), '拆修': ('chaixiu', 'cx'),
+    '白色': ('baise', 'bs'), '黑色': ('heise', 'hs'), '蓝色': ('lanse', 'ls'),
+    '红色': ('hongse', 'hs'), '绿色': ('lvse', 'ls'), '金色': ('jinse', 'js'),
+    '银色': ('yinse', 'ys'), '深空灰': ('shenkonghui', 'skh'), '远峰蓝': ('yuanfenglan', 'yfl'),
+}
+
+
+def _compact_lower(text):
+    """把文本压成「小写 + 只留字母数字」的形态，拼音与原文统一用这套口径比较"""
+    return re.sub(r'[^0-9a-z]', '', str(text or '').lower())
+
+
+def _apply_word_overrides(text, mode='full'):
+    """把多音字/行业词替换成钉死的拼音形态，避免 pypinyin 读音与商品语境不一致"""
+    result = str(text or '')
+    index = 0 if mode == 'full' else 1
+    for cn, forms in _PINYIN_WORD_OVERRIDES.items():
+        if cn in result:
+            result = result.replace(cn, forms[index])
+    return result
+
+
+def _pinyin_full(text):
+    """整段文本转全拼（无分隔、无标点）；非中文字符原样保留，保证中英混排也能匹配"""
+    prepared = _apply_word_overrides(text, 'full')
+    if not _lazy_pinyin:
+        return _compact_lower(prepared)
+    parts = _lazy_pinyin(prepared, errors=lambda chars: list(chars))
+    return _compact_lower(''.join(parts))
+
+
+def _pinyin_initials(text):
+    """整段文本转拼音首字母（如 华为→hw、小米→xm）；非中文字符原样保留"""
+    prepared = _apply_word_overrides(text, 'initials')
+    if not _lazy_pinyin:
+        return ''
+    parts = _lazy_pinyin(prepared, style=_PinyinStyle.FIRST_LETTER,
+                         errors=lambda chars: list(chars))
+    return _compact_lower(''.join(parts))
+
+
+def _pinyin_fallback_forms(text):
+    """pypinyin 不可用时的兜底：只按覆盖词表替换，首字母不做额外猜测"""
+    return _compact_lower(_apply_word_overrides(text, 'full')), ''
+
+
+def _text_search_forms(text):
+    """返回文本的三种比较形态：(原文紧凑, 全拼紧凑, 首字母紧凑)"""
+    raw = _compact_lower(text)
+    if _PINYIN_READY:
+        return raw, _pinyin_full(text), _pinyin_initials(text)
+    full, initials = _pinyin_fallback_forms(text)
+    return raw, full, initials
+
+
+def _pinyin_search_hit(needle, haystack):
+    """拼音模糊命中：needle 的任一形态是 haystack 任一形态的子串即命中
+
+    三种形态互相交叉比较，于是「中文查中文」「拼音查中文」「中文查拼音」
+    「首字母查中文」全部成立，纯拼音输入无需任何中文即可搜索。
+    """
+    needle_forms = [f for f in _text_search_forms(needle) if f]
+    if not needle_forms:
+        return True
+    haystack_forms = [f for f in _text_search_forms(haystack) if f]
+    return any(n in h for n in needle_forms for h in haystack_forms)
+
+
+def _search_forms_text(text):
+    """把文本的三种形态（原文紧凑 / 全拼 / 首字母）拼成空格分隔的一条串
+
+    前端表格本地过滤只能做子串比较，无法调用 pypinyin；把三种形态一次性
+    下发后，中文、数字、英文、全拼、首字母任何正确输入都能 `includes` 命中。
+    """
+    return ' '.join(f for f in _text_search_forms(text) if f)
+
+
 def _product_desc(product):
     """读取商品描述文本（兼容 商品描述/商品名称 两种字段名）"""
     if not isinstance(product, dict):
@@ -583,6 +704,10 @@ def _attach_decoded_images(product):
         )
         product['_category'] = category
         product['_brand'] = _product_brand(desc, category) or _PRODUCT_BRAND_UNKNOWN
+        product['_brand_alias'] = _brand_search_text(product['_brand'], category)
+        product['_search_sku'] = _search_forms_text(product.get('货号') or product.get('stock_number') or '')
+        product['_search_desc'] = _search_forms_text(desc)
+        product['_search_remark'] = _search_forms_text(product.get('备注') or product.get('remark') or '')
     return product
 
 
@@ -1407,8 +1532,13 @@ def safe_execute_func(func: Callable, default: Any = None, context: str = '') ->
     handler = ExceptionHandler()
     return handler.try_execute(func, default, context)
 
-def auto_clean_temp_dir():
-    """检查temp目录大小，超过3MB立即清理所有文件"""
+def auto_clean_temp_dir(force: bool = False):
+    """清理 temp 目录：默认仅在超过 3MB 时清理，force=True 时无条件清空
+
+    force 用于「服务启动 / 优雅退出」两个时点：temp 是一次性工作区，
+    启动前残留的旧脚本与抓包结果没有任何复用价值，留着只会越堆越多；
+    运行中的定时巡检仍走体积阈值，避免误删正在处理的临时 Excel。
+    """
     temp_dir = os.path.join(PROJECT_DIR, 'temp')
     if not os.path.isdir(temp_dir):
         return
@@ -1417,14 +1547,14 @@ def auto_clean_temp_dir():
         fp = os.path.join(temp_dir, f)
         if os.path.isfile(fp):
             temp_size += os.path.getsize(fp)
-    if temp_size > 3 * 1024 * 1024:
+    if force or temp_size > 3 * 1024 * 1024:
         cleaned = 0
         for f in os.listdir(temp_dir):
             fp = os.path.join(temp_dir, f)
             if os.path.isfile(fp):
                 safe_execute_func(lambda: os.remove(fp), context='auto_clean_temp_dir清理')
                 cleaned += 1
-        logger.info(f"[Clean] temp目录超过3MB({temp_size / (1024 * 1024):.1f}MB)，已清理{cleaned}个文件")
+        logger.info(f"[Clean] temp目录{'(强制)' if force else f'超过3MB({temp_size / (1024 * 1024):.1f}MB)'}，已清理{cleaned}个文件")
 
 def safe_execute_with_error(func: Callable, context: str = '') -> Tuple[Any, str]:
     """统一异常处理包装器 - 用于需要获取错误信息的场景"""
@@ -1830,11 +1960,11 @@ def _fetch_media_bytes(url: str) -> Tuple[Optional[bytes], str, str]:
     return data, content_type, ''
 
 
-def _product_media_urls(product_id: str) -> Tuple[List[str], str, str]:
-    """按商品ID取出图片/视频URL列表，返回 (URL列表, 命名来源, 错误信息)"""
+def _product_media_urls(product_id: str) -> Tuple[List[str], str, str, str]:
+    """按商品ID取出图片/视频URL列表，返回 (URL列表, 命名来源, 序列号, 错误信息)"""
     latest_file = _latest_product_json_path()
     if not latest_file:
-        return [], '', '没有找到JSON文件'
+        return [], '', '', '没有找到JSON文件'
     with open(latest_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
     products = data.get('商品列表', []) if isinstance(data, dict) else data
@@ -1847,12 +1977,13 @@ def _product_media_urls(product_id: str) -> Tuple[List[str], str, str]:
             if _sku_matches(p.get('货号') or p.get('stock_number') or '', target_sku)
         ), None)
     if target is None:
-        return [], '', '未找到该商品'
+        return [], '', '', '未找到该商品'
     urls = [u for u in decode_base64_images(target.get('图片') or []) if isinstance(u, str) and u]
     name_source = (str(_product_desc(target) or '').strip()
                    or _normalize_text(target.get('货号') or '')
                    or 'product')
-    return urls[:_MEDIA_MAX_FILES], name_source, ''
+    serial = str(target.get('货号') or target.get('stock_number') or '').strip()
+    return urls[:_MEDIA_MAX_FILES], name_source, serial, ''
 
 
 # ─── 媒体保存目录与商品文件夹命名 ──────────────────────────
@@ -2094,7 +2225,7 @@ _FOLDER_TRIM_CHARS = ' ,，、-/·:：;；\u3000'
 _BRAND_DEFAULT_TABLE = {
     'phone': (
         ('苹果', ('iphone', 'apple', '苹果')),
-        ('华为', ('华为', 'huawei', 'mate', 'pura', 'nova', '畅享', '优畅享')),
+        ('华为', ('华为', 'huawei', 'mate', 'pura', 'nova', 'p90', 'pura90', '畅享', '优畅享')),
         ('荣耀', ('荣耀', 'honor')),
         ('红米', ('红米', 'redmi')),
         ('小米', ('小米', 'xiaomi')),
@@ -2110,14 +2241,14 @@ _BRAND_DEFAULT_TABLE = {
         ('摩托罗拉', ('摩托罗拉', 'motorola')),
         ('诺基亚', ('诺基亚', 'nokia')),
         ('索尼', ('索尼', 'sony', 'xperia')),
-        ('谷歌', ('谷歌', 'pixel')),
+        ('谷歌', ('谷歌', 'google', 'pixel')),
         ('黑鲨', ('黑鲨', 'blackshark')),
     ),
     'laptop': (
         ('苹果', ('macbook', 'imac', 'apple', '苹果')),
         ('联想', ('联想', 'lenovo', 'thinkpad', 'thinkbook', '拯救者', '小新', 'yoga', 'legion')),
         ('戴尔', ('戴尔', 'dell', 'alienware', '外星人')),
-        ('惠普', ('惠普', '光影精灵', '暗影精灵', 'envy')),
+        ('惠普', ('惠普', 'hp', '光影精灵', '暗影精灵', 'envy')),
         ('华硕', ('华硕', 'asus', 'rog', '天选', '灵耀')),
         ('宏碁', ('宏碁', '宏基', 'acer')),
         ('机械革命', ('机械革命', 'mechrevo')),
@@ -2130,6 +2261,8 @@ _BRAND_DEFAULT_TABLE = {
         ('小米', ('小米', 'xiaomi', 'redmibook')),
         ('技嘉', ('技嘉', 'gigabyte')),
         ('七彩虹', ('七彩虹', 'colorful')),
+        ('雷蛇', ('雷蛇', 'razer')),
+        ('东芝', ('东芝', 'toshiba')),
     ),
     'tablet': (
         ('苹果', ('ipad', 'apple', '苹果')),
@@ -2243,12 +2376,20 @@ def _brand_rules() -> dict:
 
 
 def _brand_match_pairs(entries) -> list:
-    """把品牌表展开成 (别名, 品牌) 并按别名长度降序，保证「watch gt」先于「watch」命中"""
+    """把品牌表展开成 (别名, 品牌) 并按别名长度降序，保证「watch gt」先于「watch」命中
+
+    中文别名额外补一份拼音全拼（红米→hongmi、华为→huawei），
+    这样描述里写英文拼音也能识别出品牌，与拼音搜索口径保持一致。
+    """
     pairs = []
     for name, aliases in entries:
         for alias in aliases:
-            if alias:
-                pairs.append((alias, name))
+            if not alias:
+                continue
+            pairs.append((alias, name))
+            pinyin = _pinyin_full(alias)
+            if pinyin and pinyin != alias.lower():
+                pairs.append((pinyin, name))
     pairs.sort(key=lambda item: len(item[0]), reverse=True)
     return pairs
 
@@ -2277,14 +2418,59 @@ def _product_brand(text: str, category: str = '', rules: Optional[dict] = None) 
     return ''
 
 
-def _product_folder_relpath(name_source: str, category: str = '', brand: str = '') -> str:
-    """生成相对保存路径：品类/品牌/商品文件夹名，如 手机/华为/华为Nova 12活力版 电池97%"""
+def _brand_aliases_text(brand: str, category: str = '') -> str:
+    """取某品牌在品牌表里的全部别名（含英文名与中文名），用于品牌搜索的英文/拼音命中
+
+    例如品牌「苹果」返回 `iphone apple 苹果`，于是搜 `apple`、`pingguo`、
+    `pg` 都能命中苹果商品，无需输入中文。
+    """
+    brand = str(brand or '').strip()
+    if not brand:
+        return ''
+    rules = _brand_rules()
+    category_key = {
+        _PRODUCT_CATEGORY_PHONE: 'phone',
+        _PRODUCT_CATEGORY_LAPTOP: 'laptop',
+        _PRODUCT_CATEGORY_TABLET: 'tablet',
+        _PRODUCT_CATEGORY_WATCH: 'watch',
+        _PRODUCT_CATEGORY_SMART: 'other',
+    }.get(category, 'other')
+    keys = [category_key] + [k for k in ('phone', 'laptop', 'tablet', 'watch', 'other')
+                             if k != category_key]
+    for key in keys:
+        aliases = []
+        for name, alias_list in rules.get(key, ()):
+            if name == brand:
+                aliases.extend(alias_list)
+        if aliases:
+            return ' '.join(a for a in aliases if a)
+    return ''
+
+
+def _brand_search_text(brand: str, category: str = '') -> str:
+    """品牌搜索串：品牌名 + 全部别名 + 原文/全拼/首字母三种形态
+
+    前端表格本地过滤只能做子串比较，把三种形态一次性拼进该串，
+    于是 `huawei` / `pingguo` / `pg` / `华为` 都能直接 `includes` 命中。
+    """
+    brand = str(brand or '').strip()
+    if not brand:
+        return ''
+    alias = _brand_aliases_text(brand, category)
+    base = ' '.join(x for x in (brand, alias) if x)
+    forms = [f for f in _text_search_forms(base) if f]
+    return ' '.join([base] + forms)
+
+
+def _product_folder_relpath(name_source: str, category: str = '', brand: str = '',
+                            serial: str = '') -> str:
+    """生成相对保存路径：品类/品牌/商品文件夹名，如 手机/华为/华为Nova 12活力版 电池97%(12345)"""
     text = str(name_source or '').strip()
     if not category:
         category = _product_category(text)
     if not brand:
         brand = _product_brand(text, category) or _PRODUCT_BRAND_UNKNOWN
-    folder = _product_folder_name(text, category)
+    folder = _product_folder_name(text, category, serial)
     return '/'.join((_safe_folder_name(category), _safe_folder_name(brand), folder))
 
 
@@ -2383,6 +2569,24 @@ def _folder_battery_label(text: str) -> str:
     return f'电池{value}%'
 
 
+def _folder_color_label(text: str, rules: Optional[dict] = None) -> str:
+    """提取颜色词，用于手机文件夹命名（型号 + 颜色 + 电池 + 货号）
+
+    取描述里最靠前的颜色词；同位置取最长词（「深空灰」优先于「灰色」）。
+    """
+    source = re.sub(r'\s{2,}', ' ', str(text or ''))
+    lower = source.lower()
+    rules = rules or _folder_rules()
+    hits = []
+    for word in rules.get('color', ()):
+        pos = lower.find(word)
+        if pos >= 0:
+            hits.append((pos, -len(word), word))
+    if not hits:
+        return ''
+    return min(hits)[2]
+
+
 _CATEGORY_KEY_TO_NAME = {
     'watch': _PRODUCT_CATEGORY_WATCH,
     'tablet': _PRODUCT_CATEGORY_TABLET,
@@ -2404,6 +2608,8 @@ def _product_category(text: str, rules: Optional[dict] = None, model: str = '') 
             return _CATEGORY_KEY_TO_NAME[key]
     if any(kw in lower for kw in rules['phone']):
         return _PRODUCT_CATEGORY_PHONE
+    if not model:
+        model = _pretty_model(_folder_model(text, rules))
     if model and re.match(_FOLDER_BARE_APPLE_RE, str(model).strip(), re.IGNORECASE) \
             and re.search(_FOLDER_BATTERY_RE, str(text or '')):
         return _PRODUCT_CATEGORY_PHONE
@@ -2415,17 +2621,28 @@ def _is_phone_text(text: str, rules: Optional[dict] = None, model: str = '') -> 
     return _product_category(text, rules, model) == _PRODUCT_CATEGORY_PHONE
 
 
-def _product_folder_name(name_source: str, category: Optional[str] = None) -> str:
-    """按商品描述生成商品文件夹名：手机=型号+电池，其它品类=型号"""
+def _product_folder_name(name_source: str, category: Optional[str] = None, serial: str = '') -> str:
+    """按商品描述生成商品文件夹名：手机=型号+颜色+电池+(货号)，其它品类=型号
+
+    手机把颜色与电池一起带上，并把货号作为序列号跟在电池后面，
+    如「17 Pro Max 橙色 电池91%(71028)」「苹果17 白色 电池100%(65092)」，
+    同一型号不同颜色/不同电池/不同机器因此天然不撞名，也便于人工按货号核对。
+    """
     text = str(name_source or '').strip()
     rules = _folder_rules()
     model = _pretty_model(_folder_model(text, rules))
     if category is None:
         category = _product_category(text, rules, model)
     if category == _PRODUCT_CATEGORY_PHONE:
+        color = _folder_color_label(text, rules)
+        if color:
+            model = f'{model} {color}'.strip()
         battery = _folder_battery_label(text)
         if battery:
             model = f'{model} {battery}'.strip()
+        serial = _safe_folder_name(str(serial or '').strip())
+        if serial and serial != 'product':
+            model = f'{model}({serial})'
     return _safe_folder_name(model or text)
 
 
@@ -2460,9 +2677,11 @@ def _resolve_product_folder(base_dir: str, folder_name: str, product_id: str) ->
     return os.path.join(base_dir, rel_dir, tail) if rel_dir else os.path.join(base_dir, tail)
 
 
-def _prepare_product_folder(product_id: str, name_source: str) -> Tuple[str, str]:
+def _prepare_product_folder(product_id: str, name_source: str, serial: str = '') -> Tuple[str, str]:
     """创建并返回商品保存目录（品类/品牌/文件夹名），返回 (目录, 错误信息)"""
-    folder = _resolve_product_folder(_get_download_dir(), _product_folder_relpath(name_source), product_id)
+    folder = _resolve_product_folder(
+        _get_download_dir(), _product_folder_relpath(name_source, serial=serial), product_id
+    )
     try:
         os.makedirs(folder, exist_ok=True)
         marker = os.path.join(folder, _PRODUCT_FOLDER_MARKER)
@@ -2476,7 +2695,7 @@ def _prepare_product_folder(product_id: str, name_source: str) -> Tuple[str, str
 
 def _save_media_files(product_id: str, indexes: Optional[List[int]] = None):
     """下载商品媒体并保存到默认目录，返回 (成功列表, 失败列表, 保存目录, 错误信息)"""
-    media_urls, name_source, err = _product_media_urls(product_id)
+    media_urls, name_source, serial, err = _product_media_urls(product_id)
     if err:
         return [], [], '', err
     if not media_urls:
@@ -2484,7 +2703,7 @@ def _save_media_files(product_id: str, indexes: Optional[List[int]] = None):
     total = len(media_urls)
     if indexes is None:
         indexes = list(range(total))
-    folder, folder_err = _prepare_product_folder(product_id, name_source)
+    folder, folder_err = _prepare_product_folder(product_id, name_source, serial)
     if folder_err:
         return [], [], '', folder_err
     saved, failed = [], []
@@ -2512,7 +2731,7 @@ def _save_media_files(product_id: str, indexes: Optional[List[int]] = None):
 
 def _product_media_list_payload(product_id: str):
     """返回 (媒体URL, 命名来源, 预览保存目录, 品类, 品牌, 错误)，供清单接口展示保存位置"""
-    media_urls, name_source, err = _product_media_urls(product_id)
+    media_urls, name_source, serial, err = _product_media_urls(product_id)
     if err or not media_urls:
         return media_urls, name_source, '', '', '', err
     rules = _folder_rules()
@@ -2520,7 +2739,7 @@ def _product_media_list_payload(product_id: str):
     category = _product_category(name_source, rules, model)
     brand = _product_brand(name_source, category) or _PRODUCT_BRAND_UNKNOWN
     folder = _resolve_product_folder(
-        _get_download_dir(), _product_folder_relpath(name_source, category, brand), product_id
+        _get_download_dir(), _product_folder_relpath(name_source, category, brand, serial), product_id
     )
     return media_urls, name_source, folder, category, brand, ''
 
@@ -5163,7 +5382,13 @@ async def lifespan(app):
         logger.info("[crash_protection] ✅ 资源监控线程已启动（内存清理间隔 %ds）", _MEMORY_CLEANUP_INTERVAL)
         log_print(f"[crash_protection] ✅ 资源监控线程已启动（内存清理间隔 {_MEMORY_CLEANUP_INTERVAL}s）")
 
+    # 启动前强制清空 temp（一次性工作区，启动即归零）
+    auto_clean_temp_dir(force=True)
+
     yield
+
+    # 退出前强制清空 temp，保证仓库目录不留一次性产物
+    auto_clean_temp_dir(force=True)
 
     watchdog_task.cancel()
     logger.info("[shutdown] 清理子进程资源...")
@@ -5441,6 +5666,7 @@ _SENSITIVE_LIMIT_RULES = (
     ('/api/bootstrap', 'bootstrap', 60, 60),
     ('/api/security/encrypt-init', 'encrypt-init', 10, 60),
     ('/api/security/', 'security-scan', 6, 60),
+    ('/api/clean/allowed-roots', 'clean-roots', 120, 60),
     ('/api/clean/', 'clean', 30, 60),
     ('/api/email/', 'email', 10, 60),
     ('/api/server/info', 'server-info', 60, 60),
@@ -10274,8 +10500,14 @@ def graceful_shutdown():
     
     # 2. 关闭数据库连接（如果有）
     # 这里可以添加数据库连接池的关闭逻辑
-    
-    # 3. 刷新日志
+
+    # 3. 强制清空 temp 目录（一次性工作区，退出即归零）
+    try:
+        auto_clean_temp_dir(force=True)
+    except Exception as e:  # [HANDLED]
+        _module_logger.debug(f"temp 清理失败: {type(e).__name__}: {e}")
+
+    # 4. 刷新日志
     try:
         logging.shutdown()
     except Exception:
@@ -12548,6 +12780,10 @@ if __name__ == '__main__':
                     )
                     p['_category'] = category
                     p['_brand'] = _product_brand(desc, category) or _PRODUCT_BRAND_UNKNOWN
+                    p['_brand_alias'] = _brand_search_text(p['_brand'], category)
+                    p['_search_sku'] = _search_forms_text(sku)
+                    p['_search_desc'] = _search_forms_text(desc)
+                    p['_search_remark'] = _search_forms_text(p.get('备注') or p.get('remark') or '')
 
                 _assign_product_ids(products)
 
@@ -13110,6 +13346,19 @@ if __name__ == '__main__':
                                     media_result = [img_data]
                             p['图片'] = media_result
                             return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
+                    fuzzy_products = [p for p in products if _sku_fuzzy_matches(p.get('货号'), sku)]
+                    if not fuzzy_products:
+                        fuzzy_products = [p for p in products if _pinyin_search_hit(sku, _product_desc(p))]
+                    if fuzzy_products:
+                        for p in fuzzy_products:
+                            _attach_decoded_images(p)
+                        return jsonify({
+                            'found': True,
+                            'products': fuzzy_products[:50],
+                            'total': len(fuzzy_products),
+                            'filename': os.path.basename(latest_file),
+                            'search_fallback': 'fuzzy'
+                        })
                     safe_log(logger, 'warning', '[search_product] 货号搜索未命中 货号={s} 文件={f}',
                              s=sku, f=os.path.basename(latest_file or ''))
                     return jsonify({'found': False, 'error': f'未找到货号为 {sku} 的商品'})
@@ -13120,7 +13369,7 @@ if __name__ == '__main__':
                     partial_products = []
                     for p in products:
                         stored_desc = _normalize_text(_product_desc(p)).lower()
-                        if not target_keyword or target_keyword not in stored_desc:
+                        if not _pinyin_search_hit(sku, _product_desc(p)):
                             continue
                         _attach_decoded_images(p)
                         if stored_desc == target_keyword:
@@ -13194,14 +13443,12 @@ if __name__ == '__main__':
                     return jsonify({'found': False, 'error': f'未找到价格在 {range_desc} 范围内的商品'})
 
                 elif search_type == 'brand':
-                    target_keyword = _normalize_text(sku).lower()
                     for p in products:
                         _attach_decoded_images(p)
                         brand = str(p.get('_brand', '') or '')
                         category = str(p.get('_category', '') or '')
-                        haystack = f'{category}/{brand}'.lower()
-                        if target_keyword and target_keyword not in brand.lower() \
-                                and target_keyword not in haystack:
+                        haystack = f'{category}/{brand} {_brand_aliases_text(brand, category)}'
+                        if not _pinyin_search_hit(sku, haystack):
                             continue
                         matched_products.append(p)
                     if matched_products:
@@ -13217,10 +13464,9 @@ if __name__ == '__main__':
                     return jsonify({'found': False, 'error': f'未找到品牌为 "{sku}" 的商品'})
 
                 elif search_type == 'remark':
-                    target_keyword = _normalize_text(sku).lower()
                     for p in products:
-                        remark_text = _normalize_text(p.get('备注', '') or p.get('remark', '')).lower()
-                        if not target_keyword or target_keyword not in remark_text:
+                        remark_text = str(p.get('备注', '') or p.get('remark', ''))
+                        if not _pinyin_search_hit(sku, remark_text):
                             continue
                         images = p.get('图片', [])
                         p['图片'] = decode_base64_images(images) if images else []
