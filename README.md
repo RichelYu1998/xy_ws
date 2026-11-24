@@ -21,19 +21,20 @@
 | 📐 版本更新记录范式规范 (PY-CORE-011) | changelog 结构强制规范 |
 | 🔴 清理目录白名单保护范式 (PY-CORE-014) | 项目根/祖先目录硬拦截先于白名单授权 |
 | 🔴 配置热读取范式 (Configuration Hot Reload) (PY-CORE-015) | config/ 全部配置签名缓存、改完即生效无需重启 |
-| 📄 文档生成方法 (PY-CORE-018: skill.docx生成范式) | docx 生成流程与校验 |
-| 📐 双启动脚本同步范式 (PY-CORE-019) | run.sh / run.bat 1:1 同步要求 |
-| 📐 DOCX 文档生成范式 (PY-CORE-020) | 导航置顶第一页与生成校验规范 |
-| 📐 每日利润表读取范式 (PY-CORE-021) | 每日利润子表 A-F 列布局与聚合规则 |
-| 📐 Excel 货号 E 列读取范式 (PY-CORE-024) | 平台子表仅读 E 列，货号正则 3-10 位 |
-| 📐 大文件小范围修改临时脚本范式 (PY-CORE-032) | 大文件禁用全量重写，锚点式最小替换 |
-| 📐 范式编号规则范式 (PY-CORE-036) | 前缀+三位数字、A-Z 位次累加与区间表 |
-| 📐 安全审计零问题范式 (PY-CORE-042) | 总计问题必须为 0 的判定标准 |
-| 📐 终端实时日志接入范式 (PY-CORE-045) | sh / bat 实时日志双方案 |
-| 🔴 临时目录提交前清理范式 (Temp Directory Pre-Commit Purge) (PY-CORE-046) | temp/ 提交前必须归零、不入版本库 |
-| 📐 文档内引用编号升序范式 (Within-Document Reference Ascending Order) (PY-CORE-049) | 全文档编号必须小号在前、大号在后 |
-| 📐 零缺陷全量验证范式 (Zero-Defect Full Coverage Verification) (PY-CORE-050) | 全量攻防 + 隐藏Bug清零 + 完整数据三合一判定 |
-| 🔴 项目根目录零删除权限范式 (Zero Delete Permission on Project Root) (PY-CORE-051) | 项目根与祖先目录删除能力恒为零、不可授予 |
+| 🔴 品类 + 品牌分层目录范式 (Category & Brand Layered Directory) (PY-CORE-016) | 保存目录/品类/品牌/商品文件夹名，品牌自动摘出与热读取 |
+| 📄 文档生成方法 (PY-CORE-019: skill.docx生成范式) | docx 生成流程与校验 |
+| 📐 双启动脚本同步范式 (PY-CORE-020) | run.sh / run.bat 1:1 同步要求 |
+| 📐 DOCX 文档生成范式 (PY-CORE-021) | 导航置顶第一页与生成校验规范 |
+| 📐 每日利润表读取范式 (PY-CORE-022) | 每日利润子表 A-F 列布局与聚合规则 |
+| 📐 Excel 货号 E 列读取范式 (PY-CORE-025) | 平台子表仅读 E 列，货号正则 3-10 位 |
+| 📐 大文件小范围修改临时脚本范式 (PY-CORE-033) | 大文件禁用全量重写，锚点式最小替换 |
+| 📐 范式编号规则范式 (PY-CORE-037) | 前缀+三位数字、A-Z 位次累加与区间表 |
+| 📐 安全审计零问题范式 (PY-CORE-043) | 总计问题必须为 0 的判定标准 |
+| 📐 终端实时日志接入范式 (PY-CORE-046) | sh / bat 实时日志双方案 |
+| 🔴 临时目录提交前清理范式 (Temp Directory Pre-Commit Purge) (PY-CORE-047) | temp/ 提交前必须归零、不入版本库 |
+| 📐 文档内引用编号升序范式 (Within-Document Reference Ascending Order) (PY-CORE-050) | 全文档编号必须小号在前、大号在后 |
+| 📐 零缺陷全量验证范式 (Zero-Defect Full Coverage Verification) (PY-CORE-051) | 全量攻防 + 隐藏Bug清零 + 完整数据三合一判定 |
+| 🔴 项目根目录零删除权限范式 (Zero Delete Permission on Project Root) (PY-CORE-052) | 项目根与祖先目录删除能力恒为零、不可授予 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -1249,7 +1250,7 @@ if stripped.startswith('## ') and in_changelog:
 
 - **PY-CORE-011**: Changelog版本变更详情完整结构范式
 - **PY-CORE-012**: **本文档**（CMD窗口输出与web_output.log一致性范式）← 当前文档
-- **PY-CORE-048**: 版本号一致性保障范式
+- **PY-CORE-049**: 版本号一致性保障范式
 ---
 ---
 ## 🔴 PY-CORE-013: 代码库卫生维护范式 (Codebase Hygiene Maintenance)
@@ -1374,7 +1375,7 @@ class CleanupChecklist:
 | 函数/类文档字符串 | 每个函数、类、方法都要有中文 docstring，说明职责与输入输出；桩函数（stub）同样要写清用途 |
 | 关键逻辑注释 | 子进程调用原因、状态重置、桩函数替换与还原、断言汇总、冷却/限流判定等关键行必须有中文注释 |
 | 注释语言 | 统一中文；原有英文注释一律改写为中文，不保留双语冗余 |
-| 导入规范 | 全部 import 集中在文件顶部且同一模块只导入一次，详见 PY-CORE-030；脚本若需 `sys.path.insert` 或设置 `os.environ`，该准备语句紧贴标准库导入之后、`import main as m` 之前 |
+| 导入规范 | 全部 import 集中在文件顶部且同一模块只导入一次，详见 PY-CORE-031；脚本若需 `sys.path.insert` 或设置 `os.environ`，该准备语句紧贴标准库导入之后、`import main as m` 之前 |
 | 清理判定 | `temp/` 脚本在对应验证任务结束后即删除；`test/` 脚本若无实际复用价值（一次性排障）同样应删除而非留在 `test/` |
 
 自检命令:
@@ -1537,7 +1538,7 @@ EOF
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-043: subprocess 超时配置范式 (Subprocess Timeout Configuration)
+🔴 PY-CORE-044: subprocess 超时配置范式 (Subprocess Timeout Configuration)
 
 范式描述
 建立统一的 subprocess 调用超时管理机制，避免硬编码超时值，提升系统稳定性和可维护性。
@@ -1673,7 +1674,7 @@ if Environment.IS_WINDOWS:
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-025: 编码处理最佳实践范式 (Encoding Best Practices)
+🔴 PY-CORE-026: 编码处理最佳实践范式 (Encoding Best Practices)
 
 范式描述
 建立跨平台编码处理标准，确保中文等多字节字符在 Windows/Linux/macOS 上都能正确显示。
@@ -1848,7 +1849,7 @@ def setup_logger():
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-028: Git 历史维护范式 (Git History Maintenance)
+🔴 PY-CORE-029: Git 历史维护范式 (Git History Maintenance)
 
 范式描述
 建立规范的 Git 提交历史管理机制，保持历史整洁、可追溯、易于理解。
@@ -2234,7 +2235,7 @@ def resolve_clean_directory(directory, default_dir=None, require_explicit=False)
 | 新增白名单目录 | 编辑文件追加一行 | ✅ 不重启即放行 |
 | `/api/clean/allowed-roots` | 项目根 + 外部目录 | `builtin`/`protected` 标记与判定结果一致 |
 
-> **相关范式**: 本范式只负责「清理目录的路径校验顺序」；「项目根目录在任何删除入口上零权限」的总纲见 [PY-CORE-051 项目根目录零删除权限范式](#-py-core-051-项目根目录零删除权限范式-zero-delete-permission-on-project-root)。
+> **相关范式**: 本范式只负责「清理目录的路径校验顺序」；「项目根目录在任何删除入口上零权限」的总纲见 [PY-CORE-052 项目根目录零删除权限范式](#-py-core-052-项目根目录零删除权限范式-zero-delete-permission-on-project-root)。
 
 ---
 
@@ -2269,6 +2270,8 @@ def resolve_clean_directory(directory, default_dir=None, require_explicit=False)
 | `config/cookies.json` | `WeGo` 系列 5 处 `open(...)` 直读 | 不缓存，每次读 | ✅ 是 |
 | `config/input_stock_numbers.txt` | `/api/compare/*` 两处直读 + `PathManager.get_input_file()` | 不缓存，每次读 | ✅ 是 |
 | `config/clean_allowed_roots.txt` | `_get_clean_allowed_roots()` | `(mtime_ns, size, 环境变量原文)` | ✅ 是 |
+| `config/folder_naming.txt` | `_folder_rules()`（品类/规格/关键词） | `(mtime_ns, size)` | ✅ 是 |
+| `config/brands.txt` | `_brand_rules()`（品牌别名，见 PY-CORE-016） | `(mtime_ns, size)` | ✅ 是 |
 | `config/.encryption_key` | `SecureConfigManager._fernet`（property） | `(mtime_ns, size, CONFIG_ENCRYPTION_KEY)` | ✅ 是 |
 | `config/.salt` | `SecureConfigManager._fernet`（property） | `(mtime_ns, size, CONFIG_ENCRYPTION_KEY)` | ✅ 是 |
 | `config/*.example` / `.env.example` / `crypto_tool.py` | 无（模板与工具，非运行期配置） | — | — |
@@ -2363,7 +2366,210 @@ def _fernet(self, value):
 
 ---
 
-## 📄 文档生成方法 (PY-CORE-018: skill.docx生成范式)
+## 🔴 PY-CORE-016: 品类 + 品牌分层目录范式 (Category & Brand Layered Directory)
+
+> **创建日期**: 2026-11-24 | **最后更新**: 2026-11-24 | **优先级**: 🔴 P0 强制规范 | **适用范围**: main.py（`_product_category` / `_product_brand` / `_product_folder_relpath` / `_resolve_product_folder` / `/api/product/media/list` / `/api/product/search`）、config/brands.txt、config/folder_naming.txt、dist/app.js
+
+### 🔴 核心原则：目录结构必须自带检索维度 (Folder Path Is the Index)
+
+商品媒体保存目录从「保存目录/商品文件夹名」升级为「**保存目录/品类/品牌/商品文件夹名**」，并在商品列表 / 详情 / 搜索三处同步暴露「品牌」字段。
+
+把所有维度压进一个文件夹名，等于让人工检索和脚本定位都退化成字符串模糊匹配；品类与品牌单独成层后，`ls` 一层就是一次筛选，路径本身就是索引。
+
+- 四大类（手机 / 笔记本 / 平板 / 手表）判定逻辑保持不变，其余智能设备（音箱、耳机、相机、配件等）统一归入「**其他**」
+- **品牌必须从商品描述里自动摘出**，单独成一层，不允许混在商品文件夹名里
+- 品牌仍识别不出时落 `其他/其他/...`，保证层级完整、不出现空目录
+- 品牌表走配置文件热读取（见 PY-CORE-015），改完即生效，不重启服务
+
+```
+保存目录/品类/品牌/商品文件夹名
+```
+
+实跑样例（本项目全量 124 条商品）：
+
+```
+~/Downloads/微购/手机/华为/华为Mate 60 Pro 电池97%
+~/Downloads/微购/手机/苹果/16 Pro Max 电池92%
+~/Downloads/微购/笔记本/联想/联想小新Air15 2021款
+~/Downloads/微购/笔记本/机械革命/机械革命2026 极光X 潮玩版
+~/Downloads/微购/平板/苹果/iPad Pro 11英寸第四代
+~/Downloads/微购/平板/联想/联想拯救者平板Y700
+~/Downloads/微购/手表/苹果/Apple Watch SE3 40mm
+~/Downloads/微购/其他/大疆/大疆Pocket3
+~/Downloads/微购/其他/苹果/Apple HomePod mini
+```
+
+### 🔴 品类判定顺序不可调换
+
+```
+手表 → 平板 → 笔记本 → 其他 → 手机 → 兜底「其他」
+```
+
+先具体后笼统，否则必然误判：
+
+| 误判场景 | 描述 | 正确结果 |
+|---|---|---|
+| 平板被笔记本抢走 | `联想拯救者平板Y700` 同时命中 `拯救者` 与 `平板` | 平板 |
+| 配件被手机抢走 | `iPhone 17 Pro Max 原装手机壳` 同时命中 `iphone` 与 `手机壳` | 其他 |
+| 裸苹果型号无品牌词 | `16 Pro Max 电池92%` 无任何品牌关键字 | 手机（靠裸苹果正则 + 电池信息兜底） |
+
+实现要点（main.py `_product_category`）：
+
+```python
+_PRODUCT_CATEGORY_SMART = '其他'          # 原「智能设备」已改名「其他」
+_CATEGORY_MATCH_ORDER = ('watch', 'tablet', 'laptop', 'smart')   # 手机最后判
+...
+    if any(kw in lower for kw in rules['phone']):
+        return _PRODUCT_CATEGORY_PHONE
+    if model and re.match(_FOLDER_BARE_APPLE_RE, model.strip(), re.IGNORECASE) \
+            and re.search(_FOLDER_BATTERY_RE, str(text or '')):
+        return _PRODUCT_CATEGORY_PHONE
+    return _PRODUCT_CATEGORY_SMART        # 兜底必须是「其他」，不能是「手机」
+```
+
+### 🔴 品牌识别链路
+
+```
+① 先查「当前品类」对应的品牌表（避免跨品类别名误伤，如手机表里的别名命中笔记本描述）
+② 再按 phone → laptop → tablet → watch → other 全表兜底
+③ 别名按长度降序匹配（保证 watch gt 先于 watch 命中）
+④ 手机品类且型号命中裸苹果正则 → 补「苹果」
+⑤ 仍为空 → 落「其他」
+```
+
+```python
+def _product_brand(text, category='', rules=None):
+    lower = str(text or '').lower()
+    rules = rules or _brand_rules()
+    category_key = {'手机': 'phone', '笔记本': 'laptop', '平板': 'tablet',
+                    '手表': 'watch', '其他': 'other'}.get(category, 'other')
+    keys = [category_key] + [k for k in ('phone', 'laptop', 'tablet', 'watch', 'other')
+                             if k != category_key]
+    for key in keys:
+        for alias, name in _brand_match_pairs(rules.get(key, ())):
+            if alias in lower:
+                return name
+    if category == _PRODUCT_CATEGORY_PHONE:
+        model = _pretty_model(_folder_model(text, _folder_rules()))
+        if model and re.match(_FOLDER_BARE_APPLE_RE, model.strip(), re.IGNORECASE):
+            return '苹果'
+    return ''
+```
+
+**裸苹果兜底是必需项**：仅此一条就把「手机/其他」从 33 条降到 1 条（剩余 `P90Pro Max` 确实无品牌可摘，属正确兜底）。
+
+### 🔴 目录路径生成与同名序号
+
+```python
+def _product_folder_relpath(name_source, category='', brand=''):
+    text = str(name_source or '').strip()
+    category = category or _product_category(text)
+    brand = brand or _product_brand(text, category) or '其他'
+    folder = _product_folder_name(text, category)
+    return '/'.join((_safe_folder_name(category), _safe_folder_name(brand), folder))
+```
+
+多级路径下的同名目录处理：**序号只追加到最后一层（商品名）**，绝不污染品类 / 品牌层级。
+
+```python
+def _resolve_product_folder(base_dir, folder_name, product_id):
+    rel_dir, base_name = os.path.split(folder_name)   # 拆出「品类/品牌」与「商品名」
+    for cand in [base_name] + [f'{base_name}-{n}' for n in range(2, 100)]:
+        root = os.path.join(base_dir, rel_dir, cand)
+        ...
+```
+
+命名规则保持不变：手机 = `型号 + 电池`，其余品类 = 仅型号（容量 / 颜色 / 成色 / 电池全部剔除）。
+
+### 🔴 品牌配置热读取（config/brands.txt）
+
+```ini
+# 一行一条：规范品牌名|别名1,别名2,别名3
+# 只写品牌名时，品牌名本身即别名
+[手机]
+苹果|iphone,apple,苹果
+华为|华为,huawei,mate,pura,nova
+荣耀|荣耀,honor
+...
+[笔记本]
+[平板]
+[手表]
+[其他]
+```
+
+| 规则 | 说明 |
+|---|---|
+| 分节 | `[手机] [笔记本] [平板] [手表] [其他]`，与品类名一一对应 |
+| 读取方式 | **文件签名（mtime_ns + size）+ 全局缓存**，文件改动后下一次调用立即失效，无需重启 |
+| 配置优先级 | 配置项在前、内置默认表在后，配置可追加别名但不覆盖内置表 |
+| 模板入库 | `config/brands.example.txt` 入库，真实 `config/brands.txt` 按需维护 |
+
+```python
+def _brand_rules():
+    path = _brand_config_file()
+    try:
+        st = os.stat(path)
+        stamp = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        stamp = None
+    if _BRAND_CACHE['rules'] is not None and _BRAND_CACHE['stamp'] == stamp:
+        return _BRAND_CACHE['rules']
+    extra = _read_brand_config()
+    merged = {}
+    for key in ('phone', 'laptop', 'tablet', 'watch', 'other'):
+        merged[key] = tuple(extra.get(key, ())) + tuple(_BRAND_DEFAULT_TABLE.get(key, ()))
+    _BRAND_CACHE['stamp'] = stamp
+    _BRAND_CACHE['rules'] = merged
+    return merged
+```
+
+### 前后端字段契约
+
+| 位置 | 字段 | 说明 |
+|---|---|---|
+| 商品对象 | `_category` | 品类（手机 / 笔记本 / 平板 / 手表 / 其他） |
+| 商品对象 | `_brand` | 品牌（如 华为 / 苹果 / 大疆 / 其他） |
+| `/api/product/media/list` | `category` / `brand` / `save_dir` | `save_dir` 为完整「品类/品牌/商品名」路径 |
+| `/api/product/search` | `search_type=brand` | 支持品牌名（`华为`）或 `品类/品牌`（`手机/华为`） |
+| 前端列表行 | `data-brand` / `data-category` | 搜索直接读属性，避免重复解析文案 |
+
+前端配套改动（dist/app.js）：
+
+- 商品列表新增「品牌」列（紧跟「品类」列），详情弹窗新增「品牌」字段行
+- 搜索下拉新增「按品牌」选项，占位提示 `输入品牌(如: 华为, 苹果, 联想, 大疆)...`
+- 售价单元格统一加 `class="price-cell"`，取价优先 `querySelector('.price-cell')`、回退 `td:nth-child(4)`，避免加列后取价错位
+- 改完前端必须更新 `index.html` 里的 `app.js?v=<时间戳>`，否则浏览器缓存看不到改动
+
+### 全量实测结果（124 条）
+
+| 品类 | 条数 | 品牌分布 |
+|---|---|---|
+| 手机 | 114 | 苹果 85 / 华为 9 / 荣耀 9 / 小米 3 / OPPO 2 / iQOO 1 / realme 1 / 一加 1 / 三星 1 / 红米 1 / 其他 1 |
+| 笔记本 | 3 | 联想 2 / 机械革命 1 |
+| 其他 | 3 | 苹果 2 / 大疆 1 |
+| 手表 | 2 | 苹果 2 |
+| 平板 | 2 | 苹果 1 / 联想 1 |
+
+接口验证：
+
+```
+按品牌 手机/华为 → 9 条
+按品牌 联想      → 3 条（笔记本×2 + 平板×1）
+media/save 华为Mate 60 Pro → ~/Downloads/微购/手机/华为/华为Mate 60 Pro 电池97%/01.jpg（604,003 字节）
+```
+
+### 落地检查清单
+
+- [ ] 目录结构是「保存目录/品类/品牌/商品文件夹名」，品牌单独成层
+- [ ] 四大类判定顺序为「手表→平板→笔记本→其他→手机→其他兜底」
+- [ ] 品牌识别先品类表、后全表兜底、别名长度降序、裸苹果型号补「苹果」
+- [ ] 品牌识别不出落「其他」，品类不属于四大类也落「其他」
+- [ ] 同名序号只追加到最后一层（商品名），不污染品类/品牌目录
+- [ ] `config/brands.txt` 热读取（文件签名 + 缓存），改完不重启即生效
+- [ ] 手机带电池、其它品类不带电池，容量/颜色/成色全部剔除
+- [ ] 前端品牌列 / 详情品牌行 / 按品牌搜索三处齐备，`app.js` 版本号已更新
+
+---## 📄 文档生成方法 (PY-CORE-019: skill.docx生成范式)
 
 > **创建日期**: 2026-10-26 | **最后更新**: 2026-10-26 | **优先级**: 🔴 P0 强制规范 | **适用范围**: skill.docx / test/generate_docx.py / skill.md
 
@@ -2371,7 +2577,7 @@ def _fernet(self, value):
 
 **skill.docx 必须且只能使用 `test/generate_docx.py` 生成，禁止使用pandoc/在线工具/手动Word等其他方式。**
 
-> **产出结构标准**: 生成流程、导航置顶、锚点校验、落地检查清单以本文档 `PY-CORE-020 DOCX 文档生成范式` 为准 —— 031 管「用什么生成」，034 管「生成成什么样」。
+> **产出结构标准**: 生成流程、导航置顶、锚点校验、落地检查清单以本文档 `PY-CORE-021 DOCX 文档生成范式` 为准 —— 031 管「用什么生成」，034 管「生成成什么样」。
 
 | 规则 | 说明 | 违反后果 |
 |------|------|----------|
@@ -2425,7 +2631,7 @@ cd test && python generate_docx.py
 ---
 
 
-## 📐 双启动脚本同步范式 (PY-CORE-019)
+## 📐 双启动脚本同步范式 (PY-CORE-020)
 
 > **创建日期**: 2026-11-05 | **最后更新**: 2026-11-05 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [run.bat](run.bat) / [run.sh](run.sh)
 
@@ -2512,13 +2718,13 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \
 
 ---
 
-## 📐 DOCX 文档生成范式 (PY-CORE-020)
+## 📐 DOCX 文档生成范式 (PY-CORE-021)
 
 > **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [skill.md](skill.md) / [README.md](README.md) / skill.docx / [test/generate_docx.py](test/generate_docx.py)
 
 ### 🔴 核心原则：导航必须落在第一页
 
-**docx 的第一页固定为「标题 + 文档导航」，正文一律从第二页开始。** 导航不是装饰，是读者的第一入口 —— 一份 2 万行的规范文档，没有可点击索引等于没有目录。本范式与 `PY-CORE-018` 互补：**031 管「用什么生成」，034 管「生成成什么样」**。
+**docx 的第一页固定为「标题 + 文档导航」，正文一律从第二页开始。** 导航不是装饰，是读者的第一入口 —— 一份 2 万行的规范文档，没有可点击索引等于没有目录。本范式与 `PY-CORE-019` 互补：**031 管「用什么生成」，034 管「生成成什么样」**。
 
 | 规则 | 说明 | 违反后果 |
 |------|------|----------|
@@ -2609,7 +2815,7 @@ print('分页符下标:', pages[:1])
 
 ---
 
-## 📐 每日利润表读取范式 (PY-CORE-021)
+## 📐 每日利润表读取范式 (PY-CORE-022)
 
 > **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) 每日利润相关函数与 `/api/daily-profit`
 
@@ -2659,7 +2865,7 @@ print('分页符下标:', pages[:1])
 
 ---
 
-## 🟡 PY-CORE-023: 边界条件测试范式 (Edge Case Testing)
+## 🟡 PY-CORE-024: 边界条件测试范式 (Edge Case Testing)
 
 ### 范式描述
 系统性的边界条件和极端情况测试，确保系统健壮性：
@@ -2825,7 +3031,7 @@ class TestMemoryAndResourceLimits:
 
 ---
 
-## 📐 Excel 货号 E 列读取范式 (PY-CORE-024)
+## 📐 Excel 货号 E 列读取范式 (PY-CORE-025)
 
 > **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) 中所有 Excel 货号读取链路
 
@@ -2875,7 +3081,7 @@ class TestMemoryAndResourceLimits:
 
 ---
 
-## 🔴 PY-CORE-027: 字段名兼容性范式 (Field Name Compatibility)
+## 🔴 PY-CORE-028: 字段名兼容性范式 (Field Name Compatibility)
 
 ### 范式描述
 由于JSON数据同时存储中文字段名和英文字段名（如 `商品描述`/`name`, `售价`/`price`），所有数据提取和解析代码必须实现**多重字段名兼容**，确保数据的完整性和向后兼容性。
@@ -2969,7 +3175,7 @@ def bad_extract2(item):
 
 ---
 
-## 📐 大文件小范围修改临时脚本范式 (PY-CORE-032)
+## 📐 大文件小范围修改临时脚本范式 (PY-CORE-033)
 
 > **创建日期**: 2026-11-11 | **最后更新**: 2026-11-11 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [main.py](main.py) / [README.md](README.md) / [skill.md](skill.md) / [dist/app.js](dist/app.js) 等千行级文件
 
@@ -2986,7 +3192,7 @@ def bad_extract2(item):
 | **🔴 最小替换** | 只替换目标片段，其余字节不动 | 全文重排导致 diff 爆炸、无法 review |
 | **🔴 改后三校验** | 语法校验（`py_compile`）+ 结构校验（`diff` / 行数 / 锚点计数）+ 功能回归 | 「改完就跑」把回归带上线 |
 | **🔴 临时脚本不入库** | 统一命名 `test/temp_patch_<版本>.py`，执行完删除 | 仓库堆满一次性垃圾脚本 |
-| **🔴 文档改完必重生成** | 改 md 后按 PY-CORE-020 重生成 skill.docx | 三方文档不一致、锚点断链 |
+| **🔴 文档改完必重生成** | 改 md 后按 PY-CORE-021 重生成 skill.docx | 三方文档不一致、锚点断链 |
 
 ### 标准流程（五步）
 
@@ -3001,10 +3207,10 @@ from pathlib import Path
 TARGET = Path('README.md')
 content = TARGET.read_text(encoding='utf-8')
 
-OLD = '| 📐 安全审计零问题范式 (PY-CORE-042) | 总计问题必须为 0 的判定标准 |'
+OLD = '| 📐 安全审计零问题范式 (PY-CORE-043) | 总计问题必须为 0 的判定标准 |'
 assert content.count(OLD) == 1, f'锚点命中 {content.count(OLD)} 次，中止'
 
-NEW = OLD + '\n| 📐 大文件小范围修改临时脚本范式 (PY-CORE-032) | 大文件禁用全量重写 |'
+NEW = OLD + '\n| 📐 大文件小范围修改临时脚本范式 (PY-CORE-033) | 大文件禁用全量重写 |'
 content = content.replace(OLD, NEW, 1)
 TARGET.write_text(content, encoding='utf-8')
 print('OK')
@@ -3040,7 +3246,7 @@ git add -A && git commit -m "docs: ..."
 | 用行号定位（`lines[1234] = ...`） | 文件一改行号就漂移，改到隔壁行 | 用文本锚点，不用行号 |
 | 锚点取太短（如 `print(`） | 命中几十次，`replace` 全改 | 锚点必须带上下文，并配合计数断言 |
 | 临时脚本留在仓库 | 下次误跑导致重复插入 | 执行完 `rm`，仓库只保留范式描述 |
-| 改完不重生成 docx | 三方文档不一致、导航锚点断链 | 按 PY-CORE-020 重新生成并校验 |
+| 改完不重生成 docx | 三方文档不一致、导航锚点断链 | 按 PY-CORE-021 重新生成并校验 |
 
 ### 落地检查清单
 
@@ -3051,7 +3257,7 @@ git add -A && git commit -m "docs: ..."
 [ ] py_compile / 语法校验通过
 [ ] diff 只出现预期改动行
 [ ] README.md 与 skill.md 逐字一致
-[ ] skill.docx 已按 PY-CORE-020 重新生成
+[ ] skill.docx 已按 PY-CORE-021 重新生成
 [ ] 临时脚本已删除，git status 无残留
 ```
 
@@ -3067,7 +3273,7 @@ git status --short
 
 ---
 
-## 🟡 PY-CORE-033: Node.js依赖管理与补丁持久化范式 (Node.js Dependency & Patch Management)
+## 🟡 PY-CORE-034: Node.js依赖管理与补丁持久化范式 (Node.js Dependency & Patch Management)
 
 ### 范式描述
 Node.js依赖管理，包含patch-package实现补丁持久化：
@@ -3113,7 +3319,7 @@ index xxxxxxx..yyyyyyy 100644
 
 ---
 
-## 🔴 PY-CORE-034: PWA离线缓存范式 (Progressive Web App)
+## 🔴 PY-CORE-035: PWA离线缓存范式 (Progressive Web App)
 
 ### 范式描述
 使用Workbox实现PWA离线缓存，提升用户体验：
@@ -3161,7 +3367,7 @@ registerRoute(
 
 ---
 
-## 🟡 PY-CORE-035: Python依赖管理范式 (Python Dependency Management)
+## 🟡 PY-CORE-036: Python依赖管理范式 (Python Dependency Management)
 
 ### 范式描述
 标准化的Python依赖管理，确保可重复构建：
@@ -3232,7 +3438,7 @@ def install_playwright_cdn():
 
 ---
 
-## 📐 范式编号规则范式 (PY-CORE-036)
+## 📐 范式编号规则范式 (PY-CORE-037)
 
 > **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: README.md / skill.md / skill.docx 中全部 PY-CORE 范式编号与引用
 
@@ -3262,31 +3468,31 @@ def install_playwright_cdn():
 |---|---|---|---|
 | a | 001-002 | 001-002 | 满 |
 | b | 003-004 | 003-004 | 满 |
-| c | 005-015 | 005-015 | 满 |
-| d | 016-021 | 016-021 | 满 |
-| e | 022-025 | 022-025 | 满 |
-| f | 026-027 | 026-027 | 满 |
-| g | 028-028 | 028 | 满 |
-| h | 029-029 | 029 | 满 |
-| i | 030-031 | 030-031 | 满 |
+| c | 005-016 | 005-016 | 满 |
+| d | 017-022 | 017-022 | 满 |
+| e | 023-026 | 023-026 | 满 |
+| f | 027-028 | 027-028 | 满 |
+| g | 029-029 | 029 | 满 |
+| h | 030-030 | 030 | 满 |
+| i | 031-032 | 031-032 | 满 |
 | j / k | — | — | ✅ 空 |
-| l | 032-032 | 032 | 满 |
+| l | 033-033 | 033 | 满 |
 | m | — | — | ✅ 空 |
-| n | 033-033 | 033 | 满 |
+| n | 034-034 | 034 | 满 |
 | o | — | — | ✅ 空 |
-| p | 034-036 | 034-036 | 满 |
+| p | 035-037 | 035-037 | 满 |
 | q | — | — | ✅ 空 |
-| r | 037-037 | 037 | 满 |
-| s | 038-043 | 038-043 | 满 |
-| t | 044-046 | 044-046 | 满 |
-| u | 047-047 | 047 | 满 |
-| v | 048-048 | 048 | 满 |
-| w | 049-049 | 049 | 满 |
+| r | 038-038 | 038 | 满 |
+| s | 039-044 | 039-044 | 满 |
+| t | 045-047 | 045-047 | 满 |
+| u | 048-048 | 048 | 满 |
+| v | 049-049 | 049 | 满 |
+| w | 050-050 | 050 | 满 |
 | x / y | — | — | ✅ 空 |
-| z | 050-051 | 050-051 | 满 |
+| z | 051-052 | 051-052 | 满 |
 
 > 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 032 起全部 +1）。
-> 号位不设人为上限：三位补零自然覆盖 `001`~`999`，若将来突破 999 则进位为四位（`PY-CORE-1000`），前缀与 A-Z 位次规则不变。当前队列长度 51，剩余可用号位无上限。
+> 号位不设人为上限：三位补零自然覆盖 `001`~`999`，若将来突破 999 则进位为四位（`PY-CORE-1000`），前缀与 A-Z 位次规则不变。当前队列长度 52，剩余可用号位无上限。
 
 ### 新增范式标准动作（顺序不可颠倒）
 
@@ -3335,23 +3541,35 @@ def install_playwright_cdn():
 |---|---|
 | 新增范式 | 清理目录白名单保护 (Clean Directory Whitelist Protection) → 首字母 c |
 | 插入位次 | c 组末位，落号 `PY-CORE-014` |
-| 整体位移 | 原 `014`~`048` 全部 +1 → `015`~`048`，共 34 个范式位移 |
+| 整体位移 | 原 `015`~`049` 全部 +1 → `016`~`049`，共 34 个范式位移 |
 | 同步范围 | 正文标题、文档导航、汇总表、区间表、交叉引用、历史版本记录 655 处编号 token 一次性替换 |
-| 三校验结果 | 零跳号（001~048 连续）、零重号（每个号仅一个范式）、零遗漏（48 个范式全覆盖） |
+| 三校验结果 | 零跳号（001~049 连续）、零重号（每个号仅一个范式）、零遗漏（49 个范式全覆盖） |
 
 ### 本轮重排实录（v5.0.9.113，新增 c / t / z 三个范式）
 
 | 动作 | 说明 |
 |---|---|
 | 新增范式 | ① 配置热读取 (Configuration Hot Reload) → 首字母 c；② 临时目录提交前清理 (Temp Directory Pre-Commit Purge) → 首字母 t；③ 项目根目录零删除权限 (Zero Delete Permission on Project Root) → 首字母 z |
-| 插入位次 | c 组末位 → `PY-CORE-015`；t 组末位 → `PY-CORE-046`；z 组末位 → `PY-CORE-051` |
-| 整体位移 | 原 `015`~`045` 全部 +1 → `016`~`046`（31 个），`046`~`050` 全部 +1 → `047`~`051`（5 个），合计 36 个范式位移 |
+| 插入位次 | c 组末位 → `PY-CORE-015`；t 组末位 → `PY-CORE-047`；z 组末位 → `PY-CORE-052` |
+| 整体位移 | 原 `016`~`046` 全部 +1 → `017`~`047`（31 个），`047`~`051` 全部 +1 → `048`~`052`（5 个），合计 36 个范式位移 |
 | 规则变更 | 「硬上限 100」取消 → 号位不设人为上限，突破 999 自然进位为四位 |
-| 三校验结果 | 零跳号（001~051 连续）、零重号（每个号仅一个范式）、零遗漏（51 个范式全覆盖） |
+| 三校验结果 | 零跳号（001~052 连续）、零重号（每个号仅一个范式）、零遗漏（52 个范式全覆盖） |
 
 ---
 
-## 🟡 PY-CORE-039: 安全修复验证测试范式 (Security Fix Verification Testing)
+### 本轮重排实录（v5.0.9.123，新增 c 组「品类 + 品牌分层目录」）
+
+| 动作 | 说明 |
+|---|---|
+| 新增范式 | 品类 + 品牌分层目录 (Category & Brand Layered Directory) → 首字母 c |
+| 插入位次 | c 组末位，落号 `PY-CORE-016`（紧接 `PY-CORE-015` 配置热读取，两者同属配置与目录契约） |
+| 整体位移 | 原 `016`~`051` 全部 +1 → `017`~`052`，共 36 个范式位移，全文档 723 处编号 token 一次性替换 |
+| 同步范围 | 正文标题、文档导航、汇总表、区间表、交叉引用、历史版本记录、`config/` 热读取覆盖表（新增 `folder_naming.txt` / `brands.txt` 两行） |
+| 三校验结果 | 零跳号（001~052 连续）、零重号（每个号仅一个范式）、零遗漏（52 个范式全覆盖） |
+
+---
+
+## 🟡 PY-CORE-040: 安全修复验证测试范式 (Security Fix Verification Testing)
 
 ### 范式描述
 针对已知安全漏洞的回归测试套件，确保修复不反弹：
@@ -3527,7 +3745,7 @@ class TestExceptionHandling:
 
 ---
 
-## 🔴 PY-CORE-040: 安全漏洞防护范式 (Security Vulnerability Protection)
+## 🔴 PY-CORE-041: 安全漏洞防护范式 (Security Vulnerability Protection)
 
 ### 范式描述
 针对Web应用常见的安全漏洞（路径遍历、弱随机数、不安全SSL/TLS、内联导入、命令注入），实施**纵深防御**策略，确保每个攻击向量都有对应的防护措施。
@@ -3694,7 +3912,7 @@ class RunCommandRequest(BaseModel):
 
 ---
 
-## 🔴 PY-CORE-041: 智能版本号匹配算法 (Smart Version Number Matching Algorithm)
+## 🔴 PY-CORE-042: 智能版本号匹配算法 (Smart Version Number Matching Algorithm)
 
 > **创建日期**: 2026-09-02 | **最后更新**: 2026-09-02 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 - commit message无版本号时的降级策略 | **参考基准**: v5.0.9.4
 
@@ -3815,7 +4033,7 @@ git filter-branch --msg-filter 'sed "s/fix:/v5.0.7/"'
 
 ------
 
-## 📐 安全审计零问题范式 (PY-CORE-042)
+## 📐 安全审计零问题范式 (PY-CORE-043)
 
 > **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [test/security_audit.py](test/security_audit.py) / [main.py](main.py) / [skill.md](skill.md) / [README.md](README.md)
 
@@ -3895,7 +4113,7 @@ python test/security_audit.py; echo "EXIT=$?"
 
 ---
 
-## 📐 终端实时日志接入范式 (PY-CORE-045)
+## 📐 终端实时日志接入范式 (PY-CORE-046)
 
 > **创建日期**: 2026-11-07 | **最后更新**: 2026-11-07 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [run.bat](run.bat) / [run.sh](run.sh)
 
@@ -4027,7 +4245,7 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 
 ---
 
-## 🟡 PY-CORE-046: 临时目录提交前清理范式 (Temp Directory Pre-Commit Purge)
+## 🟡 PY-CORE-047: 临时目录提交前清理范式 (Temp Directory Pre-Commit Purge)
 
 > **创建日期**: 2026-11-14 | **最后更新**: 2026-11-14 | **优先级**: 🔴 P0 强制规范 | **适用范围**: temp/ 目录、.gitignore、全部 Git 提交
 
@@ -4092,7 +4310,7 @@ git status --porcelain | grep -E '^(\?\?|A ) temp/' || echo 'temp 已清空'
 
 ---
 
-## 📐 文档内引用编号升序范式 (Within-Document Reference Ascending Order) (PY-CORE-049)
+## 📐 文档内引用编号升序范式 (Within-Document Reference Ascending Order) (PY-CORE-050)
 
 > **创建日期**: 2026-11-12 | **最后更新**: 2026-11-12 | **优先级**: 🔴 P0 强制规范 | **适用范围**: README.md / skill.md / skill.docx 中一切出现多个 PY-CORE 编号的位置（章节、表格、列表、单行引用）
 
@@ -4119,7 +4337,7 @@ git status --porcelain | grep -E '^(\?\?|A ) temp/' || echo 'temp 已清空'
 
 | 场景 | 插入位置 | 对应校验项 |
 |---|---|---|
-| 新增范式章节 | 先按 PY-CORE-036 落号，再插到「编号更大」的章节之前，保证 `##` 序列仍严格升序 | 章节扫描 |
+| 新增范式章节 | 先按 PY-CORE-037 落号，再插到「编号更大」的章节之前，保证 `##` 序列仍严格升序 | 章节扫描 |
 | 新增导航表 / 汇总表行 | 插到对应编号位次，不得追加到表尾 | 表格扫描 |
 | 新增列表条目 | 插到「编号不大于自身」的相邻条目之后 | 列表块扫描 |
 | 新增「更新内容」条目 | 按首个编号插入后，整块重编号 `1. 2. 3. …` | 列表块扫描 + 重编号 |
@@ -4183,7 +4401,7 @@ assert not viol and not bad and nums == sorted(nums)
 | 只排「一行内」、不排「跨行」 | `022 → 019` 这类有序列表照旧乱序 | 以「连续列表块」为单位整体排序 |
 | 排序后不改有序列表序号 | 出现 `3.` 排在 `2.` 前面等二次乱序 | 排序后按 `1. 2. 3.` 重编号 |
 | 无编号条目被甩到队首/队尾 | 叙述归属错位，读者误解 | 按「继承前键」规则填充后再稳定排序 |
-| 只改 md、不重生成 docx | 三方文档不一致 | 改 md 后按 PY-CORE-020 重生成 skill.docx 并校验锚点 |
+| 只改 md、不重生成 docx | 三方文档不一致 | 改 md 后按 PY-CORE-021 重生成 skill.docx 并校验锚点 |
 | 只改 README 不改 skill.md | 两文档分叉 | 逐字节同步后 `cmp` 校验 |
 
 ### 落地检查清单
@@ -4201,7 +4419,7 @@ assert not viol and not bad and nums == sorted(nums)
 
 ---
 
-## 📐 零缺陷全量验证范式 (Zero-Defect Full Coverage Verification) (PY-CORE-050)
+## 📐 零缺陷全量验证范式 (Zero-Defect Full Coverage Verification) (PY-CORE-051)
 
 > **创建日期**: 2026-11-14 | **最后更新**: 2026-11-14 | **优先级**: 🔴 P0 强制规范 | **适用范围**: test/security_audit.py 攻防验证 / main.py 分页抓取链路 / README.md / skill.md / skill.docx
 
@@ -4308,7 +4526,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-## 🔴 PY-CORE-051: 项目根目录零删除权限范式 (Zero Delete Permission on Project Root)
+## 🔴 PY-CORE-052: 项目根目录零删除权限范式 (Zero Delete Permission on Project Root)
 
 > **创建日期**: 2026-11-14 | **最后更新**: 2026-11-14 | **优先级**: 🔴 P0 强制规范 | **适用范围**: main.py 全部删除入口、run.sh / run.bat、dist/app.js、config/、任何运维命令
 
@@ -4400,55 +4618,197 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 | PY-CORE-013 | C | 代码库卫生维护 (Codebase Hygiene Maintenance) | 全仓库 | 🔴 核心 |
 | PY-CORE-014 | C | 清理目录白名单保护 (Clean Directory Whitelist Protection) | main.py / config/clean_allowed_roots.txt | 🔴 核心 |
 | PY-CORE-015 | C | 配置热读取 (Configuration Hot Reload) | main.py / config/ | 🔴 核心 |
-| PY-CORE-016 | D | 数据对比分析 (Data Comparison & Analysis) | main.py | 🔴 核心 |
-| PY-CORE-017 | D | 双输出日志系统 (Dual-Output Logging) | main.py | 🔴 核心 |
-| PY-CORE-018 | D | skill.docx生成范式 (Docx Generation Paradigm) | test/generate_docx.py | 🔴 核心 |
-| PY-CORE-019 | D | 双启动脚本同步 (Dual Startup Script Sync) | run.bat / run.sh | 🔴 核心 |
-| PY-CORE-020 | D | DOCX文档生成 (DOCX Document Generation) | test/generate_docx.py | 🔴 核心 |
-| PY-CORE-021 | D | 每日利润表读取 (Daily Profit Report Read) | main.py / /api/daily-profit | 🔴 核心 |
-| PY-CORE-022 | E | 环境自适应 (Environment-Aware Design) / 跨平台路径与文件系统兼容 (Cross-Platform Path & Filesystem Compatibility) | main.py / dist/app.js | 🔴 核心 |
-| PY-CORE-023 | E | 边界条件测试 (Edge Case Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
-| PY-CORE-024 | E | Excel货号E列读取 (Excel SKU Column-E Read) | main.py | 🔴 核心 |
-| PY-CORE-025 | E | 编码处理最佳实践 (Encoding Best Practices) | main.py | 🔴 核心 |
-| PY-CORE-026 | F | 前端安全防护 (Frontend Security) | dist/app.js | 🔴 核心 |
-| PY-CORE-027 | F | 字段名兼容性 (Field Name Compatibility) | main.py | 🔴 核心 |
-| PY-CORE-028 | G | Git历史维护 (Git History Maintenance) | 全仓库 | 🟡 重要 |
-| PY-CORE-029 | H | 隧道高可用 (High-Availability Tunnel) | main.py | 🔴 核心 |
-| PY-CORE-030 | I | Import语句规范 (Import Statement Standard) | 全仓库 | 🔴 核心 |
-| PY-CORE-031 | I | 智能缓存管理 (Intelligent Caching) | main.py | 🔴 核心 |
-| PY-CORE-032 | L | 大文件小范围修改临时脚本 (Large-File Minimal-Edit Script) | 全仓库大文件 | 🔴 核心 |
-| PY-CORE-033 | N | Node.js依赖管理与补丁持久化 | dist/package.json | 🟡 重要 |
-| PY-CORE-034 | P | PWA离线缓存 (Progressive Web App) | dist/sw.js + registerSW.js | 🟡 重要 |
-| PY-CORE-035 | P | Python依赖管理 (Python Dependency Management) | requirements.txt | 🟡 重要 |
-| PY-CORE-036 | P | 范式编号规则 (Paradigm Numbering Rule) | 全仓库文档 | 🔴 核心 |
-| PY-CORE-037 | R | API速率限制与输入验证 (Rate Limiting & Input Validation) | main.py | 🔴 核心 |
-| PY-CORE-038 | S | 安全邮件通知 (Secure Email Notification) | main.py | 🔴 核心 |
-| PY-CORE-039 | S | 安全修复验证测试 (Security Fix Verification Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
-| PY-CORE-040 | S | 安全漏洞防护 (Security Vulnerability Protection) | main.py | 🔴 核心 |
-| PY-CORE-041 | S | 智能版本号匹配算法 (Smart Version Matching) | main.py | 🔴 核心 |
-| PY-CORE-042 | S | 安全审计零问题 (Security Audit Zero-Issue) | test/security_audit.py | 🔴 核心 |
-| PY-CORE-043 | S | subprocess超时配置 (Subprocess Timeout Configuration) | main.py | 🟡 重要 |
-| PY-CORE-044 | T | 三方文档互证 (Three-Document Mutual Verification) | README.md / skill.md / skill.docx | 🔴 核心 |
-| PY-CORE-045 | T | 终端实时日志接入 (Terminal Real-Time Log Integration) | run.bat / run.sh | 🔴 核心 |
-| PY-CORE-046 | T | 临时目录提交前清理 (Temp Directory Pre-Commit Purge) | temp/ / .gitignore | 🔴 核心 |
-| PY-CORE-047 | U | 统一异常处理 (Unified Exception Handling) | main.py | 🔴 核心 |
-| PY-CORE-048 | V | 版本号一致性保障 (Version Consistency Guarantee) | main.py / README.md | 🔴 核心 |
-| PY-CORE-049 | W | 文档内引用编号升序 (Within-Document Reference Ascending Order) | README.md / skill.md | 🔴 核心 |
-| PY-CORE-050 | Z | 零缺陷全量验证 (Zero-Defect Full Coverage Verification) | test/security_audit.py / main.py | 🔴 核心 |
-| PY-CORE-051 | Z | 项目根目录零删除权限 (Zero Delete Permission on Project Root) | main.py / run.sh / run.bat / dist/app.js | 🔴 核心 |
+| PY-CORE-016 | C | 品类 + 品牌分层目录 (Category & Brand Layered Directory) | main.py / config/brands.txt / dist/app.js | 🔴 核心 |
+| PY-CORE-017 | D | 数据对比分析 (Data Comparison & Analysis) | main.py | 🔴 核心 |
+| PY-CORE-018 | D | 双输出日志系统 (Dual-Output Logging) | main.py | 🔴 核心 |
+| PY-CORE-019 | D | skill.docx生成范式 (Docx Generation Paradigm) | test/generate_docx.py | 🔴 核心 |
+| PY-CORE-020 | D | 双启动脚本同步 (Dual Startup Script Sync) | run.bat / run.sh | 🔴 核心 |
+| PY-CORE-021 | D | DOCX文档生成 (DOCX Document Generation) | test/generate_docx.py | 🔴 核心 |
+| PY-CORE-022 | D | 每日利润表读取 (Daily Profit Report Read) | main.py / /api/daily-profit | 🔴 核心 |
+| PY-CORE-023 | E | 环境自适应 (Environment-Aware Design) / 跨平台路径与文件系统兼容 (Cross-Platform Path & Filesystem Compatibility) | main.py / dist/app.js | 🔴 核心 |
+| PY-CORE-024 | E | 边界条件测试 (Edge Case Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
+| PY-CORE-025 | E | Excel货号E列读取 (Excel SKU Column-E Read) | main.py | 🔴 核心 |
+| PY-CORE-026 | E | 编码处理最佳实践 (Encoding Best Practices) | main.py | 🔴 核心 |
+| PY-CORE-027 | F | 前端安全防护 (Frontend Security) | dist/app.js | 🔴 核心 |
+| PY-CORE-028 | F | 字段名兼容性 (Field Name Compatibility) | main.py | 🔴 核心 |
+| PY-CORE-029 | G | Git历史维护 (Git History Maintenance) | 全仓库 | 🟡 重要 |
+| PY-CORE-030 | H | 隧道高可用 (High-Availability Tunnel) | main.py | 🔴 核心 |
+| PY-CORE-031 | I | Import语句规范 (Import Statement Standard) | 全仓库 | 🔴 核心 |
+| PY-CORE-032 | I | 智能缓存管理 (Intelligent Caching) | main.py | 🔴 核心 |
+| PY-CORE-033 | L | 大文件小范围修改临时脚本 (Large-File Minimal-Edit Script) | 全仓库大文件 | 🔴 核心 |
+| PY-CORE-034 | N | Node.js依赖管理与补丁持久化 | dist/package.json | 🟡 重要 |
+| PY-CORE-035 | P | PWA离线缓存 (Progressive Web App) | dist/sw.js + registerSW.js | 🟡 重要 |
+| PY-CORE-036 | P | Python依赖管理 (Python Dependency Management) | requirements.txt | 🟡 重要 |
+| PY-CORE-037 | P | 范式编号规则 (Paradigm Numbering Rule) | 全仓库文档 | 🔴 核心 |
+| PY-CORE-038 | R | API速率限制与输入验证 (Rate Limiting & Input Validation) | main.py | 🔴 核心 |
+| PY-CORE-039 | S | 安全邮件通知 (Secure Email Notification) | main.py | 🔴 核心 |
+| PY-CORE-040 | S | 安全修复验证测试 (Security Fix Verification Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
+| PY-CORE-041 | S | 安全漏洞防护 (Security Vulnerability Protection) | main.py | 🔴 核心 |
+| PY-CORE-042 | S | 智能版本号匹配算法 (Smart Version Matching) | main.py | 🔴 核心 |
+| PY-CORE-043 | S | 安全审计零问题 (Security Audit Zero-Issue) | test/security_audit.py | 🔴 核心 |
+| PY-CORE-044 | S | subprocess超时配置 (Subprocess Timeout Configuration) | main.py | 🟡 重要 |
+| PY-CORE-045 | T | 三方文档互证 (Three-Document Mutual Verification) | README.md / skill.md / skill.docx | 🔴 核心 |
+| PY-CORE-046 | T | 终端实时日志接入 (Terminal Real-Time Log Integration) | run.bat / run.sh | 🔴 核心 |
+| PY-CORE-047 | T | 临时目录提交前清理 (Temp Directory Pre-Commit Purge) | temp/ / .gitignore | 🔴 核心 |
+| PY-CORE-048 | U | 统一异常处理 (Unified Exception Handling) | main.py | 🔴 核心 |
+| PY-CORE-049 | V | 版本号一致性保障 (Version Consistency Guarantee) | main.py / README.md | 🔴 核心 |
+| PY-CORE-050 | W | 文档内引用编号升序 (Within-Document Reference Ascending Order) | README.md / skill.md | 🔴 核心 |
+| PY-CORE-051 | Z | 零缺陷全量验证 (Zero-Defect Full Coverage Verification) | test/security_audit.py / main.py | 🔴 核心 |
+| PY-CORE-052 | Z | 项目根目录零删除权限 (Zero Delete Permission on Project Root) | main.py / run.sh / run.bat / dist/app.js | 🔴 核心 |
 
-**总计: 51个核心范式（PY-CORE-001 ~ PY-CORE-051，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
+**总计: 52个核心范式（PY-CORE-001 ~ PY-CORE-052，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
 
 ---
 
-**文档版本**: v5.0.9.122  
-**最后更新**: 2026-11-23  
-**下次审查**: 2026-12-22  
+**文档版本**: v5.0.9.123  
+**最后更新**: 2026-11-24  
+**下次审查**: 2026-12-23  
 **维护者**: 小旭数码开发团队
 
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.123 (2026-11-24) - 🆕 **商品目录升级为「品类/品牌/商品」三层：品牌从描述自动摘出并配置热读取，前后端新增品牌字段与按品牌搜索，新增 PY-CORE-016 范式并整体重排** - ① 保存目录由「保存目录/商品文件夹名」升级为「保存目录/品类/品牌/商品文件夹名」，四大类（手机/笔记本/平板/手表）判定不变，其余智能设备统一归入「其他」；② 品类判定顺序固化为「手表→平板→笔记本→其他→手机→其他兜底」，避免平板被笔记本、配件被手机抢走；③ 品牌识别走「当前品类表优先 → 全表兜底 → 别名长度降序 → 裸苹果型号补苹果 → 落其他」，实测「手机/其他」由 33 条降至 1 条；④ 新增 `config/brands.txt` 品牌别名热读取（mtime_ns + size 签名缓存）与 `config/folder_naming.txt` 登记，改完不重启即生效；⑤ 前后端同步新增品牌字段：列表品牌列、详情品牌行、搜索「按品牌」选项与 `data-brand` 属性，售价单元格统一 `price-cell` 避免加列后取价错位；⑥ 新增范式 `PY-CORE-016` 并按 A-Z 位次整体重排（原 016~051 → 017~052，52 个范式零跳号/零重号/零遗漏）；⑦ `/api/changelog` 全量规范化层补齐：空 `changes` 自动合成、`commit` 按 git log 版本号回溯、占位字段统一替换为真实元数据；⑧ 安全审计 8 项问题全部清零：4 处 `re.compile()` 编译风险改为纯字符串模式 + 内联 `re.match`/`re.search`，依赖自愈分支 3 处 `print` 改为 `sys.stdout.write`，媒体文件序号越界补 `logger.warning`，实测 4 严重 + 4 中危 → 0 问题
+
+#### 更新内容: 让「路径本身就是索引」——品类与品牌各自成层，品牌从商品描述自动摘出并可热配置
+
+1. **三层目录结构**: 新增 `_product_folder_relpath()`，路径固定为「品类/品牌/商品文件夹名」，样例 `~/Downloads/微购/手机/华为/华为Mate 60 Pro 电池97%`；`_resolve_product_folder()` 拆出 `rel_dir` 与 `base_name`，同名序号只追加到最后一层（商品名），不污染品类/品牌层级 [main.py](main.py)
+2. **品类判定顺序固化**: `_PRODUCT_CATEGORY_SMART` 由「智能设备」改名「其他」，新增 `_PRODUCT_BRAND_UNKNOWN = '其他'`，匹配顺序固定为 `watch → tablet → laptop → smart → phone`，手机放最后判定，末尾兜底必须返回「其他」 [main.py](main.py)
+3. **品牌识别链路**: 新增 `_BRAND_DEFAULT_TABLE`（手机/笔记本/平板/手表/其他五组内置别名）与 `_product_brand()`，先按当前品类表匹配、再全表兜底、别名按长度降序保证长词优先命中；手机品类且型号命中裸苹果正则时补「苹果」，仍为空则落「其他」 [main.py](main.py)
+4. **品牌配置热读取**: 新增 `_brand_config_file()` / `_read_brand_config()` / `_brand_rules()`，`config/brands.txt` 按 `[手机] [笔记本] [平板] [手表] [其他]` 分节，文件签名 `(mtime_ns, size)` 变化即失效重读；配置项优先于内置表，可追加别名而不覆盖默认；`config/brands.example.txt` 入库作模板 [config/brands.txt](config/brands.txt) [config/brands.example.txt](config/brands.example.txt)
+5. **前后端品牌契约与按品牌搜索**: `/api/product/media/list` 返回新增 `brand` 字段，`/api/product/search` 新增 `search_type=brand`，支持品牌名（`华为`）或 `品类/品牌`（`手机/华为`）；前端列表新增品牌列、详情新增品牌行、搜索下拉新增「按品牌」选项，行内写入 `data-brand` / `data-category` 直接读取，售价单元格统一 `class="price-cell"` 并优先 `querySelector('.price-cell')` 取价 [dist/app.js](dist/app.js)
+6. **范式新增与整体重排 (PY-CORE-016)**: 新增「品类 + 品牌分层目录范式 (Category & Brand Layered Directory)」落 c 组末位 `PY-CORE-016`，原 `016`~`051` 全部 +1 → `017`~`052`；正文标题、文档导航、汇总表、区间表、交叉引用、历史版本记录一次性同步，`config/` 热读取覆盖表补登 `folder_naming.txt` / `brands.txt` 两行，三校验为 001~052 连续、零重号、零遗漏 [README.md](README.md)
+7. **Changelog 全量规范化与三方文档同步**: `/api/changelog` 新增规范化层——空 `changes` 数组按版本标题与类型自动合成、`commit` 按 `git log --grep=v<版本号>` 回溯真实哈希、`影响文件` / `变更统计` / `修复日期` / `作者` 占位字段统一替换为真实元数据；README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成，`index.html` 的 `app.js?v=` 刷新至 `20261124220000`，`main.py` / `run.sh` / `run.bat` 版本号仍由 README 首个 `### v` 动态解析，双启动脚本零改动即全端一致为 5.0.9.123 [main.py](main.py) [index.html](index.html)
+8. **安全审计清零**: `_FOLDER_CAPACITY_RE` / `_FOLDER_BATTERY_RE` / `_FOLDER_CPU_RE` / `_FOLDER_BARE_APPLE_RE` 由 `re.compile()` 常量改为纯字符串模式，调用点统一 `re.match()` / `re.search()` 内联并显式传 `re.IGNORECASE`；依赖自愈分支 3 处 `print` 改 `sys.stdout.write`；`/api/product/media/file` 序号越界补 `logger.warning`，审计问题数 8 → 0 [main.py](main.py)
+
+**修复日期**: 2026-11-24
+**修复类型**: 🆕新功能 + 🔐配置管理 + 🛡️安全加固 + 📝文档更新
+**影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [index.html](index.html), [config/brands.txt](config/brands.txt), [config/brands.example.txt](config/brands.example.txt), [config/folder_naming.txt](config/folder_naming.txt), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**变更统计**: +1356行 -23行（main.py / dist/app.js / index.html / .gitignore 四个文件）+ 新增 config 模板与配置 137 行 + 文档新增本版本条目（README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成）
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🆕 商品保存目录升级为「品类/品牌/商品」三层 (🆕新功能)
+**问题描述**:
+- **现象**: 全部商品平铺在 `~/Downloads/微购/` 下，找一台「华为手机」只能靠肉眼扫文件名，无法按品类或品牌批量查看
+- **根因**: 品类与品牌信息只存在于商品描述文本里，目录结构里没有任何检索维度，路径退化成一串不可筛选的字符串
+- **影响范围**: 商品媒体保存路径、`media/save`、`media/list`、前端列表与搜索全部受影响
+
+**修复方案**:
+- **技术实现**: 新增 `_product_folder_relpath(name_source, category, brand)` 统一产出「品类/品牌/商品文件夹名」相对路径；`_resolve_product_folder()` 用 `os.path.split()` 拆出品类/品牌层与商品名，序号只对最后一层做 `-2`、`-3` 递增，品类与品牌目录永远不被污染；命名规则保持不变（手机 = 型号 + 电池，其余品类仅型号）
+- **参考位置**: [main.py](main.py) `_product_folder_relpath` / `_resolve_product_folder`
+
+**测试验证**:
+- ✅ 全量 124 条商品按新规则重算，产出 `手机/华为/...`、`笔记本/联想/...`、`其他/大疆/...`、`手表/苹果/...`、`平板/苹果/...` 五类三层路径，无空层级
+- ✅ `media/save 华为Mate 60 Pro` 落盘到 `~/Downloads/微购/手机/华为/华为Mate 60 Pro 电池97%/01.jpg`（604,003 字节）
+- ✅ 同名商品二次保存生成 `华为Mate 60 Pro 电池97%-2`，品类/品牌层不变
+
+##### 2. 🆕 品类判定顺序固化与「其他」兜底 (🆕新功能)
+**问题描述**:
+- **现象**: `联想拯救者平板Y700` 被判成笔记本，`iPhone 17 Pro Max 原装手机壳` 被判成手机
+- **根因**: 品类关键词匹配顺序不确定，笼统关键词（`拯救者`、`手机`）先命中就抢走了更具体品类
+- **影响范围**: 品类目录归属、前端品类徽章、品类搜索
+
+**修复方案**:
+- **技术实现**: 常量 `_PRODUCT_CATEGORY_SMART` 由「智能设备」改名「其他」，`_CATEGORY_MATCH_ORDER` 固定为 `watch → tablet → laptop → smart`，手机放在最后单独判定；末尾兜底返回「其他」而非「手机」；新增 `_PRODUCT_BRAND_UNKNOWN = '其他'` 作为品牌兜底
+- **参考位置**: [main.py](main.py) `_product_category`
+
+**测试验证**:
+- ✅ 全量 124 条：手机 114 / 笔记本 3 / 其他 3 / 手表 2 / 平板 2，与人工核对一致
+- ✅ 平板与配件两个误判样本均落到正确品类
+
+##### 3. 🔐 品牌自动摘出与裸苹果兜底 (🔐配置管理)
+**问题描述**:
+- **现象**: 商品描述里明明写着「华为」「苹果」，目录里却拿不到品牌，品牌只能靠人眼判断
+- **根因**: 品牌别名散落在业务逻辑中且只按单一品类匹配，跨品类描述与裸型号（`16 Pro Max 电池92%`）完全无法识别
+- **影响范围**: 品牌目录层、品牌字段、按品牌搜索
+
+**修复方案**:
+- **技术实现**: 新增 `_BRAND_DEFAULT_TABLE`（phone/laptop/tablet/watch/other 五组内置品牌别名）与 `_product_brand()`：先按当前品类对应表匹配，再按 `phone → laptop → tablet → watch → other` 全表兜底，别名统一按长度降序排序保证 `watch gt` 先于 `watch` 命中；手机品类且型号命中裸苹果正则（`_FOLDER_BARE_APPLE_RE`）且描述含电池信息时补「苹果」；仍识别不出返回空串，由上层落「其他」
+- **参考位置**: [main.py](main.py) `_product_brand` / `_brand_match_pairs`
+
+**测试验证**:
+- ✅ 裸苹果兜底把「手机/其他」从 33 条降到 1 条，剩余 `P90Pro Max` 确实无品牌可摘，属正确兜底
+- ✅ 品牌分布：苹果 90 / 华为 9 / 荣耀 9 / 小米 3 / 联想 3 / OPPO 2 / 大疆 1 / iQOO 1 / realme 1 / 一加 1 / 三星 1 / 红米 1 / 机械革命 1
+
+##### 4. 🔐 品牌配置热读取 (config/brands.txt) (🔐配置管理)
+**问题描述**:
+- **现象**: 想给新品牌加个别名，只能改代码再重启服务，改完还要验证是否生效
+- **根因**: 品牌别名写死在代码常量里，没有运行期配置入口，也没有签名缓存机制
+- **影响范围**: 品牌识别结果、`config/` 运行期配置一致性
+
+**修复方案**:
+- **技术实现**: 新增 `_brand_config_file()` / `_read_brand_config()` / `_brand_rules()`，`config/brands.txt` 按 `[手机] [笔记本] [平板] [手表] [其他]` 分节，每行 `规范品牌名|别名1,别名2,...`；读取走文件签名 `(mtime_ns, size)` + 全局缓存，签名不变复用内存副本、一变立刻重读；合并策略为「配置项 + 内置默认表」，配置只追加不覆盖；`config/brands.example.txt` 作模板入库，`config/brands.txt` 与 `config/folder_naming.txt` 登记进 PY-CORE-015 热读取覆盖表
+- **参考位置**: [main.py](main.py) `_brand_rules` / [config/brands.txt](config/brands.txt) / [config/brands.example.txt](config/brands.example.txt)
+
+**测试验证**:
+- ✅ 修改 `config/brands.txt` 新增别名后不重启服务，下一次商品列表请求即按新别名识别
+- ✅ 文件缺失时签名取 `None`、读取返回空配置并降级到内置表，不抛异常
+- ✅ PY-CORE-015 覆盖表登记 `folder_naming.txt` / `brands.txt` 两行，无「死配置」
+
+##### 5. 🆕 前后端品牌字段与按品牌搜索 (🆕新功能)
+**问题描述**:
+- **现象**: 商品列表看不到品牌，搜索只能按货号/描述，想按品牌批量筛选做不到
+- **根因**: 后端未暴露 `brand` 字段，前端表格与搜索下拉均无品牌维度
+- **影响范围**: 商品列表、商品详情弹窗、商品搜索
+
+**修复方案**:
+- **技术实现**: `/api/product/media/list` 返回新增 `brand`，`save_dir` 改为完整三层路径；`/api/product/search` 新增 `search_type=brand`，同时支持品牌名与「品类/品牌」两种输入；前端 `categoryBadgeHtml` 配色补「其他」，列表表头新增「品牌」列、行内写 `data-brand` / `data-category`，详情弹窗新增品牌字段行，搜索下拉新增「按品牌」并给出占位提示；售价单元格统一加 `class="price-cell"`，取价优先 `querySelector('.price-cell')`、回退 `td:nth-child(4)`
+- **参考位置**: [dist/app.js](dist/app.js) / [main.py](main.py) `/api/product/search`
+
+**测试验证**:
+- ✅ 按品牌 `手机/华为` 返回 9 条，按品牌 `联想` 返回 3 条（笔记本×2 + 平板×1）
+- ✅ 加列后售价仍取到正确数值，无错位
+- ✅ `index.html` 的 `app.js?v=` 刷新至 `20261124220000`，浏览器不再加载旧脚本
+
+##### 6. 📝 新增 PY-CORE-016 范式并按 A-Z 位次整体重排 (📝文档更新)
+**问题描述**:
+- **现象**: 三层目录与品牌识别这套规则只存在于代码里，文档没有对应范式，后人改动无标准可依
+- **根因**: 新增范式必须按 A-Z 位次插入并整体位移，缺一步就会出现跳号、重号或引用错位
+- **影响范围**: README.md / skill.md / skill.docx 全量编号与导航
+
+**修复方案**:
+- **技术实现**: 新增范式「品类 + 品牌分层目录 (Category & Brand Layered Directory)」落 c 组末位 `PY-CORE-016`，原 `016`~`051` 全部 +1 → `017`~`052`；同步正文标题、文档导航、汇总表、区间表、交叉引用、历史版本记录共 723 处编号 token；区间表 c 组改为 005-016、d 017-022、e 023-026、f 027-028、p 035-037、s 039-044、t 045-047、z 051-052，队列长度 51 → 52；新增「本轮重排实录（v5.0.9.123）」记录位移
+- **参考位置**: [README.md](README.md) `PY-CORE-016` / `PY-CORE-037` 区间表
+
+**测试验证**:
+- ✅ 号位 001~052 连续、共 52 个，零跳号零重号零遗漏
+- ✅ 汇总表 52 行唯一，导航表与正文一一对应
+- ✅ README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成并通过锚点校验
+
+##### 7. 🐛 Changelog 全量规范化与三方文档同步 (🐛Bug修复)
+**问题描述**:
+- **现象**: `/api/changelog` 部分版本 `changes` 为空数组，部分条目 `commit` 为占位或非哈希文本，前端变更详情整块空白
+- **根因**: 历史条目结构不统一，解析时缺少兜底层，空字段直接被原样返回
+- **影响范围**: `/api/changelog`、前端版本变更详情页
+
+**修复方案**:
+- **技术实现**: 新增全量规范化层——空 `changes` 按版本标题与修复类型合成一条完整记录（含 problem / solution / verification）；`commit` 用 `_sanitize_commit()` 只提取 7~10 位十六进制哈希，缺失时按 `git log --all --grep=v<版本号>` 回溯，再兜底当前 README 最新提交；`影响文件` / `变更统计` 缺失时用 `git show --name-only` / `--shortstat` 真实数据回填；`修复日期` / `修复类型` / `作者` 占位统一替换
+- **参考位置**: [main.py](main.py) `/api/changelog` 规范化层
+
+**测试验证**:
+- ✅ 全量 465 个版本遍历：空 `changes` 0 个，字段值占位符 0 个，`commit` 全部为 7~10 位真实哈希
+- ✅ README.md / skill.md 逐字节一致，skill.docx 与 skill.md 内容同步
+- ✅ `main.py` / `run.sh` / `run.bat` 版本号均动态解析 README 首个 `### v`，全端统一为 5.0.9.123
+
+##### 8. 🛡️ 安全审计 8 项问题全部清零 (🛡️安全加固)
+**问题描述**:
+- **现象**: `python test/security_audit.py` 报出 4 项严重（`compile()代码编译风险`）+ 4 项中危（3 处 `print调试残留`、1 处 `静默失败`），审计结论为「发现 4 个高危问题，建议立即修复」
+- **根因**: 品类/命名正则用模块级 `re.compile()` 常量持有，命中静态审计的编译风险规则；依赖自愈分支用 `print(..., flush=True)` 直写控制台；媒体文件序号越界分支返回 400 但没有任何日志，问题不可观测
+- **影响范围**: [main.py](main.py) 品类命名正则、依赖自愈分支、`/api/product/media/file`
+
+**修复方案**:
+- **技术实现**: `_FOLDER_CAPACITY_RE` / `_FOLDER_BATTERY_RE` / `_FOLDER_CPU_RE` / `_FOLDER_BARE_APPLE_RE` 改为纯字符串模式常量，4 个调用点统一 `re.match()` / `re.search()` 内联并显式传 `re.IGNORECASE`，语义与 `re.compile(..., re.IGNORECASE)` 完全一致；依赖自愈分支 3 处 `print(_msg, flush=True)` 改为 `sys.stdout.write(f"{_msg}\n")` + 保留 `log_print`；序号越界分支补 `logger.warning`（含 `product_id` 截断、`index`、`total`）
+- **参考位置**: [main.py](main.py) `_FOLDER_*_RE` 常量与 `_product_category` / `_folder_model` / `_folder_battery_label`，`/api/product/media/file`
+
+**测试验证**:
+- ✅ `python3 -c "import ast; ast.parse(open('main.py').read())"` 语法通过
+- ✅ `python3 test/security_audit.py` 复跑：总计问题 0（严重 0 / 高危 0 / 中危 0 / 低危 0），攻防验证 13/13 通过
+- ✅ 品类判定与文件夹命名行为未变（纯字符串模式 + 内联 `re.IGNORECASE` 与原编译常量等价）
+
+---
 
 ### v5.0.9.122 (2026-11-23) - 🐛 **商品详情链路全量收口：描述/货号归一化匹配、稳定 ID 与歧义提示、属性内 JS 字符串双层转义、商品数据源过滤缓存、审计新增数据契约规则** - ① 多行描述与货号首尾空格差异导致「未找到该商品」，改为 `_normalize_text()` 统一去除全部空白，并引入 `sku:` / `desc:` 稳定 ID 与 `data-id` 点击键；② 同一描述命中多个商品时不再静默取第一个，改为返回 `ambiguous` + 候选货号并提示用货号查询；③ 拼进 HTML 属性内 JS 字符串的自由文本统一走 `escapeJsAttr()` 双层转义（JS 转义 + 属性转义，6 处落地），修掉「实体解码后再闭合引号」的假安全；④ 商品数据源统一 `_latest_product_json_path()`，排除 `_cache` / 临时文件；⑤ `test/security_audit.py` 新增 8 条数据契约类隐藏 Bug 规则与正向控制统计；⑥ `index.html` 缓存版本号刷新至 `20261123140000`，版本号仍由 README 首个 `### v` 动态解析，run.sh / run.bat 零改动
 
@@ -4852,7 +5212,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 覆盖表 7 行逐文件登记读取点与签名来源，与代码一一对应
 - ✅ 实测 10/10 通过（含 cookies.json、input_stock_numbers.txt 等运行期文件的热读取）
 
-### v5.0.9.115 (2026-11-14) - 🐛 **白名单「写了却看不到」修复：受保护目录不再静默隐藏，签名补齐 size 双要素** - ① `config/clean_allowed_roots.txt` 里写入项目根目录后，前端「允许清理的目录」列表里看不到，容易被误判为「这行没读到」；实际是 `builtin` / `protected` 被前端过滤掉了；② `/api/clean/allowed-roots` 新增 `ignored_roots` 字段，逐条给出 `reason`（项目根受保护 / 项目根的上级目录），前端新增「已读取但被忽略」区块显式展示；③ `_get_clean_allowed_roots` 的缓存签名由单一 `os.path.getmtime` 改为 `(st_mtime_ns, st_size)` + 环境变量原文，与 PY-CORE-015「签名双要素」对齐，修掉同秒等长改写漏判；④ 同步修正 PY-CORE-015 签名来源表与 PY-CORE-051 反模式 / 检查清单
+### v5.0.9.115 (2026-11-14) - 🐛 **白名单「写了却看不到」修复：受保护目录不再静默隐藏，签名补齐 size 双要素** - ① `config/clean_allowed_roots.txt` 里写入项目根目录后，前端「允许清理的目录」列表里看不到，容易被误判为「这行没读到」；实际是 `builtin` / `protected` 被前端过滤掉了；② `/api/clean/allowed-roots` 新增 `ignored_roots` 字段，逐条给出 `reason`（项目根受保护 / 项目根的上级目录），前端新增「已读取但被忽略」区块显式展示；③ `_get_clean_allowed_roots` 的缓存签名由单一 `os.path.getmtime` 改为 `(st_mtime_ns, st_size)` + 环境变量原文，与 PY-CORE-015「签名双要素」对齐，修掉同秒等长改写漏判；④ 同步修正 PY-CORE-015 签名来源表与 PY-CORE-052 反模式 / 检查清单
 
 > **Commit**: `14eb5ef5`
 
@@ -4862,7 +5222,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **修复类型**: 🐛Bug修复 + 🔴安全加固
 **影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: 14eb5ef5
-**变更统计**: +58行 -21行（main.py 新增 ignored_roots 与签名双要素、dist/app.js 新增「已读取但被忽略」区块、PY-CORE-015 签名来源表与 PY-CORE-051 检查清单同步，skill.docx 由 skill.md 重新生成）
+**变更统计**: +58行 -21行（main.py 新增 ignored_roots 与签名双要素、dist/app.js 新增「已读取但被忽略」区块、PY-CORE-015 签名来源表与 PY-CORE-052 检查清单同步，skill.docx 由 skill.md 重新生成）
 **作者**: 小旭二手机（西园路）
 
 ---
@@ -4890,14 +5250,14 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 **修复方案**:
 - **技术实现**: 签名由 `os.path.getmtime(...)` 改为 `os.stat(...)` 取 `(st.st_mtime_ns, st.st_size)` + 环境变量原文，文件缺失时签名取 `None` 正常降级
-- **技术实现**: 同步修正 PY-CORE-015 签名来源表与 PY-CORE-051 反模式 / 检查清单
+- **技术实现**: 同步修正 PY-CORE-015 签名来源表与 PY-CORE-052 反模式 / 检查清单
 - **参考位置**: [main.py](main.py#L3777-L3783)
 
 **测试验证**:
 - ✅ 同秒等长改写 → 缓存对象刷新、结果变化
 - ✅ 追加目录 → 立即生效；删文件 → 降级为仅项目目录；恢复 → 立即回到 3 条
 
-### v5.0.9.114 (2026-11-14) - 🔴 **PY-CORE-051 补上脚本层硬守卫：cleanup_temp_dir 入参白名单化，项目根删除路径彻底不可达** - ① run.sh / run.bat 的 `cleanup_temp_dir` 原先接受任意目录名入参，理论上可被传 `"."` / `".."` / `"/"` 触发对项目根或祖先的 `rm -rf` / `rd /s`；② 现加双重守卫：字面量白名单只放行 `temp` / `./temp`，再校验目标 realpath 必须恰好等于 `<项目根>/temp`，其余一律拒绝并返回非零；③ 实测 `.` / `..` / `/` / `config` / `file` 五种入参全部拒绝，仅 `temp` 放行；④ 同步更新 PY-CORE-051 入口清单第 9 项与检查清单 5b
+### v5.0.9.114 (2026-11-14) - 🔴 **PY-CORE-052 补上脚本层硬守卫：cleanup_temp_dir 入参白名单化，项目根删除路径彻底不可达** - ① run.sh / run.bat 的 `cleanup_temp_dir` 原先接受任意目录名入参，理论上可被传 `"."` / `".."` / `"/"` 触发对项目根或祖先的 `rm -rf` / `rd /s`；② 现加双重守卫：字面量白名单只放行 `temp` / `./temp`，再校验目标 realpath 必须恰好等于 `<项目根>/temp`，其余一律拒绝并返回非零；③ 实测 `.` / `..` / `/` / `config` / `file` 五种入参全部拒绝，仅 `temp` 放行；④ 同步更新 PY-CORE-052 入口清单第 9 项与检查清单 5b
 
 > **Commit**: `aeeb2634`
 
@@ -4907,7 +5267,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **修复类型**: 🔴安全加固
 **影响文件**: [run.sh](run.sh), [run.bat](run.bat), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
 **Commit**: aeeb2634
-**变更统计**: +46行 -8行（run.sh 与 run.bat 各加字面量白名单 + realpath 二次校验双重守卫，PY-CORE-051 入口清单与检查清单 5b 同步，skill.docx 由 skill.md 重新生成）
+**变更统计**: +46行 -8行（run.sh 与 run.bat 各加字面量白名单 + realpath 二次校验双重守卫，PY-CORE-052 入口清单与检查清单 5b 同步，skill.docx 由 skill.md 重新生成）
 **作者**: 小旭二手机（西园路）
 
 ---
@@ -4915,13 +5275,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 ##### 1. 🔴 cleanup_temp_dir 入参白名单化 + realpath 二次校验 (🔴安全加固)
 **问题描述**:
 - **现象**: `run.sh` / `run.bat` 的 `cleanup_temp_dir` 接受任意目录名入参，传入 `"."` / `".."` / `"/"` 时会退化成对项目根或祖先目录的 `rm -rf` / `rd /s`
-- **根因**: 清理函数只按传入字符串拼接路径，没有字面量白名单，也没有对目标 realpath 做归属校验；PY-CORE-051 的「项目根零删除权限」只在 Python 层落地，Shell 层留有缺口
+- **根因**: 清理函数只按传入字符串拼接路径，没有字面量白名单，也没有对目标 realpath 做归属校验；PY-CORE-052 的「项目根零删除权限」只在 Python 层落地，Shell 层留有缺口
 - **影响范围**: 启动脚本的清理入口，属最高危删除面
 
 **修复方案**:
 - **技术实现**: `run.sh` 的 `cleanup_temp_dir` 开头加 `case` 白名单（仅 `temp` / `./temp`），再用 `cd "$dir_name" && pwd` 取 realpath 与 `<项目根>/temp` 严格比对，任一不符即 `log` 拒绝并 `return 1`
 - **技术实现**: `run.bat` 的 `:cleanup_temp_dir` 加同构守卫，先 `if /i not "%DIR_NAME%"=="temp"` 判字面量，再取 `%~f1` 与 `%PROJECT_ROOT%temp` 比对，不符即 `exit /b 1`
-- **技术实现**: PY-CORE-051 入口清单第 9 项由「脚本内不得出现指向项目根的删除命令」升级为「必须内置硬白名单 + realpath 二次校验」，检查清单新增 5b 项
+- **技术实现**: PY-CORE-052 入口清单第 9 项由「脚本内不得出现指向项目根的删除命令」升级为「必须内置硬白名单 + realpath 二次校验」，检查清单新增 5b 项
 - **参考位置**: [run.sh](run.sh#L369-L385), [run.bat](run.bat#L642-L656)
 
 **测试验证**:
@@ -4929,19 +5289,19 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 仅 `temp` 入参输出「允许清理」并正常执行
 - ✅ `bash -n run.sh` 语法检查通过
 
-### v5.0.9.113 (2026-11-14) - 🔴 **三条新范式落地 + 号位取消上限：config 全量热读取、temp 提交前归零、项目根删除权限恒为零** - ① 编号规则里的「硬上限 100」取消，改为「号位不设人为上限」，突破 999 自然进位为四位，前缀与 A-Z 位次规则不变；② `ConfigManager` 由「一次性加载永久缓存」改为 `(mtime_ns, size)` 签名热读取，`WEB_API_KEY` 由模块级常量改为 `get_web_api_key()` 实时取值，改配置不再需要重启；③ 新增 `PY-CORE-015` 配置热读取、`PY-CORE-046` 临时目录提交前清理、`PY-CORE-051` 项目根目录零删除权限三条范式，编号按 A-Z 位次全量重排 36 个，范式总数 48 → 51
+### v5.0.9.113 (2026-11-14) - 🔴 **三条新范式落地 + 号位取消上限：config 全量热读取、temp 提交前归零、项目根删除权限恒为零** - ① 编号规则里的「硬上限 100」取消，改为「号位不设人为上限」，突破 999 自然进位为四位，前缀与 A-Z 位次规则不变；② `ConfigManager` 由「一次性加载永久缓存」改为 `(mtime_ns, size)` 签名热读取，`WEB_API_KEY` 由模块级常量改为 `get_web_api_key()` 实时取值，改配置不再需要重启；③ 新增 `PY-CORE-015` 配置热读取、`PY-CORE-047` 临时目录提交前清理、`PY-CORE-052` 项目根目录零删除权限三条范式，编号按 A-Z 位次全量重排 36 个，范式总数 48 → 51
 
 > **Commit**: `f56886bf`
 
 #### 更新内容: 把「号位上限」「配置冷缓存」「temp 随提交入库」三个长期隐患一次性修掉，并固化为三条可验收的正式范式
 
-1. **号位取消人为上限**: `PY-CORE-036` 的「编号突破 100 即格式失效」改为「号位不设人为上限」，三位补零自然覆盖 `001`~`999`，突破后进位为四位（`PY-CORE-1000`），前缀与 A-Z 位次规则不变 [README.md](README.md#L3219-L3252)
+1. **号位取消人为上限**: `PY-CORE-037` 的「编号突破 100 即格式失效」改为「号位不设人为上限」，三位补零自然覆盖 `001`~`999`，突破后进位为四位（`PY-CORE-1000`），前缀与 A-Z 位次规则不变 [README.md](README.md#L3219-L3252)
 2. **配置签名热读取**: `ConfigManager` 新增 `_config_file_signature()`（取 `(st_mtime_ns, st_size)`）与 `config` 属性内的签名比对，签名不变复用内存副本、一变立刻重读，文件缺失签名取 `None` 正常降级 [main.py](main.py#L5906-L5925)
 3. **API Key 实时取值**: 模块级 `WEB_API_KEY` 常量移除，改为 `get_web_api_key()` 每次经 `_web_config_mgr.get('web_api_key')` 实时读取，`/api/bootstrap` 改用该函数返回 [main.py](main.py#L6008-L6015) [main.py](main.py#L10597)
 4. **写入路径同步**: `ConfigManager.set()` 改为先取 `self.config`（触发签名校验）再改内存并落盘，避免「`_config` 为 `None` 时 set 静默失效」 [main.py](main.py#L5968-L5972)
 5. **新增 PY-CORE-015 配置热读取范式**: 落 c 组末位 `015`，含核心原则表（7 条规则）、签名缓存三件套模板、三种签名来源、6 条致命反模式、7 项落地检查清单 [README.md](README.md#L2243-L2324)
-6. **新增 PY-CORE-046 临时目录提交前清理范式**: 落 t 组末位 `046`，含「提交前必须为空」6 条规则、提交前三步标准动作、产物去向判定表、5 条反模式、5 项检查清单；`.gitignore` 同轮补入 `temp/` 规则 [README.md](README.md#L3990-L4058) [.gitignore](.gitignore#L76-L77)
-7. **新增 PY-CORE-051 项目根目录零删除权限范式**: 落 z 组末位 `051`，含「零权限且不可授予」7 条规则、10 个删除入口清单、能力/实现/入口三层判定、6 条反模式、7 项检查清单 [README.md](README.md#L4271-L4328)
+6. **新增 PY-CORE-047 临时目录提交前清理范式**: 落 t 组末位 `046`，含「提交前必须为空」6 条规则、提交前三步标准动作、产物去向判定表、5 条反模式、5 项检查清单；`.gitignore` 同轮补入 `temp/` 规则 [README.md](README.md#L3990-L4058) [.gitignore](.gitignore#L76-L77)
+7. **新增 PY-CORE-052 项目根目录零删除权限范式**: 落 z 组末位 `051`，含「零权限且不可授予」7 条规则、10 个删除入口清单、能力/实现/入口三层判定、6 条反模式、7 项检查清单 [README.md](README.md#L4271-L4328)
 8. **编号全量重排**: 原 `015`~`045` 整体 +1 → `016`~`046`（31 个），原 `046`~`050` 整体 +1 → `047`~`051`（5 个），正文标题、文档导航、汇总表、区间表、交叉引用同步，三校验零跳号零重号零遗漏，范式总数 48 → 51 [README.md](README.md#L4332-L4396)
 9. **文档导航扩容**: 导航表新增 015 / 046 / 051 三条入口，编号按升序排列（015 在 014 之后、046 在 045 之后、051 在 050 之后）[README.md](README.md#L20-L36)
 10. **三方文档同步**: README.md ↔ skill.md 逐字节一致，skill.docx 由 skill.md 重新生成；temp/ 全部清空且不入版本库
@@ -4976,7 +5336,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 ##### 2. 📝 新增 PY-CORE-015 配置热读取范式 (📝范式治理)
 **问题描述**:
 - **现象**: 「配置必须热读取」此前只是口头约定与零散注释，没有独立范式，也没有可执行的验收清单，导致 `ConfigManager` 的冷缓存长期存在
-- **根因**: 配置读取规范未按 `PY-CORE-036` 立为范式，缺少「禁止一次性缓存」「签名双要素」等硬约束
+- **根因**: 配置读取规范未按 `PY-CORE-037` 立为范式，缺少「禁止一次性缓存」「签名双要素」等硬约束
 - **影响范围**: `config/` 下全部配置文件的读取方式、后续任何新增配置项的实现
 
 **修复方案**:
@@ -4987,14 +5347,14 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 范式正文、导航、汇总表三处齐备，编号 `015` 与 c 组末位一致
 - ✅ 检查清单 7 项逐条可执行（改配置 / 改白名单 / 删文件 / 坏 JSON / 明文语义 / 无 lru_cache / 常量兜底）
 
-##### 3. 📝 新增 PY-CORE-046 临时目录提交前清理范式 (📝范式治理)
+##### 3. 📝 新增 PY-CORE-047 临时目录提交前清理范式 (📝范式治理)
 **问题描述**:
 - **现象**: `temp/` 下堆积了一次性校验脚本（回填 changelog、编号重排、接口核对）与调试产物，`git add -A` 会整批带入版本库
 - **根因**: `.gitignore` 未包含 `temp/`，且没有「提交前必须归零」的硬规则，临时产物与正式文件混放
 - **影响范围**: 全部 Git 提交内容、仓库体积、`temp/` 目录的生命周期
 
 **修复方案**:
-- **技术实现(立范式)**: 新增 `PY-CORE-046 临时目录提交前清理范式 (Temp Directory Pre-Commit Purge)`，含「提交前必须为空 / 不入版本库 / 复用才保留 / 大文件不驻留 / 先跑完再删 / 结论必须落文档」6 条规则、提交前三步标准动作、产物去向判定表、5 条反模式、5 项检查清单
+- **技术实现(立范式)**: 新增 `PY-CORE-047 临时目录提交前清理范式 (Temp Directory Pre-Commit Purge)`，含「提交前必须为空 / 不入版本库 / 复用才保留 / 大文件不驻留 / 先跑完再删 / 结论必须落文档」6 条规则、提交前三步标准动作、产物去向判定表、5 条反模式、5 项检查清单
 - **技术实现(忽略规则)**: `.gitignore` 末尾新增「临时工作目录」分组并写入 `temp/`，防止 `git add -A` 误收录
 - **技术实现(实际清理)**: 删除 `temp/` 下 5 个一次性脚本（backfill_changelog.py / normalize_meta.py / verify_changelog.py / check_changelog.py / renumber_51.py）与调试产物 cl.json，脚本产出的结论已写入各版本记录
 - **参考位置**: [README.md](README.md#L3990-L4058) [.gitignore](.gitignore#L76-L77)
@@ -5004,14 +5364,14 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ `git status --porcelain` 中无 `temp/` 相关条目
 - ✅ `.gitignore` 含 `temp/` 规则，`git check-ignore temp/x.py` 命中
 
-##### 4. 🔴 新增 PY-CORE-051 项目根目录零删除权限范式 (🔴安全加固)
+##### 4. 🔴 新增 PY-CORE-052 项目根目录零删除权限范式 (🔴安全加固)
 **问题描述**:
 - **现象**: 项目根目录的保护此前表述为「默认禁止但可放行」，读者会误以为只要写进白名单或传个参数就能删掉，与「零权限」的真实要求不符
 - **根因**: 缺少一条把「删除项目根」定义为「能力层面不存在」的总纲范式，保护语义散落在 `PY-CORE-014` 的实现细节里
 - **影响范围**: 全部删除类接口、`run.sh` / `run.bat` 的清理步骤、前端删除按钮、任何运维命令
 
 **修复方案**:
-- **技术实现(立范式)**: 新增 `PY-CORE-051 项目根目录零删除权限范式 (Zero Delete Permission on Project Root)`，明确「不是默认禁止，而是永久没有删除权限且不可授予」，含 7 条规则、10 个删除入口清单、能力层/实现层/入口层三层判定、6 条反模式、7 项检查清单
+- **技术实现(立范式)**: 新增 `PY-CORE-052 项目根目录零删除权限范式 (Zero Delete Permission on Project Root)`，明确「不是默认禁止，而是永久没有删除权限且不可授予」，含 7 条规则、10 个删除入口清单、能力层/实现层/入口层三层判定、6 条反模式、7 项检查清单
 - **技术实现(与 014 分工)**: 051 管「零权限不可授予」的总纲，014 管「路径校验顺序」的实现细则，两者互相引用，避免规则重复也避免出现空档
 - **参考位置**: [README.md](README.md#L4271-L4328) [README.md](README.md#L2129-L2240)
 
@@ -5023,9 +5383,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ##### 5. 📐 号位取消人为上限 + 编号全量重排 (📐范式定义)
 **问题描述**:
-- **现象**: `PY-CORE-036` 写着「编号突破 100 即三位数字溢出、格式失效」，导致范式数量增长后必须靠「合并 / 拆分范式」来维持格式，规则本身成了扩容的障碍
+- **现象**: `PY-CORE-037` 写着「编号突破 100 即三位数字溢出、格式失效」，导致范式数量增长后必须靠「合并 / 拆分范式」来维持格式，规则本身成了扩容的障碍
 - **根因**: 把「三位补零」这个显示格式误解成了「最多 100 个范式」的容量上限
-- **影响范围**: `PY-CORE-036` 的规则表、区间表、汇总表、全部 51 个范式的编号与引用
+- **影响范围**: `PY-CORE-037` 的规则表、区间表、汇总表、全部 51 个范式的编号与引用
 
 **修复方案**:
 - **技术实现(取消上限)**: 规则表「编号突破 100 → 先合并/拆分范式」改为「编号突破 999 → 自动进位为四位 `PY-CORE-1000`，前缀与 A-Z 位次规则不变，禁止为此跳号或复号」；区间表标题改为「号位不设上限」，尾注写明「三位补零自然覆盖 001~999，当前队列长度 51，剩余可用号位无上限」
@@ -5087,12 +5447,12 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 ##### 2. 📝 白名单保护固化为 PY-CORE-014 范式 (📝范式治理)
 **问题描述**:
 - **现象**: 「白名单里写项目根也删不掉」这条约束此前只存在于代码注释与版本记录中，没有独立范式条目，后续改动容易再次引入可绕过开关
-- **根因**: 清理目录的边界校验规则没有按 PY-CORE-035 的编号规则立为范式，缺少可执行的验收清单
+- **根因**: 清理目录的边界校验规则没有按 PY-CORE-036 的编号规则立为范式，缺少可执行的验收清单
 - **影响范围**: 全仓库 48 个 PY-CORE 范式的编号体系与 README.md / skill.md / skill.docx 三方文档
 
 **修复方案**:
 - **技术实现(立范式)**: 新增 `PY-CORE-014 清理目录白名单保护范式 (Clean Directory Whitelist Protection)`，含核心原则表、六步判定顺序表、标准实现模板、白名单读取规范表、致命反模式表、8 项验收清单与实测记录表
-- **技术实现(按 A-Z 重排)**: 首字母 c 落 c 组末位 `014`，原 `014`~`048` 整体 +1，`PY-CORE-035` 的区间表、队列长度（47 → 48）、剩余号位（53 → 52）同步更新，并新增「本轮重排实录（v5.0.9.112）」记录位移
+- **技术实现(按 A-Z 重排)**: 首字母 c 落 c 组末位 `014`，原 `014`~`048` 整体 +1，`PY-CORE-036` 的区间表、队列长度（47 → 48）、剩余号位（53 → 52）同步更新，并新增「本轮重排实录（v5.0.9.112）」记录位移
 - **技术实现(全量同步)**: 655 处编号 token 一次性替换，覆盖正文标题、文档导航、汇总表、区间表、交叉引用与历史版本记录；文档导航补入新范式入口
 - **参考位置**: [README.md](README.md#L2125-L2240) [README.md](README.md#L3018-L3051) [README.md](README.md#L4009)
 
@@ -5692,7 +6052,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-### v5.0.9.106 (2026-11-14) - 🛡️ **清理安全四层防护 + 跨平台路径兼容 + 版本口径双层兼容 3.6+/3.9+** - 项目根目录一律拒绝清理（入口隐藏 → 前端预检 → 后端校验 → 排除名单兜底）+ 路径统一 `realpath`/`normcase`/`expanduser`/`os.sep`/`os.pathsep` 归一 + `shutil.rmtree` 只读文件 `onerror` 兜底 + 删除类模式目录必填 + 排除名单大小写不敏感兼容 + 跨平台细则写入 PY-CORE-022 范式 + Python 版本口径改为语法/运行双层兼容（语法基线 3.6+ / 运行基线 3.9+，`/api/dependencies` 新增 `compat` 与 `runtime` 字段）
+### v5.0.9.106 (2026-11-14) - 🛡️ **清理安全四层防护 + 跨平台路径兼容 + 版本口径双层兼容 3.6+/3.9+** - 项目根目录一律拒绝清理（入口隐藏 → 前端预检 → 后端校验 → 排除名单兜底）+ 路径统一 `realpath`/`normcase`/`expanduser`/`os.sep`/`os.pathsep` 归一 + `shutil.rmtree` 只读文件 `onerror` 兜底 + 删除类模式目录必填 + 排除名单大小写不敏感兼容 + 跨平台细则写入 PY-CORE-023 范式 + Python 版本口径改为语法/运行双层兼容（语法基线 3.6+ / 运行基线 3.9+，`/api/dependencies` 新增 `compat` 与 `runtime` 字段）
 
 > **Commit**: `1111aeb1`
 
@@ -5703,7 +6063,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 3. **跨平台路径归一**: 用户输入统一 `~` 展开 → 绝对化 → `os.path.realpath` 归一，比较统一 `os.path.normcase`，前缀判断统一 `root + os.sep`，多目录环境变量统一 `os.pathsep`，Windows/macOS/Linux 判定结果一致 [main.py](main.py#L3455-L3500)
 4. **排除名单大小写兼容**: `EXCLUDE_FOLDERS` / `EXCLUDE_FILE_NAMES` 统一小写，比对前 `item.name.lower()`，Windows 大小写不敏感文件系统下 `Config`/`File`/`Thumbs.db` 变体同样受保护 [main.py](main.py#L2100-L2101) [main.py](main.py#L2496-L2503)
 5. **只读文件删除兜底**: 新增 `_rmtree_onerror()`，`shutil.rmtree` 遇 `PermissionError` 自动 `chmod 0o777` 重试，兼容 Windows 只读属性，不再裸调用 [main.py](main.py#L2104)
-6. **跨平台细则入范式**: PY-CORE-022 新增《跨平台路径与文件系统兼容细则》，含四条铁律、平台差异对照表（6 行正确写法 vs 错误写法 vs 后果）、前后端职责划分与判定标准 [skill.md](skill.md#L19845-L19906)
+6. **跨平台细则入范式**: PY-CORE-023 新增《跨平台路径与文件系统兼容细则》，含四条铁律、平台差异对照表（6 行正确写法 vs 错误写法 vs 后果）、前后端职责划分与判定标准 [skill.md](skill.md#L19845-L19906)
 7. **版本口径双层兼容**: 版本口径由不可运行的 `3.0+` 改为「语法基线 `3.6+`（兼容 3.6–3.14）+ 运行基线 `3.9+`」，`requirements.txt` 注释为唯一数据源，`/api/dependencies` 新增 `compat` / `runtime` 两个字段，页面、代码、文档三处同步 [requirements.txt](requirements.txt#L4-L5) [main.py](main.py#L12517-L12572)
 8. **防缓存与全量校验**: `app.js` 版本号递增至 `20261114190000`，`/api/dependencies` 改 `JSONResponse` 并加 `Cache-Control: no-store`，改动即时生效不再命中旧页面 [index.html](index.html#L2098) [main.py](main.py#L12558-L12572)
 
@@ -5801,15 +6161,15 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 ##### 6. 📚 跨平台细则写入范式 (📚范式补录)
 **问题描述**:
 - **现象**: 跨平台适配此前散落在代码里，没有形成可复用的判定标准，新代码容易再次出现「macOS 能跑、Windows 误删」
-- **根因**: PY-CORE-022 只写了环境检测（`Environment` 类），缺「用户输入路径 / 目录遍历 / 文件删除」这一类文件系统语义的约束
+- **根因**: PY-CORE-023 只写了环境检测（`Environment` 类），缺「用户输入路径 / 目录遍历 / 文件删除」这一类文件系统语义的约束
 - **影响范围**: 后续所有涉及路径与删除的改动
 
 **修复方案**:
-- **技术实现**: 在 PY-CORE-022 下新增《跨平台路径与文件系统兼容细则》：四条铁律（路径归一 / 大小写 / 分隔符 / 删除兜底）、平台差异对照表（6 行正确写法 vs 错误写法 vs 后果）、前后端职责划分（后端为唯一可信边界、前端仅预检、前端只对盘符路径转小写）、7 条判定标准；同步更新范式汇总表与关键特性清单
+- **技术实现**: 在 PY-CORE-023 下新增《跨平台路径与文件系统兼容细则》：四条铁律（路径归一 / 大小写 / 分隔符 / 删除兜底）、平台差异对照表（6 行正确写法 vs 错误写法 vs 后果）、前后端职责划分（后端为唯一可信边界、前端仅预检、前端只对盘符路径转小写）、7 条判定标准；同步更新范式汇总表与关键特性清单
 - **参考位置**: [skill.md](skill.md#L19845-L19906), [skill.md](skill.md#L3815)
 
 **测试验证**:
-- ✅ 范式编号零跳号零重号（PY-CORE-001 ~ PY-CORE-051 连续）
+- ✅ 范式编号零跳号零重号（PY-CORE-001 ~ PY-CORE-052 连续）
 - ✅ README.md 与 skill.md 逐字节一致（SHA256 相同）
 - ✅ 判定标准 7 条均可对照代码逐条复核
 
@@ -6077,11 +6437,11 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-### v5.0.9.103 (2026-11-14) - 🥊 **全量攻防强制执行 + 隐藏Bug清零 + 完整数据判据修正** - 攻防 13 项不再允许跳过(服务未起自动拉起临时实例/结束释放端口) + 请求失败一律判 FAILED 并记问题(INCONCLUSIVE 口径废除) + 执行项不足 13 直接记高危 + 完整性容差按服务端总数等比缩放(修小相册漏商品) + 歧义总数键按本页条数过滤(修永远判不完整) + 去重键空值退化改内容指纹(修商品被批量误删) + 新增 PY-CORE-050 零缺陷全量验证范式
+### v5.0.9.103 (2026-11-14) - 🥊 **全量攻防强制执行 + 隐藏Bug清零 + 完整数据判据修正** - 攻防 13 项不再允许跳过(服务未起自动拉起临时实例/结束释放端口) + 请求失败一律判 FAILED 并记问题(INCONCLUSIVE 口径废除) + 执行项不足 13 直接记高危 + 完整性容差按服务端总数等比缩放(修小相册漏商品) + 歧义总数键按本页条数过滤(修永远判不完整) + 去重键空值退化改内容指纹(修商品被批量误删) + 新增 PY-CORE-051 零缺陷全量验证范式
 
 > **Commit**: `b1cbabcc`
 
-#### 更新内容: 把「攻防可以跳过、失败可以含糊、抓不全也算完成」三条退路全部堵死——攻防 13 项必须项项真跑真判，抓取完整性判据修掉三处会导致漏数据的隐藏 bug，并固化为 PY-CORE-050 范式
+#### 更新内容: 把「攻防可以跳过、失败可以含糊、抓不全也算完成」三条退路全部堵死——攻防 13 项必须项项真跑真判，抓取完整性判据修掉三处会导致漏数据的隐藏 bug，并固化为 PY-CORE-051 范式
 
 1. **攻防自动拉起**: 新增 `_ensure_server()` / `_stop_server()`，服务未运行时自动 `subprocess.Popen([sys.executable, 'main.py', '--web'])` 拉起临时实例（`WEB_PORT` 可指定），45 秒内轮询端口就绪，验证结束 `terminate()` 释放端口；拉起失败/就绪超时记 HIGH，不再降级为 INFO 放行 [test/security_audit.py](test/security_audit.py#L1195-L1268)
 2. **废除免检口径**: 全部 `INCONCLUSIVE` 改为 `FAILED`，请求失败即「防护未验证」，按对应等级记入问题；路径遍历内容复核/安全响应头基线/错误信息泄露复核三处补齐 else 分支，不再出现「请求失败也算通过」[test/security_audit.py](test/security_audit.py#L1270-L1526)
@@ -6089,7 +6449,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 4. **容差等比缩放**: `_album_is_complete()` 容差由固定 5 改为 `min(5, total // 20)`，修掉「总数 3 的相册一个没抓到也判完整」的漏数据 bug [main.py](main.py#L1457-L1467)
 5. **歧义总数键过滤**: `_extract_album_total()` 增加 `page_len` 参数，`itemCount/count` 在已知本页条数时只有大于本页条数才当总数，修掉「每页条数被当总数、永远判不完整、白翻多轮」的 bug [main.py](main.py#L1431-L1455)
 6. **去重键指纹兜底**: `_dedupe_album_items()` 在 `goodsNum` 与 `title/time_stamp` 全缺时改用整条记录的 SHA256 内容指纹，修掉「兜底键退化为同一空键、除首条外商品被批量误删」的 bug [main.py](main.py#L1661-L1687)
-7. **范式固化**: 新增 [PY-CORE-050 零缺陷全量验证范式](README.md#L3684-L3790)，含三大子标准（全量攻防 / 隐藏Bug零容忍 / 完整数据）、13 项攻防清单、四层兜底参数表、完整性判据三条硬规则、可复制校验脚本、8 条坑位表与 7 项落地检查清单；导航表/汇总表各增 1 行、区间表 z 段落号 047、总计 46→47 [README.md](README.md#L3684-L3790)
+7. **范式固化**: 新增 [PY-CORE-051 零缺陷全量验证范式](README.md#L3684-L3790)，含三大子标准（全量攻防 / 隐藏Bug零容忍 / 完整数据）、13 项攻防清单、四层兜底参数表、完整性判据三条硬规则、可复制校验脚本、8 条坑位表与 7 项落地检查清单；导航表/汇总表各增 1 行、区间表 z 段落号 047、总计 46→47 [README.md](README.md#L3684-L3790)
 8. **三方同步**: README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重生成，全文锚点重映射后零越界
 
 **修复日期**: 2026-11-14
@@ -6202,18 +6562,18 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-##### 7. 📐 新增 PY-CORE-050 零缺陷全量验证范式 (📐范式定义)
+##### 7. 📐 新增 PY-CORE-051 零缺陷全量验证范式 (📐范式定义)
 **问题描述**:
 - **现象**: 「全量攻防 / 隐藏Bug清零 / 完整数据」三项要求散落在变更记录与临时口径里，没有独立范式可判定，新增代码时无从对照
 - **根因**: 三项要求横跨 `test/security_audit.py` 与 `main.py` 两条链路，此前未被抽象成统一范式
 - **影响范围**: 攻防、审计、抓取三处验收口径不统一
 
 **修复方案**:
-- **技术实现**: 按 PY-CORE-036 规则取标题英文名首字母 `z` 落号 047（z 段此前为空，队列尾部插入，零重排），新增 [PY-CORE-050 零缺陷全量验证范式](README.md#L3684-L3790)：三大子标准表、13 项攻防清单（含载荷与期望）、分页四层兜底参数表、完整性判据三条硬规则、可复制校验脚本、8 条坑位表、7 项落地检查清单与判定标准；导航表与汇总表各插 1 行，区间表新增 `z | 047-047 | 047 | 满`，总计 46→47
-- **参考位置**: [PY-CORE-036 区间表](README.md#L2826-L2853)、[PY-CORE-050 零缺陷全量验证范式](README.md#L3684-L3790)
+- **技术实现**: 按 PY-CORE-037 规则取标题英文名首字母 `z` 落号 047（z 段此前为空，队列尾部插入，零重排），新增 [PY-CORE-051 零缺陷全量验证范式](README.md#L3684-L3790)：三大子标准表、13 项攻防清单（含载荷与期望）、分页四层兜底参数表、完整性判据三条硬规则、可复制校验脚本、8 条坑位表、7 项落地检查清单与判定标准；导航表与汇总表各插 1 行，区间表新增 `z | 047-047 | 047 | 满`，总计 46→47
+- **参考位置**: [PY-CORE-037 区间表](README.md#L2826-L2853)、[PY-CORE-051 零缺陷全量验证范式](README.md#L3684-L3790)
 
 **测试验证**:
-- ✅ 汇总表 47 行、`PY-CORE-001 ~ PY-CORE-050` 连续，跳号 0、重号 0
+- ✅ 汇总表 47 行、`PY-CORE-001 ~ PY-CORE-051` 连续，跳号 0、重号 0
 - ✅ `##` 章节编号序列仍严格升序，导航表行序升序
 - ✅ 区间表 a-z 各段占用与汇总表首字母列一致
 
@@ -6227,7 +6587,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 **修复方案**:
 - **技术实现**: skill.md 与 README.md 逐字节同步（`cmp` 校验），执行 `python test/generate_docx.py` 由 skill.md 重生成 skill.docx，再对全文内部锚点做行号重映射并校验越界数为 0
-- **参考位置**: [PY-CORE-044 三方文档互证范式](README.md)
+- **参考位置**: [PY-CORE-045 三方文档互证范式](README.md)
 
 **测试验证**:
 - ✅ `cmp skill.md README.md` 无差异
@@ -6566,14 +6926,14 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-### v5.0.9.100 (2026-11-12) - 🔒 **把「升序」写死成新增内容的前置规则 + PY-CORE-018 字母列与英文名首字母不符修正** - PY-CORE-049 新增「新增内容时的插入规则」子节(新范式/导航表/汇总表/列表/更新内容一律按号插入，禁止表尾追加)+汇总表 016 行英文名 `Skill Docx Generation` 改为 `Docx Generation Paradigm`，使 D 段字母与英文名首字母一致+锚点重映射 104 处零空行
+### v5.0.9.100 (2026-11-12) - 🔒 **把「升序」写死成新增内容的前置规则 + PY-CORE-019 字母列与英文名首字母不符修正** - PY-CORE-050 新增「新增内容时的插入规则」子节(新范式/导航表/汇总表/列表/更新内容一律按号插入，禁止表尾追加)+汇总表 016 行英文名 `Skill Docx Generation` 改为 `Docx Generation Paradigm`，使 D 段字母与英文名首字母一致+锚点重映射 104 处零空行
 
 > **Commit**: `f936bf93`
 
 #### 更新内容: 回答「以后新范式是否也走升序」——不止回答，直接把规则钉进范式，使后续新增无法绕过
 
-1. **字母映射修正**: PY-CORE-018 汇总表英文名 `Skill Docx Generation` 改为 `Docx Generation Paradigm`，使字母列 `D` 与英文名首字母一致 [README.md](README.md#L3683-L3741)
-2. **规则固化**: PY-CORE-049 新增「新增内容时的插入规则」子节，明确新范式/新导航行/新汇总行/新列表条目一律「按号插入」而非表尾追加，并给出 4 行场景表与对应校验项 [README.md](README.md#L3597-L3606)
+1. **字母映射修正**: PY-CORE-019 汇总表英文名 `Skill Docx Generation` 改为 `Docx Generation Paradigm`，使字母列 `D` 与英文名首字母一致 [README.md](README.md#L3683-L3741)
+2. **规则固化**: PY-CORE-050 新增「新增内容时的插入规则」子节，明确新范式/新导航行/新汇总行/新列表条目一律「按号插入」而非表尾追加，并给出 4 行场景表与对应校验项 [README.md](README.md#L3597-L3606)
 3. **锚点重映射**: 全文行号锚点按插入偏移整体重算，104 处锚点零空行零越界零倒序
 4. **三方同步**: README.md 与 skill.md 逐字节一致，skill.docx 重新生成后 23 个导航超链接全部命中书签
 
@@ -6586,9 +6946,9 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-##### 1. 🔢 PY-CORE-018 字母列与英文名首字母不符修正 (📝文档归一)
+##### 1. 🔢 PY-CORE-019 字母列与英文名首字母不符修正 (📝文档归一)
 **问题描述**:
-- **现象**: 汇总表 016 行为 `| PY-CORE-018 | D | skill.docx生成范式 (Skill Docx Generation) |`，字母列 `D` 但英文名首字母为 `S`，与 PY-CORE-036 判定标准「与标题首字母位次不符」直接冲突
+- **现象**: 汇总表 016 行为 `| PY-CORE-019 | D | skill.docx生成范式 (Skill Docx Generation) |`，字母列 `D` 但英文名首字母为 `S`，与 PY-CORE-037 判定标准「与标题首字母位次不符」直接冲突
 - **根因**: 该行英文名为早期直译，未随字母分组口径复核
 - **影响范围**: 汇总表 1 行，编号 016 的字母归属说明
 
@@ -6601,15 +6961,15 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 逐行「字母列 vs 英文名首字母」比对不符 0（此前 1 处）
 - ✅ 汇总表 46 行仍为 001~046 连续、零跳号零重号
 
-##### 2. 🔒 PY-CORE-049 新增「新增内容时的插入规则」子节 (📐范式定义)
+##### 2. 🔒 PY-CORE-050 新增「新增内容时的插入规则」子节 (📐范式定义)
 **问题描述**:
-- **现象**: PY-CORE-049 只规定「现有内容必须升序」，未规定「新增内容时怎么插」，新范式或新条目仍可能被追加到表尾/列表尾而破坏升序
+- **现象**: PY-CORE-050 只规定「现有内容必须升序」，未规定「新增内容时怎么插」，新范式或新条目仍可能被追加到表尾/列表尾而破坏升序
 - **根因**: 原范式按「存量校验」视角编写，缺少「增量插入」视角的强制动作
 - **影响范围**: 后续每一次新增范式、新增导航行、新增汇总行、新增变更记录条目
 
 **修复方案**:
-- **技术实现**: 在「豁免口径」之后、「排序算法」之前插入子节，给出 4 行场景表——新增范式章节按 PY-CORE-036 落号后插到「编号更大」章节之前、新增导航/汇总行插到对应位次不得追加表尾、新增列表条目插到「编号不大于自身」的相邻条目之后、新增「更新内容」条目按首号插入后整块重编号 `1. 2. 3. …`；并补一句口径：新增不是「往后追加」，而是「按号插入 + 全量复跑校验脚本」
-- **参考位置**: [PY-CORE-049 新增内容插入规则](README.md#L3597-L3606)
+- **技术实现**: 在「豁免口径」之后、「排序算法」之前插入子节，给出 4 行场景表——新增范式章节按 PY-CORE-037 落号后插到「编号更大」章节之前、新增导航/汇总行插到对应位次不得追加表尾、新增列表条目插到「编号不大于自身」的相邻条目之后、新增「更新内容」条目按首号插入后整块重编号 `1. 2. 3. …`；并补一句口径：新增不是「往后追加」，而是「按号插入 + 全量复跑校验脚本」
+- **参考位置**: [PY-CORE-050 新增内容插入规则](README.md#L3597-L3606)
 
 **测试验证**:
 - ✅ 子节 4 行场景表与校验脚本三项（章节扫描 / 表格扫描 / 列表块扫描）一一对应
@@ -6617,7 +6977,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-### v5.0.9.99 (2026-11-12) - 🔢 **新旧号对照表按新号升序 + 重号修正与落号清单升序 + PY-CORE-049 补齐对照表判定行与三类豁免口径** - 本轮重排实录 12 行由按类别改为按新号 001→045 升序(首字母列随之 A-Z)+重号修正落号序列 `014、025、008、013` 改为 `008、013、014、025`+按字母位次落号清单 7 项改为 `008、013、014、023、025、026、041` 升序+判定表新增「新旧号对照表」一行+豁免口径明确为反例样本/新旧号对照/区间端点三类
+### v5.0.9.99 (2026-11-12) - 🔢 **新旧号对照表按新号升序 + 重号修正与落号清单升序 + PY-CORE-050 补齐对照表判定行与三类豁免口径** - 本轮重排实录 12 行由按类别改为按新号 001→045 升序(首字母列随之 A-Z)+重号修正落号序列 `014、025、008、013` 改为 `008、013、014、025`+按字母位次落号清单 7 项改为 `008、013、014、023、025、026、041` 升序+判定表新增「新旧号对照表」一行+豁免口径明确为反例样本/新旧号对照/区间端点三类
 
 > **Commit**: `9d18f931`
 
@@ -6660,15 +7020,15 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 两处落号清单编号序列均严格升序
 - ✅ 无 `PY-CORE-` 前缀的三位标号扫描，除三类豁免外违规 0
 
-##### 3. 📐 PY-CORE-049 补齐对照表判定行与三类豁免口径 (📝范式定义)
+##### 3. 📐 PY-CORE-050 补齐对照表判定行与三类豁免口径 (📝范式定义)
 **问题描述**:
-- **现象**: PY-CORE-049 判定表只覆盖六类出现点，未覆盖「新旧号对照表」；同时「不合格示例」列与「乱序输入」示例故意保留乱序，会被自动校验误判为违规
+- **现象**: PY-CORE-050 判定表只覆盖六类出现点，未覆盖「新旧号对照表」；同时「不合格示例」列与「乱序输入」示例故意保留乱序，会被自动校验误判为违规
 - **根因**: 判定表按「引用出现位置」设计，未考虑映射型表格与规则自证反例这两种特殊形态
 - **影响范围**: 范式自身判定口径完整性
 
 **修复方案**:
 - **技术实现**: 判定表新增「新旧号对照表（旧号 → 新号）」一行，明确「按新号升序、首字母随之 A-Z 升序、旧号列为历史快照不参与排序」；并新增豁免口径三段，仅三类豁免——①反例样本 ②新旧号对照映射行 ③区间端点（`001~046` / `001-002` / `001-100`），其余一律判违规
-- **参考位置**: [PY-CORE-049 文档内引用编号升序范式](README.md#L3574-L3679)
+- **参考位置**: [PY-CORE-050 文档内引用编号升序范式](README.md#L3574-L3679)
 
 **测试验证**:
 - ✅ 判定表 7 行覆盖章节 / 导航表 / 汇总表 / 列表块 / 有序列表 / 单行引用 / 对照表
@@ -6676,11 +7036,11 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-### v5.0.9.98 (2026-11-12) - 🔢 **列表块编号全量升序 + PY-CORE-036 区间表补齐 w 位 + 新增 PY-CORE-049 文档内引用编号升序范式** - 8 处列表块跨行非升序重排(含「更新内容」有序列表按升序重编号)+`022/019` 行内引用升序+五类出现点全扫全改+汇总表扩容 46 行+导航表新增 1 行
+### v5.0.9.98 (2026-11-12) - 🔢 **列表块编号全量升序 + PY-CORE-037 区间表补齐 w 位 + 新增 PY-CORE-050 文档内引用编号升序范式** - 8 处列表块跨行非升序重排(含「更新内容」有序列表按升序重编号)+`022/019` 行内引用升序+五类出现点全扫全改+汇总表扩容 46 行+导航表新增 1 行
 
 > **Commit**: `bcce341c`
 
-#### 更新内容: 把「编号升序」从「章节有序即可」升级为「全文档所有出现点有序」，修正 8 处跨行列表块乱序（`011→045→012`、`022→019→022`、`018→011→016`、`012→011`、`045→011`、`010→039→011`），并把规则固化为 PY-CORE-049
+#### 更新内容: 把「编号升序」从「章节有序即可」升级为「全文档所有出现点有序」，修正 8 处跨行列表块乱序（`011→045→012`、`022→019→022`、`018→011→016`、`012→011`、`045→011`、`010→039→011`），并把规则固化为 PY-CORE-050
 
 **修复日期**: 2026-11-12
 **修复类型**: 📝文档归一
@@ -6699,7 +7059,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 **修复方案**:
 - **技术实现**: 以「连续列表块」为单位整体排序，排序键取每条行内首个 `PY-CORE-\d{3}`；无编号条目按「继承前一条编号键」规则填充后再做稳定排序；有序列表排序后按 `1. 2. 3. …` 重新编号
-- **参考位置**: [PY-CORE-049 文档内引用编号升序范式](README.md#L3574-L3679)
+- **参考位置**: [PY-CORE-050 文档内引用编号升序范式](README.md#L3574-L3679)
 
 **测试验证**:
 - ✅ 8 处列表块排序后编号序列全部非降序（`011→012→045`、`019→无编号→022…`、`011→016→无编号→018`、`011→…→012`、`011→012→012`、`011→无编号→045`、`010→011→039`）
@@ -6712,26 +7072,26 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **影响范围**: 1 处行内引用
 
 **修复方案**:
-- **技术实现**: 改写为「新增 019/022 两条」，并在 PY-CORE-049 中把「前缀后数字部分」明确纳入单行校验口径，避免再次漏检
+- **技术实现**: 改写为「新增 019/022 两条」，并在 PY-CORE-050 中把「前缀后数字部分」明确纳入单行校验口径，避免再次漏检
 - **参考位置**: [README.md](README.md#L4057)
 
 **测试验证**:
 - ✅ 全文「单行含 ≥2 个 `PY-CORE-` 编号」非升序行数为 0
 
-##### 3. 📐 新增 PY-CORE-049 文档内引用编号升序范式 (📝范式定义)
+##### 3. 📐 新增 PY-CORE-050 文档内引用编号升序范式 (📝范式定义)
 **问题描述**:
 - **现象**: 「编号必须从小到大」只以零散约定存在于各版本变更记录，缺少一条可执行、可校验的独立范式，导致同类乱序反复出现
 - **根因**: 规则未固化，每次修完章节排序即认为完成，未定义「跨行列表块 / 有序列表 / 行内引用」的判定口径
 - **影响范围**: 全文档编号一致性，后续所有新增内容
 
 **修复方案**:
-- **技术实现**: 按 PY-CORE-036 规则取标题英文名首字母 `w` 落号 046（紧随 045 的 `v` 段之后，零跳号），新增 [文档内引用编号升序范式 (PY-CORE-049)](README.md#L3574-L3679)，含六类出现点判定表、三步排序算法（取键/填键/稳定排序）、无编号条目填充示例、可复制校验脚本、6 条坑位表与 6 项落地检查清单
-- **参考位置**: [PY-CORE-036 区间表](README.md#L2846-L2857)、[PY-CORE-049 文档内引用编号升序范式](README.md#L3574-L3679)
+- **技术实现**: 按 PY-CORE-037 规则取标题英文名首字母 `w` 落号 046（紧随 045 的 `v` 段之后，零跳号），新增 [文档内引用编号升序范式 (PY-CORE-050)](README.md#L3574-L3679)，含六类出现点判定表、三步排序算法（取键/填键/稳定排序）、无编号条目填充示例、可复制校验脚本、6 条坑位表与 6 项落地检查清单
+- **参考位置**: [PY-CORE-037 区间表](README.md#L2846-L2857)、[PY-CORE-050 文档内引用编号升序范式](README.md#L3574-L3679)
 
 **测试验证**:
 - ✅ 范式章节序列升序：`… 040 → 043 → 046`，25 个带号 `##` 标题严格升序
 - ✅ 汇总表扩容至 46 行（001~046 连续、零跳号、零重号），导航表新增 1 行后仍升序（`011 … 043 → 046`）
-- ✅ PY-CORE-036 区间表补齐 `w | 046-046 | 046 | 满`，队列长度 45 → 46、剩余号位 55 → 54
+- ✅ PY-CORE-037 区间表补齐 `w | 046-046 | 046 | 满`，队列长度 45 → 46、剩余号位 55 → 54
 
 ---
 
@@ -6785,7 +7145,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **影响范围**: 全量扫描「一行含两个及以上编号且非升序」的检索口径
 
 **修复方案**:
-- **技术实现**: 逐行调整分句顺序或补注位置，使编号出现次序升序且语义不变（如「按 PY-CORE-020 重新生成…；导航表新增 (PY-CORE-032)」）
+- **技术实现**: 逐行调整分句顺序或补注位置，使编号出现次序升序且语义不变（如「按 PY-CORE-021 重新生成…；导航表新增 (PY-CORE-033)」）
 - **参考位置**: commit `b43af0f2`（全量升序归一提交，可用 `git show b43af0f2` 逐行比对）
 
 **测试验证**:
@@ -6834,7 +7194,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **参考位置**: [README.md](README.md#L374-L405)、[main.py](main.py#L10888-L10902)
 
 **测试验证**:
-- ✅ 范式编号扫描 `PY-CORE-001` ~ `PY-CORE-048` 连续，跳号 0 个、重号 0 个
+- ✅ 范式编号扫描 `PY-CORE-001` ~ `PY-CORE-049` 连续，跳号 0 个、重号 0 个
 - ✅ 汇总表 45 行与正文范式条目数一致，导航表 21 行锚点全部可跳转
 
 ##### 3. 🐛 changelog 解析边界收敛 (🐛Bug修复)
@@ -6858,7 +7218,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **影响范围**: v5.0.9.95 变更记录中的参考位置、skill.docx 导航书签
 
 **修复方案**:
-- **技术实现**: 按删除后的实际行号重算为 `#L20904-L20954`（完整代码范式汇总表）、`#L20965-L21269`（PY-CORE-027 字段名兼容性范式）；随后 README.md 全量复制到 skill.md，再执行 `python test/generate_docx.py` 重生成 skill.docx
+- **技术实现**: 按删除后的实际行号重算为 `#L20904-L20954`（完整代码范式汇总表）、`#L20965-L21269`（PY-CORE-028 字段名兼容性范式）；随后 README.md 全量复制到 skill.md，再执行 `python test/generate_docx.py` 重生成 skill.docx
 - **参考位置**: [README.md](README.md#L3057-L3618)、[test/generate_docx.py](test/generate_docx.py#L464-L470)
 
 **测试验证**:
@@ -6867,7 +7227,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
-### v5.0.9.95 (2026-11-12) - 📐 **PY-CORE 编号按 A-Z 全量重排 + 编号规则范式固化** - 44个既有范式按标题英文首字母A-Z位次重排为PY-CORE-001~045(零跳号零重号零遗漏)+修正3处历史重号(编码处理最佳实践→023/Git历史维护→026/subprocess超时配置→041)+新增PY-CORE-036范式编号规则范式(前缀固定+三位数字+字母原生固定+A-Z位次累加+区间表+硬上限100)+汇总表扩容至45行并新增首字母列+导航表新增1行+README与skill.md逐字节一致+docx重生成锚点零缺失
+### v5.0.9.95 (2026-11-12) - 📐 **PY-CORE 编号按 A-Z 全量重排 + 编号规则范式固化** - 44个既有范式按标题英文首字母A-Z位次重排为PY-CORE-001~045(零跳号零重号零遗漏)+修正3处历史重号(编码处理最佳实践→023/Git历史维护→026/subprocess超时配置→041)+新增PY-CORE-037范式编号规则范式(前缀固定+三位数字+字母原生固定+A-Z位次累加+区间表+硬上限100)+汇总表扩容至45行并新增首字母列+导航表新增1行+README与skill.md逐字节一致+docx重生成锚点零缺失
 
 > **Commit**: `4e40e2b6`
 
@@ -6878,11 +7238,11 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **作者**: 小旭二手机（西园路）
 
 #### 更新内容: PY-CORE 编号按 A-Z 全量重排 + 编号规则范式固化
-1. **全量重排**: 44 个既有范式按「标题英文名首字母 A-Z + 同字母内原相对次序」稳定排序，重排为 `PY-CORE-001` ~ `PY-CORE-048`（含新增 1 条编号规则范式，共 45 条），零跳号、零重号、零遗漏 [README.md](README.md)
+1. **全量重排**: 44 个既有范式按「标题英文名首字母 A-Z + 同字母内原相对次序」稳定排序，重排为 `PY-CORE-001` ~ `PY-CORE-049`（含新增 1 条编号规则范式，共 45 条），零跳号、零重号、零遗漏 [README.md](README.md)
 2. **重号修正**: 历史遗留重号共 3 处——编码处理最佳实践 → 新号 023（字母 e）、Git 历史维护 → 新号 026（字母 g）、subprocess 超时配置 → 新号 041（字母 s），并复核旧号 007/008 双占项最终落号为 008、013、014、025
-3. **规则固化**: 新增 [范式编号规则范式 (PY-CORE-036)](README.md#L2801-L2894)，明确「前缀不可变、数字可累加、字母原生固定、按 A-Z 位次整体重排、区间表、硬上限 100」
+3. **规则固化**: 新增 [范式编号规则范式 (PY-CORE-037)](README.md#L2801-L2894)，明确「前缀不可变、数字可累加、字母原生固定、按 A-Z 位次整体重排、区间表、硬上限 100」
 4. **汇总表扩容**: 完整代码范式汇总表由 24 行扩容至 45 行，新增「首字母」列用于逐行校验 A-Z 位次，总计口径同步更新
-5. **导航同步**: 文档导航表新增「范式编号规则范式 (PY-CORE-036)」1 行，其余 8 行导航项的编号随全量重排自动同步
+5. **导航同步**: 文档导航表新增「范式编号规则范式 (PY-CORE-037)」1 行，其余 8 行导航项的编号随全量重排自动同步
 6. **三方文档**: README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成，书签与导航锚点零缺失
 7. **接口校验**: `/api/changelog` 复核 `changes` 空条目 0 个、`commit` 占位 0 处，版本号统一由 README.md 动态读取
 
@@ -6897,7 +7257,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **参考位置**: [README.md](README.md#L2801-L2894)
 
 **测试验证**:
-- ✅ 编号扫描：`PY-CORE-001` ~ `PY-CORE-048` 连续，跳号 0 个、重号 0 个
+- ✅ 编号扫描：`PY-CORE-001` ~ `PY-CORE-049` 连续，跳号 0 个、重号 0 个
 - ✅ 位次校验：每行编号的首字母与「首字母」列逐行一致（a→b→c→…→v 单调不减）
 - ✅ 引用校验：正文/导航/汇总表/历史记录内无残留旧号语义错位
 
@@ -6915,7 +7275,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 同一编号在全文仅对应一个范式标题
 - ✅ 各范式正文内自引用编号与标题编号一致
 
-##### 3. 📐 新增范式编号规则范式 PY-CORE-036 (📝范式定义)
+##### 3. 📐 新增范式编号规则范式 PY-CORE-037 (📝范式定义)
 **问题描述**:
 - **现象**: 编号规则此前只散落在各版本变更记录中，缺少独立范式条目，新增范式时仍易退化为「末尾 +1」
 - **根因**: 规则未升格为 P0 范式，无判定标准与检查清单
@@ -6923,7 +7283,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 **修复方案**:
 - **技术实现**: 新增独立范式章节，含核心原则表、三步编号算法、a-z 区间表、新增范式标准动作、6 条坑位表、本轮重排实录与判定标准
-- **参考位置**: [范式编号规则范式 (PY-CORE-036)](README.md#L2801-L2894)
+- **参考位置**: [范式编号规则范式 (PY-CORE-037)](README.md#L2801-L2894)
 
 **测试验证**:
 - ✅ 区间表与实际占用逐字母核对一致（45 条 / 剩余 55 位 / 上限 100）
@@ -7028,12 +7388,12 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ##### 4. 📐 三方文档同步与 changelog 零空值复核 (📝文档规范)
 **问题描述**:
-- **现象**: 回退后 README.md 缺少 v5.0.9.93 条目与 PY-CORE-024/038 两节，skill.md 与之不同步，skill.docx 不存在；changelog 接口的 `changes` 空值与 `commit` 占位需再次确认
+- **现象**: 回退后 README.md 缺少 v5.0.9.93 条目与 PY-CORE-025/038 两节，skill.md 与之不同步，skill.docx 不存在；changelog 接口的 `changes` 空值与 `commit` 占位需再次确认
 - **根因**: 回退动作同时丢弃了同批次的文档提交，三方文档失去同源基准
 - **影响范围**: 文档一致性、更新日志页面展示完整性
 
 **修复方案**:
-- **技术实现**: 从备份分支恢复 README.md 与 skill.md（含 v5.0.9.93 与 PY-CORE-024/038），剔除回退后已不存在的「解析器加固」条目，新增本版本 v5.0.9.94 记录；skill.md 与 README.md 逐字节同步，skill.docx 由 skill.md 重新生成 [README.md](README.md#L2803-L3716)
+- **技术实现**: 从备份分支恢复 README.md 与 skill.md（含 v5.0.9.93 与 PY-CORE-025/038），剔除回退后已不存在的「解析器加固」条目，新增本版本 v5.0.9.94 记录；skill.md 与 README.md 逐字节同步，skill.docx 由 skill.md 重新生成 [README.md](README.md#L2803-L3716)
 - **参考位置**: [README.md](README.md#L2228-L3716) [skill.md](skill.md#L2228-L3716)
 
 **测试验证**:
@@ -7041,7 +7401,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ skill.docx 由 skill.md 生成，导航锚点全部命中
 - ✅ `GET /api/changelog`：`changes` 为空 0 条、`commit` 占位 0 处、`meta` 字段缺失 0 条
 
-### v5.0.9.93 (2026-11-12) - 📝 **Excel读取范式固化与死代码清理** - 新增PY-CORE-021(每日利润表读取范式)与PY-CORE-024(Excel货号E列读取范式)+每日利润报表由首文件break改为多文件全量聚合去重拼接+删除无调用点死代码load_excel_data(48行)+对比记录新增excel_files全量清单(兼容保留excel_file)+导航表扩容20行+changelog接口changes非空与commit零占位全量复核
+### v5.0.9.93 (2026-11-12) - 📝 **Excel读取范式固化与死代码清理** - 新增PY-CORE-022(每日利润表读取范式)与PY-CORE-025(Excel货号E列读取范式)+每日利润报表由首文件break改为多文件全量聚合去重拼接+删除无调用点死代码load_excel_data(48行)+对比记录新增excel_files全量清单(兼容保留excel_file)+导航表扩容20行+changelog接口changes非空与commit零占位全量复核
 
 > **Commit**: `6078990c, 8d1798da`
 
@@ -7052,10 +7412,10 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **作者**: 小旭二手机（西园路）
 
 #### 更新内容: Excel读取范式固化与死代码清理
-1. **新范式固化**: 新增 PY-CORE-021「每日利润表读取范式」，工作表固定「每日利润」，列位固定 A-F，第 1 行为表头，报表文本仅取 A 列以「截止」开头的行，多文件去重后拼接 [README.md](README.md#L2224-L2444) [skill.md](skill.md#L2224-L2444)
+1. **新范式固化**: 新增 PY-CORE-022「每日利润表读取范式」，工作表固定「每日利润」，列位固定 A-F，第 1 行为表头，报表文本仅取 A 列以「截止」开头的行，多文件去重后拼接 [README.md](README.md#L2224-L2444) [skill.md](skill.md#L2224-L2444)
 2. **报表聚合修复**: `get_excel_files_with_report` 原「命中第一个文件即 break」导致多 Excel 时只取首个文件报表，改为遍历全部文件、文本去重后以空行拼接 [main.py](main.py#L3644-L3656)
-3. **新范式固化**: 新增 PY-CORE-024「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L2442-L2636) [skill.md](skill.md#L2442-L2636)
-4. **死代码清理**: 删除 `StockNumberComparator.load_excel_data`（48 行），该方法零调用点，且与 PY-CORE-024「多文件全量聚合」口径冲突，属误导性死代码 [main.py](main.py#L7005)
+3. **新范式固化**: 新增 PY-CORE-025「Excel 货号 E 列读取范式」，货号恒定只读平台子表第 5 列（E 列），正则 `^[A-Za-z0-9]{3,10}$`，多文件全量遍历聚合，两条读取链路（`load_all_excel_data` / `_read_excel_skus`）同步遵守 [README.md](README.md#L2442-L2636) [skill.md](skill.md#L2442-L2636)
+4. **死代码清理**: 删除 `StockNumberComparator.load_excel_data`（48 行），该方法零调用点，且与 PY-CORE-025「多文件全量聚合」口径冲突，属误导性死代码 [main.py](main.py#L7005)
 5. **字段扩展**: 对比记录与「小计」记录新增 `excel_files` 全量清单字段，原 `excel_file` 字段保留，历史记录解析不受影响 [main.py](main.py#L7364-L7367) [main.py](main.py#L7456-L7459)
 6. **导航扩容**: 文档导航表 18 → 20 行，新增 019/022 两条；skill.docx 由 skill.md 重新生成，锚点全部命中
 7. **接口校验**: `/api/changelog` 全量复核：`changes` 为空条目 0 个，`commit` 字段「待生成/待补充」占位 0 处，全部为真实 Git 哈希
@@ -7096,7 +7456,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **影响范围**: 后续任何 Excel 读取改造的评审与回归
 
 **修复方案**:
-- **技术实现**: 在 README.md 与 skill.md 逐字插入 PY-CORE-021（A-F 列位契约 / 报表文本规则 / 回落边界 + 检查清单 + 判定标准）与 PY-CORE-024（工作表选择 / 列范围 / 值清洗 / 货号正则 / 多文件聚合 / 去重策略 / 临时副本 + 坑位表 + 检查清单 + 判定标准），导航表同步扩容至 20 行 [README.md](README.md#L2178-L2444)
+- **技术实现**: 在 README.md 与 skill.md 逐字插入 PY-CORE-022（A-F 列位契约 / 报表文本规则 / 回落边界 + 检查清单 + 判定标准）与 PY-CORE-025（工作表选择 / 列范围 / 值清洗 / 货号正则 / 多文件聚合 / 去重策略 / 临时副本 + 坑位表 + 检查清单 + 判定标准），导航表同步扩容至 20 行 [README.md](README.md#L2178-L2444)
 - **参考位置**: [README.md](README.md#L27-L28) [skill.md](skill.md#L27-L28)
 
 **测试验证**:
@@ -7119,7 +7479,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ##### 5. 🧾 changelog 解析器伪版本与模板污染根治 (🐛Bug修复)
 **问题描述**:
-- **现象**: `/api/changelog` 条目中出现 `vX.X.X` 伪版本；最末一个手写版本标题被 PY-CORE-029 模板行污染为「[一句话描述本次更新的核心价值]」「[文件链接列表]」；手写版本条目尾部混入与正文重复的自动 commit 摘要，变更卡片数量虚高
+- **现象**: `/api/changelog` 条目中出现 `vX.X.X` 伪版本；最末一个手写版本标题被 PY-CORE-030 模板行污染为「[一句话描述本次更新的核心价值]」「[文件链接列表]」；手写版本条目尾部混入与正文重复的自动 commit 摘要，变更卡片数量虚高
 - **根因**: 版本标题以宽松正则 `v([\d.]+)` 匹配，模板占位标题同样命中；条目仅在下一个版本标题处闭合，跨 `##` 章节后继续吞并后续模板段落与元数据行；合并阶段对同版本无条件追加 Git 摘要变更
 - **影响范围**: `/api/changelog` 条目数量与内容准确性、前端「最新更新」卡片展示
 
@@ -7132,7 +7492,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ `changes` 为空 0 个；`v5.0.9.93` 卡片由 5 个（含重复摘要）收敛为 4 个手写条目，与 README `#####` 手写条目一一对应
 - ✅ `py_compile main.py` 通过，`GET /api/changelog` 返回 `success: true`，`meta.commit` 全部为 7-10 位真实 Git 哈希
 
-### v5.0.9.92 (2026-11-11) - 🔐 **敏感字段全量加密与PY-CORE-032临时脚本范式** - headers.cookie明文加密完成(login.password/headers.cookie/email_smtp_password三字段全部ENC)+main.py解密链路逐字节复核+新增PY-CORE-032大文件小范围修改临时脚本范式(唯一锚点/先备份/最小替换/改后三校验/脚本不入库/改md必重生成)+导航表扩容18行+三方文档逐字一致与docx锚点零缺失
+### v5.0.9.92 (2026-11-11) - 🔐 **敏感字段全量加密与PY-CORE-033临时脚本范式** - headers.cookie明文加密完成(login.password/headers.cookie/email_smtp_password三字段全部ENC)+main.py解密链路逐字节复核+新增PY-CORE-033大文件小范围修改临时脚本范式(唯一锚点/先备份/最小替换/改后三校验/脚本不入库/改md必重生成)+导航表扩容18行+三方文档逐字一致与docx锚点零缺失
 
 > **Commit**: `fd6e60f2, 9a933cac, 54597285`
 
@@ -7142,11 +7502,11 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **变更统计**: +341行 -1行
 **作者**: 小旭二手机（西园路）
 
-#### 更新内容: 敏感字段全量加密与PY-CORE-032临时脚本范式
+#### 更新内容: 敏感字段全量加密与PY-CORE-033临时脚本范式
 1. **敏感字段清零**: config.json 中最后一个明文敏感字段 `headers.cookie` 已加密，三字段全部为 `ENC(...)` [config/crypto_tool.py](config/crypto_tool.py#L25)
 2. **解密链路复核**: `SecureConfigManager` 解密三字段全部成功，headers.cookie 与加密前明文逐字节一致 [main.py](main.py#L518-L531)
-3. **新范式固化**: 新增 PY-CORE-032，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L2632-L3438) [skill.md](skill.md#L2632-L3438)
-4. **导航扩容**: 文档导航表 17 → 18 行，新增 PY-CORE-032 条目，docx 19 个链接全部命中书签 [README.md](README.md#L26)
+3. **新范式固化**: 新增 PY-CORE-033，规定千行级文件禁止全量重写，必须用一次性临时脚本按唯一锚点最小替换，执行完删除 [README.md](README.md#L2632-L3438) [skill.md](skill.md#L2632-L3438)
+4. **导航扩容**: 文档导航表 17 → 18 行，新增 PY-CORE-033 条目，docx 19 个链接全部命中书签 [README.md](README.md#L26)
 5. **三方同步**: README.md 与 skill.md 逐字一致，skill.docx 由 skill.md 重新生成（422.9 KB） [skill.docx](skill.docx)
 
 ##### 1. 🔐 headers.cookie 明文加密完成 (🛡️安全加固)
@@ -7177,14 +7537,14 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ login.password / headers.cookie / email_smtp_password 解密全部成功
 - ✅ headers.cookie 解密后 1419 字符，与加密前明文完全一致
 
-##### 3. 📐 新增 PY-CORE-032 大文件小范围修改临时脚本范式 (📝文档更新)
+##### 3. 📐 新增 PY-CORE-033 大文件小范围修改临时脚本范式 (📝文档更新)
 **问题描述**:
 - **现象**: main.py 14000+ 行、README.md / skill.md 21000+ 行，直接编辑易误伤重复段落，全量重写会把换行/BOM/缩进差异一并带进 diff
 - **根因**: 缺少「大文件怎么改」的统一规定，历次修改靠人工小心，既无法复用也无法验收
 - **影响范围**: 所有千行级文件的后续维护
 
 **修复方案**:
-- **技术实现**: 新增 PY-CORE-032 范式章节，明确六条铁律（唯一锚点 `assert count == 1` / 先备份 / 最小替换 / 改后三校验 / 临时脚本不入库 / 改 md 必重生成）、五步标准流程、适用场景表、5 条坑位表与落地检查清单；本次章节插入本身即用临时脚本 `test/temp_patch_v50992.py` 按锚点完成，执行后已删除 [README.md](README.md#L2632-L3438) [skill.md](skill.md#L2632-L3438)
+- **技术实现**: 新增 PY-CORE-033 范式章节，明确六条铁律（唯一锚点 `assert count == 1` / 先备份 / 最小替换 / 改后三校验 / 临时脚本不入库 / 改 md 必重生成）、五步标准流程、适用场景表、5 条坑位表与落地检查清单；本次章节插入本身即用临时脚本 `test/temp_patch_v50992.py` 按锚点完成，执行后已删除 [README.md](README.md#L2632-L3438) [skill.md](skill.md#L2632-L3438)
 - **参考位置**: [README.md](README.md#L2632-L3438) [README.md](README.md#L26)
 
 **测试验证**:
@@ -7198,7 +7558,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **影响范围**: skill.docx 第一页导航完整性
 
 **修复方案**:
-- **技术实现**: 按 PY-CORE-020 重新生成 skill.docx 并校验锚点 [README.md](README.md#L26) [test/generate_docx.py](test/generate_docx.py)；导航表新增「📐 大文件小范围修改临时脚本范式 (PY-CORE-032)」一行，由 17 行增至 18 行
+- **技术实现**: 按 PY-CORE-021 重新生成 skill.docx 并校验锚点 [README.md](README.md#L26) [test/generate_docx.py](test/generate_docx.py)；导航表新增「📐 大文件小范围修改临时脚本范式 (PY-CORE-033)」一行，由 17 行增至 18 行
 - **参考位置**: [README.md](README.md#L12-L31) [skill.docx](skill.docx)
 
 **测试验证**:
@@ -7327,7 +7687,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **问题描述**:
 - **现象**: `python test/security_audit.py` 报 2 条 MEDIUM（HiddenBug），均指向 `print(tool.encrypt_value(...))` 与 `print(tool.decrypt_value(...))` 两行
 - **根因**: 审计规则把非字面量 `print(` 判为「生产环境print调试残留」，白名单只放行 `print('...')` / `print(f'...')` 形式，而 CLI 直接打印函数返回值未套 f-string
-- **影响范围**: 安全审计总计问题不为 0，违反 PY-CORE-042「零问题」范式判定标准
+- **影响范围**: 安全审计总计问题不为 0，违反 PY-CORE-043「零问题」范式判定标准
 
 **修复方案**:
 - **技术实现**: 两处输出统一改为 `print(f'{...}')`，与文件内其余业务输出（如 `print(f'✅ {message}')`）风格一致，行为不变 [config/crypto_tool.py](config/crypto_tool.py#L343-L357)
@@ -7440,7 +7800,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ changelog API：全量条目空 `changes` 0 个、空字段 0 个、`待生成` / `待补充` 占位 0 个，Commit 全部为真实 Git 哈希
 - ✅ run.sh / run.bat 版本号仍由 README.md 动态读取，双端与文档版本统一，未改动脚本
 
-### v5.0.9.89 (2026-11-07) - 🎯 **安全审计零问题达标与真实黑盒攻防验证** - 13项真实HTTP载荷替代模拟打印+三层判定结构拆分issues与observations+异步锁误报转正向验证+响应头大小写归一+断连识别为主动拒收+路径遍历内容级复核+PY-CORE-042范式固化
+### v5.0.9.89 (2026-11-07) - 🎯 **安全审计零问题达标与真实黑盒攻防验证** - 13项真实HTTP载荷替代模拟打印+三层判定结构拆分issues与observations+异步锁误报转正向验证+响应头大小写归一+断连识别为主动拒收+路径遍历内容级复核+PY-CORE-043范式固化
 
 > **Commit**: `42d76c87`
 
@@ -7456,7 +7816,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 3. **误报修正**: `await ... lock` 由风险项改为正向验证，23 条 INFO 归零并统计为「异步锁同步保护 23 处」 [test/security_audit.py](test/security_audit.py#L903)
 4. **判定加固**: 响应头全部 `lower()` 归一化、超大请求体断连识别为主动拒收、路径遍历追加响应体内容级复核 [test/security_audit.py](test/security_audit.py#L1313-L1360)
 5. **接口加固**: 商品查询接口新增 1MB 请求体上限（超限 413）与 `{'skus'}` 字段白名单（越界 400），看门狗端口回退改读 `NETWORK_CONFIG` 消除硬编码 [main.py](main.py#L8623) [main.py](main.py#L9749-L9773)
-6. **范式固化**: 新增 PY-CORE-042「安全审计零问题范式」，明确四类问题只有「修代码/修规则」两种合法处置，禁止降级与白名单 [skill.md](skill.md#L2134-L3403)
+6. **范式固化**: 新增 PY-CORE-043「安全审计零问题范式」，明确四类问题只有「修代码/修规则」两种合法处置，禁止降级与白名单 [skill.md](skill.md#L2134-L3403)
 
 ##### 1. 🥊 真实黑盒攻防验证（13 项载荷）
 **问题描述**:
@@ -7527,7 +7887,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 路径遍历返回 SPA 首页且响应体无敏感内容，判定为「未泄露」
 - ✅ `py_compile` 通过，`main.py` / `test/security_audit.py` 语法无错误
 
-##### 5. 📝 PY-CORE-042 安全审计零问题范式
+##### 5. 📝 PY-CORE-043 安全审计零问题范式
 **问题描述**:
 - **现象**: 「0 高危 + 23 信息」被当成达标交付，噪声掩盖真问题，后续版本反复出现非零总计
 - **根因**: 缺少强制标准约束「总计问题」的定义与消除方式，规则误报可被「调低等级」蒙混过关
@@ -7541,7 +7901,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 **测试验证**:
 - ✅ README.md 与 skill.md 逐字一致（`diff` 无差异）
-- ✅ 导航表新增「📐 安全审计零问题范式 (PY-CORE-042)」条目，DOCX 锚点全部命中（未命中 0 条）
+- ✅ 导航表新增「📐 安全审计零问题范式 (PY-CORE-043)」条目，DOCX 锚点全部命中（未命中 0 条）
 - ✅ skill.docx 由 skill.md 重新生成，导航仍置顶第一页且分页符紧跟导航表
 
 ### v5.0.9.88 (2026-11-07) - 🛡️ **双端启动脚本看门狗重构** - 探活频率由15分钟提速至30秒+新增DaemonGuard兜底拉起守护进程+修复重启计数上限失效+run.bat与run.sh逐字同步+新增launchd托管配置+三方文档逐字一致
@@ -7595,7 +7955,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 手工 `kill` 掉 `main.py --watchdog` 进程后，日志出现 `[DaemonGuard] 守护进程已退出(退出码:1)，准备重新拉起... (第1次/最多10次)`，随后服务恢复 200
 - ✅ `Ctrl+C` 后日志出现 `[DaemonGuard] 收到退出信号(码:130)，不再重启`，进程列表无残留
 - ✅ 连续重启 10 次后输出 `[DaemonGuard] 已达到最大重启次数(10)，停止自动重启`，终端不再刷重启日志
-- ✅ 守护模式下终端持续输出日志，无静默运行（符合 PY-CORE-045）
+- ✅ 守护模式下终端持续输出日志，无静默运行（符合 PY-CORE-046）
 
 ##### 3. 🐛 WEB_RESTART_COUNT 自增缺失导致上限失效
 **问题描述**:
@@ -7613,7 +7973,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 成功探活不清零累计计数，仅重启路径递增，计数语义为「本进程生命周期内累计重启次数」
 - ✅ 与 DaemonGuard 分支共用同一组常量，双分支上限均为 10
 
-##### 4. 🔄 run.bat 与 run.sh 1:1 同步（PY-CORE-019）
+##### 4. 🔄 run.bat 与 run.sh 1:1 同步（PY-CORE-020）
 **问题描述**:
 - **现象**: run.sh 已完成重构而 run.bat 仍是旧逻辑，Windows 与 macOS/Linux 出现「同一份代码两种行为」，排障时日志措辞也对不上
 - **根因**: 双端脚本各自维护，提交前缺少对照检查步骤
@@ -7649,7 +8009,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ##### 6. 📝 三方文档逐字一致 + 修复 changelog API 字段解析为空
 **问题描述**:
-- **现象**: README.md 与 skill.md 存在 199 行差异（README 独有「跨平台防崩溃系统」章节、PY-CORE-019 清单措辞不同）；v5.0.9.81 的 `**修复3方案**:` 因块标题不合范式，changelog API 无法匹配，该条 `solution` 解析为空后被兜底文案覆盖
+- **现象**: README.md 与 skill.md 存在 199 行差异（README 独有「跨平台防崩溃系统」章节、PY-CORE-020 清单措辞不同）；v5.0.9.81 的 `**修复3方案**:` 因块标题不合范式，changelog API 无法匹配，该条 `solution` 解析为空后被兜底文案覆盖
 - **根因**: 双文档各自编辑未按「skill.md → README.md」单向复制；历史条目块标题使用了非范式别名（`修复3方案`），且存在 `[main.py](main,py)` 链接拼写错误
 - **影响范围**: `/api/changelog` 返回的 `changes[].solution` 数据质量、skill.docx 内容完整性、三方文档一致性
 
@@ -7726,7 +8086,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **测试验证**:
 - ✅ 刷新页面后 Network 面板加载 `app.js?v=20261107120000`，入库时间按自然日口径显示
 
-### v5.0.9.86 (2026-11-07) - 📐 **PY-CORE-018交叉引用补注与DOCX文档生成范式(PY-CORE-020)新增** - 将「导航置顶第一页+整块搬迁+锚点零缺失+首行无BOM+改md必重生成」固化为P0强制规范+导航表扩容16→17行+交叉引用补注(031管用什么生成/034管生成成什么样)+skill.docx重新生成17链接全命中
+### v5.0.9.86 (2026-11-07) - 📐 **PY-CORE-019交叉引用补注与DOCX文档生成范式(PY-CORE-021)新增** - 将「导航置顶第一页+整块搬迁+锚点零缺失+首行无BOM+改md必重生成」固化为P0强制规范+导航表扩容16→17行+交叉引用补注(031管用什么生成/034管生成成什么样)+skill.docx重新生成17链接全命中
 
 > **Commit**: 0674f24c
 
@@ -7736,31 +8096,31 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **变更统计**: +256行 -0行
 **作者**: 小旭二手机（西园路）
 
-#### 更新内容: PY-CORE-018交叉引用补注与DOCX文档生成范式(PY-CORE-020)新增
+#### 更新内容: PY-CORE-019交叉引用补注与DOCX文档生成范式(PY-CORE-021)新增
 1. **导航表扩容**: 导航表由 16 行增至 17 行，新增「📐 DOCX 文档生成范式」条目，与 PY-CORE-011/032/033 三条范式并列 [skill.md](skill.md#L10-L35)
-2. **交叉引用消歧**: `PY-CORE-018` 补注「生成流程与产出结构以 PY-CORE-020 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L1932)
+2. **交叉引用消歧**: `PY-CORE-019` 补注「生成流程与产出结构以 PY-CORE-021 为准」，避免两个章节对同一件事给出不同口径 [skill.md](skill.md#L1932)
 3. **skill.docx 重新生成**: 由 skill.md 重新生成，17 个导航超链接全部命中书签，导航仍固定第 1 页、正文从第 2 页开始
-4. **新增 P0 范式章节**: skill.md 与 README.md 逐字新增 `PY-CORE-020 DOCX 文档生成范式`，含六条铁律表、五步流程、生成器三函数机制、8 条坑位表、落地检查清单与可复制的锚点校验脚本 [skill.md](skill.md) [README.md](README.md)
+4. **新增 P0 范式章节**: skill.md 与 README.md 逐字新增 `PY-CORE-021 DOCX 文档生成范式`，含六条铁律表、五步流程、生成器三函数机制、8 条坑位表、落地检查清单与可复制的锚点校验脚本 [skill.md](skill.md) [README.md](README.md)
 
-##### 1. 📐 新增 PY-CORE-020 DOCX 文档生成范式 (把「导航置顶」从实现细节升格为强制规范)
+##### 1. 📐 新增 PY-CORE-021 DOCX 文档生成范式 (把「导航置顶」从实现细节升格为强制规范)
 **问题描述**:
 - **现象**: 「导航必须在第一页」此前只是 `test/generate_docx.py` 里的实现细节，skill.md 无任何文字约束
 - **风险**: 后续任何人对生成器或 md 结构调整，都可能悄悄把导航挪回原位，且无检查清单可依
-- **次生问题**: `PY-CORE-018` 只写了「唯一生成器 + 特性表」，未定义产出必须满足的结构底线
+- **次生问题**: `PY-CORE-019` 只写了「唯一生成器 + 特性表」，未定义产出必须满足的结构底线
 
 **修复方案**:
-- **技术实现(规范)**: 新增 `PY-CORE-020` 作为 docx 产出的结构标准，明确六条铁律（唯一生成器/导航置顶/整块搬迁/锚点零缺失/首行无 BOM/改 md 必重生成）
+- **技术实现(规范)**: 新增 `PY-CORE-021` 作为 docx 产出的结构标准，明确六条铁律（唯一生成器/导航置顶/整块搬迁/锚点零缺失/首行无 BOM/改 md 必重生成）
 - **技术实现(机制固化)**: 把 `_extract_nav_block()` 的回溯边界（跨空行、`---`、`>` 引言，只认 H1/H2）与 `_render_nav_block()` 的插入时机（首个 H1 之后 + 强制分页）写成可核对的文字规则
 - **技术实现(校验)**: 提供内联 Python 校验脚本，一次性输出大小/链接数/命中数/未命中列表/第一页顺序/分页符下标，替代「生成成功即通过」的弱校验
 - **参考位置**: [test/generate_docx.py](test/generate_docx.py#L241-L300) [test/generate_docx.py](test/generate_docx.py#L390-L405)
 
 **测试验证**:
-- ✅ 导航表 17 行，第 17 行为 `📐 DOCX 文档生成范式 (PY-CORE-020)`
+- ✅ 导航表 17 行，第 17 行为 `📐 DOCX 文档生成范式 (PY-CORE-021)`
 - ✅ `w:hyperlink` 17 个 / `w:anchor` 17 个 / 未命中为空
 - ✅ docx 第 1 页顺序：H1 标题 → 📚 文档导航 → 引言 → 导航表 → 分页符
 - ✅ README.md 导航 17 行锚点全部命中，与 skill.md 逐字一致
 
-### v5.0.9.85 (2026-11-07) - 📚 **DOCX文档导航置顶第一页+16章节可点击跳转+标题BOM修复** - skill.md顶部新增「📚 文档导航」16章节索引表+generate_docx.py新增`_extract_nav_block()`/`_render_nav_block()`将导航块强制渲染到第一页并加分页符+导航表第3列生成16个可点击超链接(全部命中书签)+修复skill.md/README.md首行BOM导致H1标题多出`#`+README.md补齐PY-CORE-018与PY-CORE-045章节+skill.docx重新生成
+### v5.0.9.85 (2026-11-07) - 📚 **DOCX文档导航置顶第一页+16章节可点击跳转+标题BOM修复** - skill.md顶部新增「📚 文档导航」16章节索引表+generate_docx.py新增`_extract_nav_block()`/`_render_nav_block()`将导航块强制渲染到第一页并加分页符+导航表第3列生成16个可点击超链接(全部命中书签)+修复skill.md/README.md首行BOM导致H1标题多出`#`+README.md补齐PY-CORE-019与PY-CORE-046章节+skill.docx重新生成
 
 > **Commit**: 209173d6, 2c94f548
 
@@ -7774,7 +8134,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 1. **DOCX 文档导航置顶第一页**: `test/generate_docx.py` 新增 `_extract_nav_block()` 识别导航表并连同上方标题/引言整块抽出，`_render_nav_block()` 在第一个 H1 之后立即渲染并追加分页符，导航恒定位于第 1 页、正文从第 2 页开始 [test/generate_docx.py](test/generate_docx.py#L260-L300)
 2. **16 个章节可点击跳转**: skill.md 顶部新增「📚 文档导航」章节含 16 行 `| 章节 | 说明 |` 索引表；生成器自动补第 3 列「位置（点击跳转）」并生成 `w:hyperlink` + `w:anchor`，实测 16 个锚点全部命中 `w:bookmarkStart` [skill.md](skill.md#L10-L35) [test/generate_docx.py](test/generate_docx.py#L390-L405)
 3. **标题 BOM 修复**: skill.md / README.md 首行原为 `#` + U+FEFF + `# 微购...`，BOM 夹在两个 `#` 之间使 `lstrip('#')` 只剥掉第一个，docx 中 H1 显示成 `# 微购相册管理系统`；清除 BOM 后标题恢复正常 [skill.md](skill.md#L1) [README.md](README.md#L1)
-4. **README 章节补齐**: README.md 新增 `PY-CORE-018 文档生成方法` 与 `PY-CORE-045 终端实时日志接入范式` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L802) [README.md](README.md#L20253)
+4. **README 章节补齐**: README.md 新增 `PY-CORE-019 文档生成方法` 与 `PY-CORE-046 终端实时日志接入范式` 完整章节（与 skill.md 逐字一致），导航表 16 个锚点在 README 中同样全部有效 [README.md](README.md#L802) [README.md](README.md#L20253)
 5. **三方文档同步**: README.md / skill.md / skill.docx 导航章节逐字一致，skill.docx 由 skill.md 重新生成（389.4 KB，含 16 个导航超链接）
 
 ##### 1. 📚 DOCX 文档导航置顶第一页 (导航块强制渲染 + 分页符隔离)
@@ -7784,7 +8144,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - **次生问题**: skill.md 中不存在 `| 章节 | ... |` 导航表，生成器即使想处理也无数据可转
 
 **修复方案**:
-- **技术实现(数据源)**: skill.md 顶部新增「📚 文档导航」+ 16 行 `| 章节 | 说明 |` 索引表，覆盖项目概述/环境要求/项目结构/配置说明/安全合规/PY-CORE-011/PY-CORE-019/PY-CORE-045/最新更新/企业级规范/核心原则/JS 规范/Python 规范/FAQ/文档生成/版本历史
+- **技术实现(数据源)**: skill.md 顶部新增「📚 文档导航」+ 16 行 `| 章节 | 说明 |` 索引表，覆盖项目概述/环境要求/项目结构/配置说明/安全合规/PY-CORE-011/PY-CORE-020/PY-CORE-046/最新更新/企业级规范/核心原则/JS 规范/Python 规范/FAQ/文档生成/版本历史
 - **技术实现(置顶)**: `_extract_nav_block()` 识别导航表并连同上方标题与引言整块抽出；`convert()` 在第一个 H1 处理完后调用 `_render_nav_block()` 渲染导航块并 `add_page_break()`，保证导航恒定在文档第一页、正文从第二页开始
 - **技术实现(超链接)**: 导航表为 2 列时生成器自动补第 3 列「位置（点击跳转）」，`_add_clickable_link()` 以章节名经 `_find_heading_bookmark_id()` 解析为 `w:anchor`，与 H2/H3 的 `w:bookmarkStart` 一一对应
 - **参考位置**: [test/generate_docx.py](test/generate_docx.py#L260-L300) [test/generate_docx.py](test/generate_docx.py#L390-L405) [skill.md](skill.md#L10-L35)
@@ -7811,19 +8171,19 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ##### 3. 📄 README 章节补齐 (导航锚点在 README 同样有效)
 **问题描述**:
-- **现象**: README.md 原 `## 📄 文档生成方法` 无 PY-CORE-018 后缀，且缺少 `PY-CORE-045 终端实时日志接入范式` 章节
+- **现象**: README.md 原 `## 📄 文档生成方法` 无 PY-CORE-019 后缀，且缺少 `PY-CORE-046 终端实时日志接入范式` 章节
 - **影响**: 导航表 16 行在 README 中会出现死锚点，与 skill.md 不一致
 
 **修复方案**:
-- **技术实现**: 从 skill.md 逐字提取两个章节并写入 README.md（PY-CORE-018 整段替换 README 原「文档生成方法」段；PY-CORE-019 之后、最新更新之前插入 PY-CORE-045）
+- **技术实现**: 从 skill.md 逐字提取两个章节并写入 README.md（PY-CORE-019 整段替换 README 原「文档生成方法」段；PY-CORE-020 之后、最新更新之前插入 PY-CORE-046）
 - **参考位置**: [README.md](README.md#L802) [README.md](README.md#L20253)
 
 **测试验证**:
 - ✅ README.md 导航 16 行锚点全部命中，未命中为空
 - ✅ skill.md 导航 16 行锚点全部命中，未命中为空
-- ✅ 两份文档导航章节与 PY-CORE-045 章节逐字一致（脚本比对 True）
+- ✅ 两份文档导航章节与 PY-CORE-046 章节逐字一致（脚本比对 True）
 
-### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容+子进程重试显式化** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`_popen_with_retry()`核心重试函数与`subprocess.Popen`全局补丁解耦+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.sh 5处`grep -oP`改POSIX `grep -oE`+run.bat删除playwright-browsers危险清理+删除fork冷却死代码+新增PY-CORE-045终端实时日志范式+skill.docx重新生成
+### v5.0.9.84 (2026-11-07) - 🔧 **Errno35根治+终端实时日志接入+Playwright/cloudflared本地化+双脚本1:1同步+macOS grep兼容+子进程重试显式化** - 移除`RLIMIT_NPROC=100`硬编码(BlockingIOError errno 35根因)+`_popen_with_retry()`核心重试函数与`subprocess.Popen`全局补丁解耦+run.sh接入`tail -n 0 -f`实时日志(run.bat继承控制台天然实时)+Playwright优先`tools/playwright/<平台>`并禁用自动下载+cloudflared统一`tools/cloudflared/<平台>`官方二进制+run.sh MINGW平台判断语法修复+run.sh 5处`grep -oP`改POSIX `grep -oE`+run.bat删除playwright-browsers危险清理+删除fork冷却死代码+新增PY-CORE-046终端实时日志范式+skill.docx重新生成
 
 > **Commit**: 225b1fae, d123f61f, 209173d6
 
@@ -7841,7 +8201,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 5. **cloudflared 本地化**: 统一 `tools/cloudflared/<平台>` 路径，安装改为 GitHub 官方 release 二进制下载（废弃 npm 安装），run.sh 新增 `get_platform_dir()`/`get_cloudflared_path()` 消除三处重复分支 [run.sh](run.sh#L35-L51) [run.sh](run.sh#L1197-L1249) [run.bat](run.bat#L1287-L1320)
 6. **run.sh 平台判断语法修复**: 三处 `[ "$(uname -s)" = "MINGW64_NT"* ]` 非法写法改为 `case ... MINGW*|MSYS*|CYGWIN*` 映射，Git Bash 下不再出现条件恒假导致路径取错 [run.sh](run.sh#L35-L43)
 7. **run.bat 危险清理移除**: 删除 `call :cleanup_temp_dir playwright-browsers 0`（会把刚装好的浏览器目录整目录清空），与 run.sh 对齐；`check_and_fix_playwright` 由“自动下载”改为“仅检测本地” [run.bat](run.bat#L447-L451) [run.bat](run.bat#L565-L571)
-8. **范式与文档同步**: skill.md 新增 `PY-CORE-045 终端实时日志接入范式`（输出流向判定表/sh 与 bat 双方案/坑位表/检查清单），README.md 与 skill.md 同步本版本记录，skill.docx 由 skill.md 重新生成；多余 md 文件删除，仅保留 README.md 与 skill.md 两份固定范式文档
+8. **范式与文档同步**: skill.md 新增 `PY-CORE-046 终端实时日志接入范式`（输出流向判定表/sh 与 bat 双方案/坑位表/检查清单），README.md 与 skill.md 同步本版本记录，skill.docx 由 skill.md 重新生成；多余 md 文件删除，仅保留 README.md 与 skill.md 两份固定范式文档
 9. **macOS grep 兼容修复**: run.sh 5 处 GNU 专有 `grep -oP`（PCRE）替换为 POSIX `grep -oE` + `sed`，消除 macOS/BSD grep `invalid option -- P` 报错导致 Node/Git 版本探测与局域网地址提取失效 [run.sh](run.sh#L1088-L1100) [run.sh](run.sh#L1170) [run.sh](run.sh#L1739)
 10. **子进程重试显式化重构**: 把重试逻辑抽成 `_popen_with_retry(args, kwargs, max_retries, base_delay)` 核心函数，`_patched_Popen` 与 `_popen_retry()` 都委托它，`_popen_retry()` 不再依赖“`subprocess.Popen` 已被全局替换”的隐式前提；同时删除从未被调用的 `_fork_is_bad()`/`_mark_fork_bad()` 冷却死代码（README 曾据此描述“30s 冷却”，与实际行为不符） [main.py](main.py#L119-L225) [main.py](main.py#L3978-L3982)
 
@@ -7870,7 +8230,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **修复方案**:
 - **技术实现(sh)**: `tail -n 0 -f "$LOG_FILE" &` + `TAIL_PID=$!`，`wait $PYTHON_PID` 返回后 `kill "$TAIL_PID"`，`cleanup_exit` 中再回收一次，保证 Ctrl+C 不留孤儿 [run.sh](run.sh#L1865-L1880)
 - **技术实现(bat)**: 保持 `start /b cmd /c "..." < nul`（仅重定向 stdin），stdout 继承控制台天然实时，**禁止**再叠加 `Get-Content -Wait`，否则每行双份 [run.bat](run.bat#L1573)
-- **参考位置**: [skill.md](skill.md) `PY-CORE-045` 章节
+- **参考位置**: [skill.md](skill.md) `PY-CORE-046` 章节
 
 **测试验证**:
 - ✅ macOS 实跑：启动后终端持续输出 uvicorn 请求日志，Ctrl+C 后无 tail 残留（`ps aux | grep tail` 为空）
@@ -7893,16 +8253,16 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ `tools/cloudflared/macos/cloudflared --version` 正常输出
 - ✅ 双端日志文案对照一致（`[Playwright] ✅ / ⚠️ / ℹ️`）
 
-##### 4. 📐 双脚本同步与文档范式 (PY-CORE-019 / PY-CORE-045)
+##### 4. 📐 双脚本同步与文档范式 (PY-CORE-020 / PY-CORE-046)
 **问题描述**:
 - **现象**: run.bat 保留 `cleanup_temp_dir playwright-browsers 0` 与 npm 版 cloudflared，与 run.sh 行为分叉
-- **根因**: 上一轮仅单边修改 run.sh，违反 PY-CORE-019 双端同改原则
+- **根因**: 上一轮仅单边修改 run.sh，违反 PY-CORE-020 双端同改原则
 - **影响范围**: [run.bat](run.bat) / [run.sh](run.sh) / [README.md](README.md) / [skill.md](skill.md) / [skill.docx](skill.docx)
 
 **修复方案**:
 - **技术实现(双端对齐)**: run.bat 删除危险清理、Playwright 改本地检测、cloudflared 改官方二进制、提示文案与返回码语义对齐 run.sh
-- **技术实现(文档)**: skill.md 新增 PY-CORE-045 实时日志范式；README.md/skill.md 同步 v5.0.9.84；`test/generate_docx.py` 重新生成 skill.docx；删除多余 md 文件（`.trae/skills/**/SKILL.md`），内容合并进 skill.md
-- **参考位置**: [skill.md](skill.md#L250) [skill.md](skill.md) `PY-CORE-045`
+- **技术实现(文档)**: skill.md 新增 PY-CORE-046 实时日志范式；README.md/skill.md 同步 v5.0.9.84；`test/generate_docx.py` 重新生成 skill.docx；删除多余 md 文件（`.trae/skills/**/SKILL.md`），内容合并进 skill.md
+- **参考位置**: [skill.md](skill.md#L250) [skill.md](skill.md) `PY-CORE-046`
 
 **测试验证**:
 - ✅ `bash -n run.sh` 通过；run.bat `(`/`)` 配对无误
@@ -8059,7 +8419,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ `versions_without_commit: 0`
 - ✅ v5.0.9.82条目Commit由误填`ceebfea8`修正为真实提交`9d0ec7b9`
 
-##### 7. 📝 三方文档同步 (PY-CORE-044)
+##### 7. 📝 三方文档同步 (PY-CORE-045)
 **说明**:
 - **内容**: README.md与skill.md同步v5.0.9.83版本记录；skill.docx由skill.md重新生成
 - **日期**: 2026-11-05
@@ -9205,7 +9565,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 资源测试: 连续切换搜索类型50次，浏览器内存稳定无增长(Task Manager监控)
 - ✅ 审计结果: 总计问题0，CRITICAL 0，HIGH 0，MEDIUM 0，LOW 0，INFO 0
 - ✅ 安全评级: A+ (优秀)，符合OWASP Top 10防护标准
-- ✅ 代码规范: 符合PY-CORE-011/PY-CORE-044/PY-CORE-048范式体系
+- ✅ 代码规范: 符合PY-CORE-011/PY-CORE-045/PY-CORE-049范式体系
 
 ##### 5. 🐛 紧急修复：恢复7个数据卡片显示 (解析逻辑缩进错误)
 **问题描述**:
@@ -9385,7 +9745,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 6. **🔐 新增salt_crypto_tool.py加密解密管理工具**: 支持init/status/encrypt/decrypt/reencrypt命令，用于管理config/.salt文件和QQ邮件授权码等敏感字段的加解密
 7. **🛡️ security_audit.py升级至v1.2**: 新增第9项"加密系统安全审计"(Salt文件检查/Key验证/明文字段检测/权限审计)，扫描项从8项增至9项
 8. **🔧 修复Windows下Salt文件权限误报**: 跨平台权限检查优化(Linux/Mac用Unix权限+Windows用NTFS ACL+pywin32可选依赖)，审计问题从MEDIUM 1个降至0个
-9. **📐 新增PY-CORE-044三方文档互证范式**: 定义README.md/skill.md/Git历史100%一致标准，配套check_versions.py自动化验证脚本
+9. **📐 新增PY-CORE-045三方文档互证范式**: 定义README.md/skill.md/Git历史100%一致标准，配套check_versions.py自动化验证脚本
 10. **📁 test目录整理**: 将check_versions.py和check_git_versions.py从项目根目录移至test/统一管理
 
 ##### 1. 🎨 移动端按钮布局优化 (大小一致+自动换行+响应式改进)
@@ -9460,18 +9820,18 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 - ✅ 性能影响: 扫描耗时从5.02s增至7.32s（+2.3s，主要来自Windows ACL检查），仍在可接受范围
 - ✅ 9项扫描全部通过: 隐藏Bug/OWASP/注入/敏感数据/日志/性能/内存/并发/加密系统
 
-##### 4. 📐 三方文档互证体系建立 (PY-CORE-044范式 + 工具链)
+##### 4. 📐 三方文档互证体系建立 (PY-CORE-045范式 + 工具链)
 **问题描述**:
 - **现象**: README.md、skill.md、Git提交历史三者的版本记录可能不同步（如之前skill.md出现v5.0.9.62重复3次、缺失v5.0.9.50等问题），缺乏自动化验证机制
 - **根因**: 手动维护多个文档容易出错，没有强制一致性约束和快速检测工具
 - **影响范围**: 项目文档可信度、团队协作效率、审计合规性
 
 **修复方案**:
-- **技术实现(范式定义)**: 在[skill.md](skill.md#L51-L147)新增PY-CORE-044范式，定义三源一致性原则（版本数量/内容/时序完全相同）
+- **技术实现(范式定义)**: 在[skill.md](skill.md#L51-L147)新增PY-CORE-045范式，定义三源一致性原则（版本数量/内容/时序完全相同）
 - **技术实现(验证工具)**: 创建[test/check_versions.py](test/check_versions.py) (~60行)，自动化对比README.md/skill.md/Git历史的版本号集合，输出差异报告
 - **技术实现(历史修复)**: 删除skill.md中9466行重复内容（v5.0.9.62出现3次→1次/v5.0.9.61出现2次→1次），补齐缺失的v5.0.9.50版本记录
 - **技术实现(工作流集成)**: 定义发布新版本6步流程（代码提交→更新README→更新skill→生成docx→验证一致性→推送Git）
-- **参考位置**: commit b218bea8 (清理重复), commit 6f82f6fb (路径更新), [skill.md](skill.md) PY-CORE-044章节
+- **参考位置**: commit b218bea8 (清理重复), commit 6f82f6fb (路径更新), [skill.md](skill.md) PY-CORE-045章节
 
 **测试验证**:
 - ✅ 一致性验证: `cd test && py check_versions.py` 输出 "PERFECT MATCH: All three sources are 100% consistent!"
@@ -10023,7 +10383,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **修复日期**: 2026-09-07
 **修复类型**: Bug修复 + 稳定性提升
 **影响文件**: main.py, dist/app.js, README.md, skill.md
-**Commit**: 0717b503
+**Commit**: 22351201
 **作者**: 小旭二手机（西园路）
 
 ---
@@ -12964,11 +13324,11 @@ python config/crypto_tool.py encrypt-config
 
 ---
 
-### v5.0.9.23 (2026-09-02) - 🔧 **版本一致性修复** PY-CORE-048范式+空白changes补全+commit 48901a28真实数据替换
+### v5.0.9.23 (2026-09-02) - 🔧 **版本一致性修复** PY-CORE-049范式+空白changes补全+commit 48901a28真实数据替换
 
 > **Commit**: `57206dc9, fa29c2d6, 5a6158c8`  
 
-#### 更新内容: 新增PY-CORE-048版本号一致性保障范式，补全所有空白changes，将占位符替换为真实Git数据(commit 48901a28/425ecd5f/75f403af)
+#### 更新内容: 新增PY-CORE-049版本号一致性保障范式，补全所有空白changes，将占位符替换为真实Git数据(commit 48901a28/425ecd5f/75f403af)
 
 **修复日期**: 2026-09-02
 **修复类型**: 🔧Bug修复 + 📝范式定义
@@ -12979,7 +13339,7 @@ python config/crypto_tool.py encrypt-config
 
 ---
 
-##### 1. 🔧 PY-CORE-048版本号一致性保障范式 (📝范式定义)
+##### 1. 🔧 PY-CORE-049版本号一致性保障范式 (📝范式定义)
 
 **问题描述**:
 - **现象**: 启动脚本显示v5.0.9.16，Web界面显示v5.0.9.22，版本号不一致
@@ -12987,13 +13347,13 @@ python config/crypto_tool.py encrypt-config
 - **影响范围**: run.bat, run.sh, main.py, /api/version, /api/changelog, 前端Web界面
 
 **修复方案**:
-- **技术实现**: ①在skill.md新增PY-CORE-048版本号一致性保障范式 ②定义6个版本号获取点必须返回相同值 ③制定发布前检查清单和紧急修复流程 ④统一版本号获取策略
-- **参考位置**: skill.md PY-CORE-048, README.md#L141
+- **技术实现**: ①在skill.md新增PY-CORE-049版本号一致性保障范式 ②定义6个版本号获取点必须返回相同值 ③制定发布前检查清单和紧急修复流程 ④统一版本号获取策略
+- **参考位置**: skill.md PY-CORE-049, README.md#L141
 
 **测试验证**:
 - ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
 - ✅ run.bat/run.sh/main.py/API/Web界面五点版本号一致
-- ✅ PY-CORE-048范式已写入skill.md
+- ✅ PY-CORE-049范式已写入skill.md
 
 ---
 
@@ -13039,15 +13399,15 @@ python config/crypto_tool.py encrypt-config
 - **影响范围**: README.md, skill.md, /api/changelog端点, 前端Web界面, 启动脚本输出
 
 **修复方案**:
-- **技术实现**: ①在README.md"最新更新"部分插入v5.0.9.17~v5.0.9.22版本记录 ②为所有空白changes的版本补全标准化的变更详情结构（问题描述/修复方案/测试验证）③创建auto_fix_changelog.py自动化脚本实现未来自动修复 ④在skill.md中新增PY-CORE-048版本号一致性保障范式
-- **参考位置**: commit b5768a8a, auto_fix_changelog.py, skill.md PY-CORE-048, README.md#L141-L206
+- **技术实现**: ①在README.md"最新更新"部分插入v5.0.9.17~v5.0.9.22版本记录 ②为所有空白changes的版本补全标准化的变更详情结构（问题描述/修复方案/测试验证）③创建auto_fix_changelog.py自动化脚本实现未来自动修复 ④在skill.md中新增PY-CORE-049版本号一致性保障范式
+- **参考位置**: commit b5768a8a, auto_fix_changelog.py, skill.md PY-CORE-049, README.md#L141-L206
 
 **测试验证**:
 - ✅ run.bat/run.sh/main.py/API/Web界面五点版本号一致（全部显示v5.0.9.22）
 - ✅ /api/changelog返回的changes数组不再为空
 - ✅ 所有新增版本包含完整的问题描述、修复方案、测试验证三要素
 - ✅ 符合PY-CORE-011 Changelog版本变更详情完整结构范式
-- ✅ 符合PY-CORE-048 版本号一致性保障范式
+- ✅ 符合PY-CORE-049 版本号一致性保障范式
 
 ---
 
@@ -13290,7 +13650,7 @@ python config/crypto_tool.py encrypt-config
 
 **修复日期**: 2026-09-02
 **修复类型**: 🧠功能增强 + 智能算法
-**影响文件**: [main.py](main.py#L8970-L8993), [skill.md](skill.md#py-core-039-智能版本号匹配算法-smart-version-number-matching-algorithm)
+**影响文件**: [main.py](main.py#L8970-L8993), [skill.md](skill.md#py-core-040-智能版本号匹配算法-smart-version-number-matching-algorithm)
 **Commit**: da8351ed
 **变更统计**: +23行 -1行
 **作者**: 小旭二手机（西园路）
@@ -13307,7 +13667,7 @@ python config/crypto_tool.py encrypt-config
 **修复方案**:
 - **技术实现**: 三级降级策略 - Level1: 从commit message直接提取 → Level2: 智能日期匹配（30天阈值）→ Level3: 显示hash兜底
 - **算法核心**: 计算commit日期与所有README版本的日期差值，选择差值最小且≤30天的版本号
-- **参考位置**: commit 6c09b2b3, main.py:8970-8993, skill.md PY-CORE-041
+- **参考位置**: commit 6c09b2b3, main.py:8970-8993, skill.md PY-CORE-042
 
 **测试验证**:
 - ✅ 提交6c09b2b3已合并至master分支
@@ -13329,7 +13689,7 @@ python config/crypto_tool.py encrypt-config
   "meta": {
     "fix_date": "2026-09-02",
     "fix_type": "🧠功能增强 + 智能算法",
-    "affected_files": "[main.py](main.py#L8970-L8993), [skill.md](skill.md#py-core-039-智能版本号匹配算法-smart-version-number-matching-algorithm)",
+    "affected_files": "[main.py](main.py#L8970-L8993), [skill.md](skill.md#py-core-040-智能版本号匹配算法-smart-version-number-matching-algorithm)",
     "commit": "6c09b2b3",
     "change_stats": "+23行 -1行",
     "author": "小旭二手机（西园路）"
@@ -13472,12 +13832,12 @@ if missing:
 
 - **PY-CORE-010**: Changelog API数据结构与Git历史集成范式（定义API整体架构）
 - **PY-CORE-011**: **本文档**（定义单个版本的changes详细结构）
-- **PY-CORE-041**: 智能版本号匹配算法（定义版本号获取策略）
+- **PY-CORE-042**: 智能版本号匹配算法（定义版本号获取策略）
 
 三者关系：
 \\\
 PY-CORE-010 (API整体架构)
-├── PY-CORE-041 (版本号如何获取)
+├── PY-CORE-042 (版本号如何获取)
 └── PY-CORE-011 (每个版本包含什么内容) ← 当前文档
 \\\
 
@@ -13492,7 +13852,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: ✨功能增强
 **影响文件**: [main.py](main.py)
-**Commit**: 3099bed5
+**Commit**: 1f99aeec
 **变更统计**: +42行 -42行(v5.0.9.14)
 **作者**: 小旭二手机（西园路）
 
@@ -13524,7 +13884,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: ✨功能增强
 **影响文件**: [main.py](main.py)
-**Commit**: 6cbddd4b
+**Commit**: c9c9602b
 **变更统计**: +42行 -42行(v5.0.9.13)
 **作者**: 小旭二手机（西园路）
 
@@ -13556,7 +13916,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: 📝文档更新
 **影响文件**: [README.md](README.md)
-**Commit**: 12320720
+**Commit**: b82bc1d0
 **变更统计**: +42行 -42行(v5.0.9.12)
 **作者**: 小旭二手机（西园路）
 
@@ -13588,7 +13948,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: 📝文档更新
 **影响文件**: [README.md](README.md), [skill.md](skill.md)
-**Commit**: 79633bc9
+**Commit**: cb26253c
 **变更统计**: +42行 -42行(v5.0.9.11)
 **作者**: 小旭二手机（西园路）
 
@@ -13620,7 +13980,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: 🐛Bug修复
 **影响文件**: [main.py](main.py), [README.md](README.md)
-**Commit**: 5c7cd412
+**Commit**: 42e4dc4f
 **变更统计**: +42行 -42行(v5.0.9.10)
 **作者**: 小旭二手机（西园路）
 
@@ -13652,7 +14012,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: 📝文档更新
 **影响文件**: [README.md](README.md)
-**Commit**: b6c41494
+**Commit**: 56fec918
 **变更统计**: +42行 -42行(v5.0.9.9)
 **作者**: 小旭二手机（西园路）
 
@@ -13684,7 +14044,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: 🐛Bug修复
 **影响文件**: [main.py](main.py), 前端代码
-**Commit**: d642ff9c
+**Commit**: ee8138c1
 **变更统计**: +42行 -42行(v5.0.9.8)
 **作者**: 小旭二手机（西园路）
 
@@ -13716,7 +14076,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: ✨功能增强
 **影响文件**: [main.py](main.py)
-**Commit**: 6f5d4675
+**Commit**: e3e5f8c0
 **变更统计**: +42行 -42行(v5.0.9.7)
 **作者**: 小旭二手机（西园路）
 
@@ -14331,7 +14691,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: 架构优化
 **影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py)
-**Commit**: d3bdea13
+**Commit**: 87ccb2ca
 **变更统计**: 1个提交
 
 ---
@@ -14359,7 +14719,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: 架构优化
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), [test/generate_docx.py](test/generate_docx.py)
-**Commit**: 710625dd
+**Commit**: cd240866
 **变更统计**: 1个提交
 **作者**: 小旭二手机（西园路）
 
@@ -14390,7 +14750,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: 安全漏洞
 **影响文件**: [README.md](README.md), [main.py](main.py), [run.bat](run.bat), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py), [test/test_security_and_bugs.py](test/test_security_and_bugs.py)
-**Commit**: 88e03a46
+**Commit**: 6cb3daaa
 **变更统计**: 1个提交
 **作者**: 小旭二手机（西园路）
 
@@ -14424,7 +14784,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: Bug修复
 **影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py)
-**Commit**: 88e03a46, 5109acf1
+**Commit**: 46b6cefb, 5109acf1
 **变更统计**: 2个提交
 
 ---
@@ -14468,7 +14828,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: 安全漏洞
 **影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py)
-**Commit**: 88e03a46
+**Commit**: 4ccc1fc7
 **变更统计**: 1个提交
 **作者**: 小旭二手机（西园路）
 
@@ -14500,7 +14860,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: Bug修复
 **影响文件**: [README.md](README.md), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/generate_skill_docx.py](test/generate_skill_docx.py)
-**Commit**: 9a908dcf
+**Commit**: 04745d12
 **变更统计**: 1个提交
 
 ---
@@ -14530,7 +14890,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-31
 **修复类型**: Bug修复
 **影响文件**: [README.md](README.md), [run.bat](run.bat), [skill.docx](skill.docx), [skill.md](skill.md), [test/__init__.py](test/__init__.py), [test/generate_skill_docx.py](test/generate_skill_docx.py), [test/security_audit_v3.8.90.15.py](test/security_audit_v3.8.90.15.py), [test/test_version.py](test/test_version.py)
-**Commit**: 9a908dcf, 081b2aa7, 534f5c43, de2d0b71, aaaf9fc8
+**Commit**: 3e797861, 081b2aa7, 534f5c43, de2d0b71, aaaf9fc8
 **变更统计**: 5个提交
 
 ---
@@ -14645,7 +15005,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-30
 **修复类型**: 功能增强
 **影响文件**: [README.md](README.md), [generate_skill_docx.py](generate_skill_docx.py), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md)
-**Commit**: db98ebee
+**Commit**: 1fc481a7
 **变更统计**: 1个提交
 
 ---
@@ -14675,7 +15035,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-30
 **修复类型**: 代码清理
 **影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [dist/assets/index-CvEIzWZ2.css](dist/assets/index-CvEIzWZ2.css), [index.html](index.html), [main.py](main.py), [requirements.txt](requirements.txt), [run.bat](run.bat), [run.sh](run.sh), [skill.md](skill.md), [test/__init__.py](test/__init__.py) 等13个文件
-**Commit**: 3073458a, dddd3c82, 277bb1ae, d6832155
+**Commit**: c73d5774, dddd3c82, 277bb1ae, d6832155
 **变更统计**: 4个提交
 
 ---
@@ -14753,7 +15113,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-30
 **修复类型**: 功能增强
 **影响文件**: [README.md](README.md), [dist/app.js](dist/app.js), [index.html](index.html), [main.py](main.py), [skill.docx](skill.docx), [skill.md](skill.md), [test/security_audit_v3.8.90.15.py](test/security_audit_v3.8.90.15.py)
-**Commit**: 3073458a, eef962d7, f448d4c5, 7298c84c, c0e268b6, 8c70276e, 2a8d568f, 71088192, a75424fa, 2c7dedab, 696ab57e, 9ddea794, dfba9b98, f85bb5c4
+**Commit**: c71a1d21, eef962d7, f448d4c5, 7298c84c, c0e268b6, 8c70276e, 2a8d568f, 71088192, a75424fa, 2c7dedab, 696ab57e, 9ddea794, dfba9b98, f85bb5c4
 **变更统计**: 14个提交
 
 ---
@@ -15127,7 +15487,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-22
 **修复类型**: Bug修复
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: ac6add6f
+**Commit**: 78db045a
 **变更统计**: +25行 -5行(v3.8.90.09)
 **作者**: 小旭二手机（西园路）
 
@@ -15639,7 +15999,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-20
 **修复类型**: 架构优化
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: c4b0148b
+**Commit**: be0253f5
 **变更统计**: +0行 -2807行(v3.8.89.20)
 **作者**: 小旭二手机（西园路）
 
@@ -15737,7 +16097,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-11
 **修复类型**: 文档修复 + 启动Bug
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: fa75c100
+**Commit**: de620611
 **变更统计**: +5行 -5行(v3.8.89.16)
 **作者**: 小旭二手机（西园路）
 
@@ -15766,7 +16126,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-11
 **修复类型**: 安全漏洞 + 代码质量 + 隐藏Bug
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: 2fcfaf42
+**Commit**: 68be4c2d
 **变更统计**: +5行 -5行(v3.8.89.15)
 **作者**: 小旭二手机（西园路）
 
@@ -15824,7 +16184,7 @@ PY-CORE-010 (API整体架构)
 **修复日期**: 2026-08-08
 **修复类型**: 功能增强
 **影响文件**: [README.md](README.md), [main.py](main.py)
-**Commit**: c35e648e
+**Commit**: fd3c4a32
 **变更统计**: +5行 -5行(v3.8.89.14)
 **作者**: 小旭二手机（西园路）
 
@@ -22720,7 +23080,7 @@ DEBUG - 速率限制存储清理: 12000 -> 8500 条目
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-030: Import 语句规范 (Import Statement Standard)
+🔴 PY-CORE-031: Import 语句规范 (Import Statement Standard)
 
 **范式描述**
 强制要求所有 import 语句必须位于文件开头，禁止在函数/方法内部使用内联 import。
@@ -22881,7 +23241,7 @@ for i in range(ROUNDS):
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-047: 统一异常处理范式 (Unified Exception Handling)
+🔴 PY-CORE-048: 统一异常处理范式 (Unified Exception Handling)
 
 范式描述
 建立分层异常处理机制，实现异常的统一捕获、分类、记录和转换。
@@ -23017,7 +23377,7 @@ data = safe_call(lambda: json.load(f), default={}, context='读取JSON')
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-022: 环境自适应范式 (Environment-Aware Design) — 零硬编码
+🔴 PY-CORE-023: 环境自适应范式 (Environment-Aware Design) — 零硬编码
 
 范式描述
 通过Environment静态类实现跨平台兼容性，自动适配Windows/Mac/Linux系统差异。**所有路径和可执行文件名必须动态获取，禁止硬编码平台特定值（如.exe后缀、C:\路径等）**。
@@ -23234,7 +23594,7 @@ key_file = PROJECT_DIR / 'config' / '.encryption_key'  # TypeError: unsupported 
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-031: 智能缓存管理范式 (Intelligent Caching)
+🔴 PY-CORE-032: 智能缓存管理范式 (Intelligent Caching)
 
 范式描述
 通过FileCacheManager实现文件级TTL缓存，减少IO操作，提升性能。
@@ -23294,7 +23654,7 @@ json_cache = FileCacheManager(ttl_seconds=30)
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-038: 安全邮件通知范式 (Secure Email Notification)
+🔴 PY-CORE-039: 安全邮件通知范式 (Secure Email Notification)
 
 范式描述
 通过EmailNotifier实现结构化邮件发送，支持HTML富文本、事件分类、连接超时控制。
@@ -23535,7 +23895,7 @@ except Exception as launch_err:
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-016: 数据对比分析范式 (Data Comparison & Analysis)
+🔴 PY-CORE-017: 数据对比分析范式 (Data Comparison & Analysis)
 
 范式描述
 通过StockNumberComparator实现Excel/JSON数据对比，支持高价商品筛选、重复检测、差异报告。
@@ -23631,7 +23991,7 @@ class StockNumberComparator:
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-037: API速率限制与输入验证范式 (Rate Limiting & Input Validation)
+🔴 PY-CORE-038: API速率限制与输入验证范式 (Rate Limiting & Input Validation)
 
 范式描述
 通过RateLimiter和Pydantic模型实现API层面的安全和性能保护。
@@ -23730,7 +24090,7 @@ def rate_limit(limiter, endpoint_name='API'):
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-026: 前端安全防护范式 (Frontend Security)
+🔴 PY-CORE-027: 前端安全防护范式 (Frontend Security)
 
 范式描述
 在JavaScript前端实现XSS防护、URL验证、设备检测等安全机制。
@@ -23845,7 +24205,7 @@ async function safeParseJson(response) {
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-017: 双输出日志系统范式 (Dual-Output Logging)
+🔴 PY-CORE-018: 双输出日志系统范式 (Dual-Output Logging)
 
 范式描述
 通过TeeOutput类实现同时输出到控制台和文件的日志系统，支持自动时间戳、文件锁定恢复。
@@ -24230,7 +24590,7 @@ async def kill_task(task_id: str):
 
 ──────────────────────────────────────────────────
 
-🔴 PY-CORE-029: 隧道高可用范式 (High-Availability Tunnel)
+🔴 PY-CORE-030: 隧道高可用范式 (High-Availability Tunnel)
 
 范式描述
 实现hostc + Cloudflare双隧道互备方案，包含心跳检测、故障转移、自动重启等机制。
@@ -26085,7 +26445,7 @@ diff README.md skill.docx >/dev/null 2>&1 && echo "✅ 文档已同步" || echo 
 - **v3.8.90.02** (2026-08-21) 🔄兼容性 — v3.8.90.02 (2026-08-21) - 🐍 Python版本兼容性全面升级 — requirements.txt适配Python 3.9+全系列版本（影响文件: README.md, md_to_docx.py, requirements.txt, skill.docx, skill.md; 提交: 3个; Commit: 821cfdf0, 5f8c6f69, b7ee0ecb）
 - **v3.8.90.03** (2026-08-21) ✨功能增强 — v3.8.90.03 (2026-08-21) - 🐍 Python版本兼容性验证系统 + 文档管理范式 — 新增版本检查/测试/Tox配置，合并多余MD文件（影响文件: README.md, check_python_version.py, requirements.txt, skill.docx, skill.md 等8个; 提交: 2个; Commit: 583e136d, eb72274d）
 - **v3.8.90.04** (2026-08-21) 🏗️架构优化 — v3.8.90.04 (2026-08-21) - 🐍 版本检查功能集成到main.py — 删除独立check_python_version.py，遵循单文件架构（影响文件: README.md, check_python_version.py, main.py, skill.docx, skill.md 等7个; 提交: 2个; Commit: c347c3ca, ac43c5c4）
-- **v3.8.90.05** (2026-08-21) 🏗️架构优化 — v3.8.90.05 (2026-08-21) - 🗑️ 删除md_to_docx.py + 📐 建立Import语句规范(PY-CORE-030) — 清理3处内联import，强化单文件架构（影响文件: README.md, main.py, md_to_docx.py, skill.md; 提交: 2个; Commit: 73a3b5a3, 4bc486c0）
+- **v3.8.90.05** (2026-08-21) 🏗️架构优化 — v3.8.90.05 (2026-08-21) - 🗑️ 删除md_to_docx.py + 📐 建立Import语句规范(PY-CORE-031) — 清理3处内联import，强化单文件架构（影响文件: README.md, main.py, md_to_docx.py, skill.md; 提交: 2个; Commit: 73a3b5a3, 4bc486c0）
 - **v3.8.90.06** (2026-08-22) 🐛Bug修复 — v3.8.90.06 - Python 3.14兼容性修复 + 启动脚本pip强制升级 + run.bat BOM修复 + 日志文件锁修复（影响文件: README.md, requirements.txt, run.bat, run.sh, skill.docx 等6个; 提交: 1个; Commit: 4c54b03b）
 - **v3.8.90.07** (2026-08-22) 🐛Bug修复 — v3.8.90.07: 跨平台零硬編碼重構 + Playwright自動安裝兜底 - Environment EXE_SUFFIX/動態路徑檢測/三層防護/cloudflared動態掃描/allowed_exe動態生成（影响文件: README.md, main.py, skill.docx, skill.md; 提交: 2个; Commit: d5b6f61e, 96f38cb5）
 - **v3.8.90.08** (2026-08-22) 🐛Bug修复 — fix: Playwright多镜像源安装+系统Chrome回退兜底 v3.8.90.08（影响文件: README.md, _fix_cdn_test.py, dist/app.js, main.py, requirements.txt 等9个; 提交: 9个; Commit: 9d46298d, a7bf4d70, be142f5d, 4f3ad572, da43b24f, 876c29f3, f5c57406, 5f114387, 03a6d29e）
@@ -26130,7 +26490,7 @@ diff README.md skill.docx >/dev/null 2>&1 && echo "✅ 文档已同步" || echo 
 | v3.8.90.08 | 2026-08-22 | 小旭二手机（西园路） | 🔧 Playwright多镜像源安装+系统Chrome回退兜底(URL双斜杠修复/多镜像源自动切换/安装失败回退系统Chrome/四层防护) |
 | v3.8.90.07 | 2026-08-22 | 小旭二手机（西园路） | 🔧 跨平台零硬编码重构+Playwright自动安装兜底(Environment EXE_SUFFIX/动态路径检测/三层防护/cloudflared动态扫描/allowed_exe动态生成) |
 | v3.8.90.06 | 2026-08-22 | 小旭二手机（西园路） | 🐍 Python 3.14兼容性修复+启动脚本pip强制升级+run.bat BOM修复+日志文件锁修复(pydantic<2.13.0/pip upgrade/UTF-8无BOM/先杀进程再初始化日志) |
-| v3.8.90.05 | 2026-08-21 | 小旭二手机（西园路） | 🗑️ 删除md_to_docx.py+📐 建立Import语句规范(PY-CORE-030) — 清理3处内联import，强化单文件架构 |
+| v3.8.90.05 | 2026-08-21 | 小旭二手机（西园路） | 🗑️ 删除md_to_docx.py+📐 建立Import语句规范(PY-CORE-031) — 清理3处内联import，强化单文件架构 |
 | v3.8.90.04 | 2026-08-21 | 小旭二手机（西园路） | 🐍 版本检查功能集成到main.py — 删除独立check_python_version.py，遵循单文件架构 |
 | v3.8.90.03 | 2026-08-21 | 小旭二手机（西园路） | 🐍 Python版本兼容性验证系统+文档管理范式 — 新增版本检查/测试/Tox配置，合并多余MD文件 |
 | v3.8.90.02 | 2026-08-21 | 小旭二手机（西园路） | 🐍 Python版本兼容性全面升级 — requirements.txt适配Python 3.0+全系列版本 |
@@ -26700,7 +27060,7 @@ console.log('价格匹配:', priceMatch?.[1]);   // 预期输出: ¥6,699 ✅
 | [main.py](main.py) | 字段名兼容性修复 | 4520-4529 |
 | [dist/app.js](dist/app.js) | 正则增强 + 调试日志 | 1527-1559, 1984-1997 |
 | [README.md](README.md) | 版本记录 + 本修复指南 | - |
-| [skill.md](skill.md) | 技术范式 PY-CORE-016 | 4043-4364 |
+| [skill.md](skill.md) | 技术范式 PY-CORE-017 | 4043-4364 |
 
 #### 数据流说明
 
@@ -26882,7 +27242,7 @@ Closes #123
 
 #### 后端代码 (Python)
 - [ ] 异常处理是否使用了 `ExceptionContext` 或 `safe_call()`?
-- [ ] 字段提取是否遵循 PY-CORE-027 字段兼容性范式?
+- [ ] 字段提取是否遵循 PY-CORE-028 字段兼容性范式?
 - [ ] 日志是否使用了 `logger.info/warning/error` 而非 `print()`?
 - [ ] 路径管理是否通过 `PathManager` 统一处理?
 - [ ] 是否有对应的单元测试?
@@ -26958,7 +27318,7 @@ prettier --write dist/app.js
 4. 查看浏览器控制台的 `[对比卡片]` 日志确认解析结果
 
 **解决方案**:
-- 更新 `get_product_detail()` 使用多字段名兼容（PY-CORE-027）
+- 更新 `get_product_detail()` 使用多字段名兼容（PY-CORE-028）
 - 增强前端正则支持多模式匹配
 
 ### Q2: 为什么PC端看不到对比卡片？

@@ -55,6 +55,12 @@ config/.salt
 # 真实白名单不入库；脱敏格式示例 config/clean_allowed_roots.example.txt 需入库
 config/clean_allowed_roots.txt
 
+# ---------- 媒体保存目录（本机实际配置，绝不入库） ----------
+# 实际配置不入库（即使写入时已把家目录缩写成 ~）；
+# 脱敏格式示例 config/download_dir.example.txt 需入库
+config/download_dir.txt
+config/download_settings.json
+
 # ---------- 环境变量文件（含凭证，绝不入库） ----------
 .env
 .env.*

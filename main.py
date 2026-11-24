@@ -319,12 +319,12 @@ except ImportError:
 try:
     from fastapi import FastAPI, HTTPException, Query, Header, Depends, BackgroundTasks
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, HTMLResponse
+    from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, HTMLResponse, Response
     import uvicorn
 except ImportError:
     FastAPI = HTTPException = Query = Header = Depends = BackgroundTasks = None
     CORSMiddleware = None
-    JSONResponse = FileResponse = StreamingResponse = None
+    JSONResponse = FileResponse = StreamingResponse = Response = None
     uvicorn = None
 
 try:
@@ -572,10 +572,17 @@ def _assign_product_ids(products):
 
 
 def _attach_decoded_images(product):
-    """把商品图片字段解码后回填，返回该商品"""
+    """把商品图片字段解码后回填，并标注四大品类与品牌，返回该商品"""
     if isinstance(product, dict):
         images = product.get('图片', [])
         product['图片'] = decode_base64_images(images) if images else []
+        rules = _folder_rules()
+        desc = str(_product_desc(product) or '')
+        category = _product_category(
+            desc, rules, _pretty_model(_folder_model(desc, rules))
+        )
+        product['_category'] = category
+        product['_brand'] = _product_brand(desc, category) or _PRODUCT_BRAND_UNKNOWN
     return product
 
 
@@ -1750,6 +1757,773 @@ def safe_urlopen(url_or_req, timeout=None, context=None):
                 pass
                 
         return None, error_msg
+
+# 商品媒体下载：单商品最多文件数、单文件大小上限与允许的扩展名
+_MEDIA_MAX_FILES = int(os.environ.get('MEDIA_MAX_FILES', '60'))
+_MEDIA_FILE_MAX_BYTES = int(os.environ.get('MEDIA_FILE_MAX_BYTES', str(200 * 1024 * 1024)))
+_MEDIA_ALLOWED_SUFFIXES = (
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
+    '.mp4', '.mov', '.m4v', '.webm', '.avi', '.mkv', '.3gp', '.flv',
+    '.mp3', '.m4a', '.aac', '.wav', '.ogg',
+)
+_MEDIA_CONTENT_TYPE_SUFFIX = {
+    'image/jpeg': '.jpg', 'image/jpg': '.jpg', 'image/png': '.png', 'image/gif': '.gif',
+    'image/webp': '.webp', 'image/bmp': '.bmp',
+    'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm',
+    'video/x-msvideo': '.avi', 'video/3gpp': '.3gp',
+    'audio/mpeg': '.mp3', 'audio/mp4': '.m4a', 'audio/aac': '.aac', 'audio/wav': '.wav',
+}
+
+
+def _media_file_suffix(url: str, content_type: str) -> str:
+    """优先用URL后缀，其次用响应Content-Type，兜底.jpg"""
+    path = urllib.parse.urlparse(url).path
+    suffix = os.path.splitext(path)[1].lower()
+    if suffix in _MEDIA_ALLOWED_SUFFIXES:
+        return suffix
+    mapped = _MEDIA_CONTENT_TYPE_SUFFIX.get((content_type or '').lower())
+    if mapped:
+        return mapped
+    if content_type.startswith('video/'):
+        return '.mp4'
+    if content_type.startswith('audio/'):
+        return '.mp3'
+    return '.jpg'
+
+
+def _fetch_media_bytes(url: str) -> Tuple[Optional[bytes], str, str]:
+    """下载单个媒体文件，返回 (内容, Content-Type, 错误信息)"""
+    if not isinstance(url, str) or not url.lower().startswith(('http://', 'https://')):
+        return None, '', '媒体地址无效'
+    req = urllib.request.Request(url, headers={
+        'User-Agent': _ALBUM_PREFETCH_UA,
+        'Accept': 'image/*,video/*,audio/*,*/*',
+        'Referer': 'https://www.szwego.com/',
+    })
+    resp, err = safe_urlopen(req, timeout=TIMEOUT_CONFIG['http_request_long'])
+    if resp is None:
+        safe_log(_album_logger, 'warning', '[media_dl] 下载失败 err={e}', e=(err or '')[:120])
+        return None, '', err or '下载失败'
+    try:
+        content_type = (resp.headers.get('Content-Type') or '').split(';')[0].strip().lower()
+        declared_len = resp.headers.get('Content-Length')
+        try:
+            declared_len = int(declared_len) if declared_len else 0
+        except (TypeError, ValueError):
+            declared_len = 0
+        if declared_len and declared_len > _MEDIA_FILE_MAX_BYTES:
+            safe_log(_album_logger, 'warning', '[media_dl] 文件超出大小上限 size={s}', s=declared_len)
+            return None, '', '文件过大'
+        data = resp.read(_MEDIA_FILE_MAX_BYTES + 1)
+    except Exception as e:  # [HANDLED]
+        safe_log(_album_logger, 'warning', '[media_dl] 读取失败 err={e}', e=f'{type(e).__name__}: {str(e)[:100]}')
+        return None, '', f'{type(e).__name__}'
+    finally:
+        try:
+            resp.close()
+        except Exception:  # [HANDLED]
+            pass
+    if not data:
+        return None, '', '内容为空'
+    if len(data) > _MEDIA_FILE_MAX_BYTES:
+        return None, '', '文件过大'
+    return data, content_type, ''
+
+
+def _product_media_urls(product_id: str) -> Tuple[List[str], str, str]:
+    """按商品ID取出图片/视频URL列表，返回 (URL列表, 命名来源, 错误信息)"""
+    latest_file = _latest_product_json_path()
+    if not latest_file:
+        return [], '', '没有找到JSON文件'
+    with open(latest_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    products = data.get('商品列表', []) if isinstance(data, dict) else data
+    _assign_product_ids(products)
+    target = next((p for p in products if p.get('_id') == product_id), None)
+    if target is None and product_id.lower().startswith('sku:'):
+        target_sku = product_id[4:].split('#')[0]
+        target = next((
+            p for p in products
+            if _sku_matches(p.get('货号') or p.get('stock_number') or '', target_sku)
+        ), None)
+    if target is None:
+        return [], '', '未找到该商品'
+    urls = [u for u in decode_base64_images(target.get('图片') or []) if isinstance(u, str) and u]
+    name_source = (str(_product_desc(target) or '').strip()
+                   or _normalize_text(target.get('货号') or '')
+                   or 'product')
+    return urls[:_MEDIA_MAX_FILES], name_source, ''
+
+
+# ─── 媒体保存目录与商品文件夹命名 ──────────────────────────
+# 保存目录写在 config/download_dir.txt（一行一条，# 注释，支持 ~ 展开），
+# 写入时自动把家目录缩写成 ~，配置文件里不出现真实用户名（脱敏）；
+# 脱敏格式说明见同目录 download_dir.example.txt
+_DOWNLOAD_DIR_FOLDER_NAME = '微购'
+_VIDEO_SUFFIXES = ('.mp4', '.mov', '.m4v', '.webm', '.avi', '.mkv', '.3gp', '.flv')
+_PRODUCT_FOLDER_MAX_LEN = 60
+_PRODUCT_FOLDER_MARKER = '.product_id'
+
+
+def _download_dir_config_file():
+    """保存目录配置文件的路径"""
+    return os.path.join(PathManager.get_config_dir(), 'download_dir.txt')
+
+
+def _download_dir_example_file():
+    """脱敏格式示例文件的路径"""
+    return os.path.join(PathManager.get_config_dir(), 'download_dir.example.txt')
+
+
+def _legacy_download_settings_file():
+    """旧版 JSON 配置路径（仅用于兼容读取）"""
+    return os.path.join(PathManager.get_config_dir(), 'download_settings.json')
+
+
+def _default_download_dir():
+    """默认保存目录：系统下载目录下的「微购」子文件夹（与清理白名单同目录，下载后可直接清理）"""
+    return os.path.join(os.path.expanduser('~'), 'Downloads', _DOWNLOAD_DIR_FOLDER_NAME)
+
+
+def _abbreviate_home(path):
+    """把家目录缩写成 ~，写进配置文件时脱敏"""
+    home = os.path.expanduser('~').rstrip(os.sep)
+    try:
+        norm = os.path.normpath(path)
+        if norm == home:
+            return '~'
+        if home and os.path.commonpath([norm, home]) == home:
+            return '~' + os.sep + os.path.relpath(norm, home)
+    except Exception:  # [HANDLED]
+        pass
+    return path
+
+
+def _read_download_dir_config():
+    """读取 config/download_dir.txt 的第一条有效路径（支持 # 注释与 ~ 展开）"""
+    path = _download_dir_config_file()
+    if os.path.isfile(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.split('#', 1)[0].strip().strip('"').strip("'")
+                    if line:
+                        return os.path.expanduser(line)
+        except Exception as e:  # [HANDLED]
+            log_print(f'[download_dir] 读取配置失败: {type(e).__name__}: {e}')
+    legacy = _legacy_download_settings_file()
+    if os.path.isfile(legacy):
+        try:
+            with open(legacy, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, dict) and isinstance(data.get('dir'), str) and data['dir'].strip():
+                return os.path.expanduser(data['dir'].strip())
+        except Exception:  # [HANDLED]
+            pass
+    return ''
+
+
+def _get_download_dir():
+    """当前生效的保存目录"""
+    return _read_download_dir_config() or _default_download_dir()
+
+
+def _normalize_download_dir(raw: str) -> Tuple[Optional[str], str]:
+    """校验保存目录并创建，返回 (绝对路径, 错误信息)；传空表示恢复默认目录"""
+    if raw is None:
+        raw = ''
+    if not isinstance(raw, str):
+        return None, '保存目录格式错误'
+    raw = raw.strip().strip('"').strip("'")
+    if not raw:
+        raw = _default_download_dir()
+    if len(raw) > 400:
+        return None, '目录路径过长'
+    raw = os.path.expanduser(raw)
+    if not os.path.isabs(raw):
+        return None, '请输入绝对路径（例如 ~/Downloads/微购）'
+    path = os.path.normpath(raw)
+    try:
+        os.makedirs(path, exist_ok=True)
+    except Exception as e:  # [HANDLED]
+        return None, f'无法创建目录：{type(e).__name__}'
+    if not os.path.isdir(path):
+        return None, '目标路径不是目录'
+    probe = os.path.join(path, f'.write_probe_{os.getpid()}')
+    try:
+        with open(probe, 'w', encoding='utf-8') as f:
+            f.write('ok')
+        os.remove(probe)
+    except Exception:  # [HANDLED]
+        return None, '目录不可写，请换一个目录'
+    return path, ''
+
+
+def _set_download_dir(raw: str) -> Tuple[Optional[str], str]:
+    """保存目录配置到 config/download_dir.txt（写入时家目录缩写为 ~），返回 (绝对路径, 错误信息)"""
+    path, err = _normalize_download_dir(raw)
+    if err:
+        return None, err
+    try:
+        os.makedirs(PathManager.get_config_dir(), exist_ok=True)
+        with open(_download_dir_config_file(), 'w', encoding='utf-8') as f:
+            f.write('# 图片/视频保存目录（一行一条，# 开头为注释，支持 ~ 展开）\n')
+            f.write('# 格式说明见同目录 download_dir.example.txt\n')
+            f.write(_abbreviate_home(path) + '\n')
+    except Exception as e:  # [HANDLED]
+        return None, f'保存配置失败：{type(e).__name__}'
+    return path, ''
+
+
+def _safe_folder_name(name: str) -> str:
+    """把商品描述清洗成文件夹名：保留中英文/数字/空格/% ，去掉路径非法字符"""
+    cleaned = re.sub(r'[\\/:*?"<>|\r\n\t]+', ' ', str(name or ''))
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip(' .')
+    cleaned = cleaned[:_PRODUCT_FOLDER_MAX_LEN].strip(' .')
+    return cleaned or 'product'
+
+
+# ─── 商品品类与文件夹命名规则（关键词全部热读取，改配置即生效） ───────────
+# 四个大类：手机 / 笔记本 / 平板 / 手表（含智能穿戴），其余统一归入「其他」
+# 目录结构：保存目录/品类/品牌/商品文件夹名
+#   手机 → 「型号 + 电池」，如 手机/华为/华为Nova 12活力版 电池97%
+#   笔记本 / 平板 / 手表 / 其他 → 只保留「型号」，如 平板/苹果/iPad Pro 11英寸第四代
+# 「型号」= 商品描述里第一个规格词（容量 / 颜色 / 成色 / 电池 / 版本…）之前的内容
+# 追加关键词：编辑 config/folder_naming.txt；追加品牌：编辑 config/brands.txt
+
+_PRODUCT_CATEGORY_PHONE = '手机'
+_PRODUCT_CATEGORY_LAPTOP = '笔记本'
+_PRODUCT_CATEGORY_TABLET = '平板'
+_PRODUCT_CATEGORY_WATCH = '手表'
+_PRODUCT_CATEGORY_SMART = '其他'
+
+_PRODUCT_CATEGORIES = (
+    _PRODUCT_CATEGORY_PHONE,
+    _PRODUCT_CATEGORY_LAPTOP,
+    _PRODUCT_CATEGORY_TABLET,
+    _PRODUCT_CATEGORY_WATCH,
+    _PRODUCT_CATEGORY_SMART,
+)
+
+_PRODUCT_BRAND_UNKNOWN = '其他'
+
+# 品类判定顺序：先具体后笼统，避免「联想拯救者平板」被判成笔记本
+_CATEGORY_MATCH_ORDER = ('watch', 'tablet', 'laptop', 'smart')
+
+_FOLDER_DEFAULT_SPEC_KEYWORDS = (
+    '电池', '成色', '外观', '边框', '屏幕', '屏新', '后盖', '换过', '原装', '无拆',
+    '拆修', '保修', '激活', '充电', '循环', '全套', '国行', '港版', '美版', '日版',
+    '外版', '有锁', '无锁', '靓机', '准新', '大花机', '手机壳', '保护壳', '手柄',
+    '盒子', '手感', '系统', '处理器', '显卡', '内存', '硬盘', '固态', '核显',
+    '英特尔', '锐龙', '酷睿', 'core', 'rtx', 'gtx', '英寸屏', '原色', '全新',
+)
+
+_FOLDER_DEFAULT_COLOR_KEYWORDS = (
+    '白色', '黑色', '蓝色', '绿色', '红色', '粉色', '紫色', '金色', '银色', '灰色',
+    '橙色', '黄色', '青色', '钛色', '深空灰', '星光色', '远峰蓝', '午夜色', '石墨色',
+    '玫瑰金', '香槟金', '暗紫色', '苍岭绿', '沙漠色', '天蓝色', '云杉绿', '曜石黑',
+    '昆仑霞光', '钛金属',
+)
+
+_FOLDER_DEFAULT_PHONE_KEYWORDS = (
+    'iphone', '苹果', '华为', '荣耀', '小米', '红米', 'oppo', 'vivo', 'iqoo', '一加',
+    '三星', 'realme', '真我', '魅族', '努比亚', '中兴', '摩托罗拉', '诺基亚', '手机',
+    'promax', 'pro', 'plus', 'xsmax', 'xs', 'xr',
+)
+
+# 非手机品类：命中即不算手机（优先级高于「手机品牌」，如「iPhone 17 Pro Max 原装手机壳」）
+_FOLDER_DEFAULT_NON_PHONE_KEYWORDS = (
+    'watch', 'ipad', '平板', 'macbook', '笔记本', '音箱', '耳机', 'airpods', 'homepod',
+    '大疆', 'pocket', '相机', '镜头', '键盘', '鼠标', '充电器', '手机壳', '保护壳',
+    '配件', '显示器', '主机', '投影', '手环', '腕表', '手表',
+)
+
+# 四个大类的默认判定关键词（配置文件里可追加）
+_CATEGORY_DEFAULT_KEYWORDS = {
+    'watch': ('watch', '手表', '腕表', '手环', 'iwatch', 'band', 'gt2', 'gt3', 'gt4', 'gt5'),
+    'tablet': ('ipad', '平板', 'matepad', 'pad', 'tab', 'y700', '小新pad', '平板电脑'),
+    'laptop': (
+        'macbook', '笔记本', '游戏本', '轻薄本', '超级本', '电脑', '台式', '主机',
+        '拯救者', '小新', 'thinkpad', 'thinkbook', '机械革命', '极光x', '幻16',
+        '天选', '雷神', '神舟', 'rog', '外星人', 'imac', 'matebook', 'magicbook',
+        'redmibook', '小新air', '小新pro', 'book', 'laptop',
+    ),
+    'smart': (
+        '音箱', '耳机', 'airpods', 'homepod', '相机', '镜头', '键盘', '鼠标',
+        '充电器', '手机壳', '保护壳', '配件', '显示器', '投影', '手柄', '大疆',
+        'pocket', '无人机', '路由器', 'switch', '游戏机', '充电宝', '数据线',
+    ),
+}
+
+_FOLDER_NAMING_SECTIONS = {
+    '颜色': 'color',
+    '规格': 'spec',
+    '手机品牌': 'phone',
+    '非手机': 'non_phone',
+    '笔记本': 'laptop',
+    '平板': 'tablet',
+    '手表': 'watch',
+    '其他': 'smart',
+    '智能设备': 'smart',
+}
+
+_FOLDER_CAPACITY_RE = (
+    r'\d+\s*\+\s*\d+(?:\.\d+)?\s*(?:GB|G|TB|T)?'
+    r'|\d+(?:\.\d+)?\s*(?:GB|G|TB|T)(?![0-9A-Za-z])'
+    r'|(?:32|64|128|256|512|1024|2048)(?!\d)'
+)
+
+_FOLDER_BATTERY_RE = (
+    r'(?:电池\s*(?:容量|健康|效率)?|健康)\s*[:：]?\s*(\d+(?:\.\d+)?)\s*%?'
+)
+
+# 处理器型号（如 i5-1155G7 / i7-12700H），出现即视为型号结束，避免把 CPU 写进文件夹名
+_FOLDER_CPU_RE = r'(?<![A-Za-z])i[3579](?![A-Za-z0-9])'
+
+# 无品牌词的裸苹果型号（如「13 128 白色 电池效率75%」），带电池信息时按手机处理
+_FOLDER_BARE_APPLE_RE = (
+    r'^(?:iphone\s*|ip\s*)?(?:1[0-9]|xs\s*max|xs|xr|se\d?)\s*(?:pro\s*max|pro|plus|max)?$'
+)
+
+_FOLDER_TRIM_CHARS = ' ,，、-/·:：;；\u3000'
+
+# ─── 品牌识别（品牌表热读取 config/brands.txt，改完立即生效） ───────────────
+# 品牌用于目录分层：保存目录/品类/品牌/商品文件夹名
+# 品牌表格式：每行 `规范品牌名|别名1,别名2`，无别名只写品牌名
+# 匹配时先按品类对应品牌表找，找不到再全表兜底，仍找不到归入「其他」
+_BRAND_DEFAULT_TABLE = {
+    'phone': (
+        ('苹果', ('iphone', 'apple', '苹果')),
+        ('华为', ('华为', 'huawei', 'mate', 'pura', 'nova', '畅享', '优畅享')),
+        ('荣耀', ('荣耀', 'honor')),
+        ('红米', ('红米', 'redmi')),
+        ('小米', ('小米', 'xiaomi')),
+        ('OPPO', ('oppo', 'reno', 'find x', 'findx')),
+        ('vivo', ('vivo',)),
+        ('iQOO', ('iqoo',)),
+        ('一加', ('一加', 'oneplus')),
+        ('三星', ('三星', 'samsung', 'galaxy')),
+        ('realme', ('realme', '真我')),
+        ('魅族', ('魅族', 'meizu')),
+        ('努比亚', ('努比亚', 'nubia')),
+        ('中兴', ('中兴', 'zte')),
+        ('摩托罗拉', ('摩托罗拉', 'motorola')),
+        ('诺基亚', ('诺基亚', 'nokia')),
+        ('索尼', ('索尼', 'sony', 'xperia')),
+        ('谷歌', ('谷歌', 'pixel')),
+        ('黑鲨', ('黑鲨', 'blackshark')),
+    ),
+    'laptop': (
+        ('苹果', ('macbook', 'imac', 'apple', '苹果')),
+        ('联想', ('联想', 'lenovo', 'thinkpad', 'thinkbook', '拯救者', '小新', 'yoga', 'legion')),
+        ('戴尔', ('戴尔', 'dell', 'alienware', '外星人')),
+        ('惠普', ('惠普', '光影精灵', '暗影精灵', 'envy')),
+        ('华硕', ('华硕', 'asus', 'rog', '天选', '灵耀')),
+        ('宏碁', ('宏碁', '宏基', 'acer')),
+        ('机械革命', ('机械革命', 'mechrevo')),
+        ('雷神', ('雷神', 'thundeRobot')),
+        ('神舟', ('神舟', 'hasee')),
+        ('微星', ('微星', 'msi')),
+        ('微软', ('微软', 'microsoft', 'surface')),
+        ('华为', ('华为', 'huawei', 'matebook')),
+        ('荣耀', ('荣耀', 'honor', 'magicbook')),
+        ('小米', ('小米', 'xiaomi', 'redmibook')),
+        ('技嘉', ('技嘉', 'gigabyte')),
+        ('七彩虹', ('七彩虹', 'colorful')),
+    ),
+    'tablet': (
+        ('苹果', ('ipad', 'apple', '苹果')),
+        ('华为', ('华为', 'huawei', 'matepad')),
+        ('荣耀', ('荣耀', 'honor')),
+        ('小米', ('小米', 'xiaomi', '小米平板')),
+        ('联想', ('联想', 'lenovo', '小新pad', '拯救者', 'y700')),
+        ('三星', ('三星', 'samsung', 'galaxy')),
+        ('OPPO', ('oppo',)),
+        ('vivo', ('vivo',)),
+        ('realme', ('realme', '真我')),
+        ('红米', ('红米', 'redmi')),
+    ),
+    'watch': (
+        ('苹果', ('apple watch', 'iwatch', 'apple', '苹果')),
+        ('华为', ('华为', 'huawei', 'watch gt', 'watch fit', 'watch ultimate',
+                  'gt2', 'gt3', 'gt4', 'gt5', 'fit2', 'fit3')),
+        ('荣耀', ('荣耀', 'honor')),
+        ('小米', ('小米', 'xiaomi', '手环', 'band')),
+        ('三星', ('三星', 'samsung', 'galaxy watch')),
+        ('佳明', ('佳明', 'garmin')),
+        ('OPPO', ('oppo',)),
+        ('vivo', ('vivo',)),
+        ('华米', ('华米', 'amazfit')),
+        ('颂拓', ('颂拓', 'suunto')),
+        ('小天才', ('小天才',)),
+    ),
+    'other': (
+        ('大疆', ('大疆', 'dji', 'pocket', 'mavic', 'osmo')),
+        ('苹果', ('airpods', 'homepod', 'mac mini', 'apple', '苹果')),
+        ('华为', ('华为', 'huawei', 'freebuds')),
+        ('小米', ('小米', 'xiaomi')),
+        ('索尼', ('索尼', 'sony', 'wh-1000', 'wf-1000')),
+        ('佳能', ('佳能', 'canon')),
+        ('尼康', ('尼康', 'nikon')),
+        ('富士', ('富士', 'fujifilm')),
+        ('任天堂', ('任天堂', 'nintendo', 'switch')),
+        ('罗技', ('罗技', 'logitech')),
+        ('戴森', ('戴森', 'dyson')),
+        ('影石', ('影石', 'insta360')),
+        ('森海塞尔', ('森海塞尔', 'sennheiser')),
+        ('漫步者', ('漫步者', 'edifier')),
+        ('JBL', ('jbl',)),
+        ('Bose', ('bose',)),
+    ),
+}
+
+_BRAND_SECTION_KEYS = {
+    '手机': 'phone',
+    '笔记本': 'laptop',
+    '平板': 'tablet',
+    '手表': 'watch',
+    '其他': 'other',
+    '智能设备': 'other',
+}
+
+_BRAND_CACHE = {'stamp': None, 'rules': None}
+
+
+def _brand_config_file() -> str:
+    """品牌表配置文件路径"""
+    return os.path.join(PathManager.get_config_dir(), 'brands.txt')
+
+
+def _read_brand_config() -> dict:
+    """热读取 config/brands.txt 追加品牌，返回 {品类key: [(品牌, 别名元组), ...]}"""
+    extra = {key: [] for key in ('phone', 'laptop', 'tablet', 'watch', 'other')}
+    path = _brand_config_file()
+    if not os.path.isfile(path):
+        return extra
+    try:
+        current = None
+        with open(path, 'r', encoding='utf-8') as f:
+            for raw in f:
+                line = raw.split('#', 1)[0].strip()
+                if not line:
+                    continue
+                if line.startswith('[') and line.endswith(']'):
+                    current = _BRAND_SECTION_KEYS.get(line[1:-1].strip())
+                    continue
+                if not current:
+                    continue
+                name, _, alias_text = line.partition('|')
+                name = name.strip()
+                if not name:
+                    continue
+                aliases = [a.strip().lower() for a in alias_text.split(',') if a.strip()]
+                extra[current].append((name, tuple(aliases or [name.lower()])))
+    except Exception as e:  # [HANDLED]
+        log_print(f'[brands] 读取配置失败: {type(e).__name__}: {e}')
+    return extra
+
+
+def _brand_rules() -> dict:
+    """默认品牌表 + 配置追加品牌，配置项优先；用文件签名(mtime+size)缓存，改文件即失效"""
+    path = _brand_config_file()
+    try:
+        st = os.stat(path)
+        stamp = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        stamp = None
+    if _BRAND_CACHE['rules'] is not None and _BRAND_CACHE['stamp'] == stamp:
+        return _BRAND_CACHE['rules']
+    extra = _read_brand_config()
+    merged = {}
+    for key in ('phone', 'laptop', 'tablet', 'watch', 'other'):
+        merged[key] = tuple(extra.get(key, ())) + tuple(_BRAND_DEFAULT_TABLE.get(key, ()))
+    _BRAND_CACHE['stamp'] = stamp
+    _BRAND_CACHE['rules'] = merged
+    return merged
+
+
+def _brand_match_pairs(entries) -> list:
+    """把品牌表展开成 (别名, 品牌) 并按别名长度降序，保证「watch gt」先于「watch」命中"""
+    pairs = []
+    for name, aliases in entries:
+        for alias in aliases:
+            if alias:
+                pairs.append((alias, name))
+    pairs.sort(key=lambda item: len(item[0]), reverse=True)
+    return pairs
+
+
+def _product_brand(text: str, category: str = '', rules: Optional[dict] = None) -> str:
+    """从商品描述里摘出品牌：先按品类品牌表匹配，再全表兜底，找不到返回空串"""
+    lower = str(text or '').lower()
+    rules = rules or _brand_rules()
+    category_key = {
+        _PRODUCT_CATEGORY_PHONE: 'phone',
+        _PRODUCT_CATEGORY_LAPTOP: 'laptop',
+        _PRODUCT_CATEGORY_TABLET: 'tablet',
+        _PRODUCT_CATEGORY_WATCH: 'watch',
+        _PRODUCT_CATEGORY_SMART: 'other',
+    }.get(category, 'other')
+    keys = [category_key] + [k for k in ('phone', 'laptop', 'tablet', 'watch', 'other')
+                             if k != category_key]
+    for key in keys:
+        for alias, name in _brand_match_pairs(rules.get(key, ())):
+            if alias in lower:
+                return name
+    if category == _PRODUCT_CATEGORY_PHONE:
+        model = _pretty_model(_folder_model(text, _folder_rules()))
+        if model and re.match(_FOLDER_BARE_APPLE_RE, model.strip(), re.IGNORECASE):
+            return '苹果'
+    return ''
+
+
+def _product_folder_relpath(name_source: str, category: str = '', brand: str = '') -> str:
+    """生成相对保存路径：品类/品牌/商品文件夹名，如 手机/华为/华为Nova 12活力版 电池97%"""
+    text = str(name_source or '').strip()
+    if not category:
+        category = _product_category(text)
+    if not brand:
+        brand = _product_brand(text, category) or _PRODUCT_BRAND_UNKNOWN
+    folder = _product_folder_name(text, category)
+    return '/'.join((_safe_folder_name(category), _safe_folder_name(brand), folder))
+
+
+def _folder_naming_config_file() -> str:
+    """命名规则配置文件路径"""
+    return os.path.join(PathManager.get_config_dir(), 'folder_naming.txt')
+
+
+def _read_folder_naming_config() -> dict:
+    """热读取 config/folder_naming.txt：每次调用都重新读盘，保存后立即生效"""
+    sections = {'color': [], 'spec': [], 'phone': [], 'non_phone': [],
+                'laptop': [], 'tablet': [], 'watch': [], 'smart': []}
+    path = _folder_naming_config_file()
+    if not os.path.isfile(path):
+        return sections
+    try:
+        current = None
+        with open(path, 'r', encoding='utf-8') as f:
+            for raw in f:
+                line = raw.split('#', 1)[0].strip()
+                if not line:
+                    continue
+                if line.startswith('[') and line.endswith(']'):
+                    current = _FOLDER_NAMING_SECTIONS.get(line[1:-1].strip())
+                    continue
+                if current:
+                    sections[current].append(line.lower())
+    except Exception as e:  # [HANDLED]
+        log_print(f'[folder_naming] 读取配置失败: {type(e).__name__}: {e}')
+    return sections
+
+
+def _folder_rules() -> dict:
+    """默认关键词 + 配置文件追加关键词，统一转小写做不区分大小写匹配"""
+    cfg = _read_folder_naming_config()
+
+    def _merged(defaults, key):
+        base = [str(x).lower() for x in defaults]
+        return tuple(base + [x for x in cfg.get(key, []) if x not in base])
+
+    rules = {
+        'spec': _merged(_FOLDER_DEFAULT_SPEC_KEYWORDS, 'spec'),
+        'color': _merged(_FOLDER_DEFAULT_COLOR_KEYWORDS, 'color'),
+        'phone': _merged(_FOLDER_DEFAULT_PHONE_KEYWORDS, 'phone'),
+        'non_phone': _merged(_FOLDER_DEFAULT_NON_PHONE_KEYWORDS, 'non_phone'),
+    }
+    for key in _CATEGORY_MATCH_ORDER:
+        rules[key] = _merged(_CATEGORY_DEFAULT_KEYWORDS[key], key)
+    return rules
+
+
+def _folder_model(text: str, rules: dict) -> str:
+    """取商品描述里第一个规格词之前的部分作为「型号」"""
+    normalized = re.sub(r'\s{2,}', ' ', str(text or '')).strip()
+    if not normalized:
+        return ''
+    lower = normalized.lower()
+    cut = len(normalized)
+    for kw in rules['spec'] + rules['color']:
+        pos = lower.find(kw)
+        if pos >= 0:
+            cut = min(cut, pos)
+    match = re.search(_FOLDER_CAPACITY_RE, normalized, re.IGNORECASE)
+    if match:
+        cut = min(cut, match.start())
+    match = re.search(_FOLDER_BATTERY_RE, normalized)
+    if match:
+        cut = min(cut, match.start())
+    match = re.search(_FOLDER_CPU_RE, normalized, re.IGNORECASE)
+    if match:
+        cut = min(cut, match.start())
+    model = normalized[:cut].strip(_FOLDER_TRIM_CHARS)
+    model = re.sub(r'([A-Za-z\u4e00-\u9fa5])(?:32|64|128|256|512|1024|2048)$', r'\1', model)
+    model = re.sub(r'\s+', ' ', model).strip(_FOLDER_TRIM_CHARS)
+    return model or normalized.strip(_FOLDER_TRIM_CHARS)
+
+
+def _pretty_model(model: str) -> str:
+    """把粘连的苹果型号写规范：17promax → 17 Pro Max，14pro → 14 Pro，XSMax → XS Max"""
+    result = re.sub(r'(\d{1,2})\s*(?:promax|pro\s*max)(?![a-z])',
+                    lambda m: f'{m.group(1)} Pro Max', model, flags=re.IGNORECASE)
+    result = re.sub(r'(\d{1,2})\s*pro(?![a-z])',
+                    lambda m: f'{m.group(1)} Pro', result, flags=re.IGNORECASE)
+    result = re.sub(r'xs\s*max', 'XS Max', result, flags=re.IGNORECASE)
+    return result
+
+
+def _folder_battery_label(text: str) -> str:
+    """提取电池信息，统一成「电池92%」写法"""
+    match = re.search(_FOLDER_BATTERY_RE, str(text or ''))
+    if not match:
+        return ''
+    value = match.group(1)
+    if value.endswith('.0'):
+        value = value[:-2]
+    return f'电池{value}%'
+
+
+_CATEGORY_KEY_TO_NAME = {
+    'watch': _PRODUCT_CATEGORY_WATCH,
+    'tablet': _PRODUCT_CATEGORY_TABLET,
+    'laptop': _PRODUCT_CATEGORY_LAPTOP,
+    'smart': _PRODUCT_CATEGORY_SMART,
+}
+
+
+def _product_category(text: str, rules: Optional[dict] = None, model: str = '') -> str:
+    """把商品描述判定成四个大类之一：手机 / 笔记本 / 平板 / 手表，其余归「其他」
+
+    判定顺序：手表 → 平板 → 笔记本 → 其他 → 手机（先具体后笼统，
+    避免「联想拯救者平板」被判成笔记本、「iPhone 原装手机壳」被判成手机）
+    """
+    lower = str(text or '').lower()
+    rules = rules or _folder_rules()
+    for key in _CATEGORY_MATCH_ORDER:
+        if any(kw in lower for kw in rules.get(key, ())):
+            return _CATEGORY_KEY_TO_NAME[key]
+    if any(kw in lower for kw in rules['phone']):
+        return _PRODUCT_CATEGORY_PHONE
+    if model and re.match(_FOLDER_BARE_APPLE_RE, str(model).strip(), re.IGNORECASE) \
+            and re.search(_FOLDER_BATTERY_RE, str(text or '')):
+        return _PRODUCT_CATEGORY_PHONE
+    return _PRODUCT_CATEGORY_SMART
+
+
+def _is_phone_text(text: str, rules: Optional[dict] = None, model: str = '') -> bool:
+    """是否手机类商品（兼容旧调用，内部走四品类判定）"""
+    return _product_category(text, rules, model) == _PRODUCT_CATEGORY_PHONE
+
+
+def _product_folder_name(name_source: str, category: Optional[str] = None) -> str:
+    """按商品描述生成商品文件夹名：手机=型号+电池，其它品类=型号"""
+    text = str(name_source or '').strip()
+    rules = _folder_rules()
+    model = _pretty_model(_folder_model(text, rules))
+    if category is None:
+        category = _product_category(text, rules, model)
+    if category == _PRODUCT_CATEGORY_PHONE:
+        battery = _folder_battery_label(text)
+        if battery:
+            model = f'{model} {battery}'.strip()
+    return _safe_folder_name(model or text)
+
+
+def _product_folder_marker(root: str) -> str:
+    """读取目录内记录的商品ID标记"""
+    try:
+        with open(os.path.join(root, _PRODUCT_FOLDER_MARKER), 'r', encoding='utf-8') as f:
+            return f.read().strip()
+    except Exception:  # [HANDLED]
+        return ''
+
+
+def _resolve_product_folder(base_dir: str, folder_name: str, product_id: str) -> str:
+    """确定商品保存目录：同商品复用同名目录，其它商品同名时追加序号避免混装
+
+    folder_name 支持多级相对路径（品类/品牌/文件夹名），序号只追加到最后一层
+    """
+    rel_dir, base_name = os.path.split(folder_name)
+    candidates = [base_name] + [f'{base_name}-{n}' for n in range(2, 100)]
+    for cand in candidates:
+        root = os.path.join(base_dir, rel_dir, cand) if rel_dir else os.path.join(base_dir, cand)
+        if not os.path.isdir(root):
+            return root
+        if _product_folder_marker(root) == product_id:
+            return root
+        try:
+            if not os.listdir(root):
+                return root
+        except Exception:  # [HANDLED]
+            pass
+    tail = f'{base_name}-{str(product_id)[-6:]}'
+    return os.path.join(base_dir, rel_dir, tail) if rel_dir else os.path.join(base_dir, tail)
+
+
+def _prepare_product_folder(product_id: str, name_source: str) -> Tuple[str, str]:
+    """创建并返回商品保存目录（品类/品牌/文件夹名），返回 (目录, 错误信息)"""
+    folder = _resolve_product_folder(_get_download_dir(), _product_folder_relpath(name_source), product_id)
+    try:
+        os.makedirs(folder, exist_ok=True)
+        marker = os.path.join(folder, _PRODUCT_FOLDER_MARKER)
+        if not os.path.isfile(marker):
+            with open(marker, 'w', encoding='utf-8') as f:
+                f.write(product_id)
+    except Exception as e:  # [HANDLED]
+        return '', f'无法创建保存目录：{type(e).__name__}'
+    return folder, ''
+
+
+def _save_media_files(product_id: str, indexes: Optional[List[int]] = None):
+    """下载商品媒体并保存到默认目录，返回 (成功列表, 失败列表, 保存目录, 错误信息)"""
+    media_urls, name_source, err = _product_media_urls(product_id)
+    if err:
+        return [], [], '', err
+    if not media_urls:
+        return [], [], '', '该商品没有可下载的图片或视频'
+    total = len(media_urls)
+    if indexes is None:
+        indexes = list(range(total))
+    folder, folder_err = _prepare_product_folder(product_id, name_source)
+    if folder_err:
+        return [], [], '', folder_err
+    saved, failed = [], []
+    for idx in indexes:
+        if idx < 0 or idx >= total:
+            failed.append({'index': idx, 'error': f'序号超出范围（0-{total - 1}）'})
+            continue
+        url = media_urls[idx]
+        data, content_type, dl_err = _fetch_media_bytes(url)
+        if not data:
+            failed.append({'index': idx, 'error': dl_err or '下载失败'})
+            continue
+        suffix = _media_file_suffix(url, content_type)
+        filename = f'{idx + 1:02d}{suffix}'
+        path = os.path.join(folder, filename)
+        try:
+            with open(path, 'wb') as f:
+                f.write(data)
+        except Exception as e:  # [HANDLED]
+            failed.append({'index': idx, 'error': f'写入失败：{type(e).__name__}'})
+            continue
+        saved.append({'index': idx, 'filename': filename, 'path': path, 'bytes': len(data)})
+    return saved, failed, folder, ''
+
+
+def _product_media_list_payload(product_id: str):
+    """返回 (媒体URL, 命名来源, 预览保存目录, 品类, 品牌, 错误)，供清单接口展示保存位置"""
+    media_urls, name_source, err = _product_media_urls(product_id)
+    if err or not media_urls:
+        return media_urls, name_source, '', '', '', err
+    rules = _folder_rules()
+    model = _pretty_model(_folder_model(name_source, rules))
+    category = _product_category(name_source, rules, model)
+    brand = _product_brand(name_source, category) or _PRODUCT_BRAND_UNKNOWN
+    folder = _resolve_product_folder(
+        _get_download_dir(), _product_folder_relpath(name_source, category, brand), product_id
+    )
+    return media_urls, name_source, folder, category, brand, ''
+
 
 # 相册分页接口可重试的状态码（429/5xx属于临时性失败，重试同一页即可）
 _ALBUM_API_RETRYABLE_STATUS = (429, 500, 502, 503, 504)
@@ -4411,6 +5185,29 @@ async def lifespan(app):
     except Exception:
         pass
     logger.info("[shutdown] 清理完成")
+
+# 依赖自愈：用系统Python直接启动时，fastapi/uvicorn可能只装在项目虚拟环境里，
+# 此时自动切到虚拟环境解释器重新执行，避免 FastAPI 为 None 导致启动崩溃
+if FastAPI is None or uvicorn is None:
+    _venv_dir = os.path.join(PROJECT_DIR, '.venv')
+    _in_venv = os.path.realpath(sys.prefix) == os.path.realpath(_venv_dir)
+    _venv_python = VENV_PYTHON
+    if not _in_venv and os.path.exists(_venv_python):
+        _msg = f"[deps] 当前解释器缺少 fastapi/uvicorn，自动切换虚拟环境解释器重启: {_venv_python}"
+        sys.stdout.write(f"{_msg}\n")
+        log_print(_msg)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        try:
+            os.execv(_venv_python, [_venv_python, os.path.abspath(__file__)] + sys.argv[1:])
+        except Exception as e:  # [HANDLED]
+            _msg = f"[deps] 切换虚拟环境解释器失败: {type(e).__name__}: {e}"
+            sys.stdout.write(f"{_msg}\n")
+            log_print(_msg)
+    _msg = "[deps] 缺少依赖 fastapi/uvicorn，请先安装：.venv/bin/python -m pip install -r requirements.txt"
+    sys.stdout.write(f"{_msg}\n")
+    log_print(_msg)
+    sys.exit(1)
 
 app = FastAPI(
     title="Szwego商品爬虫",
@@ -10863,13 +11660,29 @@ if __name__ == '__main__':
                     '/changelog': {'get': {'summary': '获取更新日志', 'tags': ['系统'], 'responses': {'200': {'description': '更新日志'}}}},
                     '/run': {'post': {'summary': '执行命令', 'tags': ['任务'], 'requestBody': {'content': {'application/json': {'schema': {'type': 'object', 'required': ['command'], 'properties': {'command': {'type': 'string', 'description': '要执行的命令'}}}}}}, 'responses': {'200': {'description': '执行结果'}}}},
                     '/products': {'get': {'summary': '获取商品列表', 'tags': ['商品'], 'parameters': [{'name': 'date', 'in': 'query', 'schema': {'type': 'string'}, 'description': '日期'}], 'responses': {'200': {'description': '商品列表'}}}},
-                    '/product/search': {'get': {'summary': '搜索商品（支持货号/描述/售价/价格区间）', 'tags': ['商品'], 'parameters': [
-                        {'name': 'sku', 'in': 'query', 'schema': {'type': 'string'}, 'description': '货号或描述关键词（当search_type为sku或description时使用）'},
+                    '/product/search': {'get': {'summary': '搜索商品（支持货号/描述/售价/价格区间/备注）', 'tags': ['商品'], 'parameters': [
+                        {'name': 'sku', 'in': 'query', 'schema': {'type': 'string'}, 'description': '货号、描述或备注关键词（当search_type为sku/description/remark时使用）'},
                         {'name': 'price', 'in': 'query', 'schema': {'type': 'string'}, 'description': '售价（当search_type为price时使用，如：799 或 ¥1,500）'},
                         {'name': 'price_min', 'in': 'query', 'schema': {'type': 'string'}, 'description': '最低价（当search_type为price_range时使用，可选，如：500）'},
                         {'name': 'price_max', 'in': 'query', 'schema': {'type': 'string'}, 'description': '最高价（当search_type为price_range时使用，可选，如：2000）'},
-                        {'name': 'search_type', 'in': 'query', 'schema': {'type': 'string', 'enum': ['sku', 'description', 'price', 'price_range']}, 'description': '搜索类型：sku=按货号, description=按描述, price=按售价, price_range=按价格区间（默认：sku）'}
-                    ], 'responses': {'200': {'description': '搜索结果（单个商品返回product字段，多个商品返回products数组，价格区间搜索额外返回search_price_range字段）'}}}},
+                        {'name': 'search_type', 'in': 'query', 'schema': {'type': 'string', 'enum': ['sku', 'description', 'price', 'price_range', 'remark', 'brand']}, 'description': '搜索类型：sku=按货号, description=按描述, price=按售价, price_range=按价格区间, remark=按备注, brand=按品牌（默认：sku）'}
+                    ], 'responses': {'200': {'description': '搜索结果（单个商品返回product字段，多个商品返回products数组，价格区间搜索额外返回search_price_range字段，备注搜索额外返回search_remark字段）'}}}},
+                    '/product/media/list': {'get': {'summary': '获取商品可下载的图片/视频清单', 'tags': ['商品'], 'parameters': [
+                        {'name': 'product_id', 'in': 'query', 'schema': {'type': 'string'}, 'required': True, 'description': '商品ID（来自商品列表/搜索结果的_id字段）'}
+                    ], 'responses': {'200': {'description': '媒体清单（count为文件总数，files含index与kind=image/video；category为品类、brand为品牌，save_dir为按「品类/品牌/商品文件夹名」生成的保存目录）'}, '400': {'description': '商品ID无效'}, '404': {'description': '商品不存在或无媒体文件'}}}},
+                    '/product/media/file': {'get': {'summary': '下载商品单个图片/视频', 'tags': ['商品'], 'parameters': [
+                        {'name': 'product_id', 'in': 'query', 'schema': {'type': 'string'}, 'required': True, 'description': '商品ID（来自商品列表/搜索结果的_id字段）'},
+                        {'name': 'index', 'in': 'query', 'schema': {'type': 'integer'}, 'required': True, 'description': '媒体序号（从0开始，来自media/list的files.index）'}
+                    ], 'responses': {'200': {'description': '单个文件（按Content-Disposition附件下载）'}, '400': {'description': '商品ID无效或序号越界'}, '404': {'description': '商品不存在或无媒体文件'}, '502': {'description': '文件下载失败'}}}},
+                    '/product/media/save': {'get': {'summary': '保存商品单个图片/视频到默认下载目录', 'tags': ['商品'], 'parameters': [
+                        {'name': 'product_id', 'in': 'query', 'schema': {'type': 'string'}, 'required': True, 'description': '商品ID'},
+                        {'name': 'index', 'in': 'query', 'schema': {'type': 'integer'}, 'required': True, 'description': '媒体序号（从0开始）'}
+                    ], 'responses': {'200': {'description': '保存结果（path为本地绝对路径）'}, '400': {'description': '参数无效'}, '502': {'description': '文件下载失败'}}}},
+                    '/product/media/save-all': {'post': {'summary': '保存商品全部图片/视频到默认下载目录', 'tags': ['商品'], 'parameters': [
+                        {'name': 'product_id', 'in': 'query', 'schema': {'type': 'string'}, 'required': True, 'description': '商品ID'}
+                    ], 'responses': {'200': {'description': '保存结果（dir为保存目录，saved/failed为数量）'}, '400': {'description': '参数无效'}}}},
+                    '/download/settings': {'get': {'summary': '获取默认下载目录', 'tags': ['系统'], 'responses': {'200': {'description': '当前目录、系统默认目录与配置文件路径（config/download_dir.txt）'}}},
+                                           'post': {'summary': '设置默认下载目录', 'tags': ['系统'], 'requestBody': {'content': {'application/json': {'schema': {'type': 'object', 'properties': {'dir': {'type': 'string', 'description': '绝对路径，留空则恢复默认'}}}}}}, 'responses': {'200': {'description': '设置结果'}, '400': {'description': '路径非法或不可写'}}}},
                     '/daily-profit': {'get': {'summary': '获取每日利润', 'tags': ['商品'], 'responses': {'200': {'description': '利润数据'}}}},
                     '/sku/compare': {'get': {'summary': 'SKU对比', 'tags': ['商品'], 'responses': {'200': {'description': '对比结果'}}}},
                     '/tunnel/status': {'get': {'summary': '获取隧道状态', 'tags': ['隧道'], 'responses': {'200': {'description': '隧道状态'}}}},
@@ -11720,6 +12533,7 @@ if __name__ == '__main__':
                     if last_record and isinstance(last_record, dict):
                         added_skus = set(last_record.get('added', []))
 
+                _rules = _folder_rules()
                 for p in products:
                     img_data = p.get('图片', '')
                     if img_data:
@@ -11728,6 +12542,12 @@ if __name__ == '__main__':
                         p['图片'] = []
                     sku = p.get('货号', '') or p.get('stock_number', '')
                     p['_isNew'] = sku in added_skus
+                    desc = str(_product_desc(p) or '')
+                    category = _product_category(
+                        desc, _rules, _pretty_model(_folder_model(desc, _rules))
+                    )
+                    p['_category'] = category
+                    p['_brand'] = _product_brand(desc, category) or _PRODUCT_BRAND_UNKNOWN
 
                 _assign_product_ids(products)
 
@@ -12150,8 +12970,8 @@ if __name__ == '__main__':
         async def search_product(sku: str = '', price: str = '', price_min: str = '', price_max: str = '', search_type: str = 'sku'):
             search_type = search_type.strip().lower()
 
-            if search_type not in ['sku', 'description', 'price', 'price_range']:
-                return jsonify({'error': '无效的搜索类型（支持：sku/description/price/price_range）'}, status_code=400)
+            if search_type not in ['sku', 'description', 'price', 'price_range', 'remark', 'brand']:
+                return jsonify({'error': '无效的搜索类型（支持：sku/description/price/price_range/remark/brand）'}, status_code=400)
 
             if search_type == 'sku':
                 sku = sku.strip()
@@ -12164,6 +12984,30 @@ if __name__ == '__main__':
                 if not re.match(r'^[a-zA-Z0-9\u4e00-\u9fa5\-_]+$', sku):
                     safe_log(logger, 'warning', '[search_product] 检测到可疑货号: {sku}', sku=sku)
                     return jsonify({'error': '货号包含非法字符（仅允许字母、数字、中文、横线和下划线）'}, status_code=400)
+
+            elif search_type == 'remark':
+                sku = sku.strip()
+                if not sku:
+                    return jsonify({'error': '请提供备注关键词'}, status_code=400)
+
+                if len(sku) > 200:
+                    return jsonify({'error': '备注关键词过长（最大200字符）'}, status_code=400)
+
+                if any(ord(ch) < 32 and ch not in '\n\r\t' for ch in sku):
+                    safe_log(logger, 'warning', '[search_product] 备注关键词含控制字符，已拒绝')
+                    return jsonify({'error': '备注关键词包含控制字符'}, status_code=400)
+
+            elif search_type == 'brand':
+                sku = sku.strip()
+                if not sku:
+                    return jsonify({'error': '请提供品牌关键词'}, status_code=400)
+
+                if len(sku) > 100:
+                    return jsonify({'error': '品牌关键词过长（最大100字符）'}, status_code=400)
+
+                if any(ord(ch) < 32 and ch not in '\n\r\t' for ch in sku):
+                    safe_log(logger, 'warning', '[search_product] 品牌关键词含控制字符，已拒绝')
+                    return jsonify({'error': '品牌关键词包含控制字符'}, status_code=400)
 
             elif search_type == 'price':
                 price = price.strip()
@@ -12348,7 +13192,51 @@ if __name__ == '__main__':
                     safe_log(logger, 'warning', '[search_product] 价格区间未命中 区间={r} 文件={f}',
                              r=range_desc, f=os.path.basename(latest_file or ''))
                     return jsonify({'found': False, 'error': f'未找到价格在 {range_desc} 范围内的商品'})
-                
+
+                elif search_type == 'brand':
+                    target_keyword = _normalize_text(sku).lower()
+                    for p in products:
+                        _attach_decoded_images(p)
+                        brand = str(p.get('_brand', '') or '')
+                        category = str(p.get('_category', '') or '')
+                        haystack = f'{category}/{brand}'.lower()
+                        if target_keyword and target_keyword not in brand.lower() \
+                                and target_keyword not in haystack:
+                            continue
+                        matched_products.append(p)
+                    if matched_products:
+                        return jsonify({
+                            'found': True,
+                            'products': matched_products[:100],
+                            'total': len(matched_products),
+                            'filename': os.path.basename(latest_file),
+                            'search_brand': sku
+                        })
+                    safe_log(logger, 'warning', '[search_product] 品牌搜索未命中 关键词长度={n} 文件={f}',
+                             n=len(sku), f=os.path.basename(latest_file or ''))
+                    return jsonify({'found': False, 'error': f'未找到品牌为 "{sku}" 的商品'})
+
+                elif search_type == 'remark':
+                    target_keyword = _normalize_text(sku).lower()
+                    for p in products:
+                        remark_text = _normalize_text(p.get('备注', '') or p.get('remark', '')).lower()
+                        if not target_keyword or target_keyword not in remark_text:
+                            continue
+                        images = p.get('图片', [])
+                        p['图片'] = decode_base64_images(images) if images else []
+                        matched_products.append(p)
+                    if matched_products:
+                        return jsonify({
+                            'found': True,
+                            'products': matched_products[:100],
+                            'total': len(matched_products),
+                            'filename': os.path.basename(latest_file),
+                            'search_remark': sku
+                        })
+                    safe_log(logger, 'warning', '[search_product] 备注搜索未命中 关键词长度={n} 文件={f}',
+                             n=len(sku), f=os.path.basename(latest_file or ''))
+                    return jsonify({'found': False, 'error': f'未找到备注包含 "{sku}" 的商品'})
+
             except Exception as e:  # [HANDLED]
                 logger.error(f'[search_product] 搜索失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({'error': '搜索商品失败'}, status_code=500)
@@ -12473,6 +13361,167 @@ if __name__ == '__main__':
             except Exception as e:  # [HANDLED]
                 logger.error(f'[get_product_by_id] 查询失败: {type(e).__name__}: {e}', exc_info=True)
                 return jsonify({'found': False, 'error': '查询商品信息失败'})
+
+        @app.get('/api/product/media/list')  # [SECURED]
+        async def list_product_media(product_id: str = ''):
+            product_id = product_id.strip()
+            if not product_id or len(product_id) > 200:
+                return JSONResponse(content={'error': '请提供有效的商品ID'}, status_code=400)
+            try:
+                media_urls, name_source, save_dir, category, brand, err = await asyncio.get_running_loop().run_in_executor(
+                    _blocking_io_executor, _product_media_list_payload, product_id
+                )
+            except Exception as e:  # [HANDLED]
+                logger.error(f'[media_list] 读取失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'found': False, 'error': '读取商品媒体失败'}, status_code=500)
+            if err:
+                return jsonify({'found': False, 'error': err})
+            if not media_urls:
+                return jsonify({'found': False, 'error': '该商品没有可下载的图片或视频'})
+            files = []
+            for idx, url in enumerate(media_urls):
+                suffix = _media_file_suffix(url, '')
+                files.append({
+                    'index': idx,
+                    'kind': 'video' if suffix in ('.mp4', '.mov', '.m4v', '.webm', '.avi', '.mkv', '.3gp', '.flv') else 'image',
+                })
+            return jsonify({'found': True, 'count': len(files), 'name': name_source,
+                            'category': category, 'brand': brand,
+                            'save_dir': save_dir, 'files': files})
+
+        @app.get('/api/product/media/file')  # [SECURED]
+        async def download_product_media_file(product_id: str = '', index: int = 0):
+            product_id = product_id.strip()
+            if not product_id or len(product_id) > 200:
+                return JSONResponse(content={'error': '请提供有效的商品ID'}, status_code=400)
+            try:
+                media_urls, name_source, err = await asyncio.get_running_loop().run_in_executor(
+                    _blocking_io_executor, _product_media_urls, product_id
+                )
+            except Exception as e:  # [HANDLED]
+                logger.error(f'[media_file] 读取失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'found': False, 'error': '读取商品媒体失败'}, status_code=500)
+            if err:
+                return jsonify({'found': False, 'error': err})
+            if not media_urls:
+                return jsonify({'found': False, 'error': '该商品没有可下载的图片或视频'})
+            if index < 0 or index >= len(media_urls):
+                logger.warning(f'[media_file] 序号超出范围: product_id={product_id[:32]} index={index} total={len(media_urls)}')
+                return jsonify({'found': False, 'error': f'文件序号超出范围（0-{len(media_urls) - 1}）'}, status_code=400)
+
+            url = media_urls[index]
+            data, content_type, dl_err = await asyncio.get_running_loop().run_in_executor(
+                _blocking_io_executor, _fetch_media_bytes, url
+            )
+            if not data:
+                safe_log(logger, 'warning', '[media_file] 下载失败 id={i} index={n} err={e}', i=product_id, n=index, e=dl_err or '')
+                return jsonify({'found': False, 'error': f'文件下载失败：{dl_err or "未知错误"}'}, status_code=502)
+
+            safe_name = re.sub(r'[\\/:*?"<>|\r\n\t]+', '_', name_source).strip('_')[:40] or 'product'
+            suffix = _media_file_suffix(url, content_type)
+            filename = f'{safe_name}_{index + 1:02d}{suffix}'
+            headers = {
+                'Content-Disposition': f"attachment; filename=\"media_{index + 1:02d}{suffix}\"; filename*=UTF-8''{urllib.parse.quote(filename)}",
+                'Content-Length': str(len(data)),
+                'Cache-Control': 'no-store',
+                'Access-Control-Expose-Headers': 'Content-Disposition',
+            }
+            media_type = content_type if content_type and '/' in content_type else 'application/octet-stream'
+            safe_log(logger, 'info', '[media_file] 下载完成 id={i} index={n} bytes={b}', i=product_id, n=index, b=len(data))
+            return Response(content=data, media_type=media_type, headers=headers)
+
+        @app.get('/api/download/settings')  # [SECURED]
+        async def get_download_settings():
+            try:
+                current = await asyncio.get_running_loop().run_in_executor(
+                    _blocking_io_executor, _get_download_dir
+                )
+                return jsonify({
+                    'success': True,
+                    'dir': current,
+                    'default_dir': _default_download_dir(),
+                    'exists': os.path.isdir(current),
+                    'config_file': _download_dir_config_file(),
+                    'example_file': _download_dir_example_file(),
+                    'folder_rule': '每个商品一个子文件夹：手机取「型号+电池」，其它品类只取「型号」',
+                })
+            except Exception as e:  # [HANDLED]
+                logger.error(f'[download_settings] 读取失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '读取下载目录配置失败'}, status_code=500)
+
+        @app.post('/api/download/settings')  # [SECURED]
+        async def update_download_settings(request: Request):
+            try:
+                data = await request.json()  # [SECURITY] VALIDATED
+            except Exception:  # [HANDLED]
+                return jsonify({'success': False, 'error': '请求体不是合法JSON'}, status_code=400)
+            if not isinstance(data, dict):
+                return jsonify({'success': False, 'error': '请求体格式错误'}, status_code=400)
+            raw_dir = data.get('dir', '')
+            try:
+                saved_dir, err = await asyncio.get_running_loop().run_in_executor(
+                    _blocking_io_executor, _set_download_dir, raw_dir
+                )
+            except Exception as e:  # [HANDLED]
+                logger.error(f'[download_settings] 保存失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '保存下载目录失败'}, status_code=500)
+            if err:
+                return jsonify({'success': False, 'error': err}, status_code=400)
+            safe_log(logger, 'info', '[download_settings] 目录已更新 dir={d}', d=saved_dir)
+            return jsonify({'success': True, 'dir': saved_dir, 'default_dir': _default_download_dir()})
+
+        @app.get('/api/product/media/save')  # [SECURED]
+        async def save_product_media_file(product_id: str = '', index: int = 0):
+            product_id = product_id.strip()
+            if not product_id or len(product_id) > 200:
+                return JSONResponse(content={'error': '请提供有效的商品ID'}, status_code=400)
+            try:
+                saved, failed, folder, err = await asyncio.get_running_loop().run_in_executor(
+                    _blocking_io_executor, _save_media_files, product_id, [index]
+                )
+            except Exception as e:  # [HANDLED]
+                logger.error(f'[media_save] 保存失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '保存文件失败'}, status_code=500)
+            if err:
+                return jsonify({'success': False, 'error': err}, status_code=400)
+            if not saved:
+                reason = failed[0].get('error') if failed else '保存失败'
+                return jsonify({'success': False, 'error': reason}, status_code=502)
+            item = saved[0]
+            safe_log(logger, 'info', '[media_save] 已保存 id={i} index={n} path={p}', i=product_id, n=index, p=item['path'])
+            return jsonify({
+                'success': True,
+                'dir': folder,
+                'path': item['path'],
+                'filename': item['filename'],
+                'bytes': item['bytes'],
+            })
+
+        @app.post('/api/product/media/save-all')  # [SECURED]
+        async def save_all_product_media(product_id: str = ''):
+            product_id = product_id.strip()
+            if not product_id or len(product_id) > 200:
+                return JSONResponse(content={'error': '请提供有效的商品ID'}, status_code=400)
+            try:
+                saved, failed, folder, err = await asyncio.get_running_loop().run_in_executor(
+                    _blocking_io_executor, _save_media_files, product_id, None
+                )
+            except Exception as e:  # [HANDLED]
+                logger.error(f'[media_save_all] 保存失败: {type(e).__name__}: {e}', exc_info=True)
+                return jsonify({'success': False, 'error': '保存文件失败'}, status_code=500)
+            if err:
+                return jsonify({'success': False, 'error': err}, status_code=400)
+            safe_log(logger, 'info', '[media_save_all] 完成 id={i} saved={s} failed={f} dir={d}',
+                     i=product_id, s=len(saved), f=len(failed), d=folder)
+            return jsonify({
+                'success': len(saved) > 0,
+                'dir': folder,
+                'saved': len(saved),
+                'failed': len(failed),
+                'files': saved,
+                'errors': failed,
+                'error': '' if saved else (failed[0].get('error') if failed else '保存失败'),
+            })
 
         @app.get('/api/clean/allowed-roots')  # [SECURED]
         async def api_clean_allowed_roots(request: Request):

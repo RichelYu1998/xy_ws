@@ -527,7 +527,7 @@
             const data = allProductsData || window.allProductsData;
             const rows = findRowsByIdentifier(identifier);
             rows.forEach(row => {
-                const priceCell = row.querySelector('td:nth-child(4)');
+                const priceCell = row.querySelector('.price-cell') || row.querySelector('td:nth-child(4)');
                 if (priceCell) {
                     const price = parseFloat((priceCell.textContent || '¥0').replace('¥', '').replace(',', ''));
                     const cells = row.querySelectorAll('td');
@@ -592,7 +592,7 @@
         function showLinkedBadge(row) {
             removeLinkedBadge();
             const desc = row.dataset.desc || row.dataset.sku || '';
-            const priceCell = row.querySelector('td:nth-child(4)');
+            const priceCell = row.querySelector('.price-cell') || row.querySelector('td:nth-child(4)');
             const price = priceCell ? priceCell.textContent.trim() : '';
             const skuCell = row.querySelector('td:nth-child(2)');
             const sku = skuCell ? skuCell.textContent.trim() : '';
@@ -629,7 +629,7 @@
                 if (isMobile) {
                     row.style.background = '';
                     row.style.boxShadow = '';
-                    const priceCell = row.querySelector('td:nth-child(4)');
+                    const priceCell = row.querySelector('.price-cell') || row.querySelector('td:nth-child(4)');
                     if (priceCell) {
                         const priceText = priceCell.textContent || '';
                         const priceMatch = priceText.match(/¥?([\\d,]+\\.?\\d*)/);
@@ -675,6 +675,8 @@
                 url += 'price=' + encodeURIComponent(sku) + '&search_type=price';
             } else if (searchType === 'description') {
                 url += 'sku=' + encodeURIComponent(sku) + '&search_type=description';
+            } else if (searchType === 'brand') {
+                url += 'sku=' + encodeURIComponent(sku) + '&search_type=brand';
             } else {
                 url += 'sku=' + encodeURIComponent(sku) + '&search_type=sku';
             }
@@ -900,6 +902,22 @@
             }
         }
         
+        const PRODUCT_CATEGORY_STYLES = {
+            '手机': { bg: '#ecf5ff', border: '#409EFF', color: '#409EFF' },
+            '笔记本': { bg: '#f4f4f5', border: '#909399', color: '#606266' },
+            '平板': { bg: '#f0f9eb', border: '#67c23a', color: '#529b2e' },
+            '手表': { bg: '#fdf6ec', border: '#E6A23C', color: '#b88230' },
+            '智能设备': { bg: '#fef0f0', border: '#f56c6c', color: '#c45656' },
+            '其他': { bg: '#fef0f0', border: '#f56c6c', color: '#c45656' }
+        };
+
+        function categoryBadgeHtml(name) {
+            const key = (name || '').toString();
+            if (!key) return '<span style="color:#909399;">-</span>';
+            const st = PRODUCT_CATEGORY_STYLES[key] || { bg: '#f4f4f5', border: '#dcdfe6', color: '#909399' };
+            return `<span style="display:inline-block;padding:1px 8px;border-radius:10px;border:1px solid ${st.border};background:${st.bg};color:${st.color};font-size:12px;white-space:nowrap;">${escapeHtml(  /* [ESCAPED] */key)}</span>`;
+        }
+
         function showProductModal(p) {
             console.log('[showProductModal] 开始渲染模态框, 商品:', p.货号 || p.商品描述 || '未知');
             
@@ -970,12 +988,33 @@
                 }
             }
 
+            const downloadProductId = p._id || '';
+            const safeDownloadId = escapeJsAttr(downloadProductId);
+            const dlIconStyle = 'position:absolute;top:6px;right:6px;width:26px;height:26px;padding:0;border:none;border-radius:50%;background:rgba(64,158,255,0.92);color:#fff;font-size:12px;line-height:26px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.3);';
+            const headerDownloadBtn = (downloadProductId && validImages.length > 0)
+                ? `<button type="button" onclick="downloadProductMedia('${safeDownloadId}', this)" title="保存全部图片/视频到默认目录" style="border:1px solid #409EFF;background:#409EFF;color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;"><i class="fa fa-download"></i> 保存全部 (${validImages.length})</button>`
+                : '';
+            const downloadDirBar = downloadProductId
+                ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px 0;padding:8px 10px;background:#f6f8fa;border:1px solid #e5e9f0;border-radius:6px;font-size:13px;color:#606266;">
+                        <span style="white-space:nowrap;">保存位置：</span>
+                        <code id="downloadDirText" title="默认下载目录" style="flex:1 1 200px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#fff;border:1px solid #e5e9f0;border-radius:4px;padding:2px 6px;font-size:12px;">读取中…</code>
+                        <button type="button" onclick="openDownloadDirSetting()" style="border:1px solid #dcdfe6;background:#fff;color:#606266;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;">更改</button>
+                    </div>`
+                : '';
+
+            const categoryBadge = categoryBadgeHtml(p._category);
             let modalHtml = `
                 <div id="productModal" onclick="if(event.target === this) this.remove()" style="position:fixed;z-index:9999;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto;">
                     <div style="background:#fff;padding:20px;border-radius:8px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;position:relative;">
                         <button onclick="this.parentElement.parentElement.remove()" style="position:absolute;top:10px;right:15px;font-size:24px;border:none;background:none;cursor:pointer;">&times;</button>
-                        <h3 style="margin:0 0 15px 0;color:#e4393c;">商品详情</h3>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 30px 12px 0;">
+                            <h3 style="margin:0;color:#e4393c;">商品详情</h3>
+                            ${headerDownloadBtn}
+                        </div>
+                        ${downloadDirBar}
                         ${productTimeHtml}
+                        <div style="margin-bottom:10px;"><strong>品类:</strong> ${categoryBadge}</div>
+                        <div style="margin-bottom:10px;"><strong>品牌:</strong> ${escapeHtml(  /* [ESCAPED] */p._brand) || '-'}</div>
                         <div style="margin-bottom:10px;"><strong>货号:</strong> ${escapeHtml(  /* [ESCAPED] */p.货号) || '-'}</div>
                         <div style="margin-bottom:10px;"><strong>商品描述:</strong> ${escapeHtml(  /* [ESCAPED] */p.商品描述) || '-'}</div>
                         <div style="margin-bottom:10px;color:#e4393c;font-size:20px;"><strong>售价:</strong> ${escapeHtml(  /* [ESCAPED] */p.售价) || '-'}</div>
@@ -999,13 +1038,16 @@
                                 您的浏览器不支持视频播放
                             </video>
                             <div class="video-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:12px;">加载中...</div>
+                            <button type="button" onclick="downloadProductMediaFile('${safeDownloadId}', ${i}, this)" title="下载该视频" style="${dlIconStyle}"><i class="fa fa-download"></i></button>
                         </div>`;
                     } else {
-                        modalHtml += `<img src="${safeSrcUrl}" onclick="showImagePreview('${safeVideoUrl}', ${i})" class="product-thumb" title="点击预览大图" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjE0Ij7nmoTlm77niYHmraLlvTwvdGV4dD48L3N2Zz4='">`;
+                        modalHtml += `<div style="position:relative;display:inline-block;line-height:0;"><img src="${safeSrcUrl}" onclick="showImagePreview('${safeVideoUrl}', ${i})" class="product-thumb" title="点击预览大图" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgZmlsbD0iI2Y1ZjVmNSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTk5IiBmb250LXNpemU9IjE0Ij7nmoTlm77niYHmraLlvTwvdGV4dD48L3N2Zz4='"><button type="button" onclick="downloadProductMediaFile('${safeDownloadId}', ${i}, this)" title="下载该图片" style="${dlIconStyle}"><i class="fa fa-download"></i></button></div>`;
                     }
                 });
                 modalHtml += `</div>`;
             }
+            
+            modalHtml += `</div>`;
             
             modalHtml += `</div></div>`;
             
@@ -1016,6 +1058,9 @@
                 console.log('[showProductModal] ✅ 模态框成功插入DOM, ID:', newModal.id);
                 console.log('[showProductModal] 模态框显示状态:', newModal.style.display);
                 console.log('[showProductModal] 模态框z-index:', getComputedStyle(newModal).zIndex);
+                if (downloadProductId) {
+                    loadDownloadDirInfo(downloadProductId);
+                }
             } else {
                 console.error('[showProductModal] ❌ 模态框插入失败!');
                 throw new Error('模态框元素未找到');
@@ -1255,6 +1300,214 @@
                 });
         }
 
+        function renderDownloadDirText() {
+            const el = document.getElementById('downloadDirText');
+            if (!el) return;
+            const dir = window.currentDownloadDir || '';
+            el.textContent = dir || '未设置';
+            el.title = dir || '';
+        }
+
+        window.loadDownloadDirInfo = function(productId) {
+            window.currentProductId = productId || '';
+            const settingsPromise = fetch('/api/download/settings')
+                .then(response => safeParseJson(response))
+                .then(data => {
+                    if (data && data.success) {
+                        window.downloadDirRoot = data.dir || '';
+                        window.defaultDownloadDir = data.default_dir || '';
+                        window.downloadDirConfigFile = data.config_file || '';
+                        window.downloadDirExampleFile = data.example_file || '';
+                    }
+                })
+                .catch(error => {
+                    logError('读取保存目录失败:', error.message);
+                });
+            const listPromise = productId
+                ? fetch(`/api/product/media/list?product_id=${encodeURIComponent(productId)}`)
+                    .then(response => safeParseJson(response))
+                    .catch(() => null)
+                : Promise.resolve(null);
+            Promise.all([settingsPromise, listPromise]).then(([, listData]) => {
+                if (listData && listData.save_dir) {
+                    window.currentDownloadDir = listData.save_dir;
+                } else {
+                    window.currentDownloadDir = window.downloadDirRoot || '';
+                }
+                renderDownloadDirText();
+            });
+        };
+
+        window.openDownloadDirSetting = function() {
+            const existing = document.getElementById('downloadDirModal');
+            if (existing) existing.remove();
+            const current = window.downloadDirRoot || window.currentDownloadDir || '';
+            const configFile = window.downloadDirConfigFile || '';
+            const configHint = configFile
+                ? `<div style="font-size:12px;color:#909399;line-height:1.7;margin-bottom:10px;">默认值写在配置文件 <code>${escapeHtml(configFile)}</code>（一行一条，支持 ~，家目录自动缩写，脱敏不入库），格式示例见 <code>${escapeHtml(window.downloadDirExampleFile || 'download_dir.example.txt')}</code>。</div>`
+                : '';
+            const html = `<div id="downloadDirModal" onclick="if(event.target === this) this.remove()" style="position:fixed;z-index:10001;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:20px;">
+                <div style="background:#fff;border-radius:8px;padding:20px;width:100%;max-width:560px;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+                    <h4 style="margin:0 0 10px 0;color:#303133;font-size:16px;">默认保存目录</h4>
+                    <div style="font-size:13px;color:#606266;line-height:1.7;margin-bottom:10px;">图片/视频直接保存到这里，每个商品自动建一个子文件夹：<strong>手机取「型号 + 电池」</strong>，例如 <code>16 Pro Max 电池92%/01.jpg</code>；<strong>笔记本 / iPad / 平板 / 手表 / 音箱等只取「型号」</strong>，例如 <code>iPad Pro 11英寸第四代/01.jpg</code>。型号相同时不同商品会追加 <code>-2</code>、<code>-3</code> 区分。</div>
+                    ${configHint}
+                    <input id="downloadDirInput" type="text" value="${escapeAttr(current)}" placeholder="例如 ~/Downloads/微购" style="width:100%;box-sizing:border-box;border:1px solid #dcdfe6;border-radius:4px;padding:8px 10px;font-size:13px;">
+                    <div id="downloadDirError" style="color:#e4393c;font-size:12px;margin-top:8px;min-height:16px;"></div>
+                    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px;">
+                        <button type="button" onclick="resetDownloadDir()" style="border:1px solid #dcdfe6;background:#fff;color:#606266;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;">恢复默认</button>
+                        <button type="button" onclick="document.getElementById('downloadDirModal').remove()" style="border:1px solid #dcdfe6;background:#fff;color:#606266;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;">取消</button>
+                        <button type="button" onclick="saveDownloadDir(this)" style="border:1px solid #409EFF;background:#409EFF;color:#fff;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;">保存</button>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+            const input = document.getElementById('downloadDirInput');
+            if (input) {
+                input.focus();
+                input.select();
+                input.addEventListener('keydown', event => {
+                    if (event.key === 'Enter') saveDownloadDir();
+                });
+            }
+        };
+
+        window.resetDownloadDir = function() {
+            const input = document.getElementById('downloadDirInput');
+            if (!input) return;
+            if (window.defaultDownloadDir) {
+                input.value = window.defaultDownloadDir;
+                return;
+            }
+            fetch('/api/download/settings')
+                .then(response => safeParseJson(response))
+                .then(data => {
+                    window.defaultDownloadDir = (data && data.default_dir) || '';
+                    input.value = window.defaultDownloadDir;
+                })
+                .catch(error => logError('获取默认目录失败:', error.message));
+        };
+
+        window.saveDownloadDir = function(btn) {
+            const input = document.getElementById('downloadDirInput');
+            const errEl = document.getElementById('downloadDirError');
+            const dir = input ? input.value.trim() : '';
+            if (errEl) errEl.textContent = '';
+            if (!dir) {
+                if (errEl) errEl.textContent = '请输入目录路径';
+                return;
+            }
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+            }
+            fetch('/api/download/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dir: dir })
+            })
+                .then(response => safeParseJson(response))
+                .then(data => {
+                    if (!data || !data.success) {
+                        throw new Error((data && data.error) || '保存失败');
+                    }
+                    window.downloadDirRoot = data.dir || '';
+                    window.defaultDownloadDir = data.default_dir || window.defaultDownloadDir;
+                    const modal = document.getElementById('downloadDirModal');
+                    if (modal) modal.remove();
+                    showToast('已更新保存目录：' + data.dir, 'success');
+                    loadDownloadDirInfo(window.currentProductId);
+                })
+                .catch(error => {
+                    if (errEl) errEl.textContent = error.message;
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                });
+        };
+
+        function saveMediaFile(productId, index) {
+            return fetch(`/api/product/media/save?product_id=${encodeURIComponent(productId)}&index=${index}`)
+                .then(response => safeParseJson(response))
+                .then(data => {
+                    if (!data || !data.success) {
+                        throw new Error((data && data.error) || '保存失败');
+                    }
+                    return data;
+                });
+        }
+
+        window.downloadProductMediaFile = function(productId, index, btn) {
+            if (!productId) {
+                showToast('缺少商品ID，无法保存', 'error');
+                return;
+            }
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+            }
+            saveMediaFile(productId, index)
+                .then(data => {
+                    if (data.dir) {
+                        window.currentDownloadDir = data.dir;
+                        renderDownloadDirText();
+                    }
+                    showToast(`已保存：${data.path}`, 'success', 5000);
+                })
+                .catch(error => {
+                    console.error('[保存] 单文件失败:', error);
+                    showToast('保存失败: ' + error.message, 'error');
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                });
+        };
+
+        window.downloadProductMedia = function(productId, btn) {
+            if (!productId) {
+                showToast('缺少商品ID，无法保存', 'error');
+                return;
+            }
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> 保存中...';
+            }
+            fetch(`/api/product/media/save-all?product_id=${encodeURIComponent(productId)}`, { method: 'POST' })
+                .then(response => safeParseJson(response))
+                .then(data => {
+                    if (!data) {
+                        throw new Error('保存失败');
+                    }
+                    if (!data.success && !data.saved) {
+                        throw new Error(data.error || '保存失败');
+                    }
+                    if (data.dir) {
+                        window.currentDownloadDir = data.dir;
+                        renderDownloadDirText();
+                    }
+                    const failNote = data.failed ? `，${data.failed} 个失败` : '';
+                    showToast(`已保存 ${data.saved} 个文件到 ${data.dir}${failNote}`, data.failed ? 'warning' : 'success', 6000);
+                })
+                .catch(error => {
+                    console.error('[保存] 失败:', error);
+                    showToast('保存失败: ' + error.message, 'error');
+                })
+                .finally(() => {
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalHtml;
+                    }
+                });
+        };
+        
         window.showProductById = function(productId) {
             fetch(`/api/product/by-id?product_id=${encodeURIComponent(productId)}`)
                 .then(response => safeParseJson(response))
@@ -2613,7 +2866,7 @@
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(  /* [ESCAPED] */p.sku)}</a></td>
                                             <td style="word-break: break-word; white-space: normal; min-width: 200px;"><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${safeNameForAttr}" data-id="${escapeAttr(stableId)}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${safeNameForAttr}">${escapeHtml(  /* [ESCAPED] */normalizedName || '-')}</a></td>
-                                            <td>${p.price || '-'}</td>
+                                            <td class="price-cell">${p.price || '-'}</td>
                                         </tr>`; }).join('')}
                                     </tbody>
                                 </table>
@@ -2634,7 +2887,7 @@
                                             <td>${idx + 1}</td>
                                             <td style="color: #666;">${escapeHtml(  /* [ESCAPED] */p.sku)}</td>
                                             <td style="word-break: break-word; white-space: normal; min-width: 200px; color: #666;" title="${escapeAttr(p.name || '')}">${escapeHtml(  /* [ESCAPED] */p.name || '-')}</td>
-                                            <td>${p.price || '-'}</td>
+                                            <td class="price-cell">${p.price || '-'}</td>
                                         </tr>`).join('')}
                                     </tbody>
                                 </table>
@@ -2655,7 +2908,7 @@
                                             <td>${idx + 1}</td>
                                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(p.sku)}" class="sku-link" style="color: #409EFF; text-decoration: none;">${escapeHtml(  /* [ESCAPED] */p.sku)}</a></td>
                                             <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-desc="${safeNameForAttr}" data-id="${escapeAttr(stableId)}" class="desc-link" style="color: #409EFF; text-decoration: none;" title="${safeNameForAttr}">${escapeHtml(  /* [ESCAPED] */normalizedName || '-')}</a></td>
-                                            <td>${p.price || '-'}</td>
+                                            <td class="price-cell">${p.price || '-'}</td>
                                         </tr>`; }).join('')}
                                     </tbody>
                                 </table>
@@ -2856,7 +3109,10 @@
                 tableRows.forEach(row => {
                     const sku = (row.getAttribute('data-sku') || '').toLowerCase();
                     const desc = (row.getAttribute('data-desc') || '').toLowerCase();
-                    const priceCell = row.querySelector('td:nth-child(4)');
+                    const remark = (row.getAttribute('data-remark') || '').toLowerCase();
+                    const brand = (row.getAttribute('data-brand') || '').toLowerCase();
+                    const category = (row.getAttribute('data-category') || '').toLowerCase();
+                    const priceCell = row.querySelector('.price-cell') || row.querySelector('td:nth-child(4)');
                     const priceText = priceCell ? (priceCell.textContent || '') : '';
                     
                     let isMatch = false;
@@ -2865,6 +3121,10 @@
                         isMatch = sku.includes(searchLower);
                     } else if (searchType === 'description') {
                         isMatch = desc.includes(searchLower);
+                    } else if (searchType === 'remark') {
+                        isMatch = remark.includes(searchLower);
+                    } else if (searchType === 'brand') {
+                        isMatch = brand.includes(searchLower) || (category + '/' + brand).includes(searchLower);
                     } else if (searchType === 'price' && searchPrice !== null) {
                         const rowPriceMatch = priceText.match(/¥?([\d,]+\.?\d*)/);
                         if (rowPriceMatch) {
@@ -2913,6 +3173,10 @@
                             row.style.background = 'rgba(155, 89, 182, 0.2)';
                         } else if (searchType === 'description') {
                             row.style.background = 'rgba(230, 162, 60, 0.2)';
+                        } else if (searchType === 'remark') {
+                            row.style.background = 'rgba(46, 125, 50, 0.2)';
+                        } else if (searchType === 'brand') {
+                            row.style.background = 'rgba(144, 147, 153, 0.2)';
                         } else {
                             const skuMatch = sku.includes(searchLower);
                             const descMatch = desc.includes(searchLower);
@@ -3117,7 +3381,7 @@
                             </div>
                             <div class="change-table-container">
                                 <table class="change-table" id="${tableId}">
-                                    <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>售价</th><th>员工</th></tr></thead>
+                                    <thead><tr><th>序号</th><th>货号</th><th>商品描述</th><th>品类</th><th>品牌</th><th>售价</th><th>员工</th></tr></thead>
                                     <tbody>
                     `;
                     products.forEach((p, i) => {
@@ -3138,11 +3402,15 @@
 
                         const _costPrice = (p.拿货价 || p.cost_price || p.回收价格 || '');
                         const _costAttr = _costPrice ? ` data-cost="${escapeAttr(_costPrice.toString().replace('¥', '').replace(',', ''))}"` : '';
-                        tableHtml += `<tr data-sku="${escapeAttr(sku)}" data-id="${escapeAttr(productId)}" data-desc="${safeDescForAttr}"${_costAttr} style="${rowStyle}" onmouseover="highlightRow('${safeDescForJS}')" onmouseout="unhighlightRow('${safeDescForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeDescForJS}')">
+                        const _remark = (p.备注 || p.remark || '').toString();
+                        const _remarkAttr = _remark ? ` data-remark="${escapeAttr(_remark)}"` : '';
+                        tableHtml += `<tr data-sku="${escapeAttr(sku)}" data-id="${escapeAttr(productId)}" data-desc="${safeDescForAttr}" data-brand="${escapeAttr(p._brand || '')}" data-category="${escapeAttr(p._category || '')}"${_remarkAttr}${_costAttr} style="${rowStyle}" onmouseover="highlightRow('${safeDescForJS}')" onmouseout="unhighlightRow('${safeDescForJS}')" onclick="if(!event.target.closest('.sku-link')&&!event.target.closest('.desc-link'))toggleLinkedHighlight('${safeDescForJS}')">
                             <td>${i + 1}</td>
                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-sku="${escapeAttr(sku)}" class="sku-link">${escapeHtml(  /* [ESCAPED] */sku) || '-'}</a></td>
                             <td><a href="javascript:void(0) /* [XSS_SAFE_NO_EXEC] No code execution - safe pattern */  /* [XSS_SAFE] 无执行内容 */" data-id="${escapeAttr(productId)}" data-desc="${safeDescForAttr}" class="desc-link" style="color: #409EFF; text-decoration: none; cursor: pointer;" title="点击查看详情">${escapeHtml(  /* [ESCAPED] */descDisplay)}</a></td>
-                            <td style="font-weight: bold;">${p.售价 || '-'}</td>
+                            <td>${categoryBadgeHtml(p._category)}</td>
+                            <td>${escapeHtml(  /* [ESCAPED] */p._brand) || '-'}</td>
+                            <td class="price-cell" style="font-weight: bold;">${p.售价 || '-'}</td>
                             <td>${p.员工 || '-'}</td>
                         </tr>`;
                     });
@@ -3309,6 +3577,8 @@
                                         <option value="description">按描述</option>
                                         <option value="price">按售价</option>
                                         <option value="price_range">价格区间</option>
+                                        <option value="remark">按备注</option>
+                                        <option value="brand">按品牌</option>
                                     </select>
                                 </div>
                                 <input type="text" id="product-search-input" class="form-control" placeholder="输入货号或商品描述进行搜索..." 
@@ -3503,6 +3773,14 @@
                                 case 'price':
                                     searchInput.placeholder = '输入精确售价(如: 799, 1500, 3299)...';
                                     searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索售价字段</strong>，精确匹配价格（如输入 "500" 只会找到售价正好是 ¥500 的商品）';
+                                    break;
+                                case 'remark':
+                                    searchInput.placeholder = '输入备注关键词(如: 高价商品, 只在JSON)...';
+                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>仅搜索备注字段</strong>，支持模糊匹配（如输入 "高价" 可找到备注包含高价的商品）';
+                                    break;
+                                case 'brand':
+                                    searchInput.placeholder = '输入品牌(如: 华为, 苹果, 联想, 大疆)...';
+                                    searchHint.innerHTML = '<i class="fa fa-info-circle"></i> <strong>按品牌筛选商品</strong>，也可输入「品类/品牌」（如 "手机/华为"）缩小范围';
                                     break;
                             }
                         }
