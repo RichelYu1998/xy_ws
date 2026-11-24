@@ -4685,6 +4685,7 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 **修复日期**: 2026-11-24
 **修复类型**: 🆕新功能 + 🔐配置管理 + 🛡️安全加固 + 📝文档更新
 **影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [index.html](index.html), [config/brands.txt](config/brands.txt), [config/brands.example.txt](config/brands.example.txt), [config/folder_naming.txt](config/folder_naming.txt), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 78e0bc72
 **变更统计**: +1356行 -23行（main.py / dist/app.js / index.html / .gitignore 四个文件）+ 新增 config 模板与配置 137 行 + 文档新增本版本条目（README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成）
 **作者**: 小旭二手机（西园路）
 
