@@ -35,6 +35,7 @@
 | 📐 文档内引用编号升序范式 (Within-Document Reference Ascending Order) (PY-CORE-050) | 全文档编号必须小号在前、大号在后 |
 | 📐 零缺陷全量验证范式 (Zero-Defect Full Coverage Verification) (PY-CORE-051) | 全量攻防 + 隐藏Bug清零 + 完整数据三合一判定 |
 | 🔴 项目根目录零删除权限范式 (Zero Delete Permission on Project Root) (PY-CORE-052) | 项目根与祖先目录删除能力恒为零、不可授予 |
+| 🔴 零中文输入拼音搜索范式 (Zero-Chinese-Input Pinyin Search) (PY-CORE-053) | 货号/描述/品牌/备注四类搜索全部支持拼音全拼与首字母 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -2388,8 +2389,8 @@ def _fernet(self, value):
 实跑样例（本项目全量 124 条商品）：
 
 ```
-~/Downloads/微购/手机/华为/华为Mate 60 Pro 电池97%
-~/Downloads/微购/手机/苹果/16 Pro Max 电池92%
+~/Downloads/微购/手机/华为/华为Mate 60 Pro 电池97%(A1234)
+~/Downloads/微购/手机/苹果/16 Pro Max 电池92%(99856)
 ~/Downloads/微购/笔记本/联想/联想小新Air15 2021款
 ~/Downloads/微购/笔记本/机械革命/机械革命2026 极光X 潮玩版
 ~/Downloads/微购/平板/苹果/iPad Pro 11英寸第四代
@@ -2461,11 +2462,11 @@ def _product_brand(text, category='', rules=None):
 ### 🔴 目录路径生成与同名序号
 
 ```python
-def _product_folder_relpath(name_source, category='', brand=''):
+def _product_folder_relpath(name_source, category='', brand='', serial=''):
     text = str(name_source or '').strip()
     category = category or _product_category(text)
     brand = brand or _product_brand(text, category) or '其他'
-    folder = _product_folder_name(text, category)
+    folder = _product_folder_name(text, category, serial)   # serial = 货号
     return '/'.join((_safe_folder_name(category), _safe_folder_name(brand), folder))
 ```
 
@@ -2479,7 +2480,74 @@ def _resolve_product_folder(base_dir, folder_name, product_id):
         ...
 ```
 
-命名规则保持不变：手机 = `型号 + 电池`，其余品类 = 仅型号（容量 / 颜色 / 成色 / 电池全部剔除）。
+命名规则：手机 = `型号 + 颜色 + 电池 + (货号)`，其余品类 = 仅型号（容量 / 颜色 / 成色 / 电池全部剔除）。
+
+### 🔴 手机文件夹必须带颜色，并在电池后追加货号序列号
+
+手机品类命名顺序固定为「型号 → 颜色 → 电池 → (货号)」，形如 `17 Pro Max 橙色 电池91%(71028)`、`苹果17 白色 电池100%(65092)`：
+
+| 要点 | 说明 |
+|---|---|
+| 颜色位置 | 紧跟型号之后、电池之前；无颜色词时该段整体省略，不得留双空格 |
+| 颜色取值 | 取描述中**位置最靠前**的颜色词；同位置取**最长**匹配（`深空灰` 优先于 `灰`），避免 `黑` 命中 `黑边` |
+| 颜色词表 | `_folder_rules()['color']` 热读取，新增颜色只改 config，无需重启 |
+| 追加位置 | 电池之后、末尾，形如 `型号 颜色 电池89%(18810)`；无电池信息时直接接在型号（或颜色）后 |
+| 序列号来源 | 商品对象 `货号`（缺失时回退 `stock_number`），**不允许**用下标 / 时间戳 / 随机数 |
+| 清洗口径 | 序列号同样过 `_safe_folder_name`，空值与 `product` 兜底一律不追加，避免出现 `型号(product)` |
+| 仅手机生效 | 笔记本 / 平板 / 手表 / 其他不追加，保持「仅型号」命名 |
+| 双重收益 | ① 同型号不同机器天然不撞名，`-2`/`-3` 序号极少触发；② 人工按货号一眼可对账 |
+
+```python
+def _folder_color_label(text, rules=None):
+    """取描述中位置最靠前、同位置最长的颜色词；无命中返回空串"""
+    source = re.sub(r'\s{2,}', ' ', str(text or ''))
+    lower = source.lower()
+    rules = rules or _folder_rules()
+    hits = []
+    for word in rules.get('color', ()):
+        pos = lower.find(word)
+        if pos >= 0:
+            hits.append((pos, -len(word), word))
+    return min(hits)[2] if hits else ''
+
+def _product_folder_name(name_source, category=None, serial=''):
+    text = str(name_source or '').strip()
+    rules = _folder_rules()
+    model = _pretty_model(_folder_model(text, rules))
+    if category is None:
+        category = _product_category(text, rules, model)
+    if category == _PRODUCT_CATEGORY_PHONE:
+        color = _folder_color_label(text, rules)
+        if color:
+            model = f'{model} {color}'.strip()
+        battery = _folder_battery_label(text)
+        if battery:
+            model = f'{model} {battery}'.strip()
+        serial = _safe_folder_name(str(serial or '').strip())
+        if serial and serial != 'product':
+            model = f'{model}({serial})'
+    return _safe_folder_name(model or text)
+```
+
+货号从 `_product_media_urls` 一路透传到 `_prepare_product_folder`，下载接口与清单接口共用同一序列号：
+
+```python
+def _product_media_urls(product_id):      # → (URL列表, 命名来源, 序列号, 错误信息)
+    ...
+    serial = str(target.get('货号') or target.get('stock_number') or '').strip()
+    return urls[:_MEDIA_MAX_FILES], name_source, serial, ''
+```
+
+实测命名：
+
+```
+iPhone 17 Pro Max 256G橙色 电池91%      → 手机/苹果/iPhone 17 Pro Max 橙色 电池91%(71028)
+苹果17，256G，紫色，健康100%            → 手机/苹果/苹果17 紫色 电池100%(65092)
+16 Pro      256G白色     电池89%        → 手机/苹果/16 Pro 白色 电池89%(18810)
+16 Pro Max  白色256G     电池92%        → 手机/苹果/16 Pro Max 白色 电池92%(99856)
+P90Pro Max  16+512G   电池100%          → 手机/华为/P90Pro Max 电池100%(xxxxx)（描述无颜色词，省略颜色段）
+机械革命2026 极光X 潮玩版                → 笔记本/机械革命/机械革命2026 极光X 潮玩版（不追加）
+```
 
 ### 🔴 品牌配置热读取（config/brands.txt）
 
@@ -2503,6 +2571,32 @@ def _resolve_product_folder(base_dir, folder_name, product_id):
 | 读取方式 | **文件签名（mtime_ns + size）+ 全局缓存**，文件改动后下一次调用立即失效，无需重启 |
 | 配置优先级 | 配置项在前、内置默认表在后，配置可追加别名但不覆盖内置表 |
 | 模板入库 | `config/brands.example.txt` 入库，真实 `config/brands.txt` 按需维护 |
+| 🔴 英文别名强制 | 每个品牌的别名里**必须**同时含中文名、英文名与常见系列词（`苹果\|iphone,apple,苹果`、`华为\|华为,huawei,mate,pura,nova`、`小米\|小米,xiaomi,mi`），保证纯英文输入即可命中 |
+
+### 🔴 品牌搜索必须拼入该品牌全部别名
+
+`search_type=brand` 分支不能只拿输入串去比品牌名，必须先用 `_brand_aliases_text()` 把命中品牌的**全部别名**拼成一条搜索串，再走拼音交叉匹配；这样 `apple` / `iphone` / `pingguo` / `pg` 四种输入都能命中「苹果」：
+
+```python
+def _brand_aliases_text(brand, category=''):
+    """返回该品牌在当前品类（及全表）下的全部别名，拼成空格分隔的搜索串"""
+    rules = _brand_rules()
+    keys = [category] if category else []
+    keys += [k for k in rules if k not in keys]
+    for key in keys:
+        for name, aliases in rules.get(key, ()):
+            if name == brand or brand in aliases:
+                return ' '.join((name,) + tuple(aliases))
+    return brand
+```
+
+| 输入 | 命中品牌 | 命中路径 |
+|---|---|---|
+| `apple` / `iphone` | 苹果 | 英文别名 ⊆ 品牌别名串 |
+| `pingguo` / `pg` | 苹果 | 全拼 / 首字母 ⊆ 品牌别名串拼音形态 |
+| `xiaomi` / `mi` | 小米 | 英文别名 ⊆ 品牌别名串 |
+| `hongmi` | 红米 | 英文别名 ⊆ 品牌别名串 |
+| `p90` / `pura90` | 华为 | 系列别名 ⊆ 品牌别名串（`P90Pro Max` 不再落「其他」） |
 
 ```python
 def _brand_rules():
@@ -2566,7 +2660,8 @@ media/save 华为Mate 60 Pro → ~/Downloads/微购/手机/华为/华为Mate 60 
 - [ ] 品牌识别不出落「其他」，品类不属于四大类也落「其他」
 - [ ] 同名序号只追加到最后一层（商品名），不污染品类/品牌目录
 - [ ] `config/brands.txt` 热读取（文件签名 + 缓存），改完不重启即生效
-- [ ] 手机带电池、其它品类不带电池，容量/颜色/成色全部剔除
+- [ ] 手机带颜色 + 电池，其它品类颜色/电池/容量/成色全部剔除
+- [ ] 手机文件夹必须带颜色并在电池后追加 `(货号)` 序列号（如 `17 Pro Max 橙色 电池91%(71028)`、`苹果17 白色 电池100%(65092)`），其它品类不追加
 - [ ] 前端品牌列 / 详情品牌行 / 按品牌搜索三处齐备，`app.js` 版本号已更新
 
 ---## 📄 文档生成方法 (PY-CORE-019: skill.docx生成范式)
@@ -3489,10 +3584,10 @@ def install_playwright_cdn():
 | v | 049-049 | 049 | 满 |
 | w | 050-050 | 050 | 满 |
 | x / y | — | — | ✅ 空 |
-| z | 051-052 | 051-052 | 满 |
+| z | 051-053 | 051-053 | 满 |
 
 > 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 032 起全部 +1）。
-> 号位不设人为上限：三位补零自然覆盖 `001`~`999`，若将来突破 999 则进位为四位（`PY-CORE-1000`），前缀与 A-Z 位次规则不变。当前队列长度 52，剩余可用号位无上限。
+> 号位不设人为上限：三位补零自然覆盖 `001`~`999`，若将来突破 999 则进位为四位（`PY-CORE-1000`），前缀与 A-Z 位次规则不变。当前队列长度 53，剩余可用号位无上限。
 
 ### 新增范式标准动作（顺序不可颠倒）
 
@@ -4263,6 +4358,44 @@ ps aux | grep -E "tail -n 0 -f" | grep -v grep    # 期望无输出
 | **🔴 大文件不驻留** | 调试抓包、报告 JSON 等大体积产物用完即删，不留存 | 单文件几百 KB 起，仓库迅速变大 |
 | **🟡 先跑完再删** | 校验脚本跑完、结论落到 README 版本记录后再删除 | 先删后跑导致结论无法复现 |
 | **🟡 结论必须落文档** | 临时脚本产出的结论（校验数字、实测结果）写进版本记录，而不是留在脚本里 | 删掉脚本后证据链断裂 |
+| **🔴 启动 / 退出强制归零** | 服务启动与优雅退出两个时点必须无条件清空 `temp/`（`auto_clean_temp_dir(force=True)`），不按体积阈值判断 | 小于阈值就残留，目录越堆越多 |
+
+### 启动 / 退出强制清空（不依赖人工记忆）
+
+「提交前手动清空」靠人记，早晚会漏；把归零动作挂到服务生命周期上，才可能长期为零：
+
+| 时点 | 动作 | 说明 |
+|---|---|---|
+| 启动（`lifespan` 进入，`yield` 之前） | `auto_clean_temp_dir(force=True)` | 上一次运行残留的旧脚本 / 抓包结果一律清掉 |
+| 退出（`lifespan` 的 `yield` 之后） | `auto_clean_temp_dir(force=True)` | 服务停止即归零，仓库目录不留一次性产物 |
+| 优雅退出（`graceful_shutdown`） | `auto_clean_temp_dir(force=True)` | 覆盖 `atexit` / `SIGTERM` 路径 |
+| 运行中定时巡检 | `auto_clean_temp_dir()`（非 force） | 仅超过 3MB 才清，避免误删正在处理的临时 Excel |
+
+```python
+def auto_clean_temp_dir(force: bool = False):
+    """默认仅在超过 3MB 时清理，force=True 时无条件清空（启动 / 退出用 force）"""
+    temp_dir = os.path.join(PROJECT_DIR, 'temp')
+    if not os.path.isdir(temp_dir):
+        return
+    temp_size = sum(os.path.getsize(os.path.join(temp_dir, f))
+                    for f in os.listdir(temp_dir)
+                    if os.path.isfile(os.path.join(temp_dir, f)))
+    if force or temp_size > 3 * 1024 * 1024:
+        for f in os.listdir(temp_dir):
+            fp = os.path.join(temp_dir, f)
+            if os.path.isfile(fp):                     # 只删文件、不删目录
+                safe_execute_func(lambda: os.remove(fp), context='auto_clean_temp_dir清理')
+```
+
+```python
+async def lifespan(app):
+    ...
+    auto_clean_temp_dir(force=True)   # 启动前归零
+    yield
+    auto_clean_temp_dir(force=True)   # 退出前归零
+```
+
+约束：只允许清理项目内 `temp/`，**只删文件不删目录**，绝不因为清空 temp 而触碰其它目录（与 PY-CORE-052 项目根零删除权限互不冲突）。
 
 ### 标准动作（提交前三步，顺序不可颠倒）
 
@@ -4304,9 +4437,10 @@ git status --porcelain | grep -E '^(\?\?|A ) temp/' || echo 'temp 已清空'
 [ ] 3. .gitignore 含 temp/ 规则
 [ ] 4. 有复用价值的脚本已移入 test/ 并登记
 [ ] 5. 临时脚本产出的结论已写入对应版本记录
+[ ] 6. 服务启动 / 退出已挂 `auto_clean_temp_dir(force=True)`，temp 自动归零
 ```
 
-> **判定标准**: 出现「提交内容包含 temp/ 下任意文件 / .gitignore 缺 temp/ 规则 / 一次性脚本被留在仓库根或 temp 长期存放」中任意一条，即视为「未符合本范式」。
+> **判定标准**: 出现「提交内容包含 temp/ 下任意文件 / .gitignore 缺 temp/ 规则 / 一次性脚本被留在仓库根或 temp 长期存放 / 启动或退出未强制清空 temp」中任意一条，即视为「未符合本范式」。
 
 ---
 
@@ -4599,6 +4733,169 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 
 ---
 
+## 🔴 PY-CORE-053: 零中文输入拼音搜索范式 (Zero-Chinese-Input Pinyin Search)
+
+> **创建日期**: 2026-11-24 | **最后更新**: 2026-11-24 | **优先级**: 🔴 P0 强制规范 | **适用范围**: main.py（`_compact_lower` / `_pinyin_full` / `_pinyin_initials` / `_text_search_forms` / `_pinyin_search_hit` / `_sku_fuzzy_matches` / `_brand_match_pairs` / `/api/product/search`）、requirements.txt、dist/app.js
+
+### 🔴 核心原则：搜索必须允许「零中文输入」(Zero Chinese Input)
+
+任何文本类搜索（货号 / 描述 / 品牌 / 备注）都必须支持**纯拼音全拼**或**拼音首字母**输入，输入框里一个中文字都不打也能搜到结果：
+
+```
+xiaomi  → 小米        hongmi  → 红米        huawei  → 华为
+pingguo → 苹果        lianxiang → 联想      dajiang → 大疆
+xm      → 小米        hm      → 红米        bjb     → 笔记本
+guohang → 国行        dianchi → 电池        chengsejiujiuxin → 成色九九新
+```
+
+反方向同样成立：输入中文能命中含拼音/英文的内容（`小米` 命中 `xiaomi store`）。这条能力是「用户不装中文输入法也能操作」的底线，不能因为某个分支用了 `in` 裸比较就掉线。
+
+### 🔴 三种形态交叉匹配（唯一实现口径）
+
+把「输入」和「被搜索文本」都压成三种形态，然后**两两交叉做子串比较**：
+
+| 形态 | 生成方式 | 示例（`小米 14 电池98%`） |
+|---|---|---|
+| 原文紧凑 | 小写 + 只保留字母数字 | `小米14电池98`（去空格后中文仍在） |
+| 全拼紧凑 | 整段转全拼，无分隔 | `xiaomi14dianchi98` |
+| 首字母紧凑 | 整段转拼音首字母 | `xm14dc98` |
+
+```python
+def _compact_lower(text):
+    """把文本压成「小写 + 只留字母数字」的形态，拼音与原文统一用这套口径比较"""
+    return re.sub(r'[^0-9a-z]', '', str(text or '').lower())
+
+def _text_search_forms(text):
+    """返回文本的三种比较形态：(原文紧凑, 全拼紧凑, 首字母紧凑)"""
+    raw = _compact_lower(text)
+    if _PINYIN_READY:
+        return raw, _pinyin_full(text), _pinyin_initials(text)
+    full, initials = _pinyin_fallback_forms(text)
+    return raw, full, initials
+
+def _pinyin_search_hit(needle, haystack):
+    """拼音模糊命中：needle 的任一形态是 haystack 任一形态的子串即命中"""
+    needle_forms = [f for f in _text_search_forms(needle) if f]
+    if not needle_forms:
+        return True
+    haystack_forms = [f for f in _text_search_forms(haystack) if f]
+    return any(n in h for n in needle_forms for h in haystack_forms)
+```
+
+交叉匹配覆盖的四种组合：
+
+| 输入 | 被搜文本 | 命中路径 |
+|---|---|---|
+| 中文 | 中文 | 原文紧凑 ⊆ 原文紧凑 |
+| 拼音 | 中文 | 全拼 ⊆ 全拼（`xiaomi` ⊆ `xiaomi14dianchi98`） |
+| 中文 | 拼音/英文 | 全拼 ⊆ 全拼（`小米` 转 `xiaomi` ⊆ `xiaomi store`） |
+| 首字母 | 中文 | 首字母 ⊆ 首字母（`xm` ⊆ `xm14dc98`） |
+
+### 🔴 搜索链路必须全部收口到同一个判定函数
+
+四个分支**不允许**各写一套比较逻辑，否则必然出现「按货号能拼音搜、按品牌不能」这类割裂：
+
+| `search_type` | 判定 | 说明 |
+|---|---|---|
+| `sku` | `_sku_fuzzy_matches` → 未命中再走 `_pinyin_search_hit` | 货号先精确、再归一化包含（`466` 命中 `46624`），最后用描述拼音兜底 |
+| `description` | `_pinyin_search_hit(sku, _product_desc(p))` | 原 `target_keyword not in stored_desc` 全部替换 |
+| `brand` | `_pinyin_search_hit(sku, f'{category}/{brand}')` | `xiaomi`/`xm`/`手机/小米` 三种写法都命中 |
+| `remark` | `_pinyin_search_hit(sku, 备注)` | 备注是自由文本，同样支持拼音 |
+
+```python
+def _sku_fuzzy_matches(candidate, target):
+    """货号模糊比较：先精确，再「归一化后包含」，满足输入 466 命中 46624 的模糊搜索"""
+    if _sku_matches(candidate, target):
+        return True
+    candidate_norm = _normalize_sku(candidate)
+    target_norm = _normalize_sku(target)
+    if not candidate_norm or not target_norm:
+        return False
+    return target_norm in candidate_norm
+```
+
+### 🔴 多音字与行业词必须钉死读音
+
+`pypinyin` 按通用读音切词，商品语境下会读错（`国行` 默认 `guoxing`，实际读 `guohang`）。所以**先按覆盖词表替换成钉死的拼音形态，再交给 pypinyin 处理剩余汉字**：
+
+```python
+# 中文词 → (全拼, 首字母)
+_PINYIN_WORD_OVERRIDES = {
+    '国行': ('guohang', 'gh'), '港版': ('gangban', 'gb'), '美版': ('meiban', 'mb'),
+    '红米': ('hongmi', 'hm'),   '机械革命': ('jixiegeming', 'jxgm'),
+    '成色': ('chengse', 'cs'),  '电池': ('dianchi', 'dc'),
+    '深空灰': ('shenkonghui', 'skh'), ...
+}
+
+def _apply_word_overrides(text, mode='full'):
+    result = str(text or '')
+    index = 0 if mode == 'full' else 1
+    for cn, forms in _PINYIN_WORD_OVERRIDES.items():
+        if cn in result:
+            result = result.replace(cn, forms[index])
+    return result
+```
+
+词表同时是**依赖缺失时的兜底词库**：`pypinyin` 没装时 `_pinyin_full` 退化为「词表替换 + 紧凑化」，核心品牌与规格词照样能拼音搜；首字母形态不做硬猜，宁可不命中也不给错误结果。
+
+### 🔴 品牌表别名自动补拼音
+
+品牌识别（PY-CORE-016）与品牌搜索共用同一套别名，因此 `_brand_match_pairs` 必须为中文别名自动补一份全拼：
+
+```python
+def _brand_match_pairs(entries):
+    pairs = []
+    for name, aliases in entries:
+        for alias in aliases:
+            if not alias:
+                continue
+            pairs.append((alias, name))
+            pinyin = _pinyin_full(alias)          # 红米 → hongmi
+            if pinyin and pinyin != alias.lower():
+                pairs.append((pinyin, name))
+    pairs.sort(key=lambda item: len(item[0]), reverse=True)
+    return pairs
+```
+
+补拼音后，描述里写 `hongmi k70 电池95%` 也能正确摘出品牌「红米」，不必等配置里人工补别名。
+
+### 依赖声明与降级
+
+| 场景 | 行为 |
+|---|---|
+| 已安装 `pypinyin` | 三种形态全部可用（全拼 + 首字母 + 原文） |
+| 未安装 `pypinyin` | 退化为「覆盖词表替换」，核心品牌/品类/规格词仍可拼音搜，仅首字母形态关闭 |
+| `requirements.txt` | 必须声明 `pypinyin>=0.55.0,<0.56.0`（见 PY-CORE-036） |
+
+### 全量实测（124 条商品）
+
+| 输入 | 类型 | 命中 |
+|---|---|---|
+| `xiaomi` | 品牌 | 3 条（小米） |
+| `hongmi` | 品牌 | 1 条（红米） |
+| `huawei` | 品牌 | 9 条（华为） |
+| `pingguo` | 品牌 | 90 条（苹果） |
+| `bjb` | 品牌 | 3 条（笔记本） |
+| `guohang` | 描述 | 34 条 |
+| `chengsejiujiuxin` | 描述 | 31 条 |
+| `dianchi` | 描述 | 108 条 |
+| `kaiji` | 备注 | 1 条（开机按键…） |
+| `466` / `188` | 货号 | 模糊命中 `46624` / `18810` |
+
+### 落地检查清单
+
+- [ ] 货号 / 描述 / 品牌 / 备注四类搜索全部走 `_pinyin_search_hit`，无裸 `in` 比较残留
+- [ ] 三种形态（原文紧凑 / 全拼 / 首字母）交叉匹配，中文查拼音、拼音查中文都成立
+- [ ] 多音字与行业词（国行/港版/成色/电池…）已在覆盖词表中钉死读音
+- [ ] `pypinyin` 缺失时退化为词表兜底，核心品牌仍可拼音搜，不出现功能掉线
+- [ ] 品牌别名自动补全拼，描述写 `hongmi` 也能摘出「红米」
+- [ ] 货号保留模糊包含匹配（`466` 命中 `46624`），未命中再用描述拼音兜底
+- [ ] `requirements.txt` 已声明 `pypinyin>=0.55.0,<0.56.0`
+
+> **判定标准**: 出现「某个搜索分支未接入拼音判定 / 纯拼音输入搜不到对应中文 / 多音字读音与商品语境不符 / 依赖缺失即功能整体失效」中任意一条，即视为「未符合本范式」。
+
+---
+
 ## 📊 完整代码范式汇总表
 
 | 范式编号 | 首字母 | 名称 | 覆盖文件 | 优先级 |
@@ -4655,12 +4952,13 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 | PY-CORE-050 | W | 文档内引用编号升序 (Within-Document Reference Ascending Order) | README.md / skill.md | 🔴 核心 |
 | PY-CORE-051 | Z | 零缺陷全量验证 (Zero-Defect Full Coverage Verification) | test/security_audit.py / main.py | 🔴 核心 |
 | PY-CORE-052 | Z | 项目根目录零删除权限 (Zero Delete Permission on Project Root) | main.py / run.sh / run.bat / dist/app.js | 🔴 核心 |
+| PY-CORE-053 | Z | 零中文输入拼音搜索 (Zero-Chinese-Input Pinyin Search) | main.py / requirements.txt / dist/app.js | 🔴 核心 |
 
-**总计: 52个核心范式（PY-CORE-001 ~ PY-CORE-052，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
+**总计: 53个核心范式（PY-CORE-001 ~ PY-CORE-053，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列！**
 
 ---
 
-**文档版本**: v5.0.9.123  
+**文档版本**: v5.0.9.125  
 **最后更新**: 2026-11-24  
 **下次审查**: 2026-12-23  
 **维护者**: 小旭数码开发团队
@@ -4668,6 +4966,184 @@ print('✅ 全量攻防 + 零问题 + 完整数据 三项达标')
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.125 (2026-11-24) - ✨ **六类搜索全链路统一口径：货号 / 描述 / 售价 / 价格区间 / 备注 / 品牌，中文、英文、拼音全拼、首字母、数字任意正确输入均可命中** - ① 后端新增 `_search_forms_text()`，把货号 / 描述 / 备注三类文本的「原文紧凑 + 全拼紧凑 + 首字母紧凑」三种形态一次性拼成一条搜索串，由 `/api/products` 与 `_attach_decoded_images()` 以 `_search_sku` / `_search_desc` / `_search_remark` 字段下发；② 前端表格本地过滤由裸 `includes` 升级为「原文包含 或 三形态串包含」，与后端 `/api/product/search` 的 `_pinyin_search_hit` 完全同口径，中文查拼音、拼音查中文、首字母查中文、数字查数字全部成立；③ 品牌分支复用 `_brand_alias`（品牌名 + 全部别名 + 三形态），`huawei` / `apple` / `pg` / `p90` 均可在表格直接筛出；④ 售价与价格区间统一 `¥` 与千分位清洗（正则全局替换），区间分隔符兼容 `-` / `~` / `至`；⑤ 六类搜索的 placeholder 与提示文案同步说明「中文 / 英文 / 拼音 / 首字母 / 数字」全部可用
+
+#### 更新内容: 六类搜索只允许一种口径——输入正确就一定有值
+
+| 搜索类型 | 支持的输入形态 | 实现口径 |
+|---|---|---|
+| 按货号 | 数字、字母、前缀片段（`188` → `18810`） | 原文子串 + 三形态串子串 |
+| 按描述 | 中文、英文、全拼、首字母、数字（`小米` / `xiaomi` / `xm` / `512`） | 原文子串 + 三形态串子串 |
+| 按售价 | 数字，兼容 `¥4,799` | 清洗后精确匹配（容差 0.01） |
+| 价格区间 | `1000-2000` / `1000~2000` / `1000至2000` | 分隔符兼容 + 闭区间过滤 |
+| 按备注 | 中文、英文、全拼、首字母、数字 | 原文子串 + 三形态串子串 |
+| 按品牌 | 中文、英文、全拼、首字母、系列词（`华为` / `huawei` / `hw` / `p90`） | 品牌别名串 + 三形态串子串 |
+
+```python
+def _search_forms_text(text):
+    """把文本的三种形态（原文紧凑 / 全拼 / 首字母）拼成空格分隔的一条串"""
+    return ' '.join(f for f in _text_search_forms(text) if f)
+```
+
+```javascript
+const skuForms = (row.getAttribute('data-search-sku') || '').toLowerCase();
+const descForms = (row.getAttribute('data-search-desc') || '').toLowerCase();
+const remarkForms = (row.getAttribute('data-search-remark') || '').toLowerCase();
+const searchNeedle = searchLower.replace(/\s+/g, '');
+
+if (searchType === 'description') {
+    isMatch = desc.includes(searchLower) || (searchNeedle && descForms.includes(searchNeedle));
+}
+```
+
+**实测（124 条真实商品）**：`desc xiaomi=3 小米=3 xm=4 dianchi=108 电池=108 dc=108 512=22 Pro=57 chengse=51 九九新=32`；`brand huawei=10 华为=10 hw=10 apple=90 iphone=85 pg=90 p90=10 xiaomi=3 hongmi=1 samsung=1`；`remark kaiji=1 开机=1`；`sku 188=1 1881=1 18810=1`。
+
+**修复日期**: 2026-11-24
+**修复类型**: ✨新功能 + 🔍搜索增强 + 🎯精准修复 + 📝文档更新
+**影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [index.html](index.html), [requirements.txt](requirements.txt), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 7d7a9080
+**变更统计**: +325行 -57行（`git diff --shortstat`：main.py / dist/app.js / index.html / requirements.txt / .gitignore 合计，v5.0.9.124 与 v5.0.9.125 代码合并入库）+ 文档新增本版本条目（README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成）
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. ✨ 六类搜索统一口径：中文 / 英文 / 拼音 / 首字母 / 数字全部命中 (✨新功能)
+
+**问题描述**:
+- **现象**: 列表页六类搜索中只有「按品牌」支持英文别名，其余五类仍是裸 `includes`；「按描述」输 `xiaomi` / `xm` / `dc` 返回 0 条，只有中文原样能命中；「按备注」输 `kaiji` 无结果
+- **根因**: 列表页过滤是纯前端本地过滤，直接 `sku.includes(term)`；后端 `/api/product/search` 的 `_pinyin_search_hit()` 三形态交叉匹配只在该接口生效，`/api/products` 从未把拼音形态下发，前端无从比较
+- **影响范围**: `/api/products`、`_attach_decoded_images()`、前端商品列表六类搜索
+
+**修复方案**:
+- **技术实现**: 新增 `_search_forms_text()` 把「原文紧凑 + 全拼紧凑 + 首字母紧凑」拼成一条串；`/api/products` 与 `_attach_decoded_images()` 为每个商品写入 `_search_sku` / `_search_desc` / `_search_remark`；前端行属性 `data-search-sku` / `data-search-desc` / `data-search-remark` 接收，过滤改为「原文包含 或 三形态串包含」，与后端 `_pinyin_search_hit()` 完全同口径
+- **参考位置**: [main.py](main.py#L650-L654) `_search_forms_text`、[main.py](main.py#L709-L713)、[main.py](main.py#L12783-L12790)、[dist/app.js](dist/app.js#L3126-L3134)、[dist/app.js](dist/app.js#L3415)
+
+**测试验证**:
+- ✅ 表格本地过滤实测（124 条）：`desc xiaomi=3 / 小米=3 / xm=4`、`dianchi=108 / 电池=108 / dc=108`、`512=22`、`chengse=51`、`九九新=32`
+- ✅ 品牌过滤实测：`huawei=10 / 华为=10 / hw=10`、`apple=90 / pg=90`、`p90=10`、`hongmi=1`、`samsung=1`
+- ✅ 后端接口实测：`/api/product/search?search_type=description&sku=dc` → total 108；`search_type=brand&sku=hw` → total 10
+
+##### 2. 🎯 售价与价格区间清洗容错 (🎯精准修复)
+
+**问题描述**:
+- **现象**: 输入 `¥1,299,999` 这类千分位价格匹配失败；价格区间只认 `-` 分隔，输入 `1000~2000` 或 `1000至2000` 提示格式无效
+- **根因**: `replace('¥', '')` / `replace(',', '')` 只处理首个匹配字符（字符串重载而非正则全局），区间 `split('-')` 硬编码单一分隔符
+- **影响范围**: 前端「按售价」「价格区间」两类搜索
+
+**修复方案**:
+- **技术实现**: `¥` 与 `,` 清洗改为正则全局替换 `replace(/¥/g, '')` / `replace(/,/g, '')`；区间分隔符改为 `split(/[-~至]/)`，闭区间过滤逻辑不变
+- **参考位置**: [dist/app.js](dist/app.js#L3060-L3092)
+
+**测试验证**:
+- ✅ `¥4,799` 清洗后与行内价格精确匹配（容差 0.01）
+- ✅ `1000~2000` / `1000至2000` / `1000-2000` 三种写法均正常筛选
+- ✅ 非法输入仍分别提示「售价格式无效」「请至少输入最低价或最高价」
+
+##### 3. 📝 六类搜索文案与版本三方同步 (📝文档更新)
+
+**问题描述**:
+- **现象**: 搜索框 placeholder 只提示中文示例（「输入商品名称或描述关键词...」），用户不知道拼音 / 英文 / 首字母同样可用
+- **根因**: 六类搜索能力升级后，`updateSearchPlaceholder()` 文案未同步
+- **影响范围**: 前端搜索框提示、`index.html` 缓存版本、README.md / skill.md / skill.docx
+
+**修复方案**:
+- **技术实现**: 六类搜索 placeholder 与提示文案统一改为「中文 / 英文 / 拼音全拼 / 首字母 / 数字」说明；`index.html` 的 `app.js?v=` 刷新至 `20261124235500`；版本号升 v5.0.9.125，`run.sh` / `run.bat` 零改动仍从 README 首个 `### v` 推导
+- **参考位置**: [dist/app.js](dist/app.js#L3773-L3796)、[index.html](index.html#L2136)
+
+**测试验证**:
+- ✅ `/api/version` 返回 `{"version":"5.0.9.125"}`
+- ✅ `run.sh` / `run.bat` 版本推导实测均为 `5.0.9.125`（脚本未改动）
+- ✅ 安全审计 0 问题、攻防 13/13 通过
+
+**作者**: 小旭二手机（西园路）
+
+---
+
+### v5.0.9.124 (2026-11-24) - ✨ **手机文件夹命名新增颜色段（型号 → 颜色 → 电池 → 货号），品牌英文别名全链路打通（纯英文即可搜品牌），白名单接口独立限流桶 + 前端错误分场景提示** - ① 手机文件夹命名由「型号 + 电池 + (货号)」升级为「型号 + 颜色 + 电池 + (货号)」，新增 `_folder_color_label()` 取描述中位置最靠前、同位置最长的颜色词，实测 `17 Pro Max 256G橙色 电池91%(71028)` → `iPhone 17 Pro Max 橙色 电池91%(71028)`、`苹果17，256G，紫色，健康100%` → `苹果17 紫色 电池100%(65092)`；② 品牌搜索新增 `_brand_aliases_text()`，把命中品牌的全部别名（中英文 + 系列词）拼成搜索串再走拼音交叉匹配，`apple` / `iphone` / `xiaomi` / `hongmi` / `huawei` / `samsung` / `razer` / `google` 等纯英文输入全部可直接命中对应品牌；③ 品牌内置表补齐 `p90` / `pura90` / `google` / `hp` / `razer` / `toshiba` 等英文与系列别名，`P90Pro Max` 不再落「其他」而是正确识别为华为；④ `/api/clean/allowed-roots` 从 `/api/clean/` 大桶中拆出独立限流桶（120 次 / 60 秒），页面反复刷新不再触发 429；⑤ 前端 `loadCleanAllowedRoots()` 错误分支细分「429 限流 / 空白名单 / 接口异常」三种提示，不再统一显示模糊的「允许目录读取失败」；⑥ 品类判定修正：无显式品牌词的裸苹果型号（`13 128 白色 电池效率75%`）先补全品牌再判品类，稳定落「手机/苹果」；⑦ `.trae` 目录已彻底删除并加入 `.gitignore`，不再入库
+
+#### 更新内容: 命名要「一眼能认出机器」，搜索要「不装中文输入法也能用」
+
+1. **手机命名新增颜色段**: 新增 `_folder_color_label()`，对描述做 `\s{2,}` 压缩后遍历 `_folder_rules()['color']` 词表，按 `(位置, -词长)` 排序取最优解——位置最靠前者优先、同位置最长者优先（`深空灰` 不会被 `灰` 抢先），最终命名顺序固定为「型号 → 颜色 → 电池 → (货号)」，无颜色词时整段省略不留双空格 [main.py](main.py#L2544-L2560)
+2. **品牌英文别名全链路**: 新增 `_brand_aliases_text(brand, category)`，按「当前品类表 → 全表」顺序定位品牌并返回 `' '.join((name,) + aliases)`；`search_type=brand` 分支改为对该别名串做 `_pinyin_search_hit()`；同时新增 `_brand_search_text()` 把品牌名 + 别名 + 三种拼音形态拼成一条串，由 `/api/products` 以 `_brand_alias` 下发给前端，列表页本地过滤写进 `data-brand-alias` 后同样支持纯英文 / 全拼 / 首字母，`huawei` / `apple` / `pingguo` / `pg` 在表格里直接筛出对应品牌 [main.py](main.py#L2408-L2453) [dist/app.js](dist/app.js)
+3. **品牌表补齐英文与系列别名**: `_BRAND_DEFAULT_TABLE` 与 `config/brands.txt` 追加 `p90` / `pura90`（华为）、`google`（谷歌）、`hp`（惠普）、`razer`（雷蛇）、`toshiba`（东芝）等别名，长词优先匹配顺序不变，`P90Pro Max 16+512G 电池100%` 实测品牌为华为 [main.py](main.py) [config/brands.txt](config/brands.txt)
+4. **白名单接口独立限流桶**: `_SENSITIVE_LIMIT_RULES` 新增 `('/api/clean/allowed-roots', 'clean-roots', 120, 60)`，排在 `/api/clean/` 之前，命中该路径的请求不再消耗清理主桶配额；实测连续 50 次请求全部 200 [main.py](main.py#L5641)
+5. **前端错误分场景提示**: `loadCleanAllowedRoots()` 的 `catch` 分支改为带真实错误原因输出，配合 `.catch` 前置的 `res.ok` 判断区分「429 限流，请稍后刷新」「白名单为空」「接口异常」三种场景，不再无差别显示「允许目录读取失败」 [dist/app.js](dist/app.js)
+6. **裸苹果型号品类判定修正**: `_product_category()` 在无显式品牌词时先补全 model 再匹配裸苹果正则，`13 128 白色 电池效率75%` 由「其他」修正为「手机」，品牌同步补「苹果」 [main.py](main.py)
+7. **`.trae` 目录清理**: 按用户要求彻底删除 `.trae` 目录并加入 `.gitignore`，仓库零残留（提交 `3f6680a1`） [.gitignore](.gitignore)
+8. **文档与缓存版本同步**: 本条目写入 README.md / skill.md（两文件逐字节一致），`index.html` 的 `app.js?v=` 刷新至 `20261124233000`；`main.py` / `run.sh` / `run.bat` 版本号仍由 README 首个 `### v` 动态解析，双启动脚本零改动即全端一致为 5.0.9.124 [index.html](index.html#L2136)
+
+**修复日期**: 2026-11-24
+**修复类型**: ✨新功能 + 🔍搜索增强 + 🛡️稳定性加固 + 📝文档更新
+**影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [index.html](index.html), [config/brands.txt](config/brands.txt), [.gitignore](.gitignore), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 3f6680a1, 7d7a9080
+**变更统计**: +58行 -12行（main.py / dist/app.js / config/brands.txt）+ 文档新增本版本条目（README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成）
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. ✨ 手机文件夹命名新增颜色段 (✨新功能)
+**问题描述**:
+- **现象**: 同一型号的机器在目录里只有电池与货号能区分，`iPhone 17 Pro Max 电池91%(71028)` 与同型号橙色机完全同名，人工翻目录仍要打开图片才能确认颜色
+- **根因**: `_product_folder_name()` 的手机分支只拼「型号 + 电池 + (货号)」，描述里的颜色词被 `_folder_model()` 当作噪音剔除后无人回收
+- **影响范围**: 商品媒体保存路径、`media/save`、`media/list`、前端列表与下载目录
+
+**修复方案**:
+- **技术实现**: 新增 `_folder_color_label()` 独立取色函数，先 `re.sub(r'\s{2,}', ' ', text)` 压缩多空格，再遍历 `_folder_rules()['color']` 收集 `(pos, -len(word), word)` 命中元组，`min()` 取「最靠前 + 同位置最长」；`_product_folder_name()` 在电池之前插入颜色段，空串则整段跳过
+- **参考位置**: [main.py](main.py#L2544-L2582) `_folder_color_label` / `_product_folder_name`
+
+**测试验证**:
+- ✅ `17 Pro Max 256G橙色 电池91%(71028)` → `手机/苹果/iPhone 17 Pro Max 橙色 电池91%(71028)`
+- ✅ `苹果17，256G，紫色，外观成色九九新 健康100%(65092)` → `手机/苹果/苹果17 紫色 电池100%(65092)`
+- ✅ `P90Pro Max 16+512G 电池100%`（描述无颜色词）→ `手机/华为/P90Pro Max 电池100%`，无双空格
+- ✅ 笔记本 `机械革命2026 极光X 潮玩版` 仍只保留型号，颜色/电池均不追加
+
+##### 2. 🔍 品牌搜索英文别名全链路打通 (🔍搜索增强)
+**问题描述**:
+- **现象**: 搜索框输入 `apple` / `xiaomi` / `hongmi` 时按品牌搜索无结果，必须打中文「苹果 / 小米 / 红米」
+- **根因**: `search_type=brand` 分支只用输入串直接与品牌名做子串比较，品牌表里的英文别名虽然存在但从未参与匹配
+- **影响范围**: 前端「按品牌」搜索、`/api/product/search`
+
+**修复方案**:
+- **技术实现**: 新增 `_brand_aliases_text(brand, category)`，把命中品牌的全部别名拼成 `name + aliases` 搜索串；品牌分支改为 `_pinyin_search_hit(kw, _brand_aliases_text(brand, category))`，同时补齐 `p90` / `pura90` / `google` / `hp` / `razer` / `toshiba` 等英文与系列别名；列表页本地过滤同步升级——`_brand_search_text()` 产出「品牌名 + 别名 + 原文/全拼/首字母」串由 `/api/products` 以 `_brand_alias` 下发，前端写入 `data-brand-alias` 后按去空格子串比较
+- **参考位置**: [main.py](main.py#L2408-L2453) `_brand_aliases_text` / `_brand_search_text`，`/api/products` 与 `/api/product/search` 品牌分支，[dist/app.js](dist/app.js) `data-brand-alias`
+
+**测试验证**:
+- ✅ `apple` / `iphone` / `pingguo` / `pg` 四种输入均命中苹果商品（90 条）
+- ✅ `xiaomi` / `mi` 命中小米（3 条），`hongmi` 命中红米（1 条），`huawei` 命中华为（10 条），`samsung` 命中三星（1 条）
+- ✅ 列表页「按品牌」本地过滤输入 `huawei` 由 0 条修正为 10 条，输入 `p90` 命中 10 条
+- ✅ `P90Pro Max` 品牌识别为华为，不再落「其他」
+
+##### 3. 🛡️ 白名单接口独立限流桶与前端错误分场景提示 (🛡️稳定性加固)
+**问题描述**:
+- **现象**: 清理页刷新几次就弹出「允许目录读取失败」，实际接口只是被限流
+- **根因**: `/api/clean/allowed-roots` 与其它清理接口共用 `clean` 桶（30 次 / 60 秒），页面初始化反复请求很快打满；前端 `catch` 又不区分状态码，统一显示模糊文案
+- **影响范围**: 清理页白名单展示、`/api/clean/allowed-roots`
+
+**修复方案**:
+- **技术实现**: `_SENSITIVE_LIMIT_RULES` 为 `/api/clean/allowed-roots` 单独分配 `clean-roots` 桶（120 次 / 60 秒），并置于 `/api/clean/` 之前优先匹配；前端 `loadCleanAllowedRoots()` 按 `res.ok` 与状态码区分 429 / 空白名单 / 接口异常，`catch` 输出真实错误原因
+- **参考位置**: [main.py](main.py#L5641) `_SENSITIVE_LIMIT_RULES`，[dist/app.js](dist/app.js) `loadCleanAllowedRoots`
+
+**测试验证**:
+- ✅ 连续 50 次 `GET /api/clean/allowed-roots` 全部返回 200，无 429
+- ✅ 接口返回 `roots` / `ignored_roots` / `project_dir` / `config_file` 完整字段
+- ✅ 人为断网场景下前端提示「允许目录读取失败：网络异常」，不再笼统报错
+
+##### 4. 🐛 裸苹果型号品类判定修正 (🐛缺陷修复)
+**问题描述**:
+- **现象**: 描述里不写「苹果」二字的型号（`13 128 白色 电池效率75%`）被归到「其他」，品牌也落「其他」
+- **根因**: 品类判定在品牌补全之前执行，裸苹果正则拿不到已补全的 model，手机分支直接跳过
+- **影响范围**: 品类目录归属、品牌目录归属、按品类搜索
+
+**修复方案**:
+- **技术实现**: `_product_category()` 先补全 model 再匹配 `_FOLDER_BARE_APPLE_RE`，命中即判手机，品牌链路同步补「苹果」
+- **参考位置**: [main.py](main.py) `_product_category`
+
+**测试验证**:
+- ✅ `13 128 白色 电池效率75%` → `手机/苹果/13 白色 电池75%`
+- ✅ 显式品牌词场景（`华为Mate 60 Pro`）判定不变
+
+---
 
 ### v5.0.9.123 (2026-11-24) - 🆕 **商品目录升级为「品类/品牌/商品」三层：品牌从描述自动摘出并配置热读取，前后端新增品牌字段与按品牌搜索，新增 PY-CORE-016 范式并整体重排** - ① 保存目录由「保存目录/商品文件夹名」升级为「保存目录/品类/品牌/商品文件夹名」，四大类（手机/笔记本/平板/手表）判定不变，其余智能设备统一归入「其他」；② 品类判定顺序固化为「手表→平板→笔记本→其他→手机→其他兜底」，避免平板被笔记本、配件被手机抢走；③ 品牌识别走「当前品类表优先 → 全表兜底 → 别名长度降序 → 裸苹果型号补苹果 → 落其他」，实测「手机/其他」由 33 条降至 1 条；④ 新增 `config/brands.txt` 品牌别名热读取（mtime_ns + size 签名缓存）与 `config/folder_naming.txt` 登记，改完不重启即生效；⑤ 前后端同步新增品牌字段：列表品牌列、详情品牌行、搜索「按品牌」选项与 `data-brand` 属性，售价单元格统一 `price-cell` 避免加列后取价错位；⑥ 新增范式 `PY-CORE-016` 并按 A-Z 位次整体重排（原 016~051 → 017~052，52 个范式零跳号/零重号/零遗漏）；⑦ `/api/changelog` 全量规范化层补齐：空 `changes` 自动合成、`commit` 按 git log 版本号回溯、占位字段统一替换为真实元数据；⑧ 安全审计 8 项问题全部清零：4 处 `re.compile()` 编译风险改为纯字符串模式 + 内联 `re.match`/`re.search`，依赖自愈分支 3 处 `print` 改为 `sys.stdout.write`，媒体文件序号越界补 `logger.warning`，实测 4 严重 + 4 中危 → 0 问题
 
