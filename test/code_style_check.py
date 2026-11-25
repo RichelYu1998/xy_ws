@@ -17,6 +17,7 @@
 - JavaScript：dist/app.js（构建产物 bundle 为压缩代码，不纳入扫描）。
 
 用法：python test/code_style_check.py
+      python test/code_style_check.py --selftest   （闸门自检：探针只写系统临时目录）
 时机：每次改动代码后（含新增 .py）必须跑一遍，退出码 0 才允许提交
 退出码：0 = 零问题达标；1 = 存在违规
 """
@@ -25,6 +26,7 @@ import ast
 import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 PROJECT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -266,7 +268,7 @@ class StyleAuditor:
             'ALI-009': '禁止 eval / new Function / document.write',
             'ALI-010': '禁止直接 print（走 log_print / logger）',
             'ALI-011': '命名规范（snake_case / CamelCase）',
-            'ALI-012': '受检文件必须存在',
+            'ALI-012': '核心受检文件必须存在',
             'ALI-013': '禁止裸魔法超时数字',
             'ALI-014': 'UTF-8 无 BOM',
             'ALI-015': '禁止 TODO / FIXME 遗留标记',
@@ -279,7 +281,48 @@ class StyleAuditor:
                 'total': len(self.issues)}
 
 
+SELF_TEST_PROBE = '''
+import subprocess
+
+
+def BadName():
+    """探针：同时触发 ALI-001 / ALI-011 / ALI-013"""
+    try:
+        subprocess.run(['echo', 'hi'], timeout=5)
+    except Exception:
+        pass
+'''
+
+SELF_TEST_EXPECT = ('ALI-001', 'ALI-011', 'ALI-013')
+
+
+def run_self_test():
+    """自检闸门有效性：探针只写在系统临时目录，绝不落到项目扫描范围内"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        probe_path = Path(tmpdir) / 'probe_violation.py'
+        probe_path.write_text(SELF_TEST_PROBE, encoding='utf-8')
+        auditor = StyleAuditor()
+        auditor.audit_python(str(probe_path))
+        hit_rules = {issue['rule'] for issue in auditor.issues}
+
+    print('=' * 68)
+    print('闸门自检：用临时探针验证规则确实会命中（探针不落盘到项目目录）')
+    print('=' * 68)
+    for rule in SELF_TEST_EXPECT:
+        mark = '✅' if rule in hit_rules else '❌'
+        print(f'{mark} {rule} 命中' if rule in hit_rules else f'{mark} {rule} 未命中，闸门失效')
+    missing = [rule for rule in SELF_TEST_EXPECT if rule not in hit_rules]
+    if missing:
+        print(f'\n⚠️ 自检失败，以下规则未触发: {missing}')
+        return 1
+    print('\n✅ 自检通过：三条核心规则全部命中，闸门有效且未污染项目目录')
+    return 0
+
+
 def main():
+    if '--selftest' in sys.argv:
+        return run_self_test()
+
     version = read_version()
     py_targets = discover_py_targets()
     print('=' * 68)

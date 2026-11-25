@@ -536,8 +536,11 @@ BASELINE_LONG_LINES = {'main.py': 295, 'config/crypto_tool.py': 0, 'test/generat
 运行方式（每次改动代码后必跑，退出码 0 即达标）：
 
 ```bash
-python test/code_style_check.py
+python test/code_style_check.py            # 常规检查：全量扫描 + 16 条规则
+python test/code_style_check.py --selftest # 闸门自检：探针只写系统临时目录，验证规则确实会命中
 ```
+
+> **自检的意义**: 检查脚本常年报「0 问题」时，无法区分「代码真的干净」还是「规则根本没生效」。`--selftest` 用 `tempfile.TemporaryDirectory()` 在系统临时目录写一份三处违规的探针（`ALI-001` 静默吞异常 / `ALI-011` 非 snake_case 命名 / `ALI-013` 裸魔法超时），断言三条规则必须全部命中，任一未命中即退出码 1 判定闸门失效。探针随临时目录销毁，**绝不落盘到 `test/` 等受检目录**——这正是「验证闸门有效」与「保持仓库洁净」的正确解法，禁止再手工创建 `test/_probe_violation.py` 之类的临时探针文件。
 
 静默异常的合法写法（唯一入口，见 PY-CORE-051 统一异常处理）：
 
@@ -554,6 +557,7 @@ def _swallow_exc(context: str, exc: BaseException) -> None:
 
 - [ ] `python test/code_style_check.py` 退出码 0，`ALI-001` ~ `ALI-016` 全部 ✅
 - [ ] 每次改动代码后都跑一遍检查（新增 / 修改任意 `.py` 均须重跑，禁止跳过）
+- [ ] 怀疑规则失效时跑 `--selftest`，禁止在 `test/` 下手工创建探针文件
 - [ ] 新增 `.py` 无需登记，自动发现机制保证落盘即纳入扫描、基线默认 0
 - [ ] `main.py` 全部 `except` 分支要么调 `_swallow_exc()`，要么带 `# [SILENT_OK]` 理由
 - [ ] `dist/app.js` 中 `var` / `alert` / `==` / `!=` 计数全部为 0
@@ -573,8 +577,9 @@ def _swallow_exc(context: str, exc: BaseException) -> None:
 | 基线内既有超长函数继续加行 | 技术债滚雪球 | 基线只允许减少，新增代码必须达标 |
 | 新写脚本不跑检查就提交 | 规范漂移无人发现，闸门形同虚设 | 改动后立即跑一遍，退出码 0 才提交 |
 | 手工维护受检文件清单 | 漏登记导致新文件长期不被扫描 | 依赖自动发现，只保留核心必需清单 |
+| 手工在 `test/` 下造探针验证规则 | 探针落在扫描范围，检查报「违规」误导人 | 用 `--selftest`，探针只写系统临时目录 |
 
-> **判定标准**: 出现「静默 `pass` 无 `[SILENT_OK]` 标注 / 裸 `except` / 可变默认参数 / 新增函数超 80 行 / 新增超宽行 / 前端 `var`、`alert`、`==`、`eval` 任一残留 / 裸魔法超时数字 / 异常变量未使用 / `python test/code_style_check.py` 非 0 退出 / 改动代码后未跑检查」中任意一条，即视为「未符合本范式」。
+> **判定标准**: 出现「静默 `pass` 无 `[SILENT_OK]` 标注 / 裸 `except` / 可变默认参数 / 新增函数超 80 行 / 新增超宽行 / 前端 `var`、`alert`、`==`、`eval` 任一残留 / 裸魔法超时数字 / 异常变量未使用 / `python test/code_style_check.py` 非 0 退出 / 改动代码后未跑检查 / 在 `test/` 下遗留探针文件」中任意一条，即视为「未符合本范式」。
 
 ---
 
@@ -5462,17 +5467,83 @@ def _brand_match_pairs(entries):
 
 ## 🔄 最新更新
 
-### v5.0.9.131 (2026-11-25) - 🔴 **阿里规范检查脚本常驻化：自动发现全部 .py、每次改动必跑，PY-CORE-003 升级为仓库唯一规范闸门** - ① [test/code_style_check.py](test/code_style_check.py) 受检范围由手工登记清单改为自动发现，新增 `discover_py_targets()` 递归扫描项目内全部 `.py`（排除 `.venv` / `node_modules` / `tools` / `temp` / `file` / `.git`），新增脚本落盘即纳入扫描、基线默认 0，彻底消除「漏登记」导致新文件长期不被检查的隐患；② 原 `PY_TARGETS` 拆为 `PY_REQUIRED`（核心必需文件存在性校验，缺失即 `ALI-012` 违规）+ 自动发现，`ALI-012` 条款由「受检文件必须存在」细化为「核心受检文件必须存在，其余 `.py` 由自动发现兜底」；③ 检查输出新增扫描范围提示行（`Python N 个文件（自动发现）+ JavaScript 1 个文件`），当前实测 13 个 Python 文件 + 1 个 JavaScript 文件；④ 自动发现暴露并修复 3 处存量违规：`test/test_429_handling.py` 的 `do_GET` 属 `BaseHTTPRequestHandler` 协议回调必须保留原名，纳入 `NAME_ALLOWLIST`；`test/bench_30.py` 与 `test/bench_prefetch.py` 的裸魔法超时 `timeout=180` / `timeout=120` 改为 `BENCH_SUBPROCESS_TIMEOUT` / `BENCH_PREFETCH_TIMEOUT` 环境变量（默认值不变，可外部覆盖）；⑤ `PY-CORE-003` 正文补充「常驻闸门」定位与运行方式，落地清单新增「每次改动必跑」「新增 `.py` 无需登记」「基线默认 0」三条，避坑表新增「不跑检查就提交」「手工维护受检清单」两坑；⑥ 检查结果 `ALI-001` ~ `ALI-016` 全部 ✅，总计问题 0，退出码 0
+### v5.0.9.131 (2026-11-25) - 🔴 **阿里规范检查脚本常驻化：自动发现全部 .py、每次改动必跑，新增 --selftest 自检闸门，PY-CORE-003 升级为仓库唯一规范闸门**
 
-#### 更新内容: 从「手工登记受检」升级为「全量自动发现 + 每次必跑」
+#### 更新内容: 让规范检查从「手工登记 + 人工记忆」变成「全量自动发现 + 可自证有效」，并杜绝临时探针文件污染仓库
 
-| 场景 | 旧做法 | 新做法 |
-|---|---|---|
-| 受检范围 | `PY_TARGETS` 手工登记 5 个文件 | `discover_py_targets()` 自动发现全部 `.py`（13 个） |
-| 新增脚本 | 需手工加入清单，否则不检查 | 落盘即纳入，基线默认 0 |
-| 检查时机 | 提交前跑一次（易遗漏） | 每次改动代码后必跑，退出码 0 才提交 |
-| 存量违规 | 未纳入扫描长期潜伏 | 首次全量扫描即暴露 3 处并当场清零 |
-| 协议回调命名 | 与 snake_case 规则冲突 | `NAME_ALLOWLIST` 显式放行 `do_GET` 等 HTTP 动词 |
+**修复日期**: 2026-11-25
+**修复类型**: 🔴 规范治理 + 🛠️ 工具增强 + 📝文档更新
+**影响文件**: [test/code_style_check.py](test/code_style_check.py), [test/bench_30.py](test/bench_30.py), [test/bench_prefetch.py](test/bench_prefetch.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 9d1784c8
+**变更统计**: +129行 -22行
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🔍 受检范围由手工登记改为全量自动发现 (🔴规范治理)
+
+**问题描述**:
+- **现象**: [test/code_style_check.py](test/code_style_check.py) 用 `PY_TARGETS` 手工登记 5 个文件，`test/` 下 `bench_30.py` / `bench_prefetch.py` / `diag_lanes.py` / `test_429_handling.py` 等 8 个脚本从未被扫描
+- **根因**: 受检清单靠人工维护，新增脚本无人记得补登记，规范闸门对「没登记的文件」完全失效
+- **影响范围**: 全部 Python 脚本的规范覆盖度、`ALI-001` ~ `ALI-016` 的实际约束力
+
+**修复方案**:
+- **技术实现**: 新增 `discover_py_targets()` 递归扫描项目内全部 `.py`，排除 `.git` / `.venv` / `.idea` / `node_modules` / `tools` / `temp` / `file`；原 `PY_TARGETS` 拆为 `PY_REQUIRED`（仅做核心文件存在性校验，缺失即 `ALI-012`）+ 自动发现，新增脚本落盘即纳入、基线默认 0；`ALI-012` 条款同步细化为「核心受检文件必须存在，其余 `.py` 由自动发现兜底」；输出新增扫描范围提示行
+- **参考位置**: [test/code_style_check.py](test/code_style_check.py) `discover_py_targets()` / `scan_all()`
+
+**测试验证**:
+- ✅ 扫描范围由 5 个文件扩到 13 个 Python 文件 + 1 个 JavaScript 文件，输出实测 `Python 13 个文件（自动发现）`
+- ✅ 自动发现即暴露 3 处存量违规，当场清零
+- ✅ `python test/code_style_check.py` 退出码 0，`ALI-001` ~ `ALI-016` 全部 ✅
+
+##### 2. 🧪 新增 --selftest 闸门自检，探针不落盘 (🛠️工具增强)
+
+**问题描述**:
+- **现象**: 验证「闸门会不会抓违规」时手工在 `test/` 下写了 `test/_probe_violation.py`，检查脚本报「发现 3 处规范违规，必须修复至 0！」；探针删掉后报错仍留在终端输出里，容易被误读成真实违规
+- **根因**: 缺少「自证有效」的内建手段，只能靠手工造违规文件，探针本身又落在扫描范围内，验证动作与仓库洁净互相冲突
+- **影响范围**: 检查脚本的可信度、`test/` 目录洁净度、CI 判定结果
+
+**修复方案**:
+- **技术实现**: 新增 `--selftest` 模式与 `SELF_TEST_PROBE` / `SELF_TEST_EXPECT` 常量，探针用 `tempfile.TemporaryDirectory()` 写到系统临时目录，跑完即随上下文销毁；自检断言 `ALI-001` / `ALI-011` / `ALI-013` 三条必须命中，任一未命中即退出码 1 判定闸门失效；`main()` 入口优先分发 `--selftest`，常规检查逻辑不变
+- **参考位置**: [test/code_style_check.py](test/code_style_check.py) `run_self_test()` / `SELF_TEST_PROBE`
+
+**测试验证**:
+- ✅ `python test/code_style_check.py --selftest` 三条规则全部命中，退出码 0
+- ✅ 自检后 `find . -name "*probe*"` 无任何输出，项目目录零残留
+- ✅ 常规检查仍为「总计问题 0，代码规范全部达标」，退出码 0
+
+##### 3. 🧹 自动发现暴露的 3 处存量违规清零 (🐛规范修复)
+
+**问题描述**:
+- **现象**: 全量自动发现后，`test_429_handling.py` 报 `do_GET` 命名违规，`bench_30.py` / `bench_prefetch.py` 报裸魔法超时违规
+- **根因**: 三个脚本此前未被纳入扫描，`ALI-011` / `ALI-013` 对其从未生效
+- **影响范围**: [test/test_429_handling.py](test/test_429_handling.py), [test/bench_30.py](test/bench_30.py), [test/bench_prefetch.py](test/bench_prefetch.py)
+
+**修复方案**:
+- **技术实现**: `do_GET` 属 `BaseHTTPRequestHandler` 协议回调，名字由框架约定不可改，纳入 `NAME_ALLOWLIST`（同时放行 `do_POST` / `do_PUT` / `do_DELETE` / `do_HEAD` / `do_PATCH` / `do_OPTIONS`）；`timeout=180` / `timeout=120` 改为 `BENCH_SUBPROCESS_TIMEOUT` / `BENCH_PREFETCH_TIMEOUT` 环境变量，默认值与原来一致、可外部覆盖
+- **参考位置**: [test/code_style_check.py](test/code_style_check.py) `NAME_ALLOWLIST`，[test/bench_30.py](test/bench_30.py#L15)，[test/bench_prefetch.py](test/bench_prefetch.py#L15)
+
+**测试验证**:
+- ✅ `ALI-011` / `ALI-013` 由 ❌ 转为 ✅，违规数归零
+- ✅ 两个基准脚本默认超时行为未变（180s / 120s），仅来源改为环境变量
+- ✅ 全量 16 条规则零违规，退出码 0
+
+##### 4. 📝 PY-CORE-003 范式同步升级为「常驻闸门」 (📝文档更新)
+
+**问题描述**:
+- **现象**: [PY-CORE-003](README.md#L480) 只写了「用可执行脚本固化」，未定义受检范围、运行时机与自检方式
+- **根因**: 范式停留在「有脚本」层面，没把「每次必跑」「全量覆盖」「闸门可自证」写成硬约束
+- **影响范围**: `PY-CORE-003` 正文、文档导航、范式汇总表、`ALI-012` 条款描述
+
+**修复方案**:
+- **技术实现**: 范式描述新增「常驻闸门」段落（自动发现范围、排除目录、每次改动必跑、禁止先提交再补检查）；规则清单 `ALI-012` / `ALI-013` 同步细化；核心实现补 `discover_py_targets()` 代码块与 `--selftest` 运行方式；落地清单新增「每次改动必跑」「新增 `.py` 无需登记」「基线默认 0」三条；避坑表新增「新写脚本不跑检查就提交」「手工维护受检文件清单」两坑；判定标准追加「改动代码后未跑检查」
+- **参考位置**: [skill.md](skill.md#L480) `PY-CORE-003`，[skill.md](skill.md) 文档导航与汇总表
+
+**测试验证**:
+- ✅ README.md 与 skill.md 逐字节一致（`cmp` 无差异）
+- ✅ skill.docx 由 skill.md 重新生成，613.8 KB，导航置顶第一页
+- ✅ 汇总表 `PY-CORE-001` ~ `PY-CORE-056` 连续无重号，`PY-CORE-003` 覆盖文件列更新为 `test/code_style_check.py / 全部 .py / dist/app.js`
+- ✅ `run.sh` / `run.bat` 未改动，版本仍从 README.md 首条 `### v` 动态读取
 
 ### v5.0.9.130 (2026-11-25) - 🖥️ **全尺寸显示适配：320px 手机 ~ 7680px 8K 投影（含 300 寸投影 / 100 寸电视）逐档适配，字号流体缩放、容器分档放开、高度动态化** - ① 新增 [dist/display-adapt.css](dist/display-adapt.css) 作为天气看板适配层，根字号 `clamp(16px, calc(0.62vw + 6.4px), 56px)` 随视口等比放大，`glass-panel` 在 1920 / 2560 / 3840 / 7680 四档逐级放开 1200px 固定上限；② [index.html](index.html) 根字号改 `clamp(16px, calc(0.5128vw + 8.62px), 48px)`，容器宽度新增 1400 / 1920 / 2560 / 3840 / 7680 五档，看板 iframe 高度由固定 560px 改为 `clamp(600px, 62vh, 1200px)` 起的三档动态高度；③ 补 `100dvh` 兜底与超宽屏 21:9、竖屏大屏、超短横屏三组特殊比例规则，`100vw` 容器收紧为 `width: 100%` 防横向溢出；④ [dist/app.js](dist/app.js) 设备识别由 5 档扩到 10 档（`tv` / `large-tv` / `projector-4k` / `projector-5k` / `projector-8k`），`DEVICE_CLASS_LIST` 先全清后按档加，新增 `is-large-screen` / `is-ultrawide` 两个大类；⑤ `.file-tree pre` 改 `pre-wrap`、导航栏时间文字加省略号、依赖清单表套 `table-responsive`，修掉 768px 平板 73px 横向溢出与 320px 表格越界，Chrome 实测 13 档视口页面级横向溢出全为 0；⑥ 新增范式「全尺寸显示适配 (Responsive Display Adaptation)」落 r 组末位 `PY-CORE-041`，原 `041`~`055` 整体 +1 → `042`~`056`
 
@@ -5499,7 +5570,8 @@ def _brand_match_pairs(entries):
 **修复日期**: 2026-11-25
 **修复类型**: 🖥️ 适配增强 + 📝文档更新
 **影响文件**: [index.html](index.html), [dist/display-adapt.css](dist/display-adapt.css), [dist/index.html](dist/index.html), [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 与本次 v5.0.9.130 提交同批（代码 4 文件 + 文档 3 文件）
+**Commit**: c17fce8e
+**变更统计**: +2470行 -1476行
 **作者**: 小旭二手机（西园路）
 
 ---
