@@ -709,16 +709,8 @@ def _attach_decoded_images(product, prefer_local=None):
         if prefer_local is None:
             prefer_local = True
         _apply_client_media(product, prefer_local)
-        rules = _folder_rules()
-        desc = str(_product_desc(product) or '')
-        category = _product_category(
-            desc, rules, _pretty_model(_folder_model(desc, rules))
-        )
-        product['_category'] = category
-        product['_brand'] = _product_brand(desc, category) or _PRODUCT_BRAND_UNKNOWN
-        product['_brand_alias'] = _brand_search_text(product['_brand'], category)
+        product.update(_product_meta(_product_desc(product)))
         product['_search_sku'] = _search_forms_text(product.get('货号') or product.get('stock_number') or '')
-        product['_search_desc'] = _search_forms_text(desc)
         product['_search_remark'] = _search_forms_text(product.get('备注') or product.get('remark') or '')
     return product
 
@@ -2922,8 +2914,28 @@ def _read_folder_naming_config() -> dict:
     return sections
 
 
+_FOLDER_RULES_CACHE = {'stamp': None, 'rules': None}
+
+
+def _config_stamp(path: str):
+    """配置文件签名 (mtime_ns, size)；文件不存在时为 None"""
+    try:
+        st = os.stat(path)
+        return (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+
+
 def _folder_rules() -> dict:
-    """默认关键词 + 配置文件追加关键词，统一转小写做不区分大小写匹配"""
+    """默认关键词 + 配置文件追加关键词，统一转小写做不区分大小写匹配
+
+    优先返回缓存；配置文件签名变化（改完保存）才重新读盘刷新缓存，
+    「改配置即生效」的热更新语义保持不变。
+    """
+    stamp = _config_stamp(_folder_naming_config_file())
+    cached = _FOLDER_RULES_CACHE
+    if cached['rules'] is not None and cached['stamp'] == stamp:
+        return cached['rules']
     cfg = _read_folder_naming_config()
 
     def _merged(defaults, key):
@@ -2938,6 +2950,8 @@ def _folder_rules() -> dict:
     }
     for key in _CATEGORY_MATCH_ORDER:
         rules[key] = _merged(_CATEGORY_DEFAULT_KEYWORDS[key], key)
+    cached['stamp'] = stamp
+    cached['rules'] = rules
     return rules
 
 
@@ -3033,6 +3047,42 @@ def _product_category(text: str, rules: Optional[dict] = None, model: str = '') 
             and re.search(_FOLDER_BATTERY_RE, str(text or '')):
         return _PRODUCT_CATEGORY_PHONE
     return _PRODUCT_CATEGORY_SMART
+
+
+_PRODUCT_META_CACHE = {'sig': None, 'items': {}}
+_PRODUCT_META_CACHE_MAX = 4096
+
+
+def _product_meta(desc: str) -> dict:
+    """按商品描述生成品类/品牌/搜索标注：先查缓存，未命中算完写回
+
+    缓存以描述文本为键，同描述的重复商品只算一次；品类或品牌规则文件
+    任一改动，签名变化即整体清空，保证改完配置立刻按新规则标注。
+    """
+    text = str(desc or '')
+    rules = _folder_rules()
+    _brand_rules()
+    sig = (_FOLDER_RULES_CACHE['stamp'], _BRAND_CACHE['stamp'])
+    cache = _PRODUCT_META_CACHE
+    if cache['sig'] != sig:
+        cache['sig'] = sig
+        cache['items'].clear()
+    items = cache['items']
+    hit = items.get(text)
+    if hit is not None:
+        return hit
+    category = _product_category(text, rules, _pretty_model(_folder_model(text, rules)))
+    brand = _product_brand(text, category) or _PRODUCT_BRAND_UNKNOWN
+    meta = {
+        '_category': category,
+        '_brand': brand,
+        '_brand_alias': _brand_search_text(brand, category),
+        '_search_desc': _search_forms_text(text),
+    }
+    if len(items) >= _PRODUCT_META_CACHE_MAX:
+        items.pop(next(iter(items)))
+    items[text] = meta
+    return meta
 
 
 def _is_phone_text(text: str, rules: Optional[dict] = None, model: str = '') -> bool:
@@ -13320,22 +13370,10 @@ if __name__ == '__main__':
                     if last_record and isinstance(last_record, dict):
                         added_skus = set(last_record.get('added', []))
 
-                _rules = _folder_rules()
                 _prefer_local = _client_prefers_local_media(request)
                 for p in products:
-                    _apply_client_media(p, _prefer_local)
-                    sku = p.get('货号', '') or p.get('stock_number', '')
-                    p['_isNew'] = sku in added_skus
-                    desc = str(_product_desc(p) or '')
-                    category = _product_category(
-                        desc, _rules, _pretty_model(_folder_model(desc, _rules))
-                    )
-                    p['_category'] = category
-                    p['_brand'] = _product_brand(desc, category) or _PRODUCT_BRAND_UNKNOWN
-                    p['_brand_alias'] = _brand_search_text(p['_brand'], category)
-                    p['_search_sku'] = _search_forms_text(sku)
-                    p['_search_desc'] = _search_forms_text(desc)
-                    p['_search_remark'] = _search_forms_text(p.get('备注') or p.get('remark') or '')
+                    _attach_decoded_images(p, _prefer_local)
+                    p['_isNew'] = (p.get('货号') or p.get('stock_number') or '') in added_skus
 
                 _assign_product_ids(products)
 
@@ -13722,7 +13760,7 @@ if __name__ == '__main__':
                 _prefer_local = _client_prefers_local_media(request)
                 for p in products:
                     if _sku_matches(p.get('货号'), sku):
-                        _apply_client_media(p, _prefer_local)
+                        _attach_decoded_images(p, _prefer_local)
                         p['_id'] = _product_stable_id(p, 0)
                         return jsonify({'found': True, 'product': p})
                 safe_log(logger, 'warning', '[get_product] 未找到货号={s} 文件={f} 商品数={n}',
@@ -13836,7 +13874,7 @@ if __name__ == '__main__':
                 if search_type == 'sku':
                     for p in products:
                         if _sku_matches(p.get('货号'), sku):
-                            _apply_client_media(p, _prefer_local)
+                            _attach_decoded_images(p, _prefer_local)
                             return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
                     fuzzy_products = [p for p in products if _sku_fuzzy_matches(p.get('货号'), sku)]
                     if not fuzzy_products:
@@ -13888,7 +13926,7 @@ if __name__ == '__main__':
                             try:
                                 product_price = float(price_str.replace('¥', '').replace(',', '').strip())
                                 if abs(product_price - price_float) < 0.01:
-                                    _apply_client_media(p, _prefer_local)
+                                    _attach_decoded_images(p, _prefer_local)
                                     matched_products.append(p)
                             except (ValueError, TypeError):
                                 continue
@@ -13914,7 +13952,7 @@ if __name__ == '__main__':
                                     in_range = False
                                 
                                 if in_range:
-                                    _apply_client_media(p, _prefer_local)
+                                    _attach_decoded_images(p, _prefer_local)
                                     matched_products.append(p)
                             except (ValueError, TypeError):
                                 continue
@@ -13958,7 +13996,7 @@ if __name__ == '__main__':
                         remark_text = str(p.get('备注', '') or p.get('remark', ''))
                         if not _pinyin_search_hit(sku, remark_text):
                             continue
-                        _apply_client_media(p, _prefer_local)
+                        _attach_decoded_images(p, _prefer_local)
                         matched_products.append(p)
                     if matched_products:
                         return jsonify({
