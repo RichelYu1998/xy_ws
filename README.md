@@ -5142,8 +5142,8 @@ def _lan_base_url():
 **修复日期**: 2026-11-25
 **修复类型**: ✨新功能 + 🐛Bug修复 + 📝文档更新
 **影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 60511b77
-**变更统计**: +483行 -39行（`git show --shortstat 60511b77`：main.py / dist/app.js 代码合计）；文档同步见本版本 docs 提交
+**Commit**: 60511b77, 87890e13, 6255690b
+**变更统计**: +483行 -39行（`git show --shortstat 60511b77`：main.py / dist/app.js）+56行 -22行（`git show --shortstat 6255690b`：README.md / skill.md / skill.docx 编号升序修复）
 **作者**: 小旭二手机（西园路）
 
 ---
