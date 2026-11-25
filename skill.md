@@ -5264,8 +5264,8 @@ def _media_url_for_client(url: str, prefer_local: bool, source_url: str = '', lo
 **修复日期**: 2026-11-25
 **修复类型**: ✨新功能 + 🐛Bug修复 + 📝文档更新
 **影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [index.html](index.html), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 49ce23fe
-**变更统计**: +170行 -108行（`git show --shortstat 49ce23fe`：main.py / dist/app.js / index.html）+ 文档新增本版本条目（README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成）
+**Commit**: 49ce23fe, dea18832
+**变更统计**: +170行 -108行（`git show --shortstat 49ce23fe`：main.py / dist/app.js / index.html）+228行 -3行（`git show --shortstat dea18832`：README.md / skill.md / skill.docx / main.py 文档同步与 IP 判定收紧）
 **作者**: 小旭二手机（西园路）
 
 ---
