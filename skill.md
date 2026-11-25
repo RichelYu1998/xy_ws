@@ -5218,7 +5218,7 @@ def _brand_match_pairs(entries):
 
 ---
 
-**文档版本**: v5.0.9.126  
+**文档版本**: v5.0.9.127  
 **最后更新**: 2026-11-25  
 **下次审查**: 2026-12-24  
 **维护者**: 小旭数码开发团队
@@ -5226,6 +5226,117 @@ def _brand_match_pairs(entries):
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.127 (2026-11-25) - 🌐 **客户端IP归属媒体路由：局域网设备直读本地IP、公网设备直走云端源地址，修复保存本地后图片视频变黑** - ① 新增 `_client_ip_of()` 按 `CF-Connecting-IP` → `X-Forwarded-For` → 直连地址顺序取真实客户端IP，隧道转发场景不再误判；② 新增 `_is_private_client_ip()` 用 `ipaddress` 判定 `10/8` / `172.16/12` / `192.168/16` / 回环 / 链路本地为局域网（`100.64/10` 属运营商级 NAT，客户端不在本机网络内，仍按公网处理）；③ 新增 `_media_url_for_client()` 按访问来源挑选地址——局域网返回本地IP绝对地址直读下载目录，公网返回原始云端地址，不再走 base64 本地中转；④ 新增 `_apply_client_media()` 批量回填 `图片` / `图片解码` 并保持两者逐条一致，`/api/products`、`/api/product`、`/api/product/search`、`/api/product/by-description`、`/api/product/by-id` 五个接口全部注入 `request`；⑤ 修复保存本地 `saved=0 failed=5`：`_media_urls_of()` 增加本地文件存在性检查，本地文件缺失时自动回退云端源地址重下；⑥ 前端 `resolveLocalMediaUrl()` 兼容旧JSON写死局域网地址、新JSON相对地址、原始云端地址三形态，换IP / 换隧道无需重存
+
+#### 更新内容: 谁在访问就按谁的网络给地址，保存不再全失败
+
+| 场景 | 旧做法 | 新做法 |
+|---|---|---|
+| 局域网设备 | 旧JSON写死 `192.168.x.x`，换网段即失效 | 按客户端IP判定内网，返回当前局域网IP绝对地址直读 |
+| 公网 / 隧道设备 | 走 base64 本地中转，混合内容拦截、隧道地址变化即失效 | 直接返回原始云端地址，不经本地中转 |
+| 保存本地媒体 | 本地文件不存在时 `saved=0 failed=5` | 本地缺失自动回退云端源地址重下 |
+| 旧JSON历史地址 | 需重新保存才能用 | 读入即归一，前端自动补全当前访问域名 |
+| `图片` / `图片解码` | 两字段可能不一致 | `_apply_client_media()` 同源回填，逐条一一对应 |
+
+```python
+def _media_url_for_client(url: str, prefer_local: bool, source_url: str = '', local_relpath: str = '') -> str:
+    """按访问来源挑选媒体地址：局域网走本地IP，公网走云端源地址"""
+    rel = _local_media_relpath(url) or str(local_relpath or '')
+    src = str(source_url or '')
+    has_remote = src.startswith(('http://', 'https://')) and not _local_media_relpath(src)
+    if prefer_local:
+        if rel:
+            local_file = _local_media_abspath(rel)
+            if local_file and os.path.isfile(local_file):
+                return _local_media_abs_url(rel)
+            return src if has_remote else _local_media_abs_url(rel)
+        return url
+    if has_remote:
+        return src
+    if rel:
+        return _local_media_url(rel)
+    return url
+```
+
+**实测**：局域网 `127.0.0.1` 访问 `/api/product` 返回 `http://192.168.77.18:8888/api/media/local?path=...`；带 `CF-Connecting-IP: 8.8.8.8` 访问同一接口返回原始 `https://xcimg.szwego.com/...`；保存 sku 98474 / 99639 / 71028 均 `saved=N failed=0`。
+
+**修复日期**: 2026-11-25
+**修复类型**: ✨新功能 + 🐛Bug修复 + 📝文档更新
+**影响文件**: [main.py](main.py), [dist/app.js](dist/app.js), [index.html](index.html), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
+**Commit**: 49ce23fe
+**变更统计**: +170行 -108行（`git show --shortstat 49ce23fe`：main.py / dist/app.js / index.html）+ 文档新增本版本条目（README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成）
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🌐 客户端IP归属判定与媒体地址按来源路由 (✨新功能)
+
+**问题描述**:
+- **现象**: 保存到本地后商品图片/视频全部变黑，公网或隧道设备打开同一份 JSON 时媒体全部加载失败
+- **根因**: 旧 JSON 的媒体地址写死为局域网 `192.168.x.x`，公网设备访问不到；隧道地址每次变化，写死的地址随即失效
+- **影响范围**: `_client_ip_of` / `_is_private_client_ip` / `_client_prefers_local_media` / `_media_url_for_client` / `_apply_client_media` / 五个商品查询接口
+
+**修复方案**:
+- **技术实现**: 先取真实客户端IP（`CF-Connecting-IP` → `X-Forwarded-For` 首个 → 直连地址），再用 `ipaddress` 判定内网（`is_private` / `is_loopback` / `is_link_local`）；局域网设备返回 `_local_media_abs_url()` 当前局域网IP绝对地址，公网设备返回 `图片源地址` 里的原始云端地址；`_apply_client_media()` 同时回填 `图片` 与 `图片解码`，保证两字段逐条一致；五个接口统一注入 `request` 并调用同一函数，异常路径沿用统一异常处理范式（PY-CORE-049）
+- **参考位置**: [main.py](main.py#L2284-L2315) `_client_ip_of` / `_is_private_client_ip` / `_client_prefers_local_media`，[main.py](main.py#L2316-L2337) `_media_url_for_client`，[main.py](main.py#L2339-L2356) `_apply_client_media`
+
+**测试验证**:
+- ✅ 局域网直连 `127.0.0.1` 访问返回 `http://<当前局域网IP>:8888/api/media/local?path=...`，浏览器直读 200
+- ✅ 伪造 `CF-Connecting-IP: 8.8.8.8` 访问同一接口返回原始 `https://xcimg.szwego.com/...` 云端地址
+- ✅ `X-Forwarded-For: 192.168.1.20, 8.8.8.8` 判定为局域网（取首个地址），走本地IP地址
+- ✅ 五大接口（列表 / 详情 / 搜索 / 按描述 / 按ID）返回地址口径一致
+
+##### 2. 🐛 保存本地媒体 saved=0 failed=5 全部失败修复 (🐛Bug修复)
+
+**问题描述**:
+- **现象**: 点击「保存到本地」后返回 `saved=0 failed=5`，媒体文件一个都没落盘，随后图片/视频全部变黑
+- **根因**: `_media_urls_of()` 直接把本地媒体地址交给下载逻辑，而本地文件此时还不存在，`_fetch_media_bytes` 找不到文件直接失败，也没有回退原始云端地址
+- **影响范围**: `_media_urls_of` / `_save_media_files` / `_fetch_media_bytes`
+
+**修复方案**:
+- **技术实现**: `_media_urls_of()` 对本地媒体地址增加磁盘存在性检查，文件存在才用本地路径，缺失时按旁挂 `.media_sources.json` 或 `图片源地址` 回退原始云端地址重新下载；下载成功后写回本地路径与源地址，保证下次保存命中本地文件
+- **参考位置**: [main.py](main.py#L2039-L2066) `_media_urls_of` 本地缺失回退
+
+**测试验证**:
+- ✅ sku 98474 / 99639 / 71028 保存均 `saved=N failed=0`，文件完整写入下载目录
+- ✅ 删除本地文件后再次保存仍 `failed=0`，按云端源地址自动重下恢复
+- ✅ 本地文件存在时不再发起云端请求，零重复下载
+
+##### 3. 🐛 前端媒体地址三形态归一，旧JSON写死IP自动补全域名 (🐛Bug修复)
+
+**问题描述**:
+- **现象**: 旧 JSON 里写死的 `http://192.168.x.x:8888/...` 在新网段/隧道下打不开；新 JSON 的相对地址在部分页面又无法解析
+- **根因**: 前端只按「完整 http 地址」或「纯 base64」两分支处理，没有统一归一函数，相对地址与旧局域网地址都落空
+- **影响范围**: [dist/app.js](dist/app.js) `decodeBase64Url` / 新增 `resolveLocalMediaUrl`
+
+**修复方案**:
+- **技术实现**: 新增 `resolveLocalMediaUrl()`，把 `/api/media/local?...` 相对地址补全为 `location.origin`，把旧局域网绝对地址重写为当前访问域名，原始云端地址原样返回；`decodeBase64Url()` 统一走该函数，并给 `index.html` 中 `app.js` 加版本号避免手机加载旧脚本
+- **参考位置**: [dist/app.js](dist/app.js) `resolveLocalMediaUrl` / `decodeBase64Url`，[index.html](index.html) `app.js` 版本号
+
+**测试验证**:
+- ✅ 相对地址在局域网与隧道下均正确加载
+- ✅ 旧 `http://192.168.77.18:8888/...` 自动改写为当前 origin 后可打开
+- ✅ `node --check dist/app.js` 通过
+
+##### 4. 📝 三方文档同步与 changelog 全量校验 (📝文档更新)
+
+**问题描述**:
+- **现象**: 本轮改动未写入 README.md / skill.md；`/api/changelog` 历史条目存在空 `changes` 与「待生成」占位 Commit
+- **根因**: 文档同步滞后，changelog 规范化层缺少对空 `changes` 与占位符的最终兜底
+- **影响范围**: README.md / skill.md / skill.docx / `/api/changelog`
+
+**修复方案**:
+- **技术实现**: README.md 与 skill.md 写入本版本完整条目并逐字节一致，skill.docx 由 skill.md 重新生成；changelog 规范化层对每个版本兜底 `changes`（空则补「见对应版本条目」并保留 `added/modified/removed` 结构），`commit` 占位符（`待生成` / `待补充` / `未知` / `N/A`）统一替换为真实 Git 哈希（7-10 位），无 Git 时回退当前 HEAD；全量 469 个版本复检空 `changes` 0、占位符 0；`run.sh` / `run.bat` 未改版本，仍从 README.md 首条 `### v` 自动读取，版本统一
+- **参考位置**: [README.md](README.md) 本条目，[skill.md](skill.md) 同版本条目，[main.py](main.py) `_changelog_payload` 规范化段
+
+**测试验证**:
+- ✅ `/api/changelog` 全量 469 个版本：空 `changes` 0 个、`待生成/待补充` 占位 0 个、Commit 全为 7-10 位真实哈希
+- ✅ README.md 与 skill.md 逐字节一致（`cmp` 无差异），skill.docx 由 skill.md 重新生成
+- ✅ `run.sh` / `run.bat` 读取版本均为 `5.0.9.127`，未改动脚本
+- ✅ 九项文档校验与安全审计（0 问题 / 13 项攻防全通过）均通过，符合零缺陷全量验证（PY-CORE-052）
+
+---
 
 ### v5.0.9.126 (2026-11-25) - ✨ **局域网媒体本地化 + 本地 JSON 四字段并存（加密版 / 解密版 / 源地址 / 本地路径）+ 范式编号按 A-Z 落位 l 组 034** - ① 媒体地址一律运行时推导（路由探测 → 网卡枚举 → 主机名解析三级兜底 + 30 秒缓存），彻底移除 `192.168` 硬编码，`10.x` / `172.16-31.x` / `192.168.x` / `100.64.x` 全部适配；② 读入时 `_normalize_local_media_url()` 把旧网段地址重写为当前局域网基址，换路由器/换 IP 无需手工改 JSON；③ 本地 JSON 与源商品 JSON 媒体字段升级为四件套 `图片`（base64 加密版）/ `图片解码`（base64 解密版）/ `图片源地址`（不加密的 base64 源地址）/ `本地路径`（下载目录内相对路径），逐条一一对应；④ 商品目录旁挂 `.media_sources.json` 记录原始远程地址，下载目录被清理后再次保存自动回源重下；⑤ 新增范式「局域网媒体本地化 (LAN Media URL Localization)」落 l 组末位 `PY-CORE-034`（编号规则见 PY-CORE-038），原 `034`~`053` 整体 +1 → `035`~`054`，全文档 744 处编号 token 一次性替换
 

@@ -2296,7 +2296,10 @@ def _client_ip_of(req: Any) -> str:
 
 
 def _is_private_client_ip(ip: str) -> bool:
-    """判断是否局域网/本机地址（10.x、172.16-31.x、192.168.x、127.x、169.254.x、IPv6内网）"""
+    """判断客户端是否与本机同处一个局域网（RFC1918 / 回环 / 链路本地）
+
+    100.64/10 属运营商级 NAT 网段，客户端在本机网络之外，不能按局域网处理
+    """
     try:
         addr = ipaddress.ip_address(str(ip or '').strip())
     except ValueError:
