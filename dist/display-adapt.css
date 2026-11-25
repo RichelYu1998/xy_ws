@@ -1,0 +1,104 @@
+/* ==========================================================================
+   全尺寸显示适配层（dist 天气时钟看板）
+   ==========================================================================
+   适配目标：320px 手机 ~ 300 寸投影（3840px 4K / 7680px 8K）
+   适配设备：手机 / 平板 / 笔记本 / 桌面显示器 / 电视 / 投影仪 / 超宽屏
+   核心策略：
+   1) 根字号随视口流体缩放（clamp），Tailwind 的 rem 尺寸整体等比放大，
+      小屏不缩水、大屏不显得「字小如蚁」；
+   2) 大屏放开 glass-panel 的 1200px 固定上限，避免 100 寸电视 / 300 寸
+      投影上内容只剩中间一条窄带；
+   3) 视口高度统一走 dvh，规避移动端地址栏收缩导致的 100vh 溢出；
+   4) 超宽 / 超短 / 竖屏大屏各给独立档位，任何比例都不出现横向滚动条。
+   维护要求：本文件为适配层，只做「覆盖」不做「改版」，禁止改写原有组件样式。
+   ========================================================================== */
+
+html {
+  font-size: clamp(16px, calc(0.62vw + 6.4px), 56px);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* 视口高度统一：100vh 在移动端会因地址栏收起而溢出，dvh 优先 */
+.h-screen {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* 100vw 在存在纵向滚动条时会横向溢出，收紧为 100% */
+.w-screen {
+  width: 100vw;
+  max-width: 100%;
+}
+
+/* 固定 10px 的小字改为 rem，跟随根字号一起放大 */
+.text-\[10px\] {
+  font-size: 0.625rem !important;
+}
+
+/* 大屏放开容器宽度上限：FHD 保持原样，2K / 4K / 8K 逐档放宽 */
+@media (min-width: 1920px) {
+  .glass-panel {
+    max-width: min(92vw, 1760px) !important;
+  }
+}
+
+@media (min-width: 2560px) {
+  .glass-panel {
+    max-width: min(90vw, 2360px) !important;
+  }
+}
+
+@media (min-width: 3840px) {
+  .glass-panel {
+    max-width: min(88vw, 3400px) !important;
+  }
+}
+
+@media (min-width: 7680px) {
+  .glass-panel {
+    max-width: min(86vw, 6600px) !important;
+  }
+}
+
+/* 仅时钟模式本身就是全屏展示，必须保持满宽，不被大屏上限收窄 */
+.glass-panel.clock-only-mode {
+  max-width: 100vw !important;
+}
+
+/* 超宽屏（21:9 / 32:9）：限制阅读宽度，避免长行难以扫视 */
+@media (min-aspect-ratio: 21/9) {
+  .glass-panel {
+    max-width: min(88vw, 2600px) !important;
+  }
+}
+
+/* 竖屏大屏（竖装电视 / 竖投投影）：按视口宽度单独给档，避免字号过小 */
+@media (orientation: portrait) and (min-width: 1080px) {
+  html {
+    font-size: clamp(20px, calc(1.1vw + 6px), 52px);
+  }
+}
+
+/* 超短横屏（手机横放 / 矮窗口）：收紧根字号，保证一屏放得下 */
+@media (max-height: 480px) and (orientation: landscape) {
+  html {
+    font-size: 14px;
+  }
+}

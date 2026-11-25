@@ -217,17 +217,27 @@
                 'mobile': /mobile|android|iphone|ipad|ipod/i.test(ua)
             };
             
-            // 根据屏幕宽度判断设备类型
+            // 根据屏幕宽度判断设备类型（覆盖 320px 手机 ~ 300 寸投影 / 8K 大屏）
             if (width < 576) {
                 deviceType = 'phone';
             } else if (width < 768) {
                 deviceType = 'tablet';
             } else if (width < 992) {
                 deviceType = 'laptop';
-            } else if (width < 1200) {
+            } else if (width < 1440) {
                 deviceType = 'desktop';
-            } else {
+            } else if (width < 1920) {
                 deviceType = 'large-desktop';
+            } else if (width < 2560) {
+                deviceType = 'tv';
+            } else if (width < 3840) {
+                deviceType = 'large-tv';
+            } else if (width < 5120) {
+                deviceType = 'projector-4k';
+            } else if (width < 7680) {
+                deviceType = 'projector-5k';
+            } else {
+                deviceType = 'projector-8k';
             }
             
             // 组装设备信息
@@ -255,7 +265,7 @@
                 isMobile: mobileDevices.mobile,
                 isPhone: deviceType === 'phone',
                 isTablet: deviceType === 'tablet',
-                isDesktop: deviceType === 'desktop' || deviceType === 'laptop' || deviceType === 'large-desktop',
+                isDesktop: !['phone', 'tablet'].includes(deviceType),
                 width: width,
                 height: height,
                 info: deviceInfo,
@@ -264,17 +274,32 @@
             };
         }
         
+        // 设备类型样式类清单：窗口跨档缩放时必须先全部移除，避免旧类残留叠加
+        const DEVICE_CLASS_LIST = [
+            'is-phone', 'is-tablet', 'is-laptop', 'is-desktop', 'is-large-desktop',
+            'is-tv', 'is-large-tv', 'is-projector-4k', 'is-projector-5k', 'is-projector-8k',
+            'is-mobile', 'is-desktop-device', 'is-large-screen', 'is-ultrawide'
+        ];
+
         // 应用设备适配样式
         function applyDeviceStyles() {
             const device = detectDevice();
-            document.body.classList.remove('is-phone', 'is-tablet', 'is-desktop', 'is-mobile', 'is-desktop-device');
+            document.body.classList.remove(...DEVICE_CLASS_LIST);
             document.body.classList.add('is-' + device.type);
             if (device.isMobile) {
                 document.body.classList.add('is-mobile');
             } else {
                 document.body.classList.add('is-desktop-device');
             }
-            
+            // 大屏档位（≥1920）：电视 / 投影仪按大字号排版
+            if (device.width >= 1920) {
+                document.body.classList.add('is-large-screen');
+            }
+            // 超宽屏档位（≥21:9）：横向留白、限制阅读宽度
+            if (device.height > 0 && device.width / device.height >= 21 / 9) {
+                document.body.classList.add('is-ultrawide');
+            }
+
             return device;
         }
         
