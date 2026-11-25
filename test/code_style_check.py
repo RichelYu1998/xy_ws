@@ -11,7 +11,13 @@
 5. 配置规范（禁止裸魔法数字超时值，必须走 TIMEOUT_CONFIG / 环境变量）
 6. 编码与标记规范（UTF-8 无 BOM、禁止 TODO/FIXME 遗留标记）
 
+扫描范围：
+- Python：自动发现项目内全部 .py（排除 .venv / node_modules / tools / temp / file），
+  新增文件无需手工登记，落盘即纳入扫描，基线默认 0；
+- JavaScript：dist/app.js（构建产物 bundle 为压缩代码，不纳入扫描）。
+
 用法：python test/code_style_check.py
+时机：每次改动代码后（含新增 .py）必须跑一遍，退出码 0 才允许提交
 退出码：0 = 零问题达标；1 = 存在违规
 """
 
@@ -24,8 +30,9 @@ from pathlib import Path
 PROJECT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 README = PROJECT_DIR / 'README.md'
 
-PY_TARGETS = ['main.py', 'config/crypto_tool.py', 'test/generate_docx.py', 'test/security_audit.py',
-              'test/code_style_check.py']
+PY_REQUIRED = ['main.py', 'config/crypto_tool.py', 'test/generate_docx.py', 'test/security_audit.py',
+               'test/code_style_check.py']
+PY_EXCLUDE_DIRS = {'.git', '.venv', '.idea', 'node_modules', 'tools', 'temp', 'file'}
 JS_TARGETS = ['dist/app.js']
 
 MAX_LINE_LEN = 120
@@ -36,7 +43,8 @@ BASELINE_LONG_LINES = {'main.py': 295, 'config/crypto_tool.py': 0, 'test/generat
                        'test/security_audit.py': 7, 'test/code_style_check.py': 0,
                        'dist/app.js': 326}
 
-NAME_ALLOWLIST = {'_patched_Popen', '_SECURITY_CHECKS', 'PROJECT_DIR'}
+NAME_ALLOWLIST = {'_patched_Popen', '_SECURITY_CHECKS', 'PROJECT_DIR', 'do_GET', 'do_POST',
+                  'do_PUT', 'do_DELETE', 'do_HEAD', 'do_PATCH', 'do_OPTIONS'}
 SILENT_MARK = '[SILENT_OK]'
 PRINT_ALLOWLIST = ('log_print', 'safe_print', '_safe_print', 'print_', 'pprint')
 
@@ -64,6 +72,16 @@ def read_text(rel_path):
     if not path.is_file():
         return None
     return path.read_text(encoding='utf-8', errors='replace')
+
+
+def discover_py_targets():
+    targets = []
+    for path in sorted(PROJECT_DIR.rglob('*.py')):
+        rel_parts = path.relative_to(PROJECT_DIR).parts
+        if any(part in PY_EXCLUDE_DIRS for part in rel_parts[:-1]):
+            continue
+        targets.append(path.relative_to(PROJECT_DIR).as_posix())
+    return targets
 
 
 class StyleAuditor:
@@ -228,7 +246,10 @@ class StyleAuditor:
             self.add('ALI-005', rel_path, 0, f'超宽行 {long_count} 行，基线 {baseline} 行，只允许减少')
 
     def scan_all(self):
-        for rel_path in PY_TARGETS:
+        for rel_path in PY_REQUIRED:
+            if not (PROJECT_DIR / rel_path).is_file():
+                self.add('ALI-012', rel_path, 0, '核心受检文件缺失')
+        for rel_path in discover_py_targets():
             self.audit_python(rel_path)
         for rel_path in JS_TARGETS:
             self.audit_js(rel_path)
@@ -260,8 +281,10 @@ class StyleAuditor:
 
 def main():
     version = read_version()
+    py_targets = discover_py_targets()
     print('=' * 68)
     print(f'阿里巴巴代码规范合规检查 (Python / JavaScript 适配版)  当前版本: v{version}')
+    print(f'扫描范围: Python {len(py_targets)} 个文件（自动发现）+ JavaScript {len(JS_TARGETS)} 个文件')
     print('=' * 68)
 
     auditor = StyleAuditor()

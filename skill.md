@@ -18,7 +18,7 @@
 | 📂 项目结构 | 目录树与关键文件职责 |
 | ⚙️ 配置说明 | config.json 字段、加密与端口配置 |
 | 🔐 安全合规状态 | 加密存储与安全检查项 |
-| 🔴 阿里巴巴代码规范范式 (Alibaba Code Standard) (PY-CORE-003) | ALI-001~016 十六条款 + 可执行检查脚本，异常/命名/前端安全全兜底 |
+| 🔴 阿里巴巴代码规范范式 (Alibaba Code Standard) (PY-CORE-003) | ALI-001~016 十六条款 + test/code_style_check.py 常驻检查，全部 .py 自动纳入、每次改动必跑 |
 | 📐 版本更新记录范式规范 (PY-CORE-012) | changelog 结构强制规范 |
 | 🔴 清理目录白名单保护范式 (PY-CORE-015) | 项目根/祖先目录硬拦截先于白名单授权 |
 | 🔴 配置热读取范式 (Configuration Hot Reload) (PY-CORE-016) | config/ 全部配置签名缓存、改完即生效无需重启 |
@@ -483,6 +483,8 @@ if __name__ == '__main__':
 
 全仓库以《阿里巴巴代码规范》核心条款为硬约束，并用可执行脚本固化，避免规范只停留在文档：异常不得静默吞没、禁止裸 `except`、禁止可变默认参数、函数与单行长度受控、前端禁止 `var` / `alert` / 非严格相等 / `eval`、超时值必须走配置、文件必须 UTF-8 无 BOM。规范条款与检查编号一一对应（`ALI-001` ~ `ALI-016`），改代码与跑检查是同一个动作的两半。
 
+检查脚本常驻 [test/code_style_check.py](test/code_style_check.py)，是仓库唯一规范闸门：Python 侧自动发现项目内全部 `.py`（排除 `.venv` / `node_modules` / `tools` / `temp` / `file`），新增脚本落盘即纳入扫描、无需手工登记；每次改动代码后（含新增 `.py`）都必须跑一遍，退出码 0 才允许提交，禁止「先提交再补检查」。
+
 ### 规则清单（ALI-001 ~ ALI-016）
 
 | 规则编号 | 条款 | 适配层 | 检查方式 |
@@ -498,21 +500,43 @@ if __name__ == '__main__':
 | ALI-009 | 禁止 `eval` / `new Function` / `document.write` | JavaScript | 正则 |
 | ALI-010 | 路由处理函数内禁止 `print`，必须 `logger` / `log_print` | Python | AST + `app.` 装饰器区间 |
 | ALI-011 | 类名 CamelCase（允许 `_` 前缀）、函数名 snake_case | Python | 正则 |
-| ALI-012 | 受检文件必须存在，缺失即视为违规 | 全仓库 | 文件存在性 |
-| ALI-013 | 超时值必须取自 `TIMEOUT_CONFIG` / 环境变量，禁止裸数字 | Python | AST 关键字参数 |
+| ALI-012 | 核心受检文件必须存在（`main.py` / `config/crypto_tool.py` / `test/code_style_check.py` / `test/security_audit.py` / `test/generate_docx.py`），其余 `.py` 由自动发现兜底 | 全仓库 | 文件存在性 |
+| ALI-013 | 超时值必须取自 `TIMEOUT_CONFIG` / 环境变量 / 模块常量，禁止裸数字 | Python | AST 关键字参数 |
 | ALI-014 | 文件必须 UTF-8 且无 BOM | 全仓库 | 首字节检查 |
 | ALI-015 | 禁止 `TODO` / `FIXME` / `XXX` / `HACK` 注释遗留 | 全仓库 | 注释正则 |
 | ALI-016 | 捕获的异常变量必须被使用（记录上下文），禁止 `as e` 后弃用 | Python | AST 名称引用 |
 
 ### 核心实现
 
-检查脚本 [test/code_style_check.py](test/code_style_check.py) 以 AST + 正则双通道扫描，存量超长函数 / 超宽行按「基线冻结」比对，只允许减少：
+检查脚本 [test/code_style_check.py](test/code_style_check.py) 以 AST + 正则双通道扫描，Python 受检范围由自动发现生成（新增文件基线默认 0），存量超长函数 / 超宽行按「基线冻结」比对，只允许减少：
+
+```python
+PY_REQUIRED = ['main.py', 'config/crypto_tool.py', 'test/generate_docx.py', 'test/security_audit.py',
+               'test/code_style_check.py']
+PY_EXCLUDE_DIRS = {'.git', '.venv', '.idea', 'node_modules', 'tools', 'temp', 'file'}
+
+
+def discover_py_targets():
+    targets = []
+    for path in sorted(PROJECT_DIR.rglob('*.py')):
+        rel_parts = path.relative_to(PROJECT_DIR).parts
+        if any(part in PY_EXCLUDE_DIRS for part in rel_parts[:-1]):
+            continue
+        targets.append(path.relative_to(PROJECT_DIR).as_posix())
+    return targets
+```
 
 ```python
 BASELINE_LONG_FUNCS = {'main.py': 48, 'test/security_audit.py': 4}
 BASELINE_LONG_LINES = {'main.py': 295, 'config/crypto_tool.py': 0, 'test/generate_docx.py': 0,
                        'test/security_audit.py': 7, 'test/code_style_check.py': 0,
                        'dist/app.js': 326}
+```
+
+运行方式（每次改动代码后必跑，退出码 0 即达标）：
+
+```bash
+python test/code_style_check.py
 ```
 
 静默异常的合法写法（唯一入口，见 PY-CORE-051 统一异常处理）：
@@ -529,9 +553,11 @@ def _swallow_exc(context: str, exc: BaseException) -> None:
 ### 落地清单
 
 - [ ] `python test/code_style_check.py` 退出码 0，`ALI-001` ~ `ALI-016` 全部 ✅
+- [ ] 每次改动代码后都跑一遍检查（新增 / 修改任意 `.py` 均须重跑，禁止跳过）
+- [ ] 新增 `.py` 无需登记，自动发现机制保证落盘即纳入扫描、基线默认 0
 - [ ] `main.py` 全部 `except` 分支要么调 `_swallow_exc()`，要么带 `# [SILENT_OK]` 理由
 - [ ] `dist/app.js` 中 `var` / `alert` / `==` / `!=` 计数全部为 0
-- [ ] `subprocess.run(...)` 的 `timeout` 全部取自 `TIMEOUT_CONFIG`（见 PY-CORE-047）
+- [ ] `subprocess.run(...)` 的 `timeout` 全部取自 `TIMEOUT_CONFIG` / 环境变量 / 模块常量（见 PY-CORE-047）
 - [ ] 新增文件一律 UTF-8 无 BOM，提交前跑一次检查脚本
 - [ ] 基线数值只允许随重构下调，禁止为让检查通过而调高
 
@@ -545,8 +571,10 @@ def _swallow_exc(context: str, exc: BaseException) -> None:
 | 新函数越写越长 | 单函数职责不清、难以测试 | 拆成 ≤ 80 行的子函数 |
 | 超时值写死 `timeout=5` | 环境差异导致误超时或卡死 | 走 `TIMEOUT_CONFIG['subprocess_short']` |
 | 基线内既有超长函数继续加行 | 技术债滚雪球 | 基线只允许减少，新增代码必须达标 |
+| 新写脚本不跑检查就提交 | 规范漂移无人发现，闸门形同虚设 | 改动后立即跑一遍，退出码 0 才提交 |
+| 手工维护受检文件清单 | 漏登记导致新文件长期不被扫描 | 依赖自动发现，只保留核心必需清单 |
 
-> **判定标准**: 出现「静默 `pass` 无 `[SILENT_OK]` 标注 / 裸 `except` / 可变默认参数 / 新增函数超 80 行 / 新增超宽行 / 前端 `var`、`alert`、`==`、`eval` 任一残留 / 裸魔法超时数字 / 异常变量未使用 / `python test/code_style_check.py` 非 0 退出」中任意一条，即视为「未符合本范式」。
+> **判定标准**: 出现「静默 `pass` 无 `[SILENT_OK]` 标注 / 裸 `except` / 可变默认参数 / 新增函数超 80 行 / 新增超宽行 / 前端 `var`、`alert`、`==`、`eval` 任一残留 / 裸魔法超时数字 / 异常变量未使用 / `python test/code_style_check.py` 非 0 退出 / 改动代码后未跑检查」中任意一条，即视为「未符合本范式」。
 
 ---
 
@@ -5366,7 +5394,7 @@ def _brand_match_pairs(entries):
 |---------|-----|------|---------|--------|
 | PY-CORE-001 | A | 文件清理自动化 (Automated File Cleanup) | main.py | 🔴 核心 |
 | PY-CORE-002 | A | API压力测试 (API Stress Testing) | 范式示例（本仓库未包含该脚本） | 🟡 重要 |
-| PY-CORE-003 | A | 阿里巴巴代码规范 (Alibaba Code Standard) | main.py / dist/app.js / test/code_style_check.py | 🔴 核心 |
+| PY-CORE-003 | A | 阿里巴巴代码规范 (Alibaba Code Standard) | test/code_style_check.py / 全部 .py / dist/app.js | 🔴 核心 |
 | PY-CORE-004 | B | 浏览器自动化爬虫 (Browser Automation Scraping) | main.py | 🔴 核心 |
 | PY-CORE-005 | B | 后台任务管理 (Background Task Management) | main.py | 🔴 核心 |
 | PY-CORE-006 | C | 统一路径管理 (Centralized Path Management) | main.py | 🔴 核心 |
@@ -5425,7 +5453,7 @@ def _brand_match_pairs(entries):
 
 ---
 
-**文档版本**: v5.0.9.130  
+**文档版本**: v5.0.9.131  
 **最后更新**: 2026-11-25  
 **下次审查**: 2026-12-24  
 **维护者**: 小旭数码开发团队
@@ -5433,6 +5461,18 @@ def _brand_match_pairs(entries):
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.131 (2026-11-25) - 🔴 **阿里规范检查脚本常驻化：自动发现全部 .py、每次改动必跑，PY-CORE-003 升级为仓库唯一规范闸门** - ① [test/code_style_check.py](test/code_style_check.py) 受检范围由手工登记清单改为自动发现，新增 `discover_py_targets()` 递归扫描项目内全部 `.py`（排除 `.venv` / `node_modules` / `tools` / `temp` / `file` / `.git`），新增脚本落盘即纳入扫描、基线默认 0，彻底消除「漏登记」导致新文件长期不被检查的隐患；② 原 `PY_TARGETS` 拆为 `PY_REQUIRED`（核心必需文件存在性校验，缺失即 `ALI-012` 违规）+ 自动发现，`ALI-012` 条款由「受检文件必须存在」细化为「核心受检文件必须存在，其余 `.py` 由自动发现兜底」；③ 检查输出新增扫描范围提示行（`Python N 个文件（自动发现）+ JavaScript 1 个文件`），当前实测 13 个 Python 文件 + 1 个 JavaScript 文件；④ 自动发现暴露并修复 3 处存量违规：`test/test_429_handling.py` 的 `do_GET` 属 `BaseHTTPRequestHandler` 协议回调必须保留原名，纳入 `NAME_ALLOWLIST`；`test/bench_30.py` 与 `test/bench_prefetch.py` 的裸魔法超时 `timeout=180` / `timeout=120` 改为 `BENCH_SUBPROCESS_TIMEOUT` / `BENCH_PREFETCH_TIMEOUT` 环境变量（默认值不变，可外部覆盖）；⑤ `PY-CORE-003` 正文补充「常驻闸门」定位与运行方式，落地清单新增「每次改动必跑」「新增 `.py` 无需登记」「基线默认 0」三条，避坑表新增「不跑检查就提交」「手工维护受检清单」两坑；⑥ 检查结果 `ALI-001` ~ `ALI-016` 全部 ✅，总计问题 0，退出码 0
+
+#### 更新内容: 从「手工登记受检」升级为「全量自动发现 + 每次必跑」
+
+| 场景 | 旧做法 | 新做法 |
+|---|---|---|
+| 受检范围 | `PY_TARGETS` 手工登记 5 个文件 | `discover_py_targets()` 自动发现全部 `.py`（13 个） |
+| 新增脚本 | 需手工加入清单，否则不检查 | 落盘即纳入，基线默认 0 |
+| 检查时机 | 提交前跑一次（易遗漏） | 每次改动代码后必跑，退出码 0 才提交 |
+| 存量违规 | 未纳入扫描长期潜伏 | 首次全量扫描即暴露 3 处并当场清零 |
+| 协议回调命名 | 与 snake_case 规则冲突 | `NAME_ALLOWLIST` 显式放行 `do_GET` 等 HTTP 动词 |
 
 ### v5.0.9.130 (2026-11-25) - 🖥️ **全尺寸显示适配：320px 手机 ~ 7680px 8K 投影（含 300 寸投影 / 100 寸电视）逐档适配，字号流体缩放、容器分档放开、高度动态化** - ① 新增 [dist/display-adapt.css](dist/display-adapt.css) 作为天气看板适配层，根字号 `clamp(16px, calc(0.62vw + 6.4px), 56px)` 随视口等比放大，`glass-panel` 在 1920 / 2560 / 3840 / 7680 四档逐级放开 1200px 固定上限；② [index.html](index.html) 根字号改 `clamp(16px, calc(0.5128vw + 8.62px), 48px)`，容器宽度新增 1400 / 1920 / 2560 / 3840 / 7680 五档，看板 iframe 高度由固定 560px 改为 `clamp(600px, 62vh, 1200px)` 起的三档动态高度；③ 补 `100dvh` 兜底与超宽屏 21:9、竖屏大屏、超短横屏三组特殊比例规则，`100vw` 容器收紧为 `width: 100%` 防横向溢出；④ [dist/app.js](dist/app.js) 设备识别由 5 档扩到 10 档（`tv` / `large-tv` / `projector-4k` / `projector-5k` / `projector-8k`），`DEVICE_CLASS_LIST` 先全清后按档加，新增 `is-large-screen` / `is-ultrawide` 两个大类；⑤ `.file-tree pre` 改 `pre-wrap`、导航栏时间文字加省略号、依赖清单表套 `table-responsive`，修掉 768px 平板 73px 横向溢出与 320px 表格越界，Chrome 实测 13 档视口页面级横向溢出全为 0；⑥ 新增范式「全尺寸显示适配 (Responsive Display Adaptation)」落 r 组末位 `PY-CORE-041`，原 `041`~`055` 整体 +1 → `042`~`056`
 

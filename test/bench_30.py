@@ -6,12 +6,14 @@
 运行方式：.venv/bin/python test/bench_30.py
 """
 import json
+import os
 import re
 import statistics
 import subprocess
 import time
 
 RUNS = 30
+SUBPROCESS_TIMEOUT = int(os.environ.get('BENCH_SUBPROCESS_TIMEOUT', '180'))
 results = []
 
 for i in range(1, RUNS + 1):
@@ -19,7 +21,7 @@ for i in range(1, RUNS + 1):
     # 每次都用独立子进程跑一遍完整流程，避免进程内缓存干扰耗时统计
     proc = subprocess.run(
         ['.venv/bin/python', 'main.py', '--task', '1'],
-        capture_output=True, text=True, timeout=180,
+        capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT,
     )
     elapsed = time.time() - start
     out = proc.stdout + proc.stderr

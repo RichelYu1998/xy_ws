@@ -6,10 +6,12 @@
 运行方式：.venv/bin/python test/bench_prefetch.py
 """
 import json
+import os
 import statistics
 import subprocess
 
 RUNS = 30
+SUBPROCESS_TIMEOUT = int(os.environ.get('BENCH_PREFETCH_TIMEOUT', '120'))
 
 # 子进程脚本：只做预热 + 取首包，不启动浏览器，避免干扰耗时统计
 CHILD = r'''
@@ -32,7 +34,7 @@ rows = []
 for i in range(1, RUNS + 1):
     # 每轮独立进程，确保预热状态从零开始
     proc = subprocess.run(
-        ['.venv/bin/python', '-c', CHILD], capture_output=True, text=True, timeout=120,
+        ['.venv/bin/python', '-c', CHILD], capture_output=True, text=True, timeout=SUBPROCESS_TIMEOUT,
     )
     line = [l for l in proc.stdout.splitlines() if l.startswith('{')]
     if not line:
