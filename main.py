@@ -384,8 +384,8 @@ def _posix_spawn_popen(args, kwargs):
         try:
             sys.stderr.write("[spawn-skip] " + reason + "\n")
             sys.stderr.flush()
-        except Exception:
-            pass
+        except Exception as exc:
+            _swallow_exc('sys.stderr.write("[spawn-skip] " + reason + "\n")', exc)
         return None
 
     if not _USE_POSIX_SPAWN:
@@ -478,6 +478,14 @@ logger.setLevel(logging.DEBUG)
 _PRODUCT_JSON_GLOB = '*微购相册*.json'
 _PRODUCT_JSON_EXCLUDE_MARKERS = ('_cache', '~$', '.tmp', '.bak')
 _PRODUCT_DESC_MAX_LEN = 2000
+
+
+def _swallow_exc(context: str, exc: BaseException) -> None:
+    """吞掉可忽略异常：统一记录 DEBUG 日志，禁止静默 pass（阿里规范例外处理条款）"""
+    try:
+        _module_logger.debug(f'[忽略异常] {context}: {type(exc).__name__}: {exc}')
+    except Exception:
+        return
 
 
 def _iter_product_json_files():
@@ -766,8 +774,8 @@ def install_asyncio_noise_filter():
                     fexc = fut.exception()
                     if fexc is not None:
                         parts.append(f'{type(fexc).__name__}: {fexc}')
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('fexc = fut.exception()', exc)
             detail = ' '.join(parts)
         except Exception:
             detail = ''
@@ -776,12 +784,12 @@ def install_asyncio_noise_filter():
             return
         try:
             loop_.default_exception_handler(context)
-        except Exception:
-            pass
+        except Exception as exc:
+            _swallow_exc('loop_.default_exception_handler(context)', exc)
     try:
         loop.set_exception_handler(_handler)
-    except Exception:
-        pass
+    except Exception as exc:
+        _swallow_exc('loop.set_exception_handler(_handler)', exc)
 
 def check_file_bom(file_path, auto_fix=False):
     try:
@@ -934,8 +942,8 @@ def check_features(version):
 for _stream in (sys.stdout, sys.stderr):
     try:
         _stream.reconfigure(encoding='utf-8', errors='replace')
-    except (AttributeError, Exception):
-        pass
+    except (AttributeError, Exception) as exc:
+        _swallow_exc('_stream.reconfigure(encoding="utf-8", errors="replace")', exc)
 
 TIMEOUT_CONFIG = {
     'socket_connect': int(os.environ.get('TIMEOUT_SOCKET_CONNECT', '5')),
@@ -945,6 +953,7 @@ TIMEOUT_CONFIG = {
     'subprocess_kill': int(os.environ.get('TIMEOUT_SUBPROCESS_KILL', '3')),
     'subprocess_wait': int(os.environ.get('TIMEOUT_SUBPROCESS_WAIT', '10')),
     'subprocess_run': int(os.environ.get('TIMEOUT_SUBPROCESS_RUN', '30')),
+    'subprocess_short': int(os.environ.get('TIMEOUT_SUBPROCESS_SHORT', '5')),
     'browser_page_load': int(os.environ.get('TIMEOUT_BROWSER_PAGE_LOAD', '30')),
     'browser_page_load_long': int(os.environ.get('TIMEOUT_BROWSER_PAGE_LOAD_LONG', '60')),
     'browser_element_click': int(os.environ.get('TIMEOUT_BROWSER_ELEMENT_CLICK', '1')),
@@ -1617,8 +1626,8 @@ def safe_log(logger_obj, level: str, message: str, **kwargs):
     except Exception as e:  # [HANDLED]
         try:
             logger_obj.error(f'安全日志记录失败: {sanitize_log_input(str(e))}')
-        except Exception:
-            pass
+        except Exception as exc:
+            _swallow_exc('logger_obj.error(f"安全日志记录失败: {sanitize_log_input(str(e))}")', exc)
             
 def timing_safe_compare(a: str, b: str) -> bool:
     """时间安全比较函数 - 防止时序攻击（Timing Attack）
@@ -1781,8 +1790,8 @@ def _is_safe_url(url: str) -> bool:
 
         try:
             ip = ipaddress.ip_address(hostname)
-        except ValueError:
-            pass
+        except ValueError as exc:
+            _swallow_exc('ip = ipaddress.ip_address(hostname)', exc)
         else:
             forbidden_ranges = [
                 ipaddress.ip_network('10.0.0.0/8'),
@@ -1900,8 +1909,8 @@ def safe_urlopen(url_or_req, timeout=None, context=None):
         if response:
             try:
                 response.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('response.close()', exc)
                 
         return None, error_msg
 
@@ -1991,8 +2000,8 @@ def _fetch_media_bytes(url: str) -> Tuple[Optional[bytes], str, str]:
     finally:
         try:
             resp.close()
-        except Exception:  # [HANDLED]
-            pass
+        except Exception as exc:  # [HANDLED]
+            _swallow_exc('resp.close()', exc)
     if not data:
         return None, '', '内容为空'
     if len(data) > _MEDIA_FILE_MAX_BYTES:
@@ -2435,8 +2444,8 @@ def _abbreviate_home(path):
             return '~'
         if home and os.path.commonpath([norm, home]) == home:
             return '~' + os.sep + os.path.relpath(norm, home)
-    except Exception:  # [HANDLED]
-        pass
+    except Exception as exc:  # [HANDLED]
+        _swallow_exc('os.path.commonpath 归一化', exc)
     return path
 
 
@@ -2459,8 +2468,8 @@ def _read_download_dir_config():
                 data = json.load(f)
             if isinstance(data, dict) and isinstance(data.get('dir'), str) and data['dir'].strip():
                 return os.path.expanduser(data['dir'].strip())
-        except Exception:  # [HANDLED]
-            pass
+        except Exception as exc:  # [HANDLED]
+            _swallow_exc('读取 legacy download_settings.json', exc)
     return ''
 
 
@@ -3081,8 +3090,8 @@ def _resolve_product_folder(base_dir: str, folder_name: str, product_id: str) ->
         try:
             if not os.listdir(root):
                 return root
-        except Exception:  # [HANDLED]
-            pass
+        except Exception as exc:  # [HANDLED]
+            _swallow_exc('探测可写目录', exc)
     tail = f'{base_name}-{str(product_id)[-6:]}'
     return os.path.join(base_dir, rel_dir, tail) if rel_dir else os.path.join(base_dir, tail)
 
@@ -3439,8 +3448,8 @@ def fetch_album_api_page(full_url, headers, cookie_str, timeout=_ALBUM_API_TIMEO
             if retry_after:
                 try:
                     wait_seconds = max(wait_seconds, min(float(retry_after), _ALBUM_RATE_LIMIT_MAX_DELAY))
-                except (TypeError, ValueError):
-                    pass
+                except (TypeError, ValueError) as exc:
+                    _swallow_exc('wait_seconds = max(wait_seconds, min(float(retry_after), _AL', exc)
             wait_seconds += random.uniform(0, 0.5)
             with _album_rate_limit_lock:
                 _album_rate_limit_hits += 1
@@ -3461,8 +3470,8 @@ def fetch_album_api_page(full_url, headers, cookie_str, timeout=_ALBUM_API_TIMEO
         if retry_after:
             try:
                 wait_seconds = max(wait_seconds, min(float(retry_after), 30.0))
-            except (TypeError, ValueError):
-                pass
+            except (TypeError, ValueError) as exc:
+                _swallow_exc('wait_seconds = max(wait_seconds, min(float(retry_after), 30.', exc)
         logger.debug(f'  [重试] 第{general_attempts}/{max_retries}次请求失败({last_error})，{wait_seconds:.1f}秒后重试')
         time.sleep(wait_seconds)
         general_delay = min(general_delay * 2, 16.0)
@@ -3959,6 +3968,21 @@ def format_size(size_bytes: int) -> str:
         size_bytes /= 1024.0
     return f"{size_bytes:.2f} PB"
 
+
+def _folder_size(path: Path) -> int:
+    """递归统计文件夹内所有文件的总大小（跳过符号链接，避免把链接目标的大小算进来）"""
+    total = 0
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            file_path = Path(root) / name
+            try:
+                if file_path.is_symlink():
+                    continue
+                total += file_path.stat().st_size
+            except OSError:
+                continue
+    return total
+
 def setup_logger(log_file: Optional[str] = None, log_level: int = logging.INFO, stream=None) -> logging.Logger:
     logger = logging.getLogger('FileCleaner')
     logger.setLevel(log_level)
@@ -4396,12 +4420,20 @@ def clean_all_files(
 
     total_files = len(files_to_delete)
     total_folders = len(folders_to_delete)
-    total_size = sum(
+    folder_sizes = {
+        folder: safe_call(lambda f=folder: _folder_size(f), default=0, context='clean_all_files获取文件夹大小')
+        for folder in folders_to_delete
+    }
+    total_file_size = sum(
         safe_call(lambda f=item: f.stat().st_size, default=0, context='clean_all_files获取文件大小')
         for item in files_to_delete
     )
+    total_folder_size = sum(folder_sizes.values())
+    total_size = total_file_size + total_folder_size
 
     logger.info(f"找到 {total_files} 个文件和 {total_folders} 个文件夹")
+    logger.info(f"  - 文件大小: {format_size(total_file_size)}")
+    logger.info(f"  - 文件夹大小: {format_size(total_folder_size)}")
     logger.info(f"  - 总大小: {format_size(total_size)}")
 
     if not files_to_delete and not folders_to_delete:
@@ -4420,7 +4452,7 @@ def clean_all_files(
     if folders_to_delete:
         logger.info("\n将要删除的文件夹列表：")
         for i, folder in enumerate(folders_to_delete, 1):
-            logger.info(f"{i:3d}. {folder.name}")
+            logger.info(f"{i:3d}. {folder.name} ({format_size(folder_sizes.get(folder, 0))})")
 
     if dry_run:
         logger.info("\n[测试模式] 未实际删除文件和文件夹")
@@ -4454,14 +4486,14 @@ def clean_all_files(
                                     ['cmd', '/c', 'del', '/f', '/q', str(file)],
                                     check=True,
                                     capture_output=True,
-                                    timeout=5
+                                    timeout=TIMEOUT_CONFIG['subprocess_short']
                                 )
                             else:
                                 subprocess.run(
                                     ['rm', '-f', str(file)],
                                     check=True,
                                     capture_output=True,
-                                    timeout=5
+                                    timeout=TIMEOUT_CONFIG['subprocess_short']
                                 )
                         except Exception as e:
                             raise PermissionError(f"无法删除文件（可能被占用或权限不足）: {file.name}") from e
@@ -4471,17 +4503,20 @@ def clean_all_files(
                 deleted_files_count += 1
                 deleted_size += file_size
                 logger.info(f"已删除文件: {file.name} ({format_size(file_size)})")
-            except Exception as e:
+            except Exception:
                 failed_count += 1
                 raise
 
     for folder in folders_to_delete:
         with ExceptionContext(f"删除文件夹 {folder.name}", default=False) as ctx:
+            folder_size = folder_sizes.get(folder, 0)
             shutil.rmtree(folder, onerror=_rmtree_onerror)
-            deleted_folders_count += 1
-            logger.info(f"已删除文件夹: {folder.name}")
             if ctx.error:
                 failed_count += 1
+            else:
+                deleted_folders_count += 1
+                deleted_size += folder_size
+                logger.info(f"已删除文件夹: {folder.name} ({format_size(folder_size)})")
 
     logger.info("\n" + "=" * 60)
     logger.info("清理完成")
@@ -4782,8 +4817,8 @@ def get_version_from_readme():
         if packaging_version is not None:
             try:
                 return str(max(all_versions, key=lambda v: packaging_version.parse(v)))
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('return str(max(all_versions, key=lambda v: packaging_version', exc)
         best = all_versions[0]
         for v in all_versions[1:]:
             parts_a = [int(x) for x in best.split('.')]
@@ -5127,12 +5162,12 @@ class Environment:
                 finally:
                     try:
                         resp.close()
-                    except Exception:
-                        pass
-            except urllib.error.HTTPError as e:
+                    except Exception as exc:
+                        _swallow_exc('resp.close()', exc)
+            except urllib.error.HTTPError:
                 elapsed_time = time.time() - start_time
                 return round(elapsed_time, 3)
-            except Exception as e:
+            except Exception:
                 if attempt < max_retries:
                     time.sleep(0.3)
                 else:
@@ -5649,8 +5684,8 @@ def _get_system_total_memory() -> int:
             result = subprocess.run(['sysctl', '-n', 'hw.memsize'], 
                                   capture_output=True, text=True)
             return int(result.stdout.strip())
-    except Exception:
-        pass
+    except Exception as exc:
+        _swallow_exc('if Environment.IS_LINUX: with open("/proc/meminfo", "r") as ', exc)
     
     # 默认返回2GB
     return 2 * 1024 * 1024 * 1024
@@ -5858,14 +5893,14 @@ async def lifespan(app):
                 except Exception:
                     try:
                         cf_process.kill()
-                    except Exception:
-                        pass
-    except Exception:
-        pass
+                    except Exception as exc:
+                        _swallow_exc('cf_process.kill()', exc)
+    except Exception as exc:
+        _swallow_exc('with _cf_state_lock: if cf_process and cf_process.poll() is ', exc)
     try:
         _blocking_io_executor.shutdown(wait=False)
-    except Exception:
-        pass
+    except Exception as exc:
+        _swallow_exc('_blocking_io_executor.shutdown(wait=False)', exc)
     logger.info("[shutdown] 清理完成")
 
 # 依赖自愈：用系统Python直接启动时，fastapi/uvicorn可能只装在项目虚拟环境里，
@@ -6452,8 +6487,8 @@ def run_command_background(task_id, command):
             try:
                 for _l in process.stdout:
                     _line_q.put(_l)
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('for _l in process.stdout: _line_q.put(_l)', exc)
 
         _reader_t = threading.Thread(target=_read_stdout, daemon=True)
         _reader_t.start()
@@ -6462,8 +6497,8 @@ def run_command_background(task_id, command):
             if process.poll() is not None:
                 try:
                     _reader_t.join(timeout=2)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('_reader_t.join(timeout=2)', exc)
                 while not _line_q.empty():
                     try:
                         stdout_lines.append(_line_q.get_nowait())
@@ -6493,8 +6528,8 @@ def run_command_background(task_id, command):
             try:
                 process.kill()
                 process.wait(timeout=5)
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('process.kill()', exc)
         with _tasks_lock:
             tasks[task_id]['returncode'] = process.returncode
             final_output = ''.join(stdout_lines)
@@ -6869,8 +6904,8 @@ class PathManager:
             finally:
                 try:
                     response.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('response.close()', exc)
                 
         except urllib.error.HTTPError as e:
             if e.code in [401, 403, 404, 405]:
@@ -6902,8 +6937,8 @@ class PathManager:
             finally:
                 try:
                     response.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('response.close()', exc)
                 
         except urllib.error.HTTPError as e:
             if e.code in [401, 403, 404, 405]:
@@ -6941,8 +6976,8 @@ class PathManager:
             if sock is not None:
                 try:
                     sock.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('sock.close()', exc)
     
     @staticmethod
     def _sync_url_to_tunnel_file(url):
@@ -7167,8 +7202,8 @@ class PathManager:
             if s is not None:
                 try:
                     s.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('s.close()', exc)
 
     @staticmethod
     def _interface_lan_ip():
@@ -7900,8 +7935,8 @@ class FileManager:
                     os.rename(tmp_path, file_path)
                 try:
                     os.remove(tmp_path)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('os.remove(tmp_path)', exc)
                 return True
         except Exception:
             raise last_error
@@ -7933,8 +7968,8 @@ class FileManager:
                 if os.path.exists(tmp_path):
                     try:
                         os.remove(tmp_path)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('os.remove(tmp_path)', exc)
                 raise
 
     @staticmethod
@@ -7951,8 +7986,8 @@ class FileManager:
                 if os.path.exists(tmp_path):
                     try:
                         os.remove(tmp_path)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('os.remove(tmp_path)', exc)
                 raise
 
     @staticmethod
@@ -7975,8 +8010,8 @@ class FileManager:
                 if os.path.exists(tmp_path):
                     try:
                         os.remove(tmp_path)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('os.remove(tmp_path)', exc)
                 raise
 
     @staticmethod
@@ -8291,8 +8326,8 @@ class WegoScraper:
                             price_value = int(price_match.group(1).replace(',', ''))
                             if 100 <= price_value <= 50000:
                                 return '¥' + price_match.group(1)
-                        except (ValueError, TypeError):
-                            pass
+                        except (ValueError, TypeError) as exc:
+                            _swallow_exc('price_value = int(price_match.group(1).replace(",", ""))', exc)
                             
                     return None
                 except Exception as e:  # [HANDLED]
@@ -8309,8 +8344,8 @@ class WegoScraper:
                             cost_value = int(cost_match.group(1).replace(',', ''))
                             if cost_value > 50:
                                 return '¥' + cost_match.group(1)
-                        except (ValueError, TypeError):
-                            pass
+                        except (ValueError, TypeError) as exc:
+                            _swallow_exc('cost_value = int(cost_match.group(1).replace(",", ""))', exc)
                             
                     cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', text)
                     if cost_match2:
@@ -8318,8 +8353,8 @@ class WegoScraper:
                             cost_value = int(cost_match2.group(1).replace(',', ''))
                             if cost_value > 50:
                                 return '¥' + cost_match2.group(1)
-                        except (ValueError, TypeError):
-                            pass
+                        except (ValueError, TypeError) as exc:
+                            _swallow_exc('cost_value = int(cost_match2.group(1).replace(",", ""))', exc)
                             
                     if html:
                         html_cost_match = re.search(r'拿货价[：:]\s*¥?\s*([\d,]+)', html)
@@ -8328,8 +8363,8 @@ class WegoScraper:
                                 cost_value = int(html_cost_match.group(1).replace(',', ''))
                                 if cost_value > 50:
                                     return '¥' + html_cost_match.group(1)
-                            except (ValueError, TypeError):
-                                pass
+                            except (ValueError, TypeError) as exc:
+                                _swallow_exc('cost_value = int(html_cost_match.group(1).replace(",", ""))', exc)
                                 
                         html_cost_match2 = re.search(r'拿货价\s*[：:]\s*([\d,]+)', html)
                         if html_cost_match2:
@@ -8337,8 +8372,8 @@ class WegoScraper:
                                 cost_value = int(html_cost_match2.group(1).replace(',', ''))
                                 if cost_value > 50:
                                     return '¥' + html_cost_match2.group(1)
-                            except (ValueError, TypeError):
-                                pass
+                            except (ValueError, TypeError) as exc:
+                                _swallow_exc('cost_value = int(html_cost_match2.group(1).replace(",", ""))', exc)
                                 
                     return None
                 except Exception as e:  # [HANDLED]
@@ -8511,8 +8546,8 @@ class WegoScraper:
             try:
                 current_url = self.config_manager.get_target_url()
                 logger.debug(f'  使用target_url作为备选: {current_url}')
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('current_url = self.config_manager.get_target_url()', exc)
         album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
         
         try:
@@ -8870,8 +8905,8 @@ class WegoScraper:
             try:
                 current_url = self.config_manager.get_target_url()
                 logger.debug(f'  使用target_url作为备选: {current_url}')
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('current_url = self.config_manager.get_target_url()', exc)
         album_id = '_du7mJco53PgiClrX_onUY7Hs5F3Mez8q5_nMrFQ'
         
         try:
@@ -9192,8 +9227,8 @@ class WegoScraper:
                 if time_stamp:
                     try:
                         created_time = datetime.fromtimestamp(int(time_stamp) / 1000).strftime('%Y-%m-%d %H:%M:%S')
-                    except (ValueError, TypeError, OSError):
-                        pass
+                    except (ValueError, TypeError, OSError) as exc:
+                        _swallow_exc('created_time = datetime.fromtimestamp(int(time_stamp) / 1000', exc)
                         
                 try:
                     sale_price_int = int(sale_price) if sale_price is not None else None
@@ -9360,8 +9395,8 @@ class WegoScraper:
                 try:
                     sell_price = float(str(product['售价']).replace('¥', '').replace(',', '').strip())
                     total_sell_price += sell_price
-                except (ValueError, TypeError):
-                    pass
+                except (ValueError, TypeError) as exc:
+                    _swallow_exc('sell_price = float(str(product["售价"]).replace("¥", "").repla', exc)
                     
             if '拿货价' in product:
                 try:
@@ -9369,8 +9404,8 @@ class WegoScraper:
                     if cost_price_str:  # 确保不是空字符串
                         cost_price = float(cost_price_str)
                         total_cost_price += cost_price
-                except (ValueError, TypeError):
-                    pass
+                except (ValueError, TypeError) as exc:
+                    _swallow_exc('cost_price_str = str(product["拿货价"]).replace("¥", "").replac', exc)
                     
             # 计算闲鱼平台手续费（售价 * 1.6%）
             if sell_price > 0:
@@ -10714,8 +10749,8 @@ def select_pip_mirror(venv_path: str):
                 finally:
                     try:
                         resp.close()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('resp.close()', exc)
             except urllib.error.HTTPError as e:
                 elapsed = round(time.time() - start, 3)
                 logger.debug(f'    [~] {name}: HTTP {e.code} ({elapsed}s)')
@@ -10829,8 +10864,8 @@ def install_playwright_cdn():
                 if resp:
                     try:
                         resp.close()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('resp.close()', exc)
             return round(time.time() - start, 3)
         except urllib.error.HTTPError:
             return round(time.time() - start, 3)
@@ -11030,8 +11065,8 @@ def graceful_shutdown():
     # 4. 刷新日志
     try:
         logging.shutdown()
-    except Exception:
-        pass
+    except Exception as exc:
+        _swallow_exc('logging.shutdown()', exc)
     
     _module_logger.info("✅ 服务器已安全关闭")
     _module_logger.info("=" * 60)
@@ -11547,8 +11582,8 @@ class DependencyAuditor:
         if packaging_version is not None:
             try:
                 return packaging_version.parse(v1)<packaging_version.parse(v2)
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as exc:
+                _swallow_exc('return packaging_version.parse(v1)<packaging_version.parse(v', exc)
         p1=[int(x) for x in v1.split('.') if x.isdigit()]
         p2=[int(x) for x in v2.split('.') if x.isdigit()]
         for i in range(max(len(p1),len(p2))):
@@ -11606,8 +11641,8 @@ if __name__ == '__main__':
                 try:
                     import msvcrt
                     os.set_handle_inheritable(msvcrt.get_osfhandle(_fh.fileno()), True)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('import msvcrt', exc)
             _origin = sys.stderr
 
             class _TeeStderr:
@@ -11619,8 +11654,8 @@ if __name__ == '__main__':
                     try:
                         if self._origin is not None:
                             self._origin.write(data)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('if self._origin is not None: self._origin.write(data)', exc)
                     return len(data)
 
                 def writelines(self, lines):
@@ -11632,8 +11667,8 @@ if __name__ == '__main__':
                         try:
                             if s is not None:
                                 s.flush()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _swallow_exc('if s is not None: s.flush()', exc)
 
                 def fileno(self):
                     return self._fh.fileno()
@@ -11661,8 +11696,8 @@ if __name__ == '__main__':
 
             sys.stderr = _TeeStderr(_origin, _fh)
             _normalize_stdio_for_subprocess._installed = True
-        except Exception:
-            pass
+        except Exception as exc:
+            _swallow_exc('_log_dir = PathManager.get_file_dir()', exc)
 
     _normalize_stdio_for_subprocess()
 
@@ -11700,8 +11735,8 @@ if __name__ == '__main__':
             try:
                 with open(_wd_crash_log, 'a', encoding='utf-8') as f:
                     f.write(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {reason}\n")
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('with open(_wd_crash_log, "a", encoding="utf-8") as f: f.writ', exc)
 
         def _wd_kill_proc(proc):
             if not proc:
@@ -11713,26 +11748,26 @@ if __name__ == '__main__':
                     for c in children:
                         try:
                             c.terminate()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _swallow_exc('c.terminate()', exc)
                     try:
                         p.terminate()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('p.terminate()', exc)
                     gone, alive = psutil.wait_procs(children + [p], timeout=5)
                     for a in alive:
                         try:
                             a.kill()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _swallow_exc('a.kill()', exc)
                 else:
                     proc.terminate()
                     try:
                         proc.wait(timeout=5)
                     except subprocess.TimeoutExpired:
                         proc.kill()
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('if psutil: p = psutil.Process(proc.pid) children = p.childre', exc)
 
         def _wd_check_memory(proc):
             if not psutil or not proc:
@@ -11742,8 +11777,8 @@ if __name__ == '__main__':
                 if mem_mb > _wd_max_memory_mb:
                     logger.warning(f"[watchdog] 内存超限: {mem_mb:.0f}MB > {_wd_max_memory_mb}MB")
                     return True
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('mem_mb = psutil.Process(proc.pid).memory_info().rss / (1024 ', exc)
             return False
 
         _wd_sub_cmd = [sys.executable, os.path.abspath(__file__)]
@@ -12122,8 +12157,8 @@ if __name__ == '__main__':
                     logger.debug(f"停止CF Tunnel时异常: {e}")
                     try:
                         cf_process.kill()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('cf_process.kill()', exc)
         
         try:
             signal.signal(signal.SIGINT, signal_handler)
@@ -12163,8 +12198,8 @@ if __name__ == '__main__':
             try:
                 if int(content_length) > 10 * 1024 * 1024:
                     return JSONResponse(status_code=413, content={'error': '请求体过大（最大10MB）'}, headers=_no_store_headers())
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError) as exc:
+                _swallow_exc('if int(content_length) > 10 * 1024 * 1024: return JSONRespon', exc)
             
             # 频率限制: 对高频轮询接口进行限流（防止过度轮询打崩服务器）
             # 按"IP + 接口分桶"计数，避免隧道状态轮询与任务输出轮询互相挤占配额
@@ -12747,11 +12782,11 @@ if __name__ == '__main__':
                 process.stdin.write(user_input + '\n')
                 process.stdin.flush()
                 return JSONResponse(content={'success': True, 'message': '输入已发送'})
-            except (BrokenPipeError, OSError, ValueError) as e:
+            except (BrokenPipeError, OSError, ValueError):
                 with _processes_lock:
                     processes.pop(task_id, None)
                 raise HTTPException(status_code=500, detail='进程已结束，无法发送输入')
-            except Exception as e:
+            except Exception:
                 raise HTTPException(status_code=500, detail='Internal server error')
 
         @app.post('/kill')  # [SECURED]
@@ -12861,7 +12896,7 @@ if __name__ == '__main__':
                 }, headers=_no_store_headers())
             except HTTPException:
                 raise
-            except Exception as e:  # [HANDLED]
+            except Exception:  # [HANDLED]
                 raise HTTPException(status_code=500, detail='Internal server error')
 
         @app.get('/api/sku/compare')  # [SECURED]
@@ -12906,7 +12941,7 @@ if __name__ == '__main__':
                 return JSONResponse(content=result)
             except HTTPException:
                 raise
-            except Exception as e:  # [HANDLED]
+            except Exception:  # [HANDLED]
                 error_detail = 'Internal server error'
                 logger.debug(f'get_daily_profit错误: {error_detail}')
                 raise HTTPException(status_code=500, detail='Internal server error')
@@ -12939,8 +12974,8 @@ if __name__ == '__main__':
                     try:
                         if int(content_length) > 1024 * 1024:
                             return jsonify({'error': '请求体过大（最大1MB）'}, status_code=413)
-                    except (ValueError, TypeError):
-                        pass
+                    except (ValueError, TypeError) as exc:
+                        _swallow_exc('if int(content_length) > 1024 * 1024: return jsonify({"error', exc)
                     try:
                         req_data = await request.json()  # [SECURITY] VALIDATED
                     except Exception as json_err:
@@ -13327,8 +13362,8 @@ if __name__ == '__main__':
                             fee = price * 0.016
                             total_fee += fee
                             valid_price_count += 1
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('price_str = p.get("售价", "") or p.get("price", "")', exc)
                         
 
                     # 累加拿货价（成本）
@@ -13339,8 +13374,8 @@ if __name__ == '__main__':
                             cost = float(cost_clean)
                             if cost > 0:
                                 total_cost_price += cost
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        _swallow_exc('cost_str = p.get("拿货价", "") or p.get("cost_price", "") or p.', exc)
 
                 avg_price = total_price / valid_price_count if valid_price_count > 0 else 0
                 
@@ -13504,8 +13539,8 @@ if __name__ == '__main__':
                                             '日期': record_date_str,
                                             '备注': remark
                                         })
-                                    except (ValueError, TypeError, IndexError):
-                                        pass
+                                    except (ValueError, TypeError, IndexError) as exc:
+                                        _swallow_exc('amount = float(str(row_data[1] or 0).replace("¥", "").replac', exc)
                                         
                             wb.close()
                             break
@@ -13621,8 +13656,8 @@ if __name__ == '__main__':
                 def safe_print(*args, **kwargs):
                     try:
                         logger.debug(*args, **kwargs)
-                    except (IOError, OSError):
-                        pass
+                    except (IOError, OSError) as exc:
+                        _swallow_exc('logger.debug(*args, **kwargs)', exc)
                         
                 safe_print(f'开始处理 {len(products)} 个商品...')
                 
@@ -15641,8 +15676,8 @@ if __name__ == '__main__':
                     finally:
                         try:
                             response.close()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _swallow_exc('response.close()', exc)
                 except Exception as e:  # [HANDLED]
                     if verbose:
                         logger.debug(f"[Email] URL验证失败 (第{attempt+1}/{max_retries}次): {url} - {str(e)[:100]}")
@@ -15674,13 +15709,13 @@ if __name__ == '__main__':
                     if resp:
                         try:
                             resp.close()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _swallow_exc('resp.close()', exc)
                 with _tunnel_state_lock:
                     tunnel_last_heartbeat = time.time()
                     tunnel_heartbeat_failed = False
                 return True
-            except Exception as e:  # [HANDLED]
+            except Exception:  # [HANDLED]
                 with _tunnel_state_lock:
                     tunnel_heartbeat_failed = True
                 return False
@@ -16128,7 +16163,7 @@ if __name__ == '__main__':
                                     buffer = buffer[-500:]
                             else:
                                 time.sleep(0.1)
-                        except Exception as e:  # [HANDLED]
+                        except Exception:  # [HANDLED]
                             time.sleep(0.1)
 
                 read_thread = threading.Thread(target=read_output, daemon=True)
@@ -16600,8 +16635,8 @@ ingress:
                         try:
                             for _l in _proc.stdout:
                                 _line_q.put(_l)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _swallow_exc('for _l in _proc.stdout: _line_q.put(_l)', exc)
 
                     _reader_t = threading.Thread(target=_cf_read_stdout, daemon=True)
                     _reader_t.start()
@@ -16615,8 +16650,8 @@ ingress:
                         if _proc.poll() is not None:
                             try:
                                 _reader_t.join(timeout=2)
-                            except Exception:
-                                pass
+                            except Exception as exc:
+                                _swallow_exc('_reader_t.join(timeout=2)', exc)
                             while not _line_q.empty():
                                 try:
                                     _captured.append(_line_q.get_nowait())
@@ -16654,7 +16689,7 @@ ingress:
                                     _sock.close()
 
                             try:
-                                _result = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq cloudflared.exe'], capture_output=True, text=True, timeout=5)
+                                _result = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq cloudflared.exe'], capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_short'])
                                 if 'cloudflared.exe' in _result.stdout:
                                     log_print(f"[Cloudflare] ⚠️ 检测到其他 cloudflared 进程正在运行:\n{_result.stdout}")
                                 else:
@@ -16703,8 +16738,8 @@ ingress:
                     except Exception:
                         try:
                             _proc.kill()
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _swallow_exc('_proc.kill()', exc)
 
                 except Exception as e:  # [HANDLED]
                     log_print(f'[Cloudflare] ❌ Plan B 第{attempt + 1}次尝试异常: {type(e).__name__}: {e}')
@@ -16823,8 +16858,8 @@ ingress:
                                 except Exception:
                                     try:
                                         _old_proc.kill()
-                                    except Exception:
-                                        pass
+                                    except Exception as exc:
+                                        _swallow_exc('_old_proc.kill()', exc)
                             
                             with _cf_state_lock:
                                 cf_url = None
@@ -17252,8 +17287,8 @@ ingress:
             if s is not None:
                 try:
                     s.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('s.close()', exc)
         
         logger.debug("=" * 50)
         logger.debug("Szwego商品爬虫 - Web服务")

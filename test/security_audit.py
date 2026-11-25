@@ -35,6 +35,15 @@ if sys.stdout.encoding != 'utf-8':
 if sys.stderr.encoding != 'utf-8':
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
+
+def _swallow_exc(context: str, exc: BaseException) -> None:
+    """吞掉可忽略异常：统一记录上下文，禁止静默 pass（阿里规范例外处理条款）"""
+    try:
+        print(f"    ℹ️  [忽略异常] {context}: {type(exc).__name__}: {exc}", file=sys.stderr)
+    except Exception:
+        return
+
+
 try:
     # 可选依赖：仅在 Windows 下做 Salt 文件 ACL 细粒度检查时使用，缺失时降级跳过
     import ntsecuritycon as con
@@ -516,8 +525,8 @@ class SecurityAuditor:
             for fut in as_completed(futures):
                 try:
                     fut.result()
-                except Exception as e:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('并发扫描任务结果', exc)
 
         self._scan_data_contract_bugs()
 
@@ -1044,8 +1053,8 @@ class SecurityAuditor:
                                 recommendation="确保事件监听器/DOM节点/缓存在不再需要时及时清理",
                                 code_snippet=pattern[:80]
                             ))
-            except Exception as e:
-                pass
+            except Exception as exc:
+                _swallow_exc('内存泄漏扫描', exc)
 
         print("  ✅ 内存泄漏检测完成")
 
@@ -1196,7 +1205,7 @@ class SecurityAuditor:
 
                     except ImportError:
                         # pywin32未安装，跳过详细检查（这是正常的，不是安全问题）
-                        pass
+                        pass  # [SILENT_OK] 可选依赖缺失属能力探测，非异常吞没
                     except Exception as perm_error:
                         # 权限检查失败但不影响主流程
                         print(f"    ℹ️  Windows权限详细检查跳过: {perm_error}")
@@ -1230,8 +1239,8 @@ class SecurityAuditor:
                         recommendation="重新初始化加密系统: `py salt_crypto_tool.py init --password NEW_PASSWORD`",
                         code_snippet=f"Salt size: {salt_size} bytes (expected 16)"
                     ))
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('Salt 文件大小检查', exc)
 
         # 检查4: Key文件存在性
         if not key_file.exists():
@@ -1412,8 +1421,8 @@ class SecurityAuditor:
             if log_handle:
                 try:
                     log_handle.close()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    _swallow_exc('关闭审计日志句柄', exc)
             self._add_issue(SecurityIssue(
                 severity='HIGH',
                 category='AttackDefense',
@@ -1456,11 +1465,12 @@ class SecurityAuditor:
         try:
             proc.terminate()
             proc.wait(timeout=10)
-        except Exception:
+        except Exception as exc:
+            _swallow_exc('终止审计临时服务', exc)
             try:
                 proc.kill()
-            except Exception:
-                pass
+            except Exception as exc:
+                _swallow_exc('强制杀死审计临时服务', exc)
 
     def _run_live_attack_defense_tests(self):
         """真实攻防验证：对运行中的服务发起黑盒攻击载荷，逐项校验防护是否生效"""

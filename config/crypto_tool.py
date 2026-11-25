@@ -34,7 +34,7 @@ def _configure_stdio() -> None:
         try:
             stream.reconfigure(encoding='utf-8', errors='replace')
         except (AttributeError, ValueError):
-            pass
+            pass  # [SILENT_OK] 不支持 reconfigure 的流保持原样，属可忽略能力探测
 
 
 class CryptoTool:

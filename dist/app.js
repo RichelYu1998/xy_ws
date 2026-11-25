@@ -50,12 +50,12 @@
                 .catch(function() {});
         })();
         
+        // 统一转交后续 showToast 实现，禁止使用 alert 阻断页面（阿里规范：禁止弹窗式阻塞提示）
         window.showToast = function(message, type, duration) {
-            console.log('[Toast-' + (type || 'info') + ']', message);
-            if (typeof duration === 'number' && typeof alert === 'function') {
-                setTimeout(function() {
-                    try { alert(message); } catch(e) {}
-                }, 100);
+            if (typeof showToast === 'function') {
+                showToast(message, type, duration);
+            } else {
+                console.warn('[Toast] 消息:', message);
             }
         };
 
@@ -1567,10 +1567,10 @@
         document.addEventListener('DOMContentLoaded', function() {
             
             document.addEventListener('click', function(e) {
-                    var skuLink = e.target.closest('.sku-link');
+                    const skuLink = e.target.closest('.sku-link');
                 if (skuLink) {
                     e.preventDefault();
-                    var sku = skuLink.dataset.sku;
+                    const sku = skuLink.dataset.sku;
                     if (sku) {
                         console.log('[按钮点击] 查看商品详情:', sku);
                         toggleLinkedHighlight(sku);
@@ -1578,11 +1578,11 @@
                     }
                     return;
                 }
-                var descLink = e.target.closest('.desc-link');
+                const descLink = e.target.closest('.desc-link');
                 if (descLink) {
                     e.preventDefault();
-                    var productId = descLink.dataset.id;
-                    var desc = descLink.dataset.desc;
+                    const productId = descLink.dataset.id;
+                    const desc = descLink.dataset.desc;
                     if (productId) {
                         console.log('[按钮点击] 按ID查看商品详情:', productId);
                         showProductById(productId);
@@ -1592,9 +1592,9 @@
                     }
                     return;
                 }
-                var summaryRow = e.target.closest('.summary-row');
+                const summaryRow = e.target.closest('.summary-row');
                 if (summaryRow) {
-                    var dateKey = summaryRow.dataset.date;
+                    const dateKey = summaryRow.dataset.date;
                     if (dateKey && typeof window.toggleProfitDetail === 'function') {
                         window.toggleProfitDetail(dateKey, summaryRow);
                         if (typeof window.highlightChartPoint === 'function') {
@@ -1607,10 +1607,10 @@
             fetch('/api/version')
                 .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
-                    var v = data.version || '...';
-                    var heroEl = document.getElementById('hero-version');
+                    const v = data.version || '...';
+                    const heroEl = document.getElementById('hero-version');
                     if (heroEl) heroEl.textContent = '版本: ' + v;
-                    var footerEl = document.getElementById('footer-version');
+                    const footerEl = document.getElementById('footer-version');
                     if (footerEl) footerEl.textContent = '版本: ' + v;
                 })
                 .catch(function(e) {
@@ -1626,12 +1626,12 @@
                         console.warn('[Dependencies] 无有效数据，保留页面静态清单');
                         return;
                     }
-                    var tbody = document.getElementById('deps-tbody');
+                    const tbody = document.getElementById('deps-tbody');
                     if (!tbody) return;
-                    var order = [];
-                    var grouped = {};
+                    const order = [];
+                    const grouped = {};
                     data.dependencies.forEach(function(dep) {
-                        var key = dep.category || '其他';
+                        const key = dep.category || '其他';
                         if (!grouped[key]) {
                             grouped[key] = [];
                             order.push(key);
@@ -1640,10 +1640,10 @@
                     });
                     tbody.innerHTML = '';
                     order.forEach(function(cat) {
-                        var items = grouped[cat];
+                        const items = grouped[cat];
                         items.forEach(function(dep, idx) {
-                            var tr = document.createElement('tr');
-                            var html = '';
+                            const tr = document.createElement('tr');
+                            let html = '';
                             if (idx === 0) {
                                 html += '<td rowspan="' + items.length + '">' + escapeHtml(cat) + '</td>';
                             }
@@ -1654,9 +1654,9 @@
                             tbody.appendChild(tr);
                         });
                     });
-                    var envEl = document.getElementById('env-requirements');
+                    const envEl = document.getElementById('env-requirements');
                     if (envEl && data.python) {
-                        var pyText = 'Python ' + data.python.min + '（语法基线';
+                        let pyText = 'Python ' + data.python.min + '（语法基线';
                         if (data.python.compat) {
                             pyText += '，兼容 ' + data.python.compat;
                         }
@@ -1681,27 +1681,27 @@
                             console.warn('[Changelog] 无有效数据');
                             return;
                         }
-                        var latest = data.changelog[0];
+                        const latest = data.changelog[0];
                         console.log('[Changelog] 最新版本:', latest.version);
 
-                        var titleEl = document.getElementById('changelog-title');
+                        const titleEl = document.getElementById('changelog-title');
                         if (titleEl) titleEl.textContent = '最新更新 (v' + latest.version + ')';
 
-                        var container = document.getElementById('changelog-container');
+                        const container = document.getElementById('changelog-container');
                         if (!container) return;
 
                         container.innerHTML = '';
-                        var verCard = document.createElement('div');
+                        const verCard = document.createElement('div');
                         verCard.style.cssText = 'margin-bottom: 15px; border-left: 3px solid #67c23a; padding-left: 12px;';
 
-                        var changes = latest.changes || latest.items || [];
+                        const changes = latest.changes || latest.items || [];
                         if (changes && changes.length) {
                             changes.forEach(function(item, idx) {
                                 try {
-                                    var itemDiv = document.createElement('div');
+                                    const itemDiv = document.createElement('div');
                                     itemDiv.style.cssText = 'margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px dashed #ebeef5;';
 
-                                    var itemTitle = document.createElement('div');
+                                    const itemTitle = document.createElement('div');
                                     itemTitle.style.cssText = 'font-weight: 600; color: #303133; font-size: 14px; margin-bottom: 8px;';
                                     itemTitle.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a; margin-right: 4px;"></i>' +
                                         escapeHtml(item.title || '') +
@@ -1709,9 +1709,9 @@
                                     itemDiv.appendChild(itemTitle);
 
                                     if (item.problem && Object.keys(item.problem).length) {
-                                        var probDiv = document.createElement('div');
+                                        const probDiv = document.createElement('div');
                                         probDiv.style.cssText = 'padding: 8px 12px; background: #fef0f0; border-radius: 4px; margin-bottom: 6px; font-size: 13px; color: #606266; line-height: 1.7;';
-                                        var probHtml = '<div style="font-weight:600;color:#f56c6c;margin-bottom:4px;"><i class="fa fa-exclamation-triangle"></i> 问题描述</div>';
+                                        let probHtml = '<div style="font-weight:600;color:#f56c6c;margin-bottom:4px;"><i class="fa fa-exclamation-triangle"></i> 问题描述</div>';
                                         if (item.problem.phenomenon) probHtml += '<div><b>现象:</b> ' + escapeHtml(item.problem.phenomenon) + '</div>';
                                         if (item.problem.root_cause) probHtml += '<div><b>根因:</b> ' + escapeHtml(item.problem.root_cause) + '</div>';
                                         if (item.problem.scope) probHtml += '<div><b>影响范围:</b> ' + escapeHtml(item.problem.scope) + '</div>';
@@ -1720,9 +1720,9 @@
                                     }
 
                                     if (item.solution && Object.keys(item.solution).length) {
-                                        var solDiv = document.createElement('div');
+                                        const solDiv = document.createElement('div');
                                         solDiv.style.cssText = 'padding: 8px 12px; background: #f0f9ff; border-radius: 4px; margin-bottom: 6px; font-size: 13px; color: #606266; line-height: 1.7;';
-                                        var solHtml = '<div style="font-weight:600;color:#409EFF;margin-bottom:4px;"><i class="fa fa-wrench"></i> 修复方案</div>';
+                                        let solHtml = '<div style="font-weight:600;color:#409EFF;margin-bottom:4px;"><i class="fa fa-wrench"></i> 修复方案</div>';
                                         if (item.solution.implementation) solHtml += '<div><b>技术实现:</b> ' + escapeHtml(item.solution.implementation) + '</div>';
                                         if (item.solution.reference) solHtml += '<div><b>参考位置:</b> ' + escapeHtml(item.solution.reference) + '</div>';
                                         solDiv.innerHTML = solHtml;
@@ -1730,9 +1730,9 @@
                                     }
 
                                     if (item.verification && item.verification.length) {
-                                        var verList = document.createElement('div');
+                                        const verList = document.createElement('div');
                                         verList.style.cssText = 'padding: 8px 12px; background: #f0f9eb; border-radius: 4px; font-size: 13px; color: #606266; line-height: 1.7;';
-                                        var verHtml = '<div style="font-weight:600;color:#67c23a;margin-bottom:4px;"><i class="fa fa-check-square"></i> 测试验证</div>';
+                                        let verHtml = '<div style="font-weight:600;color:#67c23a;margin-bottom:4px;"><i class="fa fa-check-square"></i> 测试验证</div>';
                                         item.verification.forEach(function(v) {
                                             verHtml += '<div style="padding-left:16px;">✅ ' + escapeHtml(v) + '</div>';
                                         });
@@ -1760,7 +1760,7 @@
                         showToast('更新日志加载失败', 'warning');
                     }
                 });
-            var featureIcons = [
+            const featureIcons = [
                 {icon: 'fa-cloud-download', bg: '#e8f4fd', color: '#409EFF'},
                 {icon: 'fa-exchange', bg: '#fef0e6', color: '#e6a23c'},
                 {icon: 'fa-file-excel-o', bg: '#e6f7e6', color: '#67c23a'},
@@ -1776,18 +1776,18 @@
                 .then(function(response) { return safeParseJson(response); })
                 .then(function(data) {
                     if (!data.success) return;
-                    var featuresContainer = document.getElementById('features-container');
+                    const featuresContainer = document.getElementById('features-container');
                     if (featuresContainer && data.features && data.features.length) {
                         data.features.forEach(function(feat, idx) {
-                            var iconInfo = featureIcons[idx % featureIcons.length];
-                            var descParts = [];
+                            const iconInfo = featureIcons[idx % featureIcons.length];
+                            const descParts = [];
                             if (feat.items) {
                                 feat.items.forEach(function(item) {
                                     descParts.push(item.title + (item.desc ? ': ' + item.desc : ''));
                                 });
                             }
-                            var desc = descParts.join('，') || '';
-                            var col = document.createElement('div');
+                            const desc = descParts.join('，') || '';
+                            const col = document.createElement('div');
                             col.className = 'col-md-6 col-lg-4 mb-4';
                             col.innerHTML = '<div class="feature-card">'
                                 + '<div class="icon-wrapper" style="background: ' + iconInfo.bg + ';">'
@@ -1799,38 +1799,38 @@
                             featuresContainer.appendChild(col);
                         });
                     }
-                    var usageContainer = document.getElementById('usage-steps-container');
+                    const usageContainer = document.getElementById('usage-steps-container');
                     if (usageContainer && data.install_steps) {
                         usageContainer.innerHTML = '';
-                        var stepNum = 1;
+                        let stepNum = 1;
                         data.install_steps.forEach(function(step) {
-                            var h4 = document.createElement('h4');
+                            const h4 = document.createElement('h4');
                             h4.className = 'mt-4 mb-3';
                             h4.textContent = stepNum + '. ' + step.title;
                             usageContainer.appendChild(h4);
-                            var content = step.content || '';
-                            var codeBlocks = content.split('```');
-                            for (var ci = 0; ci < codeBlocks.length; ci++) {
+                            const content = step.content || '';
+                            const codeBlocks = content.split('```');
+                            for (let ci = 0; ci < codeBlocks.length; ci++) {
                                 if (ci % 2 === 1) {
-                                    var codeText = codeBlocks[ci].replace(/^[a-z]+\n/, '');
-                                    var codeDiv = document.createElement('div');
+                                    const codeText = codeBlocks[ci].replace(/^[a-z]+\n/, '');
+                                    const codeDiv = document.createElement('div');
                                     codeDiv.className = 'code-block';
-                                    var pre = document.createElement('pre');
+                                    const pre = document.createElement('pre');
                                     pre.textContent = codeText.trim();
                                     codeDiv.appendChild(pre);
                                     usageContainer.appendChild(codeDiv);
                                 } else {
-                                    var textLines = codeBlocks[ci].trim().split('\n');
+                                    const textLines = codeBlocks[ci].trim().split('\n');
                                     textLines.forEach(function(tl) {
                                         tl = tl.trim();
                                         if (!tl) return;
-                                        var mList = tl.match(/^-\s+\*\*(.+?)\*\*[:：]?\s*(.*)/);
+                                        const mList = tl.match(/^-\s+\*\*(.+?)\*\*[:：]?\s*(.*)/);
                                         if (mList) {
-                                            var li = document.createElement('p');
+                                            const li = document.createElement('p');
                                             li.innerHTML = '<i class="fa fa-check-circle" style="color: #67c23a;"></i> <strong>' + escapeHtml(  /* [ESCAPED] */mList[1]) + '</strong>' + (mList[2] ? ' - ' + escapeHtml(  /* [ESCAPED] */mList[2]) : '');
                                             usageContainer.appendChild(li);
                                         } else {
-                                            var p = document.createElement('p');
+                                            const p = document.createElement('p');
                                             p.textContent = tl;
                                             usageContainer.appendChild(p);
                                         }
@@ -2271,7 +2271,7 @@
                     console.log('[对比卡片] ✅ 面板已成功创建并插入DOM');
                 } else {
                     console.error('[对比卡片] ❌ 无法找到任何容器元素，无法创建爬虫结果面板');
-                    alert('错误：无法显示爬虫结果面板，请刷新页面重试');
+                    showToast('错误：无法显示爬虫结果面板，请刷新页面重试', 'error');
                     return;
                 }
             } else {
@@ -3662,7 +3662,7 @@
                         console.log('[Mobile] Screen width:', window.innerWidth, '=>', window.innerWidth <= 480 ? 'APPLYING mobile styles' : 'Skipping (PC mode)');
                         if (window.innerWidth <= 480) {
                             try {
-                                var card = document.querySelector('.comparison-card.products-card');
+                                const card = document.querySelector('.comparison-card.products-card');
                                 if (card) {
                                     card.setAttribute('style', 'padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;');
                                     console.log('[Mobile] ✅ Card styled, width:', card.offsetWidth);
@@ -3671,40 +3671,40 @@
                                     return;
                                 }
 
-                                var body = document.querySelector('.comparison-card.products-card .comparison-body');
+                                const body = document.querySelector('.comparison-card.products-card .comparison-body');
                                 if (body) {
                                     body.setAttribute('style', 'padding: 4px !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; overflow: hidden !important;');
                                     console.log('[Mobile] ✅ Body styled, width:', body.offsetWidth);
                                 }
 
-                                var stats = document.querySelector('.responsive-stats');
+                                const stats = document.querySelector('.responsive-stats');
                                 if (stats) {
                                     stats.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; gap: 0 !important;');
                                     console.log('[Mobile] ✅ Stats styled, width:', stats.offsetWidth);
                                 }
 
-                                var rows = document.querySelectorAll('.responsive-row');
+                                const rows = document.querySelectorAll('.responsive-row');
                                 console.log('[Mobile] ✅ Found', rows.length, 'rows');
                                 rows.forEach(function(row, idx) {
                                     row.setAttribute('style', 'display: block !important; padding: 0 !important; margin: 0 0 8px 0 !important; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important;');
                                 });
 
-                                var items = document.querySelectorAll('.responsive-item');
+                                const items = document.querySelectorAll('.responsive-item');
                                 console.log('[Mobile] ✅ Found', items.length, 'items');
                                 items.forEach(function(item, index) {
-                                    var marginBottom = (index < items.length - 1) ? '10px' : '0';
+                                    const marginBottom = (index < items.length - 1) ? '10px' : '0';
 
                                     // 保留原始颜色
-                                    var originalBg = item.style.background || item.style.backgroundColor || '';
-                                    var originalBorderLeftColor = item.style.borderLeftColor || '';
+                                    let originalBg = item.style.background || item.style.backgroundColor || '';
+                                    let originalBorderLeftColor = item.style.borderLeftColor || '';
 
                                     // 如果原始样式中没有，尝试从computed style获取
                                     if (!originalBg || originalBg === '') {
-                                        var computedStyle = window.getComputedStyle(item);
+                                        const computedStyle = window.getComputedStyle(item);
                                         originalBg = computedStyle.background || computedStyle.backgroundColor || '';
                                     }
                                     if (!originalBorderLeftColor || originalBorderLeftColor === '') {
-                                        var computedStyle2 = window.getComputedStyle(item);
+                                        const computedStyle2 = window.getComputedStyle(item);
                                         originalBorderLeftColor = computedStyle2.borderLeftColor || '';
                                     }
 
@@ -4402,12 +4402,12 @@
                 runButtons.forEach(function(btn) {
                     btn.onclick = function(e) {
                         e.preventDefault();
-                        var choice = this.getAttribute('data-func');
-                        var btnId = this.id || 'unknown';
+                        const choice = this.getAttribute('data-func');
+                        const btnId = this.id || 'unknown';
                         console.log('[按钮点击] id:', btnId, 'data-func:', choice);
-                        if (choice && choice != '6') {
+                        if (choice && choice !== '6') {
                             runFunction(parseInt(choice));
-                        } else if (choice == '6') {
+                        } else if (choice === '6') {
                             console.log('[功能6] 打开文件清理面板');
                             showCleanerPanel();
                         }
@@ -4475,8 +4475,8 @@
                 skuApiButtons.forEach(function(btn) {
                     btn.onclick = function(e) {
                         e.preventDefault();
-                        var apiUrl = this.getAttribute('data-api');
-                        var btnId = this.id || 'unknown';
+                        const apiUrl = this.getAttribute('data-api');
+                        const btnId = this.id || 'unknown';
                         console.log('[按钮点击] id:', btnId, 'api:', apiUrl);
 
                         if (apiUrl === '/api/sku/compare/txt') {
@@ -5082,7 +5082,7 @@
             if (wasVisible) {
                 detailRow.style.display = 'none';
                 allRows.forEach(function(row) {
-                    var icon = row.querySelector('.detail-toggle-icon');
+                    const icon = row.querySelector('.detail-toggle-icon');
                     if (icon) icon.className = 'fa fa-plus-circle detail-toggle-icon';
                     row.style.background = '';
                 });
@@ -5097,7 +5097,7 @@
                 detailContent = document.getElementById('detail-content-' + dateId);
                 detailRow.style.display = 'table-row';
                 allRows.forEach(function(row) {
-                    var icon = row.querySelector('.detail-toggle-icon');
+                    const icon = row.querySelector('.detail-toggle-icon');
                     if (icon) icon.className = 'fa fa-minus-circle detail-toggle-icon';
                     row.style.background = '#e6f0ff';
                 });
@@ -5376,11 +5376,11 @@
             }
             panel.style.display = 'block';
             
-            var dragHandle = panel.querySelector('.drag-handle');
+            const dragHandle = panel.querySelector('.drag-handle');
             if (dragHandle) {
-                var isDragging = false;
-                var dragStartX = 0, dragStartY = 0;
-                var panelStartX = 0, panelStartY = 0;
+                let isDragging = false;
+                let dragStartX = 0, dragStartY = 0;
+                let panelStartX = 0, panelStartY = 0;
                 
                 function onDragStart(clientX, clientY) {
                     isDragging = true;
@@ -5394,14 +5394,14 @@
                 
                 function onDragMove(clientX, clientY) {
                     if (!isDragging) return;
-                    var dx = clientX - dragStartX;
-                    var dy = clientY - dragStartY;
-                    var newLeft = panelStartX + dx;
-                    var newTop = panelStartY + dy;
-                    var vw = window.innerWidth;
-                    var vh = window.innerHeight;
-                    var pw = panel.offsetWidth;
-                    var ph = panel.offsetHeight;
+                    const dx = clientX - dragStartX;
+                    const dy = clientY - dragStartY;
+                    let newLeft = panelStartX + dx;
+                    let newTop = panelStartY + dy;
+                    const vw = window.innerWidth;
+                    const vh = window.innerHeight;
+                    const pw = panel.offsetWidth;
+                    const ph = panel.offsetHeight;
                     if (newLeft < 0) newLeft = 0;
                     if (newTop < 0) newTop = 0;
                     if (newLeft + pw > vw) newLeft = vw - pw;
@@ -5422,7 +5422,7 @@
                 };
                 dragHandle.ontouchstart = function(e) {
                     if (e.target.closest('span[onclick]')) return;
-                    var touch = e.touches[0];
+                    const touch = e.touches[0];
                     onDragStart(touch.clientX, touch.clientY);
                 };
                 
@@ -5433,7 +5433,7 @@
                 
                 window._profitPanelDragMove = function(e) { onDragMove(e.clientX, e.clientY); };
                 window._profitPanelDragEnd = onDragEnd;
-                window._profitPanelDragMoveTouch = function(e) { var t = e.touches[0]; onDragMove(t.clientX, t.clientY); };
+                window._profitPanelDragMoveTouch = function(e) { const t = e.touches[0]; onDragMove(t.clientX, t.clientY); };
                 
                 document.addEventListener('mousemove', window._profitPanelDragMove);
                 document.addEventListener('mouseup', window._profitPanelDragEnd);
@@ -5730,8 +5730,8 @@
         // 绑定货号对比API按钮
         document.querySelectorAll('.btn-sku-api').forEach(function(btn) {
             btn.onclick = function() {
-                var apiUrl = this.getAttribute('data-api');
-                var btnId = this.id || 'unknown';
+                const apiUrl = this.getAttribute('data-api');
+                const btnId = this.id || 'unknown';
                 console.log('[按钮点击] id:', btnId, 'api:', apiUrl);
                 
                 if (apiUrl === '/api/sku/compare/txt') {
@@ -6683,7 +6683,7 @@
                         });
                     }
                     // 动态设置版权年份
-                    var copyrightEl = document.getElementById('footer-copyright');
+                    const copyrightEl = document.getElementById('footer-copyright');
                     if (copyrightEl) {
                         copyrightEl.textContent = '\u00a9 ' + new Date().getFullYear() + ' Szwego爬虫. All rights reserved.';
                     }
@@ -6691,10 +6691,10 @@
                     if (data.version) {
                         document.title = 'Szwego商品爬虫 v' + data.version;
                     }
-                    var browserStatusEl = document.getElementById('browser-status');
+                    const browserStatusEl = document.getElementById('browser-status');
                     if (browserStatusEl) {
                         if (data.browser_ready) {
-                            var browserType = data.playwright_chromium ? 'Playwright Chromium' : '系统Chrome';
+                            const browserType = data.playwright_chromium ? 'Playwright Chromium' : '系统Chrome';
                             browserStatusEl.innerHTML = '<i class="fa fa-check-circle" style="color:#22c55e"></i> 浏览器就绪 (' + browserType + ')';
                         } else {
                             browserStatusEl.innerHTML = '<i class="fa fa-exclamation-triangle" style="color:#f59e0b"></i> 浏览器未就绪 (未检测到Chromium)';
