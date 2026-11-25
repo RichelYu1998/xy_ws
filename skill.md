@@ -18,7 +18,7 @@
 | 📂 项目结构 | 目录树与关键文件职责 |
 | ⚙️ 配置说明 | config.json 字段、加密与端口配置 |
 | 🔐 安全合规状态 | 加密存储与安全检查项 |
-| 🔴 阿里巴巴代码规范范式 (Alibaba Code Standard) (PY-CORE-003) | ALI-001~016 十六条款 + test/code_style_check.py 常驻检查，全部 .py 自动纳入、每次改动必跑 |
+| 🔴 阿里巴巴代码规范范式 (Alibaba Code Standard) (PY-CORE-003) | ALI-001~016 十六条款 + test/code_style_check.py 常驻闸门，全部 .py 自动纳入、每次改动必跑、`--selftest` 自检规则有效性 |
 | 📐 版本更新记录范式规范 (PY-CORE-012) | changelog 结构强制规范 |
 | 🔴 清理目录白名单保护范式 (PY-CORE-015) | 项目根/祖先目录硬拦截先于白名单授权 |
 | 🔴 配置热读取范式 (Configuration Hot Reload) (PY-CORE-016) | config/ 全部配置签名缓存、改完即生效无需重启 |
