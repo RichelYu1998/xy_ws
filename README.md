@@ -5218,7 +5218,7 @@ def _brand_match_pairs(entries):
 
 ---
 
-**文档版本**: v5.0.9.127  
+**文档版本**: v5.0.9.128  
 **最后更新**: 2026-11-25  
 **下次审查**: 2026-12-24  
 **维护者**: 小旭数码开发团队
@@ -5226,6 +5226,45 @@ def _brand_match_pairs(entries):
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.128 (2026-11-25) - 🐛 **隧道回退公网地址提取修复：`cloudflare:` 行与 `trycloudflare` 日志格式均可识别，hostc 不可达时公网地址不再丢失** - ① `get_public_url_from_web_log()` 策略1 增加 `cf_match` 优先级（`hostc` → `cloudflare` → 旧格式），权威源 `tunnel_url.txt` 中仅有 `cloudflare:` 行时也能提取；② 策略1 与备用源 `web_output.log` 的回退正则由单一 `hostc.dev` 扩展为 `hostc.dev | trycloudflare.com`，Cloudflare Quick Tunnel 日志可直接命中；③ 修复 hostc 域名不可达时 `tunnel_url.txt` 被写成空文件、`/api/tunnel/status` 顶层 `url` 为 `null` 的问题
+
+#### 更新内容: hostc 挂了也能拿到 CF 公网地址
+
+| 场景 | 旧做法 | 新做法 |
+|---|---|---|
+| `tunnel_url.txt` 仅含 `cloudflare:` 行 | 策略1 只认 `hostc:` / `Public URL:`，提取失败 | 增加 `cf_match` 优先级，直接读出 CF 地址 |
+| `web_output.log` 只有 `trycloudflare.com` | 备用源只匹配 `hostc.dev`，全部落空 | 回退正则兼容 `trycloudflare.com` |
+| hostc 域名不可达 | 权威源为空，顶层 `url` 为 `null` | CF 回退地址可被正确提取并回写 |
+
+```python
+if hostc_match:
+    candidate_url = hostc_match.group(1).rstrip('/')
+elif cf_match:
+    candidate_url = cf_match.group(1).rstrip('/')
+elif tunnel_match:
+    candidate_url = tunnel_match.group(1).rstrip('/')
+else:
+    candidate_url = None
+```
+
+##### 1. 🐛 隧道回退公网地址提取修复 (🐛Bug修复)
+
+**问题描述**:
+- **现象**: hostc 域名不可达回退 Cloudflare Quick Tunnel 时，`tunnel_url.txt` 被写成空文件，`/api/tunnel/status` 顶层 `url` 恒为 `null`，后端分享链接/邮件取不到公网地址（前端读 `cloudflare.url` 仍正常）
+- **根因**: `get_public_url_from_web_log()` 策略1 提取了 `cf_match` 却未参与选值，只认 `hostc:` 与 `Public URL:`；备用源回退正则只匹配 `hostc.dev`，匹配不到 `trycloudflare.com` 日志
+- **影响范围**: [main.py](main.py) `get_public_url_from_web_log()` 策略1 与备用源匹配段
+
+**修复方案**:
+- **技术实现**: 策略1 选值顺序改为 `hostc` → `cloudflare` → 旧格式；两处回退正则扩展为 `(?:hostc\.dev|trycloudflare\.com)`，CF 回退场景公网地址可正常提取
+- **参考位置**: [main.py](main.py#L6638-L6651) 策略1 选值，[main.py](main.py#L6734-L6736) 备用源匹配
+
+**测试验证**:
+- ✅ hostc 不可达、CF 回退时 `tunnel_url.txt` 正确写入 `cloudflare:` 地址，顶层 `url` 非空、`detailed_status` 为 `stable`
+- ✅ 局域网直连返回本地IP、`CF-Connecting-IP` / `X-Forwarded-For` 公网返回云端源地址、内网 XFF 返回本地IP
+- ✅ 真实公网隧道 `https://fixtures-sky-leu-dance.trycloudflare.com/api/product?sku=99639` 返回 `https://xcimg.szwego.com/...` 源地址
+
+---
 
 ### v5.0.9.127 (2026-11-25) - 🌐 **客户端IP归属媒体路由：局域网设备直读本地IP、公网设备直走云端源地址，修复保存本地后图片视频变黑** - ① 新增 `_client_ip_of()` 按 `CF-Connecting-IP` → `X-Forwarded-For` → 直连地址顺序取真实客户端IP，隧道转发场景不再误判；② 新增 `_is_private_client_ip()` 用 `ipaddress` 判定 `10/8` / `172.16/12` / `192.168/16` / 回环 / 链路本地为局域网（`100.64/10` 属运营商级 NAT，客户端不在本机网络内，仍按公网处理）；③ 新增 `_media_url_for_client()` 按访问来源挑选地址——局域网返回本地IP绝对地址直读下载目录，公网返回原始云端地址，不再走 base64 本地中转；④ 新增 `_apply_client_media()` 批量回填 `图片` / `图片解码` 并保持两者逐条一致，`/api/products`、`/api/product`、`/api/product/search`、`/api/product/by-description`、`/api/product/by-id` 五个接口全部注入 `request`；⑤ 修复保存本地 `saved=0 failed=5`：`_media_urls_of()` 增加本地文件存在性检查，本地文件缺失时自动回退云端源地址重下；⑥ 前端 `resolveLocalMediaUrl()` 兼容旧JSON写死局域网地址、新JSON相对地址、原始云端地址三形态，换IP / 换隧道无需重存
 

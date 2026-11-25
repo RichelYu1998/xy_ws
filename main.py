@@ -6640,12 +6640,12 @@ class PathManager:
                 # 旧格式兼容：Public URL: https://...
                 tunnel_match = re.search(r'Public URL:\s*(https://[^\s]+)', tunnel_content)
                 if not tunnel_match:
-                    # 回退：匹配任意 hostc.dev URL
-                    tunnel_match = re.search(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', tunnel_content)
+                    tunnel_match = re.search(r'(https://[a-zA-Z0-9_-]+\.(?:hostc\.dev|trycloudflare\.com))', tunnel_content)
                 
-                # 优先使用新格式的 hostc URL，其次使用旧格式
                 if hostc_match:
                     candidate_url = hostc_match.group(1).rstrip('/')
+                elif cf_match:
+                    candidate_url = cf_match.group(1).rstrip('/')
                 elif tunnel_match:
                     candidate_url = tunnel_match.group(1).rstrip('/')
                 else:
@@ -6729,8 +6729,7 @@ class PathManager:
                             result_url = candidate_url
                             url_source = 'web_output.log' + (' (skip_validation)' if skip_validation else ' (no validation)')
                     else:
-                        # 回退：匹配任意 hostc.dev URL
-                        matches = re.findall(r'(https://[a-zA-Z0-9_-]+\.hostc\.dev)', content)
+                        matches = re.findall(r'(https://[a-zA-Z0-9_-]+\.(?:hostc\.dev|trycloudflare\.com))', content)
                         if matches:
                             candidate_url = matches[-1].rstrip('/')
                             
