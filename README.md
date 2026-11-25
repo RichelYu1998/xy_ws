@@ -5474,8 +5474,8 @@ def _brand_match_pairs(entries):
 **修复日期**: 2026-11-25
 **修复类型**: 🔴 规范治理 + 🛠️ 工具增强 + 📝文档更新
 **影响文件**: [test/code_style_check.py](test/code_style_check.py), [test/bench_30.py](test/bench_30.py), [test/bench_prefetch.py](test/bench_prefetch.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)
-**Commit**: 9d1784c8
-**变更统计**: +129行 -22行
+**Commit**: 9d1784c8, b748ca22
+**变更统计**: +341行 -47行
 **作者**: 小旭二手机（西园路）
 
 ---
