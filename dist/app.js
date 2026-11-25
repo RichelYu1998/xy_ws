@@ -928,7 +928,8 @@
                     existingModal.remove();
                 }
 
-                const images = p.图片;
+                const hasDecoded = p.图片解码 && (Array.isArray(p.图片解码) ? p.图片解码.length > 0 : true);
+                const images = hasDecoded ? p.图片解码 : p.图片;
                 const imageList = images ? (Array.isArray(images) ? images : [images]) : [];
                 const validImages = imageList.filter(img => img);
                 const decodedImages = validImages.map(img => decodeBase64Url(img));
@@ -1470,6 +1471,18 @@
                 });
         };
 
+        function refreshProductModal(productId) {
+            if (!productId || !document.getElementById('productModal')) return;
+            fetch(`/api/product/by-id?product_id=${encodeURIComponent(productId)}`)
+                .then(response => safeParseJson(response))
+                .then(data => {
+                    if (data && data.found && data.product && document.getElementById('productModal')) {
+                        showProductModal(data.product);
+                    }
+                })
+                .catch(error => console.warn('[保存] 刷新商品详情失败:', error));
+        }
+
         window.downloadProductMedia = function(productId, btn) {
             if (!productId) {
                 showToast('缺少商品ID，无法保存', 'error');
@@ -1494,7 +1507,11 @@
                         renderDownloadDirText();
                     }
                     const failNote = data.failed ? `，${data.failed} 个失败` : '';
-                    showToast(`已保存 ${data.saved} 个文件到 ${data.dir}${failNote}`, data.failed ? 'warning' : 'success', 6000);
+                    const jsonNote = data.json_filename ? `，已生成 ${data.json_filename}` : '';
+                    showToast(`已保存 ${data.saved} 个文件到 ${data.dir}${jsonNote}${failNote}`, data.failed ? 'warning' : 'success', 6000);
+                    if (data.saved) {
+                        refreshProductModal(productId);
+                    }
                 })
                 .catch(error => {
                     console.error('[保存] 失败:', error);

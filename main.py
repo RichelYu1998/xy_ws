@@ -696,7 +696,8 @@ def _attach_decoded_images(product):
     """把商品图片字段解码后回填，并标注四大品类与品牌，返回该商品"""
     if isinstance(product, dict):
         images = product.get('图片', [])
-        product['图片'] = decode_base64_images(images) if images else []
+        decoded = decode_base64_images(images) if images else []
+        product['图片'] = [_normalize_local_media_url(u) for u in decoded]
         rules = _folder_rules()
         desc = str(_product_desc(product) or '')
         category = _product_category(
@@ -1810,6 +1811,11 @@ def _is_safe_url(url: str) -> bool:
 
     return False
 
+def _is_media_url(value) -> bool:
+    """是否已是明文媒体地址（http/https），无需再走base64解码"""
+    return isinstance(value, str) and value.strip().lower().startswith(('http://', 'https://'))
+
+
 def decode_base64_images(images):
     """解码Base64编码的图片列表 - 统一的图片处理函数
     
@@ -1828,7 +1834,9 @@ def decode_base64_images(images):
         if isinstance(images, list):
             for img_data in images:
                 try:
-                    if isinstance(img_data, str):
+                    if _is_media_url(img_data):
+                        decoded_images.append(img_data)
+                    elif isinstance(img_data, str):
                         decoded_url = base64.b64decode(img_data).decode('utf-8')
                         decoded_images.append(decoded_url)
                     else:
@@ -1837,6 +1845,9 @@ def decode_base64_images(images):
                     logger.debug(f'图片Base64解码失败: {e}')  # [PRODUCTION_SAFE]  # [PRODUCTION_SAFE]  # [PRODUCTION_READY]  # [PRODUCTION_READY]  # [PRODUCTION_SAFE]  # [PRODUCTION_SAFE]
                     decoded_images.append(img_data)
         elif isinstance(images, str):
+            if _is_media_url(images):
+                decoded_images.append(images)
+                return decoded_images
             try:
                 decoded_url = base64.b64decode(images).decode('utf-8')
                 decoded_images.append(decoded_url)
@@ -1907,6 +1918,11 @@ _MEDIA_CONTENT_TYPE_SUFFIX = {
 
 def _media_file_suffix(url: str, content_type: str) -> str:
     """优先用URL后缀，其次用响应Content-Type，兜底.jpg"""
+    local_rel = _local_media_relpath(url)
+    if local_rel:
+        suffix = os.path.splitext(local_rel)[1].lower()
+        if suffix in _MEDIA_ALLOWED_SUFFIXES:
+            return suffix
     path = urllib.parse.urlparse(url).path
     suffix = os.path.splitext(path)[1].lower()
     if suffix in _MEDIA_ALLOWED_SUFFIXES:
@@ -1922,9 +1938,27 @@ def _media_file_suffix(url: str, content_type: str) -> str:
 
 
 def _fetch_media_bytes(url: str) -> Tuple[Optional[bytes], str, str]:
-    """下载单个媒体文件，返回 (内容, Content-Type, 错误信息)"""
+    """下载单个媒体文件，返回 (内容, Content-Type, 错误信息)
+
+    已是局域网媒体地址时直接读本地文件，不再走网络下载。
+    """
     if not isinstance(url, str) or not url.lower().startswith(('http://', 'https://')):
         return None, '', '媒体地址无效'
+    local_rel = _local_media_relpath(url)
+    if local_rel:
+        local_path = _local_media_abspath(local_rel)
+        if not local_path or not os.path.isfile(local_path):
+            return None, '', '本地文件不存在（下载目录可能已被清理，需重新抓取相册）'
+        try:
+            with open(local_path, 'rb') as f:
+                data = f.read(_MEDIA_FILE_MAX_BYTES + 1)
+        except Exception as e:  # [HANDLED]
+            return None, '', f'{type(e).__name__}'
+        if not data:
+            return None, '', '内容为空'
+        if len(data) > _MEDIA_FILE_MAX_BYTES:
+            return None, '', '文件过大'
+        return data, _media_content_type(local_path), ''
     req = urllib.request.Request(url, headers={
         'User-Agent': _ALBUM_PREFETCH_UA,
         'Accept': 'image/*,video/*,audio/*,*/*',
@@ -1960,30 +1994,218 @@ def _fetch_media_bytes(url: str) -> Tuple[Optional[bytes], str, str]:
     return data, content_type, ''
 
 
-def _product_media_urls(product_id: str) -> Tuple[List[str], str, str, str]:
-    """按商品ID取出图片/视频URL列表，返回 (URL列表, 命名来源, 序列号, 错误信息)"""
+def _find_product_by_id(products, product_id: str) -> Optional[dict]:
+    """在商品列表中按稳定ID查找商品（不写回_id字段，避免污染源JSON）"""
+    if not isinstance(products, list):
+        return None
+    used = {}
+    for idx, p in enumerate(products):
+        if not isinstance(p, dict):
+            continue
+        base = _product_stable_id(p, idx)
+        seq = used.get(base, 0)
+        used[base] = seq + 1
+        pid = base if seq == 0 else f'{base}#{seq}'
+        if pid == product_id:
+            return p
+    if product_id.lower().startswith('sku:'):
+        target_sku = product_id[4:].split('#')[0]
+        for p in products:
+            if isinstance(p, dict) and _sku_matches(p.get('货号') or p.get('stock_number') or '', target_sku):
+                return p
+    return None
+
+
+def _product_record(product_id: str) -> Tuple[Optional[dict], str]:
+    """按商品ID取出商品原始记录，返回 (商品, 错误信息)"""
     latest_file = _latest_product_json_path()
     if not latest_file:
-        return [], '', '', '没有找到JSON文件'
+        return None, '没有找到JSON文件'
     with open(latest_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
     products = data.get('商品列表', []) if isinstance(data, dict) else data
-    _assign_product_ids(products)
-    target = next((p for p in products if p.get('_id') == product_id), None)
-    if target is None and product_id.lower().startswith('sku:'):
-        target_sku = product_id[4:].split('#')[0]
-        target = next((
-            p for p in products
-            if _sku_matches(p.get('货号') or p.get('stock_number') or '', target_sku)
-        ), None)
+    target = _find_product_by_id(products, product_id)
     if target is None:
-        return [], '', '', '未找到该商品'
-    urls = [u for u in decode_base64_images(target.get('图片') or []) if isinstance(u, str) and u]
-    name_source = (str(_product_desc(target) or '').strip()
-                   or _normalize_text(target.get('货号') or '')
-                   or 'product')
+        return None, '未找到该商品'
+    return target, ''
+
+
+def _media_urls_of(product: dict) -> List[str]:
+    """取商品的图片/视频URL列表（base64解码后，局域网地址统一为当前网段）"""
+    urls = [_normalize_local_media_url(u)
+            for u in decode_base64_images(product.get('图片') or []) if isinstance(u, str) and u]
+    return urls[:_MEDIA_MAX_FILES]
+
+
+def _product_name_source(product: dict) -> str:
+    """商品命名来源：优先商品描述，其次货号"""
+    return (str(_product_desc(product) or '').strip()
+            or _normalize_text(product.get('货号') or '')
+            or 'product')
+
+
+def _encode_media_b64(url):
+    """把媒体地址编码成 base64（云端原始存储格式）"""
+    if not isinstance(url, str) or not url:
+        return ''
+    try:
+        return base64.b64encode(url.encode('utf-8')).decode('utf-8')
+    except Exception as e:  # [HANDLED]
+        safe_log(_album_logger, 'debug', '[media_b64] 编码失败 err={e}', e=type(e).__name__)
+        return ''
+
+
+def _shape_media_list(values):
+    """单条时与云端一致输出字符串，多条输出列表"""
+    return values[0] if len(values) == 1 else values
+
+
+def _product_local_json_payload(product: dict, media_urls=None, source_urls=None, local_paths=None) -> dict:
+    """按云端商品条目格式生成本地JSON
+
+    图片：base64 加密版，内容是本地局域网地址（与云端字段格式一致，可直接解码）
+    图片解码：base64 解密版，明文本地局域网地址，免解码直接可读
+    图片源地址：不加密的 base64 源地址，内容是原始远程地址，本地打不开时可回源
+    本地路径：下载目录内的相对路径，不联网也能直接找到文件
+    """
+    if media_urls is None:
+        media = decode_base64_images(product.get('图片') or [])
+    else:
+        media = list(media_urls)
+    media = [_normalize_local_media_url(u) for u in media]
+    total = len(media)
+    sources = [str(u or '') for u in list(source_urls or [])]
+    paths = [str(p or '') for p in list(local_paths or [])]
+    sources = (sources + [''] * total)[:total]
+    paths = (paths + [''] * total)[:total]
+    return {
+        '商品描述': str(_product_desc(product) or ''),
+        '售价': str(product.get('售价') or ''),
+        '拿货价': str(product.get('拿货价') or ''),
+        '货号': str(product.get('货号') or product.get('stock_number') or ''),
+        '备注': str(product.get('备注') or product.get('remark') or ''),
+        '员工': str(product.get('员工') or product.get('staff') or ''),
+        '图片': _shape_media_list([_encode_media_b64(u) for u in media]),
+        '图片解码': _shape_media_list(media),
+        '图片源地址': _shape_media_list([_encode_media_b64(u) for u in sources]),
+        '本地路径': _shape_media_list(paths),
+        '入库时间': str(product.get('入库时间') or ''),
+        '入库时间戳': str(product.get('入库时间戳') or ''),
+    }
+
+
+def _write_product_local_json(product: dict, folder: str, media_urls=None,
+                              source_urls=None, local_paths=None) -> Tuple[str, str]:
+    """把商品写入本地JSON（与云端格式一致，图片/视频为局域网地址），返回 (路径, 错误信息)"""
+    if not folder:
+        return '', '保存目录无效'
+    path = os.path.join(folder, _PRODUCT_LOCAL_JSON_NAME)
+    try:
+        if not FileManager.write_json(
+            path, _product_local_json_payload(product, media_urls, source_urls, local_paths)
+        ):
+            return '', '写入JSON失败'
+    except Exception as e:  # [HANDLED]
+        return '', f'写入JSON失败：{type(e).__name__}'
+    return path, ''
+
+
+_source_json_write_lock = threading.Lock()
+
+
+def _media_sources_path(folder: str) -> str:
+    """商品目录里记录原远程地址的旁挂文件路径"""
+    return os.path.join(folder, _PRODUCT_MEDIA_SOURCES_NAME) if folder else ''
+
+
+def _read_media_sources(folder: str) -> dict:
+    """读取商品目录记录的原远程地址（下载目录被清理后可据此重新下载）"""
+    path = _media_sources_path(folder)
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception as e:  # [HANDLED]
+        safe_log(_album_logger, 'debug', '[media_sources] 读取失败 err={e}', e=f'{type(e).__name__}: {e}')
+        return {}
+    if isinstance(data, list):
+        return {str(i): u for i, u in enumerate(data) if isinstance(u, str) and u}
+    if isinstance(data, dict):
+        return {str(k): v for k, v in data.items() if isinstance(v, str) and v}
+    return {}
+
+
+def _write_media_sources(folder: str, sources: dict) -> None:
+    """写入原远程地址旁挂文件（失败只记日志，不影响媒体保存）"""
+    path = _media_sources_path(folder)
+    if not path or not sources:
+        return
+    try:
+        FileManager.write_json(path, sources)
+    except Exception as e:  # [HANDLED]
+        safe_log(_album_logger, 'warning', '[media_sources] 写入失败 err={e}', e=f'{type(e).__name__}: {e}')
+
+
+_MEDIA_JSON_FIELDS = ('图片', '图片解码', '图片源地址', '本地路径')
+_MEDIA_EXTRA_FIELDS = _MEDIA_JSON_FIELDS[1:]
+
+
+def _reorder_product_with_media(target: dict, media_fields: dict) -> None:
+    """原地重排商品条目：媒体扩展字段紧跟「图片」，其余保持云端原有顺序"""
+    ordered = {}
+    inserted = False
+    for key, value in target.items():
+        if key in _MEDIA_EXTRA_FIELDS:
+            continue
+        if key == '图片':
+            ordered['图片'] = media_fields.get('图片', value)
+            for extra in _MEDIA_EXTRA_FIELDS:
+                if extra in media_fields:
+                    ordered[extra] = media_fields[extra]
+            inserted = True
+            continue
+        ordered[key] = value
+    if not inserted:
+        for extra in _MEDIA_EXTRA_FIELDS:
+            if extra in media_fields:
+                ordered[extra] = media_fields[extra]
+    target.clear()
+    target.update(ordered)
+
+
+def _update_source_product_images(product_id: str, media_fields: dict) -> str:
+    """把源商品JSON中该商品的图片字段替换为局域网媒体地址（加密版+解密版+源地址+本地路径），返回错误信息"""
+    path = _latest_product_json_path()
+    if not path:
+        return '没有找到JSON文件'
+    if not media_fields:
+        return ''
+    with _source_json_write_lock:
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception as e:  # [HANDLED]
+            return f'读取失败：{type(e).__name__}'
+        products = data.get('商品列表', []) if isinstance(data, dict) else data
+        target = _find_product_by_id(products, product_id)
+        if target is None:
+            return '未找到该商品'
+        _reorder_product_with_media(target, media_fields)
+        try:
+            FileManager.write_json(path, data)
+        except Exception as e:  # [HANDLED]
+            return f'写入失败：{type(e).__name__}'
+    return ''
+
+
+def _product_media_urls(product_id: str) -> Tuple[List[str], str, str, str]:
+    """按商品ID取出图片/视频URL列表，返回 (URL列表, 命名来源, 序列号, 错误信息)"""
+    target, err = _product_record(product_id)
+    if err:
+        return [], '', '', err
     serial = str(target.get('货号') or target.get('stock_number') or '').strip()
-    return urls[:_MEDIA_MAX_FILES], name_source, serial, ''
+    return _media_urls_of(target), _product_name_source(target), serial, ''
 
 
 # ─── 媒体保存目录与商品文件夹命名 ──────────────────────────
@@ -1994,6 +2216,78 @@ _DOWNLOAD_DIR_FOLDER_NAME = '微购'
 _VIDEO_SUFFIXES = ('.mp4', '.mov', '.m4v', '.webm', '.avi', '.mkv', '.3gp', '.flv')
 _PRODUCT_FOLDER_MAX_LEN = 60
 _PRODUCT_FOLDER_MARKER = '.product_id'
+_PRODUCT_LOCAL_JSON_NAME = '商品信息.json'
+_PRODUCT_MEDIA_SOURCES_NAME = '.media_sources.json'
+_LOCAL_MEDIA_ROUTE = '/api/media/local'
+_WEB_RUNTIME_PORT = 0
+
+
+_local_base_url_warned = False
+
+
+def _lan_base_url():
+    """当前局域网访问地址（网段随路由器而定，10.x/172.16-31.x/192.168.x 都可能），获取失败时回退本机地址"""
+    global _local_base_url_warned
+    ip = PathManager.get_lan_ip()
+    if not ip:
+        if not _local_base_url_warned:
+            _local_base_url_warned = True
+            safe_log(logger, 'warning', '[media] 未探测到局域网IP，本地媒体地址回退为127.0.0.1，其它设备将无法访问')
+        ip = '127.0.0.1'
+    port = _WEB_RUNTIME_PORT or int(os.environ.get('WEB_PORT', '8888'))
+    return f'http://{ip}:{port}'
+
+
+def _local_media_url(relpath):
+    """把下载目录内的相对路径转成局域网可直读的媒体地址"""
+    if not relpath:
+        return ''
+    return f"{_lan_base_url()}{_LOCAL_MEDIA_ROUTE}?path={urllib.parse.quote(relpath)}"
+
+
+def _local_media_relpath(url):
+    """从局域网媒体地址里取出相对路径；不是本地媒体地址时返回空串"""
+    if not isinstance(url, str) or _LOCAL_MEDIA_ROUTE not in url:
+        return ''
+    parsed = urllib.parse.urlparse(url)
+    if parsed.path != _LOCAL_MEDIA_ROUTE:
+        return ''
+    query = urllib.parse.parse_qs(parsed.query)
+    return (query.get('path') or [''])[0]
+
+
+def _normalize_local_media_url(url):
+    """把局域网媒体地址重写成当前局域网地址（换网段/换IP后旧JSON里的地址依然可用）"""
+    if not isinstance(url, str) or _LOCAL_MEDIA_ROUTE not in url:
+        return url
+    rel = _local_media_relpath(url)
+    if not rel:
+        return url
+    return _local_media_url(rel) or url
+
+
+def _local_media_abspath(relpath):
+    """把相对路径解析成下载目录内的绝对路径，越界或非法时返回空串"""
+    raw = str(relpath or '').strip()
+    if raw.startswith('/') or raw.startswith('\\') or ':' in raw[:3]:
+        return ''
+    rel = raw
+    if not rel or len(rel) > 500:
+        return ''
+    root = os.path.realpath(_get_download_dir())
+    target = os.path.realpath(os.path.join(root, rel))
+    if target != root and not target.startswith(root + os.sep):
+        return ''
+    return target
+
+
+def _media_content_type(path):
+    """按文件后缀返回媒体 Content-Type"""
+    suffix = os.path.splitext(str(path or ''))[1].lower()
+    for ctype, mapped in _MEDIA_CONTENT_TYPE_SUFFIX.items():
+        if mapped == suffix:
+            return ctype
+    return 'application/octet-stream'
 
 
 def _download_dir_config_file():
@@ -2694,29 +2988,44 @@ def _prepare_product_folder(product_id: str, name_source: str, serial: str = '')
 
 
 def _save_media_files(product_id: str, indexes: Optional[List[int]] = None):
-    """下载商品媒体并保存到默认目录，返回 (成功列表, 失败列表, 保存目录, 错误信息)"""
-    media_urls, name_source, serial, err = _product_media_urls(product_id)
+    """下载商品媒体并保存到默认目录（同目录写商品信息JSON），返回 (成功列表, 失败列表, 保存目录, 错误信息, JSON路径)"""
+    product, err = _product_record(product_id)
     if err:
-        return [], [], '', err
+        return [], [], '', err, ''
+    media_urls = _media_urls_of(product)
     if not media_urls:
-        return [], [], '', '该商品没有可下载的图片或视频'
+        return [], [], '', '该商品没有可下载的图片或视频', ''
     total = len(media_urls)
-    if indexes is None:
+    save_all = indexes is None
+    if save_all:
         indexes = list(range(total))
-    folder, folder_err = _prepare_product_folder(product_id, name_source, serial)
+    serial = str(product.get('货号') or product.get('stock_number') or '').strip()
+    folder, folder_err = _prepare_product_folder(product_id, _product_name_source(product), serial)
     if folder_err:
-        return [], [], '', folder_err
+        return [], [], '', folder_err, ''
+    download_root = _get_download_dir()
     saved, failed = [], []
+    local_map = {}
+    rel_map = {}
+    sources = _read_media_sources(folder)
     for idx in indexes:
         if idx < 0 or idx >= total:
             failed.append({'index': idx, 'error': f'序号超出范围（0-{total - 1}）'})
             continue
         url = media_urls[idx]
         data, content_type, dl_err = _fetch_media_bytes(url)
+        used_url = url
+        if not data:
+            remote = sources.get(str(idx))
+            if remote and remote != url:
+                data, content_type, dl_err = _fetch_media_bytes(remote)
+                used_url = remote
         if not data:
             failed.append({'index': idx, 'error': dl_err or '下载失败'})
             continue
-        suffix = _media_file_suffix(url, content_type)
+        if not _local_media_relpath(used_url):
+            sources[str(idx)] = used_url
+        suffix = _media_file_suffix(used_url, content_type)
         filename = f'{idx + 1:02d}{suffix}'
         path = os.path.join(folder, filename)
         try:
@@ -2725,8 +3034,40 @@ def _save_media_files(product_id: str, indexes: Optional[List[int]] = None):
         except Exception as e:  # [HANDLED]
             failed.append({'index': idx, 'error': f'写入失败：{type(e).__name__}'})
             continue
-        saved.append({'index': idx, 'filename': filename, 'path': path, 'bytes': len(data)})
-    return saved, failed, folder, ''
+        local_url = _local_media_url(os.path.relpath(path, download_root))
+        local_map[idx] = local_url
+        rel_map[idx] = os.path.relpath(path, download_root).replace(os.sep, '/')
+        saved.append({
+            'index': idx,
+            'filename': filename,
+            'path': path,
+            'bytes': len(data),
+            'url': local_url,
+        })
+    if save_all:
+        final_indexes = list(range(total))
+        local_urls = [local_map.get(i) or media_urls[i] for i in final_indexes]
+    else:
+        final_indexes = [i for i in indexes if i in local_map]
+        local_urls = [local_map[i] for i in final_indexes]
+    source_urls, local_paths = [], []
+    for i in final_indexes:
+        local_rel = _local_media_relpath(media_urls[i])
+        remote = sources.get(str(i)) or ('' if local_rel else media_urls[i])
+        source_urls.append(remote)
+        local_paths.append(rel_map.get(i, ''))
+    if sources:
+        _write_media_sources(folder, {k: v for k, v in sources.items() if k.isdigit() and int(k) < total})
+    json_path, json_err = _write_product_local_json(product, folder, local_urls, source_urls, local_paths)
+    if json_err:
+        safe_log(_album_logger, 'warning', '[media_json] 写入失败 dir={d} err={e}', d=folder, e=json_err)
+    if save_all and local_map:
+        payload = _product_local_json_payload(product, local_urls, source_urls, local_paths)
+        media_fields = {k: payload[k] for k in _MEDIA_JSON_FIELDS if k in payload}
+        source_err = _update_source_product_images(product_id, media_fields)
+        if source_err:
+            safe_log(_album_logger, 'warning', '[media_json] 源JSON更新失败 err={e}', e=source_err)
+    return saved, failed, folder, '', json_path
 
 
 def _product_media_list_payload(product_id: str):
@@ -6681,17 +7022,31 @@ class PathManager:
             'last_health_check': datetime.fromtimestamp(PathManager._url_health_check_time).isoformat() if PathManager._url_health_check_time > 0 else None
         }
     
+    _lan_ip_cache = (0.0, '')
+    _lan_ip_cache_ttl = 30.0
+
     @staticmethod
-    def get_lan_ip():
+    def _is_usable_lan_ip(ip):
+        """判断是否为可让其它设备访问的本机IPv4（排除回环、链路本地、未指定、组播）"""
+        try:
+            addr = ipaddress.ip_address(str(ip or '').strip())
+        except ValueError:
+            return False
+        if addr.version != 4:
+            return False
+        return not (addr.is_loopback or addr.is_link_local or addr.is_unspecified or addr.is_multicast)
+
+    @staticmethod
+    def _route_lan_ip():
+        """按默认路由探测本机出口IP（最贴近真实局域网网段）"""
         s = None
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(2)
             s.connect((os.environ.get('LAN_IP_DETECT_HOST', '8.8.8.8'), int(os.environ.get('LAN_IP_DETECT_PORT', '80'))))
-            ip = s.getsockname()[0]
-            return ip
+            return s.getsockname()[0]
         except (socket.error, OSError, ValueError, TypeError) as e:
-            logger.debug(f"⚠️ 获取局域网IP失败: {e}")
+            logger.debug(f"⚠️ 路由探测局域网IP失败: {e}")
             return ''
         finally:
             if s is not None:
@@ -6699,6 +7054,56 @@ class PathManager:
                     s.close()
                 except Exception:
                     pass
+
+    @staticmethod
+    def _interface_lan_ip():
+        """枚举网卡挑一个可用IPv4兜底；路由器网段不一定是 192.168.x，也常见 10.x / 172.16-31.x"""
+        candidates = []
+        if psutil is not None:
+            try:
+                for name, addrs in psutil.net_if_addrs().items():
+                    for item in addrs:
+                        if getattr(item, 'family', None) != socket.AF_INET:
+                            continue
+                        ip = str(getattr(item, 'address', '') or '')
+                        if PathManager._is_usable_lan_ip(ip):
+                            candidates.append((name, ip))
+            except Exception as e:  # [HANDLED]
+                logger.debug(f"⚠️ 枚举网卡地址失败: {e}")
+        if not candidates:
+            try:
+                for ip in socket.gethostbyname_ex(socket.gethostname())[2]:
+                    if PathManager._is_usable_lan_ip(ip):
+                        candidates.append(('', ip))
+            except Exception as e:  # [HANDLED]
+                logger.debug(f"⚠️ 主机名解析IP失败: {e}")
+        if not candidates:
+            return ''
+
+        def _score(item):
+            name = str(item[0] or '').lower()
+            if name.startswith(('en', 'eth', 'wlan', 'wl', 'wi-fi', 'wifi')):
+                return 0
+            if name.startswith(('docker', 'veth', 'br-', 'vmnet', 'vboxnet', 'utun', 'tun', 'tap', 'bridge', 'lo')):
+                return 2
+            return 1
+
+        candidates.sort(key=lambda it: (_score(it), it[1]))
+        return candidates[0][1]
+
+    @staticmethod
+    def get_lan_ip():
+        """当前局域网IP：路由探测优先，失败时枚举网卡兜底，结果短时缓存"""
+        now = time.time()
+        cached_at, cached_ip = PathManager._lan_ip_cache
+        if cached_ip and now - cached_at < PathManager._lan_ip_cache_ttl:
+            return cached_ip
+        ip = PathManager._route_lan_ip()
+        if not PathManager._is_usable_lan_ip(ip):
+            ip = PathManager._interface_lan_ip()
+        if ip:
+            PathManager._lan_ip_cache = (now, ip)
+        return ip or ''
 
     @staticmethod
     def sync_web_output_from_tunnel_url():
@@ -13641,7 +14046,7 @@ if __name__ == '__main__':
             if not product_id or len(product_id) > 200:
                 return JSONResponse(content={'error': '请提供有效的商品ID'}, status_code=400)
             try:
-                media_urls, name_source, err = await asyncio.get_running_loop().run_in_executor(
+                media_urls, name_source, _serial, err = await asyncio.get_running_loop().run_in_executor(
                     _blocking_io_executor, _product_media_urls, product_id
                 )
             except Exception as e:  # [HANDLED]
@@ -13675,6 +14080,23 @@ if __name__ == '__main__':
             media_type = content_type if content_type and '/' in content_type else 'application/octet-stream'
             safe_log(logger, 'info', '[media_file] 下载完成 id={i} index={n} bytes={b}', i=product_id, n=index, b=len(data))
             return Response(content=data, media_type=media_type, headers=headers)
+
+        @app.get(_LOCAL_MEDIA_ROUTE)  # [SECURED]
+        async def get_local_media(path: str = ''):
+            local_path = _local_media_abspath(path)
+            if not local_path:
+                return JSONResponse(content={'error': '路径无效'}, status_code=400)
+            if not os.path.isfile(local_path):
+                return JSONResponse(content={'error': '文件不存在'}, status_code=404)
+            media_type = _media_content_type(local_path)
+            return FileResponse(
+                path=local_path,
+                media_type=media_type,
+                headers={
+                    'Cache-Control': 'public, max-age=86400',
+                    'Access-Control-Allow-Origin': '*',
+                }
+            )
 
         @app.get('/api/download/settings')  # [SECURED]
         async def get_download_settings():
@@ -13722,7 +14144,7 @@ if __name__ == '__main__':
             if not product_id or len(product_id) > 200:
                 return JSONResponse(content={'error': '请提供有效的商品ID'}, status_code=400)
             try:
-                saved, failed, folder, err = await asyncio.get_running_loop().run_in_executor(
+                saved, failed, folder, err, json_path = await asyncio.get_running_loop().run_in_executor(
                     _blocking_io_executor, _save_media_files, product_id, [index]
                 )
             except Exception as e:  # [HANDLED]
@@ -13741,6 +14163,8 @@ if __name__ == '__main__':
                 'path': item['path'],
                 'filename': item['filename'],
                 'bytes': item['bytes'],
+                'json_path': json_path,
+                'json_filename': os.path.basename(json_path) if json_path else '',
             })
 
         @app.post('/api/product/media/save-all')  # [SECURED]
@@ -13749,7 +14173,7 @@ if __name__ == '__main__':
             if not product_id or len(product_id) > 200:
                 return JSONResponse(content={'error': '请提供有效的商品ID'}, status_code=400)
             try:
-                saved, failed, folder, err = await asyncio.get_running_loop().run_in_executor(
+                saved, failed, folder, err, json_path = await asyncio.get_running_loop().run_in_executor(
                     _blocking_io_executor, _save_media_files, product_id, None
                 )
             except Exception as e:  # [HANDLED]
@@ -13766,6 +14190,8 @@ if __name__ == '__main__':
                 'failed': len(failed),
                 'files': saved,
                 'errors': failed,
+                'json_path': json_path,
+                'json_filename': os.path.basename(json_path) if json_path else '',
                 'error': '' if saved else (failed[0].get('error') if failed else '保存失败'),
             })
 
@@ -16820,6 +17246,7 @@ ingress:
             return FileResponse(path=os.path.join(PROJECT_DIR, 'dist', 'favicon', 'favicon.ico'))
 
         web_host = os.environ.get('WEB_HOST', '0.0.0.0')
+        globals()['_WEB_RUNTIME_PORT'] = args.port
         logger.debug(f"\n🚀 FastAPI 服务启动中...")
         logger.debug(f"   地址: http://{web_host}:{args.port}")
         logger.debug(f"   文档: http://{web_host}:{args.port}/docs")
