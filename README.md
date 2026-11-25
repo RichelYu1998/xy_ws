@@ -4646,12 +4646,19 @@ git status --porcelain | grep -E '^(\?\?|A ) temp/' || echo 'temp 已清空'
 
 ```python
 import re
+
 lines = open('README.md', encoding='utf-8').read().split('\n')
 ITEM = re.compile(r'^(\s*)([-*+]\s+|\d+\.\s+)')
-def firstnum(l):
-    m = re.findall(r'PY-CORE-(\d{3})', l)
+OL = re.compile(r'^(\d+)\.\s+')
+
+def nums_of(s):
+    return re.findall(r'PY-CORE-(\d{3})', s)
+
+def firstnum(s):
+    m = nums_of(s)
     return int(m[0]) if m else None
-# 1) 连续列表块内跨行升序
+
+# 1) 列表块跨行首个编号升序
 viol, i, n = [], 0, len(lines)
 while i < n:
     if ITEM.match(lines[i]):
@@ -4664,15 +4671,96 @@ while i < n:
         i = j
     else:
         i += 1
+
 # 2) 单行多编号升序
-bad = [(k + 1, re.findall(r'PY-CORE-(\d{3})', l)) for k, l in enumerate(lines)
-       if len(re.findall(r'PY-CORE-(\d{3})', l)) >= 2
-       and re.findall(r'PY-CORE-(\d{3})', l) != sorted(re.findall(r'PY-CORE-(\d{3})', l))]
-# 3) 范式章节 / 表格行升序
-nums = [int(re.search(r'PY-CORE-(\d{3})', l).group(1)) for l in lines
-        if l.startswith('## ') and re.search(r'PY-CORE-(\d{3})', l)]
-print('列表块非升序', viol, '| 单行非升序', bad, '| 章节升序', nums == sorted(nums))
-assert not viol and not bad and nums == sorted(nums)
+bad = [(k + 1, nums_of(l)) for k, l in enumerate(lines)
+       if len(nums_of(l)) >= 2 and nums_of(l) != sorted(nums_of(l))]
+
+# 3) 范式章节编号严格升序 + 零重号
+heads = [firstnum(l) for l in lines if l.startswith('## ') and firstnum(l) is not None]
+assert heads == sorted(heads) and len(heads) == len(set(heads)), heads
+
+# 4) 汇总表：编号连续 + 首字母列 A-Z 非降 + 字母列与标题英文名首字母一致
+rows = [l.strip() for l in lines if re.match(r'^\|\s*PY-CORE-\d{3}\s*\|', l.strip())]
+tnums, tletters = [], []
+for r in rows:
+    cell = [c.strip() for c in r.strip('|').split('|')]
+    tnums.append(int(re.search(r'PY-CORE-(\d{3})', cell[0]).group(1)))
+    tletters.append(cell[1].lower())
+assert tnums == list(range(1, len(tnums) + 1)), tnums
+assert all(tletters[k] <= tletters[k + 1] for k in range(len(tletters) - 1)), tletters
+for r in rows:
+    cell = [c.strip() for c in r.strip('|').split('|')]
+    title = cell[2]
+    m = re.search(r'\(([A-Za-z])', title)
+    init = m.group(1).lower() if m else next(c for c in title if c.isascii() and c.isalpha()).lower()
+    assert init == cell[1].lower(), (cell[0], cell[1], title)
+
+# 5) 区间表：覆盖号段首尾相接且与汇总表逐号一致
+zone, on = [], False
+for l in lines:
+    s = l.strip()
+    if '编号区间表' in s:
+        on = True
+        continue
+    if on:
+        if re.match(r'^\|\s*[a-z]', s):
+            zone.append(re.findall(r'\d{3}', s))
+        elif s.startswith('>') or s.startswith('###'):
+            break
+covered = [k for z in zone if len(z) >= 2 for k in range(int(z[0]), int(z[1]) + 1)]
+assert covered == tnums, covered
+
+# 6) 有序列表编号：组内步长恒为 1（允许被代码块隔断的延续）
+groups, cur = [], []
+for l in lines:
+    if OL.match(l):
+        cur.append(int(OL.match(l).group(1)))
+    elif cur:
+        groups.append(cur)
+        cur = []
+if cur:
+    groups.append(cur)
+assert all(all(g[k + 1] - g[k] == 1 for k in range(len(g) - 1)) for g in groups if len(g) >= 2), groups
+
+# 7) 「更新内容」块：整块重编号 1..N 且各条首个编号升序
+for i, l in enumerate(lines):
+    if not l.strip().startswith('#### 更新内容'):
+        continue
+    items, j = [], i + 1
+    while j < len(lines) and not re.match(r'^####|^###|^---', lines[j].strip()):
+        if OL.match(lines[j]):
+            items.append(lines[j])
+        j += 1
+    if len(items) >= 2:
+        assert [int(OL.match(x).group(1)) for x in items] == list(range(1, len(items) + 1)), (i + 1, items[0])
+        fv = [firstnum(x) for x in items if firstnum(x) is not None]
+        assert fv == sorted(fv), (i + 1, fv)
+
+# 8) 变更小节编号：同版本内按分组重启，每组 1..N 连续
+H5 = re.compile(r'^#####\s+(\d+)\.\s+')
+blocks, cur = [], []
+for l in lines:
+    if H5.match(l):
+        cur.append(int(H5.match(l).group(1)))
+    elif l.startswith('### ') or l.startswith('#### '):
+        if cur:
+            blocks.append(cur)
+            cur = []
+if cur:
+    blocks.append(cur)
+for b in blocks:
+    g = []
+    for v in b + [0]:
+        if g and v <= g[-1]:
+            assert g == list(range(1, len(g) + 1)), g
+            g = []
+        if v:
+            g.append(v)
+
+print('✅ 八项全过 | 列表块违规', len(viol), '| 单行违规', len(bad),
+      '| 章节', len(heads), '| 汇总表', len(tnums), '| 区间覆盖至', covered[-1],
+      '| 有序列表组', len(groups), '| 变更小节块', len(blocks))
 ```
 
 ### 必须避开的坑
@@ -4691,13 +4779,16 @@ assert not viol and not bad and nums == sorted(nums)
 ```
 [ ] 1. 列表块扫描：连续 `-` / `*` / `1.` 块内首个编号非降序，违规 0
 [ ] 2. 单行扫描：一行含 ≥2 编号且非升序，违规 0
-[ ] 3. 章节扫描：`##` 范式标题编号序列严格升序
-[ ] 4. 表格扫描：导航表与汇总表行序严格升序、汇总表 001~054 连续零跳号
-[ ] 5. 有序列表重编号：`1. 2. 3. …` 连续，无跳号无重复
-[ ] 6. 三方同步：README.md 与 skill.md 逐字节一致，skill.docx 重生成后锚点零缺失
+[ ] 3. 章节扫描：`##` 范式标题编号严格升序且零重号
+[ ] 4. 汇总表扫描：编号从 001 起连续零跳号、首字母列 A-Z 非降、字母列与标题英文名首字母一致
+[ ] 5. 区间表扫描：各字母号段首尾相接，覆盖号段与汇总表逐号一致
+[ ] 6. 有序列表重编号：组内步长恒为 1，`1. 2. 3. …` 连续，无跳号无重复
+[ ] 7. 更新内容块：整块重编号 `1..N` 且各条首个编号升序
+[ ] 8. 变更小节扫描：同版本内 `##### N.` 按分组重启，每组 `1..N` 连续
+[ ] 9. 三方同步：README.md 与 skill.md 逐字节一致，skill.docx 重生成后锚点零缺失
 ```
 
-> **判定标准**: 出现「列表块跨行非升序 / 单行多编号非升序 / 范式章节非升序 / 表格行序非升序 / 排序后未重编号 / 三方未同步」中任意一条，即视为「未符合本范式」。
+> **判定标准**: 出现「列表块跨行非升序 / 单行多编号非升序 / 范式章节非升序或重号 / 汇总表跳号或首字母列非 A-Z 或字母列与英文名不符 / 区间表号段断裂或与汇总表不一致 / 有序列表跳号或未重编号 / 更新内容块未重编号或首个编号非升序 / 变更小节跳号 / 三方未同步」中任意一条，即视为「未符合本范式」。
 
 ---
 
@@ -5230,6 +5321,22 @@ def _lan_base_url():
 - ✅ 表格扫描：汇总表 54 行 `001~054` 连续零跳号、首字母列 A-Z 非降；文档导航表 `011→014→015→016→019→020→021→022→025→033→034→038→044→047→048→051→052→053→054` 非降
 - ✅ 有序列表：v5.0.9.113 更新内容 `1.`~`10.` 连续；PY-CORE-026 核心原则 `1.`~`6.` 连续
 - ✅ 三方同步：README.md 与 skill.md 逐字节一致，skill.docx 由 skill.md 重新生成
+
+##### 6. 📐 校验脚本升级为七项全量，把「严格 A-Z + 从小到大」变成一键可验证 (📝文档更新)
+
+**问题描述**:
+- **现象**: PY-CORE-038 判定标准里的「汇总表字母列与英文名首字母一致」「区间表号段首尾相接」「有序列表 `1..N` 连续」「更新内容块重编号」四条无脚本覆盖，而 PY-CORE-051 自带校验脚本只查 3 项（列表块 / 单行 / 章节），靠人工比对易漏
+- **根因**: 校验脚本与判定标准不同步，范式写了规则但脚本没落全，导致「字母对了但数字乱序」这类问题只能靠肉眼兜
+- **影响范围**: README.md / skill.md / skill.docx 的 PY-CORE-051 校验脚本与落地检查清单
+
+**修复方案**:
+- **技术实现**: 校验脚本由 3 项扩到 8 项——① 列表块跨行首个编号升序；② 单行多编号升序；③ `##` 章节严格升序且零重号；④ 汇总表 001 起连续 + 首字母列 A-Z 非降 + 字母列与标题英文名首字母一致；⑤ 区间表各字母号段首尾相接且与汇总表逐号一致；⑥ 有序列表组内步长恒为 1（允许代码块隔断的延续）；⑦ 更新内容块重编号 `1..N` 且各条首个编号升序；⑧ 变更小节 `##### N.` 按分组重启且每组 `1..N` 连续。落地检查清单由 6 项扩到 9 项，判定标准同步补齐
+- **参考位置**: [skill.md](skill.md#L4643-L4760) PY-CORE-051 八项校验脚本，[skill.md](skill.md#L4776-L4792) 落地检查清单
+
+**测试验证**:
+- ✅ 八项全过：列表块违规 0、单行违规 0、章节 32 个严格升序零重号、汇总表 54 行连续且字母列全一致、区间表覆盖 `001~054` 与汇总表逐号一致、有序列表 183 组步长全为 1、更新内容块 471 个全为 `1..N` 且首号升序、变更小节 470 块分组后每组全为 `1..N`
+- ✅ 修掉历史遗留真跳号：v5.0.9.81 详细小节 `1,2,3,4,11` 改为 `1,2,3,4,5`
+- ✅ 脚本从 skill.md 原样提取可独立执行，语法检查与断言全部通过
 
 ---
 
@@ -9345,7 +9452,7 @@ if (searchType === 'description') {
 - ✅ Windows(MSYS): find检测chrome-win/chrome.exe路径正确
 - ✅ 已安装时跳过安装，未安装时自动安装
 
-##### 11. ⚡ 隧道后台异步启动 (解决Cloudflare 429限流阻塞uvicorn)
+##### 5. ⚡ 隧道后台异步启动 (解决Cloudflare 429限流阻塞uvicorn)
 **问题描述**:
 - **现象**: 2026-10-26 13:19:04启动Web服务后，run.bat显示"等待 Web 服务启动完成..."卡住4分钟+，最终报"[ERROR] Web服务启动超时"退出
 - **根因**: Cloudflare Tunnel启动时遇到429限流(Too Many Requests)，需要等300秒重试。原代码中`auto_start_tunnel()`和`uvicorn.run()`是**串行执行**——隧道卡住就全卡住，uvicorn无法启动
