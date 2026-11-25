@@ -692,12 +692,15 @@ def _assign_product_ids(products):
     return products
 
 
-def _attach_decoded_images(product):
-    """把商品图片字段解码后回填，并标注四大品类与品牌，返回该商品"""
+def _attach_decoded_images(product, prefer_local=None):
+    """把商品图片字段解码后回填，并标注四大品类与品牌，返回该商品
+
+    prefer_local=True 局域网设备用本地IP地址；False 公网设备用云端源地址
+    """
     if isinstance(product, dict):
-        images = product.get('图片', [])
-        decoded = decode_base64_images(images) if images else []
-        product['图片'] = [_normalize_local_media_url(u) for u in decoded]
+        if prefer_local is None:
+            prefer_local = True
+        _apply_client_media(product, prefer_local)
         rules = _folder_rules()
         desc = str(_product_desc(product) or '')
         category = _product_category(
@@ -1811,9 +1814,12 @@ def _is_safe_url(url: str) -> bool:
 
     return False
 
-def _is_media_url(value) -> bool:
-    """是否已是明文媒体地址（http/https），无需再走base64解码"""
-    return isinstance(value, str) and value.strip().lower().startswith(('http://', 'https://'))
+def _is_media_url(value: Any) -> bool:
+    """是否已是明文媒体地址（http/https 或本地媒体相对地址），无需再走base64解码"""
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    return text.lower().startswith(('http://', 'https://')) or text.startswith(_LOCAL_MEDIA_ROUTE)
 
 
 def decode_base64_images(images):
@@ -2031,10 +2037,33 @@ def _product_record(product_id: str) -> Tuple[Optional[dict], str]:
 
 
 def _media_urls_of(product: dict) -> List[str]:
-    """取商品的图片/视频URL列表（base64解码后，局域网地址统一为当前网段）"""
-    urls = [_normalize_local_media_url(u)
-            for u in decode_base64_images(product.get('图片') or []) if isinstance(u, str) and u]
-    return urls[:_MEDIA_MAX_FILES]
+    """取商品的图片/视频URL列表，逐个挑可用的地址：
+
+    本地文件已存在 -> 局域网绝对地址（服务端直接读盘，不再走网络）
+    本地文件缺失   -> 原始云端地址（保存/预览都还能用）
+    两者都没有     -> 原样返回
+    """
+    urls = decode_base64_images(product.get('图片') or [])
+    sources = decode_base64_images(product.get('图片源地址') or [])
+    result = []
+    for idx, u in enumerate(urls):
+        if not isinstance(u, str) or not u:
+            continue
+        rel = _local_media_relpath(u)
+        if rel:
+            local_abs = _local_media_abs_url(rel)
+            local_file = _local_media_abspath(rel)
+            if local_file and os.path.isfile(local_file):
+                result.append(local_abs)
+                continue
+            remote = str(sources[idx] if idx < len(sources) else '')
+            if remote.startswith(('http://', 'https://')) and not _local_media_relpath(remote):
+                result.append(remote)
+                continue
+            result.append(local_abs)
+            continue
+        result.append(u)
+    return result[:_MEDIA_MAX_FILES]
 
 
 def _product_name_source(product: dict) -> str:
@@ -2238,14 +2267,98 @@ def _lan_base_url():
     return f'http://{ip}:{port}'
 
 
-def _local_media_url(relpath):
-    """把下载目录内的相对路径转成局域网可直读的媒体地址"""
+def _local_media_url(relpath: str) -> str:
+    """把下载目录内的相对路径转成媒体地址（相对地址，写入JSON时用，跟随访问域名/隧道）"""
+    if not relpath:
+        return ''
+    return f"{_LOCAL_MEDIA_ROUTE}?path={urllib.parse.quote(relpath)}"
+
+
+def _local_media_abs_url(relpath: str) -> str:
+    """把下载目录内的相对路径转成局域网绝对地址（局域网设备直读用）"""
     if not relpath:
         return ''
     return f"{_lan_base_url()}{_LOCAL_MEDIA_ROUTE}?path={urllib.parse.quote(relpath)}"
 
 
-def _local_media_relpath(url):
+def _client_ip_of(req: Any) -> str:
+    """取请求的真实客户端IP：隧道场景优先取 Cloudflare / 转发头，最后回退直连地址"""
+    try:
+        headers = req.headers
+        ip = (headers.get('cf-connecting-ip') or '').strip()
+        if not ip:
+            ip = (headers.get('x-forwarded-for') or '').split(',')[0].strip()
+        if not ip:
+            ip = req.client.host if req.client else ''
+        return str(ip or '').strip('[]')
+    except Exception:  # [HANDLED]
+        return ''
+
+
+def _is_private_client_ip(ip: str) -> bool:
+    """判断是否局域网/本机地址（10.x、172.16-31.x、192.168.x、127.x、169.254.x、IPv6内网）"""
+    try:
+        addr = ipaddress.ip_address(str(ip or '').strip())
+    except ValueError:
+        return False
+    return addr.is_private or addr.is_loopback or addr.is_link_local
+
+
+def _client_prefers_local_media(req: Any) -> bool:
+    """局域网设备走本地IP直读；公网设备（隧道/外网）走云端源地址"""
+    if req is None:
+        return True
+    return _is_private_client_ip(_client_ip_of(req))
+
+
+def _media_url_for_client(url: str, prefer_local: bool, source_url: str = '', local_relpath: str = '') -> str:
+    """按访问来源挑选媒体地址
+
+    局域网：本地绝对IP地址（直读下载目录里的文件），文件已被清理时回退原始云端地址
+    公网：优先原始云端地址（不经本地中转、不走base64），缺失时才回退相对本地地址
+    """
+    rel = _local_media_relpath(url) or str(local_relpath or '')
+    src = str(source_url or '')
+    has_remote = src.startswith(('http://', 'https://')) and not _local_media_relpath(src)
+    if prefer_local:
+        if rel:
+            local_file = _local_media_abspath(rel)
+            if local_file and os.path.isfile(local_file):
+                return _local_media_abs_url(rel)
+            return src if has_remote else _local_media_abs_url(rel)
+        return url
+    if has_remote:
+        return src
+    if rel:
+        return _local_media_url(rel)
+    return url
+
+
+def _apply_client_media(product: dict, prefer_local: bool) -> dict:
+    """按访问来源回填商品的图片/视频地址（图片与图片解码保持一致）"""
+    if not isinstance(product, dict):
+        return product
+    urls = decode_base64_images(product.get('图片') or [])
+    sources = decode_base64_images(product.get('图片源地址') or [])
+    paths = product.get('本地路径') or []
+    if isinstance(paths, str):
+        paths = [paths]
+    elif not isinstance(paths, list):
+        paths = []
+    chosen = []
+    for idx, url in enumerate(urls):
+        chosen.append(_media_url_for_client(
+            url,
+            prefer_local,
+            sources[idx] if idx < len(sources) else '',
+            paths[idx] if idx < len(paths) else '',
+        ))
+    product['图片'] = chosen
+    product['图片解码'] = chosen
+    return product
+
+
+def _local_media_relpath(url: Any) -> str:
     """从局域网媒体地址里取出相对路径；不是本地媒体地址时返回空串"""
     if not isinstance(url, str) or _LOCAL_MEDIA_ROUTE not in url:
         return ''
@@ -2256,8 +2369,8 @@ def _local_media_relpath(url):
     return (query.get('path') or [''])[0]
 
 
-def _normalize_local_media_url(url):
-    """把局域网媒体地址重写成当前局域网地址（换网段/换IP后旧JSON里的地址依然可用）"""
+def _normalize_local_media_url(url: Any) -> Any:
+    """把本地媒体地址统一成相对地址（换网段/换IP/走隧道后旧JSON里的地址依然可用）"""
     if not isinstance(url, str) or _LOCAL_MEDIA_ROUTE not in url:
         return url
     rel = _local_media_relpath(url)
@@ -2266,7 +2379,7 @@ def _normalize_local_media_url(url):
     return _local_media_url(rel) or url
 
 
-def _local_media_abspath(relpath):
+def _local_media_abspath(relpath: Any) -> str:
     """把相对路径解析成下载目录内的绝对路径，越界或非法时返回空串"""
     raw = str(relpath or '').strip()
     if raw.startswith('/') or raw.startswith('\\') or ':' in raw[:3]:
@@ -13146,7 +13259,7 @@ if __name__ == '__main__':
                 return jsonify({'error': '服务器内部错误'}, status_code=500)
 
         @app.get('/api/products')  # [SECURED]
-        async def get_all_products():
+        async def get_all_products(request: Request):
             try:
                 def _load_products_json():
                     latest_file = _latest_product_json_path()
@@ -13171,12 +13284,9 @@ if __name__ == '__main__':
                         added_skus = set(last_record.get('added', []))
 
                 _rules = _folder_rules()
+                _prefer_local = _client_prefers_local_media(request)
                 for p in products:
-                    img_data = p.get('图片', '')
-                    if img_data:
-                        p['图片'] = decode_base64_images(img_data)
-                    else:
-                        p['图片'] = []
+                    _apply_client_media(p, _prefer_local)
                     sku = p.get('货号', '') or p.get('stock_number', '')
                     p['_isNew'] = sku in added_skus
                     desc = str(_product_desc(p) or '')
@@ -13555,7 +13665,7 @@ if __name__ == '__main__':
                 return jsonify({'error': '服务器内部错误'}, status_code=500)
 
         @app.get('/api/product')  # [SECURED]
-        async def get_product(sku: str = ''):
+        async def get_product(request: Request, sku: str = ''):
             sku = sku.strip()
             if not sku:
                 return jsonify({'error': '请提供货号'}, status_code=400)
@@ -13572,32 +13682,10 @@ if __name__ == '__main__':
                 return jsonify({'found': False, 'error': '没有找到JSON文件'})
             try:
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
+                _prefer_local = _client_prefers_local_media(request)
                 for p in products:
                     if _sku_matches(p.get('货号'), sku):
-                        # 解码Base64图片URL
-                        images = p.get('图片', [])
-                        if images:
-                            if isinstance(images, list):
-                                decoded_images = []
-                                for img in images:
-                                    try:
-                                        decoded = base64.b64decode(img).decode('utf-8')
-                                        decoded_images.append(decoded)
-                                    except Exception as e:  # [HANDLED]
-                                        logger.debug(f"Exception decoding image: {e}")
-                                        decoded_images.append(img)
-                                p['图片'] = decoded_images
-                            elif isinstance(images, str):
-                                try:
-                                    decoded = base64.b64decode(images).decode('utf-8')
-                                    p['图片'] = [decoded]
-                                except Exception as e:  # [HANDLED]
-                                    logger.debug(f"Exception decoding image to list: {e}")
-                                    p['图片'] = [images]
-                            else:
-                                p['图片'] = []
-                        else:
-                            p['图片'] = []
+                        _apply_client_media(p, _prefer_local)
                         p['_id'] = _product_stable_id(p, 0)
                         return jsonify({'found': True, 'product': p})
                 safe_log(logger, 'warning', '[get_product] 未找到货号={s} 文件={f} 商品数={n}',
@@ -13608,7 +13696,7 @@ if __name__ == '__main__':
                 return jsonify({'found': False, 'error': '服务器内部错误'})
         
         @app.get('/api/product/search')  # [SECURED]
-        async def search_product(sku: str = '', price: str = '', price_min: str = '', price_max: str = '', search_type: str = 'sku'):
+        async def search_product(request: Request, sku: str = '', price: str = '', price_min: str = '', price_max: str = '', search_type: str = 'sku'):
             search_type = search_type.strip().lower()
 
             if search_type not in ['sku', 'description', 'price', 'price_range', 'remark', 'brand']:
@@ -13706,57 +13794,19 @@ if __name__ == '__main__':
                 
                 _assign_product_ids(products)
                 matched_products = []
+                _prefer_local = _client_prefers_local_media(request)
                 
                 if search_type == 'sku':
                     for p in products:
                         if _sku_matches(p.get('货号'), sku):
-                            media_result = []
-                            new_image_url = p.get('图片', '')
-                            img_data = new_image_url
-                            if new_image_url:
-                                try:
-                                    if isinstance(new_image_url, str):
-                                        if new_image_url.strip().startswith('<') or not new_image_url.strip().startswith('['):
-                                            img_data = new_image_url
-                                        else:
-                                            try:
-                                                img_data = json.loads(new_image_url)
-                                            except (json.JSONDecodeError, TypeError):
-                                                img_data = new_image_url
-                                    else:
-                                        img_data = new_image_url
-                                except Exception as e:  # [HANDLED]
-                                    logger.debug(f'  ⚠️ 图片URL解析异常: {e}')
-                                    img_data = new_image_url
-                            if isinstance(img_data, list):
-                                for b64_str in img_data:
-                                    try:
-                                        decoded_url = base64.b64decode(b64_str).decode('utf-8')
-                                        if decoded_url.startswith('http'):
-                                            media_result.append(decoded_url)
-                                        else:
-                                            media_result.append(b64_str)
-                                    except Exception as e:  # [HANDLED]
-                                        logger.debug(f"Exception processing media: {e}")
-                                        media_result.append(b64_str)
-                            else:
-                                try:
-                                    decoded_url = base64.b64decode(img_data).decode('utf-8')
-                                    if decoded_url.startswith('http'):
-                                        media_result = [decoded_url]
-                                    else:
-                                        media_result = [img_data]
-                                except Exception as e:  # [HANDLED]
-                                    logger.debug(f"Exception processing media: {e}")
-                                    media_result = [img_data]
-                            p['图片'] = media_result
+                            _apply_client_media(p, _prefer_local)
                             return jsonify({'found': True, 'product': p, 'filename': os.path.basename(latest_file), 'saved': True})
                     fuzzy_products = [p for p in products if _sku_fuzzy_matches(p.get('货号'), sku)]
                     if not fuzzy_products:
                         fuzzy_products = [p for p in products if _pinyin_search_hit(sku, _product_desc(p))]
                     if fuzzy_products:
                         for p in fuzzy_products:
-                            _attach_decoded_images(p)
+                            _attach_decoded_images(p, _prefer_local)
                         return jsonify({
                             'found': True,
                             'products': fuzzy_products[:50],
@@ -13776,7 +13826,7 @@ if __name__ == '__main__':
                         stored_desc = _normalize_text(_product_desc(p)).lower()
                         if not _pinyin_search_hit(sku, _product_desc(p)):
                             continue
-                        _attach_decoded_images(p)
+                        _attach_decoded_images(p, _prefer_local)
                         if stored_desc == target_keyword:
                             exact_products.append(p)
                         else:
@@ -13801,8 +13851,7 @@ if __name__ == '__main__':
                             try:
                                 product_price = float(price_str.replace('¥', '').replace(',', '').strip())
                                 if abs(product_price - price_float) < 0.01:
-                                    images = p.get('图片', [])
-                                    p['图片'] = decode_base64_images(images) if images else []
+                                    _apply_client_media(p, _prefer_local)
                                     matched_products.append(p)
                             except (ValueError, TypeError):
                                 continue
@@ -13828,8 +13877,7 @@ if __name__ == '__main__':
                                     in_range = False
                                 
                                 if in_range:
-                                    images = p.get('图片', [])
-                                    p['图片'] = decode_base64_images(images) if images else []
+                                    _apply_client_media(p, _prefer_local)
                                     matched_products.append(p)
                             except (ValueError, TypeError):
                                 continue
@@ -13849,7 +13897,7 @@ if __name__ == '__main__':
 
                 elif search_type == 'brand':
                     for p in products:
-                        _attach_decoded_images(p)
+                        _attach_decoded_images(p, _prefer_local)
                         brand = str(p.get('_brand', '') or '')
                         category = str(p.get('_category', '') or '')
                         haystack = f'{category}/{brand} {_brand_aliases_text(brand, category)}'
@@ -13873,8 +13921,7 @@ if __name__ == '__main__':
                         remark_text = str(p.get('备注', '') or p.get('remark', ''))
                         if not _pinyin_search_hit(sku, remark_text):
                             continue
-                        images = p.get('图片', [])
-                        p['图片'] = decode_base64_images(images) if images else []
+                        _apply_client_media(p, _prefer_local)
                         matched_products.append(p)
                     if matched_products:
                         return jsonify({
@@ -13893,7 +13940,7 @@ if __name__ == '__main__':
                 return jsonify({'error': '搜索商品失败'}, status_code=500)
 
         @app.get('/api/product/by-description')  # [SECURED]
-        async def get_product_by_description(description: str = ''):
+        async def get_product_by_description(request: Request, description: str = ''):
             description = description.strip()
             if not description:
                 return JSONResponse(content={'error': '请提供商品描述'}, status_code=400)
@@ -13920,6 +13967,7 @@ if __name__ == '__main__':
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 _assign_product_ids(products)
                 target_desc = _normalize_text(description)
+                _prefer_local = _client_prefers_local_media(request)
 
                 def _ambiguous(cands):
                     return jsonify({
@@ -13935,7 +13983,7 @@ if __name__ == '__main__':
 
                 exact = [p for p in products if _normalize_text(_product_desc(p)) == target_desc]
                 if len(exact) == 1:
-                    return jsonify({'found': True, 'product': _attach_decoded_images(exact[0])})
+                    return jsonify({'found': True, 'product': _attach_decoded_images(exact[0], _prefer_local)})
                 if len(exact) > 1:
                     safe_log(logger, 'warning', '[get_product_by_description] 描述命中多个商品 count={n}', n=len(exact))
                     return _ambiguous(exact)
@@ -13943,7 +13991,7 @@ if __name__ == '__main__':
                 candidates = [p for p in products if target_desc and target_desc in _normalize_text(_product_desc(p))]
                 if len(candidates) == 1:
                     safe_log(logger, 'warning', '[get_product_by_description] 精确匹配失败，已用唯一子串兜底命中')
-                    return jsonify({'found': True, 'product': _attach_decoded_images(candidates[0])})
+                    return jsonify({'found': True, 'product': _attach_decoded_images(candidates[0], _prefer_local)})
                 if len(candidates) > 1:
                     safe_log(logger, 'warning', '[get_product_by_description] 子串命中多个商品 count={n}', n=len(candidates))
                     return _ambiguous(candidates)
@@ -13956,7 +14004,7 @@ if __name__ == '__main__':
                 return jsonify({'found': False, 'error': '查询商品信息失败'})
 
         @app.get('/api/product/by-id')  # [SECURED]
-        async def get_product_by_id(product_id: str = ''):
+        async def get_product_by_id(request: Request, product_id: str = ''):
             product_id = product_id.strip()
             if not product_id or len(product_id) > 200:
                 return JSONResponse(content={'error': '请提供有效的商品ID'}, status_code=400)
@@ -13975,9 +14023,10 @@ if __name__ == '__main__':
             try:
                 products = data.get('商品列表', []) if isinstance(data, dict) else data
                 _assign_product_ids(products)
+                _prefer_local = _client_prefers_local_media(request)
                 for p in products:
                     if p.get('_id') == product_id:
-                        return jsonify({'found': True, 'product': _attach_decoded_images(p)})
+                        return jsonify({'found': True, 'product': _attach_decoded_images(p, _prefer_local)})
 
                 fallback = []
                 pid_lower = product_id.lower()
@@ -13992,7 +14041,7 @@ if __name__ == '__main__':
                     ]
                 if len(fallback) == 1:
                     safe_log(logger, 'warning', '[get_product_by_id] 严格ID未命中，已按归一化兜底命中 ID={i}', i=product_id)
-                    return jsonify({'found': True, 'product': _attach_decoded_images(fallback[0])})
+                    return jsonify({'found': True, 'product': _attach_decoded_images(fallback[0], _prefer_local)})
                 if len(fallback) > 1:
                     safe_log(logger, 'warning', '[get_product_by_id] 兜底命中多个商品 ID={i} count={n}', i=product_id, n=len(fallback))
                     return jsonify({

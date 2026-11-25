@@ -882,17 +882,30 @@
             }
         }
         
+        function resolveLocalMediaUrl(url) {
+            if (!url || typeof url !== 'string' || url.indexOf('/api/media/local') === -1) return url;
+            try {
+                const parsed = new URL(url, window.location.origin);
+                return window.location.origin + parsed.pathname + parsed.search;
+            } catch (e) {
+                return url;
+            }
+        }
+
         function decodeBase64Url(url) {
             if (!url) return url;
             try {
                 if (url.startsWith('http://') || url.startsWith('https://')) {
                     log('URL已是HTTP格式:', url.substring(0, 50) + '...');
-                    return url;
+                    return resolveLocalMediaUrl(url);
+                }
+                if (url.charAt(0) === '/') {
+                    return resolveLocalMediaUrl(url);
                 }
                 const decoded = atob(url);
                 if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
                     log('Base64解码成功:', decoded.substring(0, 50) + '...');
-                    return decoded;
+                    return resolveLocalMediaUrl(decoded);
                 }
                 log('解码后非HTTP格式，返回原始URL');
                 return url;
