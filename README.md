@@ -5656,7 +5656,7 @@ if hit is not None:
 **修复日期**: 2026-11-25  
 **修复类型**: 🐛 Bug修复 + 🚀 性能优化 + 📝 文档更新  
 **影响文件**: [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)  
-**Commit**: 9de48ee2  
+**Commit**: 9de48ee2, 1f641edf  
 **变更统计**: +67行 -29行  
 **作者**: 小旭二手机（西园路）
 
@@ -5675,7 +5675,7 @@ if hit is not None:
 
 **测试验证**:
 - ✅ 货号 `84715` 详情返回 `_category` / `_brand` 均有值，卡片不再出现 `-`
-- ✅ 五个商品接口逐一实测，`_category` / `_brand` / `_brand_alias` / `_search_sku` / `_search_desc` / `_search_remark` 六个字段全部非空
+- ✅ 五个商品接口逐一实测，`_category` / `_brand` / `_brand_alias` / `_search_sku` / `_search_desc` 五个字段全部非空，`_search_remark` 按备注原文生成（该商品无备注时为空串，符合预期）
 - ✅ 全量 128 条商品逐字段对比新旧逻辑，标注结果完全一致，无一条差异
 
 ##### 2. ⚡ 新增商品标注结果缓存与级联签名 (🚀性能优化)
