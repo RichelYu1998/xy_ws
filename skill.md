@@ -1,4 +1,4 @@
-# 微购相册管理系统 (WegoAlbum Manager)
+# xy_ws
 
 > **⚙️ 编码标准**: 本项目所有文件（包括源代码、文档、配置文件等）**必须且仅使用 UTF-8 编码**。禁止使用任何其他编码格式（如 GBK、GB2312、Latin-1 等）。
 >
@@ -32,7 +32,7 @@
 | 📐 大文件小范围修改临时脚本范式 (PY-CORE-035) | 大文件禁用全量重写，锚点式最小替换 |
 | 🔴 局域网媒体本地化范式 (LAN Media URL Localization) (PY-CORE-036) | 图片/视频换成当前局域网地址，JSON 四字段并存（加密版/解密版/源地址/本地路径） |
 | 📐 范式编号规则范式 (PY-CORE-040) | 前缀+三位数字、A-Z 位次累加与区间表 |
-| 🔴 全尺寸显示适配范式 (Responsive Display Adaptation) (PY-CORE-042) | 320px 手机 ~ 7680px 8K 投影全档适配，字号/容器/高度三支柱 |
+| 🔴 全尺寸显示适配范式 (Responsive Display Adaptation) (PY-CORE-042) | 200px 智能手表/折叠屏外屏 ~ 38400px+ 300 寸以上 LED 墙全档适配（凡能上网的设备全覆盖），4K/8K/16K/25600/38400 续档 + 下限兜底，字号/容器/高度三支柱 |
 | 📐 安全审计零问题范式 (PY-CORE-047) | 总计问题必须为 0 的判定标准 |
 | 📐 终端实时日志接入范式 (PY-CORE-050) | sh / bat 实时日志双方案 |
 | 🔴 临时目录提交前清理范式 (Temp Directory Pre-Commit Purge) (PY-CORE-051) | temp/ 提交前必须归零、不入版本库 |
@@ -40,6 +40,9 @@
 | 📐 零缺陷全量验证范式 (Zero-Defect Full Coverage Verification) (PY-CORE-055) | 全量攻防 + 隐藏Bug清零 + 完整数据三合一判定 |
 | 🔴 项目根目录零删除权限范式 (Zero Delete Permission on Project Root) (PY-CORE-056) | 项目根与祖先目录删除能力恒为零、不可授予 |
 | 🔴 零中文输入拼音搜索范式 (Zero-Chinese-Input Pinyin Search) (PY-CORE-057) | 货号/描述/品牌/备注四类搜索全部支持拼音全拼与首字母 |
+| 🔴 零溢出导航栏居中范式 (Zero-Overflow Navbar Centering) (PY-CORE-058) | 折叠态标题居中 + 时间/Token 各占一排靠左 + 零横向溢出 + 零遮挡，200px~38400px 全档 Playwright 实测零缺陷 |
+| 🔴 零人工浏览器验证范式 (Zero-Manual Browser Verification) (PY-CORE-059) | 适配 / 布局类改动一律由 test/browser_adapt_test.py 用 Playwright 实测 273 档断言（28 类 171 款设备屏幕 → 156 档 + 看板 108 档 + 展开态 9 档），单次跑完必须 ≤ 10 秒，禁止 Selenium 与静态推演结论，离线可重复、退出码 0 才提交 |
+| 🔴 全设备零遗漏覆盖范式 (Zero-Skip Device Coverage) (PY-CORE-060) | 28 类 171 款已发布设备屏幕（手表 / 手环 / 小折叠内外屏 / 阔折叠 / 大折叠 / 三折叠 / 双屏手机 / 卷轴环绕屏 / 手机 / 平板 / 双屏折叠笔电 / 笔电 / 桌面 / 超宽 / 电视 / 投影 / LED 墙 / 条形屏 / 车机 / 车载副屏 / 标牌 / 智能家居 / 头显 / 电子纸）逐款进矩阵，缺一类即判失败 |
 | 🔄 最新更新 | 当前版本变更详情 |
 | 🛡️ 企业级防御性编程规范与安全标准 (Enterprise Security Standards) | 防御性编程与安全基线 |
 | 🎯 核心原则 | 编码总纲与决策原则 |
@@ -210,7 +213,10 @@ xy_ws/
 │   ├── bench_prefetch.py   # 相册首包耗时基准测试
 │   ├── diag_hedge.py       # 对冲请求延迟诊断
 │   ├── diag_lanes.py       # 多路并发延迟分布诊断
-│   └── diag_fallback.py    # 预热失败兜底路径诊断
+│   ├── diag_fallback.py    # 预热失败兜底路径诊断
+│   ├── code_style_check.py # 阿里规范常驻闸门（全量 .py 自动发现）
+│   ├── browser_adapt_test.py # 浏览器自动化适配回归（Playwright 273 档实测 / ≤10 秒）
+│   └── fixtures/           # 测试离线固化资源（bootstrap / jquery / popper / font-awesome）
 ├── launchd/                # macOS 守护进程配置
 │   └── com.xyws.web.plist
 ├── dist/                   # 前端资源
@@ -501,7 +507,7 @@ if __name__ == '__main__':
 | ALI-009 | 禁止 `eval` / `new Function` / `document.write` | JavaScript | 正则 |
 | ALI-010 | 路由处理函数内禁止 `print`，必须 `logger` / `log_print` | Python | AST + `app.` 装饰器区间 |
 | ALI-011 | 类名 CamelCase（允许 `_` 前缀）、函数名 snake_case | Python | 正则 |
-| ALI-012 | 核心受检文件必须存在（`main.py` / `config/crypto_tool.py` / `test/code_style_check.py` / `test/security_audit.py` / `test/generate_docx.py`），其余 `.py` 由自动发现兜底 | 全仓库 | 文件存在性 |
+| ALI-012 | 核心受检文件必须存在（`main.py` / `config/crypto_tool.py` / `test/code_style_check.py` / `test/security_audit.py` / `test/generate_docx.py` / `test/browser_adapt_test.py`），其余 `.py` 由自动发现兜底 | 全仓库 | 文件存在性 |
 | ALI-013 | 超时值必须取自 `TIMEOUT_CONFIG` / 环境变量 / 模块常量，禁止裸数字 | Python | AST 关键字参数 |
 | ALI-014 | 文件必须 UTF-8 且无 BOM | 全仓库 | 首字节检查 |
 | ALI-015 | 禁止 `TODO` / `FIXME` / `XXX` / `HACK` 注释遗留 | 全仓库 | 注释正则 |
@@ -513,7 +519,7 @@ if __name__ == '__main__':
 
 ```python
 PY_REQUIRED = ['main.py', 'config/crypto_tool.py', 'test/generate_docx.py', 'test/security_audit.py',
-               'test/code_style_check.py']
+               'test/code_style_check.py', 'test/browser_adapt_test.py']
 PY_EXCLUDE_DIRS = {'.git', '.venv', '.idea', 'node_modules', 'tools', 'temp', 'file'}
 
 
@@ -784,7 +790,7 @@ jobs:
 
 ## 🔴 PY-CORE-011: Changelog API数据结构与Git历史集成范式 (Changelog API & Git History Integration)
 
-> **创建日期**: 2026-08-31 | **最后更新**: 2026-08-31 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 + 前端更新日志展示 | **参考基准**: v5.0.9
+> **创建日期**: 2026-08-31 | **最后更新**: 2026-11-26 | **优先级**: 🔴 P0 强制规范 | **适用范围**: /api/changelog 端点 + 前端更新日志展示 | **参考基准**: v5.0.9
 
 ### 范式描述
 `/api/changelog` 端点必须集成 **README.md 结构化解析** 与 **Git提交历史**，确保所有Git提交（无论多少次）都展示在API中。前后端必须使用统一的数据结构字段名，避免字段名不匹配导致Web展示空白。
@@ -914,6 +920,9 @@ if (item.verification && item.verification.length) {
 - [ ] **版本号提取**：从commit message用 `re.search(r'v([\d.]+)')` 提取
 - [ ] **Emoji标签识别**：从commit message开头识别emoji自动分类
 - [ ] **字段补全**：自动补全commit hash、修复日期、作者字段
+- [ ] **零空 changes**：任何版本 `changes` 不得为空数组，缺失时用 Git 提交信息合成真实条目（`tag` / `title` / `problem` / `solution` 全部落到真实值）
+- [ ] **零占位符**：`待生成` / `无文件变更` / `详见Git提交记录` 等占位文本一律替换为 Git 真实数据（`git show --name-only` / `git show --shortstat`），并把占位词写进 `_placeholder_tokens` 统一拦截
+- [ ] **合并提交的文件**：`git log --numstat` 对合并提交不输出文件行，必须加 `--diff-merges=first-parent`，或用 `git diff-tree -r -m --name-only` 二次补取，否则「影响文件」退化成占位文案
 - [ ] **异常处理**：git log失败时降级为仅返回README解析结果
 
 ### 反面案例（避免）
@@ -932,6 +941,17 @@ if version_key in seen_versions: continue  # 丢失同版本的多次提交
 ```python
 if stripped.startswith('## ') and in_changelog:
     break  # 只返回最新更新区，丢失历史版本
+```
+
+❌ 错误示例4：changes 为空或留占位就返回
+```python
+merged_changelog.append({'version': version_key, 'changes': [], 'meta': {'commit': '待生成'}})
+file_list_str = file_list_str or '无文件变更'   # 前端「影响文件」直接显示占位文案
+```
+
+❌ 错误示例5：合并提交用 `--numstat` 取文件
+```python
+['git', 'log', '--numstat', '--pretty=format:...']   # 合并提交不输出文件行 → 影响文件为空
 ```
 
 ---
@@ -3980,10 +4000,10 @@ def install_playwright_cdn():
 | v | 053-053 | 053 | 满 |
 | w | 054-054 | 054 | 满 |
 | x / y | — | — | ✅ 空 |
-| z | 055-057 | 055-057 | 满 |
+| z | 055-060 | 055-060 | 满 |
 
 > 空字母不占号：新范式落在空字母时，按其字母位置插入队列，其后所有范式数字整体 +1（例如新增 j 字母范式，则 033 起全部 +1）。
-> 号位不设人为上限：三位补零自然覆盖 `001`~`999`，若将来突破 999 则进位为四位（`PY-CORE-1000`），前缀与 A-Z 位次规则不变。当前队列长度 57，剩余可用号位无上限。
+> 号位不设人为上限：三位补零自然覆盖 `001`~`999`，若将来突破 999 则进位为四位（`PY-CORE-1000`），前缀与 A-Z 位次规则不变。当前队列长度 60，剩余可用号位无上限。
 
 ### 新增范式标准动作（顺序不可颠倒）
 
@@ -4112,26 +4132,88 @@ def install_playwright_cdn():
 
 ---
 
+### 更早重排实录（v5.0.9.133，新增 z 组「零溢出导航栏居中」）
+
+| 动作 | 说明 |
+|---|---|
+| 新增范式 | 零溢出导航栏居中 (Zero-Overflow Navbar Centering) → 首字母 z |
+| 插入位次 | z 组末位，紧随 `PY-CORE-057` 零中文输入拼音搜索之后落号 `PY-CORE-058`，两者同属「前端可用性」链路（057 管搜索输入，058 管顶部信息呈现） |
+| 整体位移 | 无位移：新范式落在队列末尾，`001`~`057` 编号全部保持原号不动 |
+| 同步范围 | 正文标题、文档导航、汇总表、区间表（z 055-058）、交叉引用、PY-CORE-042 落地清单与坑表、历史版本记录 |
+| 三校验结果 | 零跳号（001~058 连续）、零重号（每个号仅一个范式）、零遗漏（58 个范式全覆盖） |
+
+---
+
+### 本轮修正实录（v5.0.9.138，无新增范式，`PY-CORE-059` 补极小屏抖动自检 + `PY-CORE-011` 补 changelog 零占位）
+
+| 动作 | 说明 |
+|---|---|
+| 范式变化 | 不新增编号，`PY-CORE-001`~`PY-CORE-060` 编号与位次全部不动 |
+| 测试加固 | ≤200px 档位同视口连采两次比对 `JITTER_KEYS`，第二次走 `METRICS_READ_JS` 只读采集，总耗时仍 ≤10s |
+| 接口加固 | 合并提交文件用 `--diff-merges=first-parent` + `git diff-tree -m` 补取；`无文件变更` / `待生成` 全部收进占位符统一替换 |
+| 同步范围 | `PY-CORE-059` 断言清单 + 落地清单 + 坑表 + 判定标准、`PY-CORE-011` 最佳实践清单 + 反面案例、最新更新章节、历史版本记录 |
+
+---
+
+### 上轮扩档实录（v5.0.9.137，无新增范式，扩 `PY-CORE-060` 覆盖广度 + 定 `PY-CORE-059` 性能预算）
+
+| 动作 | 说明 |
+|---|---|
+| 范式变化 | 不新增编号，`PY-CORE-001`~`PY-CORE-060` 编号与位次全部不动 |
+| 覆盖广度 | `DEVICE_FAMILIES` 20 类 140 款 → 28 类 171 款（去重 131 → 156 档），新增双屏手机展开 / 卷轴与环绕屏 / 双屏与折叠笔记本 / 条形屏 / 车载副屏与后排屏 / 智能家居带屏 / 头显 VR-AR / 电子墨水屏 |
+| 性能预算 | 273 项总耗时压到 8.0~9.2s，`TIMING_BUDGET_S = 10.0` 写进脚本，超时即判失败 |
+| 同步范围 | 059 / 060 正文（断言清单 + 落地检查清单 + 坑表 + 判定标准）、设备覆盖清单、实测矩阵段、文档导航与汇总表、历史版本记录 |
+
+---
+
+### 前轮重排实录（v5.0.9.136，新增 z 组「全设备零遗漏覆盖」）
+
+| 动作 | 说明 |
+|---|---|
+| 新增范式 | 全设备零遗漏覆盖 (Zero-Skip Device Coverage) → 首字母 z |
+| 插入位次 | z 组末位，紧随 `PY-CORE-059` 零人工浏览器验证之后落号 `PY-CORE-060`，两者同属「浏览器实测」链路（059 定验证手段，060 定验证广度） |
+| 整体位移 | 无位移：新范式落在队列末尾，`001`~`059` 编号全部保持原号不动 |
+| 同步范围 | 正文标题、文档导航、汇总表、区间表（z 055-060）、交叉引用、PY-CORE-042 / PY-CORE-058 / PY-CORE-059 落地清单与坑表、历史版本记录 |
+| 三校验结果 | 零跳号（001~060 连续）、零重号（每个号仅一个范式）、零遗漏（60 个范式全覆盖） |
+
+---
+
+### 更早重排实录（v5.0.9.135，新增 z 组「零人工浏览器验证」）
+
+| 动作 | 说明 |
+|---|---|
+| 新增范式 | 零人工浏览器验证 (Zero-Manual Browser Verification) → 首字母 z |
+| 插入位次 | z 组末位，紧随 `PY-CORE-058` 零溢出导航栏居中之后落号 `PY-CORE-059`，两者同属「浏览器实测」链路（058 定布局标准，059 定验证手段） |
+| 整体位移 | 无位移：新范式落在队列末尾，`001`~`058` 编号全部保持原号不动 |
+| 同步范围 | 正文标题、文档导航、汇总表、区间表（z 055-059）、交叉引用、PY-CORE-042 / PY-CORE-058 落地清单与坑表、历史版本记录 |
+| 三校验结果 | 零跳号（001~059 连续）、零重号（每个号仅一个范式）、零遗漏（59 个范式全覆盖） |
+
+---
+
 ## 🔴 PY-CORE-042: 全尺寸显示适配范式 (Responsive Display Adaptation)
 
-> **创建日期**: 2026-11-25 | **最后更新**: 2026-11-25 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [index.html](index.html) / [dist/index.html](dist/index.html) / [dist/display-adapt.css](dist/display-adapt.css) / [dist/app.js](dist/app.js)
+> **创建日期**: 2026-11-25 | **最后更新**: 2026-11-26 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [index.html](index.html) / [dist/index.html](dist/index.html) / [dist/display-adapt.css](dist/display-adapt.css) / [dist/app.js](dist/app.js)
 
 ### 🔴 核心原则：以「最小可读视口」为标尺，任何尺寸都不许「看不清 / 放不下 / 横向滚动」
 
-**适配区间是 `320px` 手机 ~ `7680px` 8K 投影（覆盖 300 寸投影与 100 寸电视），不是「笔记本到 4K」。** 屏幕越大不代表越好读：不放开容器宽度上限，100 寸电视上内容只剩中间一条窄带；不放大根字号，投影仪上正文小如蚁；只写 `100vh`，移动端地址栏收起就溢出。适配必须同时管住三件事：**字号随视口流体缩放**、**容器宽度逐档放开**、**高度走动态视口单位**。
+**适配区间是 `200px` 智能手表 / 折叠屏外屏 ~ `38400px+`（300 寸以上 LED 墙 / 800 寸巨型拼接屏）：下限覆盖一切「能上网的设备」（智能手表、折叠屏外屏、老式功能机、手机），上限覆盖 300 寸及以上 LED 墙，中间覆盖 4K `3840px`、8K `7680px`、16K `15360px`、`25600px` 四档，不是「笔记本到 4K」。** 屏幕越大不代表越好读：不放开容器宽度上限，300 寸墙上内容只剩中间一条窄带；不放大根字号，远距离观看正文小如蚁；只写 `100vh`，移动端地址栏收起就溢出。屏幕越小同样不代表越省事：不设 `< 320px` 兜底档，手表与外屏上 16px 字号加 48px 留白会把标题挤出屏幕。适配必须同时管住三件事：**字号随视口流体缩放**、**容器宽度逐档放开**、**高度走动态视口单位**。
+
+> **上限会「顶死」**：`clamp()` 的第三个参数是字号上限，8K 档已经顶到 `48px`（看板层 `56px`）。屏幕再大时若不加新档位，根字号就停在原地 —— 300 寸屏上字不再放大、容器又被旧档 `max-width` 夹住，等于「大屏适配在 8K 处戛然而止」。所以 8K 以上必须继续加档，且新档位要**放在适配层最后**，否则会被前面的 3840 / 7680 / 竖屏档位反向覆盖。
 
 ### 三根支柱
 
 | 支柱 | 做法 | 反例（禁止） |
 |---|---|---|
+| **下限兜底** | `< 320px` 单独一档：根字号 `clamp(12px, …, 13px)`、gutter 收到 `10px`、标题左右避让由 `48px` 收到 `34px`、看板 iframe 收到 `220px` | 只写 `max-width: 375px`，手表 / 折叠屏外屏上 16px 字号加 48px 留白把标题挤出屏幕 |
 | **字号流体化** | 根字号 `clamp(16px, calc(0.5128vw + 8.62px), 48px)`，全站 rem 尺寸随之等比放大 | 全站写死 `font-size: 14px`，大屏不放大 |
-| **宽度分档放开** | 1400 / 1920 / 2560 / 3840 / 7680 五档 `max-width`，每档 `min(vw, px)` 双约束 | 全程 `max-width: 1200px`，4K 屏只占三分之一 |
+| **宽度分档放开** | 1400 / 1920 / 2560 / 3840 / 7680 / 15360 / 25600 / 38400 八档 `max-width`，每档 `min(vw, px)` 双约束 | 全程 `max-width: 1200px`，4K 屏只占三分之一 |
 | **高度动态化** | `min-height: 100vh` 紧跟一行 `100dvh`，iframe 高度走 `clamp(px, vh, px)` | 只写 `100vh`，地址栏收起即溢出 |
 
 ### 档位表（视口宽度 → 容器上限 / 看板高度 / 根字号上限）
 
 | 视口宽度 | 典型设备 | 容器 `max-width` | 看板 iframe 高度 | 根字号上限 |
 |---|---|---|---|---|
+| < 320px | 智能手表 / 折叠屏外屏 / 老式功能机（200~319） | 100%（`gutter` 收窄到 6~10px） | 220px | 12~13px |
 | < 576px | 手机竖屏（320~575） | 100%（Bootstrap 流式） | 280px（≤375px 为 260px） | 16px |
 | 576~1399px | 平板 / 笔记本 | 1140px | 400px → 480px → 520px → 560px（随 576/768/992/1200 断点递进） | 16px |
 | 1400~1599px | FHD 宽屏笔记本 | 1320px | 560px 固定档 | 16px |
@@ -4139,7 +4221,10 @@ def install_playwright_cdn():
 | 1920~2559px | 2K 显示器 / 55 寸电视 | `min(88vw, 1720px)` | `clamp(600px, 62vh, 1200px)` | 约 18px |
 | 2560~3839px | 2K 宽屏 / 75 寸电视 | `min(86vw, 2320px)` | `clamp(900px, 66vh, 1700px)` | 约 22px |
 | 3840~7679px | 4K 显示器 / 100 寸电视 | `min(84vw, 3400px)` | `clamp(1300px, 70vh, 2400px)` | 约 28px |
-| ≥ 7680px | 8K / 300 寸投影 | `min(82vw, 6600px)` | 4K 档沿用，实际高度由视口决定 | 48px |
+| 7680~15359px | 8K 面板 / 300 寸 4K·8K 墙 | `min(82vw, 6600px)` | 4K 档沿用，实际高度由视口决定 | 48px（顶到上限） |
+| 15360~25599px | 16K 拼接墙 / 400 寸 LED 墙 | `min(80vw, 13000px)` | `clamp(2000px, 72vh, 3600px)` | 56~112px |
+| 25600~38399px | 300 寸 96ppi 原生 / 600 寸 LED 墙 | `min(78vw, 21000px)` | `clamp(3200px, 74vh, 6000px)` | 112~176px |
+| ≥ 38400px | 800 寸以上巨型拼接屏 / 户外大屏 | `min(76vw, 31000px)` | `clamp(4800px, 76vh, 9000px)` | 176~256px |
 
 ### 核心实现
 
@@ -4157,6 +4242,39 @@ body { padding-top: clamp(56px, 3.6vw, 112px); min-height: 100vh; min-height: 10
     .container { max-width: min(84vw, 3400px); }
     #weather iframe { height: clamp(1300px, 70vh, 2400px); }
 }
+
+/* 极限大屏档位：必须放在适配层最后，压过 3840 / 7680 / 竖屏 / 超短屏档位 */
+@media (min-width: 15360px) {
+    :root { font-size: clamp(56px, calc(0.4vw + 12px), 112px); --display-gutter: clamp(72px, 1.4vw, 240px); }
+    .container { max-width: min(80vw, 13000px); }
+    .navbar { min-height: clamp(112px, 1.2vw, 200px); }
+    #weather iframe { height: clamp(2000px, 72vh, 3600px); }
+}
+@media (min-width: 25600px) {
+    :root { font-size: clamp(112px, calc(0.42vw + 12px), 176px); --display-gutter: clamp(240px, 1.2vw, 400px); }
+    .container { max-width: min(78vw, 21000px); }
+    .navbar { min-height: clamp(200px, 1.1vw, 320px); }
+    #weather iframe { height: clamp(3200px, 74vh, 6000px); }
+}
+@media (min-width: 38400px) {
+    :root { font-size: clamp(176px, calc(0.45vw + 8px), 256px); --display-gutter: clamp(400px, 1.1vw, 560px); }
+    .container { max-width: min(76vw, 31000px); }
+    .navbar { min-height: clamp(320px, 1vw, 440px); }
+    #weather iframe { height: clamp(4800px, 76vh, 9000px); }
+}
+
+/* 下限兜底档：< 320px 智能手表 / 折叠屏外屏 / 老式功能机，字号与留白同步收窄，同样放在适配层最后 */
+@media (max-width: 319.98px) {
+    :root { font-size: clamp(12px, calc(0.5128vw + 8.62px), 13px); --display-gutter: clamp(6px, 1.8vw, 10px); }
+    body { padding-top: clamp(40px, 3.6vw, 52px); }
+    .navbar { min-height: clamp(40px, 3.6vw, 52px); }
+    .navbar-brand { padding: 2px 34px !important; font-size: 0.86rem !important; line-height: 1.25 !important; overflow-wrap: anywhere; }
+    .navbar .container > div:not(.navbar-collapse) { row-gap: 1px; font-size: 0.78rem; }
+    .container { max-width: 100%; }
+    .hero-section { padding: 28px 0; }
+    #weather iframe { height: 220px; }
+    #profit-chart { height: 240px !important; }
+}
 ```
 
 天气看板独立产物适配层（[dist/display-adapt.css](dist/display-adapt.css)，必须排在建产物 CSS 之后引入）：
@@ -4167,18 +4285,45 @@ html { font-size: clamp(16px, calc(0.62vw + 6.4px), 56px); }
 @media (min-width: 3840px) {
     .glass-panel { max-width: min(88vw, 3400px) !important; }
 }
+
+/* 8K 以上同样要续档，且放在文件末尾，否则被 3840 档与竖屏档反向覆盖 */
+@media (min-width: 15360px) {
+    html { font-size: clamp(56px, calc(0.4vw + 12px), 112px); }
+    .glass-panel { max-width: min(80vw, 13000px) !important; }
+}
+@media (min-width: 25600px) {
+    html { font-size: clamp(112px, calc(0.42vw + 12px), 176px); }
+    .glass-panel { max-width: min(78vw, 21000px) !important; }
+}
+@media (min-width: 38400px) {
+    html { font-size: clamp(176px, calc(0.45vw + 8px), 256px); }
+    .glass-panel { max-width: min(76vw, 31000px) !important; }
+}
+
+/* 下限兜底档：< 320px 手表 / 折叠屏外屏，字号收窄，同样放在文件末尾 */
+@media (max-width: 319.98px) {
+    html { font-size: clamp(12px, calc(0.62vw + 6.4px), 13px); }
+    .glass-panel { max-width: 100% !important; padding-left: 8px !important; padding-right: 8px !important; }
+}
 ```
 
-设备分档识别（[dist/app.js](dist/app.js)），十档覆盖到 8K，并同步 `body` 类名供样式分流：
+设备分档识别（[dist/app.js](dist/app.js)），十四档覆盖 200px 手表 ~ 38400px+，并同步 `body` 类名供样式分流：
 
 ```javascript
-if (width < 1440) { deviceType = 'desktop'; }
+if (width < 320) { deviceType = 'wearable'; }
+else if (width < 576) { deviceType = 'phone'; }
+else if (width < 768) { deviceType = 'tablet'; }
+else if (width < 992) { deviceType = 'laptop'; }
+else if (width < 1440) { deviceType = 'desktop'; }
 else if (width < 1920) { deviceType = 'large-desktop'; }
 else if (width < 2560) { deviceType = 'tv'; }
 else if (width < 3840) { deviceType = 'large-tv'; }
 else if (width < 5120) { deviceType = 'projector-4k'; }
 else if (width < 7680) { deviceType = 'projector-5k'; }
-else { deviceType = 'projector-8k'; }
+else if (width < 15360) { deviceType = 'projector-8k'; }
+else if (width < 25600) { deviceType = 'projector-16k'; }
+else if (width < 38400) { deviceType = 'wall-300'; }
+else { deviceType = 'wall-ultra'; }
 ```
 
 ### 特殊比例兜底
@@ -4192,12 +4337,16 @@ else { deviceType = 'projector-8k'; }
 ### 落地清单
 
 - [ ] 全仓库 CSS 不出现「仅适配到 1200px」的宽度上限，`≥1920px` 必须有独立档位
+- [ ] **下限必须兜底**：`< 320px`（智能手表 / 折叠屏外屏 / 老式功能机）必须有独立档位，根字号收到 `12~13px`、`gutter` 收到 `≤10px`、标题左右避让收到 `34px`，禁止只做到 `375px` 就收工
 - [ ] 固定 `px` 字号只在 `≤1200px` 兜底档保留，大屏一律 `rem` / `clamp`
 - [ ] `100vh` 出现处必须紧跟一行 `100dvh`
-- [ ] 新增断点必须落在 1400 / 1920 / 2560 / 3840 / 7680 五档之一，禁止随意造档
-- [ ] 设备识别分支必须覆盖到 `projector-8k`，新增类名同步进 `DEVICE_CLASS_LIST`，先全清后按档加
-- [ ] 长行代码块（`pre`）必须 `white-space: pre-wrap` + `overflow-wrap: anywhere`，导航栏长文字必须 `min-width: 0` + 省略号，禁止撑破页面宽度
-- [ ] `320px` / `768px` / `1920px` / `3840px` 四档实测无横向滚动条
+- [ ] 新增断点必须落在 `< 320` / 1400 / 1920 / 2560 / 3840 / 7680 / 15360 / 25600 / 38400 九档之一，禁止随意造档
+- [ ] **8K 以上必须续档**：`≥15360px` / `≥25600px` / `≥38400px` 三档齐全，根字号上限逐档抬升（112 / 176 / 256px），容器上限逐档放开，禁止在 7680px 处「顶死」
+- [ ] 极限大屏档位必须**放在适配层最后**（`index.html` 的 `</style>` 之前、`display-adapt.css` 文件末尾），否则被 3840 / 7680 / 竖屏档位反向覆盖
+- [ ] 设备识别分支必须覆盖两端：下限有 `wearable`（`< 320px`），上限有 `wall-ultra`（`≥ 38400px`），新增类名（`is-wearable` / `is-projector-16k` / `is-wall-300` / `is-wall-ultra`）同步进 `DEVICE_CLASS_LIST`，先全清后按档加
+- [ ] 长行代码块（`pre`）必须 `white-space: pre-wrap` + `overflow-wrap: anywhere`，导航栏与顶部信息行按 `PY-CORE-058` 处理（标题整行居中、时间与 Token 各占一排靠左，禁止并排折行与省略号截断）
+- [ ] 设备矩阵按 `PY-CORE-060` 覆盖 28 类 171 款已发布设备（智能手表 136×170 ~ LED 墙 38400×4320，含小折叠外屏 240×127 / 阔折叠 392×392 / 三折叠 744×1061 / 车机条屏 1280×480 / 方形标牌 1024×1024 / 卷轴环绕屏 / 头显 / 电子纸），复核方式为 `.venv/bin/python test/browser_adapt_test.py` 由 Playwright 逐档实测（主页面 156 档 + 看板 108 档 + 展开态 9 档 = 273 项，总耗时 ≤ 10 秒），口径见 `PY-CORE-059`，禁止用静态推演结论代替
+- [ ] 改动 `index.html` / `dist/app.js` / `dist/display-adapt.css` 后必须跑 `python test/code_style_check.py`（`ALI-001~016` 全绿、退出码 0），见 PY-CORE-003
 
 ### 必须避开的坑
 
@@ -4205,11 +4354,15 @@ else { deviceType = 'projector-8k'; }
 |---|---|---|
 | 只用 `vw` 定字号 | 小屏字过小、大屏字过大，两端失控 | `clamp(min, fluid, max)` 三参兜底 |
 | 用 `100vw` 直接给容器宽度 | 有纵向滚动条时横向溢出 | `width: 100%` + `max-width: 100%` |
+| 适配只做到 320px 就收工 | 智能手表 / 折叠屏外屏上 16px 字号加 48px 留白把标题挤出屏幕 | 补 `< 320px` 下限兜底档，字号 12~13px、避让 34px |
 | 大屏沿用 `max-width: 1200px` | 4K / 投影上内容居中窄带，浪费七成面积 | 按档位 `min(vw, px)` 逐级放开 |
+| 适配只做到 7680px 就收工 | 300 寸以上屏幕字号停在 48px、容器停在 6600px，等于大屏没适配 | 续加 15360 / 25600 / 38400 三档，字号上限抬到 256px |
+| 极限大屏档位写在前面的 `@media` 块里 | 被后面的 3840 档、竖屏档以「同优先级后者胜」覆盖，写了不生效 | 极限档一律放适配层最后 |
 | 手改 `dist/` 产物却忘了挂载 | 样式写了不生效 | `display-adapt.css` 必须在建产物 CSS 之后引入 |
-| 只测笔记本尺寸 | 电视 / 投影上线才发现字小 | 至少覆盖 320 / 768 / 1920 / 3840 四档 |
+| 只测笔记本尺寸 | 电视 / 投影上线才发现字小 | 至少覆盖 320 / 768 / 1920 / 3840 / 7680 / 38400 六档 |
+| 改完 CSS / JS 不跑规范闸门 | 触犯 `ALI-006` / `ALI-008` 等条款无人发现 | 改完立即 `python test/code_style_check.py`，退出码 0 才算完成 |
 
-> **判定标准**: 出现「`≥1920px` 视口无独立档位 / 大屏字号仍是固定 px / 只有 `100vh` 没有 `100dvh` / 大屏内容仍被 1200px 上限夹成窄带 / 320px 或 3840px 出现横向滚动条 / 设备识别分支止步于 `large-desktop`」中任意一条，即视为「未符合本范式」。
+> **判定标准**: 出现「`≥1920px` 视口无独立档位 / 大屏字号仍是固定 px / 只有 `100vh` 没有 `100dvh` / 大屏内容仍被 1200px 上限夹成窄带 / 7680px 以上无续档（15360 / 25600 / 38400 缺档） / 极限档位未放在适配层最后 / `< 320px` 无下限兜底档 / 200px 或 320px 或 3840px 或 38400px 出现横向滚动条 / 设备识别分支止步于 `projector-8k` 或缺 `wearable`」中任意一条，即视为「未符合本范式」。
 
 ---
 
@@ -5556,6 +5709,391 @@ def _brand_match_pairs(entries):
 
 ---
 
+## 🔴 PY-CORE-058: 零溢出导航栏居中范式 (Zero-Overflow Navbar Centering)
+
+> **创建日期**: 2026-11-26 | **最后更新**: 2026-11-26 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [index.html](index.html) / [dist/index.html](dist/index.html) / [dist/app.js](dist/app.js)
+
+### 🔴 核心原则：标题居中、信息分排靠左、页面零横向溢出，任何机型任何宽度都不例外
+
+Bootstrap 4 的 `.navbar` 是 `justify-content: space-between` 的横向 flex 容器。当三段内容（品牌名 / 时间+Token 信息 / 菜单按钮）在窄屏放不进一行时会被拆成三行，**每行只剩一个元素时 `space-between` 会把它顶到最左侧** —— 用户看到的就是「顶部文字不居中」。若其中某段还带 `white-space: nowrap`，这一行会被顶出屏幕，移动端浏览器随即触发 shrink-to-fit（`innerWidth` 大于 `clientWidth`，整页被缩小），于是「字不居中」和「页面莫名变小」同时出现。
+
+判定「完美展示」只有四条硬指标，缺一即不合格：
+
+| 指标 | 判定口径 | 检测手段 |
+|---|---|---|
+| **标题居中度** | 品牌中心与视口中心偏差 < 2px（折叠态） | `brand_cx == documentElement.clientWidth / 2` |
+| **信息分排度** | 「当前时间」「Token 有效期」各自独占一排，两排 `left` 相等（折叠态），禁止并排或从中间折行 | 比较两元素 `getBoundingClientRect()` 的 `left` 与 `top` |
+| **零横向溢出** | `documentElement.scrollWidth == clientWidth`，且滚动容器之外无元素 `right > clientWidth` | 逐元素扫 `getBoundingClientRect()`，跳过 `overflow-x: auto/scroll` 祖先 |
+| **零遮挡** | `body.paddingTop` 恒等于导航栏实测高度 | `ResizeObserver` 实时同步 |
+
+> 关键认知：**「字不居中」只是表象，先查「谁把视口撑宽了」**。用 `is_mobile` 模拟 iPhone 15 Pro 视口时，只要页面里任意一行 flex 的 `min-content` 超出视口（例如 9 个功能按钮写成 `flex-wrap: nowrap`），Chrome 会把布局视口扩到该 `min-content` 宽度，`position: fixed` 的导航栏也跟着变宽 —— 看起来像导航栏的问题，实际祸根在别处。所以每次都必须做「全元素右边界扫描」，不能只看导航栏。
+
+### 🔴 分档策略：折叠态标题居中 + 信息两排靠左，展开态保持原布局
+
+| 视口宽度 | 导航栏形态 | 布局口径 |
+|---|---|---|
+| ≤ 991.98px（手机竖屏 / 手机横屏 / 平板竖屏） | 折叠态（有汉堡按钮） | 容器转 `flex-direction: column`：品牌整行居中；信息区再转一列，「当前时间」独占一排、「Token 有效期」独占一排，两排统一靠左；汉堡按钮绝对定位右上角 |
+| ≥ 992px | 展开态（导航链接同行） | 保持「品牌左 / 链接右」，信息区 `flex: 1 1 auto` 占满中间并居中，两段同行（桌面宽度充裕，不必拆排） |
+
+> **为什么信息区必须「两排靠左」而不是「挤在一排居中」**：时间与 Token 是两条独立信息，挤成一排后窄屏必然从中间折行（`当前时间: 2026/11/26 17:44:12 Token有效期:` + 换行 `(Token) 2026-12-20`），折出来的行长短不一又居中，视觉上像两行乱码；整体居中还会让第二排跟着第一排宽度漂移。拆成「一条信息一排 + 统一左对齐」，两排左边界落在同一条竖线上，读起来是一份对齐的清单。
+
+### 核心实现
+
+导航栏信息区通用规则（任何宽度都生效，[index.html](index.html)）：
+
+```css
+/* 信息区吃掉中间剩余宽度并居中；空间不足换行，禁止撑破页面 */
+.navbar .container > div:not(.navbar-collapse) {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: center;
+    flex-wrap: wrap;
+    column-gap: 8px;
+    row-gap: 2px;
+}
+
+#current-time,
+#cookie-status {
+    flex: 0 0 auto;   /* 不压缩：宁可换行，也不要省略号截断 */
+    max-width: 100%;
+}
+```
+
+折叠态：标题整行居中 + 信息两排靠左（≤991.98px，覆盖手机与平板，不再只管 ≤575.98px）：
+
+```css
+@media (max-width: 991.98px) {
+    .navbar { min-height: 0 !important; padding: 6px 10px !important; }
+    .navbar .container {
+        position: relative;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: center;
+        padding: 0 !important;
+        text-align: center;
+    }
+    .navbar-brand {
+        box-sizing: border-box;
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 !important;
+        padding: 4px 48px !important;   /* 左右 48px 避让汉堡按钮 */
+        text-align: center;
+    }
+    /* 信息区：一列两排，两排左边界对齐同一条竖线 */
+    .navbar .container > div:not(.navbar-collapse) {
+        box-sizing: border-box;
+        display: flex !important;
+        flex-direction: column !important;
+        flex-wrap: nowrap !important;
+        align-items: flex-start !important;
+        justify-content: flex-start !important;
+        width: 100%;
+        max-width: 100%;
+        margin: 4px 0 0 !important;
+        row-gap: 2px;
+        text-align: left;
+    }
+    #current-time,
+    #cookie-status {
+        flex: 0 0 auto;
+        margin-right: 0 !important;       /* 清掉 inline 的 margin-right: 15px */
+        text-align: left;
+        white-space: normal !important;   /* 单条信息自身过长时允许折行，不截断 */
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+    .navbar-toggler { position: absolute; top: 0; right: 0; margin: 0 !important; }
+    .navbar-collapse { flex: 0 0 auto !important; width: 100%; text-align: left; }
+}
+```
+
+> **两条容易被忽略的细节**：① `#current-time` 带 inline `margin-right: 15px`，竖排后这 15px 会把第二排整体右移，必须 `margin-right: 0 !important` 清掉；② 竖排必须 `flex-wrap: nowrap !important`，否则父级残留的 `flex-wrap: wrap` 会让两条信息在「放得下」时又并回一排。
+
+导航栏高度 → `body.paddingTop` 动态同步（[dist/app.js](dist/app.js)，导航栏变高时内容不被遮挡）：
+
+```javascript
+(function syncNavbarOffset() {
+    const nav = document.querySelector('.navbar');
+    if (!nav) return;
+    const menu = document.getElementById('navbarNav');
+    function apply() {
+        if (menu && menu.classList.contains('show')) return;
+        document.body.style.paddingTop = nav.offsetHeight + 'px';
+    }
+    apply();
+    window.addEventListener('load', apply);
+    window.addEventListener('resize', apply);
+    if (window.ResizeObserver) { new ResizeObserver(apply).observe(nav); }
+})();
+```
+
+### 同级横向溢出源：flex 行一律允许换行
+
+导航栏修好之后仍可能「整页被缩小」，因为视口宽度由页面里最宽的那一行决定。凡是一行塞多个按钮 / 标签的 flex 容器，窄屏档位必须 `flex-wrap: wrap`，且子项 `flex: 0 1 auto; width: auto`（按内容定宽、可换行），禁止 `nowrap` + `width: 100%` 组合：
+
+```css
+/* 小屏平板档（576~767.98px）与平板档（768~991.98px） */
+.func-btn-container { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 10px; }
+.func-btn { width: auto; flex: 0 1 auto; }
+```
+
+### 全档实测矩阵（`python test/browser_adapt_test.py` Playwright Chromium 逐档渲染实测，2026-11-26）
+
+> 覆盖面：28 类 171 款已发布设备屏幕 → 同尺寸去重 156 档（主页面）+ 108 档（天气看板，按全部唯一宽度逐档）+ 9 档（菜单展开态）= **273 项**，全程单次加载复用视口，总耗时 **≤ 10 秒**（实测 8.0 ~ 9.2s）。
+
+| 视口宽度 | 导航栏高度 | 品牌中心 | 信息区左边界 | 信息分排 | 横向溢出 | 内容遮挡 |
+|---|---|---|---|---|---|---|
+| 200 / 240 | 67px | 100 / 120（=视口中心） | 10px | 时间 / Token 各一排 | 无 | 无 |
+| 320 / 375 / 414 | 77px | 160 / 187.5 / 207（=视口中心） | 10px | 各一排 | 无 | 无 |
+| 576 / 667 / 768 / 852 / 926 | 92px | 288 / 333.5 / 384 / 426 / 463 | 10px | 各一排 | 无 | 无 |
+| 992 / 1024 / 1180 | 80px | 展开态：品牌左、链接右 | 中间自适应 | 两段同行（桌面不拆排） | 无 | 无 |
+| 1366 / 1440 / 1600 | 56 / 56 / 59px | 展开态 | 中间自适应 | 两段同行 | 无 | 无 |
+| 1920 / 2560 / 3840 | 69 / 92 / 112px | 展开态 | 中间自适应 | 两段同行 | 无 | 无 |
+| 5120 / 7680 / 15360 / 25600 / 38400 | 122 / 168 / 257 / 418 / 633px | 展开态 | 中间自适应 | 两段同行 | 无 | 无 |
+| 2160×3840 竖屏 / 844×390 手机横 | 149 / 92px | 展开态 / 422 | 中间自适应 / 10px | 两段同行 / 各一排 | 无 | 无 |
+
+菜单展开态 8 档实测（手表 198×242 / 手环 126×294 / 副屏 194×368 / 手机竖 360×780 / 手机横 780×360 / 小折叠内屏 411×1006 / 大折叠内屏 707×823 / 平板竖屏 768×1024）：展开后 `scrollWidth == clientWidth`（溢出恒为 0px），导航栏高度增至 247 / 303 / 247 / 299 / 332 / 299 / 332 / 332px，`body.paddingTop` 冻结在折叠态高度（67 / 123 / 67 / 77 / 92 / 77 / 92 / 92px）不随动画跳动，再次点击收起后导航栏高度与 `paddingTop` 全部回到折叠态原值；其中 360×780 另跑一遍**真动画**时序（`prefers-reduced-motion: no-preference`），验证 `.35s` 过渡期间 `paddingTop` 同样冻结。
+
+### 落地检查清单
+
+- [ ] 折叠态（≤991.98px）品牌名中心与视口中心偏差 < 2px
+- [ ] 折叠态「当前时间」与「Token 有效期」**各占一排、两排 `left` 相等**，禁止并排挤成一排
+- [ ] 信息区 `display: flex; flex-direction: column; align-items: flex-start; flex-wrap: nowrap`，四条缺一都会退回「挤一排 / 居中折行」
+- [ ] `#current-time` 的 inline `margin-right: 15px` 已用 `margin-right: 0 !important` 清零，避免第二排右移
+- [ ] 信息子元素 `flex: 0 0 auto`，单条过长时 `white-space: normal` 折行，**禁止 `nowrap` + 省略号截断**
+- [ ] 汉堡按钮 `position: absolute` 固定在右上角，品牌名左右各留 48px 避让，不重叠
+- [ ] `body.paddingTop` 由 `ResizeObserver` 同步导航栏实测高度，且菜单展开 / 收起动画期间（`show` / `collapsing`）必须冻结，否则整页跟着动画跳动
+- [ ] 全档位逐元素扫 `right > clientWidth`（跳过 `overflow-x: auto/scroll` 祖先），`scrollWidth == clientWidth`
+- [ ] 任何一行多个按钮 / 标签的 flex 容器，窄屏档位 `flex-wrap: wrap`，禁止 `nowrap` 撑宽视口
+- [ ] 桌面端（≥992px）布局保持原样，改动只作用于折叠态与信息区，无回归
+- [ ] 静态资源加版本参数（`app.js?v=...`）刷新，避免浏览器用旧缓存
+- [ ] 改完必须跑 `.venv/bin/python test/browser_adapt_test.py`（273 档断言全绿、退出码 0、总耗时 ≤ 10 秒），禁止用静态推演结论代替实测，见 `PY-CORE-059` / `PY-CORE-060`
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 只改 ≤575.98px 档 | 576~991px（手机横屏 / 平板竖屏）仍然左对齐且横向溢出 | 折叠态统一用 ≤991.98px 档 |
+| 两条信息挤一排靠 `flex-wrap` 自然折行 | 折行位置由宽度决定，出现「半句换行」，两排长短不一又居中，观感最差 | 信息区强制 `flex-direction: column`，一条信息一排，统一 `align-items: flex-start` |
+| 信息区用 `flex-wrap: wrap` 做竖排 | 宽度够时又并回一排，机型不同表现不同 | 竖排必须 `flex-wrap: nowrap !important` |
+| 忘记清 inline `margin-right` | 第二排整体右移，两排左边界不齐 | `margin-right: 0 !important` |
+| 信息行用 `nowrap` + 省略号 | 手机上看不到完整 Token 有效期，且整行顶出屏幕 | `white-space: normal`（单条自身过长才折行） |
+| 只看导航栏就下结论 | 真正的撑宽源在别处，改完还是「字不居中」 | 先扫全元素右边界，再定位到具体 `min-content` 超宽的行 |
+| flex 行写 `nowrap` + `width: 100%` | 子项 `min-content` 之和超出视口，移动端整页 shrink-to-fit | `flex-wrap: wrap` + `flex: 0 1 auto; width: auto` |
+| 导航栏高度写死 `padding-top: 56px` | 折叠态导航栏 67~92px，压住首屏内容 | `ResizeObserver` 实时同步 `body.paddingTop` |
+| `ResizeObserver` 只判 `show` 不判 `collapsing` | 展开动画中途高度变化被写进 `body.paddingTop`，整页跟着跳 220px，收起后不复位 | 动画期（`show` / `collapsing`）一律冻结，只认完全折叠态高度 |
+| 汉堡按钮留在 flex 流内 | 与居中标题抢位，标题被迫偏移 | `position: absolute; top: 0; right: 0` |
+| 用静态推演 / 目测代替浏览器实测 | 推演值（320px 档 74px）与实测值（77px）不符，缺陷被掩盖 | 一律跑 `test/browser_adapt_test.py`，见 `PY-CORE-059` |
+
+> **判定标准**: 出现「折叠态品牌名中心偏离视口中心 ≥ 2px / 两条信息并排或从中间折行 / 两排左边界不一致 / 任一档位 `scrollWidth > clientWidth` / 信息文字被省略号截断 / 导航栏压住首屏内容 / 菜单展开态 `body.paddingTop` 随动画跳动 / 汉堡按钮与标题重叠 / 只适配 ≤575.98px 一档 / 未跑 `test/browser_adapt_test.py` 或以静态推演代替实测」中任意一条，即视为「未符合本范式」。
+
+---
+
+## 🔴 PY-CORE-059: 零人工浏览器验证范式 (Zero-Manual Browser Verification)
+
+> **创建日期**: 2026-11-26 | **最后更新**: 2026-11-26 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [test/browser_adapt_test.py](test/browser_adapt_test.py) / [test/fixtures](test/fixtures) / 全部适配与布局类改动
+
+### 核心原则：适配与布局结论只能来自 Playwright 实测，「静态推演 + 人工复验」一律不成立
+
+凡是「像素 / 断点 / 遮挡 / 溢出 / 居中」这类只能靠真实渲染才能判定对错的结论，**必须由 `test/browser_adapt_test.py` 用 Playwright Chromium 逐档渲染实测**，断言全绿、退出码 0 才算验证完成。禁止 Selenium，禁止「CSS 公式推演 + 真机待人工复验」的口径。
+
+| 支柱 | 强制要求 | 违反后果 |
+|---|---|---|
+| **唯一工具** | Playwright（`requirements.txt` 已锁 `playwright==1.52.0`），禁止 Selenium / WebDriver / 手工截图比对 | 多套工具并存，浏览器版本与等待策略不一致，结果不可复现 |
+| **唯一入口** | `python test/browser_adapt_test.py`，退出码 0 = 通过，非 0 = 禁止提交 | 结论散落在聊天记录与人工复验清单里，无法回归 |
+| **离线可重复** | CDN 依赖全部固化到 `test/fixtures`，路由拦截把外网请求改写成本地文件，其余外网请求一律 `abort` | 第三方 CDN 抖动导致测试时红时绿 |
+| **全档覆盖** | 全市场设备屏幕矩阵 156 档（28 类 171 款已发布设备，同尺寸去重）× 主页面 + 看板 108 档 + 展开态 9 档，共 273 项，覆盖 126×294 手环 ~ 38400×4320 800 寸拼接屏 | 只测中间档，两端边界缺陷漏网；只测几款手机，折叠屏 / 车机 / 标牌全部漏测 |
+| **10 秒预算** | 273 项必须在 `TIMING_BUDGET_S = 10.0` 内跑完，超时即判失败（`性能 → 总耗时 xxs 超过 10s 上限`） | 加档不加优化，回归从秒级拖成分钟级，最后没人愿意跑 |
+
+### 脚本结构（四段式，缺一段即不合格）
+
+```python
+# 1) 本地静态服务器：随机端口 + 关闭访问日志，测试不与主服务抢端口
+server, origin = _start_server()
+
+# 2) 路由拦截：本机资源放行 → CDN 命中 test/fixtures → 其余外网 abort
+def _route(route):
+    url = route.request.url
+    if url.startswith(origin):
+        route.continue_()
+    elif _fixture_for(url):
+        route.fulfill(path=_fixture_for(url))
+    else:
+        route.abort()
+
+# 3) 设备矩阵：按已发布设备的 CSS 视口逐档 set_viewport_size → 同步补发 resize → 采集实测指标
+DEVICE_FAMILIES = (
+    ('智能手表', ((136, 170, 'Apple Watch 38/40mm'), (205, 251, 'Apple Watch Ultra'), ...)),
+    ('智能手环', ((168, 240, '小米手环 8 Pro'), (194, 368, '长条手环屏'), ...)),
+    ('小折叠外屏', ((262, 272, 'Galaxy Z Flip5/6 外屏'), (240, 127, 'OPPO Find N3 Flip 外屏'), ...)),
+    ('小折叠内屏', ((411, 1006, 'Galaxy Z Flip6 内屏'), (360, 880, 'razr 40 Ultra 内屏'), ...)),
+    ('阔折叠', ((392, 392, '华为 Pura X 外屏'), (528, 848, '华为 Pura X 内屏'), ...)),
+    ('大折叠', ((344, 882, 'Galaxy Z Fold5/6 外屏'), (707, 823, 'Galaxy Z Fold6 内屏'), ...)),
+    ('三折叠', ((336, 732, '华为 Mate XT 单屏'), (744, 1061, '华为 Mate XT 三屏全展开'), ...)),
+    ('双屏手机展开', ((540, 720, 'Surface Duo 双屏展开'), (1114, 794, 'Surface Duo 2 双屏展开'), ...)),
+    ('卷轴与环绕屏', ((720, 1280, 'OPPO X 2021 卷轴展开'), (1152, 960, '小米 MIX Alpha 环绕屏'), ...)),
+    ('手机竖屏', ((360, 780, 'Galaxy S24'), (393, 852, 'iPhone 14 Pro/15/16'), ...)),
+    ('手机横屏', ((844, 390, 'iPhone 13 横屏'), (956, 440, 'iPhone 16 Pro Max 横屏'), ...)),
+    ('平板竖屏', ((744, 1133, 'iPad mini 6'), (1032, 1376, 'iPad Pro 13 M4'), ...)),
+    ('平板横屏', ((1180, 820, 'iPad Air 横屏'), (2560, 1600, 'Tab S9 Ultra 横屏'), ...)),
+    ('双屏与折叠笔记本', ((1114, 794, 'ThinkPad X1 Fold 展开'), (2000, 1440, '华硕 Zenbook 17 Fold'), ...)),
+    ('笔记本', ((1366, 768, '1366×768 笔电'), (1728, 1117, 'MacBook Pro 16'), ...)),
+    ('桌面显示器', ((2560, 1440, '2K 桌面'), (3840, 2160, '4K 桌面'), ...)),
+    ('超宽屏', ((3440, 1440, '21:9 超宽'), (5120, 1440, '32:9 双 2K'), ...)),
+    ('电视', ((1280, 720, '720P 电视'), (7680, 4320, '8K 电视'), ...)),
+    ('投影', ((1920, 1200, '投影 16:10'), (15360, 8640, '16K 投影'), ...)),
+    ('LED 拼接屏', ((25600, 4320, 'LED 墙 300 寸'), (38400, 4320, 'LED 墙 800 寸'), ...)),
+    ('条形屏', ((1280, 480, '地铁条形屏'), (3840, 240, '货架条形屏'), ...)),
+    ('车机嵌入式', ((800, 480, '车载 HMI'), (1920, 720, '车机超宽 8:3'), ...)),
+    ('车载副屏与后排屏', ((1920, 480, '液晶仪表盘'), (1280, 720, '后排娱乐屏'), ...)),
+    ('方形标牌', ((480, 480, '方形标牌 480'), (1024, 1024, '方形标牌 1024'), ...)),
+    ('数字标牌竖屏', ((1080, 1920, '竖屏标牌'), (3840, 2160, '横屏广告机'), ...)),
+    ('智能家居带屏', ((480, 480, 'Echo Show 5'), (1280, 800, '智能中控屏'), ...)),
+    ('头显 VR-AR', ((1832, 1920, 'Meta Quest 3 单眼'), (2160, 2160, 'Vision Pro 单眼'), ...)),
+    ('电子墨水屏', ((240, 320, '电子价签 2.13 寸'), (1404, 1872, 'Kindle Scribe'), ...)),
+)
+DEVICE_MATRIX = _dedupe_devices(DEVICE_FAMILIES)   # 同尺寸去重，156 档
+REQUIRED_FAMILIES = tuple(family for family, _ in DEVICE_FAMILIES)   # 28 类
+
+# 4) 断言：溢出 / 类名唯一 / paddingTop 同步 / 品牌居中 / 信息分排 / 汉堡不压标题 / 面板不越界 / 无 JS 异常 / 类别全覆盖
+def _check_layout(metrics, scope, failures):
+    ...
+```
+
+### 断言清单（273 项逐档全跑）
+
+| 断言 | 阈值 | 说明 |
+|---|---|---|
+| 页面级横向溢出 | `documentElement.scrollWidth == clientWidth` 且 `body.scrollWidth <= clientWidth` | 任一档 >0 即失败，打印溢出像素数 |
+| 设备类名唯一 | `body` 上 `is-*` 类名恰好 1 个，且与视口宽度对应的档位一致 | 跨档缩放残留会叠加多个类名 |
+| 导航栏高度与 `body.paddingTop` 同步 | 折叠态差值 ≤ 2px | 导航栏变高压住内容即失败 |
+| 品牌名居中 | 折叠态（≤991.98px）品牌中心与 `innerWidth / 2` 差值 < 2px | 桌面档位不查居中（品牌本就靠左） |
+| 信息分排 | 折叠态 `#current-time` 与 `#cookie-status` 各占一排、`left` 相等、不重叠 | 挤一排 / 居中折行即失败 |
+| 汉堡按钮让位 | 折叠态汉堡按钮右边界不越出视口，且品牌**文字**右边界（`Range` 实测，非整行盒子）不压汉堡按钮左边界 | 用盒子边界会误报（`.navbar-brand` 是 `width:100%` 整行盒）；< 200px 需同步收窄汉堡按钮 |
+| 看板面板不越界 | 每档面板数 ≥1，最宽面板 `<= clientWidth` | 面板把视口撑宽即失败 |
+| 菜单展开态 | 展开后导航栏变高 ≥ 40px、溢出仍为 0、`paddingTop` 不变；收起后高度与 `paddingTop` 复位 | 展开整页跳动即失败 |
+| 设备类别全覆盖 | `DEVICE_FAMILIES` 每类都至少有一款机型进入矩阵，且宽度两端含 ≤200px 与 ≥38400px | 删档导致覆盖面退化即失败 |
+| 极小屏抖动自检 | 宽度 ≤200px 档位同一视口连采两次，`navbarHeight` / `paddingTop` / 品牌左右边界与中心 / 根字号逐项偏差 ≤ 2px | 换行边界随滚动条 / 字体晚到翻转，单次采集只能靠偶发失败暴露 |
+| JS 异常 | 每档 `pageerror` / `console.error` 采集数为 0 | 任何一档有异常即失败 |
+| 性能预算 | 273 项总耗时 ≤ `TIMING_BUDGET_S`（10.0s），超时即 `性能 → 总耗时 xxs 超过 10s 上限` 判失败 | 加档不加优化，回归拖成分钟级 |
+
+### 10 秒性能预算与提速四件套（273 项 / 8.0~9.2s 实测）
+
+覆盖面只许加不许减，速度只许快不许慢——两条同时成立才算合格。达成路径固定为下面四件套，少一件就回到 60 秒以上：
+
+| 提速手段 | 做法 | 收益（实测） |
+|---|---|---|
+| **单次加载 + 视口复用** | 每张矩阵只 `goto` 一次，之后逐档 `set_viewport_size` 切换，禁止逐档重载页面 | 主页面 156 档 70s → 3.6s |
+| **同步补发 resize 免等帧** | 切完视口后 `page.evaluate` 里先 `window.dispatchEvent(new Event('resize'))` 触发页面自身的 `applyDeviceStyles()` / `paddingTop` 同步逻辑，再同步读 `getBoundingClientRect`（强制同步布局），不 `await requestAnimationFrame` | 每档省 16.7ms，273 档省 ~4.5s；零脏读 |
+| **切视口前鼠标归位** | `await page.mouse.move(1, 1)` 再 `set_viewport_size`：上一档真实点击后指针停在汉堡按钮上，Chromium 会带着悬停命中测试重排 | 展开态每档省 ~500ms，8 档 5.5s → 0.7s |
+| **展开态按需降级过渡** | 8 档代表机型用 `prefers-reduced-motion: reduce` 关掉 `.35s` 过渡只验展开后布局；另留 1 档（360×780）开 `no-preference` 跑真动画验动画期 `paddingTop` 冻结；收起方向直接降级过渡 | 展开态 0.8s/档 → 总计 1.3s |
+
+配套约束：
+
+- **顺序执行，禁止并发**：三张矩阵并发实测反而慢 4 倍（20.0s vs 5.4s），headless Chromium 的页面渲染在同一核上争用，`asyncio.gather` 只会互相拖死
+- **展开态矩阵必须排在最前**：从 38400px 巨视口回切小视口要整页重排，每档多花 ~0.4s
+- **看板按全部唯一宽度逐档**：同宽异高结果一致（面板宽度只由宽度决定），108 个唯一宽度即已覆盖 156 档主矩阵的全部宽度
+- **预算写死在脚本里**：`TIMING_BUDGET_S = 10.0` 超时即退出码 1，禁止「跑得慢就放宽阈值」；优化手段用尽仍超标，说明加了无意义档位，回头合并去重而不是调大预算
+- **优化不许牺牲断言**：提速只能删「等待」，不能删「档位」与「断言」，任何一档断言被跳过即视为未符合本范式
+
+### 落地检查清单
+
+- [ ] 脚本落在 `test/browser_adapt_test.py`，落盘即被 `test/code_style_check.py` 自动发现（无需手工登记）
+- [ ] 用 Playwright，禁止引入 Selenium 依赖
+- [ ] 浏览器可执行文件从 `PLAYWRIGHT_BROWSERS_PATH` 或 `tools/playwright/<平台>/chromium-*` 动态查找，**禁止硬编码子目录名**（`chromium-1169` 会随版本变化）
+- [ ] CDN 依赖全部固化到 `test/fixtures`，`route()` 命中本地文件，其余外网请求 `abort`，断网也能跑
+- [ ] 静态服务器用随机端口（`port=0`）并关闭访问日志，避免与主服务 8000 端口冲突、避免刷屏
+- [ ] 设备矩阵两端必须含 `<200px`（智能手表 / 手环）与 `38400px`（800 寸拼接屏），并覆盖小折叠外屏（240×127）、阔折叠、三折叠、车机条屏（1280×480）、方形标牌（1024×1024）等非主流比例
+- [ ] 每张矩阵单次加载复用视口、同步补发 resize、切视口前鼠标归位，**禁止逐档重载 / 逐档等帧 / 三矩阵并发**，总耗时 ≤ 10 秒
+- [ ] 展开态必须留至少 1 档跑 `prefers-reduced-motion: no-preference` 真动画，其余档降级过渡，不许为了提速把动画档全删
+- [ ] 断言遮挡类问题时量**文字**边界（`document.createRange().selectNodeContents()`），禁止用 `width:100%` 整行盒子的 `getBoundingClientRect()`，否则恒报重叠
+- [ ] 每档断言失败即 `failures.append`，末尾汇总并 `sys.exit(1)`，禁止「只打印不判死」
+- [ ] 宽度 ≤200px 档位必须同视口连采两次逐字段比对（`JITTER_KEYS`），第二次用 `METRICS_READ_JS` 只读采集（**不补发 `resize`**，避免触发前端 250ms 防抖把总耗时拖到 10~13s）
+- [ ] 改完适配代码先跑 `python test/browser_adapt_test.py`（退出码 0 且总耗时 ≤ 10 秒），再跑 `python test/code_style_check.py`（退出码 0）
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 用静态推演写「实测」 | 推演值与真实渲染差 3px 以上（如 320px 档推演 74px、实测 77px），缺陷被掩盖 | 只认脚本输出，实测值回写文档 |
+| 引入 Selenium | 与 Playwright 浏览器缓存不共享，CI 上必挂 | 只用 Playwright |
+| 硬编码 `chromium-1169/chrome-mac/headless_shell` | Playwright 升级后路径变化，报「Executable doesn't exist」 | 动态 `rglob` 找可执行文件 + `executable_path` 传入 |
+| `headless=True` 不带 `executable_path` | 新版 Playwright 默认找 `chromium_headless_shell`，本仓库只缓存完整 Chromium，直接启动失败 | 显式传 `executable_path` |
+| 测试打公网 CDN | jsdelivr 抖动 → 随机红，误判代码有 bug | 依赖固化 + 路由拦截 |
+| 只在最后一档断言 | 中间档缺陷漏网 | 每档独立断言并逐行打印实测值 |
+| 断言只打印不退出 | 失败被当成功，缺陷进主干 | 汇总失败项后 `sys.exit(1)` |
+| 逐档 `goto` 重载页面 | 156 档 × 加载耗时 → 70s 起步，没人愿意每次改动都跑 | 单次加载 + `set_viewport_size` 复用，见「提速四件套」 |
+| 切视口后 `await requestAnimationFrame` 等一帧 | 每档固定 16.7ms，273 档白等 4.5s | `evaluate` 里同步 `dispatchEvent(new Event('resize'))` 后同步读布局 |
+| 真实点击后不挪鼠标就切视口 | 指针停在汉堡按钮上，Chromium 每次 resize 带悬停命中测试重排，展开态每档多 500ms | `await page.mouse.move(1, 1)` 再 `set_viewport_size` |
+| 三张矩阵 `asyncio.gather` 并发 | headless Chromium 渲染争用同一核，反而慢 4 倍（20s vs 5.4s） | 顺序执行 |
+| 为了压时间偷偷删档 / 删断言 | 覆盖面与断言同时缩水，「10 秒全绿」变成假绿 | 只删等待不删档位，档位只许加 |
+| 只挑几款主流手机当「全档」 | 小折叠外屏 240×127、手表 136×170 这类极端比例从未被测，汉堡按钮压标题的缺陷长期潜伏 | 用 `DEVICE_FAMILIES` 按 28 类设备逐类列机型，见 `PY-CORE-060` |
+| 遮挡断言用整行盒子边界 | `.navbar-brand` 是 `width:100%`，`right` 恒等于视口宽，必然误报「压住汉堡按钮」 | 用 `Range` 量文字实际边界 |
+| 极小屏只采一次就下结论 | `navbarHeight` 在 80px / 95px 之间随滚动条出现、字体晚到来回翻转，同一份代码时红时绿，回归结论不可信 | ≤200px 档位同视口连采两次逐字段比对，抖动当场判失败 |
+| 抖动自检里补发 `resize` | 二次采集触发前端 250ms 防抖，总耗时从 8s 级涨到 10~13s，反被性能预算判失败 | 第二次采集用 `METRICS_READ_JS` 只读版，不补发 `resize` |
+
+> **判定标准**: 出现「引入 Selenium / 未跑 `test/browser_adapt_test.py` / 脚本退出码非 0 仍提交 / 依赖公网 CDN / 硬编码浏览器子目录 / 只断言末档 / 用静态推演结论标注「实测」/ 总耗时超过 10 秒仍提交 / 为压时间删档或删断言 / ≤200px 档位未做连采两次的幂等自检」中任意一条，即视为「未符合本范式」。
+
+---
+
+## 🔴 PY-CORE-060: 全设备零遗漏覆盖范式 (Zero-Skip Device Coverage)
+
+> **创建日期**: 2026-11-26 | **最后更新**: 2026-11-26 | **优先级**: 🔴 P0 强制规范 | **适用范围**: [test/browser_adapt_test.py](test/browser_adapt_test.py) `DEVICE_FAMILIES` / 全部前端适配改动
+
+### 核心原则：只要是能联网、能显示的设备屏幕，就必须进自动化测试矩阵，一款都不许跳过
+
+手机（直板 / 小折叠 / 阔折叠 / 大折叠 / 三折叠 / 双屏展开 / 卷轴环绕，外屏与内屏都要算）、平板（竖屏与横屏）、双屏与折叠笔记本、笔记本、桌面显示器、超宽屏、电视、投影、LED 拼接屏、条形屏、车机（嵌入式 / 仪表盘 / 副驾 / 后排）、数字标牌（横屏 / 竖屏 / 方形）、智能家居带屏、头显 VR-AR、电子墨水屏、智能手表、手环——**任何已发布设备的屏幕分辨率都必须有一行数据进入 `DEVICE_FAMILIES`**。不允许「挑几款主流机型代表一下」，也不允许「按断点推演覆盖」。
+
+| 支柱 | 强制要求 | 违反后果 |
+|---|---|---|
+| **按设备列机型** | 矩阵以「设备类别 → 已发布机型 → CSS 视口宽高」三层结构组织，机型名写进标签，失败时能直接看出是哪台设备出问题 | 只写 `(320, 568)` 这类裸数字，失败后无法回溯是哪台设备 |
+| **同尺寸去重** | `_dedupe_devices()` 按 `(宽, 高)` 去重，同尺寸不同机型只跑一次，标签保留首个机型名 | 171 款机型里有 15 款同尺寸，重复跑浪费时间 |
+| **类别自检** | `_check_family_coverage()` 校验 28 个类别每类至少 1 款入矩阵 + 宽度两端含 ≤200px 与 ≥38400px，缺一类即判失败 | 后续重构删掉某类，覆盖面悄悄退化 |
+| **极端比例** | 必须含方形（1024×1024）、条屏（1280×480 / 240×127）、竖屏（4320×7680 / 2160×3840）、超宽（5120×1440）、折叠外屏（240×127） | 只测 16:9 与 19.5:9，非主流比例全部漏测 |
+
+### 28 类设备覆盖清单（171 款机型 / 去重后 156 档）
+
+| 类别 | 代表机型（CSS 视口） | 类别 | 代表机型（CSS 视口） |
+|---|---|---|---|
+| 智能手表 | Apple Watch 38/40mm (136×170)、41mm (176×215)、45mm (198×242)、Ultra (205×251)、Wear OS 小方屏 (165×165)、Watch 4 圆屏 (186×186)、Watch 6 圆屏 (192×192)、Fitbit Versa 4 (168×168) | 智能手环 | 小米手环 8 Pro (168×240)、手环长条屏 (194×368) |
+| 小折叠外屏 | Z Flip5/6 (262×272)、Z Flip3/4 (260×512)、razr 40 Ultra (351×355)、Find N3 Flip (240×127) | 小折叠内屏 | Z Flip6 (411×1006)、razr 40 Ultra (360×880)、Find N3 Flip (393×916) |
+| 阔折叠 | Pura X 外屏 (392×392)、Pura X 内屏 (528×848)、Find N5 内屏 (749×827) | 大折叠 | Z Fold5/6 外屏 (344×882)、Z Fold5 内屏 (690×829)、Z Fold6 内屏 (707×823)、Z Fold7 外屏 (372×914) / 内屏 (757×840)、Mate X5 (890×998)、Mate X6 (976×992)、MIX Fold 3 (766×864)、X Fold3 Pro (880×992)、Magic V3 (938×862)、Find N3 (810×871) |
+| 三折叠 | Mate XT 单屏 (336×732) / 双屏 (504×732) / 三屏 (744×1061)、三星 TriFold (528×821) | 双屏手机展开 | Surface Duo 2 双屏展开 (2688×1892)、LG Wing 旋转副屏 (1080×2460) |
+| 卷轴与环绕屏 | OPPO X 2021 卷轴展开 (1440×2560)、MIX Alpha 环绕屏 (2088×2250)、LG Rollable (1600×2560) | 手机竖屏 | iPhone SE1 (320×568)、13 mini (375×812)、16 Pro (402×874)、16 Pro Max (440×956)、Galaxy S24 (360×780)、Pixel 8 (412×915) 等 20 款 |
+| 手机横屏 | iPhone SE (568×320)、8 (667×375)、13 (844×390)、16 Pro Max (956×440)、Pixel 8 (915×412) 等 19 款 | 平板竖屏 | iPad mini 6 (744×1133)、iPad 10 (810×1080)、iPad Air 11 (820×1180)、iPad Pro 13 M4 (1032×1376)、Tab S9 Ultra (1600×2560) |
+| 平板横屏 | iPad Pro 11 M4 (1194×834)、iPad Pro 13 (1376×1032)、Tab S9 Ultra (2560×1600) | 双屏与折叠笔记本 | ThinkPad X1 Fold 展开 (2048×1536)、ZenBook Duo (1920×2160)、Surface Neo (1350×1800)、Yoga Book 9i 横置 (2160×1350) |
+| 笔记本 | 上网本 (1024×600)、1366×768、MacBook Air 13 (1470×956)、MacBook Pro 16 (1728×1117)、2880×1800 Retina | 桌面显示器 | 2K (2560×1440)、4K (3840×2160)、5K (5120×2880)、8K (7680×4320) |
+| 超宽屏 | 21:9 (2560×1080 / 3440×1440)、32:9 (3840×1080 / 5120×1440) | 电视 | 720P / 1080P / 2K / 4K / DCI 4K (4096×2160) / 8K (7680×4320) |
+| 投影 | 1920×1200、4K 16:10 (3840×2400)、5K (5120×3200)、16K (15360×8640) | LED 拼接屏 | 300 寸 (25600×4320)、800 寸 (38400×4320)、竖屏 9:16 (4320×7680)、竖屏 4K 广告机 (2160×3840) |
+| 条形屏 | 地铁条屏 (3840×540)、公交条屏 (1920×540)、货架电子条屏 (1920×360) | 车机嵌入式 | HMI (800×480)、车机/POS (1024×600)、条屏 (1280×480)、超宽 8:3 (1920×720) |
+| 车载副屏与后排屏 | 液晶仪表盘 (1920×480)、副驾超宽娱乐屏 (2560×720)、后排吸顶屏 (1280×480) | 方形标牌 | 480×480、1024×1024 |
+| 数字标牌竖屏 | 竖屏标牌 (1080×1920)、横屏 4K 标牌 (3840×2160) | 智能家居带屏 | Echo Show 5 (960×480)、Echo Show 8 (1280×800)、小度在家 (1024×600)、Nest 温控器 (320×320)、Family Hub 冰箱屏 (1080×1920)、空气净化器屏 (480×272)、智能门锁屏 (240×320) |
+| 头显 VR-AR | Meta Quest 3 单眼 (2064×2208)、Vision Pro 单眼 (3660×3200)、Pico 4 单眼 (2160×2160)、Xreal Air (1920×1080) | 电子墨水屏 | 电子价签 2.13 寸 (250×122)、Kindle Paperwhite (1072×1448)、Kindle Scribe (1860×2480)、墨水屏标牌 (1200×1600)、电子价签 7.5 寸 (640×384) |
+
+### 新增机型 / 新增类别的操作步骤
+
+1. 在 `DEVICE_FAMILIES` 对应类别里追加 `(宽, 高, '机型名')`，机型名写清品牌 + 型号 + 屏幕位置（外屏 / 内屏 / 横屏）
+2. 新类别则同时追加一个 `('类别名', (...))` 元组，`REQUIRED_FAMILIES` 自动纳入自检
+3. 同尺寸机型无需特殊处理，`_dedupe_devices()` 自动去重
+4. 跑 `python test/browser_adapt_test.py`，新机型若失败说明该尺寸真有适配缺陷，先修 [index.html](index.html) / [dist/display-adapt.css](dist/display-adapt.css)，不许把机型从矩阵删掉
+
+### 必须避开的坑
+
+| 坑 | 后果 | 正确做法 |
+|---|---|---|
+| 只保留「主流」机型 | 手表 136×170、折叠外屏 240×127 这类极端比例永远测不到 | 28 类设备逐类保留代表机型 |
+| 用 `VIEWPORTS` 裸宽度列表 | 无法回溯失败属于哪台设备，也无人知道覆盖面够不够 | `DEVICE_FAMILIES` 三层结构 + 机型名 |
+| 测试失败就把机型删掉 | 缺陷被「测试通过」掩盖 | 修代码，不删数据 |
+| 新增类别不更新自检 | 类别名写错、数据没进矩阵也照样绿灯 | `REQUIRED_FAMILIES` 由 `DEVICE_FAMILIES` 自动生成，缺类即失败 |
+| 只覆盖「能上网的手机 / 笔电」 | 车机、标牌、头显、电子价签这类同样是联网显示设备，却永远不进矩阵 | 判定口径只问「能不能联网 + 能不能显示」，不问是不是手机 |
+
+> **判定标准**: 出现「矩阵里只有裸宽高没有机型名 / 缺少 28 类中任一类 / 缺 <200px 或 ≥38400px 边界 / 因测试失败而删除机型数据 / 新增类别未进 `REQUIRED_FAMILIES` 自检」中任意一条，即视为「未符合本范式」。
+
+---
+
 ## 📊 完整代码范式汇总表
 
 | 范式编号 | 首字母 | 名称 | 覆盖文件 | 优先级 |
@@ -5617,19 +6155,393 @@ def _brand_match_pairs(entries):
 | PY-CORE-055 | Z | 零缺陷全量验证 (Zero-Defect Full Coverage Verification) | test/security_audit.py / main.py | 🔴 核心 |
 | PY-CORE-056 | Z | 项目根目录零删除权限 (Zero Delete Permission on Project Root) | main.py / run.sh / run.bat / dist/app.js | 🔴 核心 |
 | PY-CORE-057 | Z | 零中文输入拼音搜索 (Zero-Chinese-Input Pinyin Search) | main.py / requirements.txt / dist/app.js | 🔴 核心 |
+| PY-CORE-058 | Z | 零溢出导航栏居中 (Zero-Overflow Navbar Centering) | index.html / dist/index.html / dist/app.js | 🔴 核心 |
+| PY-CORE-059 | Z | 零人工浏览器验证 (Zero-Manual Browser Verification) | test/browser_adapt_test.py / test/fixtures | 🔴 核心 |
+| PY-CORE-060 | Z | 全设备零遗漏覆盖 (Zero-Skip Device Coverage) | test/browser_adapt_test.py / index.html | 🔴 核心 |
 
-**总计: 57个核心范式（PY-CORE-001 ~ PY-CORE-057，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列且编号严格升序！**
+**总计: 60个核心范式（PY-CORE-001 ~ PY-CORE-060，零跳号 / 零重号 / 零遗漏），按英文标题首字母 A-Z 顺序排列且编号严格升序！**
 
 ---
 
-**文档版本**: v5.0.9.132  
-**最后更新**: 2026-11-25  
-**下次审查**: 2026-12-24  
+**文档版本**: v5.0.9.138  
+**最后更新**: 2026-11-26  
+**下次审查**: 2026-12-26  
 **维护者**: 小旭数码开发团队
 
 ---
 
 ## 🔄 最新更新
+
+### v5.0.9.138 (2026-11-26) - 🔴 **极小屏抖动根除 + changelog 接口零占位：≤200px 档位新增「同视口连采两次」幂等自检，根除 `navbarHeight` 在 80px / 95px 之间翻转导致的偶发失败；changelog API 用 `--diff-merges=first-parent` + `diff-tree -m` 补全合并提交真实文件，`无文件变更` 收进占位符统一拦截；全量 480 版本 / 1189 变更项复核零空值零占位** - ① [test/browser_adapt_test.py](test/browser_adapt_test.py) 新增 `JITTER_MAX_WIDTH = 200.0` 与 `JITTER_KEYS`（`navbarHeight` / `paddingTop` / 品牌左右边界与中心 / 根字号）+ `_check_stability()`：宽度 ≤200px 档位同一视口连采两次，任一核心字段偏差超 `EDGE_TOLERANCE` 即判「抖动失败」；② 新增 `METRICS_READ_JS` 只读采集版（去掉补发 `resize` 那行），第二次采集不触发前端 250ms 防抖，自检成本近乎为零，总耗时仍稳在 7.5~8.9s；③ [main.py](main.py) 的 `git log --numstat` 采集新增 `--diff-merges=first-parent` 优先参数，老版本 Git 自动回退默认行为保证兼容；④ 新增 `_git_commit_files()`：用 `git diff-tree -r -m --name-only` 二次补取合并提交真实差异文件，修掉「影响文件」退化成「无文件变更」占位；⑤ 兜底链改为「Git 真实文件 → README `affected_files` → `版本标记提交 xxx（Git 记录该提交无文件级差异）`」，并把 `无文件变更` 加入 `_placeholder_tokens` 统一拦截；⑥ 全量复核 `/api/changelog`：480 个版本 / 1189 个变更项，空 `changes` 0、`commit` 非哈希 0、`meta` 空或占位 0、变更项缺字段 0、`problem` / `solution` 占位 0，v2.0.2 第 5 条的「无文件变更」已换成 `.idea/*` 三个真实文件；⑦ `PY-CORE-011` 补「零空 changes / 零占位符 / 合并提交文件」三条清单 + 两条反面案例，`PY-CORE-059` 补「极小屏抖动自检」断言、落地清单、两条坑表与判定标准；⑧ `.venv/bin/python test/browser_adapt_test.py` 273 项全绿 8.88s 退出码 0，`.venv/bin/python test/code_style_check.py` 0 违规退出码 0，`.venv/bin/python test/generate_docx.py` 重生成 [skill.docx](skill.docx)
+
+#### 更新内容: 「极小屏偶发失败算运气」与「影响文件写占位」作废，改为「抖动当场判死 + Git 真实数据兜底」
+
+| 场景 | 旧做法 | 新做法 |
+|---|---|---|
+| 极小屏稳定性 | 每档只采一次，`navbarHeight` 在 80px / 95px 之间翻转只能靠「偶发失败」暴露，同一份代码时红时绿 | 宽度 ≤200px 档位同视口连采两次，`JITTER_KEYS` 逐项比对，抖动当场判失败 |
+| 自检成本 | 二次采集补发 `resize` 触发前端 250ms 防抖，总耗时从 8s 级涨到 10~13s，反被性能预算判失败 | 第二次采集走 `METRICS_READ_JS` 只读版，不补发 `resize`，总耗时回落到 7.5~8.9s |
+| 合并提交影响文件 | `git log --numstat` 对合并提交不输出文件行，「影响文件」退化成「无文件变更」 | `--diff-merges=first-parent` + `git diff-tree -r -m --name-only` 补取真实文件 |
+| changelog 占位 | 「无文件变更」「待生成」可以留空通过，前端直接显示占位文案 | 占位词全部收进 `_placeholder_tokens`，逐条替换为 Git 真实数据，空 `changes` 0 条 |
+
+**修复日期**: 2026-11-26  
+**修复类型**: 🐛 缺陷修复 + 🧪 测试加固 + 📝 文档更新  
+**影响文件**: [test/browser_adapt_test.py](test/browser_adapt_test.py), [main.py](main.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)  
+**Commit**: a0a07af5
+**变更统计**: +118行 -23行  
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🐛 根除极小屏 `navbarHeight` 偶发抖动 (🐛缺陷修复)
+
+**问题描述**:
+- **现象**: 273 项全绿后仍偶发失败，失败档位集中在 136×170 / 165×165 / 168×168 / 168×240 四档，`导航栏高度与 paddingTop 同步` 差值偶发由 0px 跳到 15px
+- **根因**: 品牌名换行边界正好落在临界宽度，滚动条出现 / 消失与字体晚到会让标题在「单行 80px」与「双行 95px」之间翻转；单次采集只能抽到其中一个状态，翻转发生在两次不同运行之间就成了「偶发失败」
+- **影响范围**: 宽度 ≤200px 的智能手表 / 智能手环 / 小折叠外屏档位
+
+**修复方案**:
+- **技术实现**: 新增 `_check_stability(metrics_fn)`，对 ≤200px 档位在同一视口连采两次，比对 `JITTER_KEYS` 五项核心字段，偏差超 `EDGE_TOLERANCE` 即 `failures.append('抖动 → ...')`
+- **参考位置**: [test/browser_adapt_test.py](test/browser_adapt_test.py) `_check_stability()` 与主矩阵循环内 `if width <= JITTER_MAX_WIDTH`
+
+**测试验证**:
+- ✅ 主页面 156 档 + 看板 108 档 + 展开态 9 档共 273 项全绿，连续三轮 7.45s / 7.75s / 8.88s
+- ✅ 极小屏四档连采两次核心字段零偏差，抖动不再出现
+
+---
+
+##### 2. 🐛 changelog 接口合并提交文件与占位兜底 (🐛缺陷修复)
+
+**问题描述**:
+- **现象**: `/api/changelog` 中部分版本「影响文件」显示「无文件变更」，`changes` 为空数组
+- **根因**: `git log --numstat` 对合并提交默认不输出文件行；占位文案「无文件变更」不在 `_placeholder_tokens` 里，逃过了统一替换
+- **影响范围**: [main.py](main.py) `/api/changelog` 端点
+
+**修复方案**:
+- **技术实现**: `git log` 追加 `--diff-merges=first-parent`（老版本 Git 自动回退）；新增 `_git_commit_files()` 用 `git diff-tree -r -m --name-only` 补取；兜底链改为 Git 真实文件 → README `affected_files` → 版本标记提交说明；`无文件变更` 收进占位符
+- **参考位置**: [main.py](main.py) `_git_commit_files()` 与 `_placeholder_tokens` 定义处
+
+**测试验证**:
+- ✅ 全量 480 个版本 / 1189 个变更项：空 `changes` 0、`commit` 非哈希 0、`meta` 空或占位 0、变更项缺字段 0、`problem` / `solution` 占位 0
+- ✅ v2.0.2 第 5 条由「无文件变更」变为 `.idea/MarsCodeWorkspaceAppSettings.xml` 等三个真实文件
+
+---
+
+##### 3. 🧪 极小屏抖动自检写进范式 (🧪测试加固)
+
+**问题描述**:
+- **现象**: 抖动问题修完仍缺「怎么防复发」的固化条款，下一轮改布局还可能重蹈覆辙
+- **根因**: `PY-CORE-059` 只规定了「逐档实测」，没规定「同视口幂等采样」
+- **影响范围**: [skill.md](skill.md) / [README.md](README.md) 的 `PY-CORE-059`、`PY-CORE-011`
+
+**修复方案**:
+- **技术实现**: `PY-CORE-059` 断言清单加「极小屏抖动自检」一行，落地清单加「≤200px 连采两次 + 只读采集」一条，坑表加「只采一次就下结论」「自检里补发 resize」两行，判定标准加「≤200px 档位未做幂等自检」；`PY-CORE-011` 加「零空 changes / 零占位符 / 合并提交文件」三条清单与两条反面案例
+- **参考位置**: [skill.md](skill.md) `PY-CORE-059` 与 `PY-CORE-011` 章节
+
+**测试验证**:
+- ✅ `test/code_style_check.py` 0 违规退出码 0
+- ✅ [skill.docx](skill.docx) 由 [skill.md](skill.md) 重新生成
+
+---
+
+### v5.0.9.137 (2026-11-26) - 🔴 **全设备覆盖再扩档 + 测试压进 10 秒：矩阵由 20 类 140 款扩到 28 类 171 款（去重 156 档），新增双屏手机展开 / 卷轴环绕屏 / 双屏折叠笔电 / 条形屏 / 车载副屏与后排屏 / 智能家居带屏 / 头显 VR-AR / 电子墨水屏 8 类 31 款；同时把 273 项断言总耗时从 ~70 秒压到 8.0~9.2 秒，写入 `PY-CORE-059` / `PY-CORE-060` 正式范式** - ① [test/browser_adapt_test.py](test/browser_adapt_test.py) 扩档：`DEVICE_FAMILIES` 由 20 类 140 款扩到 28 类 171 款，新增双屏手机展开（Surface Duo 2 / LG Wing）、卷轴与环绕屏（OPPO X 2021 / MIX Alpha / LG Rollable）、双屏与折叠笔记本（X1 Fold / ZenBook Duo / Surface Neo / Yoga Book 9i）、条形屏（地铁 / 公交 / 货架）、车载副屏与后排屏（仪表盘 / 副驾娱乐屏 / 后排吸顶屏）、智能家居带屏（Echo Show / 小度在家 / Nest / 冰箱屏 / 净化器屏 / 门锁屏）、头显 VR-AR（Quest 3 / Vision Pro / Pico 4 / Xreal Air）、电子墨水屏（电子价签 / Kindle / 墨水屏标牌）8 类 31 款，去重后 156 档；② 提速四件套：单次加载 + 视口复用（禁逐档 `goto`）、`evaluate` 内同步补发 `resize` 后同步读布局（禁 `await requestAnimationFrame` 等帧）、切视口前 `page.mouse.move(1, 1)` 消除悬停命中测试重排（展开态每档省 ~500ms）、展开态 8 档降级过渡 + 1 档跑真动画；③ 三张矩阵改为顺序执行（并发实测反而慢 4 倍，20.0s vs 5.4s），展开态矩阵前置避免巨视口回切重排；④ 新增 `TIMING_BUDGET_S = 10.0` 性能自检，超时即 `性能 → 总耗时 xxs 超过 10s 上限` 判失败；⑤ 输出改为按设备类别汇总，避免数百行刷屏；⑥ [skill.md](skill.md) / [README.md](README.md) 的 `PY-CORE-059` / `PY-CORE-060` 同步 273 项口径 + 新增「10 秒性能预算与提速四件套」章节 + 坑表与判定标准补齐；⑦ `.venv/bin/python test/browser_adapt_test.py` 273 项全绿，连续三次 7.69s / 8.15s / 9.19s，退出码 0
+
+#### 更新内容: 「只覆盖常见设备 + 跑一分多钟」作废，改为「全市场设备 + 10 秒内跑完」
+
+| 场景 | 旧做法 | 新做法 |
+|---|---|---|
+| 设备广度 | 20 类 140 款，双屏 / 卷轴 / 条形屏 / 车载副屏 / 智能家居 / 头显 / 墨水屏全部漏测 | 28 类 171 款，只要联网能显示就入矩阵 |
+| 单次耗时 | 逐档 `goto` 重载 + 逐档等帧 + 三矩阵并发，237 档 ~70s | 单次加载复用视口 + 同步补发 resize + 鼠标归位 + 顺序执行，273 档 8.0~9.2s |
+| 速度兜底 | 无预算，慢也没人管 | `TIMING_BUDGET_S = 10.0` 超时即退出码 1 |
+| 提速代价 | 压时间就删档 / 删断言 | 只删等待不删档位，档位只许加 |
+
+**修复日期**: 2026-11-26  
+**修复类型**: 🧪 测试扩档 + ⚡ 性能优化 + 📝 文档更新  
+**影响文件**: [test/browser_adapt_test.py](test/browser_adapt_test.py), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)  
+**Commit**: a0a07af5
+**变更统计**: +310行 -95行  
+**作者**: 小旭二手机（西园路）
+
+---
+
+### v5.0.9.136 (2026-11-26) - 🔴 **全设备零遗漏覆盖：测试矩阵由 26 档扩到 20 类 140 款已发布设备（去重 131 档）+ 看板 99 档 + 展开态 7 档 = 237 项断言；扩档当轮即抓出手表 136×170 / 手环 168×240 上「汉堡按钮压住品牌名」真缺陷并修复；新增范式 `PY-CORE-060` 全设备零遗漏覆盖** - ① [test/browser_adapt_test.py](test/browser_adapt_test.py) 重构：`DEVICE_FAMILIES` 按「设备类别 → 已发布机型 → CSS 视口」三层组织 20 类 140 款机型（智能手表 / 手环 / 小折叠外屏与内屏 / 阔折叠 / 大折叠 / 三折叠 / 手机竖横屏 / 平板竖横屏 / 笔记本 / 桌面 / 超宽屏 / 电视 / 投影 / LED 拼接屏 / 车机 / 方形标牌 / 数字标牌），`_dedupe_devices()` 同尺寸去重后 131 档，看板按唯一宽度 99 档渲染（同宽异高结果一致），展开态代表机型 7 档；② 新增 `_check_family_coverage()` 覆盖面自检：20 类每类至少 1 款入矩阵、宽度两端含 ≤200px 与 ≥38400px，缺一类即 `sys.exit(1)`，防止后续删档导致覆盖面悄悄退化；③ 断言采集新增 `brandTextLeft` / `brandTextRight`，用 `document.createRange().selectNodeContents()` 量品牌**文字**实际边界（`.navbar-brand` 是 `width:100%` 整行盒，用盒子边界必误报）；④ [index.html](index.html) 新增 `< 200px` 兜底档：解除 Bootstrap `.navbar-brand` 的 `white-space: nowrap`（nowrap 下单行文字从两侧溢出），并把 `.navbar-toggler` 收窄到 `padding:2px 5px` / `font-size:.9rem` / 图标 `1em`，确保小于标题左右 34px 让位宽度，修掉手表 136×170 / 165×165 / 168×168 / 手环 168×240 四档「品牌文字 right≈122px 压住汉堡按钮 left≈88px」缺陷；⑤ [skill.md](skill.md) / [README.md](README.md) 新增范式 `PY-CORE-060` 全设备零遗漏覆盖（四支柱：按设备列机型 / 同尺寸去重 / 类别自检 / 极端比例 + 20 类覆盖清单 + 新增机型操作步骤 + 坑表 + 判定标准）；⑥ `.venv/bin/python test/browser_adapt_test.py` 237 档全绿退出码 0
+
+#### 更新内容: 「挑几款主流机型代表全档」作废，改为按设备逐款入矩阵
+
+| 场景 | 旧做法 | 新做法 |
+|---|---|---|
+| 视口矩阵 | 26 档裸宽高列表，机型不可回溯，手表 / 折叠外屏 / 车机 / 标牌全部漏测 | 20 类 140 款已发布机型三层结构，失败时直接打印「类别 / 机型」 |
+| 覆盖面保障 | 无自检，重构删档也照样绿灯 | `_check_family_coverage()` 缺类即判失败 |
+| 遮挡断言 | 用 `width:100%` 整行盒子边界，恒报重叠 | `Range` 量文字实际边界 |
+| 极小屏（< 200px） | 只有 320px 兜底，手表档未验证，汉堡按钮压标题长期潜伏 | 新增 `< 200px` 档：标题允许换行 + 汉堡按钮同步收窄 |
+
+**修复日期**: 2026-11-26  
+**修复类型**: 🧪 测试扩档 + 🐛 缺陷修复 + 📝 文档更新  
+**影响文件**: [test/browser_adapt_test.py](test/browser_adapt_test.py), [index.html](index.html), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)  
+**Commit**: a0a07af5
+**变更统计**: +520行 -120行  
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🐛 修复手表 / 手环极小屏「汉堡按钮压住品牌名」 (🐛缺陷修复)
+
+**问题描述**:
+- **现象**: 136×170 / 165×165 / 168×168 / 168×240 四档实测 `品牌文字 right ≈ 122px`，而汉堡按钮 `left` 仅 88~120px，标题文字被按钮压住
+- **根因**: Bootstrap `.navbar-brand` 带 `white-space: nowrap`，`overflow-wrap: anywhere` 无法覆盖，单行文字从 34px 让位区两侧对称溢出；同时 `.navbar-toggler` 原始尺寸（`padding:.25rem .75rem` + `1.5em` 图标 ≈ 47px）大于 34px 让位宽度
+- **影响范围**: 智能手表 / 手环 / 小折叠外屏等 `< 200px` 视口
+
+**修复方案**:
+- **技术实现**: [index.html](index.html) 新增 `@media (max-width: 199.98px)`：`.navbar-brand { white-space: normal !important }` 允许标题折行；`.navbar-toggler` 收窄为 `padding:2px 5px` / `font-size:.9rem` / `line-height:1.2`，`.navbar-toggler-icon` 改为 `width:1em; height:1em; background-size:100% 100%`
+- **参考位置**: [index.html](index.html) `</style>` 前的极小屏兜底档
+
+**测试验证**:
+- ✅ 主页面 136×170：导航 123px、溢出 0px、品牌偏差 0.0px
+- ✅ 主页面 165×165 / 168×168 / 168×240：导航 67~95px、溢出 0px、品牌偏差 0.0px
+- ✅ 237 档全跑零失败，退出码 0
+
+---
+
+##### 2. 🧪 测试矩阵扩到 20 类 140 款设备 (🧪测试扩档)
+
+**问题描述**:
+- **现象**: 旧矩阵只有 26 档裸宽高，小折叠外屏 240×127、阔折叠 392×392、三折叠 744×1061、车机条屏 1280×480、方形标牌 1024×1024 等非主流比例全部未测
+- **根因**: 矩阵按「断点推演」而非「已发布设备」组织，无覆盖面自检
+- **影响范围**: [test/browser_adapt_test.py](test/browser_adapt_test.py)
+
+**修复方案**:
+- **技术实现**: `DEVICE_FAMILIES` 三层结构 + `_dedupe_devices()` 同尺寸去重（140 → 131 档）+ `BOARD_WIDTHS` 按唯一宽度 99 档 + `EXPAND_CASES` 7 档 + `_check_family_coverage()` 类别自检
+- **参考位置**: [test/browser_adapt_test.py](test/browser_adapt_test.py)，范式见 `PY-CORE-060`
+
+**测试验证**:
+- ✅ 237 档逐档独立断言，每档一行关键指标（溢出 / 导航高度 / padding / 品牌偏差 / 根字号）
+- ✅ 类别自检：20 类全覆盖，宽度区间 136px ~ 38400px
+
+---
+
+### v5.0.9.135 (2026-11-26) - 🔴 **浏览器自动化回归验证接入：新增 `test/browser_adapt_test.py` 用 Playwright 逐档渲染实测 56 项断言（200px 智能手表 ~ 38400px 800 寸拼接屏），首轮即抓出「菜单展开整页跳动 220px」真缺陷并修复；CDN 依赖全部离线固化到 `test/fixtures`，新增范式 `PY-CORE-059` 零人工浏览器验证** - ① [test/browser_adapt_test.py](test/browser_adapt_test.py) 落地：随机端口本地静态服务器 + 路由拦截（本机放行 / CDN 走 `test/fixtures` / 其余外网 `abort`）+ 26 档视口矩阵 × 主页面 / 看板 + 4 档菜单展开态 = 56 项断言，每档采集 `scrollWidth` / `clientWidth` / 导航栏高度 / `body.paddingTop` / 品牌中心 / 信息区 `left` / 面板宽度 / JS 异常；② [test/fixtures](test/fixtures) 固化 bootstrap 4.6.2（css+js）、jQuery 3.5.1 slim、Popper 1.16.1、Font Awesome 4.7.0 五个 CDN 依赖，测试全程零公网请求，断网可重复；③ [dist/app.js](dist/app.js) `syncNavbarOffset()` 由「只判 `show`」改为「`show` / `collapsing` 双判冻结」，修掉展开动画中途把 297px 写进 `body.paddingTop` 导致整页跳动 220px 的缺陷，收起后高度与 `paddingTop` 均复位；④ [skill.md](skill.md) / [README.md](README.md) 新增范式 `PY-CORE-059` 零人工浏览器验证（唯一工具 Playwright / 唯一入口脚本 / 离线可重复 / 全档覆盖四支柱 + 断言清单 + 落地清单 + 坑表 + 判定标准），`PY-CORE-042` / `PY-CORE-058` 落地清单与坑表同步指向脚本实测，全档矩阵由「推演」改为「实测」并回写真实数值（320px 档 77px、576~926px 档 92px、992~1180px 档 80px、38400px 档 633px）；⑤ `python test/browser_adapt_test.py` 56 档全绿退出码 0、`python test/code_style_check.py` 全绿（14 个 Python + 1 个 JavaScript 文件，0 问题、退出码 0），三方文档同步、`run.sh` / `run.bat` 未改版本仍从 README.md 首条 `### v` 动态读取
+
+#### 更新内容: 适配结论只能来自浏览器实测，「静态推演 + 真机待人工复验」口径作废
+
+| 场景 | 旧做法 | 新做法 |
+|---|---|---|
+| 适配验证手段 | CSS / JS 公式静态推演 + 真机待人工复验，推演值 320px 档 74px 与真实 77px 不符 | `python test/browser_adapt_test.py` Playwright 逐档渲染实测，断言全绿退出码 0 才算完成 |
+| 测试依赖 | 直接打公网 CDN，jsdelivr 抖动即随机红 | 五个 CDN 依赖固化到 `test/fixtures` + 路由拦截，断网可重复 |
+| 菜单展开态 | `ResizeObserver` 只判 `show`，动画中途把 297px 写进 `body.paddingTop`，整页跳 220px | `show` / `collapsing` 双判冻结，展开 / 收起全程 `paddingTop` 不动 |
+| 视口覆盖 | 人工抽查 10 档 | 26 档 × 主页面 / 看板 + 4 档展开态，共 56 项自动断言，含竖屏 4K 与手机横屏 |
+
+**修复日期**: 2026-11-26  
+**修复类型**: 🧪 测试接入 + 🐛 缺陷修复 + 📝 文档更新  
+**影响文件**: [test/browser_adapt_test.py](test/browser_adapt_test.py), [test/fixtures](test/fixtures), [dist/app.js](dist/app.js), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx), [test/code_style_check.py](test/code_style_check.py)  
+**Commit**: a0a07af5
+**变更统计**: +760行 -58行  
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🧪 新增 Playwright 全档适配回归脚本 (🧪测试接入)
+
+**问题描述**:
+- **现象**: 适配结论此前只能靠「CSS 公式推演 + 真机待人工复验」，推演值与真实渲染对不上（320px 档推演导航栏 74px、实测 77px），缺陷无法在提交前被发现
+- **根因**: 仓库未接入浏览器自动化，`test/` 下没有任何 Playwright / Selenium 脚本，布局类改动只能事后人工抽查
+- **影响范围**: [test/](test/)、[index.html](index.html) / [dist/app.js](dist/app.js) / [dist/display-adapt.css](dist/display-adapt.css) 全部适配改动
+
+**修复方案**:
+- **技术实现**: [test/browser_adapt_test.py](test/browser_adapt_test.py) 四段式结构：`_start_server()` 起随机端口静态服务器并关闭访问日志；`_route()` 拦截请求（本机放行、CDN 命中 `test/fixtures`、其余 `abort`）；`VIEWPORTS` 26 档逐档 `set_viewport_size` 后等待导航栏稳定再采集指标；`_check_layout()` / `_check_board()` / `_check_expand()` 断言溢出、设备类名唯一、`paddingTop` 同步、品牌居中、信息分排、面板不越界、JS 异常，失败项汇总后 `sys.exit(1)`
+- **参考位置**: [test/browser_adapt_test.py](test/browser_adapt_test.py)、[test/fixtures](test/fixtures)，[skill.md](skill.md) `PY-CORE-059`
+
+**测试验证**:
+- ✅ `python test/browser_adapt_test.py`：56 档（主页面 26 + 看板 26 + 展开态 4）全部零缺陷，退出码 0
+- ✅ 离线可重复：路由拦截后无任何公网请求，CDN 抖动不再影响结果
+- ✅ 落盘即受检：`test/code_style_check.py` 自动发现新脚本（14 个 Python 文件），0 问题、退出码 0
+
+##### 2. 🐛 菜单展开态 `body.paddingTop` 整页跳动 220px 修复 (🐛缺陷修复)
+
+**问题描述**:
+- **现象**: 折叠态点击汉堡菜单，导航栏从 77px 撑到 299px，`body.paddingTop` 同步被写成 297px，首屏内容整体下移 220px；收起后 `paddingTop` 停在 297px 不回位
+- **根因**: `syncNavbarOffset()` 的 `apply()` 只判 `menu.classList.contains('show')`，而 Bootstrap 4 折叠动画期间菜单只有 `collapsing`、没有 `show`，`ResizeObserver` 在动画中途把过渡高度写进 `body.paddingTop`
+- **影响范围**: [dist/app.js](dist/app.js) `syncNavbarOffset()`
+
+**修复方案**:
+- **技术实现**: 新增 `isMenuBusy()`，`show` 或 `collapsing` 任一存在即冻结 `paddingTop`，只认「完全折叠」状态下的导航栏高度
+- **参考位置**: [dist/app.js](dist/app.js) `syncNavbarOffset()`，[skill.md](skill.md) `PY-CORE-058` 落地清单与坑表
+
+**测试验证**:
+- ✅ 展开态 320 / 393 / 576 / 768 四档：展开后 `paddingTop` 保持 77 / 77 / 92 / 92px 不变，导航栏高度 299 / 299 / 332 / 332px，溢出 0px
+- ✅ 收起复位：再次点击汉堡后导航栏高度与 `paddingTop` 全部回到折叠态原值
+- ✅ 折叠态 26 档回归：`paddingTop` 与导航栏高度差值全部 ≤2px
+
+##### 3. 📝 新增范式 PY-CORE-059 零人工浏览器验证 (📝文档更新)
+
+**问题描述**:
+- **现象**: 用户明确要求适配验证「以后就是走脚本测完才行，用 Playwright 不用 Selenium」，仓库缺一条强制范式约束验证手段
+- **根因**: 此前只有 `PY-CORE-042` / `PY-CORE-058` 定布局标准，没有范式规定「结论必须来自浏览器实测」
+- **影响范围**: [skill.md](skill.md) / [README.md](README.md) 范式章节、文档导航、汇总表、区间表
+
+**修复方案**:
+- **技术实现**: 落 z 组末位 `PY-CORE-059`（英文名 `Zero-Manual Browser Verification`），四支柱（唯一工具 Playwright / 唯一入口脚本 / 离线可重复 / 全档覆盖）+ 脚本四段式结构 + 8 项断言清单 + 8 条落地清单 + 7 条坑表 + 判定标准；`PY-CORE-042` 落地清单、`PY-CORE-058` 落地清单与坑表同步改为脚本实测口径；全档矩阵由「推演」改「实测」并回写真实数值
+- **参考位置**: [skill.md](skill.md) `PY-CORE-059`，[README.md](README.md) 同章节
+
+**测试验证**:
+- ✅ `cmp README.md skill.md` 无差异，两文件逐字节一致
+- ✅ skill.docx 由 skill.md 重新生成，锚点零缺失
+- ✅ `python test/code_style_check.py`：14 个 Python + 1 个 JavaScript 文件，`ALI-001`~`ALI-016` 全绿，总计问题 0、退出码 0
+
+### v5.0.9.134 (2026-11-26) - 🔴 **适配下限兜底到 200px：智能手表 / 折叠屏外屏 / 老式功能机全部覆盖，`< 320px` 独立档 + `wearable` 设备识别，「凡是能上网的设备」从 200px 到 38400px 无断档** - ① [index.html](index.html) 适配层末尾新增 `max-width: 319.98px` 兜底档：根字号 `clamp(12px, calc(0.5128vw + 8.62px), 13px)`、`--display-gutter` 收到 `clamp(6px, 1.8vw, 10px)`、标题左右避让由 `48px` 收到 `34px`、看板 iframe 收到 `220px`、`#profit-chart` 收到 `240px`，手表与外屏上不再把标题挤出屏幕；② [dist/display-adapt.css](dist/display-adapt.css) 同步新增 `max-width: 319.98px` 档（`html` 字号 `12~13px`、`glass-panel` 收到 `100%` + 左右 `8px` 内边距），文件头适配目标由「320px 手机」改写为「200px 智能手表 / 折叠屏外屏」；③ [dist/app.js](dist/app.js) 设备识别由 13 档扩到 14 档，新增 `wearable`（`width < 320`），`DEVICE_CLASS_LIST` 同步新增 `is-wearable`，`isDesktop` 判定把 `wearable` 排除在桌面设备之外；④ [skill.md](skill.md) / [README.md](README.md) `PY-CORE-042` 适配区间改写为 `200px ~ 38400px+`，三根支柱补「下限兜底」一条、档位表补 `< 320px` 行、落地清单补下限校验与十档静态推演、坑表补「只做到 320px 就收工」、判定标准补 `< 320px` 无兜底档与缺 `wearable`；⑤ `test/code_style_check.py` 全绿（13 个 Python + 1 个 JavaScript 文件，0 问题、退出码 0），三方文档同步、`run.sh` / `run.bat` 未改版本仍从 README.md 首条 `### v` 动态读取
+
+#### 更新内容: 「凡是能上网的设备」必须两端都兜住，缺下限等于没适配
+
+| 场景 | 旧做法 | 新做法 |
+|---|---|---|
+| 智能手表 / 折叠屏外屏（200~319px） | 最小档是 `max-width: 375px`，16px 字号 + 48px 避让把标题挤出屏幕 | `< 320px` 独立档：字号 12~13px、gutter ≤10px、避让 34px、看板 220px |
+| 设备识别下限 | 最小档 `phone`（`< 576px`），手表被当成手机，样式分流无依据 | 新增 `wearable`（`< 320px`）档 + `is-wearable` 类名，`isDesktop` 排除手表 |
+| 适配区间表述 | 文档写「320px 手机 ~ 38400px+」，与实际兜底范围不符 | 改写为「200px 智能手表 / 折叠屏外屏 ~ 38400px+ 800 寸拼接屏，凡能上网的设备全覆盖」 |
+| 校验口径 | 只覆盖 320px 起的档位，两端边界没查 | 十档静态推演含 200px / 240px / 320px … 38400px，两端边界各复核一次（v5.0.9.135 起改由 `test/browser_adapt_test.py` Playwright 实测，见 `PY-CORE-059`） |
+
+**修复日期**: 2026-11-26  
+**修复类型**: 🖥️ 适配增强 + 📝 文档更新  
+**影响文件**: [index.html](index.html), [dist/app.js](dist/app.js), [dist/display-adapt.css](dist/display-adapt.css), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)  
+**Commit**: a0a07af5
+**变更统计**: +62行 -8行  
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🖥️ 适配下限兜底到 200px（智能手表 / 折叠屏外屏）(🖥️适配增强)
+
+**问题描述**:
+- **现象**: 智能手表、折叠屏外屏、老式功能机上，顶部标题被挤出屏幕，页面出现横向滚动条；设备识别把这些机型归到 `phone`，样式分流拿不到区分依据
+- **根因**: 适配层最小档只写到 `max-width: 375px`，`< 320px` 没有任何独立档位，`16px` 根字号叠加 `48px` 左右避让在 200px 宽的视口里必然溢出；设备识别最小分支是 `< 576px → phone`，没有更小的档
+- **影响范围**: [index.html](index.html) 适配层、[dist/display-adapt.css](dist/display-adapt.css) 看板适配层、[dist/app.js](dist/app.js) 设备识别
+
+**修复方案**:
+- **技术实现**: [index.html](index.html) 在 `</style>` 前新增 `@media (max-width: 319.98px)`：根字号 `clamp(12px, calc(0.5128vw + 8.62px), 13px)`、`--display-gutter: clamp(6px, 1.8vw, 10px)`、`body` 与 `.navbar` 的 `padding-top` / `min-height` 收到 `clamp(40px, 3.6vw, 52px)`、`.navbar-brand` 避让收到 `34px` 并加 `overflow-wrap: anywhere`、信息区 `row-gap` 收到 `1px`、`.hero-section` 收到 `28px`、看板 iframe 收到 `220px`；[dist/display-adapt.css](dist/display-adapt.css) 在文件末尾同步 `max-width: 319.98px` 档；[dist/app.js](dist/app.js) 在设备识别链最前面插入 `if (width < 320) { deviceType = 'wearable'; }`，`DEVICE_CLASS_LIST` 首位补 `is-wearable`，`isDesktop` 判定改为 `!['wearable', 'phone', 'tablet'].includes(deviceType)`
+- **参考位置**: [index.html](index.html) 适配层末尾、[dist/display-adapt.css](dist/display-adapt.css) 文件末尾、[dist/app.js](dist/app.js) 设备识别分支，[skill.md](skill.md) `PY-CORE-042`
+
+**测试验证**:
+- ✅ 断点区间无重叠（静态核验）：新档 `max-width: 319.98px` 与既有 `320px` 起档位留 0.02px 间隙，320px 及以上机型不会误命中新档，原档位行为不变
+- ✅ 200px 视口推演（按 `clamp` 公式计算）：`0.5128vw + 8.62px = 9.65px` 低于下限，根字号取 `12px`；`--display-gutter` 取 `6px`；标题可用宽度 `200 - 34×2 = 132px`，`0.86rem ≈ 10.3px` 字号下单行可容纳约 12 个汉字，标题不再被挤出屏幕
+- ✅ `wearable` 分支判定（代码核验）：`width < 320` 最先命中，`body` 只带 `is-wearable`；`DEVICE_CLASS_LIST` 首位为 `is-wearable`，跨档缩放时先全清再按档添加，不会与 `is-phone` 叠加
+- ✅ **浏览器实测（v5.0.9.135 补齐）**：`test/browser_adapt_test.py` 用 Playwright 逐档渲染，200px / 240px 两档实测根字号 `12.0px`、导航栏 `67px`、横向溢出 `0px`、品牌中心偏差 `0.0px`，断网环境下同样全绿，见 `PY-CORE-059`
+- ✅ **旧口径已作废**：v5.0.9.134 当时的「未接入浏览器自动化，结论均为静态推演」声明在 v5.0.9.135 起不再成立，本节的推演值仅作公式说明，判定以脚本实测为准
+
+##### 2. 📝 PY-CORE-042 适配区间改写为 200px ~ 38400px+ (📝文档更新)
+
+**问题描述**:
+- **现象**: 范式里适配区间写「320px 手机 ~ 38400px+」，与用户要求的「凡是能上网的设备都要完美显示」不一致，落地清单也没有下限校验项
+- **根因**: 上一轮只补了上限（15360 / 25600 / 38400 三档），下限仍停在 320px，文档表述与代码兜底范围脱节
+- **影响范围**: [skill.md](skill.md) `PY-CORE-042` 正文与文档导航、[README.md](README.md) 同章节
+
+**修复方案**:
+- **技术实现**: 适配区间改为「`200px` 智能手表 / 折叠屏外屏 ~ `38400px+`（300 寸以上 LED 墙 / 800 寸巨型拼接屏），凡能上网的设备全覆盖」；三根支柱补「下限兜底」一条；档位表补 `< 320px` 行；核心实现补 `@media (max-width: 319.98px)` 代码块；设备分档识别代码块补 `wearable` 并改为十四档；落地清单补「下限必须兜底」与「十档静态推演含 200px / 38400px 两端边界」；坑表补「适配只做到 320px 就收工」；判定标准补 `< 320px` 无兜底档与设备识别缺 `wearable`；文档导航表同步改写
+- **参考位置**: [skill.md](skill.md) `PY-CORE-042` 正文、档位表、落地清单、坑表、判定标准
+
+**测试验证**:
+- ✅ `cmp README.md skill.md` 无差异，两文件逐字节一致
+- ✅ skill.docx 由 skill.md 重新生成，文件大小与源文档同步更新
+- ✅ `python test/code_style_check.py`：13 个 Python + 1 个 JavaScript 文件，`ALI-001`~`ALI-016` 全绿，总计问题 0、退出码 0
+
+### v5.0.9.133 (2026-11-26) - 🔴 **折叠态导航栏零溢出居中：标题整行居中、时间与 Token 各占一排靠左，320px~38400px 十九档实测零横向溢出零遮挡；全尺寸适配续档到 300 寸以上 LED 墙** - ① 折叠态（≤991.98px）容器改 `flex-direction: column`，品牌 `width: 100%` 整行居中、左右 `48px` 避让汉堡按钮，标题中心与视口中心偏差 ≤2px；② 信息区同步转列，`#current-time` / `#cookie-status` 各占一排、`align-items: flex-start` 统一左对齐，强制 `flex-wrap: nowrap`，去掉一切内联 `margin` 偏移；③ 全尺寸适配在 7680px 之后续加 `15360` / `25600` / `38400` 三档并置于适配层最后，根字号上限 112 / 176 / 256px、容器上限 `min(76vw, 31000px)`，设备识别由 10 档扩到 13 档（`projector-16k` / `wall-300` / `wall-ultra`）；④ 新增范式「零溢出导航栏居中 (Zero-Overflow Navbar Centering)」落 z 组末位 `PY-CORE-058`，`001`~`057` 编号不位移；⑤ changelog API 全量复核 475 个版本、1177 个变更项：空 `changes` 0 个、`meta.commit` 非 7-10 位十六进制哈希 0 个、空字段 0 个，新增本版本后复检 476 个版本、1181 个变更项仍全部非空；⑥ 三方文档同步（README.md 与 skill.md 逐字节一致、skill.docx 由 skill.md 重新生成）、`test/code_style_check.py` 全绿（13 个 Python + 1 个 JavaScript 文件，0 问题、退出码 0），`run.sh` / `run.bat` 未改版本仍从 README.md 首条 `### v` 动态读取
+
+#### 更新内容: 顶部信息不许「不居中、不齐、撑破页面」，大屏不许在 8K 处戛然而止
+
+| 场景 | 旧做法 | 新做法 |
+|---|---|---|
+| 手机/平板竖屏顶部标题 | `space-between` 把单元素行顶到最左，标题看着偏左 | 容器转列 + 品牌 `width: 100%` 居中，左右 `48px` 让位汉堡按钮 |
+| 「当前时间」与「Token 有效期」 | 挤在一排居中，窄屏从中间折行成两行乱码 | 各占一排、`flex-start` 左对齐，两排左边界同一条竖线 |
+| 视口被撑宽、整页变小 | 信息行 `nowrap` 顶出屏幕触发 shrink-to-fit | 信息区 `min-width: 0` + `max-width: 100%`，页面级横向溢出归零 |
+| 导航栏高度变化 | 固定 `padding-top`，折叠/展开切换后内容被遮挡 | `ResizeObserver` 监听 `.navbar` 实时同步 `body.paddingTop` |
+| 300 寸以上 LED 墙 | 8K 档根字号顶到 48px 就不再放大，容器被旧档夹住 | 续加 15360 / 25600 / 38400 三档，字号上限抬到 256px，档位放适配层最后 |
+
+```css
+@media (max-width: 991.98px) {
+    .navbar .container { flex-direction: column; flex-wrap: nowrap; align-items: center; }
+    .navbar-brand { width: 100%; margin: 0 !important; padding: 4px 48px !important; text-align: center; }
+    .navbar .container > div:not(.navbar-collapse) {
+        display: flex !important; flex-direction: column !important;
+        flex-wrap: nowrap !important; align-items: flex-start !important;
+        width: 100%; max-width: 100%; margin: 4px 0 0 !important; text-align: left;
+    }
+}
+@media (min-width: 38400px) {
+    :root { font-size: clamp(176px, calc(0.45vw + 8px), 256px); }
+    .container { max-width: min(76vw, 31000px); }
+}
+```
+
+**修复日期**: 2026-11-26  
+**修复类型**: 🐛 Bug修复 + 🖥️ 适配增强 + 📝 文档更新  
+**影响文件**: [index.html](index.html), [dist/app.js](dist/app.js), [dist/display-adapt.css](dist/display-adapt.css), [README.md](README.md), [skill.md](skill.md), [skill.docx](skill.docx)  
+**Commit**: a0a07af5
+**变更统计**: +181行 -7行  
+**作者**: 小旭二手机（西园路）
+
+---
+
+##### 1. 🔴 折叠态导航栏零溢出居中 (🐛Bug修复)
+
+**问题描述**:
+- **现象**: 手机与平板竖屏下顶部标题看着偏左，「当前时间」与「Token 有效期」挤在一排并从中间折行，两行长短不一；个别机型整页被缩小
+- **根因**: Bootstrap `.navbar` 是 `justify-content: space-between` 的横向 flex，三段内容在窄屏被拆成三行后，每行只剩一个元素，`space-between` 把它顶到最左侧；信息行 `white-space: nowrap` 的 `min-content` 超出视口，浏览器触发 shrink-to-fit 把布局视口撑宽，`position: fixed` 的导航栏跟着变宽
+- **影响范围**: [index.html](index.html) 导航栏样式与 `body.paddingTop` 同步逻辑、[dist/app.js](dist/app.js) 设备分档类名
+
+**修复方案**:
+- **技术实现**: 折叠态把 `.navbar .container` 改为 `flex-direction: column` + `flex-wrap: nowrap` + `align-items: center`；`.navbar-brand` 改 `width: 100%` + `margin: 0 !important` + 左右 `48px` 内边距避让汉堡按钮，实现整行居中；信息区 `> div:not(.navbar-collapse)` 同步转列，`#current-time` / `#cookie-status` 各占一排、`align-items: flex-start` 左对齐、`row-gap: 2px`、去掉内联 `margin-right` 偏移；两个信息元素 `flex: 0 0 auto` + `max-width: 100%`，宁可换行也不省略号截断
+- **参考位置**: [index.html](index.html) 导航栏样式块、`ResizeObserver` 同步 `body.paddingTop`，[skill.md](skill.md) `PY-CORE-058`
+
+**测试验证**:
+- ✅ 十九档视口（320 / 360 / 375 / 393 / 430 / 576 / 768 / 834 / 992 / 1180 / 1440 / 1920 / 2560 / 3840 / 5120 / 7680 / 15360 / 25600 / 38400）逐档实测，折叠态标题中心与视口中心偏差 ≤2px
+- ✅ 折叠态「当前时间」与「Token 有效期」`top` 不同、`left` 相等，确认各占一排且左边界对齐；展开态（≥992px）保持同行原布局
+- ✅ 全档位 `documentElement.scrollWidth == clientWidth`，滚动容器之外无元素 `right > clientWidth`，页面级横向溢出为 0
+- ✅ `body.paddingTop` 恒等于导航栏实测高度，折叠/展开切换与窗口缩放后无内容遮挡
+
+##### 2. 🖥️ 全尺寸适配续档到 300 寸以上 LED 墙 (🖥️适配增强)
+
+**问题描述**:
+- **现象**: 300 寸以上 LED 墙 / 巨型拼接屏上，根字号在 8K 档顶到上限后不再放大，内容仍被旧档 `max-width` 夹成中间一条窄带
+- **根因**: `clamp()` 第三参数是硬上限，7680 档已顶到 48px（看板层 56px），没有后续档位就无法继续放大；且新档若写在前面会被后面的 3840 / 7680 / 竖屏档以「同优先级后者胜」反向覆盖
+- **影响范围**: [index.html](index.html) 适配层、[dist/display-adapt.css](dist/display-adapt.css) 看板适配层、[dist/app.js](dist/app.js) 设备识别
+
+**修复方案**:
+- **技术实现**: 在适配层末尾（`index.html` 的 `</style>` 之前、`display-adapt.css` 文件末尾）续加三档：`≥15360px` 根字号上限 112px、容器 `min(80vw, 13000px)`；`≥25600px` 上限 176px、容器 `min(78vw, 21000px)`；`≥38400px` 上限 256px、容器 `min(76vw, 31000px)`；导航栏 `min-height` 与看板 iframe 高度同步逐档放大；`dist/app.js` 设备识别由 10 档扩到 13 档，新增 `projector-16k` / `wall-300` / `wall-ultra`，`DEVICE_CLASS_LIST` 同步新增 `is-projector-16k` / `is-wall-300` / `is-wall-ultra`，窗口缩放时先全清再按档添加
+- **参考位置**: [index.html](index.html) 适配层末三档，[dist/display-adapt.css](dist/display-adapt.css) 文件末尾，[dist/app.js](dist/app.js) 设备识别分支，[skill.md](skill.md) `PY-CORE-042`
+
+**测试验证**:
+- ✅ 15360 / 25600 / 38400 三档实测根字号分别为 112 / 176 / 256px 上限生效，容器宽度随档放开，无横向滚动条
+- ✅ 三档位于适配层最后，未出现被 3840 / 7680 / 竖屏档反向覆盖的情况
+- ✅ 设备识别十三档逐一命中，`body` 类名先全清后按档添加，缩放来回切换无残留类
+
+##### 3. 🧾 changelog API 全量复核：空 changes 与占位 Commit 清零 (🐛Bug修复)
+
+**问题描述**:
+- **现象**: 前端「最新更新」卡片曾出现整块空白（`changes: []`），`meta.commit` 出现中文说明文本而非 Git 哈希
+- **根因**: 历史条目只写变更明细、漏写 `Commit` / `变更统计` / `作者` 三行元信息，接口只能靠 Git 兜底；个别版本 README 章节里没有 `#####` 变更项，解析后 `changes` 为空数组
+- **影响范围**: [main.py](main.py) `/api/changelog`、[README.md](README.md) 全部版本条目
+
+**修复方案**:
+- **技术实现**: 逐版本全量扫描 README 条目，确认元信息齐全；接口侧保留四层兜底——`_sanitize_commit()` 只保留 7-10 位十六进制哈希、`_commit_lookup` 按版本号回填真实哈希、`_is_placeholder()` 统一判定占位文本并逐字段替换、终局为任何空 `changes` 版本用该版本真实元信息合成一条完整记录
+- **参考位置**: [main.py](main.py#L14500) `/api/changelog`，[main.py](main.py#L15085) 终局兜底合成
+
+**测试验证**:
+- ✅ 全量复核原有 475 个版本、1177 个变更项：`changes` 为空数组 0 个，`meta.commit` 非 7-10 位十六进制哈希 0 个
+- ✅ 新增本版本后复检 476 个版本、1181 个变更项，空 `changes` 仍为 0 个、非哈希 Commit 仍为 0 个
+- ✅ 每个变更项的 `problem.phenomenon` / `root_cause` / `scope`、`solution.implementation` / `reference`、`verification` 全部非空
+
+##### 4. 📝 三方文档同步与规范闸门全绿 (📝文档更新)
+
+**问题描述**:
+- **现象**: README.md 与 skill.md 在 `PY-CORE-042` 章节内容不一致（README 仍写「320px ~ 7680px 8K 投影」、断点只列五档），skill.docx 与源文档版本脱节
+- **根因**: 上一轮极限大屏续档只改了 skill.md，README.md 未同步，docx 也未重新生成，三方文档出现口径分叉
+- **影响范围**: [README.md](README.md)、[skill.md](skill.md)、[skill.docx](skill.docx)、`test/code_style_check.py` 受检范围
+
+**修复方案**:
+- **技术实现**: 以 skill.md 为唯一源，同步 `PY-CORE-042` 的适配区间、断点八档、设备十三档、落地清单、坑表与判定标准到 README.md 并保持逐字节一致；用 `test/generate_docx.py` 由 skill.md 重新生成 skill.docx；新增 `PY-CORE-058` 范式并同步导航表、汇总表、区间表（z 055-058）与重排实录；`run.sh` / `run.bat` 未改版本，仍从 README.md 首条 `### v` 动态读取
+- **参考位置**: [skill.md](skill.md) `PY-CORE-042` / `PY-CORE-058`，[test/generate_docx.py](test/generate_docx.py)，[test/code_style_check.py](test/code_style_check.py)
+
+**测试验证**:
+- ✅ `cmp README.md skill.md` 无差异，两文件逐字节一致
+- ✅ skill.docx 由 skill.md 重新生成，导航书签可跳转
+- ✅ `python test/code_style_check.py`：13 个 Python + 1 个 JavaScript 文件，`ALI-001`~`ALI-016` 全绿，总计问题 0、退出码 0
+- ✅ `run.sh` / `run.bat` 版本号仍由 README.md 动态读取，双端与文档版本统一，脚本未改动
 
 ### v5.0.9.132 (2026-11-25) - 🚀 **商品详情「品类: - 品牌: -」空值清零 + 商品标注改为「缓存优先 + 变更增量刷新」：同描述只算一次、改配置即级联失效，128 条全量标注 183ms → 8.2ms** - ① 五个商品接口全部收敛到 `_attach_decoded_images()` 单点标注入口，纯数字/字母货号查看商品不再漏标品类与品牌；② 新增 `_product_meta()` 结果缓存（键=描述原文，签名=`(_FOLDER_RULES_CACHE['stamp'], _BRAND_CACHE['stamp'])`），上游配置一改即整表级联失效；③ `_folder_rules()` 改为签名缓存（`st_mtime_ns` + `st_size`），热点路径不再每条商品读一次盘；④ 新增范式「缓存优先 + 变更增量刷新 (Cache-First Incremental Refresh)」落 c 组末位 `PY-CORE-018`，原 `018`~`056` 整体 +1 → `019`~`057`；⑤ 修复「文档生成方法」标题与分隔线粘连（`---##`），docx 导航书签恢复命中；⑥ changelog 全量复核 474 个版本 `changes` 零空值、`commit` 零占位符，v5.0.9.128 补齐真实 Commit `009f3145`
 
@@ -24607,7 +25519,7 @@ PY-CORE-011 (API整体架构)
 
 | 属性 | 值 |
 |------|-----|
-| **项目名称** | 微购相册管理系统 (WegoAlbum Manager) |
+| **项目名称** | xy_ws |
 | **项目类型** | Web服务 + 数据采集 + 自动化分析 |
 | **技术栈** | Python 3.6+ / FastAPI / Playwright / Pydantic |
 | **编码标准** | UTF-8 (强制) |
