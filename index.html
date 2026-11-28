@@ -1362,7 +1362,7 @@
 
             .func-btn-container {
                 display: flex;
-                flex-wrap: nowrap;
+                flex-wrap: wrap;
                 gap: 5px;
                 padding: 0 10px;
             }
@@ -1373,6 +1373,8 @@
                 font-size: 11px;
                 padding: 0 5px;
                 margin: 0;
+                width: auto;
+                flex: 0 1 auto;
             }
 
             .footer {
@@ -1398,7 +1400,7 @@
 
             .func-btn-container {
                 display: flex;
-                flex-wrap: nowrap;
+                flex-wrap: wrap;
                 gap: 5px;
                 padding: 0 10px;
             }
@@ -1409,6 +1411,8 @@
                 font-size: 11px;
                 padding: 0 5px;
                 margin: 0;
+                width: auto;
+                flex: 0 1 auto;
             }
 
             #output-panel {
@@ -1663,11 +1667,12 @@
             }
         }
         /* ============================================================
-           全尺寸显示适配（手机 320px → 300 寸投影 / 8K 大屏）
+           全尺寸显示适配（200px 智能手表 → 38400px+ 800 寸巨型拼接屏）
            ============================================================
            适配策略：
+           0) 下限兜底：< 320px（手表 / 折叠屏外屏）单独一档，字号与留白同步收窄；
            1) 根字号随视口流体缩放，全站 rem 尺寸等比放大；
-           2) 容器宽度按 FHD / 2K / 4K / 8K 逐档放开，大屏不再「居中窄带」；
+           2) 容器宽度按 FHD / 2K / 4K / 8K / 16K / 300 寸逐档放开，大屏不再「居中窄带」；
            3) 看板 iframe 高度按档位抬升，投影仪上一屏展示完整看板；
            4) 超宽屏 / 超短横屏 / 竖屏大屏各有独立档位，任何比例无横向滚动。
            ============================================================ */
@@ -1781,6 +1786,171 @@
         @media (orientation: portrait) and (min-width: 1080px) {
             :root { font-size: clamp(20px, calc(1.1vw + 6px), 52px); }
             #weather iframe { height: clamp(900px, 60vh, 2000px); }
+        }
+
+        /* ============================================================
+           极限大屏档位（8K 以上）：16K 拼接墙 / 300 寸以上 LED 墙 / 巨型广告机
+           必须放在适配层最后，保证优先级压过上面的 3840 / 7680 / 竖屏 / 超短屏档位：
+           1) 8K 档根字号已顶到 48px 上限，再往上不加档就会「字不再放大」；
+           2) 容器上限继续放开，否则 300 寸屏上内容又变回中间窄带；
+           3) 导航栏高度、看板 iframe、左右留白同步放大，远距离观看才看得清。
+           ============================================================ */
+        @media (min-width: 15360px) {
+            :root {
+                font-size: clamp(56px, calc(0.4vw + 12px), 112px);
+                --display-gutter: clamp(72px, 1.4vw, 240px);
+            }
+            .container { max-width: min(80vw, 13000px); }
+            .navbar { min-height: clamp(112px, 1.2vw, 200px); }
+            #weather iframe { height: clamp(2000px, 72vh, 3600px); }
+        }
+        @media (min-width: 25600px) {
+            :root {
+                font-size: clamp(112px, calc(0.42vw + 12px), 176px);
+                --display-gutter: clamp(240px, 1.2vw, 400px);
+            }
+            .container { max-width: min(78vw, 21000px); }
+            .navbar { min-height: clamp(200px, 1.1vw, 320px); }
+            #weather iframe { height: clamp(3200px, 74vh, 6000px); }
+        }
+        @media (min-width: 38400px) {
+            :root {
+                font-size: clamp(176px, calc(0.45vw + 8px), 256px);
+                --display-gutter: clamp(400px, 1.1vw, 560px);
+            }
+            .container { max-width: min(76vw, 31000px); }
+            .navbar { min-height: clamp(320px, 1vw, 440px); }
+            #weather iframe { height: clamp(4800px, 76vh, 9000px); }
+        }
+
+        /* 导航栏信息区：占满中间剩余宽度并居中，空间不足时换行，禁止撑破页面 */
+        .navbar .container > div:not(.navbar-collapse) {
+            flex: 1 1 auto;
+            min-width: 0;
+            justify-content: center;
+            flex-wrap: wrap;
+            column-gap: 8px;
+            row-gap: 2px;
+        }
+
+        #current-time,
+        #cookie-status {
+            flex: 0 0 auto;
+            max-width: 100%;
+        }
+
+        /* 折叠态导航栏（≤991.98px：手机 / 平板 / 手机横屏）：标题整行居中，时间与 Token 各占一行靠左，菜单按钮固定在右上角 */
+        @media (max-width: 991.98px) {
+            .navbar {
+                min-height: 0 !important;
+                padding: 6px 10px !important;
+            }
+            .navbar .container {
+                position: relative;
+                flex-direction: column;
+                flex-wrap: nowrap;
+                align-items: center;
+                justify-content: center;
+                padding: 0 !important;
+                text-align: center;
+            }
+            .navbar-brand {
+                box-sizing: border-box;
+                display: block;
+                width: 100%;
+                max-width: 100%;
+                margin: 0 !important;
+                padding: 4px 48px !important;
+                text-align: center;
+            }
+            .navbar .container > div:not(.navbar-collapse) {
+                box-sizing: border-box;
+                display: flex !important;
+                flex-direction: column !important;
+                flex-wrap: nowrap !important;
+                align-items: flex-start !important;
+                justify-content: flex-start !important;
+                width: 100%;
+                max-width: 100%;
+                margin: 4px 0 0 !important;
+                row-gap: 2px;
+                text-align: left;
+            }
+            #current-time,
+            #cookie-status {
+                flex: 0 0 auto;
+                margin-right: 0 !important;
+                text-align: left;
+                white-space: normal !important;
+                overflow: visible !important;
+                text-overflow: clip !important;
+            }
+            .navbar-toggler {
+                position: absolute;
+                top: 0;
+                right: 0;
+                margin: 0 !important;
+            }
+            .navbar-collapse {
+                flex: 0 0 auto !important;
+                width: 100%;
+                text-align: left;
+            }
+        }
+
+        /* 超小屏兜底档（< 320px：智能手表 / 折叠屏外屏 / 老式功能机）：字号与留白同步收窄，任何能上网的设备都不许横向溢出 */
+        @media (max-width: 319.98px) {
+            :root {
+                font-size: clamp(12px, calc(0.5128vw + 8.62px), 13px);
+                --display-gutter: clamp(6px, 1.8vw, 10px);
+            }
+            body {
+                padding-top: clamp(40px, 3.6vw, 52px);
+            }
+            .navbar {
+                min-height: clamp(40px, 3.6vw, 52px);
+            }
+            .navbar-brand {
+                padding: 2px 34px !important;
+                font-size: 0.86rem !important;
+                line-height: 1.25 !important;
+                overflow-wrap: anywhere;
+            }
+            .navbar .container > div:not(.navbar-collapse) {
+                row-gap: 1px;
+                font-size: 0.78rem;
+            }
+            .container {
+                max-width: 100%;
+            }
+            .hero-section {
+                padding: 28px 0;
+            }
+            #weather iframe {
+                height: 220px;
+            }
+            #profit-chart {
+                height: 240px !important;
+            }
+        }
+
+        /* 极小屏兜底档（< 200px：智能手表 / 手环 / 折叠屏外屏）：汉堡按钮同步收窄，
+           必须小于标题左右 34px 的让位宽度；标题解除 Bootstrap 的 white-space: nowrap，
+           否则单行文字会从两侧溢出并压住汉堡按钮 */
+        @media (max-width: 199.98px) {
+            .navbar-brand {
+                white-space: normal !important;
+            }
+            .navbar-toggler {
+                padding: 2px 5px !important;
+                font-size: 0.9rem !important;
+                line-height: 1.2 !important;
+            }
+            .navbar-toggler-icon {
+                width: 1em;
+                height: 1em;
+                background-size: 100% 100%;
+            }
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
@@ -2056,7 +2226,10 @@ xy_ws/
 │   ├── bench_prefetch.py        <span style="color: #909399;"># 相册首包耗时基准测试</span>
 │   ├── diag_hedge.py            <span style="color: #909399;"># 对冲请求延迟诊断</span>
 │   ├── diag_lanes.py            <span style="color: #909399;"># 多路并发延迟分布诊断</span>
-│   └── diag_fallback.py         <span style="color: #909399;"># 预热失败兜底路径诊断</span>
+│   ├── diag_fallback.py         <span style="color: #909399;"># 预热失败兜底路径诊断</span>
+│   ├── code_style_check.py      <span style="color: #909399;"># 阿里规范常驻闸门（全量 .py 自动发现）</span>
+│   ├── browser_adapt_test.py    <span style="color: #909399;"># 浏览器自动化适配回归（Playwright 56 档实测）</span>
+│   └── fixtures/                <span style="color: #909399;"># 测试离线固化资源（bootstrap / jquery / popper / font-awesome）</span>
 ├── temp/                        <span style="color: #409EFF;">📁 临时脚本目录（验证后即清空）</span>
 ├── tools/                       <span style="color: #409EFF;">📁 本地化工具链</span>
 │   ├── playwright/              <span style="color: #909399;"># 内置 Chromium 浏览器</span>
@@ -2256,6 +2429,6 @@ xy_ws/
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js"></script>
 
     <!-- 主应用脚本（已提取并优化） -->
-    <script src="./dist/app.js?v=20261125130500"></script>
+    <script src="./dist/app.js?v=20261126180000"></script>
 </body>
 </html>

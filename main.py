@@ -14645,11 +14645,45 @@ if __name__ == '__main__':
                 readme_version_map = {entry['version']: entry for entry in changelog}
                 readme_versions_used = set()
                 merged_changelog = []
+
+                def _git_commit_files(commit_hash):
+                    """补取某次提交的真实差异文件：合并提交在 `git log --numstat` 下不输出文件行，
+                    这里用 `diff-tree -m` 按父提交逐个比对拿回真实文件名，避免「影响文件」退化成占位文案"""
+                    if not commit_hash:
+                        return ''
+                    try:
+                        proc = subprocess.run(
+                            ['git', '-c', 'core.quotepath=false', 'diff-tree', '-r', '-m',
+                             '--no-commit-id', '--name-only', commit_hash],
+                            capture_output=True, text=True, timeout=TIMEOUT_CONFIG['subprocess_kill'],
+                            cwd=PROJECT_DIR
+                        )
+                        if proc.returncode == 0:
+                            names = list(dict.fromkeys(n.strip() for n in proc.stdout.splitlines() if n.strip()))
+                            if names:
+                                shown = ', '.join(f'[{f}]({f})' for f in names[:10])
+                                return shown if len(names) <= 10 else f'{shown} 等{len(names)}个文件'
+                    except (subprocess.SubprocessError, OSError) as e:  # [HANDLED]
+                        logger.debug(f'[api_changelog] diff-tree 读取提交 {commit_hash} 的文件失败: {e}')
+                    return ''
+
                 try:
-                    git_log_output = subprocess.check_output(
-                        ['git', '-c', 'core.quotepath=false', 'log', '--numstat', '--pretty=format:COMMITSEP|%H|%ad|%s', '--date=short'],
-                        cwd=PROJECT_DIR, text=True, encoding='utf-8', stderr=subprocess.DEVNULL
-                    ).strip()
+                    # 合并提交在默认的 `git log --numstat` 下不输出任何文件差异，
+                    # 会让「影响文件」退化成占位文案。`--diff-merges=first-parent`
+                    # 只对合并提交补出「相对第一父」的真实差异，普通提交输出不变；
+                    # 老版本 Git（<2.31）不认识该参数，回退到默认行为保证不崩
+                    git_log_base = ['git', '-c', 'core.quotepath=false', 'log', '--numstat',
+                                    '--pretty=format:COMMITSEP|%H|%ad|%s', '--date=short']
+                    try:
+                        git_log_output = subprocess.check_output(
+                            git_log_base + ['--diff-merges=first-parent'],
+                            cwd=PROJECT_DIR, text=True, encoding='utf-8', stderr=subprocess.DEVNULL
+                        ).strip()
+                    except subprocess.CalledProcessError:
+                        git_log_output = subprocess.check_output(
+                            git_log_base,
+                            cwd=PROJECT_DIR, text=True, encoding='utf-8', stderr=subprocess.DEVNULL
+                        ).strip()
                     if git_log_output:
                         git_commits = []
                         cur_hash = cur_date = cur_msg = None
@@ -14734,7 +14768,11 @@ if __name__ == '__main__':
                             if len(commit_files) > 10:
                                 file_list_str += f' 等{len(commit_files)}个文件'
                             if not file_list_str:
-                                file_list_str = '无文件变更'
+                                file_list_str = _git_commit_files(commit_hash)
+                            if not file_list_str:
+                                file_list_str = (readme_version_map.get(version_key) or {}).get('meta', {}).get('affected_files', '')
+                            if not file_list_str:
+                                file_list_str = f'版本标记提交 {short_hash}（Git 记录该提交无文件级差异）'
                             stats_str = f'+{total_add}行 -{total_del}行' if (total_add or total_del) else '二进制文件变更'
                             if version_key in readme_version_map and version_key not in readme_versions_used:
                                 readme_versions_used.add(version_key)
@@ -14881,7 +14919,7 @@ if __name__ == '__main__':
 
                 _placeholder_tokens = (
                     '', '待生成', '待补充', '待完善', 'TBD', 'N/A', 'None', 'null',
-                    '详见Git提交记录及commit message', '无文件变更记录', '详见Git提交记录'
+                    '详见Git提交记录及commit message', '无文件变更记录', '无文件变更', '详见Git提交记录'
                 )
 
                 def _clean_value(value):

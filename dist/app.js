@@ -217,8 +217,10 @@
                 'mobile': /mobile|android|iphone|ipad|ipod/i.test(ua)
             };
             
-            // 根据屏幕宽度判断设备类型（覆盖 320px 手机 ~ 300 寸投影 / 8K 大屏）
-            if (width < 576) {
+            // 根据屏幕宽度判断设备类型（覆盖 200px 智能手表 ~ 38400px+ 800 寸巨型拼接屏）
+            if (width < 320) {
+                deviceType = 'wearable';
+            } else if (width < 576) {
                 deviceType = 'phone';
             } else if (width < 768) {
                 deviceType = 'tablet';
@@ -236,8 +238,14 @@
                 deviceType = 'projector-4k';
             } else if (width < 7680) {
                 deviceType = 'projector-5k';
-            } else {
+            } else if (width < 15360) {
                 deviceType = 'projector-8k';
+            } else if (width < 25600) {
+                deviceType = 'projector-16k';
+            } else if (width < 38400) {
+                deviceType = 'wall-300';
+            } else {
+                deviceType = 'wall-ultra';
             }
             
             // 组装设备信息
@@ -265,7 +273,7 @@
                 isMobile: mobileDevices.mobile,
                 isPhone: deviceType === 'phone',
                 isTablet: deviceType === 'tablet',
-                isDesktop: !['phone', 'tablet'].includes(deviceType),
+                isDesktop: !['wearable', 'phone', 'tablet'].includes(deviceType),
                 width: width,
                 height: height,
                 info: deviceInfo,
@@ -276,8 +284,9 @@
         
         // 设备类型样式类清单：窗口跨档缩放时必须先全部移除，避免旧类残留叠加
         const DEVICE_CLASS_LIST = [
-            'is-phone', 'is-tablet', 'is-laptop', 'is-desktop', 'is-large-desktop',
+            'is-wearable', 'is-phone', 'is-tablet', 'is-laptop', 'is-desktop', 'is-large-desktop',
             'is-tv', 'is-large-tv', 'is-projector-4k', 'is-projector-5k', 'is-projector-8k',
+            'is-projector-16k', 'is-wall-300', 'is-wall-ultra',
             'is-mobile', 'is-desktop-device', 'is-large-screen', 'is-ultrawide'
         ];
 
@@ -303,9 +312,11 @@
             return device;
         }
         
-        // 监听窗口大小变化
+        // 监听窗口大小变化：先立即应用一次（拖动窗口 / 旋转屏幕时设备样式实时跟随，
+        // 不再等 250ms），再用防抖兜底一次（部分环境 resize 事件稀疏，保证最终态一定被应用）
         let resizeTimeout;
         window.addEventListener('resize', function() {
+            applyDeviceStyles();
             clearTimeout(resizeTimeout);
             resizeTimeout = setTimeout(function() {
                 applyDeviceStyles();
@@ -1873,6 +1884,27 @@
                     }
                 });
             const device = applyDeviceStyles();
+
+            (function syncNavbarOffset() {
+                const nav = document.querySelector('.navbar');
+                if (!nav) return;
+                const menu = document.getElementById('navbarNav');
+                // 菜单展开 / 收起动画期间导航栏高度在变化，此时必须冻结 paddingTop，
+                // 只认「完全折叠」状态下的高度，避免整页跟着动画上下跳动
+                function isMenuBusy() {
+                    return !!menu && (menu.classList.contains('show') || menu.classList.contains('collapsing'));
+                }
+                function apply() {
+                    if (isMenuBusy()) return;
+                    document.body.style.paddingTop = nav.offsetHeight + 'px';
+                }
+                apply();
+                window.addEventListener('load', apply);
+                window.addEventListener('resize', apply);
+                if (window.ResizeObserver) {
+                    new ResizeObserver(apply).observe(nav);
+                }
+            })();
             
             function detectSystem() {
                 const userAgent = navigator.userAgent;

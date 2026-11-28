@@ -33,7 +33,7 @@ PROJECT_DIR = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 README = PROJECT_DIR / 'README.md'
 
 PY_REQUIRED = ['main.py', 'config/crypto_tool.py', 'test/generate_docx.py', 'test/security_audit.py',
-               'test/code_style_check.py']
+               'test/code_style_check.py', 'test/browser_adapt_test.py']
 PY_EXCLUDE_DIRS = {'.git', '.venv', '.idea', 'node_modules', 'tools', 'temp', 'file'}
 JS_TARGETS = ['dist/app.js']
 

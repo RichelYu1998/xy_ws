@@ -1,8 +1,10 @@
 /* ==========================================================================
    全尺寸显示适配层（dist 天气时钟看板）
    ==========================================================================
-   适配目标：320px 手机 ~ 300 寸投影（3840px 4K / 7680px 8K）
-   适配设备：手机 / 平板 / 笔记本 / 桌面显示器 / 电视 / 投影仪 / 超宽屏
+   适配目标：200px 智能手表 / 折叠屏外屏 ~ 38400px+ 300 寸以上 LED 墙 / 巨型拼接屏
+             （4K 3840 / 8K 7680 / 16K 15360 / 25600 / 38400px+）
+   适配设备：智能手表 / 折叠屏外屏 / 老式功能机 / 手机 / 平板 / 笔记本 / 桌面显示器 /
+             电视 / 投影仪 / 超宽屏 / LED 拼接墙 —— 凡是能上网的设备全部覆盖
    核心策略：
    1) 根字号随视口流体缩放（clamp），Tailwind 的 rem 尺寸整体等比放大，
       小屏不缩水、大屏不显得「字小如蚁」；
@@ -100,5 +102,55 @@ body {
 @media (max-height: 480px) and (orientation: landscape) {
   html {
     font-size: 14px;
+  }
+}
+
+/* ==========================================================================
+   极限大屏档位（8K 以上）：16K 拼接墙 / 300 寸以上 LED 墙 / 巨型广告机
+   必须放在文件末尾，保证压过上面所有档位（含竖屏大屏档与超宽屏档）：
+   1) 8K 档根字号已顶到 56px 上限，再往上不加档，屏幕再大文字也不再放大；
+   2) glass-panel 上限继续放开，否则 300 寸屏上内容又缩回中间窄带；
+   3) 远距离观看需要更大字号，字号上限随档位逐级抬升。
+   ========================================================================== */
+@media (min-width: 15360px) {
+  html {
+    font-size: clamp(56px, calc(0.4vw + 12px), 112px);
+  }
+
+  .glass-panel {
+    max-width: min(80vw, 13000px) !important;
+  }
+}
+
+@media (min-width: 25600px) {
+  html {
+    font-size: clamp(112px, calc(0.42vw + 12px), 176px);
+  }
+
+  .glass-panel {
+    max-width: min(78vw, 21000px) !important;
+  }
+}
+
+@media (min-width: 38400px) {
+  html {
+    font-size: clamp(176px, calc(0.45vw + 8px), 256px);
+  }
+
+  .glass-panel {
+    max-width: min(76vw, 31000px) !important;
+  }
+}
+
+/* 超小屏兜底档（< 320px：智能手表 / 折叠屏外屏 / 老式功能机）：字号收窄，任何能上网的设备都不许横向溢出 */
+@media (max-width: 319.98px) {
+  html {
+    font-size: clamp(12px, calc(0.62vw + 6.4px), 13px);
+  }
+
+  .glass-panel {
+    max-width: 100% !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
   }
 }
